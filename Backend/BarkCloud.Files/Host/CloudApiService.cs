@@ -1,9 +1,12 @@
 using BarkCloud.Files.Features.Cloud.AttachFile;
+using BarkCloud.Files.Features.Cloud.CopyFileEntry;
 using BarkCloud.Files.Features.Cloud.CreateDirectory;
 using BarkCloud.Files.Features.Cloud.DeleteDirectory;
 using BarkCloud.Files.Features.Cloud.DeleteFileEntry;
 using BarkCloud.Files.Features.Cloud.GetPath;
 using BarkCloud.Files.Features.Cloud.ListDirectory;
+using BarkCloud.Files.Features.Cloud.ListDirectoryDetailed;
+using BarkCloud.Files.Features.Cloud.ListUserImages;
 using BarkCloud.Files.Features.Cloud.MoveDirectory;
 using BarkCloud.Files.Features.Cloud.MoveFileEntry;
 using BarkCloud.Files.Features.Cloud.RenameDirectory;
@@ -88,6 +91,16 @@ public class CloudApiService : CloudApi.CloudApiBase
         return _mediator.Send(command);
     }
 
+    public override Task<DirectoryListingDetailed> ListDirectoryDetailed(ListDirectoryRequest request, ServerCallContext context)
+    {
+        var command = new ListDirectoryDetailedCommand
+        {
+            DirectoryId = request.HasDirectoryId ? ParseOptionalGuid(request.DirectoryId) : null
+        };
+
+        return _mediator.Send(command);
+    }
+
     public override Task<CloudEmpty> AttachFile(AttachFileRequest request, ServerCallContext context)
     {
         var command = new AttachFileCommand
@@ -127,6 +140,38 @@ public class CloudApiService : CloudApi.CloudApiBase
         var command = new DeleteFileEntryCommand
         {
             EntryId = Guid.Parse(request.EntryId)
+        };
+
+        return _mediator.Send(command);
+    }
+
+    public override Task<CloudEmpty> CopyFileEntry(CopyFileEntryRequest request, ServerCallContext context)
+    {
+        var command = new CopyFileEntryCommand
+        {
+            SourceEntryId = Guid.Parse(request.SourceEntryId),
+            TargetDirectoryId = ParseOptionalGuid(request.TargetDirectoryId),
+            NewName = request.NewName
+        };
+
+        return _mediator.Send(command);
+    }
+
+    public override Task<ListUserImagesResponse> ListUserImages(ListUserImagesRequest request, ServerCallContext context)
+    {
+        DateTime? cursorCreatedAt = null;
+        Guid? cursorFileId = null;
+        if (request.CursorCreatedAt is not null && !string.IsNullOrWhiteSpace(request.CursorFileId))
+        {
+            cursorCreatedAt = request.CursorCreatedAt.ToDateTime();
+            cursorFileId = Guid.Parse(request.CursorFileId);
+        }
+
+        var command = new ListUserImagesCommand
+        {
+            Limit = request.Limit,
+            CursorCreatedAt = cursorCreatedAt,
+            CursorFileId = cursorFileId
         };
 
         return _mediator.Send(command);

@@ -45,20 +45,25 @@ NextCloud-подобная иерархия папок и файловых за�
 
 ## Features
 
-`Backend/BarkCloud.Files/Features/Cloud/` — 10 фич, каждая пара `XxxCommand.cs` + `XxxCommandHandler.cs`:
+`Backend/BarkCloud.Files/Features/Cloud/` — 13 фич, каждая пара `XxxCommand.cs` + `XxxCommandHandler.cs`:
 
 ### Директории
 - `CreateDirectory` — создать папку (возвращает `DirectoryInfo`)
 - `RenameDirectory` — переименовать
 - `MoveDirectory` — переместить в другую папку
 - `DeleteDirectory` — удалить рекурсивно
-- `ListDirectory` — листинг (subdirs + files)
+- `ListDirectory` — листинг (subdirs + files), только метаданные
+- `ListDirectoryDetailed` — листинг с обогащёнными `FileEntryDetailed` (полная `UploadFileInfo` с URL/превью)
 
 ### Записи о файлах
 - `AttachFile` — привязать существующий `UploadFile` к папке (создаёт `CloudFileEntry`)
 - `RenameFileEntry` — изменить отображаемое имя записи
 - `MoveFileEntry` — перенести в другую папку
-- `DeleteFileEntry` — удалить запись (не удаляет сам `UploadFile`)
+- `CopyFileEntry` — скопировать запись (на тот же `FileId`, новое имя в целевой папке; один блоб в S3, новая `CloudFileEntry`)
+- `DeleteFileEntry` — удалить запись (не удаляет сам `UploadFile`, декремент `Uploaders` только если у владельца не осталось других копий)
+
+### Галерея
+- `ListUserImages` — выборка всех изображений пользователя (`UploadFile` уровня, не `CloudFileEntry`) от новых к старым с cursor-пагинацией. Фильтр изображения — `Helpers/ImageDetection.IsImage`: `ImageWidth>0` ИЛИ имя оканчивается на одно из `.jpg/.jpeg/.png/.gif/.webp/.heic/.heif/.bmp/.tiff/.tif`
 
 ### Навигация
 - `GetPath` — построить путь до объекта (директории/записи) в иерархии
