@@ -1,0 +1,128 @@
+
+namespace BarkCloud.Identity.Features.SetPassword;
+
+using BarkCloud.GrpcServer.Metrics;
+using BarkCloud.GrpcServer.Tracker;
+using BarkCloud.Proto.Users;
+using BarkCloud.Shared.Exceptions.Identity;
+using BarkCloud.Shared.Identity;
+using BarkCloud.Shared.Queue.Notifications;
+
+using GrpcServer.XAuth;
+
+using Infrastructure;
+
+using MediatR;
+
+using Microsoft.Extensions.Logging;
+
+using Persistence.Services;
+
+using Services;
+
+public class SetPasswordCommandHandler : IRequestHandler<SetPasswordCommand>
+{
+    private readonly UserContext _userContext;
+    private readonly PasswordsStorage _passwordsStorage;
+    private readonly RefreshTokensStorage refreshTokensStorage;
+    private readonly NotificationQueueSender _notificationQueueSender;
+    private readonly LocationClient _locationClient;
+    private readonly UsersServerApi.UsersServerApiClient _usersClient;
+    private readonly RequestContext _requestContext;
+    private readonly MetricsCollector _metrics;
+    private readonly ILogger<SetPasswordCommandHandler> _logger;
+
+    public SetPasswordCommandHandler(UserContext userContext, PasswordsStorage passwordsStorage,
+        RefreshTokensStorage refreshTokensStorage, NotificationQueueSender notificationQueueSender,
+        LocationClient locationClient, UsersServerApi.UsersServerApiClient usersClient, RequestContext requestContext,
+        MetricsCollector metrics, ILogger<SetPasswordCommandHandler> logger)
+    {
+        _userContext = userContext;
+        _passwordsStorage = passwordsStorage;
+        this.refreshTokensStorage = refreshTokensStorage;
+        _notificationQueueSender = notificationQueueSender;
+        _locationClient = locationClient;
+        _usersClient = usersClient;
+        _requestContext = requestContext;
+        _metrics = metrics;
+        _logger = logger;
+    }
+
+    public async Task Handle(SetPasswordCommand request, CancellationToken cancellationToken)
+    {
+        _logger.LogInformation(
+            "Начало изменения пароля для пользователя {UserId}",
+            _userContext.UserId
+        );
+
+        var currentHash = await _passwordsStorage.GetUserPasswordHash(_userContext.UserId);
+        if (currentHash != null)
+        {
+            if (string.IsNullOrEmpty(request.OldPassword))
+            {
+                _metrics.Increment("password_change_failed_invalid_old");
+                throw new InvalidOldPasswordException();
+            }
+
+            if (!PasswordHasher.VerifyPassword(request.OldPassword, currentHash))
+            {
+                _metrics.Increment("password_change_failed_invalid_old");
+                throw new InvalidOldPasswordException();
+            }
+        }
+
+        var passwordHash = PasswordHasher.HashPassword(request.NewPassword);
+
+        _logger.LogDebug("Обновление хэша пароля в БД для пользователя {UserId}", _userContext.UserId);
+
+        var isNewUser = await _passwordsStorage.UpdateUserPasswordHash(_userContext.UserId, passwordHash);
+
+        _metrics.Increment("password_changes");
+        if (isNewUser)
+        {
+            _metrics.Increment("password_changes_initial");
+        }
+
+        // Отправка уведомления об изменении пароля
+        var userInfo = await _usersClient.GetByIdAsync(new GetByIdRequest { UserId = _userContext.UserId });
+        var userContacts = await _usersClient.GetUserContactsAsync(new GetUserContactsRequest { UserId = _userContext.UserId });
+
+        var locationInfo = await _locationClient.GetLocationString(_requestContext.IpAddress);
+
+        if (!isNewUser)
+        {
+            var passwordChangedNotification = new EmailNotification
+            {
+                OwnerId = _userContext.UserId,
+                Address = userContacts.Contact.Email,
+                CreatedAt = DateTime.UtcNow,
+                Payload = new Dictionary<string, string>
+                {
+                    {"username", userInfo.User.Username},
+                    {"ip", _requestContext.IpAddress ?? string.Empty},
+                    {"devicename", _requestContext.DeviceName ?? string.Empty},
+                    {"os", _requestContext.OperationSystem ?? string.Empty},
+                    {"location", locationInfo},
+                    {"appname", $"{_requestContext.AppName} v.{_requestContext.AppVersion}"},
+                    {"datetime", DateTime.UtcNow.ToString("dd.MM.yyyy HH:mm:ss")}
+
+                },
+                ServiceId = ServiceId.Identity,
+                Title = "Пароль успешно изменен",
+                Type = NotificationType.PasswordChanged
+            };
+
+            _logger.LogDebug(
+                "Отправка уведомления об изменении пароля на адрес {Email}",
+                userContacts.Contact.Email
+            );
+
+            await _notificationQueueSender.SendNotification(passwordChangedNotification);
+        }
+
+        _logger.LogInformation(
+            "Пароль успешно изменен для пользователя {UserId}. Уведомление отправлено",
+            _userContext.UserId
+        );
+    }
+}

@@ -1,0 +1,51 @@
+using BarkCloud.GrpcServer.XAuth;
+using BarkCloud.Users.Infrastructure;
+using BarkCloud.Users.Persistence.Services;
+
+using MediatR;
+
+namespace BarkCloud.Users.Features.ChangeName;
+
+public class ChangeNameCommandHandler : IRequestHandler<ChangeNameCommand>
+{
+    private readonly UserContext _userContext;
+    private readonly UsersStorage _usersStorage;
+    private readonly UserInfoQueueSender _userInfoQueueSender;
+    private readonly ILogger<ChangeNameCommandHandler> _logger;
+
+    public ChangeNameCommandHandler(UserContext userContext, UsersStorage usersStorage, UserInfoQueueSender userInfoQueueSender,
+        ILogger<ChangeNameCommandHandler> logger)
+    {
+        _userContext = userContext;
+        _usersStorage = usersStorage;
+        _userInfoQueueSender = userInfoQueueSender;
+        _logger = logger;
+    }
+
+    public async Task Handle(ChangeNameCommand request, CancellationToken cancellationToken)
+    {
+        var firstName = request.FirstName?.Trim();
+        var lastName = request.LastName?.Trim();
+
+        _logger.LogInformation(
+            "Начало изменения имени для пользователя {UserId}: '{FirstName} {LastName}'",
+            _userContext.UserId,
+            firstName,
+            lastName
+        );
+
+        await _usersStorage.ChangeName(_userContext.UserId, firstName, lastName);
+
+        _logger.LogDebug(
+            "Отправка события об изменении имени в очередь RabbitMQ для пользователя {UserId}",
+            _userContext.UserId
+        );
+
+        await _userInfoQueueSender.NameChangedEvent(_userContext.UserId, firstName, lastName);
+
+        _logger.LogInformation(
+            "Изменение имени успешно завершено для пользователя {UserId}",
+            _userContext.UserId
+        );
+    }
+}

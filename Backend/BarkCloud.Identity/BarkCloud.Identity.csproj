@@ -1,0 +1,49 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Grpc.AspNetCore.Web" Version="2.76.0" />
+        <PackageReference Include="Grpc.Net.ClientFactory" Version="2.71.0" />
+        <PackageReference Include="Grpc.Tools" Version="2.72.0">
+          <PrivateAssets>all</PrivateAssets>
+          <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
+        <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
+        <PackageReference Include="MassTransit.RabbitMQ" Version="8.5.2" />
+        <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.1" />
+        <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="10.0.1">
+          <PrivateAssets>all</PrivateAssets>
+          <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
+        <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.0" />
+        <PackageReference Include="Otp.NET" Version="1.4.0" />
+        <PackageReference Include="QRCoder" Version="1.6.0" />
+        <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.14.0" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Content Include="..\..\.dockerignore">
+        <Link>.dockerignore</Link>
+      </Content>
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\..\Shared\BarkCloud.Shared.Exceptions\BarkCloud.Shared.Exceptions.csproj" />
+      <ProjectReference Include="..\..\Shared\BarkCloud.Shared.Queue\BarkCloud.Shared.Queue.csproj" />
+      <ProjectReference Include="..\..\Shared\BarkCloud.Shared.Identity\BarkCloud.Shared.Identity.csproj" />
+      <ProjectReference Include="..\BarkCloud.GrpcServer\BarkCloud.GrpcServer.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <Protobuf Include="..\..\Shared\BarkCloud.Proto\identity_api.proto" GrpcServices="Server" />
+        <Protobuf Include="..\..\Shared\BarkCloud.Proto\users_api.proto" GrpcServices="Client" />
+        <Protobuf Include="..\..\Shared\BarkCloud.Proto\shared.proto" GrpcServices="None" />
+        
+    </ItemGroup>
+</Project>

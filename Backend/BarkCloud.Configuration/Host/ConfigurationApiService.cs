@@ -1,0 +1,187 @@
+using BarkCloud.Configuration.Features.AddReservedName;
+using BarkCloud.Configuration.Features.DeleteReservedName;
+using BarkCloud.Configuration.Features.GetConfiguration;
+using BarkCloud.Configuration.Features.GetReservedNames;
+using BarkCloud.Configuration.Features.UpdateConfiguration;
+using BarkCloud.Configuration.Features.UpdateReservedName;
+using BarkCloud.GrpcServer.Metrics;
+using BarkCloud.Proto.Configuration;
+using BarkCloud.Shared.Identity;
+
+using Grpc.Core;
+
+using MediatR;
+
+using System.Diagnostics;
+
+namespace BarkCloud.Configuration.Host;
+
+public class ConfigurationApiService : BarkCloud.Proto.Configuration.ConfigurationApi.ConfigurationApiBase
+{
+    private readonly IMediator _mediator;
+    private readonly MetricsCollector _metrics;
+
+    public ConfigurationApiService(IMediator mediator, MetricsCollector metrics)
+    {
+        _mediator = mediator;
+        _metrics = metrics;
+    }
+
+    public override async Task<GetConfigurationResponse> GetConfiguration(GetConfigurationRequest request, ServerCallContext context)
+    {
+        _metrics.Increment("config_get_requests");
+        _metrics.Set("last_config_get_unix", DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+        var sw = Stopwatch.StartNew();
+        try
+        {
+            var response = await _mediator.Send(new GetConfigurationCommand
+            {
+                ServiceId = (ServiceId)request.ServiceId
+            });
+
+            sw.Stop();
+            _metrics.Increment("config_get_success");
+            _metrics.Add("config_get_duration_ms_total", sw.ElapsedMilliseconds);
+            _metrics.Set("last_config_get_items", response.Configurations.Count);
+            return response;
+        }
+        catch
+        {
+            sw.Stop();
+            _metrics.Increment("config_get_errors");
+            _metrics.Add("config_get_duration_ms_total", sw.ElapsedMilliseconds);
+            throw;
+        }
+    }
+
+    public override async Task<UpdateConfigurationResponse> UpdateConfiguration(UpdateConfigurationRequest request, ServerCallContext context)
+    {
+        _metrics.Increment("config_update_requests");
+        _metrics.Set("last_config_update_unix", DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+        var sw = Stopwatch.StartNew();
+        try
+        {
+            var response = await _mediator.Send(new UpdateConfigurationCommand
+            {
+                Section = request.Section,
+                Key = request.Key,
+                Value = request.Value,
+                ServiceId = request.ServiceId,
+                EditedBy = request.EditedBy,
+                EditedFrom = request.EditedFrom
+            });
+
+            sw.Stop();
+            // handler ловит исключения сам и возвращает Success=false — учитываем это
+            if (response.Success)
+                _metrics.Increment("config_update_success");
+            else
+                _metrics.Increment("config_update_errors");
+
+            _metrics.Add("config_update_duration_ms_total", sw.ElapsedMilliseconds);
+            return response;
+        }
+        catch
+        {
+            sw.Stop();
+            _metrics.Increment("config_update_errors");
+            _metrics.Add("config_update_duration_ms_total", sw.ElapsedMilliseconds);
+            throw;
+        }
+    }
+
+    // ─── Reserved Names ─────────────────────────────────────────────────────────
+
+    public override async Task<GetReservedNamesResponse> GetReservedNames(GetReservedNamesRequest request, ServerCallContext context)
+    {
+        _metrics.Increment("reserved_names_get_requests");
+        var sw = Stopwatch.StartNew();
+        try
+        {
+            var response = await _mediator.Send(new GetReservedNamesCommand());
+            sw.Stop();
+            _metrics.Increment("reserved_names_get_success");
+            _metrics.Add("reserved_names_get_duration_ms_total", sw.ElapsedMilliseconds);
+            return response;
+        }
+        catch
+        {
+            sw.Stop();
+            _metrics.Increment("reserved_names_get_errors");
+            _metrics.Add("reserved_names_get_duration_ms_total", sw.ElapsedMilliseconds);
+            throw;
+        }
+    }
+
+    public override async Task<AddReservedNameResponse> AddReservedName(AddReservedNameRequest request, ServerCallContext context)
+    {
+        _metrics.Increment("reserved_names_add_requests");
+        var sw = Stopwatch.StartNew();
+        try
+        {
+            var response = await _mediator.Send(new AddReservedNameCommand { Name = request.Name });
+            sw.Stop();
+            if (response.Success)
+                _metrics.Increment("reserved_names_add_success");
+            else
+                _metrics.Increment("reserved_names_add_errors");
+            _metrics.Add("reserved_names_add_duration_ms_total", sw.ElapsedMilliseconds);
+            return response;
+        }
+        catch
+        {
+            sw.Stop();
+            _metrics.Increment("reserved_names_add_errors");
+            _metrics.Add("reserved_names_add_duration_ms_total", sw.ElapsedMilliseconds);
+            throw;
+        }
+    }
+
+    public override async Task<UpdateReservedNameResponse> UpdateReservedName(UpdateReservedNameRequest request, ServerCallContext context)
+    {
+        _metrics.Increment("reserved_names_update_requests");
+        var sw = Stopwatch.StartNew();
+        try
+        {
+            var response = await _mediator.Send(new UpdateReservedNameCommand { OldName = request.OldName, NewName = request.NewName });
+            sw.Stop();
+            if (response.Success)
+                _metrics.Increment("reserved_names_update_success");
+            else
+                _metrics.Increment("reserved_names_update_errors");
+            _metrics.Add("reserved_names_update_duration_ms_total", sw.ElapsedMilliseconds);
+            return response;
+        }
+        catch
+        {
+            sw.Stop();
+            _metrics.Increment("reserved_names_update_errors");
+            _metrics.Add("reserved_names_update_duration_ms_total", sw.ElapsedMilliseconds);
+            throw;
+        }
+    }
+
+    public override async Task<DeleteReservedNameResponse> DeleteReservedName(DeleteReservedNameRequest request, ServerCallContext context)
+    {
+        _metrics.Increment("reserved_names_delete_requests");
+        var sw = Stopwatch.StartNew();
+        try
+        {
+            var response = await _mediator.Send(new DeleteReservedNameCommand { Name = request.Name });
+            sw.Stop();
+            if (response.Success)
+                _metrics.Increment("reserved_names_delete_success");
+            else
+                _metrics.Increment("reserved_names_delete_errors");
+            _metrics.Add("reserved_names_delete_duration_ms_total", sw.ElapsedMilliseconds);
+            return response;
+        }
+        catch
+        {
+            sw.Stop();
+            _metrics.Increment("reserved_names_delete_errors");
+            _metrics.Add("reserved_names_delete_duration_ms_total", sw.ElapsedMilliseconds);
+            throw;
+        }
+    }
+}

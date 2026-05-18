@@ -1,0 +1,102 @@
+<resources>
+    <string name="app_name">BarkCloud</string>
+
+    <!-- Login -->
+    <string name="login_title">Вход</string>
+    <string name="login_field_label">Логин или email</string>
+    <string name="login_password_label">Пароль</string>
+    <string name="login_password_show">Показать пароль</string>
+    <string name="login_password_hide">Скрыть пароль</string>
+    <string name="login_otp_label">Код подтверждения</string>
+    <string name="login_otp_hint">Введите 6-значный код</string>
+    <string name="login_submit">Войти</string>
+    <string name="login_create_account">Создать аккаунт</string>
+    <string name="login_forgot_password">Забыли пароль?</string>
+    <string name="login_error_invalid_credentials">Неверный логин или пароль</string>
+    <string name="login_error_network">Не удалось связаться с сервером</string>
+    <string name="login_coming_soon">Скоро</string>
+
+    <!-- Bottom navigation -->
+    <string name="tab_photos">Фото</string>
+    <string name="tab_videos">Видео</string>
+    <string name="tab_files">Файлы</string>
+    <string name="tab_shared">Общие</string>
+    <string name="tab_settings">Настройки</string>
+
+    <!-- Placeholders -->
+    <string name="placeholder_photos">Скоро здесь будут фото</string>
+    <string name="placeholder_videos">Скоро здесь будут видео</string>
+    <string name="placeholder_files">Скоро здесь будут файлы</string>
+    <string name="placeholder_shared">Скоро здесь будут общие папки</string>
+    <string name="placeholder_settings">Скоро здесь будут настройки</string>
+
+    <!-- Files section -->
+    <string name="files_section_on_device">На устройстве</string>
+    <string name="files_section_server">Папки с сервера</string>
+    <string name="files_server_empty">Пока пусто</string>
+    <string name="files_on_device_subtitle">Внутреннее хранилище</string>
+    <string name="files_grant_permission_title">Нужен доступ ко всем файлам</string>
+    <string name="files_grant_permission_body">Чтобы показывать локальные файлы, BarkCloud нужно разрешение «Доступ ко всем файлам».</string>
+    <string name="files_grant_permission_button">Выдать доступ</string>
+    <string name="files_root_title">Файлы</string>
+    <string name="files_storage_root">Внутреннее хранилище</string>
+
+    <!-- Browser -->
+    <string name="files_action_create_folder">Новая папка</string>
+    <string name="files_action_open">Открыть</string>
+    <string name="files_action_share">Поделиться</string>
+    <string name="files_action_rename">Переименовать</string>
+    <string name="files_action_delete">Удалить</string>
+    <string name="files_action_copy">Копировать в…</string>
+    <string name="files_action_move">Переместить в…</string>
+    <string name="files_action_select_all">Выбрать всё</string>
+    <string name="files_action_clear_selection">Снять выделение</string>
+    <string name="files_action_sort">Сортировка</string>
+    <string name="files_action_show_hidden">Показать скрытые</string>
+    <string name="files_action_hide_hidden">Скрыть скрытые</string>
+    <string name="files_action_more">Ещё</string>
+    <string name="files_back">Назад</string>
+
+    <!-- Dialogs -->
+    <string name="files_dialog_new_folder_title">Новая папка</string>
+    <string name="files_dialog_new_folder_hint">Имя папки</string>
+    <string name="files_dialog_rename_title">Переименовать</string>
+    <string name="files_dialog_rename_hint">Новое имя</string>
+    <string name="files_dialog_delete_title">Удалить?</string>
+    <string name="files_dialog_delete_message">Удалить выбранные элементы (%1$d)? Действие необратимо.</string>
+    <string name="files_dialog_cancel">Отмена</string>
+    <string name="files_dialog_confirm">Готово</string>
+    <string name="files_dialog_create">Создать</string>
+    <string name="files_dialog_delete_confirm">Удалить</string>
+    <string name="files_pick_folder_title">Куда?</string>
+    <string name="files_pick_folder_confirm">Выбрать эту папку</string>
+
+    <!-- Operations -->
+    <string name="files_op_in_progress">Идёт операция…</string>
+    <string name="files_op_copy_in_progress">Копирование…</string>
+    <string name="files_op_move_in_progress">Перемещение…</string>
+    <string name="files_op_delete_in_progress">Удаление…</string>
+    <string name="files_op_error_generic">Не удалось выполнить операцию</string>
+    <string name="files_op_error_exists">Уже существует</string>
+    <string name="files_op_error_invalid_name">Недопустимое имя</string>
+    <string name="files_op_error_no_app">Не нашлось приложения для открытия</string>
+
+    <!-- Misc -->
+    <string name="files_empty_folder">Папка пуста</string>
+    <string name="files_items_count_zero">пусто</string>
+    <string name="files_items_count_one">%1$d элемент</string>
+    <string name="files_items_count_few">%1$d элемента</string>
+    <string name="files_items_count_many">%1$d элементов</string>
+    <string name="files_size_b">%1$d Б</string>
+    <string name="files_size_kb">%1$.1f КБ</string>
+    <string name="files_size_mb">%1$.1f МБ</string>
+    <string name="files_size_gb">%1$.2f ГБ</string>
+
+    <!-- Sort options -->
+    <string name="files_sort_name_asc">Имя ↑</string>
+    <string name="files_sort_name_desc">Имя ↓</string>
+    <string name="files_sort_size_asc">Размер ↑</string>
+    <string name="files_sort_size_desc">Размер ↓</string>
+    <string name="files_sort_date_asc">Дата ↑</string>
+    <string name="files_sort_date_desc">Дата ↓</string>
+</resources>

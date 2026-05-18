@@ -1,0 +1,106 @@
+using BarkCloud.GrpcServer.Metrics;
+using BarkCloud.GrpcServer.XAuth;
+using BarkCloud.Proto.Files;
+using BarkCloud.Proto.Users;
+using BarkCloud.Shared.Exceptions.Users;
+using BarkCloud.Users.Infrastructure;
+using BarkCloud.Users.Persistence.Services;
+
+using MediatR;
+
+namespace BarkCloud.Users.Features.SetProfilePicture;
+
+public class SetProfilePictureCommandHandler : IRequestHandler<SetProfilePictureCommand, SetProfilePictureResponse>
+{
+    private readonly FilesServerApi.FilesServerApiClient _filesServerApiClient;
+    private readonly UsersStorage _usersStorage;
+    private readonly UserContext _userContext;
+    private readonly UserInfoQueueSender _userInfoQueueSender;
+    private readonly MetricsCollector _metrics;
+    private readonly ILogger<SetProfilePictureCommandHandler> _logger;
+
+    public SetProfilePictureCommandHandler(
+        FilesServerApi.FilesServerApiClient filesServerApiClient,
+        UsersStorage usersStorage, UserContext userContext, UserInfoQueueSender userInfoQueueSender,
+        MetricsCollector metrics,
+        ILogger<SetProfilePictureCommandHandler> logger)
+    {
+        _filesServerApiClient = filesServerApiClient;
+        _usersStorage = usersStorage;
+        _userContext = userContext;
+        _userInfoQueueSender = userInfoQueueSender;
+        _metrics = metrics;
+        _logger = logger;
+    }
+
+    public async Task<SetProfilePictureResponse> Handle(SetProfilePictureCommand request, CancellationToken cancellationToken)
+    {
+        _logger.LogInformation(
+            "Начало установки аватара для пользователя {UserId}. FileId: {FileId}",
+            _userContext.UserId,
+            request.FileId?.ToString() ?? "null (удаление аватара)"
+        );
+
+        var fileUrl = string.Empty;
+        var previewUrl = string.Empty;
+
+        if (request.FileId != null)
+        {
+            _logger.LogDebug("Получение информации о файле {FileId} из сервиса Files", request.FileId);
+
+            // Получаем информацию о файле по его ID
+            var fileDataRequest = new GetFileDataRequest
+            {
+                FileId = request.FileId.ToString()
+            };
+
+            GetFileDataResponse fileDataResponse;
+            try
+            {
+                fileDataResponse = await _filesServerApiClient.GetFileDataAsync(fileDataRequest, cancellationToken: cancellationToken);
+                _metrics.Increment("files_fetch_success");
+            }
+            catch
+            {
+                _metrics.Increment("files_fetch_errors");
+                throw;
+            }
+
+            if (fileDataResponse.FileInfo.Type != UploadFileType.UserAvatar)
+            {
+                _logger.LogWarning(
+                    "Файл {FileId} имеет неверный тип {FileType}, ожидается {ExpectedType}",
+                    request.FileId,
+                    fileDataResponse.FileInfo.Type,
+                    UploadFileType.UserAvatar
+                );
+                throw new ProfilePictureHasNotValidType();
+            }
+
+            fileUrl = fileDataResponse.FileInfo.FileUrl;
+            previewUrl = fileDataResponse.FileInfo.PreviewUrl;
+
+            _logger.LogDebug(
+                "Файл аватара проверен. URL: {FileUrl}",
+                fileUrl
+            );
+        }
+
+        // Обновляем профильное изображение пользователя
+        await _usersStorage.UpdateProfilePicture(_userContext.UserId, fileUrl, previewUrl);
+
+        _logger.LogDebug(
+            "Отправка события об изменении аватара в очередь RabbitMQ для пользователя {UserId}",
+            _userContext.UserId
+        );
+
+        await _userInfoQueueSender.UserChangedAvatarEvent(_userContext.UserId, fileUrl, previewUrl);
+
+        _logger.LogInformation(
+            "Аватар успешно установлен для пользователя {UserId}",
+            _userContext.UserId
+        );
+
+        return new SetProfilePictureResponse();
+    }
+}

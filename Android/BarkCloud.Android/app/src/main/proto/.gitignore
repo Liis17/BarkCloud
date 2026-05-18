@@ -1,0 +1,3 @@
+# Файлы здесь синхронизируются из ../../../Shared/BarkCloud.Proto
+# задачей syncSharedProto в app/build.gradle.kts.
+*.proto

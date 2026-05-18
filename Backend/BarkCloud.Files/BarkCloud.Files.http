@@ -1,0 +1,6 @@
+@BarkCloud.Files_HostAddress = http://localhost:5188
+
+GET {{BarkCloud.Files_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

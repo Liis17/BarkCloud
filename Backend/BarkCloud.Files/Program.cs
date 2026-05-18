@@ -1,0 +1,110 @@
+using BarkCloud.Files.Consumers;
+using BarkCloud.Files.Extensions;
+using BarkCloud.Files.Host;
+using BarkCloud.Files.Infrastructure;
+using BarkCloud.Files.Persistence;
+using BarkCloud.Files.Services;
+using BarkCloud.GrpcServer;
+using BarkCloud.GrpcServer.XAuth;
+using BarkCloud.Shared.Identity;
+
+using MassTransit;
+
+using Microsoft.EntityFrameworkCore;
+
+using Serilog;
+
+namespace BarkCloud.Files;
+
+public class Program
+{
+    public static void Main(string[] args)
+    {
+        var builder = WebApplication.CreateBuilder(args);
+
+        builder.LoadConfiguration(ServiceId.Files);
+        builder.AddBarkCloudSerilog("BarkCloud.Files");
+        builder.SetRunningAddress(builder.Configuration);
+
+        // Регистрируем gRPC сервисы с интерцепторами
+        builder.Services.AddGrpc(options =>
+        {
+            options.Interceptors.Add<ServerExceptionInterceptor>();
+            // Оригинальные файлы изображений от админ-панели могут быть больше дефолтных 4 МБ
+            options.MaxReceiveMessageSize = 20 * 1024 * 1024; // 20 МБ
+            options.MaxSendMessageSize = 20 * 1024 * 1024;    // 20 МБ
+        });
+        builder.Services.AddBarkCloudMetrics("BarkCloud.Files");
+
+        builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssemblyContaining<Program>());
+
+        builder.Services.AddGrpcReflection();
+
+        builder.Services.AddXAuth(builder.Configuration);
+
+        // Регистрируем gRPC клиент для UsersServerApi
+        builder.Services.AddGrpcClient<BarkCloud.Proto.Users.UsersServerApi.UsersServerApiClient>(o =>
+            {
+                o.Address = new Uri(builder.Configuration["UsersService:Host"]);
+            }).AddInterceptor(() => new BarkCloud.Shared.Auth.JwtClientInterceptor(builder.Configuration["UsersService:Token"]))
+            .AddInterceptor(() => new BarkCloud.Shared.Exceptions.Interceptors.ExceptionClientInterceptor());
+
+        builder.Services.AddControllers();
+
+        builder.Services.AddScoped<UploadedFilesStorage>();
+        builder.Services.AddScoped<TempFilesStorage>();
+        builder.Services.AddScoped<FileHashesStorage>();
+        builder.Services.AddScoped<CloudHierarchyStorage>();
+        builder.Services.AddSingleton<ImageCompressor>();
+        builder.Services.AddHostedService<TempFileCleanupService>();
+
+        builder.Services.AddMinioS3(builder.Configuration);
+
+        builder.Services.AddDbContext<FilesContext>(options =>
+            options.UseNpgsql(builder.Configuration["FilesDb"]));
+
+        builder.Services.AddMassTransit(x =>
+        {
+            x.AddConsumer<SessionRevokedConsumer>();
+
+            x.UsingRabbitMq((context, cfg) =>
+            {
+                cfg.Host(builder.Configuration["RabbitMQ:Host"], "/", h =>
+                {
+                    h.Username(builder.Configuration["RabbitMQ:Username"]);
+                    h.Password(builder.Configuration["RabbitMQ:Password"]);
+                });
+
+                cfg.ReceiveEndpoint("session-revoked-files", e =>
+                {
+                    e.ConfigureConsumer<SessionRevokedConsumer>(context);
+                });
+            });
+        });
+
+        var app = builder.Build();
+
+        using (var scope = app.Services.CreateScope())
+        {
+            var ctx = scope.ServiceProvider.GetRequiredService<FilesContext>();
+            ctx.Database.Migrate();
+
+            // Инициализируем S3 бакеты
+            var bucketInitializer = scope.ServiceProvider.GetRequiredService<S3BucketInitializer>();
+            bucketInitializer.InitializeBucketsAsync().GetAwaiter().GetResult();
+        }
+
+        app.MapGrpcReflectionService();
+
+        app.UseXAuth();
+
+        app.MapControllers();
+
+        app.MapGrpcService<FilesApiService>();
+        app.MapGrpcService<FilesServerApiService>();
+        app.MapGrpcService<CloudApiService>();
+
+        app.Lifetime.ApplicationStopped.Register(Log.CloseAndFlush);
+        app.Run();
+    }
+}

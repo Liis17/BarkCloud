@@ -1,0 +1,17 @@
+<Solution>
+  <Folder Name="/Backend/">
+    <Project Path="Backend/BarkCloud.Configuration/BarkCloud.Configuration.csproj" />
+    <Project Path="Backend/BarkCloud.Files/BarkCloud.Files.csproj" />
+    <Project Path="Backend/BarkCloud.GrpcServer/BarkCloud.GrpcServer.csproj" />
+    <Project Path="Backend/BarkCloud.Identity/BarkCloud.Identity.csproj" />
+    <Project Path="Backend/BarkCloud.Users/BarkCloud.Users.csproj" />
+  </Folder>
+  <Folder Name="/Shared/">
+    <Project Path="Shared/BarkCloud.Proto/BarkCloud.Proto.csproj" />
+    <Project Path="Shared/BarkCloud.Shared.Auth/BarkCloud.Shared.Auth.csproj" />
+    <Project Path="Shared/BarkCloud.Shared.Exceptions/BarkCloud.Shared.Exceptions.csproj" />
+    <Project Path="Shared/BarkCloud.Shared.Identity/BarkCloud.Shared.Identity.csproj" />
+    <Project Path="Shared/BarkCloud.Shared.Queue/BarkCloud.Shared.Queue.csproj" />
+    <Project Path="Shared/BarkCloud.Shared.SecurityUtilities/BarkCloud.Shared.SecurityUtilities.csproj" />
+  </Folder>
+</Solution>
