@@ -1,0 +1,14 @@
+{
+  "generate": {
+    "clients": true,
+    "servers": false,
+    "messages": true
+  },
+  "generatedSource": {
+    "accessLevel": "internal",
+    "accessLevelOnImports": false
+  },
+  "_V1": {
+    "version": 1
+  }
+}
