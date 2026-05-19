@@ -33,6 +33,9 @@
 ### 📱 Модули — Android
 - [[modules/android-app]] — Нативный Android-клиент (Kotlin, gradle) — **сейчас пустая заготовка**
 
+### 📱 Модули — iOS
+- [[modules/ios-app]] — Нативный iOS-клиент (SwiftUI, Swift 5, iOS 18+), полный паритет с Android — в работе по 6 PR
+
 ### 🔧 API & gRPC
 - [[api/configuration-api]] — gRPC API сервиса Configuration
 - [[api/identity-api]] — gRPC API сервиса Identity (Auth, OTP, RefreshToken)
@@ -40,6 +43,7 @@
 - [[api/files-api]] — gRPC API сервиса Files (`FilesApi`, `CloudApi`, `FilesServerApi`)
 
 ### 📋 Изменения
+- [[changelog/2026-05-19]] — iOS PR 1: setup проекта и базовый каркас
 - [[changelog/2026-05-18]] — актуализация vault под реальное состояние кода
 
 ## Стек технологий
