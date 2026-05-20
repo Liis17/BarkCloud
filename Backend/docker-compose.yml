@@ -20,6 +20,15 @@ services:
       CONFIGURATION_USERNAME: ${CONFIGURATION_USERNAME}
       CONFIGURATION_PASSWORD: ${CONFIGURATION_PASSWORD}
       CONFIGURATION_PORT: ${CONFIGURATION_PORT}
+      # Postgres внутри контейнера всегда слушает 5432 — POSTGRES_PORT из .env это host-маппинг
+      CONFIGURATION_DBPORT: "5432"
+      # MinIO внутри контейнера всегда слушает 9000 — MINIO_PORT из .env это host-маппинг
+      MINIO_HOST: minio
+      MINIO_PORT: "9000"
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
     networks:
       - barkcloud-network
 
@@ -76,15 +85,17 @@ services:
     image: quay.io/minio/minio:RELEASE.2025-04-22T22-12-26Z-cpuv1
     container_name: minio
     restart: always
+    # MINIO_PORT / MINIO_WEBPORT в .env — это host-маппинг.
+    # Внутри контейнера MinIO всегда слушает 9000 (API) и 9001 (console).
     ports:
-      - "${MINIO_PORT}:${MINIO_PORT}"
-      - "${MINIO_WEBPORT}:${MINIO_WEBPORT}"
+      - "${MINIO_PORT}:9000"
+      - "${MINIO_WEBPORT}:9001"
     environment:
       MINIO_ROOT_USER: "${MINIO_ROOT_USER}"
       MINIO_ROOT_PASSWORD: "${MINIO_ROOT_PASSWORD}"
     volumes:
       - minio_data:/data
-    command: server /data --console-address ":${MINIO_WEBPORT}"
+    command: server /data --console-address ":9001"
     networks:
       - barkcloud-network
 
@@ -112,8 +123,9 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql
       - backup_volume:/backup
+    # POSTGRES_PORT в .env — host-маппинг. Внутри контейнера Postgres всегда слушает 5432.
     ports:
-      - "${POSTGRES_PORT}:${POSTGRES_PORT}"
+      - "${POSTGRES_PORT}:5432"
     networks:
       - barkcloud-network
 
