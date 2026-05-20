@@ -26,6 +26,10 @@ public class ConfigurationDefaultsPopulator
     private readonly string _postgresPassword;
     private readonly string _rabbitUsername;
     private readonly string _rabbitPassword;
+    private readonly string _minioHost;
+    private readonly string _minioPort;
+    private readonly string _minioAccessKey;
+    private readonly string _minioSecretKey;
 
     /// <summary>
     /// Маппинг ServiceId → имя контейнера в Docker
@@ -75,6 +79,10 @@ public class ConfigurationDefaultsPopulator
         string postgresPassword,
         string rabbitUsername,
         string rabbitPassword,
+        string minioHost,
+        string minioPort,
+        string minioAccessKey,
+        string minioSecretKey,
         MetricsCollector? metrics = null)
     {
         _context = context;
@@ -85,6 +93,10 @@ public class ConfigurationDefaultsPopulator
         _postgresPassword = postgresPassword;
         _rabbitUsername = rabbitUsername;
         _rabbitPassword = rabbitPassword;
+        _minioHost = minioHost;
+        _minioPort = minioPort;
+        _minioAccessKey = minioAccessKey;
+        _minioSecretKey = minioSecretKey;
     }
 
     /// <summary>
@@ -316,9 +328,9 @@ public class ConfigurationDefaultsPopulator
 
             return config.Key switch
             {
-                "ServiceUrl"     => "http://minio:9000",
-                "AccessKey"      => "minioadmin",
-                "SecretKey"      => "minioadmin",
+                "ServiceUrl"     => $"http://{_minioHost}:{_minioPort}",
+                "AccessKey"      => _minioAccessKey,
+                "SecretKey"      => _minioSecretKey,
                 "BucketName"     => bucketId,
                 "ForcePathStyle" => "true",
                 _ => null
