@@ -105,10 +105,19 @@ public class Program
                         var rabbitUsername = builder.Configuration["RABBITMQ_DEFAULT_USER"] ?? "guest";
                         var rabbitPassword = builder.Configuration["RABBITMQ_DEFAULT_PASS"] ?? "guest";
 
+                        // MinIO: дефолтные значения соответствуют внутренней docker-сети.
+                        // MINIO_PORT здесь — порт API внутри контейнера (не маппинг наружу).
+                        var minioHost = builder.Configuration["MINIO_HOST"] ?? "minio";
+                        var minioPort = builder.Configuration["MINIO_PORT"] ?? "9000";
+                        var minioAccessKey = builder.Configuration["MINIO_ROOT_USER"] ?? "minioadmin";
+                        var minioSecretKey = builder.Configuration["MINIO_ROOT_PASSWORD"] ?? "minioadmin";
+
                         var populatorLogger = scope.ServiceProvider.GetRequiredService<ILogger<ConfigurationDefaultsPopulator>>();
                         var populator = new ConfigurationDefaultsPopulator(
                             ctx, populatorLogger, pgHostOnly, username, password,
-                            rabbitUsername, rabbitPassword, metrics);
+                            rabbitUsername, rabbitPassword,
+                            minioHost, minioPort, minioAccessKey, minioSecretKey,
+                            metrics);
 
                         populator.EnsureSeedAsync().GetAwaiter().GetResult();
                         populator.PopulateDefaultsAsync().GetAwaiter().GetResult();
