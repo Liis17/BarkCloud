@@ -1,0 +1,129 @@
+version: '3.8'
+
+x-common-variables: &common-variables
+  CONFIGURATION_SERVICE_URL: "${CONFIGURATION_SERVICE_URL}"
+  ASPNETCORE_ENVIRONMENT: "${ASPNETCORE_ENVIRONMENT}"
+
+services:
+  # === Основные микросервисы (prod-образы) ===
+
+  configuration:
+    image: docker.barkfluff.com:5000/barkcloud-configuration:latest
+    container_name: cloud-configuration
+    restart: always
+    env_file:
+      - .env
+    environment:
+      <<: *common-variables
+      CONFIGURATION_HOST: ${CONFIGURATION_HOST}
+      CONFIGURATION_DATABASE: ${CONFIGURATION_DATABASE}
+      CONFIGURATION_USERNAME: ${CONFIGURATION_USERNAME}
+      CONFIGURATION_PASSWORD: ${CONFIGURATION_PASSWORD}
+      CONFIGURATION_PORT: ${CONFIGURATION_PORT}
+    networks:
+      - barkcloud-network
+
+  identity:
+    image: docker.barkfluff.com:5000/barkcloud-identity:latest
+    container_name: cloud-identity
+    restart: always
+    environment:
+      <<: *common-variables
+    networks:
+      - barkcloud-network
+    depends_on:
+      - configuration
+
+  users:
+    image: docker.barkfluff.com:5000/barkcloud-users:latest
+    container_name: cloud-users
+    restart: always
+    environment:
+      <<: *common-variables
+    networks:
+      - barkcloud-network
+    depends_on:
+      - configuration
+
+  files:
+    image: docker.barkfluff.com:5000/barkcloud-files:latest
+    container_name: cloud-files
+    restart: always
+    environment:
+      <<: *common-variables
+    networks:
+      - barkcloud-network
+    depends_on:
+      - configuration
+
+  # === Инфраструктурные сервисы ===
+
+  seq:
+    image: datalust/seq:latest
+    container_name: seq
+    restart: always
+    ports:
+      - "${SEQ_WEBPORT}:80"
+    environment:
+      ACCEPT_EULA: "Y"
+      SEQ_FIRSTRUN_ADMINPASSWORD: "${SEQ_ADMIN_PASSWORD}"
+    volumes:
+      - seq_data:/data
+    networks:
+      - barkcloud-network
+
+  minio:
+    image: quay.io/minio/minio:RELEASE.2025-04-22T22-12-26Z-cpuv1
+    container_name: minio
+    restart: always
+    ports:
+      - "${MINIO_PORT}:${MINIO_PORT}"
+      - "${MINIO_WEBPORT}:${MINIO_WEBPORT}"
+    environment:
+      MINIO_ROOT_USER: "${MINIO_ROOT_USER}"
+      MINIO_ROOT_PASSWORD: "${MINIO_ROOT_PASSWORD}"
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":${MINIO_WEBPORT}"
+    networks:
+      - barkcloud-network
+
+  rabbitmq:
+    image: rabbitmq:latest
+    container_name: rabbitmq
+    restart: always
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: "${RABBITMQ_DEFAULT_USER}"
+      RABBITMQ_DEFAULT_PASS: "${RABBITMQ_DEFAULT_PASS}"
+    networks:
+      - barkcloud-network
+
+  postgres:
+    image: postgres:18
+    container_name: postgres_barkcloud
+    restart: always
+    environment:
+      POSTGRES_USER: "${POSTGRES_USER}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+      POSTGRES_DB: "${POSTGRES_DB}"
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - pgdata:/var/lib/postgresql
+      - backup_volume:/backup
+    ports:
+      - "${POSTGRES_PORT}:${POSTGRES_PORT}"
+    networks:
+      - barkcloud-network
+
+networks:
+  barkcloud-network:
+    driver: bridge
+
+volumes:
+  pgdata:
+  rabbitmq_data:
+  minio_data:
+  backup_volume:
+  seq_data:
