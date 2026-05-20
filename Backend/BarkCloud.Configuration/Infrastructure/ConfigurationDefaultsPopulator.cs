@@ -87,6 +87,27 @@ public class ConfigurationDefaultsPopulator
         _rabbitPassword = rabbitPassword;
     }
 
+    /// <summary>
+    /// При пустой таблице создаёт записи для всех ожидаемых ключей (Section/Key/ServiceId)
+    /// с пустым Value. Дальше <see cref="PopulateDefaultsAsync"/> заполнит их дефолтами.
+    /// </summary>
+    public async Task EnsureSeedAsync()
+    {
+        var hasAny = await _context.Configurations.AnyAsync();
+        if (hasAny)
+        {
+            _logger.LogInformation("Таблица Configurations уже содержит записи, seed не требуется");
+            return;
+        }
+
+        var seedItems = ConfigurationSeed.BuildSeedItems();
+        await _context.Configurations.AddRangeAsync(seedItems);
+        await _context.SaveChangesAsync();
+
+        _metrics?.Add("configurations_seeded_total", seedItems.Count);
+        _logger.LogInformation("Засеяно пустых записей конфигурации: {Count}", seedItems.Count);
+    }
+
     public async Task PopulateDefaultsAsync()
     {
         var emptyConfigs = await _context.Configurations
@@ -290,11 +311,16 @@ public class ConfigurationDefaultsPopulator
         // --- S3 Buckets (внутренний Docker-адрес MinIO) ---
         if (config.Section.StartsWith("S3Buckets:"))
         {
+            // Имя бакета извлекаем из секции вида "S3Buckets:<bucket-id>"
+            var bucketId = config.Section.Substring("S3Buckets:".Length);
+
             return config.Key switch
             {
-                "ServiceUrl" => "http://minio:9000",
-                "AccessKey" => "minioadmin",
-                "SecretKey" => "minioadmin",
+                "ServiceUrl"     => "http://minio:9000",
+                "AccessKey"      => "minioadmin",
+                "SecretKey"      => "minioadmin",
+                "BucketName"     => bucketId,
+                "ForcePathStyle" => "true",
                 _ => null
             };
         }

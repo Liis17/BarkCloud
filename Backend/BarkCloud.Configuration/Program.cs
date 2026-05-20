@@ -110,6 +110,7 @@ public class Program
                             ctx, populatorLogger, pgHostOnly, username, password,
                             rabbitUsername, rabbitPassword, metrics);
 
+                        populator.EnsureSeedAsync().GetAwaiter().GetResult();
                         populator.PopulateDefaultsAsync().GetAwaiter().GetResult();
                     }
                     catch (Exception populateEx)
