@@ -65,6 +65,35 @@ services:
     depends_on:
       - configuration
 
+  # Веб-клиент (HTTP, отдаёт страницы браузеру; к микросервисам обращается по docker-сети через gRPC)
+  web:
+    image: docker.barkfluff.com:5000/barkcloud-web:latest
+    container_name: cloud-web
+    restart: always
+    env_file:
+      - .env
+    environment:
+      <<: *common-variables
+      ASPNETCORE_URLS: "http://+:8080"
+      # JwtSettings должны совпадать с Identity (значения берутся из Configuration-сервиса)
+      JwtSettings__SecretKey: "${JWT_SECRET_KEY}"
+      JwtSettings__Issuer: "${JWT_ISSUER}"
+      JwtSettings__Audience: "${JWT_AUDIENCE}"
+      # Адреса микросервисов в docker-сети
+      Backend__Identity: "http://cloud-identity:7020"
+      Backend__Users: "http://cloud-users:7021"
+      Backend__Files: "http://cloud-files:7025"
+      App__CookieSecure: "${WEB_COOKIE_SECURE}"
+      App__PublicHost: "${WEB_PUBLIC_HOST}"
+    ports:
+      - "${WEB_PORT}:8080"
+    networks:
+      - barkcloud-network
+    depends_on:
+      - identity
+      - users
+      - files
+
   # === Reverse-proxy (единственная точка выхода наружу) ===
 
   nginx:

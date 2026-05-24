@@ -4,48 +4,37 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
   </PropertyGroup>
 
   <ItemGroup>
-    <None Remove="Pages\Files.html" />
-    <None Remove="Pages\Login Page Full.html" />
-    <None Remove="Pages\Photos.html" />
-    <None Remove="Pages\Settings.html" />
-    <None Remove="Pages\shared.css" />
-    <None Remove="Pages\Shared.html" />
-    <None Remove="Pages\shared.jsx" />
-    <None Remove="Pages\Videos.html" />
+    <PackageReference Include="Google.Protobuf" Version="3.32.0" />
+    <PackageReference Include="Grpc.Net.ClientFactory" Version="2.71.0" />
+    <PackageReference Include="Grpc.Tools" Version="2.72.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.14.0" />
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="Pages\Files.html">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Pages\Login Page Full.html">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Pages\Photos.html">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Pages\Settings.html">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Pages\shared.css">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Pages\Shared.html">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Pages\shared.jsx">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Pages\Videos.html">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </Content>
+    <ProjectReference Include="..\..\Shared\BarkCloud.Shared.Auth\BarkCloud.Shared.Auth.csproj" />
+    <ProjectReference Include="..\..\Shared\BarkCloud.Shared.Identity\BarkCloud.Shared.Identity.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.8" />
+    <Protobuf Include="..\..\Shared\BarkCloud.Proto\shared.proto" GrpcServices="None" />
+    <Protobuf Include="..\..\Shared\BarkCloud.Proto\identity_api.proto" GrpcServices="Client" />
+    <Protobuf Include="..\..\Shared\BarkCloud.Proto\users_api.proto" GrpcServices="Client" />
+    <Protobuf Include="..\..\Shared\BarkCloud.Proto\files_api.proto" GrpcServices="Client" />
+  </ItemGroup>
+
+  <!-- HTML/CSS/JSX страницы отдаются клиенту в рантайме — копируем их в output и publish -->
+  <ItemGroup>
+    <Content Include="Pages\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
   </ItemGroup>
 
 </Project>
