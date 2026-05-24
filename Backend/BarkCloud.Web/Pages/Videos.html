@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BarkCloud — Видео</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,wght@8..144,300;8..144,400;8..144,500;8..144,600;8..144,700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="shared.css"/>
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+  <script type="text/babel" src="shared.jsx"></script>
+  <style>
+    .vid-toolbar { display:flex; align-items:center; gap:14px; margin-bottom: 24px; flex-wrap: wrap; }
+    .vid-toolbar .right { margin-left:auto; display:flex; gap:8px; align-items:center; }
+
+    .sort-dd {
+      display:flex; align-items:center; gap:8px;
+      height: 40px;
+      padding: 0 16px;
+      border: 1px solid var(--md-outline);
+      border-radius: var(--r-full);
+      background: transparent;
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--md-on-surface);
+      cursor: pointer;
+      transition: background var(--d-short);
+    }
+    .sort-dd:hover { background: color-mix(in srgb, var(--md-on-surface) 6%, transparent); }
+    .sort-dd .lbl { color: var(--md-on-surface-variant); }
+
+    /* Featured */
+    .featured-vid {
+      position: relative;
+      aspect-ratio: 21/9;
+      border-radius: var(--r-xl);
+      overflow: hidden;
+      cursor: pointer;
+      margin-bottom: 32px;
+    }
+    .featured-vid .thumb { width:100%; height:100%; border-radius: 0; }
+    .featured-vid .overlay {
+      position: absolute; inset: 0;
+      background: linear-gradient(180deg, rgba(0,0,0,.05) 0%, rgba(0,0,0,.75) 100%);
+      padding: 32px;
+      display:flex; flex-direction:column; justify-content:flex-end;
+      color: #fff;
+    }
+    .featured-vid .play-btn {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      width: 96px; height: 96px;
+      border-radius: var(--r-xl);
+      background: var(--md-primary-container);
+      color: var(--md-on-primary-container);
+      display:flex; align-items:center; justify-content:center;
+      transition: transform var(--d-med) var(--m-emph), border-radius var(--d-med) var(--m-emph);
+      border: none;
+      cursor: pointer;
+    }
+    .featured-vid:hover .play-btn {
+      transform: translate(-50%, -50%) scale(1.06);
+      border-radius: var(--r-full);
+    }
+    .featured-vid .play-btn svg { margin-left: 6px; }
+    .featured-vid .kicker {
+      font-size: 13px;
+      color: rgba(255,255,255,.85);
+      margin-bottom: 12px;
+      display: inline-flex; align-items: center; gap: 10px;
+    }
+    .featured-vid .kicker .pin {
+      background: var(--md-primary-container);
+      color: var(--md-on-primary-container);
+      padding: 4px 12px;
+      border-radius: var(--r-full);
+      font-weight: 500;
+      font-size: 12px;
+    }
+    .featured-vid .title {
+      font-size: 36px;
+      font-weight: 500;
+      line-height: 44px;
+      max-width: 60%;
+      letter-spacing: 0;
+    }
+    .featured-vid .meta-row {
+      margin-top: 16px;
+      display:flex; gap: 24px; flex-wrap: wrap;
+      font-size: 13px;
+      color: rgba(255,255,255,.85);
+    }
+    .featured-vid .meta-row .key { color: rgba(255,255,255,.55); margin-right: 6px; }
+    .featured-vid .duration {
+      position: absolute; top: 20px; right: 20px;
+      font-size: 13px;
+      background: rgba(0,0,0,.55); color: white;
+      padding: 6px 12px; border-radius: var(--r-full);
+      font-weight: 500;
+    }
+    .featured-vid .res-badge {
+      position: absolute; top: 20px; left: 20px;
+      font-size: 12px;
+      background: var(--md-primary); color: var(--md-on-primary);
+      padding: 6px 14px; border-radius: var(--r-full);
+      font-weight: 500;
+    }
+
+    /* Video grid */
+    .vid-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 24px;
+    }
+    .vcard { display:flex; flex-direction:column; gap: 12px; cursor: pointer; }
+    .vcard .vthumb {
+      position: relative;
+      aspect-ratio: 16/9;
+      border-radius: var(--r-lg);
+      overflow: hidden;
+      transition: transform var(--d-short);
+    }
+    .vcard:hover .vthumb { transform: translateY(-3px); }
+    .vcard .vthumb .thumb { width:100%; height:100%; border-radius: var(--r-lg); }
+    .vcard .vthumb .play {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+      width: 56px; height: 56px;
+      border-radius: var(--r-lg);
+      background: var(--md-primary-container);
+      color: var(--md-on-primary-container);
+      display:flex; align-items:center; justify-content:center;
+      border: none;
+      opacity: 0;
+      transition: opacity var(--d-short), border-radius var(--d-med) var(--m-emph);
+    }
+    .vcard:hover .vthumb .play { opacity: 1; border-radius: var(--r-full); }
+    .vcard .vthumb .play svg { margin-left: 4px; }
+    .vcard .dur {
+      position: absolute; bottom: 10px; right: 10px;
+      font-size: 11px;
+      background: rgba(0,0,0,.65); color: white;
+      padding: 4px 8px; border-radius: var(--r-sm);
+      font-weight: 500;
+    }
+    .vcard .res {
+      position: absolute; top: 10px; left: 10px;
+      font-size: 11px;
+      background: rgba(255,255,255,.95); color: var(--md-on-surface);
+      padding: 4px 10px; border-radius: var(--r-full);
+      font-weight: 500;
+    }
+    .vcard .vt {
+      font-size: 15px; font-weight: 500;
+      color: var(--md-on-surface);
+      line-height: 22px;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .vcard .vmeta {
+      font-size: 12px;
+      color: var(--md-on-surface-variant);
+      display: flex; gap: 12px;
+    }
+    .vcard .vmeta .dot { color: var(--md-outline); }
+
+    /* Stat strip — M3 cards */
+    .stat-strip {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 28px;
+    }
+    .stat {
+      background: var(--md-surface-container-low);
+      padding: 20px 22px;
+      border-radius: var(--r-lg);
+      display:flex; flex-direction:column; gap: 6px;
+    }
+    .stat .k {
+      font-size: 13px;
+      color: var(--md-on-surface-variant);
+      font-weight: 500;
+    }
+    .stat .v {
+      font-size: 32px;
+      font-weight: 500;
+      line-height: 40px;
+      color: var(--md-on-surface);
+    }
+    .stat .delta {
+      font-size: 12px;
+      color: var(--md-success);
+      font-weight: 500;
+    }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+
+<!--
+  ╔══════════════════════════════════════════════════════════════════╗
+  ║ SERVER PAYLOAD (Videos.html)                                     ║
+  ╠══════════════════════════════════════════════════════════════════╣
+  ║ JSON-схема:                                                      ║
+  ║   {                                                              ║
+  ║     "stats":    [{ k, v, d? }, ...],                             ║
+  ║     "filters":  [{ key, label, count? }, ...],                   ║
+  ║     "featured": { title, kicker, uploadedAt, dur, quality,       ║
+  ║                   size, codec, gps, resBadge, tint:[a,b] },      ║
+  ║     "videos":   [{ title, dur, res, date, size, t }, ...],       ║
+  ║     "sectionMeta": "12 из 186 · сортировка по дате",             ║
+  ║     "sort": "Новые сначала"                                      ║
+  ║   }                                                              ║
+  ╚══════════════════════════════════════════════════════════════════╝
+-->
+<script type="application/json" id="server-data">
+{{{ page_data_json }}}
+</script>
+
+<script type="text/babel">
+const { AppShell, Icon } = window;
+
+function loadServerData() {
+  try {
+    const raw = document.getElementById('server-data')?.textContent?.trim();
+    if (!raw || raw.startsWith('{{')) return null;
+    return JSON.parse(raw);
+  } catch (e) { console.warn('server-data parse failed', e); return null; }
+}
+const SERVER_DATA = loadServerData();
+
+const FILTERS = SERVER_DATA?.filters ?? [
+  {key:'all', label:'Все', count:'186'},
+  {key:'4k', label:'4K и HDR', count:'42'},
+  {key:'short', label:'Короткие', count:'94'},
+  {key:'long', label:'Длинные'},
+  {key:'screen', label:'Запись экрана', count:'21'},
+  {key:'unedited', label:'Не обработано', count:'8'},
+];
+
+const TINTS = [
+  ['#A8C99A','#3A5A3A'], ['#B4A3D6','#3F2E66'], ['#E8A87C','#5F2F14'],
+  ['#E0BB6F','#6F4A1E'], ['#8FAFCC','#2A4360'], ['#D696B0','#4E2238'],
+  ['#8FC3BB','#1F4540'], ['#C8A78C','#4F3024'], ['#7E9FC3','#1E3550'],
+];
+
+const VIDEOS = SERVER_DATA?.videos ?? [
+  {title:'Утренняя пробежка в парке Горького', dur:'12:34', res:'4K · 60 кадров/с', date:'Сегодня', size:'2,1 ГБ', t:0},
+  {title:'Дикий пляж, drone shot', dur:'4:18', res:'4K HDR', date:'14 мая', size:'890 МБ', t:1},
+  {title:'Выступление на конференции — финальный мастер', dur:'48:02', res:'1080p', date:'12 мая', size:'4,6 ГБ', t:2},
+  {title:'Запись экрана: новая фича сборщика', dur:'7:25', res:'Экран', date:'12 мая', size:'310 МБ', t:3},
+  {title:'Дочка играет на пианино — первый этюд', dur:'2:08', res:'1080p', date:'11 мая', size:'420 МБ', t:4},
+  {title:'Прогулка по старому городу, Прага', dur:'18:42', res:'4K', date:'5 мая', size:'3,8 ГБ', t:5},
+  {title:'Тестовый рендер VFX, версия 04', dur:'0:24', res:'4K HDR', date:'2 мая', size:'180 МБ', t:6},
+  {title:'Гроза с балкона, замедление 240 fps', dur:'1:12', res:'Slo-mo', date:'28 апр', size:'620 МБ', t:7},
+  {title:'Котик и лазерная указка, ч.2', dur:'3:30', res:'1080p', date:'24 апр', size:'520 МБ', t:8},
+  {title:'Дорога на работу, таймлапс', dur:'0:42', res:'Timelapse', date:'21 апр', size:'140 МБ', t:0},
+  {title:'Концерт, второй ряд — полный сет', dur:'1:14:22', res:'1080p', date:'18 апр', size:'7,2 ГБ', t:1},
+  {title:'Семейный обед, бабушкин день рождения', dur:'24:51', res:'1080p · 60 кадров/с', date:'12 апр', size:'5,4 ГБ', t:3},
+];
+
+const STATS = SERVER_DATA?.stats ?? [
+  {k:'Всего видео', v:'186', d:'+12 за месяц'},
+  {k:'4K и HDR', v:'42', d:'+3 за неделю'},
+  {k:'Хронометраж', v:'48 ч 12 м'},
+  {k:'Занято', v:'94,6 ГБ', d:'из 312,4 ГБ медиа'},
+];
+
+const FEATURED = SERVER_DATA?.featured ?? {
+  title: 'Дикий пляж — рассвет, drone shot',
+  kicker: '★ Выбор недели',
+  uploadedAt: 'Загружено 14 мая, 14:08',
+  dur: '4:18',
+  quality: '4K HDR · 60 кадров/с',
+  size: '890 МБ',
+  codec: 'H.265',
+  gps: '55,74° N · 37,62° E',
+  resBadge: '4K HDR',
+  tint: ['#E8A87C','#5A2810'],
+};
+
+const SECTION_META = SERVER_DATA?.sectionMeta ?? '12 из 186 · сортировка по дате';
+const SORT_LABEL = SERVER_DATA?.sort ?? 'Новые сначала';
+
+function App() {
+  const [filter, setFilter] = React.useState('all');
+
+  const actions = (
+    <>
+      <button className="btn outlined"><Icon.filter size={16}/> Фильтр</button>
+      <button className="btn primary"><Icon.upload size={16}/> Загрузить видео</button>
+    </>
+  );
+
+  return (
+    <AppShell
+      page="videos"
+      kicker={<><span>Библиотека</span><span className="sep">/</span><span className="cur">Видео</span></>}
+      title="Видео"
+      actions={actions}
+    >
+      {/* Stats */}
+      <div className="stat-strip">
+        {STATS.map((s,i) => (
+          <div key={i} className="stat">
+            <div className="k">{s.k}</div>
+            <div className="v">{s.v}</div>
+            {s.d && <div className="delta">{s.d}</div>}
+          </div>
+        ))}
+      </div>
+
+      {/* Toolbar */}
+      <div className="vid-toolbar">
+        <div className="chip-row">
+          {FILTERS.map(f => (
+            <button key={f.key}
+              className={"chip" + (filter === f.key ? " active" : "")}
+              onClick={() => setFilter(f.key)}>
+              {filter === f.key && <Icon.check size={16}/>}
+              {f.label}
+              {f.count && <span className="count">{f.count}</span>}
+            </button>
+          ))}
+        </div>
+        <div className="right">
+          <button className="sort-dd">
+            <span className="lbl">Сорт.:</span>
+            <span>{SORT_LABEL}</span>
+            <Icon.chevDown size={16}/>
+          </button>
+        </div>
+      </div>
+
+      {/* Featured */}
+      <div className="featured-vid">
+        <div className="thumb" style={{'--tint-a':FEATURED.tint?.[0]||'#E8A87C','--tint-b':FEATURED.tint?.[1]||'#5A2810'}}/>
+        <div className="overlay">
+          <div className="kicker">
+            <span className="pin">{FEATURED.kicker}</span>
+            <span>{FEATURED.uploadedAt}</span>
+          </div>
+          <div className="title">{FEATURED.title}</div>
+          <div className="meta-row">
+            <span><span className="key">Длит.</span> {FEATURED.dur}</span>
+            <span><span className="key">Качество</span> {FEATURED.quality}</span>
+            <span><span className="key">Размер</span> {FEATURED.size}</span>
+            <span><span className="key">Кодек</span> {FEATURED.codec}</span>
+            {FEATURED.gps && <span><span className="key">GPS</span> {FEATURED.gps}</span>}
+          </div>
+        </div>
+        <button className="play-btn"><Icon.play size={36}/></button>
+        <div className="res-badge">{FEATURED.resBadge}</div>
+        <div className="duration">{FEATURED.dur}</div>
+      </div>
+
+      {/* Section header */}
+      <div className="section-head">
+        <h2>Недавнее</h2>
+        <div className="meta">{SECTION_META}</div>
+      </div>
+
+      {/* Video grid */}
+      <div className="vid-grid">
+        {VIDEOS.map((v, i) => {
+          const tint = TINTS[v.t % TINTS.length];
+          return (
+            <div key={i} className="vcard">
+              <div className="vthumb">
+                <div className="thumb" style={{'--tint-a':tint[0],'--tint-b':tint[1]}}/>
+                <button className="play"><Icon.play size={22}/></button>
+                <div className="res">{v.res}</div>
+                <div className="dur">{v.dur}</div>
+              </div>
+              <div className="vt">{v.title}</div>
+              <div className="vmeta">
+                <span>{v.date}</span><span className="dot">·</span>
+                <span>{v.size}</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </AppShell>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

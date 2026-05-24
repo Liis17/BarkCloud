@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BarkCloud — Файлы</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,wght@8..144,300;8..144,400;8..144,500;8..144,600;8..144,700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="shared.css"/>
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+  <script type="text/babel" src="shared.jsx"></script>
+  <style>
+    .content { padding: 0 !important; }
+    .files-shell {
+      display: grid;
+      grid-template-columns: 1fr 360px;
+      gap: 16px;
+      height: 100%;
+      padding: 4px 16px 16px;
+    }
+    .files-main {
+      display:flex; flex-direction: column;
+      overflow: hidden;
+      background: var(--md-surface-container-low);
+      border-radius: var(--r-xl);
+    }
+    .files-inspector {
+      background: var(--md-surface-container-low);
+      border-radius: var(--r-xl);
+      overflow-y: auto;
+      padding: 24px;
+    }
+
+    /* breadcrumb + toolbar */
+    .files-bar {
+      display: flex; align-items: center; gap: 14px;
+      padding: 16px 24px;
+    }
+    .breadcrumb {
+      display:flex; align-items:center; gap: 2px;
+      font-size: 14px;
+      flex-wrap: wrap;
+    }
+    .breadcrumb a {
+      color: var(--md-on-surface-variant);
+      text-decoration: none;
+      padding: 6px 10px;
+      border-radius: var(--r-full);
+      transition: background var(--d-short), color var(--d-short);
+      font-weight: 500;
+      display: inline-flex; align-items: center;
+    }
+    .breadcrumb a:hover { background: color-mix(in srgb, var(--md-on-surface) 8%, transparent); color: var(--md-on-surface); }
+    .breadcrumb .sep { color: var(--md-outline); font-size: 16px; }
+    .breadcrumb .cur {
+      color: var(--md-on-secondary-container);
+      font-weight: 500;
+      padding: 6px 12px;
+      background: var(--md-secondary-container);
+      border-radius: var(--r-full);
+    }
+    .files-bar .right { margin-left:auto; display:flex; gap:8px; align-items:center; }
+
+    /* Segmented buttons — M3 */
+    .view-toggle {
+      display: inline-flex;
+      background: transparent;
+      border: 1px solid var(--md-outline);
+      border-radius: var(--r-full);
+      overflow: hidden;
+      height: 40px;
+    }
+    .view-toggle button {
+      background: transparent;
+      border: none;
+      padding: 0 16px;
+      cursor: pointer;
+      color: var(--md-on-surface-variant);
+      display: flex; align-items: center; gap: 8px;
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 500;
+      transition: background var(--d-short), color var(--d-short);
+    }
+    .view-toggle button.on {
+      background: var(--md-secondary-container);
+      color: var(--md-on-secondary-container);
+    }
+    .view-toggle button + button { border-left: 1px solid var(--md-outline); }
+    .view-toggle button:hover:not(.on) { background: color-mix(in srgb, var(--md-on-surface) 8%, transparent); }
+
+    /* Primary tabs */
+    .files-tabs {
+      display: flex;
+      padding: 0 16px;
+      border-bottom: 1px solid var(--md-outline-variant);
+      gap: 0;
+    }
+    .files-tab {
+      padding: 14px 20px;
+      background: transparent; border: none; cursor: pointer;
+      color: var(--md-on-surface-variant);
+      font-family: inherit;
+      font-size: 14px; font-weight: 500; letter-spacing: .1px;
+      border-bottom: 3px solid transparent;
+      margin-bottom: -1px;
+      transition: color var(--d-short), border-color var(--d-short);
+      position: relative;
+    }
+    .files-tab:hover { color: var(--md-on-surface); }
+    .files-tab.on { color: var(--md-primary); border-color: var(--md-primary); }
+    .files-tab .count {
+      margin-left: 8px;
+      color: var(--md-on-surface-variant);
+      background: var(--md-surface-container-high);
+      padding: 2px 8px; border-radius: var(--r-full);
+      font-size: 11px;
+      font-weight: 500;
+    }
+    .files-tab.on .count {
+      background: var(--md-primary-container);
+      color: var(--md-on-primary-container);
+    }
+
+    /* Table */
+    .files-list {
+      flex: 1; overflow: auto;
+    }
+    .ftable {
+      width: 100%; border-collapse: collapse;
+      font-size: 14px;
+    }
+    .ftable thead th {
+      position: sticky; top: 0;
+      background: var(--md-surface-container-low);
+      padding: 12px 16px;
+      text-align: left;
+      font-size: 12px;
+      color: var(--md-on-surface-variant);
+      border-bottom: 1px solid var(--md-outline-variant);
+      font-weight: 500;
+      white-space: nowrap;
+    }
+    .ftable thead th:first-child { padding-left: 24px; }
+    .ftable thead th:last-child { padding-right: 24px; text-align: right; }
+
+    .ftable tbody tr {
+      cursor: pointer;
+      transition: background var(--d-short);
+    }
+    .ftable tbody tr:hover { background: color-mix(in srgb, var(--md-on-surface) 6%, transparent); }
+    .ftable tbody tr.selected {
+      background: var(--md-secondary-container);
+    }
+    .ftable tbody tr.selected:hover { background: color-mix(in srgb, var(--md-on-secondary-container) 10%, var(--md-secondary-container)); }
+    .ftable td {
+      padding: 12px 16px;
+      vertical-align: middle;
+      color: var(--md-on-surface);
+      border-bottom: 1px solid var(--md-outline-variant);
+    }
+    .ftable tbody tr.selected td { border-color: transparent; }
+    .ftable td:first-child { padding-left: 24px; }
+    .ftable td:last-child { padding-right: 24px; text-align: right; }
+    .ftable td.name {
+      display: flex; align-items: center; gap: 14px;
+    }
+
+    /* File-type chips — M3 container colors */
+    .file-icon {
+      width: 40px; height: 40px;
+      border-radius: var(--r-md);
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: .3px;
+    }
+    .file-icon.folder { background: var(--md-primary-container); color: var(--md-on-primary-container); }
+    .file-icon.img    { background: #C8E6C9; color: #1B5E20; }
+    .file-icon.vid    { background: #D1C4E9; color: #311B92; }
+    .file-icon.doc    { background: #BBDEFB; color: #0D47A1; }
+    .file-icon.pdf    { background: #FFCDD2; color: #B71C1C; }
+    .file-icon.zip    { background: #FFE0B2; color: #6D4C00; }
+    .file-icon.code   { background: #B2DFDB; color: #004D40; }
+    .file-icon.audio  { background: #F8BBD0; color: #880E4F; }
+
+    .file-name-col .fn { color: var(--md-on-surface); font-weight: 500; }
+    .file-name-col .meta { font-size: 12px; color: var(--md-on-surface-variant); margin-top: 2px; }
+
+    td.size, td.modified { font-size: 13px; color: var(--md-on-surface-variant); }
+    td.modified .ago { font-size: 11px; color: var(--md-outline); margin-top: 2px; display: block; }
+
+    td.owner {
+      display: flex; align-items: center; gap: 10px;
+      color: var(--md-on-surface);
+      font-size: 13px;
+    }
+    td.owner .av {
+      width: 26px; height: 26px; border-radius: 50%;
+      background: var(--md-tertiary-container);
+      color: var(--md-on-tertiary-container);
+      display:flex; align-items:center; justify-content:center;
+      font-weight: 600; font-size: 10px;
+    }
+    td.shared-col { font-size: 12px; color: var(--md-on-surface-variant); font-weight: 500; }
+    td.shared-col.has { color: var(--md-primary); }
+
+    .row-actions { display: inline-flex; gap: 2px; opacity: 0; transition: opacity var(--d-short); }
+    tr:hover .row-actions { opacity: 1; }
+    tr.selected .row-actions { opacity: 1; }
+    .row-actions button {
+      width: 36px; height: 36px;
+      background: transparent;
+      border: none;
+      border-radius: 50%;
+      color: var(--md-on-surface-variant);
+      display:flex; align-items:center; justify-content:center;
+      cursor: pointer;
+      transition: background var(--d-short), color var(--d-short);
+    }
+    .row-actions button:hover { background: color-mix(in srgb, var(--md-on-surface) 10%, transparent); color: var(--md-on-surface); }
+
+    .star-cell {
+      color: var(--md-outline);
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 36px; height: 36px;
+      border-radius: 50%;
+    }
+    .star-cell.on { color: var(--md-primary); }
+    .star-cell:hover { background: color-mix(in srgb, var(--md-on-surface) 8%, transparent); }
+
+    /* INSPECTOR */
+    .insp-preview {
+      aspect-ratio: 4/3;
+      margin-bottom: 20px;
+      position: relative;
+      border-radius: var(--r-lg);
+      overflow: hidden;
+      background: var(--md-surface-container-high);
+    }
+    .insp-preview .thumb { width:100%; height:100%; border-radius: var(--r-lg); }
+    .insp-preview .pin {
+      position: absolute; top: 12px; left: 12px;
+      font-size: 11px;
+      background: rgba(0,0,0,.6);
+      color: white;
+      padding: 6px 10px; border-radius: var(--r-full);
+      font-weight: 500;
+    }
+
+    .insp-name {
+      font-size: 22px;
+      font-weight: 500;
+      line-height: 28px;
+      letter-spacing: 0;
+      margin-bottom: 4px;
+      word-break: break-word;
+      color: var(--md-on-surface);
+    }
+    .insp-path {
+      font-family: 'Roboto Mono', monospace;
+      font-size: 12px;
+      color: var(--md-on-surface-variant);
+      margin-bottom: 20px;
+    }
+    .insp-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+    .insp-actions .btn { width: 100%; height: 40px; font-size: 13px; padding: 0 12px; }
+    .insp-section {
+      border-top: 1px solid var(--md-outline-variant);
+      padding-top: 18px;
+      margin-bottom: 18px;
+    }
+    .insp-section h4 {
+      font-size: 14px;
+      color: var(--md-on-surface);
+      margin-bottom: 12px;
+      font-weight: 500;
+    }
+    .kv-list { display: grid; grid-template-columns: 110px 1fr; gap: 10px 14px; font-size: 13px; }
+    .kv-list dt { color: var(--md-on-surface-variant); font-size: 12px; align-self: center; }
+    .kv-list dd { color: var(--md-on-surface); }
+
+    .tag-row { display: flex; flex-wrap: wrap; gap: 6px; }
+    .tag {
+      font-size: 12px;
+      padding: 6px 12px;
+      border-radius: var(--r-sm);
+      background: var(--md-surface-container-high);
+      color: var(--md-on-surface-variant);
+      font-weight: 500;
+      border: 1px solid transparent;
+    }
+    .tag.accent {
+      background: var(--md-primary-container);
+      color: var(--md-on-primary-container);
+    }
+    .tag.dashed {
+      background: transparent;
+      border-style: dashed;
+      border-color: var(--md-outline);
+      color: var(--md-on-surface-variant);
+      cursor: pointer;
+    }
+    .tag.dashed:hover { border-color: var(--md-primary); color: var(--md-primary); }
+
+    .share-list { display: flex; flex-direction: column; gap: 12px; }
+    .share-row { display: flex; align-items: center; gap: 12px; font-size: 13px; }
+    .share-row .av {
+      width: 32px; height: 32px; border-radius: 50%;
+      display:flex; align-items:center; justify-content:center;
+      font-weight: 600;
+      font-size: 11px;
+      flex-shrink: 0;
+    }
+    .share-row .nm { color: var(--md-on-surface); }
+    .share-row .perm {
+      margin-left: auto;
+      color: var(--md-on-surface-variant);
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .activity-row { display: flex; gap: 14px; padding: 12px 0; border-bottom: 1px solid var(--md-outline-variant); }
+    .activity-row:last-child { border: none; padding-bottom: 0; }
+    .activity-row .dot {
+      width: 10px; height: 10px; border-radius: 50%;
+      background: var(--md-primary);
+      margin-top: 7px;
+      flex-shrink: 0;
+    }
+    .activity-row.older .dot { background: var(--md-outline-variant); }
+    .activity-row .who { font-size: 13px; color: var(--md-on-surface); font-weight: 500; }
+    .activity-row .what { font-size: 13px; color: var(--md-on-surface-variant); margin-top: 2px; }
+    .activity-row .when { font-size: 11px; color: var(--md-outline); margin-top: 4px; }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+
+<!--
+  ╔═══════════════════════════════════════════════════════════════╗
+  ║ SERVER PAYLOAD (Files.html)                                       ║
+  ╠═══════════════════════════════════════════════════════════════╣
+  ║ Сервер должен заменить всё содержимое блока ниже на JSON      ║
+  ║ вида:                                                            ║
+  ║   {                                                              ║
+  ║     "tabs":       [{ key, label, count }, ...],                  ║
+  ║     "breadcrumb": [{ label, href }, ...],                        ║
+  ║     "files":      [{ id, kind, ext, name, meta, size, ... },...],║
+  ║     "selectedId": <id выбранного файла из files>           ║
+  ║   }                                                              ║
+  ║                                                                  ║
+  ║ Поля файла в files[]:                                          ║
+  ║   id, kind, ext, name, meta, size, mod, ago, owner, tone,        ║
+  ║   shared, star, path, details:{type,size,dim,cam,created,...},   ║
+  ║   tags:[...], people:[{initials,tone,name,role}], activity:[...]  ║
+  ╚═══════════════════════════════════════════════════════════════╝
+-->
+<script type="application/json" id="server-data">
+{{{ page_data_json }}}
+</script>
+
+<script type="text/babel">
+const { AppShell, Icon } = window;
+
+// ── Считываем данные сервера (с fallback на демо для режима дизайн-превью) ──
+function loadServerData() {
+  try {
+    const raw = document.getElementById('server-data')?.textContent?.trim();
+    if (!raw || raw.startsWith('{{')) return null;
+    return JSON.parse(raw);
+  } catch (e) { console.warn('server-data parse failed', e); return null; }
+}
+const SERVER_DATA = loadServerData();
+
+const TABS = SERVER_DATA?.tabs ?? [
+  {key:'all', label:'Всё', count: 124},
+  {key:'recent', label:'Недавнее', count: 18},
+  {key:'starred', label:'Избранное', count: 9},
+  {key:'shared', label:'Общие', count: 23},
+  {key:'trash', label:'Корзина', count: 4},
+];
+
+const BREADCRUMB = SERVER_DATA?.breadcrumb ?? [
+  {label:'projects', href:'#'},
+  {label:'2026', href:'#'},
+  {label:'photos', href:'#'},
+  {label:'raw', href:'#', current:true},
+];
+
+const FILES = SERVER_DATA?.files ?? [
+  {id:'f1', kind:'folder', ext:'DIR', name:'Проекты', meta:'12 папок · 84 файла', size:'4,2 ГБ', mod:'14 мая 2026', ago:'4 дня назад', owner:'Я', tone:'p', shared:'3 чел.', star:true, tags:['рабочее','архив']},
+  {id:'f2', kind:'folder', ext:'DIR', name:'Фото · 2026', meta:'8 альбомов', size:'62,4 ГБ', mod:'18 мая 2026', ago:'Сегодня', owner:'Я', tone:'p', shared:'—', star:false},
+  {id:'f3', kind:'folder', ext:'DIR', name:'Документы', meta:'46 файлов', size:'182 МБ', mod:'17 мая 2026', ago:'Вчера', owner:'Я', tone:'p', shared:'2 чел.', star:true},
+  {id:'f4', kind:'img', ext:'RAW', name:'IMG_2026_05_18_14-07-32.arw', meta:'Sony A7 IV · 24 мм', size:'48,2 МБ', mod:'18 мая 2026', ago:'2 ч назад', owner:'Я', tone:'p', shared:'—', star:false,
+    path:'/projects/2026/photos/raw/',
+    details:{type:'Sony RAW (.arw)', size:'48,2 МБ', dim:'7008 × 4672', cam:'Sony α7 IV · 24 мм · f/4 · ISO 200', created:'18 мая 2026, 14:07', modified:'2 часа назад', gps:'55,74° N · 37,62° E', sha:'a4f9c2b8…e7d1c014'},
+    tags:[{l:'проекты', accent:true},{l:'портфолио'},{l:'не обработано'},{l:'2026'}],
+    people:[
+      {initials:'АК', tone:'p', name:'Антон К. (вы)', role:'Владелец'},
+      {initials:'ЛС', tone:'g', name:'Лена С.', role:'Редактор'},
+      {initials:'ДО', tone:'v', name:'Дима О.', role:'Просмотр'},
+    ],
+    activity:[
+      {who:'Антон К.', what:'загрузил файл', when:'2 часа назад · 14:08', fresh:true},
+      {who:'Лена С.', what:'получила доступ «Редактор»', when:'1 ч 14 мин назад'},
+      {who:'Дима О.', what:'открыл предпросмотр', when:'22 мин назад'},
+    ],
+  },
+  {id:'f5', kind:'pdf', ext:'PDF', name:'Контракт_2026_BarkCloud_v3.pdf', meta:'18 стр.', size:'2,4 МБ', mod:'17 мая 2026', ago:'Вчера', owner:'Лена С.', tone:'s', shared:'4 чел.', star:false},
+  {id:'f6', kind:'doc', ext:'MD', name:'Roadmap Q2-Q3.md', meta:'Markdown', size:'14 КБ', mod:'17 мая 2026', ago:'Вчера', owner:'Я', tone:'p', shared:'7 чел.', star:true},
+  {id:'f7', kind:'vid', ext:'MP4', name:'concert_full_master.mp4', meta:'1080p · 1:14:22', size:'7,2 ГБ', mod:'18 апр 2026', ago:'Месяц назад', owner:'Я', tone:'p', shared:'—', star:false},
+  {id:'f8', kind:'zip', ext:'ZIP', name:'design-system-2026-q2.zip', meta:'из 142 файлов', size:'318 МБ', mod:'16 мая 2026', ago:'2 дня назад', owner:'Я', tone:'p', shared:'—', star:false},
+  {id:'f9', kind:'code', ext:'JSX', name:'CloudSync.controller.jsx', meta:'React · 842 строки', size:'42 КБ', mod:'15 мая 2026', ago:'3 дня назад', owner:'Дима О.', tone:'t', shared:'2 чел.', star:false},
+  {id:'f10', kind:'audio', ext:'FLAC', name:'recording-podcast-ep04.flac', meta:'48 кГц · стерео', size:'412 МБ', mod:'10 мая 2026', ago:'Неделю назад', owner:'Я', tone:'p', shared:'1 чел.', star:false},
+  {id:'f11', kind:'doc', ext:'XLS', name:'Бюджет-проекта-2026.xlsx', meta:'8 листов', size:'1,1 МБ', mod:'8 мая 2026', ago:'10 дней назад', owner:'Лена С.', tone:'s', shared:'5 чел.', star:false},
+  {id:'f12', kind:'img', ext:'PNG', name:'screenshot_dashboard_v12.png', meta:'2880 × 1800', size:'4,8 МБ', mod:'7 мая 2026', ago:'11 дней назад', owner:'Я', tone:'p', shared:'—', star:false},
+];
+
+const INITIAL_SELECTED_ID = SERVER_DATA?.selectedId ?? 'f4';
+
+function avBg(tone) {
+  if (tone === 'p') return 'var(--md-primary-container)';
+  if (tone === 's') return '#C8E6C9';
+  if (tone === 't') return '#D1C4E9';
+  return 'var(--md-surface-container-highest)';
+}
+function avFg(tone) {
+  if (tone === 'p') return 'var(--md-on-primary-container)';
+  if (tone === 's') return '#1B5E20';
+  if (tone === 't') return '#311B92';
+  return 'var(--md-on-surface)';
+}
+
+function FileRow({ f, selected, onSelect }) {
+  return (
+    <tr className={selected ? 'selected' : ''} onClick={onSelect}>
+      <td style={{width: 44, textAlign:'center', padding:'8px 4px'}}>
+        <span className={"star-cell" + (f.star ? ' on' : '')}>
+          <Icon.star size={18}/>
+        </span>
+      </td>
+      <td className="name">
+        <div className={"file-icon " + f.kind}>{f.ext}</div>
+        <div className="file-name-col">
+          <div className="fn">{f.name}</div>
+          <div className="meta">{f.meta}</div>
+        </div>
+      </td>
+      <td className="owner">
+        <div className="av" style={{background: avBg(f.tone), color: avFg(f.tone)}}>
+          {f.owner === 'Я' ? 'АК' : f.owner.split(' ').map(s=>s[0]).join('').slice(0,2)}
+        </div>
+        {f.owner}
+      </td>
+      <td className="size">{f.size}</td>
+      <td className="modified">
+        {f.mod}
+        <span className="ago">{f.ago}</span>
+      </td>
+      <td className={"shared-col" + (f.shared !== '—' ? ' has' : '')}>{f.shared}</td>
+      <td>
+        <span className="row-actions">
+          <button title="Поделиться"><Icon.share size={18}/></button>
+          <button title="Скачать"><Icon.download size={18}/></button>
+          <button title="Ещё"><Icon.more size={18}/></button>
+        </span>
+      </td>
+    </tr>
+  );
+}
+
+function Inspector({ f }) {
+  if (!f) return null;
+  const d = f.details || {};
+  return (
+    <div>
+      <div className="insp-preview">
+        <div className="thumb" style={{'--tint-a':'#D9A87E','--tint-b':'#8A5A3A'}}/>
+        <div className="pin">{f.ext} · предпросмотр</div>
+      </div>
+      <div className="insp-name">{f.name}</div>
+      <div className="insp-path">{f.path || '—'}</div>
+
+      <div className="insp-actions">
+        <button className="btn primary"><Icon.download size={16}/> Скачать</button>
+        <button className="btn"><Icon.share size={16}/> Поделиться</button>
+        <button className="btn outlined"><Icon.eye size={16}/> Открыть</button>
+        <button className="btn outlined"><Icon.pencil size={16}/> Переименовать</button>
+      </div>
+
+      <div className="insp-section">
+        <h4>Детали</h4>
+        <dl className="kv-list">
+          {d.type     && <React.Fragment><dt>Тип</dt><dd>{d.type}</dd></React.Fragment>}
+          {d.size     && <React.Fragment><dt>Размер</dt><dd>{d.size}</dd></React.Fragment>}
+          {d.dim      && <React.Fragment><dt>Размерность</dt><dd>{d.dim}</dd></React.Fragment>}
+          {d.cam      && <React.Fragment><dt>Камера</dt><dd>{d.cam}</dd></React.Fragment>}
+          {d.created  && <React.Fragment><dt>Создан</dt><dd>{d.created}</dd></React.Fragment>}
+          {d.modified && <React.Fragment><dt>Изменён</dt><dd>{d.modified}</dd></React.Fragment>}
+          {d.gps      && <React.Fragment><dt>GPS</dt><dd>{d.gps}</dd></React.Fragment>}
+          {d.sha      && <React.Fragment><dt>SHA-256</dt><dd className="mono" style={{fontSize:11, color:'var(--md-on-surface-variant)', wordBreak:'break-all'}}>{d.sha}</dd></React.Fragment>}
+        </dl>
+      </div>
+
+      {f.tags && f.tags.length > 0 && (
+        <div className="insp-section">
+          <h4>Метки</h4>
+          <div className="tag-row">
+            {f.tags.map((t, i) => (
+              <span key={i} className={"tag" + (t.accent ? ' accent' : '')}>{t.l}</span>
+            ))}
+            <span className="tag dashed">+ метка</span>
+          </div>
+        </div>
+      )}
+
+      {f.people && f.people.length > 0 && (
+        <div className="insp-section">
+          <h4>Доступ — {f.people.length} {f.people.length === 1 ? 'человек' : 'человека'}</h4>
+          <div className="share-list">
+            {f.people.map((p, i) => (
+              <div key={i} className="share-row">
+                <div className="av" style={{background: avBg(p.tone), color: avFg(p.tone)}}>{p.initials}</div>
+                <span className="nm">{p.name}</span>
+                <span className="perm">{p.role}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {f.activity && f.activity.length > 0 && (
+        <div className="insp-section">
+          <h4>Активность</h4>
+          {f.activity.map((a, i) => (
+            <div key={i} className={"activity-row" + (a.fresh ? '' : ' older')}>
+              <div className="dot"/>
+              <div>
+                <div className="who">{a.who}</div>
+                <div className="what">{a.what}</div>
+                <div className="when">{a.when}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function App() {
+  const [tab, setTab] = React.useState('all');
+  const initialIdx = Math.max(0, FILES.findIndex(f => f.id === INITIAL_SELECTED_ID));
+  const [sel, setSel] = React.useState(initialIdx === -1 ? 0 : initialIdx);
+
+  const actions = (
+    <>
+      <button className="btn outlined"><Icon.plus size={16}/> Создать</button>
+      <button className="btn primary"><Icon.upload size={16}/> Загрузить</button>
+    </>
+  );
+
+  return (
+    <AppShell
+      page="files"
+      kicker={<><span>Библиотека</span><span className="sep">/</span><span className="cur">Файлы</span></>}
+      title="Файлы"
+      actions={actions}
+    >
+      <div className="files-shell">
+        <div className="files-main">
+          {/* Breadcrumb bar */}
+          <div className="files-bar">
+            <div className="breadcrumb">
+              <a href="#"><Icon.folder size={18}/></a>
+              {BREADCRUMB.map((b, i) => (
+                <React.Fragment key={i}>
+                  <span className="sep">/</span>
+                  {b.current
+                    ? <span className="cur">{b.label}</span>
+                    : <a href={b.href || '#'}>{b.label}</a>}
+                </React.Fragment>
+              ))}
+            </div>
+            <div className="right">
+              <div className="view-toggle">
+                <button className="on"><Icon.list size={18}/> Список</button>
+                <button><Icon.grid size={18}/> Сетка</button>
+              </div>
+            </div>
+          </div>
+
+          {/* Tabs */}
+          <div className="files-tabs">
+            {TABS.map(t => (
+              <button key={t.key}
+                className={"files-tab" + (tab === t.key ? ' on' : '')}
+                onClick={() => setTab(t.key)}>
+                {t.label} <span className="count">{t.count}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* Table */}
+          <div className="files-list">
+            <table className="ftable">
+              <thead>
+                <tr>
+                  <th style={{width: 44}}></th>
+                  <th>Имя</th>
+                  <th style={{width: 160}}>Владелец</th>
+                  <th style={{width: 96}}>Размер</th>
+                  <th style={{width: 160}}>Изменён</th>
+                  <th style={{width: 110}}>Доступ</th>
+                  <th style={{width: 130}}></th>
+                </tr>
+              </thead>
+              <tbody>
+                {FILES.map((f, i) => (
+                  <FileRow key={i} f={f} selected={i === sel} onSelect={() => setSel(i)}/>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Inspector */}
+        <aside className="files-inspector">
+          <Inspector f={FILES[sel]}/>
+        </aside>
+      </div>
+    </AppShell>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

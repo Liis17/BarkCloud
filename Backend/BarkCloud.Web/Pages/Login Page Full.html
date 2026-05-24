@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BarkCloud — Войти</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,wght@8..144,300;8..144,400;8..144,500;8..144,600;8..144,700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+  <!--
+    SERVER-SIDE TEMPLATE VARIABLES (Login Page)
+    ──────────────────────────────────────────
+    app.version         — "v2.4.1"
+    server.host         — "cloud.bark.io"
+    server.tls          — "TLS 1.3"
+    server.online       — boolean (JSON), влияет на индикатор
+    form.email          — предзаполненный email (при ошибке / remember-me)
+    form.attempts_left  — "3"
+    flash.kind          — "" | "error" | "2fa"  (определяет экран)
+    sso.enabled         — boolean (JSON)
+    year                — "2026"
+  -->
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --md-primary:               #9A4F1E;
+      --md-on-primary:            #FFFFFF;
+      --md-primary-container:     #FFDCC2;
+      --md-on-primary-container:  #341100;
+      --md-secondary-container:   #FFDCC2;
+      --md-on-secondary-container:#2B170A;
+      --md-tertiary-container:    #EBE49B;
+      --md-on-tertiary-container: #1D1C00;
+
+      --md-error:                 #BA1A1A;
+      --md-error-container:       #FFDAD6;
+      --md-on-error-container:    #410002;
+      --md-success:               #2E7D32;
+
+      --md-surface:               #FFF8F5;
+      --md-surface-container-low: #FFF1E9;
+      --md-surface-container:     #FBEBE1;
+      --md-surface-container-high:#F5E5DC;
+      --md-surface-container-highest:#F0DFD6;
+      --md-on-surface:            #211A15;
+      --md-on-surface-variant:    #52443C;
+      --md-outline:               #847469;
+      --md-outline-variant:       #D7C2B5;
+
+      --r-sm:  8px;
+      --r-md:  12px;
+      --r-lg:  16px;
+      --r-xl:  28px;
+      --r-full:9999px;
+
+      --m-emph: cubic-bezier(0.2, 0, 0, 1.0);
+      --d-short: 150ms;
+      --d-med: 300ms;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--md-surface);
+      color: var(--md-on-surface);
+      font-family: 'Roboto Flex', 'Roboto', system-ui, sans-serif;
+      overflow: hidden;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    /* Stage */
+    .stage {
+      position: relative;
+      width: 100vw; height: 100vh;
+      overflow: hidden;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      background: var(--md-surface);
+    }
+
+    /* Decorative organic shapes — M3 Expressive style, no glow */
+    .shape-deco {
+      position: absolute;
+      pointer-events: none;
+      z-index: 0;
+    }
+    .shape-a {
+      top: -120px; right: -80px;
+      width: 480px; height: 480px;
+      background: var(--md-primary-container);
+      border-radius: 60% 40% 55% 45% / 50% 60% 40% 50%;
+      opacity: .9;
+      animation: morph1 28s ease-in-out infinite;
+    }
+    .shape-b {
+      bottom: -160px; left: -100px;
+      width: 520px; height: 520px;
+      background: var(--md-tertiary-container);
+      border-radius: 50% 50% 40% 60% / 45% 55% 45% 55%;
+      opacity: .55;
+      animation: morph2 32s ease-in-out infinite;
+    }
+    .shape-c {
+      top: 38%; left: 56%;
+      width: 280px; height: 280px;
+      background: var(--md-secondary-container);
+      border-radius: 60% 40% 50% 50% / 50% 55% 45% 50%;
+      opacity: .7;
+      animation: morph3 24s ease-in-out infinite;
+    }
+    @keyframes morph1 {
+      0%,100% { border-radius: 60% 40% 55% 45% / 50% 60% 40% 50%; transform: translate(0,0); }
+      50%     { border-radius: 45% 55% 40% 60% / 55% 45% 60% 40%; transform: translate(40px, 30px); }
+    }
+    @keyframes morph2 {
+      0%,100% { border-radius: 50% 50% 40% 60% / 45% 55% 45% 55%; transform: translate(0,0); }
+      50%     { border-radius: 42% 58% 50% 50% / 55% 45% 55% 45%; transform: translate(-30px, -40px); }
+    }
+    @keyframes morph3 {
+      0%,100% { border-radius: 60% 40% 50% 50% / 50% 55% 45% 50%; transform: translate(0,0); }
+      50%     { border-radius: 40% 60% 55% 45% / 55% 45% 60% 40%; transform: translate(-50px, 20px); }
+    }
+
+    /* Header */
+    header.topbar {
+      position: relative; z-index: 5;
+      padding: 20px 32px;
+      display: flex; justify-content: space-between; align-items: center;
+      background: var(--md-surface);
+    }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .brand-mark {
+      width: 40px; height: 40px;
+      border-radius: 12px;
+      background: var(--md-primary-container);
+      color: var(--md-on-primary-container);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .brand-name {
+      font-size: 18px; font-weight: 600;
+      color: var(--md-on-surface);
+    }
+    .brand-name .v {
+      color: var(--md-on-surface-variant);
+      font-weight: 400; margin-left: 8px;
+      font-size: 13px;
+    }
+
+    .top-meta {
+      display: flex; align-items: center; gap: 20px;
+      font-size: 13px;
+      color: var(--md-on-surface-variant);
+      font-weight: 500;
+    }
+    .meta-item { display: flex; align-items: center; gap: 8px; }
+    .meta-item .dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--md-success);
+    }
+    .host-name { color: var(--md-primary); font-family: 'Roboto Mono', monospace; font-size: 12px; }
+    .lang-pill {
+      border: 1px solid var(--md-outline);
+      border-radius: var(--r-full);
+      padding: 6px 14px;
+      cursor: pointer;
+      transition: background var(--d-short);
+      color: var(--md-on-surface);
+      font-weight: 500;
+      font-size: 13px;
+    }
+    .lang-pill:hover { background: color-mix(in srgb, var(--md-on-surface) 8%, transparent); }
+
+    /* Center */
+    main.center-wrap {
+      position: relative; z-index: 2;
+      display: flex; align-items: center; justify-content: center;
+      padding: 24px;
+    }
+
+    /* Card — M3 surface-container */
+    .glass {
+      position: relative;
+      width: 440px;
+      max-width: 100%;
+      background: var(--md-surface-container-low);
+      border-radius: var(--r-xl);
+      padding: 36px 36px 32px;
+      display: flex; flex-direction: column; gap: 22px;
+      animation: rise .6s var(--m-emph) both;
+    }
+    @keyframes rise { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: none; } }
+
+    .glass-header { display: flex; align-items: center; gap: 14px; }
+    .glass-header .mark {
+      width: 48px; height: 48px;
+      border-radius: 14px;
+      background: var(--md-primary);
+      color: var(--md-on-primary);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .glass-header .label {
+      font-size: 13px;
+      color: var(--md-on-surface-variant);
+      font-weight: 500;
+      letter-spacing: .1px;
+    }
+    .glass-header .label .name { color: var(--md-on-surface); font-weight: 600; }
+
+    .glass h1 {
+      font-size: 36px;
+      line-height: 44px;
+      font-weight: 500;
+      color: var(--md-on-surface);
+      letter-spacing: 0;
+    }
+    .glass h1 .accent { color: var(--md-primary); }
+    .glass .sub {
+      font-size: 15px;
+      color: var(--md-on-surface-variant);
+      margin-top: -12px;
+      line-height: 22px;
+    }
+
+    /* Form */
+    .fields { display: flex; flex-direction: column; gap: 14px; }
+    .field { display: flex; flex-direction: column; gap: 0; }
+    .field-label {
+      display: flex; justify-content: space-between; align-items: center;
+      font-size: 13px;
+      color: var(--md-on-surface-variant);
+      font-weight: 500;
+      margin-bottom: 6px;
+    }
+    .field-label .hint { color: var(--md-primary); cursor: pointer; text-decoration: none; font-weight: 500; }
+    .field-label .hint:hover { text-decoration: underline; }
+
+    /* M3 filled text field */
+    .input-wrap {
+      position: relative;
+      display: flex; align-items: center;
+    }
+    .input-wrap input {
+      width: 100%;
+      background: var(--md-surface-container);
+      border: none;
+      border-bottom: 1px solid var(--md-outline);
+      border-radius: var(--r-sm) var(--r-sm) 0 0;
+      color: var(--md-on-surface);
+      font-family: inherit;
+      font-size: 16px;
+      padding: 14px 16px;
+      outline: none;
+      transition: background var(--d-short), border-color var(--d-short);
+    }
+    .input-wrap input::placeholder { color: var(--md-on-surface-variant); }
+    .input-wrap input:hover { background: var(--md-surface-container-high); }
+    .input-wrap input:focus {
+      background: var(--md-surface-container-high);
+      border-bottom: 2px solid var(--md-primary);
+      padding-bottom: 13px;
+    }
+    .input-wrap.has-icon input { padding-right: 48px; }
+    .eye-btn {
+      position: absolute; right: 8px;
+      width: 40px; height: 40px;
+      background: transparent; border: none; cursor: pointer;
+      color: var(--md-on-surface-variant);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      transition: background var(--d-short), color var(--d-short);
+    }
+    .eye-btn:hover { background: color-mix(in srgb, var(--md-on-surface) 8%, transparent); color: var(--md-on-surface); }
+
+    /* Error state */
+    .glass.has-error .input-wrap input {
+      background: var(--md-error-container);
+      border-bottom-color: var(--md-error);
+    }
+    .err-banner {
+      display: flex; align-items: flex-start; gap: 12px;
+      padding: 14px 16px;
+      background: var(--md-error-container);
+      border-radius: var(--r-md);
+      font-size: 14px;
+      color: var(--md-on-error-container);
+    }
+    .err-banner svg { flex-shrink: 0; margin-top: 2px; color: var(--md-error); }
+
+    /* Bottom row */
+    .row-bottom {
+      display: flex; justify-content: space-between; align-items: center;
+      font-size: 14px;
+      margin-top: 4px;
+    }
+    .remember {
+      display: flex; align-items: center; gap: 10px;
+      cursor: pointer; color: var(--md-on-surface); user-select: none;
+      font-weight: 500;
+    }
+    .remember input { display: none; }
+    .check-mark {
+      width: 20px; height: 20px;
+      border-radius: var(--r-sm);
+      border: 2px solid var(--md-outline);
+      background: transparent;
+      display: flex; align-items: center; justify-content: center;
+      transition: background var(--d-short), border-color var(--d-short);
+    }
+    .remember input:checked + .check-mark {
+      background: var(--md-primary);
+      border-color: var(--md-primary);
+    }
+    .remember input:checked + .check-mark::after {
+      content: '';
+      width: 10px; height: 6px;
+      border-left: 2px solid var(--md-on-primary);
+      border-bottom: 2px solid var(--md-on-primary);
+      transform: rotate(-45deg) translate(1px, -1px);
+    }
+    .row-bottom a.forgot { color: var(--md-on-surface-variant); text-decoration: none; font-weight: 500; }
+    .row-bottom a.forgot:hover { color: var(--md-primary); }
+
+    /* Primary button */
+    .btn-primary {
+      width: 100%;
+      height: 56px;
+      background: var(--md-primary);
+      border: none;
+      border-radius: var(--r-full);
+      color: var(--md-on-primary);
+      font-family: inherit;
+      font-size: 16px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: filter var(--d-short), box-shadow var(--d-short);
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      margin-top: 4px;
+    }
+    .btn-primary:hover { filter: brightness(1.06); box-shadow: 0 2px 6px rgba(0,0,0,.1); }
+    .btn-primary:active { filter: brightness(.94); }
+
+    /* Divider */
+    .divider-row {
+      display: flex; align-items: center; gap: 12px;
+      color: var(--md-on-surface-variant);
+      font-size: 13px;
+      font-weight: 500;
+    }
+    .divider-row::before, .divider-row::after {
+      content: ''; flex: 1; height: 1px; background: var(--md-outline-variant);
+    }
+
+    /* SSO row */
+    .sso-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .sso-btn {
+      background: transparent;
+      border: 1px solid var(--md-outline);
+      border-radius: var(--r-full);
+      color: var(--md-on-surface);
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 500;
+      padding: 12px 14px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      transition: background var(--d-short);
+    }
+    .sso-btn:hover { background: color-mix(in srgb, var(--md-on-surface) 6%, transparent); }
+
+    .below-card {
+      margin-top: 24px;
+      text-align: center;
+      font-size: 15px;
+      color: var(--md-on-surface-variant);
+    }
+    .below-card a { color: var(--md-primary); text-decoration: none; font-weight: 500; }
+    .below-card a:hover { text-decoration: underline; }
+
+    /* 2FA */
+    .otp-row { display: flex; gap: 8px; justify-content: space-between; }
+    .otp-row input {
+      width: 54px; height: 64px;
+      text-align: center;
+      font-family: inherit;
+      font-size: 28px;
+      font-weight: 500;
+      background: var(--md-surface-container);
+      border: none;
+      border-bottom: 1px solid var(--md-outline);
+      border-radius: var(--r-sm) var(--r-sm) 0 0;
+      color: var(--md-on-surface);
+      outline: none;
+      transition: background var(--d-short), border-color var(--d-short);
+    }
+    .otp-row input:focus {
+      border-bottom: 2px solid var(--md-primary);
+      background: var(--md-surface-container-high);
+    }
+    .otp-resend { font-size: 14px; color: var(--md-on-surface-variant); text-align: center; }
+    .otp-resend a { color: var(--md-primary); text-decoration: none; font-weight: 500; }
+    .back-link {
+      background: transparent; border: none;
+      color: var(--md-on-surface-variant); font-size: 14px; cursor: pointer;
+      font-family: inherit;
+      display: flex; align-items: center; gap: 8px;
+      padding: 0; margin-top: -8px;
+      font-weight: 500;
+      transition: color var(--d-short);
+    }
+    .back-link:hover { color: var(--md-on-surface); }
+
+    /* Footer */
+    footer.footbar {
+      position: relative; z-index: 5;
+      padding: 14px 32px;
+      display: flex; justify-content: space-between; align-items: center;
+      background: var(--md-surface);
+      font-size: 12px;
+      color: var(--md-on-surface-variant);
+      font-weight: 500;
+    }
+    .foot-links { display: flex; gap: 24px; }
+    .foot-links a { color: var(--md-on-surface-variant); text-decoration: none; transition: color var(--d-short); }
+    .foot-links a:hover { color: var(--md-primary); }
+
+    @keyframes shake {
+      0%,100%{transform:translateX(0)}
+      20%,60%{transform:translateX(-6px)}
+      40%,80%{transform:translateX(6px)}
+    }
+    .shake { animation: shake .4s ease-in-out; }
+
+    @media (max-width: 520px) {
+      .glass { width: 100%; padding: 28px 22px; }
+      .glass h1 { font-size: 28px; line-height: 36px; }
+      header.topbar, footer.footbar { padding-left: 18px; padding-right: 18px; }
+      .top-meta .meta-item:first-child { display: none; }
+      .otp-row input { width: 44px; height: 56px; font-size: 22px; }
+    }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const CloudIcon = ({ size = 22 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M17.5 19a4.5 4.5 0 0 0 0-9 .5.5 0 0 1-.5-.5 5 5 0 0 0-9.9-1 4 4 0 0 0-3.6 4 4 4 0 0 0 4 4.5h10z"/>
+  </svg>
+);
+const EyeIcon = ({ open }) => open ? (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+) : (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+);
+const AlertIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+);
+const KeyIcon = () => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+);
+const GithubIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .3a12 12 0 0 0-3.8 23.38c.6.12.83-.26.83-.57v-2c-3.34.72-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.08-.74.09-.73.09-.73 1.2.08 1.84 1.23 1.84 1.23 1.07 1.83 2.81 1.3 3.5.99.1-.78.42-1.3.76-1.6-2.66-.3-5.46-1.33-5.46-5.93 0-1.31.47-2.38 1.24-3.22-.13-.3-.54-1.53.11-3.17 0 0 1-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.28-1.55 3.28-1.23 3.28-1.23.66 1.64.25 2.87.13 3.17.77.84 1.23 1.91 1.23 3.22 0 4.61-2.8 5.62-5.48 5.92.43.37.81 1.1.81 2.22v3.29c0 .31.21.69.83.57A12 12 0 0 0 12 .3"/></svg>
+);
+const ArrowIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+);
+const BackArrow = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+);
+
+function OtpRow() {
+  const [vals, setVals] = React.useState(['','','','','','']);
+  const refs = React.useRef([]);
+  function set(i, v) {
+    const ch = v.replace(/\D/g,'').slice(-1);
+    const next = [...vals];
+    next[i] = ch;
+    setVals(next);
+    if (ch && i < 5) refs.current[i+1]?.focus();
+  }
+  function onKey(i, e) {
+    if (e.key === 'Backspace' && !vals[i] && i > 0) refs.current[i-1]?.focus();
+  }
+  return (
+    <div className="otp-row">
+      {vals.map((v,i) => (
+        <input key={i}
+          ref={el => refs.current[i] = el}
+          value={v}
+          onChange={e => set(i, e.target.value)}
+          onKeyDown={e => onKey(i, e)}
+          inputMode="numeric"
+          maxLength={1}
+        />
+      ))}
+    </div>
+  );
+}
+
+function LoginCard({ state, showSSO }) {
+  const [showPw, setShowPw] = React.useState(false);
+  const [email, setEmail] = React.useState(state === 'error' ? '{{ form.email }}' : '');
+  const [pw, setPw] = React.useState(state === 'error' ? '{{ form.password_masked }}' : '');
+  const [shake, setShake] = React.useState(false);
+
+  function handleSubmit(e) {
+    e.preventDefault();
+    if (state === 'error') {
+      setShake(true);
+      setTimeout(() => setShake(false), 400);
+    }
+  }
+
+  if (state === '2fa') {
+    return (
+      <div className="glass">
+        <button className="back-link"><BackArrow/> Назад</button>
+        <div className="glass-header">
+          <div className="mark"><KeyIcon/></div>
+          <div className="label">Шаг 2 из 2 — <span className="name">2FA</span></div>
+        </div>
+        <h1>Код<br/>подтверждения</h1>
+        <p className="sub">Введите 6-значный код из приложения-аутентификатора.</p>
+        <OtpRow/>
+        <button className="btn-primary" onClick={handleSubmit}>Подтвердить <ArrowIcon/></button>
+        <p className="otp-resend">Не получили код? <a href="#">Отправить снова</a></p>
+      </div>
+    );
+  }
+
+  return (
+    <div className={"glass" + (state === 'error' ? ' has-error' : '') + (shake ? ' shake' : '')}>
+      <div className="glass-header">
+        <div className="mark"><CloudIcon size={24}/></div>
+        <div className="label">Вход в <span className="name">BarkCloud</span></div>
+      </div>
+      <h1>Войти в<br/><span className="accent">хранилище</span></h1>
+      <p className="sub">Личный сервер. Только вы и ваши файлы.</p>
+
+      {state === 'error' && (
+        <div className="err-banner">
+          <AlertIcon/>
+          <div>
+            <div style={{fontWeight:600, marginBottom:2}}>Неверный логин или пароль</div>
+            <div style={{fontSize:13, opacity:.85}}>Осталось {"{{ form.attempts_left }}"} попытки до временной блокировки.</div>
+          </div>
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} style={{display:'flex',flexDirection:'column',gap:14}}>
+        <div className="field">
+          <div className="field-label"><span>Email или логин</span></div>
+          <div className="input-wrap">
+            <input
+              type="text"
+              placeholder="admin@local.net"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              autoComplete="username"
+            />
+          </div>
+        </div>
+
+        <div className="field">
+          <div className="field-label">
+            <span>Пароль</span>
+            <a className="hint" href="#">Забыли?</a>
+          </div>
+          <div className="input-wrap has-icon">
+            <input
+              type={showPw ? "text" : "password"}
+              placeholder="••••••••••"
+              value={pw}
+              onChange={e => setPw(e.target.value)}
+              autoComplete="current-password"
+            />
+            <button type="button" className="eye-btn" onClick={() => setShowPw(s => !s)} aria-label="Показать пароль">
+              <EyeIcon open={showPw}/>
+            </button>
+          </div>
+        </div>
+
+        <div className="row-bottom">
+          <label className="remember">
+            <input type="checkbox" defaultChecked/>
+            <span className="check-mark"/>
+            Запомнить меня
+          </label>
+          <a href="#" className="forgot">14 дней</a>
+        </div>
+
+        <button type="submit" className="btn-primary">
+          Войти <ArrowIcon/>
+        </button>
+      </form>
+
+      {showSSO && (
+        <>
+          <div className="divider-row">или через</div>
+          <div className="sso-row">
+            <button className="sso-btn"><GithubIcon/> GitHub</button>
+            <button className="sso-btn"><KeyIcon/> SSO / OIDC</button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function App() {
+  // Параметры экрана входа. На проде сервер может подставить
+  // state = "error" | "2fa" | "default" и свой акцентный цвет.
+  const t = {
+    state: '{{ flash.kind | default("default") }}',
+    showSSO: false,
+    animateShapes: true,
+    accent: '#9A4F1E',
+  };
+
+  React.useEffect(() => {
+    document.documentElement.style.setProperty('--md-primary', t.accent);
+  }, [t.accent]);
+
+  return (
+    <div className="stage">
+        {/* Decorative shapes */}
+        <div className="shape-deco shape-a" style={{animationPlayState: t.animateShapes ? 'running' : 'paused'}}/>
+        <div className="shape-deco shape-b" style={{animationPlayState: t.animateShapes ? 'running' : 'paused'}}/>
+        <div className="shape-deco shape-c" style={{animationPlayState: t.animateShapes ? 'running' : 'paused'}}/>
+
+        {/* Header */}
+        <header className="topbar">
+          <div className="brand">
+            <div className="brand-mark"><CloudIcon size={22}/></div>
+            <div className="brand-name">BarkCloud<span className="v">{"{{ app.version }}"}</span></div>
+          </div>
+          <div className="top-meta">
+            <div className="meta-item">
+              <span className="dot"/>
+              <span>Сервер: </span>
+              <span className="host-name">{"{{ server.host }}"}</span>
+            </div>
+            <div className="meta-item">
+              <span>{"{{ server.tls }}"}</span>
+            </div>
+            <div className="lang-pill">RU / EN</div>
+          </div>
+        </header>
+
+        {/* Main */}
+        <main className="center-wrap">
+          <div style={{display:'flex', flexDirection:'column', alignItems:'center'}}>
+            <LoginCard state={t.state} showSSO={t.showSSO}/>
+            <p className="below-card">
+              Нет аккаунта? <a href="#">Запросить инвайт →</a>
+            </p>
+          </div>
+        </main>
+
+        {/* Footer */}
+        <footer className="footbar">
+          <div>© {"{{ year }}"} BarkCloud · self-hosted instance</div>
+          <div className="foot-links">
+            <a href="#">Документация</a>
+            <a href="#">Статус</a>
+            <a href="#">GitHub</a>
+            <a href="#">Приватность</a>
+          </div>
+          <div>AES-256 · Zero-knowledge</div>
+        </footer>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

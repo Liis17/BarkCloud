@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BarkCloud — Фото</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,wght@8..144,300;8..144,400;8..144,500;8..144,600;8..144,700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="shared.css"/>
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+  <script type="text/babel" src="shared.jsx"></script>
+  <style>
+    .photos-toolbar { display:flex; align-items:center; gap:14px; margin-bottom: 24px; flex-wrap: wrap; }
+    .photos-toolbar .right { margin-left:auto; display:flex; gap:8px; align-items:center; }
+
+    .view-toggle {
+      display: inline-flex;
+      border: 1px solid var(--md-outline);
+      border-radius: var(--r-full);
+      overflow: hidden;
+      height: 40px;
+      background: transparent;
+    }
+    .view-toggle button {
+      background: transparent; border: none;
+      padding: 0 16px;
+      color: var(--md-on-surface-variant);
+      cursor: pointer; display:flex; align-items:center; gap:8px;
+      font-family: inherit; font-size: 14px; font-weight: 500;
+      transition: background var(--d-short);
+    }
+    .view-toggle button.on { background: var(--md-secondary-container); color: var(--md-on-secondary-container); }
+    .view-toggle button + button { border-left: 1px solid var(--md-outline); }
+    .view-toggle button:hover:not(.on) { background: color-mix(in srgb, var(--md-on-surface) 8%, transparent); }
+
+    /* Memories carousel */
+    .memories {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+    .memory {
+      position: relative;
+      aspect-ratio: 16/10;
+      cursor: pointer;
+      transition: transform var(--d-med) var(--m-emph);
+      border-radius: var(--r-xl);
+      overflow: hidden;
+    }
+    .memory:hover { transform: translateY(-3px) scale(1.01); }
+    .memory .thumb { width:100%; height:100%; border-radius: var(--r-xl); }
+    .memory .overlay {
+      position: absolute; inset: 0;
+      background: linear-gradient(180deg, transparent 35%, rgba(0,0,0,.65) 100%);
+      padding: 14px 16px;
+      display: flex; flex-direction: column; justify-content: flex-end;
+      border-radius: var(--r-xl);
+    }
+    .memory .mlabel {
+      font-size: 16px; font-weight: 600; line-height: 22px;
+      color: #fff;
+    }
+    .memory .mdate {
+      font-size: 12px;
+      color: rgba(255,255,255,.85);
+      margin-top: 4px;
+      font-weight: 500;
+    }
+    .memory .badge {
+      position: absolute; top: 12px; left: 12px;
+      font-size: 11px;
+      background: rgba(255,255,255,.95);
+      color: var(--md-on-surface);
+      padding: 4px 10px; border-radius: var(--r-full);
+      font-weight: 500;
+    }
+    .memory.featured {
+      grid-column: span 2; grid-row: span 2;
+    }
+    @media (max-width: 1280px) {
+      .memories { grid-template-columns: repeat(3, 1fr); }
+      .memory.featured { grid-column: span 2; grid-row: span 1; }
+    }
+
+    .date-group { margin-bottom: 36px; }
+    .date-head {
+      display:flex; align-items:baseline; justify-content:space-between;
+      margin-bottom: 16px;
+    }
+    .date-head h3 {
+      font-size: 22px;
+      font-weight: 500;
+      line-height: 28px;
+      color: var(--md-on-surface);
+    }
+    .date-head .right {
+      font-size: 13px;
+      color: var(--md-on-surface-variant);
+      display:flex; gap: 12px; align-items:center;
+    }
+    .date-head .right a { color: var(--md-primary); text-decoration: none; font-weight: 500; }
+    .date-head .right a:hover { text-decoration: underline; }
+
+    .photo-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: 8px;
+    }
+    .photo-grid .photo {
+      position: relative;
+      aspect-ratio: 1/1;
+      cursor: pointer;
+      transition: transform var(--d-short);
+      border-radius: var(--r-md);
+      overflow: hidden;
+    }
+    .photo-grid .photo:hover { transform: scale(1.02); z-index: 2; }
+    .photo-grid .photo .thumb { width:100%; height:100%; border-radius: var(--r-md); }
+    .photo-grid .photo.tall { aspect-ratio: 3/4; grid-row: span 2; }
+    .photo-grid .photo .vbadge {
+      position: absolute; bottom: 8px; right: 8px;
+      font-size: 11px;
+      background: rgba(0,0,0,.65); color: white;
+      padding: 3px 8px; border-radius: var(--r-full);
+      font-weight: 500;
+      display: inline-flex; align-items: center; gap: 4px;
+    }
+    .photo-grid .photo .heart {
+      position: absolute; top: 8px; right: 8px;
+      width: 28px; height: 28px;
+      background: rgba(255,255,255,.95);
+      border-radius: 50%;
+      display:flex; align-items:center; justify-content:center;
+      color: var(--md-primary);
+    }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+
+<!--
+  ╔══════════════════════════════════════════════════════════════════╗
+  ║ SERVER PAYLOAD (Photos.html)                                     ║
+  ╠══════════════════════════════════════════════════════════════════╣
+  ║ Server should fill the JSON below with:                          ║
+  ║   {                                                              ║
+  ║     "filters":   [{ key, label, count }, ...],                   ║
+  ║     "memories":  [{ label, date, tint:[a,b], featured? }, ...],  ║
+  ║     "groups":    [{                                              ║
+  ║        label, meta,                                              ║
+  ║        photos:[{ tint:[a,b], tall?, video?, fav?, dur? }, ...]   ║
+  ║     }, ...],                                                     ║
+  ║     "memoriesUpdated": "03:14"                                   ║
+  ║   }                                                              ║
+  ╚══════════════════════════════════════════════════════════════════╝
+-->
+<script type="application/json" id="server-data">
+{{{ page_data_json }}}
+</script>
+
+<script type="text/babel">
+const { AppShell, Icon } = window;
+
+function loadServerData() {
+  try {
+    const raw = document.getElementById('server-data')?.textContent?.trim();
+    if (!raw || raw.startsWith('{{')) return null;
+    return JSON.parse(raw);
+  } catch (e) { console.warn('server-data parse failed', e); return null; }
+}
+const SERVER_DATA = loadServerData();
+
+const FILTERS = SERVER_DATA?.filters ?? [
+  {key:'all', label:'Все фото', count:'4 218'},
+  {key:'albums', label:'Альбомы', count:'24'},
+  {key:'people', label:'Люди', count:'58'},
+  {key:'places', label:'Места', count:'17'},
+  {key:'things', label:'Объекты'},
+  {key:'screen', label:'Скриншоты', count:'412'},
+  {key:'fav', label:'Избранное', count:'89'},
+];
+
+const MEMORIES = SERVER_DATA?.memories ?? [
+  {label:'Прошлым летом', date:'Август 2025 · 128 фото', tint:['#E8A87C','#7A4A2E'], featured: true},
+  {label:'Прогулка по парку', date:'14 мая 2026 · 34 фото', tint:['#A8C99A','#4A6F4A']},
+  {label:'Друзья', date:'12 человек · 212 фото', tint:['#B4A3D6','#5B4889']},
+  {label:'Кулинария', date:'Сборник · 46 фото', tint:['#E0BB6F','#8A5E2A']},
+  {label:'Закаты', date:'Избранное · 72 фото', tint:['#F0936D','#8A3E1E']},
+];
+
+const MEMORIES_UPDATED = SERVER_DATA?.memoriesUpdated ?? '03:14';
+
+const TINTS = [
+  ['#A8C99A','#4A6F4A'], ['#B4A3D6','#5B4889'], ['#E8A87C','#7A4A2E'],
+  ['#E0BB6F','#8A5E2A'], ['#8FAFCC','#3F5A7E'], ['#D696B0','#6F3552'],
+  ['#8FC3BB','#2F5C56'], ['#C8A78C','#6F4A3A'], ['#7E9FC3','#2A436A'],
+  ['#C9A87A','#6F4F2A'], ['#9A87BC','#4E3A6E'], ['#7FA0BC','#34536F'],
+];
+
+function gen(seed, n) {
+  const arr = [];
+  let s = seed * 9301;
+  for (let i = 0; i < n; i++) {
+    s = (s * 1664525 + 1013904223) % 4294967296;
+    const t = TINTS[s % TINTS.length];
+    const tall = (s >> 5) % 7 === 0;
+    const video = (s >> 9) % 11 === 0;
+    const fav = (s >> 13) % 9 === 0;
+    const dur = video ? `${((s>>17)%4)+1}:${String((s>>19)%60).padStart(2,'0')}` : null;
+    arr.push({tint: t, tall, video, fav, dur});
+  }
+  return arr;
+}
+
+const DATE_GROUPS = SERVER_DATA?.groups ?? [
+  {label:'Сегодня, 18 мая 2026', meta:'Москва · 14 фото', seed: 11, count: 14},
+  {label:'Эти выходные', meta:'15–17 мая · 38 фото', seed: 17, count: 24},
+  {label:'Май 2026', meta:'1–14 мая · 142 фото', seed: 23, count: 18},
+  {label:'Апрель 2026', meta:'Прага, поездка · 287 фото', seed: 41, count: 20},
+];
+
+function Memory({ m }) {
+  return (
+    <div className={"memory" + (m.featured ? " featured" : "")}>
+      <div className="thumb" style={{'--tint-a': m.tint[0], '--tint-b': m.tint[1]}}/>
+      <div className="overlay">
+        <div className="badge">{m.featured ? 'Воспоминание' : 'Альбом'}</div>
+        <div className="mlabel">{m.label}</div>
+        <div className="mdate">{m.date}</div>
+      </div>
+    </div>
+  );
+}
+
+function Photo({ p }) {
+  return (
+    <div className={"photo" + (p.tall ? " tall" : "")}>
+      <div className="thumb" style={{'--tint-a': p.tint[0], '--tint-b': p.tint[1]}}/>
+      {p.video && <div className="vbadge"><Icon.play size={10}/> {p.dur}</div>}
+      {p.fav && <div className="heart"><Icon.star size={14}/></div>}
+    </div>
+  );
+}
+
+function App() {
+  const [filter, setFilter] = React.useState('all');
+  const [view, setView] = React.useState('grid');
+
+  const actions = (
+    <>
+      <button className="btn outlined"><Icon.filter size={16}/> Фильтр</button>
+      <button className="btn primary"><Icon.upload size={16}/> Загрузить</button>
+    </>
+  );
+
+  return (
+    <AppShell
+      page="photos"
+      kicker={<><span>Библиотека</span><span className="sep">/</span><span className="cur">Фото</span></>}
+      title="Фотогалерея"
+      actions={actions}
+    >
+      {/* Toolbar */}
+      <div className="photos-toolbar">
+        <div className="chip-row">
+          {FILTERS.map(f => (
+            <button key={f.key}
+              className={"chip" + (filter === f.key ? " active" : "")}
+              onClick={() => setFilter(f.key)}>
+              {filter === f.key && <Icon.check size={16}/>}
+              {f.label}
+              {f.count && <span className="count">{f.count}</span>}
+            </button>
+          ))}
+        </div>
+        <div className="right">
+          <div className="view-toggle">
+            <button className={view==='grid'?'on':''} onClick={()=>setView('grid')}><Icon.grid size={18}/> Сетка</button>
+            <button className={view==='list'?'on':''} onClick={()=>setView('list')}><Icon.list size={18}/> Список</button>
+          </div>
+        </div>
+      </div>
+
+      {/* Memories */}
+      <div className="section-head">
+        <h2>Воспоминания и альбомы</h2>
+        <div className="meta">Автоподборка · обновлено {MEMORIES_UPDATED}</div>
+      </div>
+      <div className="memories">
+        {MEMORIES.map((m, i) => <Memory key={i} m={m}/>)}
+      </div>
+
+      {/* Date groups */}
+      {DATE_GROUPS.map((g, i) => (
+        <div key={i} className="date-group">
+          <div className="date-head">
+            <h3>{g.label}</h3>
+            <div className="right">
+              <span>{g.meta}</span>
+              <a href="#">Открыть →</a>
+            </div>
+          </div>
+          <div className="photo-grid">
+            {(g.photos || gen(g.seed, g.count)).map((p, j) => <Photo key={j} p={p}/>)}
+          </div>
+        </div>
+      ))}
+    </AppShell>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
