@@ -33,6 +33,7 @@ public sealed class DockerService
         ("identity", "cloud-identity"),
         ("users", "cloud-users"),
         ("files", "cloud-files"),
+        ("notification", "cloud-notification"),
         (WebService, WebContainer),
     ];
 

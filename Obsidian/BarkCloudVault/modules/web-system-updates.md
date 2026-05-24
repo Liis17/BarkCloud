@@ -15,7 +15,7 @@ Parent: [[modules/backend-web]] · See also: [[index]] · [[structure/infrastruc
 ## Управляемый набор
 
 Только сервисы приложения + сам веб (инфраструктуру postgres/minio/rabbitmq/seq/nginx **не трогаем**). Маппинг сервис → контейнер:
-`configuration→cloud-configuration`, `identity→cloud-identity`, `users→cloud-users`, `files→cloud-files`, `web→cloud-web`.
+`configuration→cloud-configuration`, `identity→cloud-identity`, `users→cloud-users`, `files→cloud-files`, `notification→cloud-notification`, `web→cloud-web`.
 
 ## Механизм
 
