@@ -136,6 +136,88 @@ public class UsersStorage
         await _usersContext.SaveChangesAsync();
     }
 
+    public async Task ChangeBio(long userId, string? bio)
+    {
+        var user = await _usersContext.Users.FirstOrDefaultAsync(x => x.Id == userId);
+        if (user is null)
+        {
+            throw new UserNotFoundException();
+        }
+
+        user.Bio = bio;
+
+        await _usersContext.SaveChangesAsync();
+    }
+
+    public async Task<List<User>> SearchUsers(string query, long excludeUserId, int limit)
+    {
+        var pattern = query.Trim().ToLower();
+
+        return await _usersContext.Users
+            .Include(u => u.Contact)
+            .Where(u => !u.IsDraft && u.Id != excludeUserId)
+            .Where(u => u.Privacy == null || u.Privacy.SearchableByUsername)
+            .Where(u =>
+                u.Username.ToLower().Contains(pattern) ||
+                u.FirstName.ToLower().Contains(pattern) ||
+                u.LastName.ToLower().Contains(pattern))
+            .OrderBy(u => u.Username)
+            .Take(limit)
+            .ToListAsync();
+    }
+
+    public async Task DeleteUser(long userId)
+    {
+        var user = await _usersContext.Users.FirstOrDefaultAsync(x => x.Id == userId);
+
+        if (user is null)
+        {
+            throw new UserNotFoundException();
+        }
+
+        // Связанные UserContact / UserDevice / UserPrivacy удалятся каскадно (см. UsersContext).
+        _usersContext.Users.Remove(user);
+
+        await _usersContext.SaveChangesAsync();
+    }
+
+    public async Task<UserPrivacy> GetOrCreatePrivacy(long userId)
+    {
+        var privacy = await _usersContext.UserPrivacies.FirstOrDefaultAsync(p => p.UserId == userId);
+
+        if (privacy is not null)
+        {
+            return privacy;
+        }
+
+        var userExists = await _usersContext.Users.AnyAsync(u => u.Id == userId);
+        if (!userExists)
+        {
+            throw new UserNotFoundException();
+        }
+
+        privacy = new UserPrivacy { UserId = userId };
+        await _usersContext.UserPrivacies.AddAsync(privacy);
+        await _usersContext.SaveChangesAsync();
+
+        return privacy;
+    }
+
+    public async Task<UserPrivacy> UpdatePrivacy(long userId, PrivacyVisibility profileVisibility,
+        PrivacyVisibility emailVisibility, PrivacyVisibility lastSeenVisibility, bool searchableByUsername)
+    {
+        var privacy = await GetOrCreatePrivacy(userId);
+
+        privacy.ProfileVisibility = profileVisibility;
+        privacy.EmailVisibility = emailVisibility;
+        privacy.LastSeenVisibility = lastSeenVisibility;
+        privacy.SearchableByUsername = searchableByUsername;
+
+        await _usersContext.SaveChangesAsync();
+
+        return privacy;
+    }
+
     public async Task UpdateStorageLimitGb(long userId, int limitGb)
     {
         var user = await _usersContext.Users.FirstOrDefaultAsync(x => x.Id == userId);

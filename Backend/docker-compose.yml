@@ -65,12 +65,26 @@ services:
     depends_on:
       - configuration
 
+  # Сервис уведомлений (consumer RabbitMQ → SMTP). Внешнего API нет — в nginx не маршрутизируется.
+  notification:
+    image: docker.barkfluff.com:5000/barkcloud-notification:latest
+    container_name: cloud-notification
+    restart: always
+    environment:
+      <<: *common-variables
+    networks:
+      - barkcloud-network
+    depends_on:
+      - configuration
+
   # Веб-клиент (HTTP, отдаёт страницы браузеру; к микросервисам обращается по docker-сети через gRPC)
   # JwtSettings и адреса сервисов тянет из Configuration-сервиса (CONFIGURATION_SERVICE_URL), как остальные.
   web:
     image: docker.barkfluff.com:5000/barkcloud-web:latest
     container_name: cloud-web
     restart: always
+    # root нужен для доступа к docker.sock — веб управляет обновлением бэкенда из страницы настроек.
+    user: root
     env_file:
       - .env
     environment:
@@ -78,6 +92,16 @@ services:
       ASPNETCORE_URLS: "http://+:8080"
       App__CookieSecure: "${WEB_COOKIE_SECURE}"
       App__PublicHost: "${WEB_PUBLIC_HOST}"
+      # Пароль доступа к разделу «Обслуживание» (обновление бэкенда). Пусто → раздел недоступен.
+      App__AdminPassword: "${WEB_ADMIN_PASSWORD}"
+    volumes:
+      # Управление контейнерами бэкенда (pull/up/restart) через локальный Docker.
+      - /var/run/docker.sock:/var/run/docker.sock
+      # compose-файл и .env нужны для `docker compose pull/up`; монтируем по тем же путям, что админка BarkFluff.
+      - ./docker-compose.yml:/docker-compose.yml:ro
+      - ./.env:/.env:ro
+      # Креды приватного registry для pull. Требуется `docker login docker.barkfluff.com:5000` на хосте.
+      - ~/.docker/config.json:/root/.docker/config.json:ro
     ports:
       - "${WEB_PORT}:8080"
     networks:

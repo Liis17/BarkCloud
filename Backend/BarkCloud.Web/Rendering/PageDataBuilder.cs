@@ -31,6 +31,7 @@ public sealed class PageDataBuilder
     private readonly FilesApi.FilesApiClient _files;
     private readonly CloudApi.CloudApiClient _cloud;
     private readonly IdentityApi.IdentityApiClient _identity;
+    private readonly AdminGate _admin;
     private readonly IConfiguration _config;
     private readonly ILogger<PageDataBuilder> _logger;
 
@@ -39,6 +40,7 @@ public sealed class PageDataBuilder
         FilesApi.FilesApiClient files,
         CloudApi.CloudApiClient cloud,
         IdentityApi.IdentityApiClient identity,
+        AdminGate admin,
         IConfiguration config,
         ILogger<PageDataBuilder> logger)
     {
@@ -46,6 +48,7 @@ public sealed class PageDataBuilder
         _files = files;
         _cloud = cloud;
         _identity = identity;
+        _admin = admin;
         _config = config;
         _logger = logger;
     }
@@ -175,7 +178,17 @@ public sealed class PageDataBuilder
             },
             storage = storageBlock,
             sessions,
-            sessionsHeader = $"{sessions.Count} {Plural(sessions.Count, "устройство", "устройства", "устройств")} с активным доступом"
+            sessionsHeader = $"{sessions.Count} {Plural(sessions.Count, "устройство", "устройства", "устройств")} с активным доступом",
+            admin = new
+            {
+                enabled = _admin.Enabled,
+                unlocked = _admin.IsUnlocked(http)
+            },
+            system = new
+            {
+                version = _config.Value("App:Version", "v1.0.0"),
+                edition = _config.Value("App:Edition", "self-host")
+            }
         };
 
         return JsonSerializer.Serialize(payload, Json);

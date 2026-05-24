@@ -56,6 +56,13 @@ internal static class ConfigurationSeed
             item("UsersService",      "Token", ServiceId.Identity),
             item("ExternalEndpoint",  "Host",  ServiceId.Identity),
 
+            // ─── Notification (consumer email-уведомлений; SMTP-настройки — секреты, заполняются вручную) ─
+            item("RunSettings", "Port",           ServiceId.Notification),
+            item("Email",       "Host",           ServiceId.Notification),
+            item("Email",       "Port",           ServiceId.Notification),
+            item("Email",       "SenderEmail",    ServiceId.Notification),
+            item("Email",       "SenderPassword", ServiceId.Notification),
+
             // ─── Users ──────────────────────────────────────────────────────
             item("RunSettings",       "Port",  ServiceId.Users),
             item("UsersDb",           "",      ServiceId.Users),

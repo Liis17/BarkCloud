@@ -4,7 +4,9 @@ Parent: [[index]] · See also: [[api/users-api]] · [[modules/shared-queue]]
 
 ## Назначение
 
-Сервис пользователей: профили (имя, юзернейм), draft-flow регистрации, устройства, контакты, аватарка, лимиты хранилища, проверки уникальности.
+Сервис пользователей: профили (имя, юзернейм, bio), draft-flow регистрации, устройства (+ push-токен Firebase), контакты, аватарка, настройки приватности, поиск, удаление аккаунта, лимиты хранилища, проверки уникальности.
+
+> Клиентский гайд по эндпоинтам (что слать / что вернётся): [[api/users-client-guide]].
 
 ## Расположение
 
@@ -13,11 +15,13 @@ Parent: [[index]] · See also: [[api/users-api]] · [[modules/shared-queue]]
 ## Файлы
 
 ### Domain
-- `User.cs` — основная сущность пользователя
-- `UserDevice.cs` — устройство (поля: `Id`, `UserId`, `OriginalName`, `CustomName`, `AuthorizedAt`, `AppName`, `OperationSystem`, `Location`)
+- `User.cs` — основная сущность пользователя (+ `Bio`, навигация `Privacy`)
+- `UserDevice.cs` — устройство (поля: `Id`, `UserId`, `OriginalName`, `CustomName`, `AuthorizedAt`, `AppName`, `OperationSystem`, `Location`, `FirebaseToken`)
 - `UserContact.cs` — контакт
+- `UserPrivacy.cs` — настройки приватности (one-to-one с User: `ProfileVisibility`, `EmailVisibility`, `LastSeenVisibility`, `SearchableByUsername`)
+- `PrivacyVisibility.cs` — enum (`Everyone`/`Contacts`/`Nobody`)
 
-> **Не реализовано в Domain**: Badge, ChatFolder, DevicePrekeyBundle, OneTimePrekey, Privacy, ProfileFieldVisibility, UserPersonalization, UserBadge. Если появятся — обновить эту заметку.
+> **Не реализовано в Domain**: Badge, ChatFolder, DevicePrekeyBundle, OneTimePrekey, ProfileFieldVisibility, UserPersonalization, UserBadge. Если появятся — обновить эту заметку.
 
 ### Host (gRPC)
 - `UsersApiService.cs` — клиентский `UsersApi`
@@ -40,19 +44,25 @@ Parent: [[index]] · See also: [[api/users-api]] · [[modules/shared-queue]]
 
 ### Persistence
 - `Contexts/UsersContext.cs`, `UsersContextFactory.cs`
-- `Services/UsersStorage.cs`
-- `Services/DevicesStorage.cs`
-- `Migrations/20260518171439_InitialCreate.cs` — единственная миграция на момент актуализации
+- `Services/UsersStorage.cs` (+ `ChangeBio`, `SearchUsers`, `DeleteUser`, `GetOrCreatePrivacy`, `UpdatePrivacy`)
+- `Services/DevicesStorage.cs` (+ `SetFirebaseToken`)
+- `Migrations/20260518171439_InitialCreate.cs`, `20260524215052_AddBioPrivacyFirebaseToken.cs`
 
 ## Features (реализованные)
 
 ### Профиль
 - `GetUser` — query
 - `SetProfilePicture`, `SetProfilePictureServer`
-- `ChangeName`, `ChangeUsername`
+- `ChangeName`, `ChangeUsername`, `ChangeBio`
+- `SearchUsers` — поиск по юзернейму/имени/фамилии (учитывает `SearchableByUsername`)
+- `DeleteAccount` — удаление своего аккаунта (каскад + событие `UserDeleted`)
 - `CheckExistUsername`, `CheckExistEmail` (query-handlers)
 - `FindByLogin`, `ListByIds`
 - `UpdateProfileServer`, `UpdateStorageLimit`
+
+### Privacy/ (вложенная папка)
+- `GetPrivacySettings`, `UpdatePrivacySettings` (дефолтная запись создаётся при первом обращении)
+- Реально применяется только `SearchableByUsername` (в `SearchUsers`); остальные visibility — хранимые предпочтения (нет графа контактов / трекинга last-seen).
 
 ### Draft-flow регистрации
 - `AddDraftUser` — добавляет черновик
@@ -64,16 +74,21 @@ Parent: [[index]] · See also: [[api/users-api]] · [[modules/shared-queue]]
 - `GetDevices` (свои), `GetCurrentDevice`
 - `GetUserDevices` (серверный, чужие устройства)
 - `RenameDevice`
-- `DeleteUserDevice`
+- `DeleteUserDevice` (серверный), `DeleteDevice` (клиентский, своё устройство)
+- `SetFirebaseToken` — push-токен текущего устройства
 
 ### Прочее
 - `GetUserContacts`
 
-> **Не реализовано** (из ожиданий по proto): `ChangeBio`, `SearchUsers`, `SearchUsersServer`, `Badges/`, `ChatFolders/`, `ExportData/`, `Personalization/`, `Prekeys/`, `Privacy/`, `SetFirebaseToken`. Из proto также объявлены `GetById`, но handler пока отсутствует в `Features/`.
+> **Не реализовано** (из ожиданий по proto): `SearchUsersServer`, `Badges/`, `ChatFolders/`, `ExportData/`, `Personalization/`, `Prekeys/`. Из proto также объявлены `GetById` — handler есть в Host через `GetUserQuery`.
+
+> **Пароль не здесь**: смена пароля — в [[modules/backend-identity]] (`SetPassword`). В Users `PasswordHasher` и `UserChangedPasswordEvent` удалены как неиспользуемые.
 
 ## События RabbitMQ
 
-Сейчас в [[modules/shared-queue]] определены `UserChangedAvatar/Bio/Name/Username/Password`. Реально публикуются (по `UserInfoQueueSender.cs`) при `ChangeName`/`ChangeUsername`/`SetProfilePicture` — остальные пока без обработчиков-публикаторов в коде.
+Публикуются (по `UserInfoQueueSender.cs`): `UserChangedName`, `UserChangedUsername`, `UserChangedAvatar`, `UserChangedBio` (при `ChangeBio`), `UserDeleted` (при `DeleteAccount`). DTO `UserChangedPassword` остаётся в [[modules/shared-queue]], но из Users больше не публикуется.
+
+> `UserDeleted` обрабатывают консьюмеры в [[modules/backend-identity]] (отзыв сессий + удаление пароля/2FA/сбросов/кодов) и [[modules/backend-files]] (открепление блобов из Uploaders + удаление каталогов/записей/альбомов). Физическая очистка осиротевших S3-блобов — отдельная фоновая задача (как и при ручном удалении).
 
 Слушает: `SessionRevokedEvent`.
 

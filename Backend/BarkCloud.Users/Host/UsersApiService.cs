@@ -1,14 +1,21 @@
 using BarkCloud.GrpcServer.Metrics;
 using BarkCloud.Proto.Users;
 using BarkCloud.Shared.Identity;
+using BarkCloud.Users.Features.ChangeBio;
 using BarkCloud.Users.Features.ChangeName;
 using BarkCloud.Users.Features.ChangeUsername;
 using BarkCloud.Users.Features.CheckExistEmail;
 using BarkCloud.Users.Features.CheckExistUsername;
+using BarkCloud.Users.Features.DeleteAccount;
+using BarkCloud.Users.Features.Devices.DeleteDevice;
 using BarkCloud.Users.Features.Devices.GetCurrentDevice;
 using BarkCloud.Users.Features.Devices.GetDevices;
 using BarkCloud.Users.Features.Devices.RenameDevice;
+using BarkCloud.Users.Features.Devices.SetFirebaseToken;
 using BarkCloud.Users.Features.GetUser;
+using BarkCloud.Users.Features.Privacy.GetPrivacySettings;
+using BarkCloud.Users.Features.Privacy.UpdatePrivacySettings;
+using BarkCloud.Users.Features.SearchUsers;
 using BarkCloud.Users.Features.SetProfilePicture;
 
 using Grpc.Core;
@@ -99,6 +106,55 @@ public class UsersApiService : BarkCloud.Proto.Users.UsersApi.UsersApiBase
         return new ChangeUsernameResponse();
     }
 
+    public override async Task<ChangeBioResponse> ChangeBio(ChangeBioRequest request, ServerCallContext context)
+    {
+        _metrics.Increment("profile_bio_updates");
+        await _mediator.Send(new ChangeBioCommand { Bio = request.Bio });
+
+        return new ChangeBioResponse();
+    }
+
+    public override Task<SearchUsersResponse> SearchUsers(SearchUsersRequest request, ServerCallContext context)
+    {
+        _metrics.Increment("user_searches");
+        var query = new SearchUsersQuery
+        {
+            Query = request.Query,
+            Limit = request.Limit
+        };
+
+        return _mediator.Send(query);
+    }
+
+    public override async Task<DeleteAccountResponse> DeleteAccount(DeleteAccountRequest request, ServerCallContext context)
+    {
+        _metrics.Increment("account_deletions");
+        await _mediator.Send(new DeleteAccountCommand());
+
+        return new DeleteAccountResponse();
+    }
+
+    public override Task<GetPrivacySettingsResponse> GetPrivacySettings(GetPrivacySettingsRequest request, ServerCallContext context)
+    {
+        _metrics.Increment("privacy_lookups");
+        return _mediator.Send(new GetPrivacySettingsQuery());
+    }
+
+    public override Task<UpdatePrivacySettingsResponse> UpdatePrivacySettings(UpdatePrivacySettingsRequest request, ServerCallContext context)
+    {
+        _metrics.Increment("privacy_updates");
+        var settings = request.Settings ?? new PrivacySettings();
+        var command = new UpdatePrivacySettingsCommand
+        {
+            ProfileVisibility = (Domain.PrivacyVisibility)settings.ProfileVisibility,
+            EmailVisibility = (Domain.PrivacyVisibility)settings.EmailVisibility,
+            LastSeenVisibility = (Domain.PrivacyVisibility)settings.LastSeenVisibility,
+            SearchableByUsername = settings.SearchableByUsername
+        };
+
+        return _mediator.Send(command);
+    }
+
     // Методы для работы с устройствами
 
     public override Task<GetDevicesResponse> GetDevices(GetDevicesRequest request, ServerCallContext context)
@@ -122,6 +178,28 @@ public class UsersApiService : BarkCloud.Proto.Users.UsersApi.UsersApiBase
         {
             DeviceId = Guid.Parse(request.DeviceId),
             CustomName = request.CustomName
+        };
+
+        return _mediator.Send(command);
+    }
+
+    public override Task<DeleteDeviceResponse> DeleteDevice(DeleteDeviceRequest request, ServerCallContext context)
+    {
+        _metrics.Increment("device_self_deletions");
+        var command = new DeleteDeviceCommand
+        {
+            DeviceId = Guid.Parse(request.DeviceId)
+        };
+
+        return _mediator.Send(command);
+    }
+
+    public override Task<SetFirebaseTokenResponse> SetFirebaseToken(SetFirebaseTokenRequest request, ServerCallContext context)
+    {
+        _metrics.Increment("firebase_token_updates");
+        var command = new SetFirebaseTokenCommand
+        {
+            FirebaseToken = request.FirebaseToken
         };
 
         return _mediator.Send(command);

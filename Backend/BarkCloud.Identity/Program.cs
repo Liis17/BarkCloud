@@ -71,6 +71,7 @@ public class Program
         builder.Services.AddMassTransit(x =>
         {
             x.AddConsumer<SessionRevokedConsumer>();
+            x.AddConsumer<UserDeletedConsumer>();
 
             x.UsingRabbitMq((context, cfg) =>
             {
@@ -83,6 +84,11 @@ public class Program
                 cfg.ReceiveEndpoint("session-revoked-identity", e =>
                 {
                     e.ConfigureConsumer<SessionRevokedConsumer>(context);
+                });
+
+                cfg.ReceiveEndpoint("user-deleted-identity", e =>
+                {
+                    e.ConfigureConsumer<UserDeletedConsumer>(context);
                 });
             });
         });

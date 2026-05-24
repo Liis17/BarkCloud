@@ -17,7 +17,11 @@ public class User
 
     public UserContact Contact { get; set; }
 
+    public UserPrivacy? Privacy { get; set; }
+
     public bool IsDraft { get; set; }
+
+    public string? Bio { get; set; }
 
     public string? ProfilePicture { get; set; }
 

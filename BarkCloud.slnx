@@ -4,6 +4,7 @@
     <Project Path="Backend/BarkCloud.Files/BarkCloud.Files.csproj" />
     <Project Path="Backend/BarkCloud.GrpcServer/BarkCloud.GrpcServer.csproj" />
     <Project Path="Backend/BarkCloud.Identity/BarkCloud.Identity.csproj" />
+    <Project Path="Backend/BarkCloud.Notification/BarkCloud.Notification.csproj" />
     <Project Path="Backend/BarkCloud.Users/BarkCloud.Users.csproj" />
     <Project Path="Backend/BarkCloud.Web/BarkCloud.Web.csproj" Id="cdc48aaa-a672-4432-97e4-d3f3b4065687" />
   </Folder>

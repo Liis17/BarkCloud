@@ -68,6 +68,7 @@ Parent: [[index]] · See also: [[api/files-api]] · [[modules/backend-files-clou
 
 ### Consumers
 - `SessionRevokedConsumer.cs` — слушает `SessionRevokedEvent` из [[modules/shared-queue]]
+- `UserDeletedConsumer.cs` — по `UserDeleted` (из [[modules/backend-users]]) снимает пользователя из `Uploaders` всех его блобов (освобождает квоту) и удаляет его `CloudDirectories`/`CloudFileEntries`/`Albums`/`AlbumItems`. Физическое удаление осиротевших S3-блобов не делает (как и ручное удаление)
 
 ### Прочее
 - `Extensions/FileExtensions.cs`, `Extensions/ServiceCollectionExtensions.cs`

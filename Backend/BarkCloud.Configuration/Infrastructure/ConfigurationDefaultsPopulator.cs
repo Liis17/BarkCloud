@@ -48,6 +48,7 @@ public class ConfigurationDefaultsPopulator
     {
         { ServiceId.Identity, 7000 },
         { ServiceId.Users, 7001 },
+        { ServiceId.Notification, 7022 },
         { ServiceId.Files, 7005 },
     };
 

@@ -1,5 +1,10 @@
-FROM mcr.microsoft.com/dotnet/aspnet:10.0-noble-chiseled-extra
+# Alpine + docker-cli/compose: веб управляет обновлением бэкенда через смонтированный docker.sock
+# (см. Infrastructure/DockerService.cs). Этот Dockerfile.slim использует prod-CI (build-backend-web.yml).
+# Контейнер запускается под root (доступ к docker.sock) — задаётся в docker-compose.yml.
+FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine
+RUN apk add --no-cache docker-cli docker-cli-compose icu-libs tzdata
+# icu-libs + отключённый invariant — чтобы русская локализация в Format.cs работала на alpine/musl
+ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false
 WORKDIR /app
-COPY --chown=1654:1654 publish/ .
-USER $APP_UID
+COPY publish/ .
 ENTRYPOINT ["dotnet", "BarkCloud.Web.dll"]

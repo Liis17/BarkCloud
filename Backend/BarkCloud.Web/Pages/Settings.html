@@ -295,6 +295,58 @@
     }
     .pill-info.ok { background: var(--md-success-container); color: var(--md-on-success-container); }
     .pill-info.warn { background: var(--md-warning-container); color: var(--md-on-surface); }
+
+    /* ─── Обслуживание (обновление бэкенда) ─── */
+    .svc-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 16px; align-items: center;
+      padding: 14px 0;
+      border-bottom: 1px solid var(--md-outline-variant);
+    }
+    .svc-row:last-child { border: none; padding-bottom: 0; }
+    .svc-row:first-child { padding-top: 0; }
+    .svc-main { display:flex; align-items:center; gap:12px; min-width:0; }
+    .svc-ic { width:40px; height:40px; border-radius:var(--r-md); background:var(--md-surface-container-high); color:var(--md-on-surface-variant); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+    .svc-info { min-width:0; }
+    .svc-name { font-size:14px; font-weight:500; color:var(--md-on-surface); display:flex; align-items:center; gap:8px; }
+    .svc-img { font-size:12px; color:var(--md-on-surface-variant); font-family:'Roboto Mono',monospace; margin-top:3px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:340px; }
+    .svc-actions { display:flex; gap:2px; align-items:center; }
+    .svc-actions .iconb { width:40px; height:40px; border-radius:var(--r-full); background:transparent; border:none; color:var(--md-on-surface-variant); cursor:pointer; display:flex; align-items:center; justify-content:center; transition:background var(--d-short), color var(--d-short); }
+    .svc-actions .iconb:hover:not(:disabled) { background:color-mix(in srgb, var(--md-on-surface) 8%, transparent); color:var(--md-on-surface); }
+    .svc-actions .iconb:disabled { opacity:.35; cursor:default; }
+
+    .spin { width:18px; height:18px; border-radius:50%; border:2px solid color-mix(in srgb, var(--md-primary) 30%, transparent); border-top-color:var(--md-primary); animation:sysspin .8s linear infinite; flex-shrink:0; }
+    @keyframes sysspin { to { transform:rotate(360deg); } }
+
+    .unlock-row { display:flex; gap:12px; align-items:center; max-width:440px; }
+    .unlock-row input { flex:1; background:var(--md-surface-container); border:none; border-bottom:1px solid var(--md-outline); border-radius:var(--r-xs) var(--r-xs) 0 0; color:var(--md-on-surface); font-family:inherit; font-size:15px; padding:14px 16px; outline:none; transition:border-color var(--d-short); }
+    .unlock-row input:focus { border-bottom:2px solid var(--md-primary); padding-bottom:13px; }
+    .unlock-err { color:var(--md-error); font-size:13px; margin-top:10px; }
+
+    .sys-scrim { position:fixed; inset:0; background:color-mix(in srgb, var(--md-scrim, #000) 40%, transparent); display:flex; align-items:center; justify-content:center; z-index:1000; padding:24px; }
+    .sys-dialog { background:var(--md-surface-container-high); border-radius:var(--r-xl); padding:28px; max-width:460px; width:100%; }
+    .sys-dialog h3 { font-size:20px; font-weight:500; color:var(--md-on-surface); }
+    .sys-dialog .sub { font-size:13px; color:var(--md-on-surface-variant); margin-top:4px; }
+    .prog-bar { height:6px; border-radius:var(--r-full); background:var(--md-surface-container-highest); overflow:hidden; margin:18px 0; }
+    .prog-bar > span { display:block; height:100%; background:var(--md-primary); transition:width var(--d-med) var(--m-emph); }
+    .prog-list { display:flex; flex-direction:column; gap:10px; max-height:260px; overflow:auto; }
+    .prog-item { display:flex; align-items:center; gap:10px; font-size:14px; color:var(--md-on-surface-variant); }
+    .prog-item.current, .prog-item.done { color:var(--md-on-surface); }
+    .prog-item .pi { width:20px; height:20px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+    .prog-item.done .pi { color:var(--md-success); }
+    .prog-item.error .pi { color:var(--md-error); }
+    .dlg-actions { display:flex; justify-content:flex-end; margin-top:20px; }
+
+    .upd-overlay { position:fixed; inset:0; background:var(--md-surface); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px; z-index:1100; text-align:center; padding:24px; }
+    .upd-overlay .big-spin { width:56px; height:56px; border-radius:50%; border:4px solid var(--md-primary-container); border-top-color:var(--md-primary); animation:sysspin 1s linear infinite; }
+    .upd-overlay h2 { font-size:24px; font-weight:500; color:var(--md-on-surface); }
+    .upd-overlay p { color:var(--md-on-surface-variant); max-width:420px; }
+    .upd-overlay .timer { display:inline-flex; align-items:center; gap:8px; background:var(--md-success-container); color:var(--md-on-success-container); padding:8px 16px; border-radius:var(--r-full); font-size:14px; font-weight:500; }
+
+    .sys-toast { position:fixed; left:50%; bottom:32px; transform:translateX(-50%); display:flex; align-items:center; gap:10px; padding:14px 20px; border-radius:var(--r-md); font-size:14px; font-weight:500; z-index:1200; box-shadow:0 4px 16px rgba(0,0,0,.2); max-width:520px; }
+    .sys-toast.ok { background:var(--md-success-container); color:var(--md-on-success-container); }
+    .sys-toast.err { background:var(--md-error-container); color:var(--md-on-error-container); }
   </style>
 </head>
 <body>
@@ -407,6 +459,13 @@ const SESSIONS = SERVER_DATA?.sessions ?? [
 ];
 const SESSIONS_HEADER = SERVER_DATA?.sessionsHeader ?? '5 устройств с активным доступом';
 
+// ─── Обслуживание (обновление бэкенда) ───
+const ADMIN = SERVER_DATA?.admin ?? { enabled: false, unlocked: false };
+const SYSTEM = SERVER_DATA?.system ?? { version: 'v1.0.0', edition: 'self-host' };
+const SVC_LABELS = {
+  configuration: 'Configuration', identity: 'Identity', users: 'Users', files: 'Files', web: 'Веб-клиент',
+};
+
 const NAV = [
   {key:'account', label:'Аккаунт', icon:'user'},
   {key:'security', label:'Безопасность', icon:'lock'},
@@ -416,6 +475,7 @@ const NAV = [
   {key:'sessions', label:'Устройства и сессии', icon:'device'},
   {key:'language', label:'Язык и регион', icon:'globe'},
   {key:'api', label:'API и интеграции', icon:'key'},
+  {key:'system', label:'Обслуживание', icon:'server'},
 ];
 
 function Toggle({ on, onChange }) {
@@ -435,6 +495,226 @@ function Field({ label, help, children, end }) {
   );
 }
 
+// ─────────── Обслуживание: обновление бэкенда ───────────
+
+async function sysPost(path, body) {
+  const r = await fetch(path, {
+    method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  let data = null; try { data = await r.json(); } catch (e) {}
+  return { ok: r.ok, status: r.status, data };
+}
+
+function SvcStatus({ state }) {
+  const running = state === 'running';
+  const label = running ? 'Запущен'
+    : state === 'not_found' ? 'Не найден'
+    : (state === 'exited' || state === 'dead') ? 'Остановлен'
+    : state === 'restarting' ? 'Перезапуск'
+    : (state || '—');
+  return (
+    <span className={"pill-info " + (running ? 'ok' : 'warn')}>
+      {running ? <Icon.check size={12}/> : <Icon.x size={12}/>} {label}
+    </span>
+  );
+}
+
+function SystemSection() {
+  const [unlocked, setUnlocked] = React.useState(ADMIN.unlocked);
+  const [password, setPassword] = React.useState('');
+  const [unlockErr, setUnlockErr] = React.useState('');
+  const [unlocking, setUnlocking] = React.useState(false);
+  const [services, setServices] = React.useState(null); // null = идёт загрузка
+  const [busy, setBusy] = React.useState({});
+  const [toast, setToast] = React.useState(null);
+  const [progress, setProgress] = React.useState(null);
+  const [overlay, setOverlay] = React.useState(null);
+
+  const flash = (kind, msg) => { setToast({ kind, msg }); setTimeout(() => setToast(null), 4200); };
+
+  const loadServices = React.useCallback(async () => {
+    try {
+      const r = await fetch('/api/system/services', { credentials: 'same-origin', cache: 'no-cache' });
+      if (r.ok) setServices(await r.json());
+      else { if (r.status === 403) setUnlocked(false); setServices([]); }
+    } catch (e) { setServices([]); }
+  }, []);
+
+  React.useEffect(() => { if (unlocked) { setServices(null); loadServices(); } }, [unlocked, loadServices]);
+
+  async function doUnlock() {
+    if (!password) return;
+    setUnlocking(true); setUnlockErr('');
+    const { ok, data } = await sysPost('/api/system/unlock', { password });
+    setUnlocking(false);
+    if (ok) { setPassword(''); setUnlocked(true); }
+    else setUnlockErr(data?.message || 'Не удалось разблокировать');
+  }
+  async function doLock() { await sysPost('/api/system/lock'); setUnlocked(false); setServices(null); }
+
+  async function svcAction(svc, kind) {
+    setBusy(b => ({ ...b, [svc]: true }));
+    const { ok, data } = await sysPost(`/api/system/services/${svc}/${kind}`);
+    flash(ok ? 'ok' : 'err', data?.message || (ok ? 'Готово' : 'Ошибка'));
+    setBusy(b => ({ ...b, [svc]: false }));
+    setTimeout(loadServices, 1500);
+  }
+
+  async function updateAll() {
+    const targets = (services || []).filter(s => !s.isWeb).map(s => s.service);
+    if (!targets.length) return;
+    if (!window.confirm('Обновить все сервисы приложения (кроме веб-клиента)?')) return;
+    setProgress({ items: targets.map(s => ({ svc: s, state: 'pending' })), done: 0, total: targets.length, finished: false });
+    for (const svc of targets) {
+      setProgress(p => ({ ...p, items: p.items.map(it => it.svc === svc ? { ...it, state: 'current' } : it) }));
+      const { ok } = await sysPost(`/api/system/services/${svc}/update`);
+      setProgress(p => ({ ...p, done: p.done + 1, items: p.items.map(it => it.svc === svc ? { ...it, state: ok ? 'done' : 'error' } : it) }));
+    }
+    setProgress(p => ({ ...p, finished: true }));
+    loadServices();
+  }
+
+  function webSelf(kind) {
+    const title = kind === 'update' ? 'Обновление веб-клиента' : 'Перезапуск веб-клиента';
+    if (!window.confirm(`${title}? Страница ненадолго станет недоступна и перезагрузится автоматически.`)) return;
+    const path = kind === 'update' ? '/api/system/web/update-self' : '/api/system/web/restart-self';
+    sysPost(path).then(({ ok, data }) => ok ? startOverlay(title) : flash('err', data?.message || 'Ошибка'));
+  }
+
+  function startOverlay(title) {
+    setOverlay({ title, seconds: 0 });
+    let success = 0;
+    const t0 = Date.now();
+    const tick = setInterval(() => setOverlay(o => o ? { ...o, seconds: Math.floor((Date.now() - t0) / 1000) } : o), 1000);
+    const poll = setInterval(async () => {
+      try {
+        const r = await fetch('/healthz', { cache: 'no-cache' });
+        if (r.ok) { if (++success >= 2) { clearInterval(poll); clearInterval(tick); setTimeout(() => window.location.reload(), 1500); } }
+        else success = 0;
+      } catch (e) { success = 0; }
+    }, 3000);
+  }
+
+  let body;
+  if (!ADMIN.enabled) {
+    body = <div style={{ color: 'var(--md-on-surface-variant)', fontSize: 14 }}>
+      Админ-доступ не настроен. Задайте <code>WEB_ADMIN_PASSWORD</code> в окружении веб-контейнера и перезапустите его.
+    </div>;
+  } else if (!unlocked) {
+    body = <div>
+      <div style={{ color: 'var(--md-on-surface-variant)', fontSize: 14, marginBottom: 16 }}>
+        Введите админ-пароль, чтобы управлять обновлением бэкенда.
+      </div>
+      <div className="unlock-row">
+        <input type="password" placeholder="Админ-пароль" value={password}
+          onChange={e => setPassword(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') doUnlock(); }} autoFocus/>
+        <button className="btn primary" onClick={doUnlock} disabled={unlocking || !password}>
+          {unlocking ? <span className="spin"/> : <Icon.lock size={16}/>} Разблокировать
+        </button>
+      </div>
+      {unlockErr && <div className="unlock-err">{unlockErr}</div>}
+    </div>;
+  } else if (services === null) {
+    body = <div style={{ display: 'flex', alignItems: 'center', gap: 12, color: 'var(--md-on-surface-variant)', fontSize: 14 }}>
+      <span className="spin"/> Загрузка состояния сервисов…
+    </div>;
+  } else {
+    body = <>
+      <div className="svc-list">
+        {services.map(s => {
+          const isBusy = !!busy[s.service];
+          const running = s.state === 'running';
+          return (
+            <div key={s.service} className="svc-row">
+              <div className="svc-main">
+                <div className="svc-ic"><Icon.server size={20}/></div>
+                <div className="svc-info">
+                  <div className="svc-name">{SVC_LABELS[s.service] || s.service} <SvcStatus state={s.state}/></div>
+                  {s.image && <div className="svc-img" title={s.image}>{s.image}</div>}
+                </div>
+              </div>
+              <div className="svc-actions">
+                {isBusy ? <span className="spin" style={{ margin: '0 11px' }}/> : <>
+                  <button className="iconb" title="Обновить"
+                    onClick={() => s.isWeb ? webSelf('update') : svcAction(s.service, 'update')}><Icon.download size={20}/></button>
+                  <button className="iconb" title="Перезапустить"
+                    onClick={() => s.isWeb ? webSelf('restart') : svcAction(s.service, 'restart')}><Icon.refresh size={20}/></button>
+                  {!s.isWeb && (running
+                    ? <button className="iconb" title="Остановить" onClick={() => svcAction(s.service, 'stop')}><Icon.power size={20}/></button>
+                    : <button className="iconb" title="Запустить" onClick={() => svcAction(s.service, 'start')}><Icon.play size={20}/></button>)}
+                </>}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <hr className="divider"/>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+        <button className="btn primary" onClick={updateAll}><Icon.download size={16}/> Обновить всё</button>
+        <button className="btn" onClick={() => { setServices(null); loadServices(); }}><Icon.refresh size={16}/> Обновить статус</button>
+        <button className="btn text" onClick={doLock} style={{ marginLeft: 'auto' }}><Icon.lock size={16}/> Заблокировать</button>
+      </div>
+    </>;
+  }
+
+  return (
+    <>
+      <div className="set-card" id="sec-system">
+        <div className="set-card-head">
+          <h3>Обслуживание</h3>
+          <div className="sub" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <span>Обновление и перезапуск сервисов бэкенда</span>
+            <span className="pill-info ok">{SYSTEM.version} · {SYSTEM.edition}</span>
+          </div>
+        </div>
+        <div className="set-card-body">{body}</div>
+      </div>
+
+      {progress && (
+        <div className="sys-scrim">
+          <div className="sys-dialog">
+            <h3>Обновление сервисов</h3>
+            <div className="sub">{progress.finished ? 'Готово' : 'Выполняется последовательно…'}</div>
+            <div className="prog-bar"><span style={{ width: `${Math.round(progress.done / progress.total * 100)}%` }}/></div>
+            <div className="prog-list">
+              {progress.items.map(it => (
+                <div key={it.svc} className={"prog-item " + it.state}>
+                  <span className="pi">
+                    {it.state === 'current' ? <span className="spin"/>
+                      : it.state === 'done' ? <Icon.check size={18}/>
+                      : it.state === 'error' ? <Icon.x size={18}/>
+                      : <Icon.clock size={16}/>}
+                  </span>
+                  <span>{SVC_LABELS[it.svc] || it.svc}</span>
+                </div>
+              ))}
+            </div>
+            {progress.finished && <div className="dlg-actions"><button className="btn" onClick={() => setProgress(null)}>Закрыть</button></div>}
+          </div>
+        </div>
+      )}
+
+      {overlay && (
+        <div className="upd-overlay">
+          <div className="big-spin"/>
+          <h2>{overlay.title}</h2>
+          <p>Загрузка нового образа и пересоздание контейнера. Проверяем доступность каждые 3 секунды — страница перезагрузится сама.</p>
+          <div className="timer"><Icon.clock size={16}/> {overlay.seconds} сек</div>
+        </div>
+      )}
+
+      {toast && (
+        <div className={"sys-toast " + toast.kind}>
+          {toast.kind === 'ok' ? <Icon.check size={18}/> : <Icon.x size={18}/>}
+          <span>{toast.msg}</span>
+        </div>
+      )}
+    </>
+  );
+}
+
 function App() {
   const [section, setSection] = React.useState('account');
   const [twoFa, setTwoFa] = React.useState(SECURITY.twoFa);
@@ -444,6 +724,12 @@ function App() {
   const [pushNotif, setPushNotif] = React.useState(NOTIFICATIONS.pushOn);
   const [theme, setTheme] = React.useState('light');
   const [accent, setAccent] = React.useState('#9A4F1E');
+
+  const go = (key) => {
+    setSection(key);
+    const el = document.getElementById('sec-' + key);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
 
   return (
     <AppShell
@@ -460,7 +746,7 @@ function App() {
           {NAV.map(n => {
             const Ic = Icon[n.icon];
             return (
-              <button key={n.key} className={section === n.key ? 'on' : ''} onClick={() => setSection(n.key)}>
+              <button key={n.key} className={section === n.key ? 'on' : ''} onClick={() => go(n.key)}>
                 <Ic size={20}/>
                 {n.label}
               </button>
@@ -629,6 +915,9 @@ function App() {
               </div>
             </div>
           </div>
+
+          {/* SYSTEM / MAINTENANCE */}
+          <SystemSection/>
 
           {/* DANGER ZONE */}
           <div className="set-card danger">

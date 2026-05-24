@@ -79,4 +79,16 @@ public class DevicesStorage(UsersContext context)
         context.UserDevices.Remove(device);
         await context.SaveChangesAsync();
     }
+
+    public async Task SetFirebaseToken(Guid deviceId, long userId, string? firebaseToken)
+    {
+        var device = await context.UserDevices
+            .FirstOrDefaultAsync(d => d.Id == deviceId && d.UserId == userId);
+
+        if (device == null)
+            throw new InvalidOperationException("Устройство не найдено");
+
+        device.FirebaseToken = firebaseToken;
+        await context.SaveChangesAsync();
+    }
 }

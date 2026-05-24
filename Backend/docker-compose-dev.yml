@@ -56,6 +56,18 @@ services:
     depends_on:
       - configuration
 
+  # Сервис уведомлений (consumer RabbitMQ → SMTP). Внешнего API нет, портов наружу не открывает.
+  notification:
+    image: barkcloud-notification-dev:latest
+    container_name: cloud-notification
+    restart: always
+    environment:
+      <<: *common-variables
+    networks:
+      - barkcloud-network
+    depends_on:
+      - configuration
+
   # Веб-клиент (HTTP, отдаёт страницы браузеру; к микросервисам обращается по docker-сети через gRPC)
   # JwtSettings и адреса сервисов тянет из Configuration-сервиса (CONFIGURATION_SERVICE_URL), как остальные.
   web:
