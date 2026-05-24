@@ -1,4 +1,5 @@
 using BarkCloud.Web.Auth;
+using BarkCloud.Web.Infrastructure;
 using BarkCloud.Web.Rendering;
 
 namespace BarkCloud.Web;
@@ -117,9 +118,9 @@ public static class WebEndpoints
         HttpContext http, IConfiguration config, string flashKind, string? email, string? login, string? password)
         => new()
         {
-            ["app.version"] = config["App:Version"] ?? "v1.0.0",
-            ["server.host"] = config["App:PublicHost"] ?? http.Request.Host.Value,
-            ["server.tls"] = config["App:TlsLabel"] ?? "TLS 1.3",
+            ["app.version"] = config.Value("App:Version", "v1.0.0"),
+            ["server.host"] = config.Value("App:PublicHost", http.Request.Host.Value),
+            ["server.tls"] = config.Value("App:TlsLabel", "TLS 1.3"),
             ["flash.kind"] = flashKind,
             ["form.email"] = email ?? "",
             ["form.password_masked"] = "",
