@@ -92,7 +92,7 @@ Keychain — нативный `Security` framework (без сторонних з
 | `Material3 Theme` | SwiftUI `.tint` + asset-catalog accent |
 | `androidx.navigation.compose NavHost` | SwiftUI `NavigationStack` (Files-таб) + `TabView` (5 табов) |
 | `FileProvider + ACTION_SEND` | `UIActivityViewController` через `UIViewControllerRepresentable` (PR 5) |
-| `BuildConfig.IDENTITY_API_ADDRESS = https://10.0.2.2:5001` | `https://localhost:5001` (Simulator) — константа в `GrpcManager` (PR 2) |
+| `BuildConfig.IDENTITY_API_ADDRESS = https://cloud.barkfluff.com:7020` | `GrpcEndpoint` в `GrpcManager`: `cloud.barkfluff.com:7020`, `useTLS = true`, `allowSelfSigned = true` (TLS терминируется на nginx) |
 
 ## Сборка
 

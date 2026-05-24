@@ -42,10 +42,6 @@
 - [[api/users-api]] — gRPC API сервиса Users (профиль, устройства, contacts, draft)
 - [[api/files-api]] — gRPC API сервиса Files (`FilesApi`, `CloudApi`, `FilesServerApi`)
 
-### 📋 Изменения
-- [[changelog/2026-05-19]] — iOS PR 1: setup проекта и базовый каркас
-- [[changelog/2026-05-18]] — актуализация vault под реальное состояние кода
-
 ## Стек технологий
 
 | Слой | Технологии |

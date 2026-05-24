@@ -3,8 +3,8 @@ import GRPCCore
 import GRPCNIOTransportHTTP2
 
 enum GrpcEndpoint {
-    static let identityHost = "localhost"
-    static let identityPort = 5001
+    static let identityHost = "cloud.barkfluff.com"
+    static let identityPort = 7020
     static let useTLS = true
     static let allowSelfSigned = true
 }

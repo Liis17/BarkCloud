@@ -9,6 +9,7 @@ import coil3.video.VideoFrameDecoder
 import com.barkfluff.BarkCloud.data.AuthRepository
 import com.barkfluff.BarkCloud.data.GlobalParam
 import com.barkfluff.BarkCloud.files.data.LocalFileRepository
+import com.barkfluff.BarkCloud.grpc.ClientMetadataInterceptor
 import com.barkfluff.BarkCloud.grpc.GrpcManager
 
 class BarkCloudApplication : Application(), SingletonImageLoader.Factory {
@@ -28,7 +29,7 @@ class BarkCloudApplication : Application(), SingletonImageLoader.Factory {
     override fun onCreate() {
         super.onCreate()
         globalParam = GlobalParam(this)
-        grpcManager = GrpcManager(globalParam)
+        grpcManager = GrpcManager(globalParam, ClientMetadataInterceptor.create(this))
         authRepository = AuthRepository(grpcManager, globalParam)
         localFileRepository = LocalFileRepository()
     }
