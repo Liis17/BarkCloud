@@ -21,6 +21,7 @@
 - [[modules/backend-users]] — Сервис пользователей (профили, устройства, контакты, draft-flow)
 - [[modules/backend-files]] — Сервис файлов (MinIO, аватары) + [[modules/backend-files-cloud]] облачная иерархия папок
 - [[modules/backend-grpcserver]] — Общий хост для gRPC-серверов (расширения, метрики, перехватчики)
+- [[modules/backend-web]] — Веб-клиент (HTTP-страницы для браузера + gRPC-клиент к микросервисам, логин/cookie/JWT)
 
 ### 📦 Модули — Shared
 - [[modules/shared-proto]] — Proto-контракты gRPC (общие для backend и клиентов)

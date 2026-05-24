@@ -239,7 +239,9 @@ function Memory({ m }) {
 function Photo({ p }) {
   return (
     <div className={"photo" + (p.tall ? " tall" : "")}>
-      <div className="thumb" style={{'--tint-a': p.tint[0], '--tint-b': p.tint[1]}}/>
+      {p.url
+        ? <img className="thumb" src={p.url} alt="" loading="lazy" style={{objectFit:'cover'}}/>
+        : <div className="thumb" style={{'--tint-a': p.tint[0], '--tint-b': p.tint[1]}}/>}
       {p.video && <div className="vbadge"><Icon.play size={10}/> {p.dur}</div>}
       {p.fav && <div className="heart"><Icon.star size={14}/></div>}
     </div>

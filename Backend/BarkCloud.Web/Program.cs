@@ -1,34 +1,32 @@
+using BarkCloud.Proto.Files;
+using BarkCloud.Proto.Identity;
+using BarkCloud.Proto.Users;
+using BarkCloud.Web;
+using BarkCloud.Web.Auth;
+using BarkCloud.Web.Infrastructure;
+using BarkCloud.Web.Rendering;
 
-namespace BarkCloud.Web
-{
-    public class Program
-    {
-        public static void Main(string[] args)
-        {
-            var builder = WebApplication.CreateBuilder(args);
+// gRPC к микросервисам идёт по docker-сети без TLS (h2c) — разрешаем HTTP/2 поверх http://
+AppContext.SetSwitch("System.Net.Http.SocketsHttpHandler.Http2UnencryptedSupport", true);
 
-            // Add services to the container.
+var builder = WebApplication.CreateBuilder(args);
 
-            builder.Services.AddControllers();
-            // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-            builder.Services.AddOpenApi();
+var identityAddress = builder.Configuration["Backend:Identity"] ?? "http://cloud-identity:7020";
+var usersAddress = builder.Configuration["Backend:Users"] ?? "http://cloud-users:7021";
+var filesAddress = builder.Configuration["Backend:Files"] ?? "http://cloud-files:7025";
 
-            var app = builder.Build();
+builder.Services.AddGrpcClient<IdentityApi.IdentityApiClient>(o => o.Address = new Uri(identityAddress));
+builder.Services.AddGrpcClient<UsersApi.UsersApiClient>(o => o.Address = new Uri(usersAddress));
+builder.Services.AddGrpcClient<FilesApi.FilesApiClient>(o => o.Address = new Uri(filesAddress));
+builder.Services.AddGrpcClient<CloudApi.CloudApiClient>(o => o.Address = new Uri(filesAddress));
 
-            // Configure the HTTP request pipeline.
-            if (app.Environment.IsDevelopment())
-            {
-                app.MapOpenApi();
-            }
+builder.Services.AddSingleton<TemplateRenderer>();
+builder.Services.AddSingleton<PageService>();
+builder.Services.AddScoped<AuthGateway>();
+builder.Services.AddScoped<PageDataBuilder>();
 
-            app.UseHttpsRedirection();
+var app = builder.Build();
 
-            app.UseAuthorization();
+app.MapWebEndpoints();
 
-
-            app.MapControllers();
-
-            app.Run();
-        }
-    }
-}
+app.Run();
