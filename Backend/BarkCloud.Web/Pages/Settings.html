@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BarkCloud — Настройки</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,wght@8..144,300;8..144,400;8..144,500;8..144,600;8..144,700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="shared.css"/>
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+  <script type="text/babel" src="shared.jsx"></script>
+  <style>
+    .settings-shell {
+      display: grid;
+      grid-template-columns: 240px 1fr;
+      gap: 32px;
+      max-width: 1100px;
+    }
+
+    .set-nav {
+      display: flex; flex-direction: column; gap: 4px;
+      position: sticky; top: 0;
+    }
+    .set-nav-label {
+      font-size: 11px;
+      letter-spacing: .5px;
+      color: var(--md-on-surface-variant);
+      text-transform: uppercase;
+      font-weight: 500;
+      padding: 8px 16px 6px;
+    }
+    .set-nav button {
+      display:flex; align-items:center; gap: 12px;
+      padding: 0 16px;
+      height: 48px;
+      border-radius: var(--r-full);
+      background: transparent;
+      border: none;
+      color: var(--md-on-surface-variant);
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      text-align: left;
+      transition: background var(--d-short), color var(--d-short);
+    }
+    .set-nav button:hover { background: color-mix(in srgb, var(--md-on-surface) 8%, transparent); color: var(--md-on-surface); }
+    .set-nav button.on {
+      background: var(--md-secondary-container);
+      color: var(--md-on-secondary-container);
+    }
+
+    /* M3 cards */
+    .set-content { display: flex; flex-direction: column; gap: 16px; }
+    .set-card {
+      background: var(--md-surface-container-low);
+      border-radius: var(--r-xl);
+      overflow: hidden;
+    }
+    .set-card-head {
+      padding: 24px 28px 16px;
+    }
+    .set-card-head h3 {
+      font-size: 22px;
+      line-height: 28px;
+      font-weight: 500;
+      color: var(--md-on-surface);
+    }
+    .set-card-head .sub {
+      font-size: 14px;
+      color: var(--md-on-surface-variant);
+      margin-top: 4px;
+    }
+    .set-card-body { padding: 8px 28px 28px; display: flex; flex-direction: column; gap: 16px; }
+
+    .field-row {
+      display: grid;
+      grid-template-columns: 220px 1fr auto;
+      gap: 20px;
+      align-items: center;
+      padding: 10px 0;
+    }
+    .field-row .lbl {
+      font-size: 14px;
+      color: var(--md-on-surface);
+      font-weight: 500;
+    }
+    .field-row .lbl .help {
+      display: block; font-size: 13px;
+      color: var(--md-on-surface-variant);
+      margin-top: 4px;
+      font-weight: 400;
+    }
+
+    /* M3 text fields — filled style */
+    .field-row input[type="text"], .field-row input[type="email"], .field-row select {
+      width: 100%;
+      background: var(--md-surface-container);
+      border: none;
+      border-bottom: 1px solid var(--md-outline);
+      border-radius: var(--r-xs) var(--r-xs) 0 0;
+      color: var(--md-on-surface);
+      font-family: inherit;
+      font-size: 15px;
+      padding: 14px 16px;
+      outline: none;
+      transition: background var(--d-short), border-color var(--d-short);
+    }
+    .field-row input:hover { background: var(--md-surface-container-high); }
+    .field-row input:focus {
+      border-bottom: 2px solid var(--md-primary);
+      padding-bottom: 13px;
+    }
+    .field-row .right-end { display: flex; justify-content: flex-end; }
+
+    /* M3 switch */
+    .toggle {
+      width: 52px; height: 32px;
+      border-radius: var(--r-full);
+      background: var(--md-surface-container-highest);
+      border: 2px solid var(--md-outline);
+      position: relative;
+      cursor: pointer;
+      transition: background var(--d-med) var(--m-emph), border-color var(--d-med) var(--m-emph);
+      flex-shrink: 0;
+    }
+    .toggle::after {
+      content: '';
+      position: absolute; top: 50%; left: 6px;
+      transform: translateY(-50%);
+      width: 16px; height: 16px; border-radius: 50%;
+      background: var(--md-outline);
+      transition: transform var(--d-med) var(--m-emph), width var(--d-med) var(--m-emph), height var(--d-med) var(--m-emph), background var(--d-med);
+    }
+    .toggle.on {
+      background: var(--md-primary);
+      border-color: var(--md-primary);
+    }
+    .toggle.on::after {
+      transform: translateY(-50%) translateX(20px);
+      background: var(--md-on-primary);
+      width: 24px; height: 24px;
+      left: 2px;
+    }
+
+    /* Storage breakdown */
+    .stor-bar {
+      height: 16px; border-radius: var(--r-full);
+      background: var(--md-surface-container-high);
+      overflow: hidden;
+      display: flex;
+      gap: 2px;
+    }
+    .stor-bar > span { height: 100%; }
+    .stor-legend { display: flex; flex-wrap: wrap; gap: 12px 24px; margin-top: 16px; }
+    .stor-legend .item { display:flex; align-items:center; gap: 10px; font-size: 13px; }
+    .stor-legend .sw { width: 12px; height: 12px; border-radius: var(--r-xs); }
+    .stor-legend .k { color: var(--md-on-surface); }
+    .stor-legend .v { color: var(--md-on-surface-variant); margin-left: 4px; }
+
+    /* Sessions */
+    .session-row {
+      display: grid;
+      grid-template-columns: 48px 1fr auto auto;
+      gap: 16px;
+      align-items: center;
+      padding: 14px 0;
+      border-bottom: 1px solid var(--md-outline-variant);
+    }
+    .session-row:last-child { border: none; padding-bottom: 0; }
+    .session-row .si {
+      width: 44px; height: 44px; border-radius: var(--r-md);
+      background: var(--md-surface-container-high);
+      display:flex; align-items:center; justify-content:center;
+      color: var(--md-on-surface-variant);
+    }
+    .session-row.curr .si { background: var(--md-primary-container); color: var(--md-on-primary-container); }
+    .session-row .who { font-size: 14px; color: var(--md-on-surface); font-weight: 500; }
+    .session-row .meta { font-size: 12px; color: var(--md-on-surface-variant); margin-top: 4px; }
+    .badge-curr {
+      font-size: 12px;
+      font-weight: 500;
+      background: var(--md-success-container);
+      color: var(--md-on-success-container);
+      padding: 6px 12px; border-radius: var(--r-full);
+    }
+    .session-row button.disc {
+      height: 36px;
+      padding: 0 16px;
+      background: transparent;
+      border: 1px solid var(--md-outline);
+      color: var(--md-on-surface);
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 500;
+      border-radius: var(--r-full);
+      cursor: pointer;
+      transition: background var(--d-short), color var(--d-short), border-color var(--d-short);
+    }
+    .session-row button.disc:hover { background: var(--md-error-container); border-color: var(--md-error-container); color: var(--md-on-error-container); }
+
+    /* Danger zone */
+    .danger {
+      background: var(--md-error-container);
+    }
+    .danger h3 { color: var(--md-on-error-container); }
+    .danger .sub { color: var(--md-on-error-container); opacity: .8; }
+    .danger-row {
+      display: flex; align-items: center; gap: 16px;
+      padding: 16px 0;
+      border-bottom: 1px solid color-mix(in srgb, var(--md-on-error-container) 15%, transparent);
+    }
+    .danger-row:last-child { border: none; padding-bottom: 0; }
+    .danger-row:first-child { padding-top: 0; }
+    .danger-row .info .t { font-size: 14px; color: var(--md-on-error-container); font-weight: 500; }
+    .danger-row .info .d { font-size: 13px; color: var(--md-on-error-container); opacity: .85; margin-top: 4px; }
+    .danger-btn {
+      margin-left: auto;
+      height: 40px;
+      background: var(--md-error);
+      border: none;
+      color: var(--md-on-error);
+      padding: 0 24px;
+      border-radius: var(--r-full);
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: filter var(--d-short);
+    }
+    .danger-btn:hover { filter: brightness(1.1); }
+    .danger-btn.outlined {
+      background: transparent;
+      border: 1px solid var(--md-on-error-container);
+      color: var(--md-on-error-container);
+    }
+
+    /* Avatar */
+    .avatar-big {
+      width: 88px; height: 88px;
+      border-radius: 50%;
+      background: var(--md-tertiary-container);
+      color: var(--md-on-tertiary-container);
+      display:flex; align-items:center; justify-content:center;
+      font-weight: 500; font-size: 32px;
+      flex-shrink: 0;
+    }
+
+    /* Theme picker */
+    .theme-row { display: flex; gap: 12px; }
+    .theme-swatch {
+      width: 80px; height: 56px;
+      border-radius: var(--r-md);
+      cursor: pointer;
+      position: relative;
+      border: 2px solid var(--md-outline-variant);
+      transition: border-color var(--d-short) var(--m-emph), transform var(--d-short);
+      overflow: hidden;
+    }
+    .theme-swatch:hover { transform: translateY(-2px); }
+    .theme-swatch.on { border-color: var(--md-primary); border-width: 3px; }
+    .theme-swatch.dark { background: linear-gradient(135deg, #2a2a2f 0%, #15151a 100%); }
+    .theme-swatch.dark::after { content:''; position: absolute; top: 10px; left: 10px; width: 22px; height: 6px; border-radius: 3px; background: rgba(255,255,255,.3); }
+    .theme-swatch.light { background: linear-gradient(135deg, #fafaf8 0%, #ebe7df 100%); }
+    .theme-swatch.light::after { content:''; position: absolute; top: 10px; left: 10px; width: 22px; height: 6px; border-radius: 3px; background: rgba(0,0,0,.2); }
+    .theme-swatch.auto { background: linear-gradient(135deg, #2a2a2f 50%, #ebe7df 50%); }
+
+    .accent-row { display: flex; gap: 10px; }
+    .accent-sw {
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      cursor: pointer;
+      border: 2px solid transparent;
+      position: relative;
+      transition: transform var(--d-short);
+    }
+    .accent-sw:hover { transform: scale(1.08); }
+    .accent-sw.on::after {
+      content: '';
+      position: absolute; inset: -4px;
+      border-radius: 50%;
+      border: 2px solid var(--md-primary);
+    }
+
+    .pill-info {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 6px 12px;
+      border-radius: var(--r-full);
+      font-size: 12px;
+      font-weight: 500;
+    }
+    .pill-info.ok { background: var(--md-success-container); color: var(--md-on-success-container); }
+    .pill-info.warn { background: var(--md-warning-container); color: var(--md-on-surface); }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+
+<!--
+  ╔════════════════════════════════════════════════════════════════════╗
+  ║ SERVER PAYLOAD (Settings.html)                                     ║
+  ╠════════════════════════════════════════════════════════════════════╣
+  ║ JSON-схема:                                                        ║
+  ║   {                                                                ║
+  ║     "profile": {                                                   ║
+  ║       "initials": "АК", "name": "Антон К.",                        ║
+  ║       "email": "anton@cloud.bark.io",                              ║
+  ║       "username": "admin",                                         ║
+  ║       "timezone": "Europe/Moscow · UTC+3"                          ║
+  ║     },                                                             ║
+  ║     "security": {                                                  ║
+  ║       "passwordChanged": "18 февраля 2026",                        ║
+  ║       "passwordStrength": "18 символов · стойкий",                 ║
+  ║       "twoFa": true, "e2e": true,                                  ║
+  ║       "backupCodes": "6 из 10 использованы"                        ║
+  ║     },                                                             ║
+  ║     "storage": {                                                   ║
+  ║       "used": "312,4", "total": "500", "unit": "ГБ",               ║
+  ║       "percent": 62, "forecast": "ноябрь 2026",                    ║
+  ║       "breakdown": [{ k, v, color, pct }, ...],                    ║
+  ║       "freeLabel": "187,6 ГБ",                                     ║
+  ║       "autoUpload": true, "devicesCount": "4 устройства",          ║
+  ║       "trashLabel": "1,2 ГБ · 184 файла"                           ║
+  ║     },                                                             ║
+  ║     "notifications": {                                             ║
+  ║       "emailAddress": "anton@cloud.bark.io",                       ║
+  ║       "emailOn": true, "pushOn": false, ...                        ║
+  ║     },                                                             ║
+  ║     "sessions": [{ device, browser, location, when, current? }],   ║
+  ║     "sessionsHeader": "5 устройств с активным доступом"            ║
+  ║   }                                                                ║
+  ╚════════════════════════════════════════════════════════════════════╝
+-->
+<script type="application/json" id="server-data">
+{{{ page_data_json }}}
+</script>
+
+<script type="text/babel">
+const { AppShell, Icon } = window;
+
+function loadServerData() {
+  try {
+    const raw = document.getElementById('server-data')?.textContent?.trim();
+    if (!raw || raw.startsWith('{{')) return null;
+    return JSON.parse(raw);
+  } catch (e) { console.warn('server-data parse failed', e); return null; }
+}
+const SERVER_DATA = loadServerData();
+
+// ─── Profile ───
+const PROFILE = SERVER_DATA?.profile ?? {
+  initials: 'АК',
+  name: 'Антон К.',
+  email: 'anton@cloud.bark.io',
+  username: 'admin',
+  timezone: 'Europe/Moscow · UTC+3',
+};
+
+// ─── Security ───
+const SECURITY = SERVER_DATA?.security ?? {
+  passwordChanged: '18 февраля 2026',
+  passwordStrength: '18 символов · стойкий',
+  twoFa: true,
+  e2e: true,
+  backupCodes: '6 из 10 использованы',
+};
+
+// ─── Storage ───
+const STORAGE = SERVER_DATA?.storage ?? {
+  used: '312,4', total: '500', unit: 'ГБ',
+  percent: 62, forecast: 'ноябрь 2026',
+  breakdown: [
+    {k:'Фото',    v:'152 ГБ',    color:'#9A4F1E',          pct:30},
+    {k:'Видео',   v:'94,6 ГБ',   color:'#7B5DA8',          pct:18},
+    {k:'Файлы',   v:'42,1 ГБ',   color:'#3F8E58',          pct:9},
+    {k:'Архивы',  v:'18,8 ГБ',   color:'#C9A03B',          pct:4},
+    {k:'Прочее',  v:'4,9 ГБ',    color:'var(--md-outline)',pct:1.5},
+  ],
+  freeLabel: '187,6 ГБ',
+  autoUpload: true,
+  devicesCount: '4 устройства',
+  trashLabel: '1,2 ГБ · 184 файла',
+};
+
+// ─── Notifications ───
+const NOTIFICATIONS = SERVER_DATA?.notifications ?? {
+  emailAddress: 'anton@cloud.bark.io',
+  emailOn: true,
+  pushOn: false,
+  newShare: true,
+  comments: true,
+  systemEvents: true,
+  marketing: false,
+};
+
+// ─── Sessions ───
+const SESSIONS = SERVER_DATA?.sessions ?? [
+  {device:'MacBook Pro · Safari 18',         location:'Москва · 95.31.42.117', when:'сейчас',           current:true},
+  {device:'iPhone 15 Pro · BarkCloud iOS',   location:'Москва',                 when:'2 часа назад'},
+  {device:'iPad Air · BarkCloud iOS',        location:'Москва',                 when:'вчера 22:14'},
+  {device:'Linux Workstation · Firefox 128', location:'Москва',                 when:'12 мая'},
+  {device:'Android · BarkCloud 4.2.1',       location:'Санкт-Петербург',        when:'28 апреля'},
+];
+const SESSIONS_HEADER = SERVER_DATA?.sessionsHeader ?? '5 устройств с активным доступом';
+
+const NAV = [
+  {key:'account', label:'Аккаунт', icon:'user'},
+  {key:'security', label:'Безопасность', icon:'lock'},
+  {key:'storage', label:'Хранилище', icon:'server'},
+  {key:'appearance', label:'Внешний вид', icon:'palette'},
+  {key:'notifications', label:'Уведомления', icon:'bell'},
+  {key:'sessions', label:'Устройства и сессии', icon:'device'},
+  {key:'language', label:'Язык и регион', icon:'globe'},
+  {key:'api', label:'API и интеграции', icon:'key'},
+];
+
+function Toggle({ on, onChange }) {
+  return <div className={"toggle" + (on ? ' on' : '')} onClick={() => onChange(!on)}/>;
+}
+
+function Field({ label, help, children, end }) {
+  return (
+    <div className="field-row">
+      <div className="lbl">
+        {label}
+        {help && <span className="help">{help}</span>}
+      </div>
+      <div>{children}</div>
+      <div className="right-end">{end}</div>
+    </div>
+  );
+}
+
+function App() {
+  const [section, setSection] = React.useState('account');
+  const [twoFa, setTwoFa] = React.useState(SECURITY.twoFa);
+  const [e2e, setE2e] = React.useState(SECURITY.e2e);
+  const [autoUpload, setAutoUpload] = React.useState(STORAGE.autoUpload);
+  const [emailNotif, setEmailNotif] = React.useState(NOTIFICATIONS.emailOn);
+  const [pushNotif, setPushNotif] = React.useState(NOTIFICATIONS.pushOn);
+  const [theme, setTheme] = React.useState('light');
+  const [accent, setAccent] = React.useState('#9A4F1E');
+
+  return (
+    <AppShell
+      page="settings"
+      kicker={<><span>Прочее</span><span className="sep">/</span><span className="cur">Настройки</span></>}
+      title="Настройки"
+      search={false}
+      actions={<button className="btn primary"><Icon.check size={16}/> Сохранить</button>}
+    >
+      <div className="settings-shell">
+        {/* Left nav */}
+        <div className="set-nav">
+          <div className="set-nav-label">Разделы</div>
+          {NAV.map(n => {
+            const Ic = Icon[n.icon];
+            return (
+              <button key={n.key} className={section === n.key ? 'on' : ''} onClick={() => setSection(n.key)}>
+                <Ic size={20}/>
+                {n.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Right content */}
+        <div className="set-content">
+
+          {/* ACCOUNT */}
+          <div className="set-card">
+            <div className="set-card-head">
+              <h3>Профиль</h3>
+              <div className="sub">Имя и фото, видимые другим участникам</div>
+            </div>
+            <div className="set-card-body">
+              <div style={{display:'flex', gap:20, alignItems:'center'}}>
+                <div className="avatar-big">{PROFILE.initials}</div>
+                <div style={{display:'flex', flexDirection:'column', gap:8, flex:1}}>
+                  <div style={{fontSize:14, color:'var(--md-on-surface-variant)'}}>Изменить аватар. Рекомендуется не меньше 256×256.</div>
+                  <div style={{display:'flex', gap:8}}>
+                    <button className="btn"><Icon.upload size={16}/> Загрузить</button>
+                    <button className="btn text">Удалить</button>
+                  </div>
+                </div>
+              </div>
+              <hr className="divider"/>
+              <Field label="Имя" help="Будет видно другим"><input type="text" defaultValue={PROFILE.name}/></Field>
+              <Field label="Email" help="Используется для входа"><input type="email" defaultValue={PROFILE.email}/></Field>
+              <Field label="Имя в системе" help="Изменить нельзя"><input type="text" defaultValue={PROFILE.username} disabled style={{opacity:.55, cursor:'not-allowed'}}/></Field>
+              <Field label="Часовой пояс"><input type="text" defaultValue={PROFILE.timezone}/></Field>
+            </div>
+          </div>
+
+          {/* SECURITY */}
+          <div className="set-card">
+            <div className="set-card-head">
+              <h3>Безопасность</h3>
+              <div className="sub">Пароль, двухфакторка и шифрование</div>
+            </div>
+            <div className="set-card-body">
+              <Field label="Пароль" help={`Последний раз изменён ${SECURITY.passwordChanged}`}>
+                <span className="pill-info ok"><Icon.check size={12}/> {SECURITY.passwordStrength}</span>
+              </Field>
+              <div>
+                <button className="btn"><Icon.key size={16}/> Сменить пароль</button>
+              </div>
+              <hr className="divider"/>
+              <Field label="Двухфакторная (2FA)" help="Через приложение-аутентификатор" end={<Toggle on={twoFa} onChange={setTwoFa}/>}>
+                {twoFa && <span className="pill-info ok"><Icon.check size={12}/> Включена, TOTP</span>}
+              </Field>
+              <Field label="Сквозное шифрование" help="E2E для приватных папок" end={<Toggle on={e2e} onChange={setE2e}/>}>
+                <span className="pill-info ok"><Icon.lock size={12}/> AES-256</span>
+              </Field>
+              <Field label="Резервные коды" help={SECURITY.backupCodes}>
+                <button className="btn"><Icon.download size={16}/> Скачать новые</button>
+              </Field>
+            </div>
+          </div>
+
+          {/* STORAGE */}
+          <div className="set-card">
+            <div className="set-card-head">
+              <h3>Хранилище</h3>
+              <div className="sub" style={{display:'flex', alignItems:'center', gap:10, flexWrap:'wrap'}}>
+                <span>{STORAGE.used} из {STORAGE.total} {STORAGE.unit} использовано</span>
+                <span className="pill-info warn">{STORAGE.percent}% · прогноз лимита — {STORAGE.forecast}</span>
+              </div>
+            </div>
+            <div className="set-card-body">
+              <div className="stor-bar">
+                {STORAGE.breakdown.map((b, i) => (
+                  <span key={i} style={{width:`${b.pct}%`, background:b.color}}/>
+                ))}
+              </div>
+              <div className="stor-legend">
+                {STORAGE.breakdown.map((b, i) => (
+                  <div key={i} className="item">
+                    <span className="sw" style={{background:b.color}}/>
+                    <span className="k">{b.k}</span><span className="v">{b.v}</span>
+                  </div>
+                ))}
+                <div className="item"><span className="sw" style={{background:'var(--md-surface-container-high)', border:'1px solid var(--md-outline-variant)'}}/><span className="k">Свободно</span><span className="v">{STORAGE.freeLabel}</span></div>
+              </div>
+              <hr className="divider"/>
+              <Field label="Автозагрузка с устройств" help="С телефонов и планшетов" end={<Toggle on={autoUpload} onChange={setAutoUpload}/>}><span className="pill-info ok"><Icon.check size={12}/> {STORAGE.devicesCount}</span></Field>
+              <Field label="Корзина" help="Хранится 30 дней"><div style={{display:'flex', alignItems:'center', gap:14}}><span style={{color:'var(--md-on-surface)', fontSize:14}}>{STORAGE.trashLabel}</span><button className="btn text">Очистить</button></div></Field>
+            </div>
+          </div>
+
+          {/* APPEARANCE */}
+          <div className="set-card">
+            <div className="set-card-head">
+              <h3>Внешний вид</h3>
+              <div className="sub">Тема, акцент, плотность интерфейса</div>
+            </div>
+            <div className="set-card-body">
+              <Field label="Тема">
+                <div className="theme-row">
+                  <div className={"theme-swatch light" + (theme==='light' ? ' on' : '')} onClick={()=>setTheme('light')}/>
+                  <div className={"theme-swatch dark" + (theme==='dark' ? ' on' : '')} onClick={()=>setTheme('dark')}/>
+                  <div className={"theme-swatch auto" + (theme==='auto' ? ' on' : '')} onClick={()=>setTheme('auto')}/>
+                </div>
+              </Field>
+              <Field label="Акцент">
+                <div className="accent-row">
+                  {['#9A4F1E','#7B5DA8','#3F8E58','#2E6FA8','#A04067','#C9A03B'].map(c => (
+                    <div key={c} className={"accent-sw" + (accent===c ? ' on' : '')} style={{background:c}} onClick={()=>setAccent(c)}/>
+                  ))}
+                </div>
+              </Field>
+              <Field label="Плотность">
+                <div className="chip-row">
+                  <button className="chip">Свободная</button>
+                  <button className="chip active"><Icon.check size={16}/>Стандартная</button>
+                  <button className="chip">Плотная</button>
+                </div>
+              </Field>
+              <Field label="Анимации" help="Переходы и spring-движение" end={<Toggle on={true} onChange={()=>{}}/>}><span/></Field>
+            </div>
+          </div>
+
+          {/* NOTIFICATIONS */}
+          <div className="set-card">
+            <div className="set-card-head">
+              <h3>Уведомления</h3>
+              <div className="sub">Что и куда присылать</div>
+            </div>
+            <div className="set-card-body">
+              <Field label="Email-уведомления" help={NOTIFICATIONS.emailAddress} end={<Toggle on={emailNotif} onChange={setEmailNotif}/>}><span/></Field>
+              <Field label="Push в браузер" end={<Toggle on={pushNotif} onChange={setPushNotif}/>}><span/></Field>
+              <Field label="Веб-хуки" help="Slack, Discord или собственный URL"><button className="btn"><Icon.plus size={16}/> Добавить</button></Field>
+              <hr className="divider"/>
+              <Field label="Новый общий доступ" end={<Toggle on={NOTIFICATIONS.newShare} onChange={()=>{}}/>}><span/></Field>
+              <Field label="Комментарии" end={<Toggle on={NOTIFICATIONS.comments} onChange={()=>{}}/>}><span/></Field>
+              <Field label="Системные события" help="Превышение квоты, входы" end={<Toggle on={NOTIFICATIONS.systemEvents} onChange={()=>{}}/>}><span/></Field>
+              <Field label="Маркетинг" end={<Toggle on={NOTIFICATIONS.marketing} onChange={()=>{}}/>}><span/></Field>
+            </div>
+          </div>
+
+          {/* SESSIONS */}
+          <div className="set-card">
+            <div className="set-card-head">
+              <h3>Активные сессии</h3>
+              <div className="sub">{SESSIONS_HEADER}</div>
+            </div>
+            <div className="set-card-body" style={{paddingTop: 6}}>
+              {SESSIONS.map((s, i) => (
+                <div key={i} className={"session-row" + (s.current ? ' curr' : '')}>
+                  <div className="si"><Icon.device size={20}/></div>
+                  <div>
+                    <div className="who">{s.device}</div>
+                    <div className="meta">{s.location} · {s.when}</div>
+                  </div>
+                  {s.current
+                    ? <span className="badge-curr">Текущая</span>
+                    : <span style={{width: 110}}/>}
+                  {s.current
+                    ? <span style={{width: 110}}/>
+                    : <button className="disc">Отключить</button>}
+                </div>
+              ))}
+              <div style={{marginTop: 12}}>
+                <button className="btn">Выйти со всех устройств, кроме этого</button>
+              </div>
+            </div>
+          </div>
+
+          {/* DANGER ZONE */}
+          <div className="set-card danger">
+            <div className="set-card-head">
+              <h3>Опасная зона</h3>
+              <div className="sub">Действия здесь нельзя отменить</div>
+            </div>
+            <div className="set-card-body">
+              <div className="danger-row">
+                <div className="info">
+                  <div className="t">Скачать архив всех данных</div>
+                  <div className="d">ZIP со всеми вашими файлами, метаданными и историей. Подготовка занимает около 6 часов.</div>
+                </div>
+                <button className="danger-btn outlined">Запросить экспорт</button>
+              </div>
+              <div className="danger-row">
+                <div className="info">
+                  <div className="t">Деактивировать аккаунт</div>
+                  <div className="d">Профиль скрывается, файлы сохраняются. Можно восстановить в течение 90 дней.</div>
+                </div>
+                <button className="danger-btn outlined">Деактивировать</button>
+              </div>
+              <div className="danger-row">
+                <div className="info">
+                  <div className="t">Удалить аккаунт безвозвратно</div>
+                  <div className="d">Все файлы, общие доступы и история удаляются за 24 часа. Восстановление невозможно.</div>
+                </div>
+                <button className="danger-btn">Удалить</button>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </AppShell>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
