@@ -5,25 +5,29 @@ struct MainScreen: View {
 
     var body: some View {
         TabView(selection: $selection) {
-            PlaceholderScreen(destination: .photos)
-                .tabItem {
-                    Label {
-                        Text(MainDestination.photos.labelKey)
-                    } icon: {
-                        Image(systemName: selection == .photos ? MainDestination.photos.iconFilled : MainDestination.photos.iconOutlined)
-                    }
+            NavigationStack {
+                MediaGridScreen(kind: .photo)
+            }
+            .tabItem {
+                Label {
+                    Text(MainDestination.photos.labelKey)
+                } icon: {
+                    Image(systemName: selection == .photos ? MainDestination.photos.iconFilled : MainDestination.photos.iconOutlined)
                 }
-                .tag(MainDestination.photos)
+            }
+            .tag(MainDestination.photos)
 
-            PlaceholderScreen(destination: .videos)
-                .tabItem {
-                    Label {
-                        Text(MainDestination.videos.labelKey)
-                    } icon: {
-                        Image(systemName: selection == .videos ? MainDestination.videos.iconFilled : MainDestination.videos.iconOutlined)
-                    }
+            NavigationStack {
+                MediaGridScreen(kind: .video)
+            }
+            .tabItem {
+                Label {
+                    Text(MainDestination.videos.labelKey)
+                } icon: {
+                    Image(systemName: selection == .videos ? MainDestination.videos.iconFilled : MainDestination.videos.iconOutlined)
                 }
-                .tag(MainDestination.videos)
+            }
+            .tag(MainDestination.videos)
 
             NavigationStack {
                 FilesRootScreen()
