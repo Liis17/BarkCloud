@@ -27,12 +27,17 @@ BarkCloud/
 ├── Data/Auth/                      (создаётся в PR 2)
 ├── Features/
 │   ├── Login/LoginScreen.swift     (stub, полная реализация — PR 3)
-│   ├── Main/MainScreen.swift       (stub, полная реализация — PR 4)
-│   ├── Placeholder/                (PR 4)
+│   ├── Main/MainScreen.swift       TabView: Photos/Videos → MediaGridScreen, Files → NavigationStack
+│   ├── Placeholder/                PlaceholderScreen (осталось у табов Shared/Settings)
+│   ├── Media/                      сетка Фото/Видео (3 столбика, квадраты, скелетоны)
+│   │   ├── MediaKind.swift         enum { photo, video }: titleKey, emptyKey, isVideo
+│   │   ├── MediaItem.swift         модель (id, thumbnailURL?, isVideo) + placeholders(count:isVideo:)
+│   │   ├── MediaGridViewModel.swift @Observable, isPlaceholder; load() — stub под CloudApi.ListUserImages
+│   │   └── MediaGridScreen.swift   LazyVGrid 3 кол. + приватный MediaCell, .redacted в плейсхолдер-режиме
 │   └── Files/                      (PR 5)
 │       ├── Domain/
 │       ├── Data/LocalFileRepository.swift  (stub, актер с documentsRoot)
-│       └── UI/
+│       └── UI/                     + FilesRootViewModel.swift (ServerFolder, скелетон-список папок)
 ├── Theme/
 │   ├── AppColors.swift             SwiftUI semantic colors (Color.primary/secondary/accentColor)
 │   ├── AppTypography.swift         Material 3 size scale через Font.system(size:weight:)
@@ -93,6 +98,22 @@ Keychain — нативный `Security` framework (без сторонних з
 | `androidx.navigation.compose NavHost` | SwiftUI `NavigationStack` (Files-таб) + `TabView` (5 табов) |
 | `FileProvider + ACTION_SEND` | `UIActivityViewController` через `UIViewControllerRepresentable` (PR 5) |
 | `BuildConfig.IDENTITY_API_ADDRESS = https://cloud.barkfluff.com:7020` | `GrpcEndpoint` в `GrpcManager`: `cloud.barkfluff.com:7020`, `useTLS = true`, `allowSelfSigned = true` (TLS терминируется на nginx) |
+
+## Медиа-сетка и серверные папки
+
+Реализован каркас UI поверх ещё не подключённого облачного API (см. [[api/files-api]] → `CloudApi`):
+
+- **Вкладки Фото/Видео** (`Features/Media/`) — переиспользуемый `MediaGridScreen(kind:)`:
+  `LazyVGrid` в 3 столбика, ячейки квадратные (`aspectRatio(1, .fit)`, spacing 2pt),
+  бейдж видео в углу. Пока данных нет — сетка из 12 серых плиток в режиме
+  `.redacted(reason: .placeholder)`. `MediaGridViewModel.load()` — заглушка, точка интеграции —
+  `CloudApi.ListUserImages` (cursor-пагинация, для видео фильтр по типу превью).
+- **Файлы → секция «Папки с сервера»** — раньше один неинтерактивный card; теперь список папок
+  прямо на странице (`FilesRootViewModel`, модель `ServerFolder` ≈ `DirectoryInfo`). Пока ~5
+  скелетон-строк с иконкой `folder`. Точка интеграции — `CloudApi.ListDirectory(root)`.
+
+Стиль заглушек — нативный SwiftUI `.redacted(reason: .placeholder)`; при подключении сервера
+скелетоны сменятся реальными превью/папками без переписывания вёрстки.
 
 ## Сборка
 
