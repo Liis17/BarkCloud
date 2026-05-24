@@ -10,6 +10,8 @@
 *.userosscache
 *.sln.docstates
 *.env
+# Пример-файл переменных окружения — трекаем (реальный .env остаётся игнорируемым)
+!Backend/sample.env
 
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
