@@ -55,8 +55,16 @@ public class Program
         builder.Services.AddScoped<TempFilesStorage>();
         builder.Services.AddScoped<FileHashesStorage>();
         builder.Services.AddScoped<CloudHierarchyStorage>();
+        builder.Services.AddScoped<AlbumStorage>();
         builder.Services.AddSingleton<ImageCompressor>();
+        builder.Services.AddSingleton<VideoThumbnailExtractor>();
+        builder.Services.AddScoped<PreviewPersistenceService>();
+        builder.Services.AddScoped<AlbumViewBuilder>();
         builder.Services.AddHostedService<TempFileCleanupService>();
+
+        // Путь к бинарям ffmpeg/ffprobe в образе (см. Dockerfile). По умолчанию — /usr/local/bin.
+        FFMpegCore.GlobalFFOptions.Configure(o =>
+            o.BinaryFolder = builder.Configuration["Ffmpeg:BinaryFolder"] ?? "/usr/local/bin");
 
         builder.Services.AddMinioS3(builder.Configuration);
 
@@ -103,6 +111,7 @@ public class Program
         app.MapGrpcService<FilesApiService>();
         app.MapGrpcService<FilesServerApiService>();
         app.MapGrpcService<CloudApiService>();
+        app.MapGrpcService<AlbumApiService>();
 
         app.Lifetime.ApplicationStopped.Register(Log.CloseAndFlush);
         app.Run();

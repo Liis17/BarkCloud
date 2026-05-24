@@ -4,7 +4,7 @@ Parent: [[index]]
 
 ## Назначение
 
-Нативный iOS-клиент BarkCloud (SwiftUI, Swift 5, iOS 18+). Цель — полный паритет с Android-клиентом: Login+OTP, 5-табовый Main с Files по умолчанию, локальный файл-браузер.
+Нативный iOS-клиент BarkCloud (SwiftUI, Swift 5, iOS 18+). Полный паритет с Android-клиентом ([[modules/android-app]]): Login+OTP, 5-табовый Main с Files по умолчанию, локальный файл-браузер, медиа-сетки. gRPC через grpc-swift 2. Все PR 1–6 реализованы.
 
 ## Расположение
 
@@ -19,36 +19,44 @@ Parent: [[index]]
 BarkCloud/
 ├── App/
 │   ├── BarkCloudApp.swift          @main, инжектит AppEnvironment в RootView
-│   ├── AppEnvironment.swift        @Observable service locator (sessionStore, localFileRepository)
+│   ├── AppEnvironment.swift        @Observable service locator (sessionStore, grpcManager, authRepository, localFileRepository)
 │   └── RootView.swift              gate: hasValidRefreshToken ? Main : Login
 ├── Session/
 │   └── SessionStore.swift          Keychain (kSecClassGenericPassword, service "com.barkfluff.BarkCloud.tokens")
-├── Networking/                     (создаётся в PR 2)
-├── Data/Auth/                      (создаётся в PR 2)
+├── Networking/                     gRPC: GrpcManager (actor) + интерсепторы
+│   ├── GrpcManager.swift           GrpcEndpoint (cloud.barkfluff.com:7020, TLS, allowSelfSigned), lazy IdentityApi-стаб
+│   ├── AuthInterceptor.swift       x-auth-token (динамически)
+│   ├── XAppInterceptor / XDeviceInterceptor / XIpInterceptor / XOsInterceptor — device-метаданные
+│   ├── Base64Header.swift          base64-кодирование значений заголовков
+│   ├── AuthErrorCodes.swift        GUID-коды OTP_REQUIRED / INVALID_CREDENTIALS
+│   └── GrpcError.swift             извлечение x-error-code из trailing-metadata
+├── Data/Auth/
+│   ├── AuthRepository.swift        IdentityApi.Auth, сохранение токенов в SessionStore
+│   └── AuthResult.swift            enum: success / otpRequired / invalidCredentials / otherError
 ├── Features/
-│   ├── Login/LoginScreen.swift     (stub, полная реализация — PR 3)
-│   ├── Main/MainScreen.swift       TabView: Photos/Videos → MediaGridScreen, Files → NavigationStack
-│   ├── Placeholder/                PlaceholderScreen (осталось у табов Shared/Settings)
+│   ├── Login/                      LoginScreen + LoginUiState + LoginViewModel (логин/пароль + OTP)
+│   ├── Main/                       MainScreen (TabView, 5 destinations), MainDestination
+│   ├── Placeholder/                PlaceholderScreen (табы Shared/Settings)
 │   ├── Media/                      сетка Фото/Видео (3 столбика, квадраты, скелетоны)
 │   │   ├── MediaKind.swift         enum { photo, video }: titleKey, emptyKey, isVideo
 │   │   ├── MediaItem.swift         модель (id, thumbnailURL?, isVideo) + placeholders(count:isVideo:)
 │   │   ├── MediaGridViewModel.swift @Observable, isPlaceholder; load() — stub под CloudApi.ListUserImages
 │   │   └── MediaGridScreen.swift   LazyVGrid 3 кол. + приватный MediaCell, .redacted в плейсхолдер-режиме
-│   └── Files/                      (PR 5)
-│       ├── Domain/
-│       ├── Data/LocalFileRepository.swift  (stub, актер с documentsRoot)
-│       └── UI/                     + FilesRootViewModel.swift (ServerFolder, скелетон-список папок)
+│   └── Files/                      локальный файл-браузер
+│       ├── Domain/                 FsEntry, FsSort
+│       ├── Data/                   LocalFileRepository (actor), FileShareHelper, MimeIcon, StoragePermission
+│       └── UI/                     FilesRootScreen/ViewModel, LocalBrowserScreen/ViewModel, BrowserUiState, FsRowItem, FormatUtils, PickFolderDialog, ThumbnailLoader
 ├── Theme/
 │   ├── AppColors.swift             SwiftUI semantic colors (Color.primary/secondary/accentColor)
 │   ├── AppTypography.swift         Material 3 size scale через Font.system(size:weight:)
 │   └── BarkCloudTheme.swift        ViewModifier с .tint(AppColors.accent)
 ├── Resources/
 │   └── Localizable.xcstrings       Все строки из Android strings.xml, sourceLanguage = "ru"
-├── Proto/
-│   ├── grpc-swift-proto-generator-config.json
-│   └── .gitignore                  (игнорирует синхронизируемые .proto)
+├── Generated/Proto/                сгенерённые стабы: {identity,users,files,shared}_api.{pb,grpc}.swift
 └── Assets.xcassets/                AccentColor, AppIcon (от стартера)
 ```
+
+Вне группы исходников: `Ios/BarkCloud/Proto/grpc-swift-proto-generator-config.json` (конфиг плагина-генератора) и `Ios/BarkCloud/sync_proto.sh` (Run-Script: синхронизация `.proto` из `Shared/BarkCloud.Proto`).
 
 ## Конфигурация (project.pbxproj)
 
@@ -66,24 +74,24 @@ BarkCloud/
 | `ENABLE_APP_SANDBOX` | `YES` |
 | `knownRegions` | `en, ru, Base` |
 
-## Зависимости (планируются, не подключены)
+## Зависимости (SPM, подключены)
 
-| Пакет | URL | Версия |
-|---|---|---|
-| grpc-swift | `https://github.com/grpc/grpc-swift` | `from 2.0.0` |
-| grpc-swift-nio-transport | `https://github.com/grpc/grpc-swift-nio-transport` | `from 2.0.0` |
-| grpc-swift-protobuf | `https://github.com/grpc/grpc-swift-protobuf` | `from 2.0.0` |
-| swift-protobuf | `https://github.com/apple/swift-protobuf` | `from 1.28.0` |
+| Пакет | URL |
+|---|---|
+| grpc-swift-2 | `https://github.com/grpc/grpc-swift-2` |
+| grpc-swift-nio-transport | `https://github.com/grpc/grpc-swift-nio-transport` |
+| grpc-swift-protobuf | `https://github.com/grpc/grpc-swift-protobuf` |
+| swift-protobuf | `https://github.com/apple/swift-protobuf` |
 
-Keychain — нативный `Security` framework (без сторонних зависимостей).
+Прописаны в `project.pbxproj` (XCRemoteSwiftPackageReference). Keychain — нативный `Security` framework (без сторонних зависимостей).
 
-## Ручные шаги в Xcode UI
+## Настройка проекта (выполнено)
 
-См. `Docs/IOS_SETUP.md`:
-1. Добавить 4 SPM-пакета через File → Add Package Dependencies.
-2. Подключить build-tool plugin `GRPCProtobufGenerator` к target BarkCloud.
-3. Добавить Run-Script build phase «Sync Shared Proto» (вызов `sync_proto.sh`) перед «Compile Sources».
-4. (Перед PR 2) Создать `Info.plist` с `NSAppTransportSecurity → NSAllowsArbitraryLoads` для dev (self-signed TLS на `localhost:5001`).
+См. историю в `Docs/IOS_SETUP.md`. Уже применено к проекту:
+1. 4 SPM-пакета добавлены.
+2. Build-tool plugin `GRPCProtobufGenerator` подключён (стабы в `Generated/Proto/`).
+3. Run-Script build phase синхронизирует `.proto` из `Shared/BarkCloud.Proto` (`sync_proto.sh`).
+4. ATS для self-signed TLS задан через build settings (отдельного `Info.plist` нет).
 
 ## Соответствие Android-клиенту
 
@@ -125,15 +133,15 @@ xcodebuild -project BarkCloud.xcodeproj \
   build
 ```
 
-После PR 1 — сборка проходит (PR 1 не зависит от SPM-пакетов). После добавления SPM (PR 2) — должны компилироваться `Identity_*`, `Users_*`, `Files_*` сгенерённые символы.
+SPM-пакеты подключены — сгенерённые символы (`Barkcloud_Identity_*`, `Barkcloud_Users_*`, `Barkcloud_Files_*`) компилируются.
 
-## План развития
+## История разработки (все PR закрыты)
 
 - **PR 1** ✅ — Setup: deployment target, каркас (App/Session/Theme), strings catalog, proto config, sync script.
-- **PR 2** — gRPC infra: 5 interceptor'ов, GrpcManager, AuthRepository.
-- **PR 3** — Login: полный экран с OTP-flow.
-- **PR 4** — Main tabs (TabView, 5 destinations, PlaceholderScreen).
-- **PR 5** — Local file browser: Domain, Data (FileManager), UI (CRUD, multi-select, share).
-- **PR 6** — Polish: QuickLook thumbnails, плюралы, snackbar.
+- **PR 2** ✅ — gRPC infra: интерсепторы (auth + 4 device), GrpcManager, AuthRepository.
+- **PR 3** ✅ — Login: полный экран с OTP-flow.
+- **PR 4** ✅ — Main tabs (TabView, 5 destinations, PlaceholderScreen).
+- **PR 5** ✅ — Local file browser: Domain, Data (FileManager), UI (CRUD, multi-select, share).
+- **PR 6** ✅ — Polish: QuickLook thumbnails, плюралы, snackbar.
 
-См. план в `~/.claude/plans/mellow-waddling-biscuit.md`.
+Открытые точки интеграции с сервером: `MediaGridViewModel.load()` и серверные папки в Files — заглушки под `CloudApi` ([[api/files-api]]).

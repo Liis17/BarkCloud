@@ -19,7 +19,7 @@
 - [[modules/backend-configuration]] — Сервис конфигурации (хранит настройки всех микросервисов и зарезервированные юзернеймы)
 - [[modules/backend-identity]] — Сервис идентификации (авторизация, токены, 2FA, сессии)
 - [[modules/backend-users]] — Сервис пользователей (профили, устройства, контакты, draft-flow)
-- [[modules/backend-files]] — Сервис файлов (MinIO, аватары) + [[modules/backend-files-cloud]] облачная иерархия папок
+- [[modules/backend-files]] — Сервис файлов (MinIO, аватары, превью видео через FFmpeg, галерея фото/видео, альбомы) + [[modules/backend-files-cloud]] облачная иерархия папок
 - [[modules/backend-grpcserver]] — Общий хост для gRPC-серверов (расширения, метрики, перехватчики)
 - [[modules/backend-web]] — Веб-клиент (HTTP-страницы для браузера + gRPC-клиент к микросервисам, логин/cookie/JWT)
 
@@ -32,10 +32,10 @@
 - [[modules/shared-securityutilities]] — Утилиты безопасности
 
 ### 📱 Модули — Android
-- [[modules/android-app]] — Нативный Android-клиент (Kotlin, gradle) — **сейчас пустая заготовка**
+- [[modules/android-app]] — Нативный Android-клиент (Kotlin, Compose, Material 3): логин+OTP, 5 табов, локальный файл-браузер, gRPC
 
 ### 📱 Модули — iOS
-- [[modules/ios-app]] — Нативный iOS-клиент (SwiftUI, Swift 5, iOS 18+), полный паритет с Android — в работе по 6 PR
+- [[modules/ios-app]] — Нативный iOS-клиент (SwiftUI, Swift 5, iOS 18+), полный паритет с Android — реализован
 
 ### 🔧 API & gRPC
 - [[api/configuration-api]] — gRPC API сервиса Configuration
@@ -52,17 +52,21 @@
 | Хранилище файлов | MinIO (S3-совместимое) |
 | Логирование | Serilog → Seq |
 | Контракты | Protocol Buffers (`.proto` в `Shared/BarkCloud.Proto`) |
-| Android | Kotlin, Android SDK (minSdk 35, target 36) |
-| Инфраструктура | Docker, docker-compose |
+| Android | Kotlin, Jetpack Compose, Material 3 (minSdk 30, target 36) |
+| iOS | SwiftUI, Swift 5, iOS 18+, grpc-swift 2 |
+| Инфраструктура | Docker, docker-compose, nginx (TLS-терминация + gRPC reverse-proxy) |
 
 ## Ключевые файлы
 
 | Файл | Назначение |
 |------|-----------|
 | `BarkCloud.slnx` | Solution-файл .NET (Backend + Shared) |
-| `Backend/docker-compose-dev.yml` | Dev-окружение: 4 микросервиса + инфра |
+| `Backend/docker-compose-dev.yml` | Dev-окружение: 4 микросервиса + web + инфра |
+| `Backend/nginx/cloud.barkfluff.conf` | Reverse-proxy: TLS-терминация и маршрутизация gRPC по портам |
 | `Shared/BarkCloud.Proto/*.proto` | gRPC-контракты между сервисами и клиентом |
 | `Android/BarkCloud.Android/build.gradle.kts` | Android-проект (Kotlin DSL) |
+| `Ios/BarkCloud/BarkCloud.xcodeproj` | iOS-проект (Xcode, SwiftUI) |
+| `Docs/` | Заметки по настройке (`IOS_SETUP.md`, гайдлайны Material 3) |
 
 ## Соглашения проекта
 

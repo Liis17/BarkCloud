@@ -7,11 +7,8 @@ using BarkCloud.Files.Services;
 
 using MediatR;
 
-using Microsoft.EntityFrameworkCore;
-
 using System.Security.Cryptography;
 
-using DomainUploadFile = BarkCloud.Files.Domain.UploadFile;
 using UploadFileType = BarkCloud.Files.Domain.UploadFileType;
 
 namespace BarkCloud.Files.Features.UploadFile;
@@ -23,7 +20,8 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
     private readonly S3Uploader _s3Uploader;
     private readonly S3BucketRegistry _bucketRegistry;
     private readonly ImageCompressor _imageCompressor;
-    private readonly FilesContext _context;
+    private readonly VideoThumbnailExtractor _videoThumbnailExtractor;
+    private readonly PreviewPersistenceService _previewPersistence;
     private readonly ILogger<UploadFileCommandHandler> _logger;
 
     /// <summary>
@@ -46,7 +44,8 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
         S3Uploader s3Uploader,
         S3BucketRegistry bucketRegistry,
         ImageCompressor imageCompressor,
-        FilesContext context,
+        VideoThumbnailExtractor videoThumbnailExtractor,
+        PreviewPersistenceService previewPersistence,
         ILogger<UploadFileCommandHandler> logger)
     {
         _filesStorage = filesStorage;
@@ -54,7 +53,8 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
         _s3Uploader = s3Uploader;
         _bucketRegistry = bucketRegistry;
         _imageCompressor = imageCompressor;
-        _context = context;
+        _videoThumbnailExtractor = videoThumbnailExtractor;
+        _previewPersistence = previewPersistence;
         _logger = logger;
     }
 
@@ -82,6 +82,9 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
         // Определяем тип контента по расширению файла
         var contentType = request.FileName.GetContentType();
 
+        // Классифицируем медиа (фото / видео / документ / аудио) для галереи и альбомов
+        file.MediaKind = request.FileName.GetMediaKind();
+
         // Получаем имя бакета в зависимости от типа файла
         var bucketName = _bucketRegistry.GetBucketName(file.Type);
 
@@ -91,15 +94,22 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
         long fileSize = request.FileSize > 0 ? request.FileSize : request.FileStream.Length;
 
         var isImageType = file.Type == UploadFileType.UserAvatar;
+        var isVideoContent = contentType.StartsWith("video/");
 
         Stream originalStream;
+        // Путь к временному файлу на диске. Нужен для видео (FFmpeg читает файл по пути),
+        // а также используется для буферизации больших не-картинок. null = буфер в памяти.
+        string? tempFilePath = null;
 
-        if (!isImageType && fileSize > 100 * 1024 * 1024)
+        // Видео всегда кладём на диск (FFmpeg работает с файлом), как и большие не-картинки.
+        if (isVideoContent || (!isImageType && fileSize > 100 * 1024 * 1024))
         {
+            tempFilePath = Path.GetTempFileName();
             _logger.LogInformation("Файл {FileId} ({Size} МБ) буферизуется через диск", request.FileId, fileSize / 1024 / 1024);
+            // FileShare.Read — чтобы процесс ffmpeg/ffprobe мог открыть файл параллельно нашему стриму.
             var tempStream = new FileStream(
-                Path.GetTempFileName(), FileMode.Create, FileAccess.ReadWrite,
-                FileShare.None, 81920, FileOptions.DeleteOnClose);
+                tempFilePath, FileMode.Create, FileAccess.ReadWrite,
+                FileShare.Read, 81920, FileOptions.None);
             await request.FileStream.CopyToAsync(tempStream, cancellationToken);
             tempStream.Position = 0;
             originalStream = tempStream;
@@ -110,6 +120,21 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
             await request.FileStream.CopyToAsync(memStream, cancellationToken);
             memStream.Position = 0;
             originalStream = memStream;
+        }
+
+        void CleanupTempFile()
+        {
+            if (tempFilePath is null)
+                return;
+            try
+            {
+                if (File.Exists(tempFilePath))
+                    File.Delete(tempFilePath);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Не удалось удалить временный файл {TempPath}", tempFilePath);
+            }
         }
 
         // Compute SHA256 hash of the file
@@ -155,6 +180,7 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
                 await _filesStorage.DeleteFile(file.Id);
                 await _hashesStorage.DeleteHashByFileId(file.Id, cancellationToken);
                 await originalStream.DisposeAsync();
+                CleanupTempFile();
 
                 return existingFileId.Value.ToString();
             }
@@ -223,6 +249,40 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
                 }
             }
 
+            // 2b) Видео: размеры + кадр-обложка на 5-й секунде → тот же multi-preview pipeline.
+            var needsVideoPreview = file.Type == UploadFileType.CloudFile && isVideoContent && tempFilePath is not null;
+            if (needsVideoPreview)
+            {
+                try
+                {
+                    var (vw, vh, _) = await _videoThumbnailExtractor.ProbeAsync(tempFilePath!, cancellationToken);
+                    if (vw > 0 && vh > 0)
+                    {
+                        file.ImageWidth = vw;
+                        file.ImageHeight = vh;
+                    }
+
+                    var frameBytes = await _videoThumbnailExtractor.ExtractFrameJpegAsync(
+                        tempFilePath!, VideoThumbnailExtractor.DefaultFramePosition, cancellationToken);
+
+                    using var frameStream = new MemoryStream(frameBytes);
+                    generatedPreviews = await _imageCompressor.GenerateMultiplePreviewsAsync(
+                        frameStream, CloudPreviewWidths, cancellationToken);
+
+                    _logger.LogInformation(
+                        "Сгенерировано превью видео {FileId}: {Width}x{Height}, кадров={Count}",
+                        file.Id, vw, vh, generatedPreviews?.Count ?? 0);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Не удалось сгенерировать превью видео {FileId}", file.Id);
+                }
+                finally
+                {
+                    originalStream.Position = 0;
+                }
+            }
+
             // 3) Грузим оригинал в S3
             var etag = await _s3Uploader.UploadAsync(
                 bucketName,
@@ -240,6 +300,7 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
         finally
         {
             await originalStream.DisposeAsync();
+            CleanupTempFile();
         }
 
         // Сохраняем оригинал + его хеш
@@ -257,89 +318,11 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
         // 4) Поднимаем превью в S3 + дедуп + FilePreview-связки
         if (generatedPreviews is { Count: > 0 })
         {
-            await PersistPreviewsAsync(file, generatedPreviews, bucketName, cancellationToken);
+            await _previewPersistence.PersistPreviewsAsync(file, generatedPreviews, bucketName, cancellationToken);
         }
 
         _logger.LogInformation("Обработка файла {FileId} успешно завершена", file.Id);
 
         return file.Id.ToString();
-    }
-
-    /// <summary>
-    /// Сохраняет сгенерированные превью: дедуп по SHA256, загрузка в S3, привязка через FilePreview.
-    /// </summary>
-    private async Task PersistPreviewsAsync(
-        DomainUploadFile original,
-        List<MultiPreviewItem> previews,
-        string bucketName,
-        CancellationToken cancellationToken)
-    {
-        // Существующие превью — могли быть от другого оригинала с тем же контентом (теоретически),
-        // или их нет вообще. Проверяем, чтобы не нарушить уникальный индекс (OriginalFileId, TargetWidth).
-        var existingByWidth = (await _context.FilePreviews
-                .Where(x => x.OriginalFileId == original.Id)
-                .ToListAsync(cancellationToken))
-            .ToDictionary(x => x.TargetWidth);
-
-        foreach (var item in previews)
-        {
-            if (existingByWidth.ContainsKey(item.TargetWidth))
-                continue;
-
-            // SHA256 превью — для дедупликации
-            string previewHash;
-            using (var sha256 = SHA256.Create())
-            {
-                var hashBytes = sha256.ComputeHash(item.Bytes);
-                previewHash = Convert.ToHexString(hashBytes).ToLowerInvariant();
-            }
-
-            var existingPreviewFileId = await _hashesStorage.GetFileIdByHash(previewHash);
-            Guid previewFileId;
-
-            if (existingPreviewFileId.HasValue)
-            {
-                // Уже есть UploadFile с такими байтами — переиспользуем, добавляем владельцев.
-                previewFileId = existingPreviewFileId.Value;
-                foreach (var uploaderId in original.Uploaders)
-                    await _filesStorage.AddUploaderToFile(previewFileId, uploaderId);
-            }
-            else
-            {
-                previewFileId = Guid.NewGuid();
-                using var ms = new MemoryStream(item.Bytes);
-                var previewEtag = await _s3Uploader.UploadAsync(bucketName, $"{previewFileId}", ms, "image/jpeg");
-
-                var previewFile = new DomainUploadFile
-                {
-                    Id = previewFileId,
-                    Uploaders = original.Uploaders.ToList(),
-                    CreatedAt = DateTime.UtcNow,
-                    UploadedAt = DateTime.UtcNow,
-                    Etag = previewEtag,
-                    Type = UploadFileType.CloudFile,
-                    Filename = $"preview_{item.TargetWidth}.jpg",
-                    Size = item.Bytes.Length,
-                    ImageWidth = item.ActualWidth,
-                    ImageHeight = item.ActualHeight
-                };
-
-                await _filesStorage.AddToStorage(previewFile);
-                await _hashesStorage.AddHash(new FileHash { FileId = previewFileId, Hash = previewHash });
-            }
-
-            _context.FilePreviews.Add(new FilePreview
-            {
-                Id = Guid.NewGuid(),
-                OriginalFileId = original.Id,
-                PreviewFileId = previewFileId,
-                TargetWidth = item.TargetWidth,
-                ActualWidth = item.ActualWidth,
-                ActualHeight = item.ActualHeight,
-                CreatedAt = DateTime.UtcNow
-            });
-        }
-
-        await _context.SaveChangesAsync(cancellationToken);
     }
 }

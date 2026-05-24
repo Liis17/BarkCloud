@@ -21,6 +21,12 @@ public class UploadFile
 
     public UploadFileType Type { get; set; }
 
+    /// <summary>
+    /// Категория медиа-контента (фото / видео / документ / аудио). Заполняется при загрузке
+    /// по content-type. Используется для галереи и альбомов.
+    /// </summary>
+    public MediaKind MediaKind { get; set; }
+
     public string? Filename { get; set; }
 
     public long Size { get; set; }

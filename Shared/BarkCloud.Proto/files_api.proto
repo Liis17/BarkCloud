@@ -27,12 +27,14 @@ service CloudApi {
   rpc AttachFile           (AttachFileRequest)           returns (CloudEmpty);               // Привязать загруженный файл к папке
   rpc RenameFileEntry      (RenameFileEntryRequest)      returns (CloudEmpty);               // Переименовать запись о файле
   rpc MoveFileEntry        (MoveFileEntryRequest)        returns (CloudEmpty);               // Переместить запись о файле
-  rpc CopyFileEntry        (CopyFileEntryRequest)        returns (CloudEmpty);               // Скопировать запись (один блоб → новая запись в другой папке)
   rpc DeleteFileEntry      (DeleteFileEntryRequest)      returns (CloudEmpty);               // Удалить запись о файле
 
-  rpc ListUserImages       (ListUserImagesRequest)       returns (ListUserImagesResponse);   // Все изображения пользователя от новых к старым (cursor pagination)
+  rpc ListUserImages       (ListUserImagesRequest)       returns (ListUserImagesResponse);   // [DEPRECATED] Все изображения пользователя; используйте ListUserMedia(PHOTO)
+  rpc ListUserMedia        (ListUserMediaRequest)        returns (ListUserMediaResponse);     // Медиа пользователя по типу (фото / видео) от новых к старым (cursor pagination)
 
   rpc GetPath              (GetPathRequest)              returns (PathResponse);             // Построить путь до объекта в иерархии
+
+  rpc SetVideoThumbnail    (SetVideoThumbnailRequest)    returns (CloudEmpty);               // Заменить превью видео загруженной картинкой
 }
 
 service FilesServerApi {
@@ -43,6 +45,16 @@ service FilesServerApi {
   rpc GetUserStorageInfoServer(GetUserStorageInfoServerRequest) returns(GetUserStorageInfoResponse); // Получить информацию о хранилище пользователя (для админ-панели)
 
   rpc UploadAvatarServer(UploadAvatarServerRequest) returns(UploadAvatarServerResponse); // Загрузить аватарку пользователя (для админ-панели)
+}
+
+service AlbumApi {
+  rpc CreateAlbum         (CreateAlbumRequest)         returns (AlbumInfo);            // Создать альбом
+  rpc UpdateAlbum         (UpdateAlbumRequest)         returns (AlbumInfo);            // Изменить имя / описание / обложку
+  rpc DeleteAlbum         (DeleteAlbumRequest)         returns (CloudEmpty);           // Удалить альбом
+  rpc AddItemsToAlbum     (AddItemsToAlbumRequest)     returns (CloudEmpty);           // Добавить фото/видео в альбом
+  rpc RemoveItemsFromAlbum(RemoveItemsFromAlbumRequest) returns (CloudEmpty);          // Убрать фото/видео из альбома
+  rpc ListAlbums          (ListAlbumsRequest)          returns (ListAlbumsResponse);   // Список альбомов (обложка / описание / счётчик)
+  rpc ListAlbumItems      (ListAlbumItemsRequest)      returns (ListAlbumItemsResponse); // Содержимое альбома (фото/видео с превью)
 }
 
 message GetTempDownloadUrlRequest {
@@ -88,9 +100,18 @@ message UploadFileInfo {
   string file_url = 8; // Ссылка на загрузку файла
   string preview_url = 9; // [DEPRECATED] Ссылка на «главное» превью; см. previews для мультиразмерных
   int64 file_size = 10; // Размер файла в байтах
-  repeated FilePreviewInfo previews = 11; // Превью изображения (если есть) — 128 / 512 / 1024 по ширине
-  int32 image_width = 12; // Ширина изображения в пикселях (0 если не изображение)
-  int32 image_height = 13; // Высота изображения в пикселях (0 если не изображение)
+  repeated FilePreviewInfo previews = 11; // Превью изображения/видео (если есть) — 128 / 512 / 1024 по ширине
+  int32 image_width = 12; // Ширина изображения/кадра в пикселях (0 если не медиа)
+  int32 image_height = 13; // Высота изображения/кадра в пикселях (0 если не медиа)
+  MediaKind media_kind = 14; // Категория медиа (фото / видео / документ / аудио)
+}
+
+enum MediaKind {
+  MEDIA_KIND_OTHER = 0;
+  MEDIA_KIND_PHOTO = 1;
+  MEDIA_KIND_VIDEO = 2;
+  MEDIA_KIND_DOCUMENT = 3;
+  MEDIA_KIND_AUDIO = 4;
 }
 
 message FilePreviewInfo {
@@ -213,12 +234,6 @@ message DeleteFileEntryRequest {
   string entry_id = 1;
 }
 
-message CopyFileEntryRequest {
-  string source_entry_id = 1;     // существующая запись пользователя
-  string target_directory_id = 2; // пустая строка означает корень владельца
-  string new_name = 3;            // имя в целевой папке; пустая строка — взять имя из исходной записи
-}
-
 // ============ Детальный листинг и галерея ============
 
 message FileEntryDetailed {
@@ -247,6 +262,24 @@ message ListUserImagesResponse {
   repeated UserImageItem items = 1;
   google.protobuf.Timestamp next_cursor_created_at = 2; // пусто = больше нет страниц
   string next_cursor_file_id = 3;
+}
+
+message ListUserMediaRequest {
+  MediaKind kind = 1;                               // PHOTO или VIDEO — какой тип медиа листать
+  int32 limit = 2;                                  // 1..200, default 50
+  google.protobuf.Timestamp cursor_created_at = 3;  // exclusive; пусто = с самой свежей загрузки
+  string cursor_file_id = 4;                        // tie-breaker для стабильной cursor-пагинации
+}
+
+message ListUserMediaResponse {
+  repeated UserImageItem items = 1;
+  google.protobuf.Timestamp next_cursor_created_at = 2; // пусто = больше нет страниц
+  string next_cursor_file_id = 3;
+}
+
+message SetVideoThumbnailRequest {
+  string video_file_id = 1;         // идентификатор видео-файла
+  string source_image_file_id = 2;  // загруженная пользователем картинка-кадр для нового превью
 }
 
 message GetPathRequest {
@@ -278,4 +311,74 @@ message GetUserStorageInfoResponse {
   int64 total_used_storage = 1; // Общее занятое пространство в байтах
   int64 storage_limit = 2; // Лимит хранилища в байтах
   repeated StorageByType storage_by_types = 3; // Использованное пространство по типам файлов
+}
+
+// ============ AlbumApi messages ============
+
+message AlbumInfo {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  string cover_file_id = 4;       // ID файла-обложки (пусто, если нет)
+  string cover_preview_url = 5;   // URL превью обложки (пусто, если нет)
+  int32 items_count = 6;          // Количество элементов в альбоме
+  google.protobuf.Timestamp created_at = 7;
+  google.protobuf.Timestamp updated_at = 8;
+}
+
+message CreateAlbumRequest {
+  string name = 1;
+  string description = 2;
+}
+
+message UpdateAlbumRequest {
+  string album_id = 1;
+  optional string name = 2;          // не задано = не менять
+  optional string description = 3;   // не задано = не менять
+  optional string cover_file_id = 4; // не задано = не менять; пустая строка = сбросить обложку
+}
+
+message DeleteAlbumRequest {
+  string album_id = 1;
+}
+
+message AddItemsToAlbumRequest {
+  string album_id = 1;
+  repeated string file_ids = 2;
+}
+
+message RemoveItemsFromAlbumRequest {
+  string album_id = 1;
+  repeated string file_ids = 2;
+}
+
+message ListAlbumsRequest {
+  int32 limit = 1;                                  // 1..200, default 50
+  google.protobuf.Timestamp cursor_updated_at = 2;  // exclusive; пусто = с самых свежих
+  string cursor_album_id = 3;                       // tie-breaker
+}
+
+message ListAlbumsResponse {
+  repeated AlbumInfo albums = 1;
+  google.protobuf.Timestamp next_cursor_updated_at = 2; // пусто = больше нет страниц
+  string next_cursor_album_id = 3;
+}
+
+message ListAlbumItemsRequest {
+  string album_id = 1;
+  int32 limit = 2;                                  // 1..200, default 50
+  google.protobuf.Timestamp cursor_added_at = 3;    // exclusive; пусто = с самых свежих
+  string cursor_file_id = 4;                        // tie-breaker
+  optional MediaKind kind_filter = 5;               // не задано = все типы
+}
+
+message AlbumItemEntry {
+  UploadFileInfo file = 1;                  // полная информация о файле (URL, превью, размеры)
+  google.protobuf.Timestamp added_at = 2;   // когда добавлен в альбом
+}
+
+message ListAlbumItemsResponse {
+  repeated AlbumItemEntry items = 1;
+  google.protobuf.Timestamp next_cursor_added_at = 2; // пусто = больше нет страниц
+  string next_cursor_file_id = 3;
 }

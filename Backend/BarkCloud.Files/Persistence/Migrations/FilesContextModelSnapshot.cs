@@ -23,6 +23,71 @@ namespace BarkCloud.Files.Persistence.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("BarkCloud.Files.Domain.Album", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("CoverFileId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<long>("OwnerId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OwnerId", "Name")
+                        .IsUnique();
+
+                    b.HasIndex("OwnerId", "UpdatedAt");
+
+                    b.ToTable("Albums");
+                });
+
+            modelBuilder.Entity("BarkCloud.Files.Domain.AlbumItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("AddedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("AlbumId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("FileId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("OwnerId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FileId");
+
+                    b.HasIndex("AlbumId", "AddedAt");
+
+                    b.HasIndex("AlbumId", "FileId")
+                        .IsUnique();
+
+                    b.ToTable("AlbumItems");
+                });
+
             modelBuilder.Entity("BarkCloud.Files.Domain.CloudDirectory", b =>
                 {
                     b.Property<Guid>("Id")
@@ -79,9 +144,10 @@ namespace BarkCloud.Files.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("FileId");
-
                     b.HasIndex("OwnerId", "DirectoryId");
+
+                    b.HasIndex("OwnerId", "FileId")
+                        .IsUnique();
 
                     b.HasIndex("OwnerId", "DirectoryId", "Name")
                         .IsUnique();
@@ -179,6 +245,9 @@ namespace BarkCloud.Files.Persistence.Migrations
                         .HasColumnType("integer");
 
                     b.Property<int?>("ImageWidth")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("MediaKind")
                         .HasColumnType("integer");
 
                     b.Property<long>("Size")

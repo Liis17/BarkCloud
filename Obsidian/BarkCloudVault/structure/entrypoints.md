@@ -12,8 +12,11 @@ Parent: [[index]] · See also: [[structure/overview]]
 | Identity | `Backend/BarkCloud.Identity/Program.cs` | `barkcloud-identity-dev:latest` |
 | Users | `Backend/BarkCloud.Users/Program.cs` | `barkcloud-users-dev:latest` |
 | Files | `Backend/BarkCloud.Files/Program.cs` | `barkcloud-files-dev:latest` |
+| Web | `Backend/BarkCloud.Web/Program.cs` | `barkcloud-web-dev:latest` |
 
-`BarkCloud.GrpcServer` — **не запускаемый** проект, а общая библиотека-хост, используемая всеми четырьмя сервисами для подъёма gRPC, метрик, перехватчиков и Serilog. Подключается через `WebApplicationBuilderExtensions`, `ServiceCollectionExtensions`. См. [[modules/backend-grpcserver]].
+`BarkCloud.GrpcServer` — **не запускаемый** проект, а общая библиотека-хост, используемая всеми четырьмя gRPC-сервисами для подъёма gRPC, метрик, перехватчиков и Serilog. Подключается через `WebApplicationBuilderExtensions`, `ServiceCollectionExtensions`. См. [[modules/backend-grpcserver]].
+
+`BarkCloud.Web` — ASP.NET Core HTTP-сервер (а не gRPC), отдаёт страницы браузеру и выступает gRPC-**клиентом** к остальным сервисам. См. [[modules/backend-web]].
 
 ## Порядок зависимостей (из docker-compose-dev.yml)
 
@@ -30,5 +33,12 @@ files        ─────┘
 
 - Корень проекта: `Android/BarkCloud.Android/`
 - Application ID: `com.barkfluff.BarkCloud`
-- Точка входа Kotlin: `Android/BarkCloud.Android/app/src/main/java/com/barkfluff/BarkCloud/`
+- Точка входа: `MainActivity` → `BarkCloudTheme { RootNavGraph() }`; DI — `BarkCloudApplication` (см. [[modules/android-app]])
 - Сборка: `./gradlew assembleDebug` или через Android Studio
+
+## iOS-клиент
+
+- Корень проекта: `Ios/BarkCloud/BarkCloud.xcodeproj`
+- Bundle id: `com.barkfluff.BarkCloud`
+- Точка входа: `@main BarkCloudApp` → `RootView` (см. [[modules/ios-app]])
+- Сборка: `xcodebuild` или через Xcode

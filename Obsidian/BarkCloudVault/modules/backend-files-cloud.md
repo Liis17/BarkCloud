@@ -8,6 +8,8 @@ NextCloud-подобная иерархия папок и файловых за�
 
 Корневая папка владельца **не материализуется** — представлена `ParentId == null` для директорий и синтетическим `Guid.Empty` для `CloudFileEntry.DirectoryId` (нужно для уникального индекса `(OwnerId, DirectoryId, Name)`).
 
+**Инвариант «одна директория на файл»**: блоб владельца может быть привязан максимум к одной директории. Гарантируется уникальным индексом `CloudFileEntries(OwnerId, FileId)` и проверкой в `AttachFile` (`FileAlreadyAttachedException`). Альбомы — отдельный слой many-to-many ([[modules/backend-files]]).
+
 ## Domain
 
 `Backend/BarkCloud.Files/Domain/`
@@ -45,7 +47,7 @@ NextCloud-подобная иерархия папок и файловых за�
 
 ## Features
 
-`Backend/BarkCloud.Files/Features/Cloud/` — 13 фич, каждая пара `XxxCommand.cs` + `XxxCommandHandler.cs`:
+`Backend/BarkCloud.Files/Features/Cloud/` — каждая пара `XxxCommand.cs` + `XxxCommandHandler.cs`:
 
 ### Директории
 - `CreateDirectory` — создать папку (возвращает `DirectoryInfo`)
@@ -56,14 +58,17 @@ NextCloud-подобная иерархия папок и файловых за�
 - `ListDirectoryDetailed` — листинг с обогащёнными `FileEntryDetailed` (полная `UploadFileInfo` с URL/превью)
 
 ### Записи о файлах
-- `AttachFile` — привязать существующий `UploadFile` к папке (создаёт `CloudFileEntry`)
+- `AttachFile` — привязать существующий `UploadFile` к папке (создаёт `CloudFileEntry`); отказывает, если файл уже привязан к директории владельца (`FileAlreadyAttachedException`)
 - `RenameFileEntry` — изменить отображаемое имя записи
 - `MoveFileEntry` — перенести в другую папку
-- `CopyFileEntry` — скопировать запись (на тот же `FileId`, новое имя в целевой папке; один блоб в S3, новая `CloudFileEntry`)
 - `DeleteFileEntry` — удалить запись (не удаляет сам `UploadFile`, декремент `Uploaders` только если у владельца не осталось других копий)
 
+> `CopyFileEntry` **удалён** в рамках инварианта «одна директория на файл».
+
 ### Галерея
-- `ListUserImages` — выборка всех изображений пользователя (`UploadFile` уровня, не `CloudFileEntry`) от новых к старым с cursor-пагинацией. Фильтр изображения — `Helpers/ImageDetection.IsImage`: `ImageWidth>0` ИЛИ имя оканчивается на одно из `.jpg/.jpeg/.png/.gif/.webp/.heic/.heif/.bmp/.tiff/.tif`
+- `ListUserImages` — **[deprecated]** все изображения пользователя; cursor-пагинация. Исключает превью-блобы. Заменён на `ListUserMedia`
+- `ListUserMedia` — медиа пользователя по `MediaKind` (PHOTO/VIDEO) от новых к старым; cursor-пагинация; исключает превью-блобы (`!FilePreviews.Any(p => p.PreviewFileId == f.Id)`)
+- `SetVideoThumbnail` — заменить превью видео загруженной картинкой (проверка владения, пересоздание `FilePreview` через `PreviewPersistenceService`)
 
 ### Навигация
 - `GetPath` — построить путь до объекта (директории/записи) в иерархии

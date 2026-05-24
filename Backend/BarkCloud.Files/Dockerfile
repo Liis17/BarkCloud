@@ -19,6 +19,8 @@ RUN mkdir -p /app/publish/logs
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0-noble-chiseled AS final
 WORKDIR /app
+# Статические бинари ffmpeg/ffprobe для генерации превью видео (chiseled-образ без apt).
+COPY --from=mwader/static-ffmpeg:latest /ffmpeg /ffprobe /usr/local/bin/
 COPY --chown=1654:1654 --from=build /app/publish .
 USER $APP_UID
 ENTRYPOINT ["dotnet", "BarkCloud.Files.dll"]
