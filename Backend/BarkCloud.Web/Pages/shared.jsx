@@ -73,18 +73,18 @@ const Icon = {
 
 /* ─────────── SIDEBAR ─────────── */
 const NAV_PRIMARY = [
-  {key:'photos', href:'Photos.html', label:'Фото', icon:'photo', count:'{{ nav.photos_count }}'},
-  {key:'videos', href:'Videos.html', label:'Видео', icon:'video', count:'{{ nav.videos_count }}'},
-  {key:'files', href:'Files.html', label:'Файлы', icon:'folder', count:'{{ nav.files_count }}'},
+  {key:'photos', href:'/photos', label:'Фото', icon:'photo', count:'{{ nav.photos_count }}'},
+  {key:'videos', href:'/videos', label:'Видео', icon:'video', count:'{{ nav.videos_count }}'},
+  {key:'files', href:'/files', label:'Файлы', icon:'folder', count:'{{ nav.files_count }}'},
 ];
 const NAV_SHARE = [
-  {key:'shared', href:'Shared.html', label:'Общие', icon:'share', count:'{{ nav.shared_count }}'},
-  {key:'links', href:'Shared.html', label:'Ссылки', icon:'link', count:'{{ nav.links_count }}'},
-  {key:'starred', href:'Files.html', label:'Избранное', icon:'star'},
+  {key:'shared', href:'/shared', label:'Общие', icon:'share', count:'{{ nav.shared_count }}'},
+  {key:'links', href:'/shared', label:'Ссылки', icon:'link', count:'{{ nav.links_count }}'},
+  {key:'starred', href:'/files', label:'Избранное', icon:'star'},
 ];
 const NAV_OTHER = [
-  {key:'trash', href:'Files.html', label:'Корзина', icon:'trash'},
-  {key:'settings', href:'Settings.html', label:'Настройки', icon:'settings'},
+  {key:'trash', href:'/files', label:'Корзина', icon:'trash'},
+  {key:'settings', href:'/settings', label:'Настройки', icon:'settings'},
 ];
 
 function Sidebar({ page }) {
@@ -132,11 +132,11 @@ function Sidebar({ page }) {
         <div className="bar"><div className="bar-fill" style={{width:'{{ storage.percent }}%'}}/></div>
         <div className="sb-storage-foot">
           <span>{"{{ storage.percent }}"}% использовано</span>
-          <a href="Settings.html">Расширить</a>
+          <a href="/settings">Расширить</a>
         </div>
       </div>
 
-      <a className="sb-user" href="Settings.html">
+      <a className="sb-user" href="/settings">
         <div className="avatar">{"{{ user.initials }}"}</div>
         <div className="who">
           <div className="uname">{"{{ user.display_name }}"}</div>

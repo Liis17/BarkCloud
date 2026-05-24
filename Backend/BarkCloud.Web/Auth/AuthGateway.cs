@@ -198,7 +198,14 @@ public sealed class AuthGateway
         }
     }
 
-    private string GetOrCreateDeviceId(HttpContext http)
+    /// <summary>Выставляет cookie сессии (access/refresh) — общий путь для логина и регистрации.</summary>
+    public void IssueSession(HttpContext http, Token access, Token refresh, bool persistent)
+    {
+        SetCookie(http, AccessCookie, access.Value, access.ExpirationDate, persistent);
+        SetCookie(http, RefreshCookie, refresh.Value, refresh.ExpirationDate, persistent);
+    }
+
+    public string GetOrCreateDeviceId(HttpContext http)
     {
         var existing = http.Request.Cookies[DeviceCookie];
         if (!string.IsNullOrEmpty(existing))
