@@ -41,7 +41,8 @@
 - [[api/configuration-api]] — gRPC API сервиса Configuration
 - [[api/identity-api]] — gRPC API сервиса Identity (Auth, OTP, RefreshToken)
 - [[api/users-api]] — gRPC API сервиса Users (профиль, устройства, contacts, draft)
-- [[api/files-api]] — gRPC API сервиса Files (`FilesApi`, `CloudApi`, `FilesServerApi`)
+- [[api/files-api]] — gRPC API сервиса Files (`FilesApi`, `CloudApi`, `FilesServerApi`, `AlbumApi`)
+- [[api/files-client-guide]] — Клиентский гайд по Files API (что передать/вернуть: загрузка, галерея, каталоги, альбомы) — для разработки клиента
 
 ## Стек технологий
 
