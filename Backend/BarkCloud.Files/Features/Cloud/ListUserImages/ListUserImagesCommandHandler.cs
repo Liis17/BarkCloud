@@ -57,6 +57,8 @@ public class ListUserImagesCommandHandler : IRequestHandler<ListUserImagesComman
             .AsNoTracking()
             .Where(f => f.Uploaders.Contains(ownerId)
                         && f.Type == DomainUploadFileType.CloudFile
+                        // Превью-блобы (PreviewFileId из FilePreviews) не должны протекать в галерею.
+                        && !_context.FilePreviews.Any(p => p.PreviewFileId == f.Id)
                         && (
                             (f.ImageWidth != null && f.ImageWidth > 0)
                             || (f.Filename != null && (

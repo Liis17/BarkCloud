@@ -21,6 +21,10 @@ public class FilesContext : DbContext
 
     public DbSet<FilePreview> FilePreviews { get; set; }
 
+    public DbSet<Album> Albums { get; set; }
+
+    public DbSet<AlbumItem> AlbumItems { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<TempFile>()
@@ -43,7 +47,8 @@ public class FilesContext : DbContext
             // Уникальность имени файла-записи в рамках одной директории владельца
             b.HasIndex(x => new { x.OwnerId, x.DirectoryId, x.Name }).IsUnique();
             b.HasIndex(x => new { x.OwnerId, x.DirectoryId });
-            b.HasIndex(x => x.FileId);
+            // Инвариант «одна директория на файл»: у владельца не более одной записи на блоб.
+            b.HasIndex(x => new { x.OwnerId, x.FileId }).IsUnique();
         });
 
         modelBuilder.Entity<FilePreview>(b =>
@@ -53,6 +58,24 @@ public class FilesContext : DbContext
             // Обратный поиск «к какому оригиналу относится это превью» —
             // нужен при подчистке Uploaders/дедупликации.
             b.HasIndex(x => x.PreviewFileId);
+        });
+
+        modelBuilder.Entity<Album>(b =>
+        {
+            // Уникальность имени альбома в рамках владельца.
+            b.HasIndex(x => new { x.OwnerId, x.Name }).IsUnique();
+            // Cursor-пагинация списка альбомов по дате обновления.
+            b.HasIndex(x => new { x.OwnerId, x.UpdatedAt });
+        });
+
+        modelBuilder.Entity<AlbumItem>(b =>
+        {
+            // Один файл — максимум один раз в альбоме.
+            b.HasIndex(x => new { x.AlbumId, x.FileId }).IsUnique();
+            // Cursor-пагинация содержимого альбома.
+            b.HasIndex(x => new { x.AlbumId, x.AddedAt });
+            // Обратный поиск «в каких альбомах файл».
+            b.HasIndex(x => x.FileId);
         });
     }
 }

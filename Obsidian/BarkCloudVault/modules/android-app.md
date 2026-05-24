@@ -1,10 +1,10 @@
 # Android — App
 
-Parent: [[index]]
+Parent: [[index]] · See also: [[modules/shared-proto]] · [[api/identity-api]] · [[modules/backend-grpcserver]] · [[modules/ios-app]]
 
 ## Назначение
 
-Нативный Android-клиент BarkCloud. Сейчас — **пустая стандартная заготовка** от Android Studio: только манифест, ресурсы (иконки, темы, цвета) и пара ExampleTest-классов. Бизнес-логики, экранов и gRPC-стабов пока нет.
+Нативный Android-клиент BarkCloud (Kotlin, Jetpack Compose, Material 3). Реализованы: вход с поддержкой OTP-шага (2FA), 5-табовый главный экран (Files по умолчанию) и локальный файл-браузер. gRPC-связь с микросервисами через сгенерированные из общих proto-стабы. Полный паритет с [[modules/ios-app]].
 
 ## Расположение
 
@@ -13,72 +13,92 @@ Parent: [[index]]
 ## Структура (фактическая)
 
 ```
-BarkCloud.Android/
-├── build.gradle.kts          — root gradle (Kotlin DSL)
-├── settings.gradle.kts       — rootProject.name = "BarkCloud", include(":app")
-├── gradle.properties
-├── gradlew, gradlew.bat
-├── local.properties          — пути к локальному SDK
-├── gradle/                   — wrapper и version catalog (libs.versions.toml)
-└── app/
-    ├── build.gradle.kts
-    └── src/
-        ├── main/
-        │   ├── AndroidManifest.xml
-        │   ├── java/com/barkfluff/BarkCloud/   — ПУСТО (нет .kt файлов)
-        │   └── res/
-        │       ├── drawable/      — ic_launcher_background.xml, ic_launcher_foreground.xml
-        │       ├── mipmap-*/       — ic_launcher (5 densities) + round
-        │       ├── values/         — colors.xml, strings.xml, themes.xml
-        │       ├── values-night/   — themes.xml
-        │       └── xml/            — backup_rules.xml, data_extraction_rules.xml
-        ├── test/java/com/barkfluff/BarkCloud/ExampleUnitTest.kt
-        └── androidTest/java/com/barkfluff/BarkCloud/ExampleInstrumentedTest.kt
+app/src/main/java/com/barkfluff/BarkCloud/
+├── BarkCloudApplication.kt   — ручной service locator + Coil ImageLoader (VideoFrameDecoder)
+├── MainActivity.kt           — edge-to-edge, setContent { BarkCloudTheme { RootNavGraph() } }
+├── data/
+│   ├── GlobalParam.kt        — EncryptedSharedPreferences: access/refresh токены + сроки, hasValidRefreshToken, clearSession
+│   └── AuthRepository.kt     — IdentityApi.Auth → AuthResult (Success/OtpRequired/InvalidCredentials/OtherError)
+├── grpc/
+│   ├── GrpcManager.kt         — lazy identity-канал (OkHttp), TLS с доверием самоподписанному серту
+│   ├── AuthInterceptor.kt     — заголовок x-auth-token (динамически, без base64)
+│   ├── ClientMetadataInterceptor.kt — x-device-id/name, x-os-name, x-app-name/version, x-ip-address (base64 NO_WRAP)
+│   ├── GrpcError.kt           — StatusRuntimeException.errorCode() из трейлера x-error-code
+│   └── AuthErrorCodes.kt      — GUID-коды OTP_REQUIRED / INVALID_CREDENTIALS
+├── ui/
+│   ├── navigation/RootNavGraph.kt — гейт login ↔ main по hasValidRefreshToken()
+│   ├── login/                 — LoginScreen, LoginUiState, LoginViewModel (логин/пароль + OTP)
+│   ├── main/                  — MainScreen (Scaffold + вложенный NavHost), MainDestination (5 табов), MainBottomBar
+│   ├── screens/PlaceholderScreen.kt — заглушка табов Photos/Videos/Shared/Settings
+│   └── theme/                 — Color, Shape, Theme, Type (Material 3)
+└── files/                     — локальный файл-браузер (см. ниже)
+app/src/main/proto/            — синхронизируется из Shared/BarkCloud.Proto (gradle task syncSharedProto)
 ```
+
+## Service locator (`BarkCloudApplication`)
+
+Зависимости создаются вручную в `onCreate` (без Hilt/Koin), доступны через `applicationContext as BarkCloudApplication`:
+
+- `globalParam: GlobalParam` — хранилище токенов на `EncryptedSharedPreferences` (AES256).
+- `grpcManager: GrpcManager` — каналы/стабы gRPC; в конструктор передаётся `ClientMetadataInterceptor.create(this)`.
+- `authRepository: AuthRepository` — авторизация.
+- `localFileRepository: LocalFileRepository` — доступ к локальной ФС.
+
+Класс также реализует `SingletonImageLoader.Factory` — настраивает Coil 3 с `VideoFrameDecoder` (превью видео) и crossfade. В `onTerminate` вызывает `grpcManager.shutdown()`.
+
+## Модуль `files/` — локальный браузер
+
+```
+files/
+├── domain/
+│   ├── FsEntry.kt   — sealed (Directory{childCount} / File{sizeBytes, mimeType})
+│   └── FsSort.kt    — enum сортировки + applySort (папки всегда сверху)
+├── data/
+│   ├── LocalFileRepository.kt — list/createDir/... поверх java.io.File (Dispatchers.IO, Result<>)
+│   ├── FileShareHelper.kt     — шаринг через FileProvider + ACTION_SEND
+│   ├── MimeIcon.kt            — определение MIME и иконки по расширению
+│   └── StoragePermission.kt   — MANAGE_EXTERNAL_STORAGE, externalRoot
+└── ui/
+    ├── FilesRootScreen.kt / FilesRootViewModel.kt — корень: запрос разрешения + «папки с сервера» (ServerFolder — заглушка под CloudApi)
+    ├── LocalBrowserScreen.kt / LocalBrowserViewModel.kt — навигация по каталогам
+    ├── FsRowItem.kt, FormatUtils.kt, PickFolderDialog.kt, rememberThumbnailModel.kt
+```
+
+Серверная иерархия (`ServerFolder`) — пока каркас; точка интеграции — `CloudApi.ListDirectory` ([[api/files-api]]).
+
+## gRPC-метаданные клиента
+
+Сервер ([[modules/backend-grpcserver]], `RequestContextInterceptor`) читает метаданные и на части эндпоинтов Identity **требует** заголовки (значения в base64, кроме токена):
+
+- `x-auth-token` — JWT, **без** base64. Добавляет `AuthInterceptor` динамически на каждый запрос.
+- `x-device-id`, `x-device-name`, `x-os-name`, `x-app-name`, `x-app-version`, `x-ip-address` — статичны (считаются один раз), base64 `NO_WRAP` (перенос строки сломал бы `Convert.FromBase64String` на сервере). Добавляет `ClientMetadataInterceptor`.
+
+Оба цепляются в `GrpcManager.identityStub()`. Адрес — `BuildConfig.IDENTITY_API_ADDRESS` (`https://cloud.barkfluff.com:7020`); TLS терминируется на nginx ([[structure/infrastructure]]), сертификат самоподписанный → клиент доверяет всем (trust-all `X509TrustManager`). Паритет с iOS, где те же заголовки разнесены по 5 интерсепторам ([[modules/ios-app]]).
+
+Коды ошибок-GUID (`AuthErrorCodes`) приходят в трейлере `x-error-code`; `AuthRepository` транслирует их в `AuthResult`.
 
 ## Конфигурация
 
 | Параметр | Значение |
 |---------|---------|
-| `applicationId` | `com.barkfluff.BarkCloud` |
-| `namespace` | `com.barkfluff.BarkCloud` |
-| `minSdk` | 35 |
-| `compileSdk` | 36 (minorApiLevel 1) |
-| `targetSdk` | 36 |
-| `versionCode` | 1 |
-| `versionName` | 1.0 |
-| `sourceCompatibility` / `targetCompatibility` | Java 11 |
+| `applicationId` / `namespace` | `com.barkfluff.BarkCloud` |
+| `minSdk` | 30 |
+| `compileSdk` / `targetSdk` | 36 |
+| `versionCode` / `versionName` | 1 / 1.0 |
+| Java / jvmTarget | 11 |
+| `BuildConfig.IDENTITY_API_ADDRESS` | `https://cloud.barkfluff.com:7020` |
 
-Plugin: `alias(libs.plugins.android.application)` — через version catalog (`libs`).
+Plugins: `android.application`, `kotlin.android`, `kotlin.compose`, `protobuf` (через version catalog `libs`).
 
-## Зависимости (из `app/build.gradle.kts`)
+Manifest: разрешения `INTERNET` и `MANAGE_EXTERNAL_STORAGE`; `FileProvider` с authority `${applicationId}.fileprovider` (пути в `res/xml/file_paths.xml`).
 
-- `androidx.appcompat`
-- `androidx.core.ktx`
-- (полный список — в `gradle/libs.versions.toml`)
+## proto / gRPC-сборка
 
-gRPC/Protobuf-зависимости **пока не подключены**. При интеграции с Backend контракты из [[modules/shared-proto]] нужно будет компилировать в Kotlin-стабы.
+Gradle-таск `syncSharedProto` копирует `**/*.proto` из `Shared/BarkCloud.Proto` в `app/src/main/proto`, откуда `protobuf-gradle-plugin` генерирует java+kotlin **lite** + grpc + grpckt. От таска зависят все `generateProto*`/`extract*Proto`. `resolutionStrategy` пинит `kotlin-stdlib` к версии компилятора (Coil тянет более новый stdlib).
 
-> ⚠️ Раздел выше устарел: gRPC уже подключён (`grpc/GrpcManager.kt`, генерация стабов в `build.gradle.kts`).
+## Зависимости (ключевые)
 
-## gRPC-метаданные клиента
-
-Сервер ([[modules/backend-grpcserver]], `RequestContextInterceptor`) читает из метаданных и на части эндпоинтов Identity **требует** заголовки (значения в base64, кроме токена):
-
-- `x-auth-token` — JWT, **без** base64. Добавляет `grpc/AuthInterceptor.kt` (динамически на каждый запрос).
-- `x-device-id`, `x-device-name`, `x-os-name`, `x-app-name`, `x-app-version`, `x-ip-address` — статичны, считаются один раз. Добавляет `grpc/ClientMetadataInterceptor.kt` (base64 `NO_WRAP` — иначе перенос строки ломает `Convert.FromBase64String` на сервере).
-
-Оба интерсептора цепляются в `GrpcManager`. Это паритет с iOS, где те же заголовки разнесены по 5 отдельным интерсепторам ([[modules/ios-app]]).
-
-## План документации при росте проекта
-
-Когда появятся реальные исходники, разбивай:
-- `modules/android-app-data.md` — слой данных (gRPC-клиенты, БД, репозитории)
-- `modules/android-app-domain.md` — use-cases, модели
-- `modules/android-app-ui.md` — экраны (Compose/View?), навигация
-- `modules/android-app-di.md` — DI (Hilt/Koin)
-
-Каждый — с `Parent: [[modules/android-app]]`.
+Compose BOM + material3 + material-icons-extended, navigation-compose, lifecycle-viewmodel/runtime-compose, `androidx.security:crypto`; protobuf javalite + kotlin-lite, grpc okhttp/protobuf-lite/stub/kotlin-stub; kotlinx-coroutines-android; Coil compose + video. Полный список — `gradle/libs.versions.toml`.
 
 ## Сборка
 

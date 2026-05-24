@@ -129,6 +129,17 @@ public class CloudHierarchyStorage
             .AnyAsync(x => x.OwnerId == ownerId && x.DirectoryId == directoryId && x.Name == name, cancellationToken);
     }
 
+    /// <summary>
+    /// Проверяет, есть ли у владельца уже запись для данного файла в любой директории.
+    /// Гарантирует инвариант «один блоб владельца — максимум одна запись в иерархии».
+    /// </summary>
+    public async Task<bool> FileEntryExistsForFile(long ownerId, Guid fileId, CancellationToken cancellationToken = default)
+    {
+        return await _context.CloudFileEntries
+            .AsNoTracking()
+            .AnyAsync(x => x.OwnerId == ownerId && x.FileId == fileId, cancellationToken);
+    }
+
     public async Task<CloudFileEntry> AddFileEntry(CloudFileEntry entry, CancellationToken cancellationToken = default)
     {
         _context.CloudFileEntries.Add(entry);

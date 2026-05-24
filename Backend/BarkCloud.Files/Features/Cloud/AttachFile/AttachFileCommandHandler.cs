@@ -63,6 +63,10 @@ public class AttachFileCommandHandler : IRequestHandler<AttachFileCommand, Cloud
         if (!file.Uploaders.Contains(ownerId))
             throw new CloudAccessDeniedException();
 
+        // Инвариант «одна директория на файл»: блоб владельца может быть привязан только к одной директории.
+        if (await _storage.FileEntryExistsForFile(ownerId, file.Id, cancellationToken))
+            throw new FileAlreadyAttachedException();
+
         // Проверяем уникальность имени в директории
         if (await _storage.FileEntryNameExists(ownerId, storageDirectoryId, name, cancellationToken))
             throw new DirectoryNameConflictException();

@@ -12,8 +12,21 @@ Parent: [[index]] · See also: [[structure/overview]] · [[structure/entrypoints
 - `identity` — [[modules/backend-identity]]
 - `users` — [[modules/backend-users]]
 - `files` — [[modules/backend-files]]
+- `web` — [[modules/backend-web]] (HTTP-веб-клиент; не gRPC-сервис). Единственный с проброшенным портом наружу: `${WEB_PORT}:8080`. `depends_on`: configuration, identity, users, files.
 
 Все микросервисы (кроме `configuration`) объявлены с `depends_on: configuration`.
+
+## nginx reverse-proxy
+
+`Backend/nginx/cloud.barkfluff.conf` — конфиг внешнего nginx (на хосте/перед compose, не отдельный сервис в dev-compose). Терминирует TLS на едином субдомене `cloud.barkfluff.com` и проксирует к сервисам по **внешнему порту**, внутрь — h2c (plaintext gRPC). Сертификат самоподписанный, поэтому клиенты доверяют всем (Android/iOS).
+
+| Внешний порт (TLS) | Внутренний backend |
+|---|---|
+| `7020` | `grpc://cloud-identity:7000` |
+| `7021` | `grpc://cloud-users:7021` |
+| `7025` | `grpc://cloud-files:7025` (gRPC) + `http://cloud-files:7026` под `/web/` (скачивание/загрузка файлов) |
+
+> Backend-порты соответствуют `RunSettings:Port` сервисов в конфиг-БД; при их смене — править конфиг.
 
 ## Инфраструктурные контейнеры
 
@@ -35,8 +48,9 @@ Parent: [[index]] · See also: [[structure/overview]] · [[structure/entrypoints
 - `MINIO_ROOT_USER/PASSWORD/PORT/WEBPORT`
 - `RABBITMQ_DEFAULT_USER/PASS`
 - `SEQ_ADMIN_PASSWORD/WEBPORT`
+- `WEB_PORT` — host-порт веб-клиента; `WEB_COOKIE_SECURE`, `WEB_PUBLIC_HOST` — UI-настройки web (JwtSettings и адреса сервисов web берёт из Configuration).
 
-Файл `.env` рядом с `docker-compose-dev.yml` обязателен.
+Файл `.env` рядом с `docker-compose-dev.yml` обязателен; шаблон — `Backend/sample.env`.
 
 ## Volumes
 

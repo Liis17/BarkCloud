@@ -1,3 +1,5 @@
+using BarkCloud.Files.Domain;
+
 namespace BarkCloud.Files.Extensions;
 
 public static class FileExtensions
@@ -22,6 +24,8 @@ public static class FileExtensions
             ".bmp" => "image/bmp",
             ".webp" => "image/webp",
             ".svg" => "image/svg+xml",
+            ".heic" or ".heif" => "image/heic",
+            ".tiff" or ".tif" => "image/tiff",
 
             ".pdf" => "application/pdf",
             ".doc" => "application/msword",
@@ -48,12 +52,44 @@ public static class FileExtensions
             ".mp4" => "video/mp4",
             ".avi" => "video/x-msvideo",
             ".mov" => "video/quicktime",
+            ".mkv" => "video/x-matroska",
+            ".webm" => "video/webm",
 
             ".zip" => "application/zip",
             ".rar" => "application/x-rar-compressed",
             ".7z" => "application/x-7z-compressed",
 
             _ => "application/octet-stream"
+        };
+    }
+
+    /// <summary>
+    /// Определяет категорию медиа (<see cref="MediaKind"/>) по имени файла.
+    /// Базируется на <see cref="GetContentType"/>: image/* → Photo, video/* → Video,
+    /// audio/* → Audio, документы (pdf/office/text) → Document, иначе Other.
+    /// </summary>
+    public static MediaKind GetMediaKind(this string fileName)
+    {
+        var contentType = fileName.GetContentType();
+
+        if (contentType.StartsWith("image/"))
+            return MediaKind.Photo;
+        if (contentType.StartsWith("video/"))
+            return MediaKind.Video;
+        if (contentType.StartsWith("audio/"))
+            return MediaKind.Audio;
+
+        return contentType switch
+        {
+            "application/pdf"
+            or "application/msword"
+            or "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            or "application/vnd.ms-excel"
+            or "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            or "application/vnd.ms-powerpoint"
+            or "application/vnd.openxmlformats-officedocument.presentationml.presentation" => MediaKind.Document,
+            _ when contentType.StartsWith("text/") => MediaKind.Document,
+            _ => MediaKind.Other
         };
     }
 }
