@@ -2,6 +2,7 @@ using BarkCloud.GrpcServer;
 using BarkCloud.Proto.Files;
 using BarkCloud.Proto.Identity;
 using BarkCloud.Proto.Users;
+using BarkCloud.Shared.Auth;
 using BarkCloud.Shared.Identity;
 using BarkCloud.Web;
 using BarkCloud.Web.Auth;
@@ -30,19 +31,37 @@ for (var attempt = 1; ; attempt++)
     }
 }
 
-// Адреса сервисов в docker-сети (из Configuration; fallback — внутренние порты по умолчанию)
+// Адреса сервисов в docker-сети. Первичный источник — Configuration
+// (IdentityService:Host / UsersService:Host / FilesService:Host).
+// Внутренний порт сервиса = его RunSettings:Port в Configuration-БД; оператор задаёт
+// его через .env (контейнер web получает .env через env_file), поэтому fallback строим
+// из USERS_PORT/FILES_PORT, а не из захардкоженных значений. Identity слушает 7000
+// (его IDENTITY_PORT из .env — это только host-маппинг nginx). См. nginx/cloud.barkfluff.conf.
+static string EnvPort(string name, int fallback)
+    => int.TryParse(Environment.GetEnvironmentVariable(name), out var p) && p > 0 ? p.ToString() : fallback.ToString();
+
 var identityAddress = builder.Configuration["IdentityService:Host"] ?? "http://cloud-identity:7000";
-var usersAddress = builder.Configuration["UsersService:Host"] ?? "http://cloud-users:7001";
-var filesAddress = builder.Configuration["FilesService:Host"] ?? "http://cloud-files:7005";
+var usersAddress = builder.Configuration["UsersService:Host"] ?? $"http://cloud-users:{EnvPort("USERS_PORT", 7001)}";
+var filesAddress = builder.Configuration["FilesService:Host"] ?? $"http://cloud-files:{EnvPort("FILES_PORT", 7005)}";
 
 builder.Services.AddGrpcClient<IdentityApi.IdentityApiClient>(o => o.Address = new Uri(identityAddress));
 builder.Services.AddGrpcClient<UsersApi.UsersApiClient>(o => o.Address = new Uri(usersAddress));
 builder.Services.AddGrpcClient<FilesApi.FilesApiClient>(o => o.Address = new Uri(filesAddress));
 builder.Services.AddGrpcClient<CloudApi.CloudApiClient>(o => o.Address = new Uri(filesAddress));
 
+// Серверные (inter-service) API для регистрации без почты. Авторизуются сервисным
+// токеном, который Web подписывает общим JWT-секретом (как Configuration).
+var serviceToken = ServiceToken.Generate(builder.Configuration);
+
+builder.Services.AddGrpcClient<UsersServerApi.UsersServerApiClient>(o => o.Address = new Uri(usersAddress))
+    .AddInterceptor(() => new JwtClientInterceptor(serviceToken));
+builder.Services.AddGrpcClient<IdentityServerApi.IdentityServerApiClient>(o => o.Address = new Uri(identityAddress))
+    .AddInterceptor(() => new JwtClientInterceptor(serviceToken));
+
 builder.Services.AddSingleton<TemplateRenderer>();
 builder.Services.AddSingleton<PageService>();
 builder.Services.AddScoped<AuthGateway>();
+builder.Services.AddScoped<RegistrationGateway>();
 builder.Services.AddScoped<PageDataBuilder>();
 
 var app = builder.Build();

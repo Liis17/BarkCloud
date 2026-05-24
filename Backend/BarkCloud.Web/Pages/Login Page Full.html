@@ -613,9 +613,78 @@ function LoginCard({ state, showSSO }) {
   );
 }
 
+function RegisterCard({ error }) {
+  const [showPw, setShowPw] = React.useState(false);
+  return (
+    <div className={"glass" + (error ? " has-error" : "")}>
+      <div className="glass-header">
+        <div className="mark"><CloudIcon size={24}/></div>
+        <div className="label">Регистрация в <span className="name">BarkCloud</span></div>
+      </div>
+      <h1>Создать<br/><span className="accent">аккаунт</span></h1>
+      <p className="sub">Личный сервер. Без подтверждений — сразу в облако.</p>
+
+      {error && (
+        <div className="err-banner">
+          <AlertIcon/>
+          <div style={{fontWeight:600}}>{error}</div>
+        </div>
+      )}
+
+      <form method="post" action="/register" style={{display:'flex',flexDirection:'column',gap:14}}>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+          <div className="field">
+            <div className="field-label"><span>Имя</span></div>
+            <div className="input-wrap">
+              <input type="text" name="first_name" placeholder="Антон" defaultValue={"{{ form.first_name }}"} autoComplete="given-name"/>
+            </div>
+          </div>
+          <div className="field">
+            <div className="field-label"><span>Фамилия</span></div>
+            <div className="input-wrap">
+              <input type="text" name="last_name" placeholder="Климов" defaultValue={"{{ form.last_name }}"} autoComplete="family-name"/>
+            </div>
+          </div>
+        </div>
+
+        <div className="field">
+          <div className="field-label"><span>Юзернейм</span></div>
+          <div className="input-wrap">
+            <input type="text" name="username" placeholder="anton" defaultValue={"{{ form.username }}"} autoComplete="username"/>
+          </div>
+        </div>
+
+        <div className="field">
+          <div className="field-label"><span>Email</span></div>
+          <div className="input-wrap">
+            <input type="email" name="email" placeholder="anton@local.net" defaultValue={"{{ form.email }}"} autoComplete="email"/>
+          </div>
+        </div>
+
+        <div className="field">
+          <div className="field-label"><span>Пароль</span></div>
+          <div className="input-wrap has-icon">
+            <input
+              type={showPw ? "text" : "password"}
+              name="password"
+              placeholder="не короче 6 символов"
+              autoComplete="new-password"
+            />
+            <button type="button" className="eye-btn" onClick={() => setShowPw(s => !s)} aria-label="Показать пароль">
+              <EyeIcon open={showPw}/>
+            </button>
+          </div>
+        </div>
+
+        <button type="submit" className="btn-primary">Создать аккаунт <ArrowIcon/></button>
+      </form>
+    </div>
+  );
+}
+
 function App() {
   // Параметры экрана входа. На проде сервер может подставить
-  // state = "error" | "2fa" | "default" и свой акцентный цвет.
+  // state = "error" | "2fa" | "register" | "default" и свой акцентный цвет.
   const t = {
     state: '{{ flash.kind | default("default") }}',
     showSSO: false,
@@ -656,10 +725,12 @@ function App() {
         {/* Main */}
         <main className="center-wrap">
           <div style={{display:'flex', flexDirection:'column', alignItems:'center'}}>
-            <LoginCard state={t.state} showSSO={t.showSSO}/>
-            <p className="below-card">
-              Нет аккаунта? <a href="#">Запросить инвайт →</a>
-            </p>
+            {t.state === 'register'
+              ? <RegisterCard error={'{{ form.error }}'}/>
+              : <LoginCard state={t.state} showSSO={t.showSSO}/>}
+            {t.state === 'register'
+              ? <p className="below-card">Уже есть аккаунт? <a href="/login">Войти →</a></p>
+              : <p className="below-card">Нет аккаунта? <a href="/register">Создать аккаунт →</a></p>}
           </div>
         </main>
 

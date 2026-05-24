@@ -20,3 +20,14 @@ public enum LoginOutcome
 }
 
 public sealed record LoginResult(LoginOutcome Outcome, string? Message = null);
+
+public enum RegistrationOutcome
+{
+    Success,
+    UsernameTaken,
+    EmailTaken,
+    ValidationError,
+    Error
+}
+
+public sealed record RegistrationResult(RegistrationOutcome Outcome, string? Message = null);

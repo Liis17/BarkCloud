@@ -60,6 +60,36 @@ public static class WebEndpoints
             return Results.Redirect("/login");
         });
 
+        // ───────── Регистрация (без подтверждения по почте и 2FA) ─────────
+
+        app.MapGet("/register", async (HttpContext http, AuthGateway auth, PageService pages, IConfiguration config) =>
+        {
+            if (await auth.AuthenticateAsync(http) is not null)
+                return Results.Redirect("/photos");
+
+            var html = await pages.RenderAsync(LoginPage, RegisterVars(http, config, null, "", "", "", ""));
+            return Results.Content(html, "text/html; charset=utf-8");
+        });
+
+        app.MapPost("/register", async (HttpContext http, RegistrationGateway registration, PageService pages, IConfiguration config) =>
+        {
+            var form = await http.Request.ReadFormAsync();
+            var firstName = form["first_name"].ToString();
+            var lastName = form["last_name"].ToString();
+            var username = form["username"].ToString();
+            var email = form["email"].ToString();
+            var password = form["password"].ToString();
+
+            var result = await registration.RegisterAsync(http, firstName, lastName, username, email, password);
+
+            if (result.Outcome == RegistrationOutcome.Success)
+                return Results.Redirect("/photos");
+
+            var html = await pages.RenderAsync(LoginPage,
+                RegisterVars(http, config, result.Message, firstName, lastName, username, email));
+            return Results.Content(html, "text/html; charset=utf-8");
+        });
+
         // ───────── Защищённые страницы ─────────
 
         app.MapGet("/photos", (HttpContext http, AuthGateway auth, PageDataBuilder data, PageService pages) =>
@@ -127,6 +157,23 @@ public static class WebEndpoints
             ["form.attempts_left"] = "—",
             ["form.login"] = login ?? "",
             ["form.password"] = password ?? "",
+            ["year"] = DateTime.UtcNow.Year.ToString()
+        };
+
+    private static Dictionary<string, string?> RegisterVars(
+        HttpContext http, IConfiguration config, string? error,
+        string firstName, string lastName, string username, string email)
+        => new()
+        {
+            ["app.version"] = config.Value("App:Version", "v1.0.0"),
+            ["server.host"] = config.Value("App:PublicHost", http.Request.Host.Value),
+            ["server.tls"] = config.Value("App:TlsLabel", "TLS 1.3"),
+            ["flash.kind"] = "register",
+            ["form.error"] = error ?? "",
+            ["form.first_name"] = firstName,
+            ["form.last_name"] = lastName,
+            ["form.username"] = username,
+            ["form.email"] = email,
             ["year"] = DateTime.UtcNow.Year.ToString()
         };
 }

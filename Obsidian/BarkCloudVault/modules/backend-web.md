@@ -19,19 +19,36 @@ Parent: [[index]] · See also: [[api/identity-api]] · [[api/users-api]] · [[ap
 - Истёк access → автоматический refresh через `IdentityApi.CreateToken`.
 - Логин → `IdentityApi.Auth` (с device-заголовками `x-device-name`/`x-os-name`/`x-app-name`/`x-app-version`, base64). Поддержан 2FA-шаг.
 
+## Регистрация (без подтверждения по почте и 2FA)
+
+В BarkCloud **нет** сервиса уведомлений (был только в BarkFluff), поэтому email-флоу `CreateAccount`/`ConfirmAccount` не используется. Аккаунт собирается целиком на стороне Web через **серверные (inter-service) API** и пользователь сразу логинится:
+
+1. `UsersServerApi.CheckExistUsername` / `CheckExistEmail` — проверка занятости.
+2. `UsersServerApi.AddDraftUser` (при остатке черновика → `OverrideDraftUser`) → `userId`.
+3. `UsersServerApi.ConfirmUser` → пользователь подтверждён.
+4. `IdentityServerApi.ForceSetPasswordServer` → пароль (без OTP).
+5. `IdentityServerApi.CreateSessionForUserServer` → access+refresh, регистрирует устройство.
+6. `AuthGateway.IssueSession` ставит cookie → редирект на `/photos`.
+
+Серверные вызовы авторизуются **сервисным JWT** (`TokenType=Service`), который Web подписывает общим `JwtSettings:SecretKey` сам (`Infrastructure/ServiceToken.cs`) — это снимает зависимость от засева `*Service:Token` в Configuration (на существующей БД seed не перезапускается). Email-уведомления внутри серверных обработчиков обёрнуты в try/catch, поэтому отсутствие Notifications регистрацию не ломает.
+
+> Цена подхода: Web держит привилегированный сервисный токен (может создавать сессии и менять пароли любому пользователю). Для self-host приемлемо.
+
 ## Файлы
 
 ### Корень
-- `Program.cs` — `LoadConfiguration(ServiceId.Web)`, DI gRPC-клиентов (Identity/Users/Files/Cloud), регистрация сервисов, включение h2c.
-- `WebEndpoints.cs` — маршруты: `/`, `/login` (GET/POST), `/logout`, `/photos`, `/files`, `/settings`, `/videos`, `/shared`, `/shared.jsx`, `/shared.css`.
+- `Program.cs` — `LoadConfiguration(ServiceId.Web)`, DI gRPC-клиентов (Identity/Users/Files/Cloud + серверные `UsersServerApi`/`IdentityServerApi` с `JwtClientInterceptor`), регистрация сервисов, включение h2c.
+- `WebEndpoints.cs` — маршруты: `/`, `/login` (GET/POST), `/logout`, `/register` (GET/POST), `/photos`, `/files`, `/settings`, `/videos`, `/shared`, `/shared.jsx`, `/shared.css`.
 
 ### Auth
-- `AuthGateway.cs` — cookie, локальная валидация JWT, refresh, логин/логаут.
-- `WebUser.cs` — модель пользователя + `LoginOutcome`/`LoginResult`.
+- `AuthGateway.cs` — cookie, локальная валидация JWT, refresh, логин/логаут, `IssueSession` (общая выдача cookie сессии).
+- `RegistrationGateway.cs` — регистрация без почты через серверные API (см. раздел «Регистрация»).
+- `WebUser.cs` — модель пользователя + `LoginOutcome`/`LoginResult` + `RegistrationOutcome`/`RegistrationResult`.
 
 ### Infrastructure
 - `TemplateRenderer.cs` — рендер плейсхолдеров `{{ }}` / `{{{ }}}` / `| default("…")` с JS-экранированием (не задевает JSX `style={{…}}`).
 - `DeviceInfo.cs`, `BrowserContext.cs` — построение device-метаданных из запроса браузера.
+- `ServiceToken.cs` — генерация сервисного JWT (`TokenType=Service`) из общего `JwtSettings:SecretKey`.
 
 ### Rendering
 - `PageService.cs` — чтение и рендер файлов из `Pages/`.
@@ -40,6 +57,8 @@ Parent: [[index]] · See also: [[api/identity-api]] · [[api/users-api]] · [[ap
 
 ### Pages
 - `Login Page Full.html`, `Photos.html`, `Files.html`, `Settings.html`, `Videos.html`, `Shared.html`, `shared.jsx`, `shared.css` — React+Babel страницы; сервер заполняет `{{ … }}` и `{{{ page_data_json }}}`.
+- Навигация в `shared.jsx` ведёт на чистые роуты (`/photos`, `/files`, `/settings`, …), а не на `*.html`.
+- Логин-страница содержит экран регистрации как состояние `flash.kind = "register"` (компонент `RegisterCard`, POST `/register`).
 
 ## Конфигурация
 
