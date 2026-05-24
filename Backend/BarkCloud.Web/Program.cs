@@ -14,7 +14,21 @@ AppContext.SetSwitch("System.Net.Http.SocketsHttpHandler.Http2UnencryptedSupport
 var builder = WebApplication.CreateBuilder(args);
 
 // JwtSettings и адреса микросервисов берутся из Configuration-сервиса (как у остальных сервисов).
-builder.LoadConfiguration(ServiceId.Web);
+// На холодном старте Configuration может быть ещё не готов — ждём его с повторами,
+// чтобы не уходить в краш-луп по docker restart.
+for (var attempt = 1; ; attempt++)
+{
+    try
+    {
+        builder.LoadConfiguration(ServiceId.Web);
+        break;
+    }
+    catch (Exception ex) when (attempt < 30)
+    {
+        Console.Error.WriteLine($"[startup] Configuration-сервис недоступен (попытка {attempt}): {ex.Message}. Повтор через 2с.");
+        Thread.Sleep(2000);
+    }
+}
 
 // Адреса сервисов в docker-сети (из Configuration; fallback — внутренние порты по умолчанию)
 var identityAddress = builder.Configuration["IdentityService:Host"] ?? "http://cloud-identity:7000";

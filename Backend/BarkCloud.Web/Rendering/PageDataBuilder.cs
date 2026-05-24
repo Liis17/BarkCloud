@@ -58,9 +58,9 @@ public sealed class PageDataBuilder
 
         var vars = new Dictionary<string, string?>
         {
-            ["app.version"] = _config["App:Version"] ?? "v1.0.0",
-            ["app.edition"] = _config["App:Edition"] ?? "self-host",
-            ["server.host"] = _config["App:PublicHost"] ?? http.Request.Host.Value,
+            ["app.version"] = _config.Value("App:Version", "v1.0.0"),
+            ["app.edition"] = _config.Value("App:Edition", "self-host"),
+            ["server.host"] = _config.Value("App:PublicHost", http.Request.Host.Value),
             ["sync.status"] = "Синхронизировано",
             ["sync.last_at"] = Format.Time(DateTimeOffset.UtcNow),
             ["user.initials"] = "?",
