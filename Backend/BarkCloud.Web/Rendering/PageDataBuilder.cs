@@ -351,8 +351,8 @@ public sealed class PageDataBuilder
 
         var block = new
         {
-            used = ToGb(used),
-            total = ToGb(limit),
+            used = Format.ToGb(used),
+            total = Format.ToGb(limit),
             unit = "ГБ",
             percent = Format.Percent(used, limit),
             forecast = "—",
@@ -387,9 +387,6 @@ public sealed class PageDataBuilder
         if (limitGb > 0) return limitGb * 1024L * 1024L * 1024L;
         return 0;
     }
-
-    private static string ToGb(long bytes)
-        => (bytes / (1024d * 1024d * 1024d)).ToString("0.#", System.Globalization.CultureInfo.GetCultureInfo("ru-RU"));
 
     private static string Plural(int n, string one, string few, string many)
     {

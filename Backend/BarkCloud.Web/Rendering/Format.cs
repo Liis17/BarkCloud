@@ -5,7 +5,21 @@ namespace BarkCloud.Web.Rendering;
 /// <summary>Форматирование значений в виде, привычном для русскоязычного UI.</summary>
 public static class Format
 {
-    private static readonly CultureInfo Ru = CultureInfo.GetCultureInfo("ru-RU");
+    // chiseled-образы без ICU работают в globalization-invariant mode, где доступна
+    // только инвариантная культура. Не валимся, а аккуратно деградируем.
+    private static readonly CultureInfo Ru = ResolveRu();
+
+    private static CultureInfo ResolveRu()
+    {
+        try
+        {
+            return CultureInfo.GetCultureInfo("ru-RU");
+        }
+        catch (CultureNotFoundException)
+        {
+            return CultureInfo.InvariantCulture;
+        }
+    }
 
     private const double Kb = 1024d;
     private const double Mb = Kb * 1024d;
@@ -58,6 +72,10 @@ public static class Format
 
     public static int Percent(long used, long total)
         => total <= 0 ? 0 : (int)Math.Clamp(Math.Round(used * 100d / total), 0, 100);
+
+    /// <summary>Размер в гигабайтах без единицы измерения, напр. "312,4".</summary>
+    public static string ToGb(long bytes)
+        => (bytes / Gb).ToString("0.#", Ru);
 
     public static string Initials(string firstName, string lastName)
     {
