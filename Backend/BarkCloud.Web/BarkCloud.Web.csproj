@@ -18,6 +18,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- LoadConfiguration(ServiceId.Web) тянет JwtSettings и адреса сервисов из Configuration-сервиса -->
+    <ProjectReference Include="..\BarkCloud.GrpcServer\BarkCloud.GrpcServer.csproj" />
     <ProjectReference Include="..\..\Shared\BarkCloud.Shared.Auth\BarkCloud.Shared.Auth.csproj" />
     <ProjectReference Include="..\..\Shared\BarkCloud.Shared.Identity\BarkCloud.Shared.Identity.csproj" />
   </ItemGroup>

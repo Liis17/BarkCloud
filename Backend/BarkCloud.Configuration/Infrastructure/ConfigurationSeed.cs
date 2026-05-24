@@ -84,6 +84,11 @@ internal static class ConfigurationSeed
             item("S3Buckets:cloud-files",  "SecretKey",      ServiceId.Files),
             item("S3Buckets:cloud-files",  "BucketName",     ServiceId.Files),
             item("S3Buckets:cloud-files",  "ForcePathStyle", ServiceId.Files),
+
+            // ─── Web (веб-клиент → адреса микросервисов; JwtSettings берёт из общих) ─
+            item("IdentityService", "Host", ServiceId.Web),
+            item("UsersService",    "Host", ServiceId.Web),
+            item("FilesService",    "Host", ServiceId.Web),
         };
 
         return items;

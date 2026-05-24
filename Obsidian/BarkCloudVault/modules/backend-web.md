@@ -15,14 +15,14 @@ Parent: [[index]] · See also: [[api/identity-api]] · [[api/users-api]] · [[ap
 ## Аутентификация
 
 - Cookie: `bark_at` (access), `bark_rt` (refresh), `bark_did` (стабильный device-id). HttpOnly, SameSite=Lax.
-- Токен валидируется **локально** по `JwtSettings:SecretKey/Issuer/Audience` — те же значения, что у Identity (Issuer `BarkCloud`, Audience `BarkCloudMicroservices`, SecretKey генерируется Configuration-сервисом и задаётся web через env).
+- Токен валидируется **локально** по `JwtSettings:SecretKey/Issuer/Audience`. Эти значения web получает из **Configuration-сервиса** через `LoadConfiguration(ServiceId.Web)` — `JwtSettings` засеяны как общие (`ServiceId.Unknown`) и раздаются любому сервису, поэтому секрет автоматически совпадает с Identity.
 - Истёк access → автоматический refresh через `IdentityApi.CreateToken`.
 - Логин → `IdentityApi.Auth` (с device-заголовками `x-device-name`/`x-os-name`/`x-app-name`/`x-app-version`, base64). Поддержан 2FA-шаг.
 
 ## Файлы
 
 ### Корень
-- `Program.cs` — DI gRPC-клиентов (Identity/Users/Files/Cloud), регистрация сервисов, включение h2c.
+- `Program.cs` — `LoadConfiguration(ServiceId.Web)`, DI gRPC-клиентов (Identity/Users/Files/Cloud), регистрация сервисов, включение h2c.
 - `WebEndpoints.cs` — маршруты: `/`, `/login` (GET/POST), `/logout`, `/photos`, `/files`, `/settings`, `/videos`, `/shared`, `/shared.jsx`, `/shared.css`.
 
 ### Auth
@@ -41,11 +41,19 @@ Parent: [[index]] · See also: [[api/identity-api]] · [[api/users-api]] · [[ap
 ### Pages
 - `Login Page Full.html`, `Photos.html`, `Files.html`, `Settings.html`, `Videos.html`, `Shared.html`, `shared.jsx`, `shared.css` — React+Babel страницы; сервер заполняет `{{ … }}` и `{{{ page_data_json }}}`.
 
-## Конфигурация (env)
+## Конфигурация
 
-- `JwtSettings__SecretKey/Issuer/Audience` — должны совпадать с Identity.
-- `Backend__Identity/Users/Files` — адреса сервисов в docker-сети (по умолчанию `http://cloud-identity:7020` и т.д.).
-- `App__PublicHost`, `App__CookieSecure`, `App__Version`, `ASPNETCORE_URLS`.
+Из **Configuration-сервиса** (`CONFIGURATION_SERVICE_URL`, как у остальных):
+- `JwtSettings:*` — общие (ServiceId.Unknown).
+- `IdentityService:Host` / `UsersService:Host` / `FilesService:Host` — адреса в docker-сети
+  (`http://cloud-identity:7000`, `cloud-users:7001`, `cloud-files:7005`; засеяны для `ServiceId.Web`).
+  Fallback на те же значения зашит в `Program.cs`, если Configuration их не отдал.
+
+Из env / appsettings (UI-настройки, не секреты):
+- `ASPNETCORE_URLS`, `App__PublicHost`, `App__CookieSecure`, `App__Version`.
+
+> Для нового `ServiceId.Web` правились `Shared.Identity/ServiceId.cs` и `ConfigurationSeed.cs`
+> (Configuration-сервис надо пересобрать; на существующей БД seed не перезапускается — сработает fallback в `Program.cs`).
 
 ## Инфраструктура
 
