@@ -59,6 +59,17 @@ Plugin: `alias(libs.plugins.android.application)` — через version catalog
 
 gRPC/Protobuf-зависимости **пока не подключены**. При интеграции с Backend контракты из [[modules/shared-proto]] нужно будет компилировать в Kotlin-стабы.
 
+> ⚠️ Раздел выше устарел: gRPC уже подключён (`grpc/GrpcManager.kt`, генерация стабов в `build.gradle.kts`).
+
+## gRPC-метаданные клиента
+
+Сервер ([[modules/backend-grpcserver]], `RequestContextInterceptor`) читает из метаданных и на части эндпоинтов Identity **требует** заголовки (значения в base64, кроме токена):
+
+- `x-auth-token` — JWT, **без** base64. Добавляет `grpc/AuthInterceptor.kt` (динамически на каждый запрос).
+- `x-device-id`, `x-device-name`, `x-os-name`, `x-app-name`, `x-app-version`, `x-ip-address` — статичны, считаются один раз. Добавляет `grpc/ClientMetadataInterceptor.kt` (base64 `NO_WRAP` — иначе перенос строки ломает `Convert.FromBase64String` на сервере).
+
+Оба интерсептора цепляются в `GrpcManager`. Это паритет с iOS, где те же заголовки разнесены по 5 отдельным интерсепторам ([[modules/ios-app]]).
+
 ## План документации при росте проекта
 
 Когда появятся реальные исходники, разбивай:

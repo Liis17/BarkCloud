@@ -23,7 +23,7 @@ android {
         buildConfigField(
             "String",
             "IDENTITY_API_ADDRESS",
-            "\"https://10.0.2.2:5001\""
+            "\"https://cloud.barkfluff.com:7020\""
         )
     }
 

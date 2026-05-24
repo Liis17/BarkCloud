@@ -13,6 +13,7 @@ import javax.net.ssl.X509TrustManager
 
 class GrpcManager(
     private val globalParam: GlobalParam,
+    private val metadataInterceptor: ClientMetadataInterceptor,
 ) {
 
     @Volatile
@@ -26,7 +27,9 @@ class GrpcManager(
         synchronized(this) {
             identityStub?.let { return it }
             val channel = createChannel(BuildConfig.IDENTITY_API_ADDRESS)
-            val intercepted = ClientInterceptors.intercept(channel, AuthInterceptor(globalParam))
+            val intercepted = ClientInterceptors.intercept(
+                channel, AuthInterceptor(globalParam), metadataInterceptor
+            )
             val stub = IdentityApiGrpcKt.IdentityApiCoroutineStub(intercepted)
             identityChannel = channel
             identityStub = stub
