@@ -1,6 +1,6 @@
 # gRPC API — Files
 
-Parent: [[index]] · Module: [[modules/backend-files]] · Cloud: [[modules/backend-files-cloud]] · Proto: [[modules/shared-proto]]
+Parent: [[index]] · Module: [[modules/backend-files]] · Cloud: [[modules/backend-files-cloud]] · Proto: [[modules/shared-proto]] · Клиентский гайд: [[api/files-client-guide]]
 
 Файл: `Shared/BarkCloud.Proto/files_api.proto`
 Namespace C#: `BarkCloud.Proto.Files`
