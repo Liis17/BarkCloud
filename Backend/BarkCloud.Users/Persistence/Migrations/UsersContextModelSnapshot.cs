@@ -30,6 +30,9 @@ namespace BarkCloud.Users.Persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
+                    b.Property<string>("Bio")
+                        .HasColumnType("text");
+
                     b.Property<string>("FirstName")
                         .IsRequired()
                         .HasColumnType("text");
@@ -100,6 +103,9 @@ namespace BarkCloud.Users.Persistence.Migrations
                     b.Property<string>("CustomName")
                         .HasColumnType("text");
 
+                    b.Property<string>("FirebaseToken")
+                        .HasColumnType("text");
+
                     b.Property<string>("Location")
                         .HasColumnType("text");
 
@@ -118,6 +124,37 @@ namespace BarkCloud.Users.Persistence.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("UserDevices");
+                });
+
+            modelBuilder.Entity("BarkCloud.Users.Domain.UserPrivacy", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<int>("EmailVisibility")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("LastSeenVisibility")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ProfileVisibility")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("SearchableByUsername")
+                        .HasColumnType("boolean");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId")
+                        .IsUnique();
+
+                    b.ToTable("UserPrivacies");
                 });
 
             modelBuilder.Entity("BarkCloud.Users.Domain.UserContact", b =>
@@ -142,10 +179,23 @@ namespace BarkCloud.Users.Persistence.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("BarkCloud.Users.Domain.UserPrivacy", b =>
+                {
+                    b.HasOne("BarkCloud.Users.Domain.User", "User")
+                        .WithOne("Privacy")
+                        .HasForeignKey("BarkCloud.Users.Domain.UserPrivacy", "UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("BarkCloud.Users.Domain.User", b =>
                 {
                     b.Navigation("Contact")
                         .IsRequired();
+
+                    b.Navigation("Privacy");
                 });
 #pragma warning restore 612, 618
         }

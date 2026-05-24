@@ -28,6 +28,21 @@ service UsersApi {
   // Изменить юзернейм
   rpc ChangeUsername(ChangeUsernameRequest) returns(ChangeUsernameResponse);
 
+  // Изменить описание (bio)
+  rpc ChangeBio(ChangeBioRequest) returns(ChangeBioResponse);
+
+  // Найти пользователей по юзернейму/имени
+  rpc SearchUsers(SearchUsersRequest) returns(SearchUsersResponse);
+
+  // Удалить (деактивировать) собственный аккаунт
+  rpc DeleteAccount(DeleteAccountRequest) returns(DeleteAccountResponse);
+
+  // Получить настройки приватности
+  rpc GetPrivacySettings(GetPrivacySettingsRequest) returns(GetPrivacySettingsResponse);
+
+  // Обновить настройки приватности
+  rpc UpdatePrivacySettings(UpdatePrivacySettingsRequest) returns(UpdatePrivacySettingsResponse);
+
   // Получить список устройств текущего пользователя
   rpc GetDevices(GetDevicesRequest) returns(GetDevicesResponse);
 
@@ -36,6 +51,12 @@ service UsersApi {
 
   // Переименовать устройство
   rpc RenameDevice(RenameDeviceRequest) returns(RenameDeviceResponse);
+
+  // Удалить собственное устройство (отвязать)
+  rpc DeleteDevice(DeleteDeviceRequest) returns(DeleteDeviceResponse);
+
+  // Сохранить push-токен (Firebase) для текущего устройства
+  rpc SetFirebaseToken(SetFirebaseTokenRequest) returns(SetFirebaseTokenResponse);
 }
 
 // Inter-service API
@@ -129,6 +150,65 @@ message ChangeNameRequest {
 
 message ChangeNameResponse { }
 
+message ChangeBioRequest {
+  string bio = 1; // Описание профиля (до 200 символов), пустая строка — очистить
+}
+
+message ChangeBioResponse { }
+
+message SearchUsersRequest {
+  string query = 1; // Поисковая строка (юзернейм/имя/фамилия), минимум 2 символа
+  int32 limit = 2; // Максимум результатов (1-50, по умолчанию 20)
+}
+
+message SearchUsersResponse {
+  repeated User users = 1; // Найденные пользователи
+}
+
+message DeleteAccountRequest { }
+
+message DeleteAccountResponse { }
+
+message DeleteDeviceRequest {
+  string device_id = 1; // Идентификатор устройства (GUID)
+}
+
+message DeleteDeviceResponse { }
+
+message SetFirebaseTokenRequest {
+  string firebase_token = 1; // Push-токен Firebase для текущего устройства, пустая строка — сброс
+}
+
+message SetFirebaseTokenResponse { }
+
+// Кому доступно поле/действие
+enum PrivacyVisibility {
+  PRIVACY_VISIBILITY_EVERYONE = 0; // Всем
+  PRIVACY_VISIBILITY_CONTACTS = 1; // Только контактам
+  PRIVACY_VISIBILITY_NOBODY = 2;   // Никому
+}
+
+message PrivacySettings {
+  PrivacyVisibility profile_visibility = 1;   // Кто видит профиль (аватар/имя/bio)
+  PrivacyVisibility email_visibility = 2;     // Кто видит email
+  PrivacyVisibility last_seen_visibility = 3; // Кто видит время последнего захода
+  bool searchable_by_username = 4;            // Находится ли пользователь через SearchUsers
+}
+
+message GetPrivacySettingsRequest { }
+
+message GetPrivacySettingsResponse {
+  PrivacySettings settings = 1; // Текущие настройки приватности
+}
+
+message UpdatePrivacySettingsRequest {
+  PrivacySettings settings = 1; // Новые настройки приватности (передаются целиком)
+}
+
+message UpdatePrivacySettingsResponse {
+  PrivacySettings settings = 1; // Актуальные настройки после обновления
+}
+
 message ListByIdsRequest {
   repeated int64 ids = 1; // айдишники
 }
@@ -221,6 +301,7 @@ message User {
   string profile_picture = 6; // ссылка на аватарку пользователя
   string profile_picture_preview = 7; // ссылка на превью аватарки
   int32 storage_limit_gb = 8; // лимит хранилища в гигабайтах
+  string bio = 9; // описание профиля (о себе)
 }
 
 // Сообщения для работы с устройствами

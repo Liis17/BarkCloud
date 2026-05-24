@@ -2,6 +2,8 @@
 
 Parent: [[index]] · See also: [[api/identity-api]] · [[api/users-api]] · [[api/files-api]] · [[modules/shared-identity]] · [[modules/shared-auth]]
 
+Дочерние: [[modules/web-system-updates]] — раздел «Обслуживание» (обновление/перезапуск бэкенда из настроек).
+
 ## Назначение
 
 Веб-клиент BarkCloud: HTTP-сервер, который отдаёт браузеру HTML-страницы из `Pages/` и выступает gRPC-**клиентом** к микросервисам по docker-сети. Не gRPC-сервер — браузер общается с ним по HTTP/1.1, а наружу к Identity/Users/Files уходят gRPC-вызовы (h2c).
@@ -37,11 +39,13 @@ Parent: [[index]] · See also: [[api/identity-api]] · [[api/users-api]] · [[ap
 ## Файлы
 
 ### Корень
-- `Program.cs` — `LoadConfiguration(ServiceId.Web)`, DI gRPC-клиентов (Identity/Users/Files/Cloud + серверные `UsersServerApi`/`IdentityServerApi` с `JwtClientInterceptor`), регистрация сервисов, включение h2c.
+- `Program.cs` — `LoadConfiguration(ServiceId.Web)`, DI gRPC-клиентов (Identity/Users/Files/Cloud + серверные `UsersServerApi`/`IdentityServerApi` с `JwtClientInterceptor`), регистрация сервисов (+ `AdminGate`, `DockerService`), `MapWebEndpoints` + `MapSystemEndpoints`, включение h2c.
 - `WebEndpoints.cs` — маршруты: `/`, `/login` (GET/POST), `/logout`, `/register` (GET/POST), `/photos`, `/files`, `/settings`, `/videos`, `/shared`, `/shared.jsx`, `/shared.css`.
+- `SystemEndpoints.cs` — `/healthz` + группа `/api/system/*` (обновление/перезапуск бэкенда). См. [[modules/web-system-updates]].
 
 ### Auth
 - `AuthGateway.cs` — cookie, локальная валидация JWT, refresh, логин/логаут, `IssueSession` (общая выдача cookie сессии).
+- `AdminGate.cs` — гейт админ-действий по паролю `App:AdminPassword` (cookie `bark_admin`, HMAC на `JwtSettings:SecretKey`). См. [[modules/web-system-updates]].
 - `RegistrationGateway.cs` — регистрация без почты через серверные API (см. раздел «Регистрация»).
 - `WebUser.cs` — модель пользователя + `LoginOutcome`/`LoginResult` + `RegistrationOutcome`/`RegistrationResult`.
 
@@ -49,6 +53,7 @@ Parent: [[index]] · See also: [[api/identity-api]] · [[api/users-api]] · [[ap
 - `TemplateRenderer.cs` — рендер плейсхолдеров `{{ }}` / `{{{ }}}` / `| default("…")` с JS-экранированием (не задевает JSX `style={{…}}`).
 - `DeviceInfo.cs`, `BrowserContext.cs` — построение device-метаданных из запроса браузера.
 - `ServiceToken.cs` — генерация сервисного JWT (`TokenType=Service`) из общего `JwtSettings:SecretKey`.
+- `DockerService.cs` — управление контейнерами бэкенда через `docker.sock` (pull/up/restart/start/stop, self-update веба через helper-контейнер). См. [[modules/web-system-updates]].
 
 ### Rendering
 - `PageService.cs` — чтение и рендер файлов из `Pages/`.
@@ -78,6 +83,7 @@ Parent: [[index]] · See also: [[api/identity-api]] · [[api/users-api]] · [[ap
 
 - `Dockerfile` / `Dockerfile.slim`, сервис `web` в `docker-compose.yml` и `docker-compose-dev.yml`.
 - CI: `.github/workflows/build-backend-web.yml`.
+- Для раздела «Обслуживание» финальный образ `Dockerfile` переведён на `aspnet:10.0-alpine` + `docker-cli`/`docker-cli-compose`, а сервис `web` в `docker-compose.yml` получает `user: root` и монтирует `docker.sock` / compose / `.env` / `~/.docker/config.json`. Подробности и компромисс безопасности — [[modules/web-system-updates]].
 
 ## Ограничения / TODO
 

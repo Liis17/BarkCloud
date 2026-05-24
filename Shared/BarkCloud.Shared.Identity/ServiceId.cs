@@ -8,6 +8,8 @@ public enum ServiceId
 
     Users = 2,
 
+    Notification = 3,
+
     Files = 5,
 
     Web = 6,

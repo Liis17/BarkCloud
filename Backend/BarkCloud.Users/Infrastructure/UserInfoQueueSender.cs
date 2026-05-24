@@ -58,15 +58,28 @@ public class UserInfoQueueSender
         _metrics.Increment("user_avatar_changed_published");
     }
 
-    public async Task UserChangedPasswordEvent(long userId)
+    public async Task BioChangedEvent(long userId, string newBio)
     {
-        var userChangedPasswordEvent = new UserChangedPassword()
+        var bioChangedEvent = new UserChangedBio()
+        {
+            UserId = userId,
+            NewBio = newBio
+        };
+
+        await _publishEndpoint.Publish(bioChangedEvent);
+        _metrics.Increment("user_events_published");
+        _metrics.Increment("user_bio_changed_published");
+    }
+
+    public async Task UserDeletedEvent(long userId)
+    {
+        var userDeletedEvent = new UserDeleted()
         {
             UserId = userId
         };
 
-        await _publishEndpoint.Publish(userChangedPasswordEvent);
+        await _publishEndpoint.Publish(userDeletedEvent);
         _metrics.Increment("user_events_published");
-        _metrics.Increment("user_password_changed_published");
+        _metrics.Increment("user_deleted_published");
     }
 }

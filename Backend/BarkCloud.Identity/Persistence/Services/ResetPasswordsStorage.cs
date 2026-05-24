@@ -35,4 +35,12 @@ public class ResetPasswordsStorage(IdentityContext context)
             await context.SaveChangesAsync();
         }
     }
+
+    /// <summary>
+    /// Удаляет все запросы на сброс пароля пользователя (при удалении аккаунта).
+    /// </summary>
+    public async Task DeleteByUserId(long userId)
+    {
+        await context.ResetPasswords.Where(x => x.UserId == userId).ExecuteDeleteAsync();
+    }
 }

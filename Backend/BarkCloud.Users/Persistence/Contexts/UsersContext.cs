@@ -14,12 +14,20 @@ public class UsersContext : DbContext
 
     public DbSet<UserDevice> UserDevices { get; set; }
 
+    public DbSet<UserPrivacy> UserPrivacies { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<User>()
             .HasOne(u => u.Contact)
             .WithOne(p => p.User)
             .HasForeignKey<UserContact>(p => p.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<User>()
+            .HasOne(u => u.Privacy)
+            .WithOne(p => p.User)
+            .HasForeignKey<UserPrivacy>(p => p.UserId)
             .OnDelete(DeleteBehavior.Cascade);
 
         // Настройка связей для UserDevice

@@ -39,7 +39,8 @@ Parent: [[index]] · See also: [[api/identity-api]] · [[modules/shared-identity
 - `JwtSettings.cs` — issuer, audience, ключ, lifetime
 
 ### Consumers
-- `SessionRevokedConsumer.cs`
+- `SessionRevokedConsumer.cs` — наполняет `TokenRevocationCache` по `SessionRevokedEvent`
+- `UserDeletedConsumer.cs` — по `UserDeleted` (из [[modules/backend-users]]) отзывает все сессии (удаляет refresh-токены + публикует `SessionRevokedEvent` по каждому устройству) и удаляет пароль/2FA-свойства/запросы сброса/коды подтверждения
 
 ### Persistence
 - `Contexts/IdentityContext.cs`, `IdentityContextFactory.cs`

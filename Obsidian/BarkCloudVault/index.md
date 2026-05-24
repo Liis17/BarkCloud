@@ -18,10 +18,12 @@
 ### 📦 Модули — Backend
 - [[modules/backend-configuration]] — Сервис конфигурации (хранит настройки всех микросервисов и зарезервированные юзернеймы)
 - [[modules/backend-identity]] — Сервис идентификации (авторизация, токены, 2FA, сессии)
+- [[modules/backend-notification]] — Сервис уведомлений (consumer RabbitMQ → SMTP: коды подтверждения, уведомления о входе)
 - [[modules/backend-users]] — Сервис пользователей (профили, устройства, контакты, draft-flow)
 - [[modules/backend-files]] — Сервис файлов (MinIO, аватары, превью видео через FFmpeg, галерея фото/видео, альбомы) + [[modules/backend-files-cloud]] облачная иерархия папок
 - [[modules/backend-grpcserver]] — Общий хост для gRPC-серверов (расширения, метрики, перехватчики)
 - [[modules/backend-web]] — Веб-клиент (HTTP-страницы для браузера + gRPC-клиент к микросервисам, логин/cookie/JWT)
+  - [[modules/web-system-updates]] — Обслуживание: обновление/перезапуск бэкенда из настроек (docker.sock, helper-контейнер, админ-пароль)
 
 ### 📦 Модули — Shared
 - [[modules/shared-proto]] — Proto-контракты gRPC (общие для backend и клиентов)
@@ -41,6 +43,7 @@
 - [[api/configuration-api]] — gRPC API сервиса Configuration
 - [[api/identity-api]] — gRPC API сервиса Identity (Auth, OTP, RefreshToken)
 - [[api/users-api]] — gRPC API сервиса Users (профиль, устройства, contacts, draft)
+- [[api/users-client-guide]] — Клиентский гайд по Users API (профиль, аватар, имя/юзернейм/bio, приватность, устройства, аккаунт) — для разработки клиента
 - [[api/files-api]] — gRPC API сервиса Files (`FilesApi`, `CloudApi`, `FilesServerApi`, `AlbumApi`)
 - [[api/files-client-guide]] — Клиентский гайд по Files API (что передать/вернуть: загрузка, галерея, каталоги, альбомы) — для разработки клиента
 

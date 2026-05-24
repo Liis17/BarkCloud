@@ -14,8 +14,13 @@ WORKDIR "/src/Backend/BarkCloud.Web"
 RUN --mount=type=cache,target=/root/.nuget/packages,sharing=locked \
     dotnet publish "BarkCloud.Web.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
 
-FROM mcr.microsoft.com/dotnet/aspnet:10.0-noble-chiseled-extra AS final
+# Alpine + docker-cli/compose: веб управляет обновлением бэкенда через смонтированный docker.sock
+# (см. Infrastructure/DockerService.cs). chiseled-образ не подошёл бы — в нём нет shell и пакетов.
+# Контейнер запускается под root (нужен доступ к docker.sock) — это задаётся в docker-compose.yml.
+FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS final
+RUN apk add --no-cache docker-cli docker-cli-compose icu-libs tzdata
+# icu-libs + отключённый invariant — чтобы русская локализация в Format.cs работала на alpine/musl
+ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false
 WORKDIR /app
-COPY --chown=1654:1654 --from=build /app/publish .
-USER $APP_UID
+COPY --from=build /app/publish .
 ENTRYPOINT ["dotnet", "BarkCloud.Web.dll"]

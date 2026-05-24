@@ -37,4 +37,12 @@ public class ConfirmationCodesStorage
         _context.ConfirmationCodes.Remove(code);
         await _context.SaveChangesAsync();
     }
+
+    /// <summary>
+    /// Удаляет все коды подтверждения пользователя (при удалении аккаунта).
+    /// </summary>
+    public async Task DeleteByOwnerId(long ownerId)
+    {
+        await _context.ConfirmationCodes.Where(x => x.OwnerId == ownerId).ExecuteDeleteAsync();
+    }
 }

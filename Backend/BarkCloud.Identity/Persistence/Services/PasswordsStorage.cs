@@ -66,4 +66,12 @@ public class PasswordsStorage
             await _context.SaveChangesAsync();
         }
     }
+
+    /// <summary>
+    /// Удаляет пароль пользователя (при удалении аккаунта).
+    /// </summary>
+    public async Task DeleteByUserId(long userId)
+    {
+        await _context.UserPasswords.Where(x => x.UserId == userId).ExecuteDeleteAsync();
+    }
 }

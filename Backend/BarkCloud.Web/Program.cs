@@ -60,6 +60,8 @@ builder.Services.AddGrpcClient<IdentityServerApi.IdentityServerApiClient>(o => o
 
 builder.Services.AddSingleton<TemplateRenderer>();
 builder.Services.AddSingleton<PageService>();
+builder.Services.AddSingleton<AdminGate>();
+builder.Services.AddSingleton<DockerService>();
 builder.Services.AddScoped<AuthGateway>();
 builder.Services.AddScoped<RegistrationGateway>();
 builder.Services.AddScoped<PageDataBuilder>();
@@ -67,5 +69,6 @@ builder.Services.AddScoped<PageDataBuilder>();
 var app = builder.Build();
 
 app.MapWebEndpoints();
+app.MapSystemEndpoints();
 
 app.Run();

@@ -21,7 +21,8 @@ DTO-контракты сообщений, которые сервисы пуб�
 - `UserChangedBio.cs`
 - `UserChangedName.cs`
 - `UserChangedUsername.cs`
-- `UserChangedPassword.cs`
+- `UserChangedPassword.cs` — DTO существует, но из `Users` не публикуется (пароли — в `Identity`)
+- `UserDeleted.cs` — удаление аккаунта. Публикует `Users` при `DeleteAccount`; подписаны `Identity` и `Files` (`UserDeletedConsumer.cs` в каждом)
 
 ### Notifications
 - `Notification.cs` — базовая нотификация
@@ -35,6 +36,7 @@ DTO-контракты сообщений, которые сервисы пуб�
 Identity ──► SessionRevokedEvent ──► Users, Files (Consumers/SessionRevokedConsumer)
 Identity ──► EmailNotification    ──► (внешний сервис нотификаций, не в этом репо)
 Users    ──► UserChanged*         ──► (потребители вне видимости текущего репо)
+Users    ──► UserDeleted          ──► Identity, Files (Consumers/UserDeletedConsumer)
 ```
 
 ## Зависимости

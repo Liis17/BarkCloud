@@ -18,6 +18,7 @@ public static class UserMapping
             ProfilePicture = domainUser.ProfilePicture ?? string.Empty,
             ProfilePicturePreview = domainUser.ProfilePicturePreviewUrl ?? string.Empty,
             StorageLimitGb = domainUser.StorageLimitGb,
+            Bio = domainUser.Bio ?? string.Empty,
         };
     }
 }
