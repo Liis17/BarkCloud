@@ -7,7 +7,9 @@ on:
       - master
     paths:
       - 'Backend/BarkCloud.Web/**'
+      - 'Backend/BarkCloud.GrpcServer/**'
       - 'Shared/BarkCloud.Shared.Auth/**'
+      - 'Shared/BarkCloud.Shared.Exceptions/**'
       - 'Shared/BarkCloud.Shared.Identity/**'
       - 'Shared/BarkCloud.Proto/**'
       - 'Backend/rebuild.trigger'
