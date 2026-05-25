@@ -163,10 +163,45 @@ public static class CloudApiEndpoints
                 var resp = await cloud.ListUserMediaAsync(req, token);
                 return Results.Json(new
                 {
-                    items = resp.Items.Where(i => i.File is not null).Select(i => CloudJson.Media(i.File)).ToArray(),
+                    items = resp.Items.Where(i => i.File is not null).Select(CloudJson.MediaItem).ToArray(),
                     nextCursorAt = resp.NextCursorCreatedAt?.ToDateTimeOffset(),
                     nextCursorId = resp.NextCursorFileId
                 }, Json);
+            }));
+
+        // ───────────────────────── Избранное ─────────────────────────
+
+        api.MapGet("/cloud/favorites", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud,
+            int? limit, string? cursorAt, string? cursorId) =>
+            await Guarded(http, auth, async token =>
+            {
+                var req = new ListFavoritesRequest { Limit = limit is > 0 and <= 200 ? limit.Value : 60 };
+                if (DateTimeOffset.TryParse(cursorAt, out var dt))
+                    req.CursorFavoritedAt = Timestamp.FromDateTimeOffset(dt.ToUniversalTime());
+                if (!string.IsNullOrEmpty(cursorId))
+                    req.CursorFileId = cursorId;
+
+                var resp = await cloud.ListFavoritesAsync(req, token);
+                return Results.Json(new
+                {
+                    items = resp.Items.Where(i => i.File is not null).Select(i => CloudJson.Media(i.File)).ToArray(),
+                    nextCursorAt = resp.NextCursorFavoritedAt?.ToDateTimeOffset(),
+                    nextCursorId = resp.NextCursorFileId
+                }, Json);
+            }));
+
+        api.MapPost("/cloud/favorites/add", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud, FileIdReq body) =>
+            await Guarded(http, auth, async token =>
+            {
+                await cloud.AddFavoriteAsync(new AddFavoriteRequest { FileId = body.FileId }, token);
+                return Results.Json(new { ok = true }, Json);
+            }));
+
+        api.MapPost("/cloud/favorites/remove", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud, FileIdReq body) =>
+            await Guarded(http, auth, async token =>
+            {
+                await cloud.RemoveFavoriteAsync(new RemoveFavoriteRequest { FileId = body.FileId }, token);
+                return Results.Json(new { ok = true }, Json);
             }));
 
         // ───────────────────────── Альбомы ─────────────────────────
@@ -319,6 +354,60 @@ public static class CloudApiEndpoints
                     urls = resp.FileUrls.ToDictionary(f => f.FileId, f => f.Url)
                 }, Json);
             }));
+
+        // Полные свойства файла по file_id (для модалки «Свойства») — через серверный GetFileData.
+        // FilesServerApi авторизуется сервисным токеном (интерцептор), поэтому проверяем владение вручную.
+        api.MapGet("/files/info", async (HttpContext http, AuthGateway auth, FilesServerApi.FilesServerApiClient filesServer, string? id) =>
+        {
+            var user = await auth.AuthenticateAsync(http);
+            if (user is null)
+                return Results.Json(new { error = "Не авторизован" }, Json, statusCode: 401);
+            if (string.IsNullOrEmpty(id))
+                return Results.Json(new { error = "Не указан id" }, Json, statusCode: 400);
+
+            try
+            {
+                var resp = await filesServer.GetFileDataAsync(new GetFileDataRequest { FileId = id });
+                var f = resp.FileInfo;
+                if (f is null || string.IsNullOrEmpty(f.Id))
+                    return Results.Json(new { error = "Файл не найден" }, Json, statusCode: 404);
+                if (!f.Uploaders.Contains(user.UserId))
+                    return Results.Json(new { error = "Нет доступа" }, Json, statusCode: 403);
+
+                var (iconKind, ext) = FileKind.Classify(f.FileName);
+                return Results.Json(new
+                {
+                    id = f.Id,
+                    name = f.FileName,
+                    ext,
+                    iconKind,
+                    kind = f.MediaKind switch
+                    {
+                        MediaKind.Photo => "photo",
+                        MediaKind.Video => "video",
+                        MediaKind.Document => "document",
+                        MediaKind.Audio => "audio",
+                        _ => "other"
+                    },
+                    size = f.FileSize,
+                    sizeLabel = Format.Size(f.FileSize),
+                    width = f.ImageWidth,
+                    height = f.ImageHeight,
+                    etag = f.Etag,
+                    previewCount = f.Previews.Count,
+                    createdAt = f.CreatedAt?.ToDateTimeOffset(),
+                    uploadedAt = f.UploadedAt?.ToDateTimeOffset()
+                }, Json);
+            }
+            catch (RpcException ex) when (ex.StatusCode == StatusCode.NotFound)
+            {
+                return Results.Json(new { error = "Файл не найден" }, Json, statusCode: 404);
+            }
+            catch (RpcException ex)
+            {
+                return Results.Json(new { error = ex.Status.Detail }, Json, statusCode: 502);
+            }
+        });
     }
 
     // ───────────────────────── Инфраструктура ─────────────────────────
@@ -360,6 +449,7 @@ public static class CloudApiEndpoints
     private sealed record EntryRenameReq(string EntryId, string Name);
     private sealed record EntryMoveReq(string EntryId, string? Dir);
     private sealed record EntryIdReq(string EntryId);
+    private sealed record FileIdReq(string FileId);
     private sealed record AlbumCreate(string Name, string? Description);
     private sealed record AlbumUpdate(string Album, string? Name, string? Description, string? CoverFileId);
     private sealed record AlbumIdReq(string Album);

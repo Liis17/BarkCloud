@@ -1,3 +1,4 @@
+using BarkCloud.Files.Features.Cloud.AddFavorite;
 using BarkCloud.Files.Features.Cloud.AttachFile;
 using BarkCloud.Files.Features.Cloud.CreateDirectory;
 using BarkCloud.Files.Features.Cloud.DeleteDirectory;
@@ -5,6 +6,7 @@ using BarkCloud.Files.Features.Cloud.DeleteFileEntry;
 using BarkCloud.Files.Features.Cloud.DeleteFromTrash;
 using BarkCloud.Files.Features.Cloud.EmptyTrash;
 using BarkCloud.Files.Features.Cloud.GetPath;
+using BarkCloud.Files.Features.Cloud.ListFavorites;
 using BarkCloud.Files.Features.Cloud.ListTrash;
 using BarkCloud.Files.Features.Cloud.ListDirectory;
 using BarkCloud.Files.Features.Cloud.ListDirectoryDetailed;
@@ -13,6 +15,7 @@ using BarkCloud.Files.Features.Cloud.ListUserMedia;
 using BarkCloud.Files.Features.Cloud.MoveDirectory;
 using BarkCloud.Files.Features.Cloud.MoveFileEntry;
 using BarkCloud.Files.Features.Cloud.RenameDirectory;
+using BarkCloud.Files.Features.Cloud.RemoveFavorite;
 using BarkCloud.Files.Features.Cloud.RenameFileEntry;
 using BarkCloud.Files.Features.Cloud.RestoreFromTrash;
 using BarkCloud.Files.Features.Cloud.SetVideoThumbnail;
@@ -245,6 +248,36 @@ public class CloudApiService : CloudApi.CloudApiBase
     public override Task<CloudEmpty> EmptyTrash(EmptyTrashRequest request, ServerCallContext context)
     {
         return _mediator.Send(new EmptyTrashCommand());
+    }
+
+    public override Task<CloudEmpty> AddFavorite(AddFavoriteRequest request, ServerCallContext context)
+    {
+        return _mediator.Send(new AddFavoriteCommand { FileId = Guid.Parse(request.FileId) });
+    }
+
+    public override Task<CloudEmpty> RemoveFavorite(RemoveFavoriteRequest request, ServerCallContext context)
+    {
+        return _mediator.Send(new RemoveFavoriteCommand { FileId = Guid.Parse(request.FileId) });
+    }
+
+    public override Task<ListFavoritesResponse> ListFavorites(ListFavoritesRequest request, ServerCallContext context)
+    {
+        DateTime? cursorFavoritedAt = null;
+        Guid? cursorFileId = null;
+        if (request.CursorFavoritedAt is not null && !string.IsNullOrWhiteSpace(request.CursorFileId))
+        {
+            cursorFavoritedAt = request.CursorFavoritedAt.ToDateTime();
+            cursorFileId = Guid.Parse(request.CursorFileId);
+        }
+
+        var command = new ListFavoritesCommand
+        {
+            Limit = request.Limit,
+            CursorCreatedAt = cursorFavoritedAt,
+            CursorFileId = cursorFileId
+        };
+
+        return _mediator.Send(command);
     }
 
     public override Task<PathResponse> GetPath(GetPathRequest request, ServerCallContext context)

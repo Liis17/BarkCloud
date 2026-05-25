@@ -66,6 +66,7 @@ const Icon = {
   globe: (p={}) => <svg className={p.className||"ico"} width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>,
   clock: (p={}) => <svg className={p.className||"ico"} width={p.size||18} height={p.size||18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
   eye: (p={}) => <svg width={p.size||18} height={p.size||18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>,
+  info: (p={}) => <svg width={p.size||18} height={p.size||18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>,
   pencil: (p={}) => <svg width={p.size||18} height={p.size||18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4z"/></svg>,
   check: (p={}) => <svg width={p.size||18} height={p.size||18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>,
   x: (p={}) => <svg width={p.size||18} height={p.size||18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
@@ -82,7 +83,7 @@ const NAV_PRIMARY = [
 const NAV_SHARE = [
   {key:'shared', href:'/shared', label:'Общие', icon:'share', count:'{{ nav.shared_count }}'},
   {key:'links', href:'/shared', label:'Ссылки', icon:'link', count:'{{ nav.links_count }}'},
-  {key:'starred', href:'/files', label:'Избранное', icon:'star'},
+  {key:'favorites', href:'/favorites', label:'Избранное', icon:'star'},
 ];
 const NAV_OTHER = [
   {key:'trash', href:'/trash', label:'Корзина', icon:'trash'},
@@ -139,7 +140,9 @@ function Sidebar({ page }) {
       </div>
 
       <a className="sb-user" href="/settings">
-        <div className="avatar">{"{{ user.initials }}"}</div>
+        {"{{ user.avatar_url }}"
+          ? <img className="avatar" src={"{{ user.avatar_url }}"} alt="" />
+          : <div className="avatar">{"{{ user.initials }}"}</div>}
         <div className="who">
           <div className="uname">{"{{ user.display_name }}"}</div>
           <div className="uhost">{"{{ user.role }}"} · {"{{ server.host }}"}</div>
@@ -281,54 +284,134 @@ function uploadFile(file, onProgress) {
  *  SHARED UI — превью, лайтбокс, модалка, тосты
  * ════════════════════════════════════════════════════════════════════════ */
 
-/* Превью медиа. Браузер сам выбирает ширину под размер блока (srcset + sizes + DPR). */
-function MediaThumb({ media, sizes = '200px', className = 'thumb', alt = '' }) {
+/* Превью медиа. Браузер сам выбирает ширину под размер блока (srcset + sizes + DPR).
+   Пока превью не загрузилось (или его нет) — показываем MD3-иконку-плейсхолдер по типу медиа. */
+function MediaThumb({ media, sizes = '200px', className = 'thumb' }) {
   const previews = (media && media.previews) || [];
+  const kind = media && media.kind;
+  const PhIcon = kind === 'video' ? Icon.video : kind === 'photo' ? Icon.photo : Icon.file;
+  const tint = kind === 'video'
+    ? { '--tint-a': '#9FB4D6', '--tint-b': '#3F5374' }
+    : { '--tint-a': '#C8A78C', '--tint-b': '#6F4A3A' };
+  const [loaded, setLoaded] = React.useState(false);
+
+  const placeholder = (
+    <div className={"thumb-ph" + (loaded ? " off" : "")} aria-hidden="true"><PhIcon size={34} /></div>
+  );
+
   if (!previews.length) {
-    return <div className={className} style={{ '--tint-a': '#C8A78C', '--tint-b': '#6F4A3A' }} />;
+    return <div className={className} style={tint}>{placeholder}</div>;
   }
   const srcSet = previews.map(p => `${p.url} ${p.w}w`).join(', ');
   const fallback = previews[previews.length - 1].url; // самое широкое
   return (
-    <img className={className} src={fallback} srcSet={srcSet} sizes={sizes}
-      alt={alt || (media && media.name) || ''} loading="lazy" style={{ objectFit: 'cover' }} />
+    <div className={className} style={tint}>
+      {placeholder}
+      <img className={"thumb-img" + (loaded ? " on" : "")} src={fallback} srcSet={srcSet} sizes={sizes}
+        alt="" loading="lazy" onLoad={() => setLoaded(true)} />
+    </div>
   );
 }
 
-/* Полноэкранный просмотр ОРИГИНАЛА (временная ссылка через /api/files/download) */
-function Lightbox({ media, onClose }) {
-  const [url, setUrl] = React.useState(null);
+/* Полноэкранный просмотр ОРИГИНАЛА (временная ссылка через /api/files/download).
+   Принимает упорядоченный список items + стартовый index: листание стрелками/кнопками,
+   зум колесом для фото, перемотка ±5 c стрелками для видео. */
+function Lightbox({ items, index = 0, media, onClose }) {
+  const list = Array.isArray(items) ? items : (media ? [media] : []);
+  const [i, setI] = React.useState(index);
+  const [urls, setUrls] = React.useState({});   // fileId -> временная ссылка на оригинал
   const [err, setErr] = React.useState(null);
-  const fileId = media && media.id;
+  const [scale, setScale] = React.useState(1);
+  const [pan, setPan] = React.useState({ x: 0, y: 0 });
+  const videoRef = React.useRef(null);
+  const stageRef = React.useRef(null);
+  const dragRef = React.useRef(null);
 
+  const cur = list[i] || null;
+  const fileId = cur && cur.id;
+  const isVideo = cur && cur.kind === 'video';
+
+  // загрузка оригинала текущего элемента (с кэшем по fileId)
   React.useEffect(() => {
     let alive = true;
-    setUrl(null); setErr(null);
-    if (!fileId) return;
+    setErr(null);
+    if (!fileId || urls[fileId]) return;
     apiGet('/api/files/download?ids=' + encodeURIComponent(fileId))
-      .then(d => { if (alive) setUrl((d.urls && d.urls[fileId]) || null); })
+      .then(d => { if (alive) setUrls(u => ({ ...u, [fileId]: (d.urls && d.urls[fileId]) || null })); })
       .catch(e => { if (alive) setErr(e.message); });
     return () => { alive = false; };
   }, [fileId]);
 
+  // сброс зума/смещения при переключении
+  React.useEffect(() => { setScale(1); setPan({ x: 0, y: 0 }); }, [i]);
+
+  const go = React.useCallback((delta) => {
+    setI(prev => Math.min(list.length - 1, Math.max(0, prev + delta)));
+  }, [list.length]);
+
   React.useEffect(() => {
-    const onKey = (e) => { if (e.key === 'Escape') onClose && onClose(); };
+    const onKey = (e) => {
+      if (e.key === 'Escape') { onClose && onClose(); return; }
+      if (e.key === 'ArrowLeft') {
+        if (isVideo && videoRef.current) videoRef.current.currentTime = Math.max(0, videoRef.current.currentTime - 5);
+        else go(-1);
+      } else if (e.key === 'ArrowRight') {
+        if (isVideo && videoRef.current) {
+          const d = videoRef.current.duration || Infinity;
+          videoRef.current.currentTime = Math.min(d, videoRef.current.currentTime + 5);
+        } else go(1);
+      }
+    };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  }, [onClose, isVideo, go]);
 
-  if (!media) return null;
-  const isVideo = media.kind === 'video';
+  // зум колесом (native non-passive listener — иначе preventDefault не сработает)
+  React.useEffect(() => {
+    const el = stageRef.current;
+    if (!el) return;
+    const onWheel = (e) => {
+      if (isVideo) return;
+      e.preventDefault();
+      setScale(s => Math.min(5, Math.max(1, +(s - Math.sign(e.deltaY) * 0.25).toFixed(2))));
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, [isVideo]);
+
+  if (!cur) return null;
+  const url = urls[fileId];
+
+  function onMouseDown(e) {
+    if (isVideo || scale <= 1) return;
+    e.preventDefault();
+    dragRef.current = { x: e.clientX, y: e.clientY, px: pan.x, py: pan.y };
+  }
+  function onMouseMove(e) {
+    if (!dragRef.current) return;
+    setPan({ x: dragRef.current.px + (e.clientX - dragRef.current.x), y: dragRef.current.py + (e.clientY - dragRef.current.y) });
+  }
+  function endDrag() { dragRef.current = null; }
+
   return (
-    <div className="lightbox" onClick={onClose}>
+    <div className="lightbox" onClick={onClose} onMouseMove={onMouseMove} onMouseUp={endDrag} onMouseLeave={endDrag}>
       <button className="lb-close icon-btn" onClick={onClose} title="Закрыть"><Icon.x size={24} /></button>
-      <div className="lb-stage" onClick={e => e.stopPropagation()}>
+
+      {i > 0 && <button className="lb-nav left" onClick={(e) => { e.stopPropagation(); go(-1); }} title="Назад (←)"><Icon.chev size={30} /></button>}
+      {i < list.length - 1 && <button className="lb-nav right" onClick={(e) => { e.stopPropagation(); go(1); }} title="Вперёд (→)"><Icon.chev size={30} /></button>}
+
+      <div className="lb-stage" ref={stageRef} onClick={e => e.stopPropagation()}>
         {err && <div className="lb-msg">Не удалось загрузить оригинал: {err}</div>}
         {!err && !url && <div className="lb-msg"><span className="spinner" /> Загрузка оригинала…</div>}
-        {url && isVideo && <video src={url} controls autoPlay />}
-        {url && !isVideo && <img src={url} alt={media.name || ''} />}
+        {url && isVideo && <video ref={videoRef} src={url} controls autoPlay />}
+        {url && !isVideo && <img src={url} alt={cur.name || ''} draggable={false}
+          className={scale > 1 ? 'zoomed' : ''}
+          style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})` }}
+          onMouseDown={onMouseDown}
+          onDoubleClick={() => { setScale(s => s > 1 ? 1 : 2); setPan({ x: 0, y: 0 }); }} />}
       </div>
-      {url && <a className="lb-download btn" href={url} download={media.name}><Icon.download size={16} /> Скачать</a>}
+
+      {url && <a className="lb-download btn" href={url} download={cur.name} onClick={e => e.stopPropagation()}><Icon.download size={16} /> Скачать</a>}
     </div>
   );
 }
@@ -566,8 +649,8 @@ function AlbumDetail({ album, candidates, gridSizes = GRID_SIZES, onBack, onChan
           ? <EmptyState icon="photo" title="Альбом пуст" hint="Добавьте фото или видео из вашей галереи."
             action={<button className="btn primary" onClick={() => setPicking(true)}><Icon.plus size={16} /> Добавить</button>} />
           : <div className="photo-grid">
-            {items.map(m => (
-              <div key={m.id} className="photo" onClick={() => setLightbox(m)}>
+            {items.map((m, idx) => (
+              <div key={m.id} className="photo" onClick={() => setLightbox(idx)}>
                 <MediaThumb media={m} sizes={gridSizes} />
                 {m.kind === 'video' && <div className="vbadge"><Icon.play size={10} /> видео</div>}
                 <div className="item-tools">
@@ -582,9 +665,349 @@ function AlbumDetail({ album, candidates, gridSizes = GRID_SIZES, onBack, onChan
         onSaved={() => { setEditing(false); onChanged(); toast('Сохранено'); }} toast={toast} />}
       {picking && <PickMediaModal candidates={candidates} exclude={excludeIds}
         onClose={() => setPicking(false)} onAdd={addItems} toast={toast} />}
-      {lightbox && <Lightbox media={lightbox} onClose={() => setLightbox(null)} />}
+      {lightbox !== null && items && <Lightbox items={items} index={lightbox} onClose={() => setLightbox(null)} />}
     </div>
   );
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+ *  КОНТЕКСТНОЕ МЕНЮ (ПКМ) + модалки действий над файлами/медиа
+ * ════════════════════════════════════════════════════════════════════════ */
+
+const ruDateTime = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+function fmtFull(d) { if (!d) return '—'; const dt = new Date(d); return isNaN(dt) ? '—' : ruDateTime.format(dt); }
+function kindRu(k) { return ({ photo: 'Фото', video: 'Видео', document: 'Документ', audio: 'Аудио' })[k] || 'Файл'; }
+
+const EMPTY_SET = new Set();
+
+/* Меню по координатам (x,y). item = { label, icon?, onClick?, danger?, disabled?, submenu? } */
+function ContextMenu({ x, y, items, onClose }) {
+  const ref = React.useRef(null);
+  const [pos, setPos] = React.useState({ x, y });
+  const [openSub, setOpenSub] = React.useState(null);
+
+  React.useLayoutEffect(() => {
+    const el = ref.current; if (!el) return;
+    const r = el.getBoundingClientRect();
+    let nx = x, ny = y;
+    if (x + r.width > window.innerWidth - 8) nx = Math.max(8, window.innerWidth - r.width - 8);
+    if (y + r.height > window.innerHeight - 8) ny = Math.max(8, window.innerHeight - r.height - 8);
+    setPos({ x: nx, y: ny });
+  }, [x, y, items]);
+
+  React.useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose && onClose(); };
+    const onScroll = () => onClose && onClose();
+    window.addEventListener('keydown', onKey);
+    window.addEventListener('resize', onScroll);
+    window.addEventListener('scroll', onScroll, true);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('resize', onScroll);
+      window.removeEventListener('scroll', onScroll, true);
+    };
+  }, [onClose]);
+
+  function runItem(it) {
+    if (it.disabled || (it.submenu && it.submenu.length)) return;
+    onClose && onClose();
+    it.onClick && it.onClick();
+  }
+
+  return (
+    <div className="ctx-backdrop" onMouseDown={onClose} onContextMenu={(e) => { e.preventDefault(); onClose && onClose(); }}>
+      <div className="ctx-menu" ref={ref} style={{ left: pos.x, top: pos.y }}
+        onMouseDown={e => e.stopPropagation()} onContextMenu={e => { e.preventDefault(); e.stopPropagation(); }}>
+        {items.map((it, idx) => {
+          if (it.divider) return <div key={idx} className="ctx-divider" />;
+          const IconC = it.icon && Icon[it.icon];
+          const hasSub = it.submenu && it.submenu.length;
+          return (
+            <div key={idx}
+              className={"ctx-item" + (it.danger ? " danger" : "") + (it.disabled ? " disabled" : "") + (hasSub ? " has-sub" : "")}
+              onMouseEnter={() => setOpenSub(hasSub ? idx : null)}
+              onClick={() => runItem(it)}>
+              <span className="ci-ico">{IconC ? <IconC size={17} /> : null}</span>
+              <span className="ci-label">{it.label}</span>
+              {hasSub && <span className="ci-chev"><Icon.chev size={15} /></span>}
+              {hasSub && openSub === idx && (
+                <div className="ctx-sub">
+                  {it.submenu.map((s, j) => (
+                    <div key={j} className={"ctx-item" + (s.disabled ? " disabled" : "")}
+                      onClick={(e) => { e.stopPropagation(); if (s.disabled) return; onClose && onClose(); s.onClick && s.onClick(); }}>
+                      <span className="ci-label">{s.label}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function useContextMenu() {
+  const [state, setState] = React.useState(null);
+  const openAt = React.useCallback((e, items) => {
+    e.preventDefault(); e.stopPropagation();
+    setState({ x: e.clientX, y: e.clientY, items });
+  }, []);
+  const close = React.useCallback(() => setState(null), []);
+  const menu = state ? <ContextMenu x={state.x} y={state.y} items={state.items} onClose={close} /> : null;
+  return { menu, openAt, close };
+}
+
+/* Маленькая модалка переименования */
+function RenameModal({ title = 'Переименовать', label = 'Новое имя', initial = '', onClose, onSave }) {
+  const [name, setName] = React.useState(initial || '');
+  const [busy, setBusy] = React.useState(false);
+  async function save() {
+    const v = name.trim();
+    if (!v) return;
+    setBusy(true);
+    try { await onSave(v); } finally { setBusy(false); }
+  }
+  return (
+    <Modal title={title} onClose={onClose}
+      actions={<>
+        <button className="btn text" onClick={onClose}>Отмена</button>
+        <button className="btn primary" onClick={save} disabled={busy}>{busy ? '…' : 'Сохранить'}</button>
+      </>}>
+      <label className="field-label">{label}</label>
+      <input type="text" value={name} autoFocus onChange={e => setName(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter') save(); }} />
+    </Modal>
+  );
+}
+
+/* Подтверждение действия (удаление в корзину и т.п.) */
+function ConfirmModal({ title = 'Подтвердите', message, confirmLabel = 'OK', danger = false, onClose, onConfirm }) {
+  const [busy, setBusy] = React.useState(false);
+  async function run() {
+    setBusy(true);
+    try { await onConfirm(); } finally { setBusy(false); }
+  }
+  return (
+    <Modal title={title} onClose={onClose}
+      actions={<>
+        <button className="btn text" onClick={onClose}>Отмена</button>
+        <button className={"btn " + (danger ? "danger" : "primary")} onClick={run} disabled={busy}>{busy ? '…' : confirmLabel}</button>
+      </>}>
+      <div className="confirm-msg">{message}</div>
+    </Modal>
+  );
+}
+
+/* Свойства файла — отдельный запрос GetFileData (/api/files/info), пока грузит — данные из карточки */
+function PropertiesModal({ fileId, fallback, onClose }) {
+  const [info, setInfo] = React.useState(null);
+  const [err, setErr] = React.useState(null);
+  React.useEffect(() => {
+    let alive = true;
+    apiGet('/api/files/info?id=' + encodeURIComponent(fileId))
+      .then(d => { if (alive) setInfo(d); })
+      .catch(e => { if (alive) setErr(e.message); });
+    return () => { alive = false; };
+  }, [fileId]);
+
+  const f = info || fallback || {};
+  const fb = fallback || {};
+  const rows = [
+    ['Имя', f.name],
+    ['Тип', kindRu(f.kind)],
+    ['Размер', f.sizeLabel || (f.size != null ? f.size + ' Б' : '—')],
+    (f.width && f.height) ? ['Разрешение', f.width + ' × ' + f.height + ' px'] : null,
+    ['Создан', fmtFull(f.createdAt)],
+    ['Загружен', fmtFull(f.uploadedAt)],
+    (info && info.etag) ? ['ETag', info.etag] : null,
+    (fb.entryNames && fb.entryNames.length) ? ['Имя в папке', fb.entryNames[0]] : null,
+    ['ID', f.id || fileId],
+  ].filter(Boolean);
+
+  return (
+    <Modal title="Свойства" onClose={onClose}
+      actions={<button className="btn primary" onClick={onClose}>Закрыть</button>}>
+      {err && <div className="prop-err">Полные данные недоступны: {err}</div>}
+      <div className="prop-grid">
+        {rows.map(([k, v]) => (
+          <React.Fragment key={k}><div className="pk">{k}</div><div className="pv">{v == null || v === '' ? '—' : v}</div></React.Fragment>
+        ))}
+      </div>
+    </Modal>
+  );
+}
+
+/* Членство файлов в альбомах: лениво строит fileId -> Set(albumId), перебирая ListAlbumItems */
+function useAlbumMembership(albums) {
+  const [map, setMap] = React.useState(() => new Map());
+  const loadedRef = React.useRef(false);
+
+  const ensureLoaded = React.useCallback(async () => {
+    if (loadedRef.current || !albums || !albums.length) return;
+    loadedRef.current = true;
+    try {
+      const next = new Map();
+      for (const a of albums) {
+        const d = await apiGet('/api/albums/items?album=' + encodeURIComponent(a.id) + '&limit=200');
+        for (const it of (d.items || [])) {
+          if (!next.has(it.id)) next.set(it.id, new Set());
+          next.get(it.id).add(a.id);
+        }
+      }
+      setMap(next);
+    } catch (e) { loadedRef.current = false; }
+  }, [albums]);
+
+  const of = React.useCallback((fileId) => map.get(fileId) || EMPTY_SET, [map]);
+  const addLocal = React.useCallback((fileId, albumId) => setMap(m => {
+    const n = new Map(m); const s = new Set(n.get(fileId) || []); s.add(albumId); n.set(fileId, s); return n;
+  }), []);
+  const removeLocal = React.useCallback((fileId, albumId) => setMap(m => {
+    const n = new Map(m); const s = new Set(n.get(fileId) || []); s.delete(albumId); n.set(fileId, s); return n;
+  }), []);
+
+  return { of, ensureLoaded, addLocal, removeLocal };
+}
+
+/* Полный набор действий контекстного меню для медиа галереи (Фото/Видео).
+   Возвращает overlay (меню + все модалки) и openMenu(e, media). */
+function useMediaActions({ albums, toast, onRenamed, onRemoved, reloadAlbums }) {
+  const [menu, setMenu] = React.useState(null);   // { x, y, media }
+  const [rename, setRename] = React.useState(null);
+  const [confirm, setConfirm] = React.useState(null);
+  const [props, setProps] = React.useState(null);
+  const membership = useAlbumMembership(albums);
+
+  const openMenu = React.useCallback((e, media) => {
+    e.preventDefault(); e.stopPropagation();
+    membership.ensureLoaded();
+    setMenu({ x: e.clientX, y: e.clientY, media });
+  }, [membership]);
+
+  async function copyLink(m) {
+    try {
+      const d = await apiGet('/api/files/download?ids=' + encodeURIComponent(m.id));
+      const url = d.urls && d.urls[m.id];
+      if (!url) throw new Error('Ссылка недоступна');
+      await navigator.clipboard.writeText(url);
+      toast('Ссылка скопирована (временная)');
+    } catch (e) { toast(e.message || 'Не удалось скопировать', 'err'); }
+  }
+  async function doRename(m, name) {
+    const entryId = m.entryIds && m.entryIds[0];
+    if (!entryId) { toast('Файл не привязан к папке', 'err'); return; }
+    try { await apiPost('/api/cloud/entry/rename', { entryId, name }); setRename(null); onRenamed && onRenamed(m, name); toast('Переименовано'); }
+    catch (e) { toast(e.message, 'err'); }
+  }
+  async function doDelete(m) {
+    const ids = (m.entryIds || []).slice();
+    if (!ids.length) { toast('Файл не привязан к папке', 'err'); return; }
+    try {
+      for (const eid of ids) await apiPost('/api/cloud/entry/delete', { entryId: eid });
+      setConfirm(null); onRemoved && onRemoved(m); toast('Перемещено в корзину');
+    } catch (e) { toast(e.message, 'err'); }
+  }
+  async function addToAlbum(m, albumId) {
+    try { await apiPost('/api/albums/items/add', { album: albumId, fileIds: [m.id] }); membership.addLocal(m.id, albumId); reloadAlbums && reloadAlbums(); toast('Добавлено в альбом'); }
+    catch (e) { toast(e.message, 'err'); }
+  }
+  async function removeFromAlbum(m, albumId) {
+    try { await apiPost('/api/albums/items/remove', { album: albumId, fileIds: [m.id] }); membership.removeLocal(m.id, albumId); reloadAlbums && reloadAlbums(); toast('Убрано из альбома'); }
+    catch (e) { toast(e.message, 'err'); }
+  }
+
+  function buildItems(m) {
+    const isMedia = m.kind === 'photo' || m.kind === 'video';
+    const hasEntry = (m.entryIds || []).length > 0;
+    const inAlbums = membership.of(m.id);
+    const available = (albums || []).filter(a => !inAlbums.has(a.id));
+    const present = (albums || []).filter(a => inAlbums.has(a.id));
+    const out = [
+      { label: 'Копировать ссылку', icon: 'link', onClick: () => copyLink(m) },
+      { label: 'Переименовать', icon: 'pencil', disabled: !hasEntry, onClick: () => setRename(m) },
+    ];
+    if (isMedia) {
+      out.push({
+        label: 'Добавить в альбом', icon: 'plus',
+        submenu: available.length ? available.map(a => ({ label: a.name, onClick: () => addToAlbum(m, a.id) }))
+          : [{ label: (albums && albums.length ? 'Уже во всех альбомах' : 'Нет альбомов'), disabled: true }]
+      });
+      if (present.length) {
+        out.push({ label: 'Удалить из альбома', icon: 'x', submenu: present.map(a => ({ label: a.name, onClick: () => removeFromAlbum(m, a.id) })) });
+      }
+    }
+    out.push({ label: 'Свойства', icon: 'info', onClick: () => setProps(m) });
+    out.push({ divider: true });
+    out.push({ label: 'Удалить', icon: 'trash', danger: true, disabled: !hasEntry, onClick: () => setConfirm(m) });
+    return out;
+  }
+
+  const overlay = (
+    <React.Fragment>
+      {menu && <ContextMenu x={menu.x} y={menu.y} items={buildItems(menu.media)} onClose={() => setMenu(null)} />}
+      {rename && <RenameModal title="Переименовать" label="Имя" initial={(rename.entryNames && rename.entryNames[0]) || rename.name}
+        onClose={() => setRename(null)} onSave={(name) => doRename(rename, name)} />}
+      {confirm && <ConfirmModal title="Удалить в корзину?" danger confirmLabel="Удалить"
+        message={`«${(confirm.entryNames && confirm.entryNames[0]) || confirm.name}» будет перемещён в корзину.`}
+        onClose={() => setConfirm(null)} onConfirm={() => doDelete(confirm)} />}
+      {props && <PropertiesModal fileId={props.id} fallback={props} onClose={() => setProps(null)} />}
+    </React.Fragment>
+  );
+
+  return { overlay, openMenu };
+}
+
+/* Бесконечная прокрутка галереи: cursor-пагинация /api/cloud/media + IntersectionObserver.
+   Возвращает накопленные items, индикаторы и sentinelRef для подвешивания в конец сетки. */
+function useInfiniteMedia(kind, toast) {
+  const [items, setItems] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+  const [done, setDone] = React.useState(false);
+  const cursorRef = React.useRef(null);   // { at, id } | null
+  const busyRef = React.useRef(false);
+  const doneRef = React.useRef(false);
+  const sentinelRef = React.useRef(null);
+
+  const loadMore = React.useCallback(async () => {
+    if (busyRef.current || doneRef.current) return;
+    busyRef.current = true; setLoading(true);
+    try {
+      const c = cursorRef.current;
+      let q = '/api/cloud/media?kind=' + encodeURIComponent(kind) + '&limit=60';
+      if (c) q += '&cursorAt=' + encodeURIComponent(c.at) + '&cursorId=' + encodeURIComponent(c.id);
+      const d = await apiGet(q);
+      const batch = d.items || [];
+      setItems(prev => c ? prev.concat(batch) : batch);
+      if (d.nextCursorAt) cursorRef.current = { at: d.nextCursorAt, id: d.nextCursorId };
+      else { cursorRef.current = null; doneRef.current = true; setDone(true); }
+    } catch (e) { toast && toast(e.message, 'err'); doneRef.current = true; setDone(true); }
+    finally { busyRef.current = false; setLoading(false); }
+  }, [kind, toast]);
+
+  React.useEffect(() => {
+    cursorRef.current = null; busyRef.current = false; doneRef.current = false;
+    setItems([]); setDone(false); setLoading(true);
+    loadMore();
+  }, [kind]);
+
+  React.useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver((entries) => { if (entries[0].isIntersecting) loadMore(); }, { rootMargin: '600px' });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [loadMore]);
+
+  const removeItem = React.useCallback((id) => setItems(prev => prev.filter(x => x.id !== id)), []);
+  const updateItem = React.useCallback((id, patch) => setItems(prev => prev.map(x => x.id === id ? { ...x, ...patch } : x)), []);
+  const reload = React.useCallback(() => {
+    cursorRef.current = null; busyRef.current = false; doneRef.current = false;
+    setItems([]); setDone(false); setLoading(true); loadMore();
+  }, [loadMore]);
+
+  return { items, loading, done, sentinelRef, removeItem, updateItem, reload };
 }
 
 /* Export to global scope */
@@ -593,5 +1016,7 @@ Object.assign(window, {
   api, apiGet, apiPost, pickFiles, uploadFile,
   MediaThumb, Lightbox, Modal, useToast, EmptyState, Loading,
   GRID_SIZES, plural, dateLabel, groupByDate,
-  AlbumCard, AlbumFormModal, PickMediaModal, AlbumDetail
+  AlbumCard, AlbumFormModal, PickMediaModal, AlbumDetail,
+  ContextMenu, useContextMenu, RenameModal, ConfirmModal, PropertiesModal,
+  useAlbumMembership, useMediaActions, useInfiniteMedia, kindRu, fmtFull
 });

@@ -41,6 +41,11 @@ service CloudApi {
   rpc RestoreFromTrash     (RestoreFromTrashRequest)     returns (CloudEmpty);               // Восстановить файл из корзины
   rpc DeleteFromTrash      (DeleteFromTrashRequest)      returns (CloudEmpty);               // Удалить файл из корзины навсегда (немедленно)
   rpc EmptyTrash           (EmptyTrashRequest)           returns (CloudEmpty);               // Очистить корзину целиком
+
+  // ───────── Избранное ─────────
+  rpc AddFavorite          (AddFavoriteRequest)          returns (CloudEmpty);               // Добавить файл в избранное
+  rpc RemoveFavorite       (RemoveFavoriteRequest)       returns (CloudEmpty);               // Убрать файл из избранного
+  rpc ListFavorites        (ListFavoritesRequest)        returns (ListFavoritesResponse);    // Все избранные файлы (от новых к старым)
 }
 
 service FilesServerApi {
@@ -262,6 +267,7 @@ message UserImageItem {
   UploadFileInfo file = 1;          // карточка по UploadFile
   int32 entries_count = 2;          // сколько копий записи у владельца
   repeated string entry_names = 3;  // имена в папках, до 5 шт.
+  repeated string entry_ids = 4;    // id записей каталога владельца (для rename/delete из галереи)
 }
 
 message ListUserImagesResponse {
@@ -318,6 +324,33 @@ message DeleteFromTrashRequest {
 }
 
 message EmptyTrashRequest {
+}
+
+// ============ Избранное ============
+
+message AddFavoriteRequest {
+  string file_id = 1; // Идентификатор реального UploadFile (фото / видео / документ)
+}
+
+message RemoveFavoriteRequest {
+  string file_id = 1;
+}
+
+message ListFavoritesRequest {
+  int32 limit = 1;                                    // 1..200, default 50
+  google.protobuf.Timestamp cursor_favorited_at = 2;  // exclusive; пусто = с самых свежих
+  string cursor_file_id = 3;                          // tie-breaker для стабильной cursor-пагинации
+}
+
+message FavoriteEntry {
+  UploadFileInfo file = 1;                    // полная информация о блобе (URL, размеры, превью)
+  google.protobuf.Timestamp favorited_at = 2; // когда файл добавлен в избранное
+}
+
+message ListFavoritesResponse {
+  repeated FavoriteEntry items = 1;
+  google.protobuf.Timestamp next_cursor_favorited_at = 2; // пусто = больше нет страниц
+  string next_cursor_file_id = 3;
 }
 
 message GetPathRequest {

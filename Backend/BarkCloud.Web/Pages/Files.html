@@ -245,16 +245,17 @@
 
 <script type="text/babel">
 const { AppShell, Icon, apiGet, apiPost, pickFiles, uploadFile,
-        MediaThumb, Lightbox, Modal, useToast, EmptyState, Loading } = window;
+        MediaThumb, Lightbox, Modal, useToast, EmptyState, Loading,
+        useContextMenu, ConfirmModal, PropertiesModal, useAlbumMembership } = window;
 
 const ruDate = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' });
 function fmtDate(iso) { return iso ? ruDate.format(new Date(iso)) : '—'; }
 function fmtFull(iso) { return iso ? new Date(iso).toLocaleString('ru-RU') : '—'; }
 function kindLabel(k) { return k === 'photo' ? 'фото' : k === 'video' ? 'видео' : k === 'audio' ? 'аудио' : k === 'document' ? 'документ' : 'файл'; }
 
-function DirRow({ dir, onOpen, onRename, onDelete }) {
+function DirRow({ dir, onOpen, onRename, onDelete, onMenu }) {
   return (
-    <tr onClick={() => onOpen(dir)}>
+    <tr onClick={() => onOpen(dir)} onContextMenu={(e) => onMenu(e, dir)}>
       <td className="name">
         <div className="file-icon folder">DIR</div>
         <div className="file-name-col"><div className="fn">{dir.name}</div><div className="meta">Папка</div></div>
@@ -271,10 +272,10 @@ function DirRow({ dir, onOpen, onRename, onDelete }) {
   );
 }
 
-function FileRow({ entry, selected, onSelect, onRename, onDelete, onDownload }) {
+function FileRow({ entry, selected, onSelect, onRename, onDelete, onDownload, onMenu }) {
   const m = entry.media || {};
   return (
-    <tr className={selected ? 'selected' : ''} onClick={() => onSelect(entry)}>
+    <tr className={selected ? 'selected' : ''} onClick={() => onSelect(entry)} onContextMenu={(e) => onMenu(e, entry)}>
       <td className="name">
         <div className={"file-icon " + (m.iconKind || 'doc')}>{m.ext || 'FILE'}</div>
         <div className="file-name-col"><div className="fn">{entry.name}</div><div className="meta">{kindLabel(m.kind)}</div></div>
@@ -344,7 +345,12 @@ function App() {
   const [creating, setCreating] = React.useState(false);
   const [renaming, setRenaming] = React.useState(null); // {isDir, target}
   const [name, setName] = React.useState('');
+  const [albums, setAlbums] = React.useState([]);
+  const [props, setProps] = React.useState(null);       // media для модалки «Свойства»
+  const [confirmDel, setConfirmDel] = React.useState(null); // { isDir, target }
   const [toastNode, toast] = useToast();
+  const { menu, openAt } = useContextMenu();
+  const membership = useAlbumMembership(albums);
 
   const currentDir = stack.length ? stack[stack.length - 1].id : '';
 
@@ -355,6 +361,13 @@ function App() {
       .catch(e => { toast(e.message, 'err'); setListing({ dirs: [], files: [] }); });
   }, [currentDir, toast]);
   React.useEffect(load, [load]);
+
+  const loadAlbums = React.useCallback(() => {
+    apiGet('/api/albums').then(d => setAlbums(d.albums || [])).catch(() => {});
+  }, []);
+  React.useEffect(() => { loadAlbums(); }, [loadAlbums]);
+  // Подгружаем членство в альбомах заранее — меню строится синхронно при ПКМ
+  React.useEffect(() => { membership.ensureLoaded(); }, [albums]);
 
   const openDir = (dir) => setStack(s => [...s, { id: dir.id, name: dir.name }]);
   const gotoIndex = (i) => setStack(s => s.slice(0, i + 1));   // i = -1 → корень
@@ -372,15 +385,15 @@ function App() {
       setRenaming(null); load(); toast('Переименовано');
     } catch (e) { toast(e.message, 'err'); }
   }
-  async function deleteDir(dir) {
-    if (!window.confirm(`Удалить папку «${dir.name}»? Файлы внутри попадут в корзину на 14 дней.`)) return;
-    try { await apiPost('/api/cloud/dir/delete', { id: dir.id }); load(); toast('Папка удалена, файлы в корзине'); }
-    catch (e) { toast(e.message, 'err'); }
-  }
-  async function deleteEntry(entry) {
-    if (!window.confirm(`Переместить «${entry.name}» в корзину? Через 14 дней файл удалится навсегда.`)) return;
-    try { await apiPost('/api/cloud/entry/delete', { entryId: entry.entryId }); load(); toast('Перемещено в корзину'); }
-    catch (e) { toast(e.message, 'err'); }
+  const requestDelete = (target, isDir) => setConfirmDel({ isDir, target });
+  async function doConfirmDelete() {
+    if (!confirmDel) return;
+    const { isDir, target } = confirmDel;
+    try {
+      if (isDir) { await apiPost('/api/cloud/dir/delete', { id: target.id }); toast('Папка удалена, файлы в корзине'); }
+      else { await apiPost('/api/cloud/entry/delete', { entryId: target.entryId }); toast('Перемещено в корзину'); }
+      setConfirmDel(null); load();
+    } catch (e) { toast(e.message, 'err'); }
   }
   async function download(entry) {
     try {
@@ -389,6 +402,53 @@ function App() {
       if (url) window.open(url, '_blank');
       else toast('Ссылка недоступна', 'err');
     } catch (e) { toast(e.message, 'err'); }
+  }
+  async function copyLink(fileId) {
+    try {
+      const d = await apiGet('/api/files/download?ids=' + encodeURIComponent(fileId));
+      const url = d.urls && d.urls[fileId];
+      if (!url) throw new Error('Ссылка недоступна');
+      await navigator.clipboard.writeText(url); toast('Ссылка скопирована (временная)');
+    } catch (e) { toast(e.message || 'Не удалось скопировать', 'err'); }
+  }
+  async function addToAlbum(fileId, albumId) {
+    try { await apiPost('/api/albums/items/add', { album: albumId, fileIds: [fileId] }); membership.addLocal(fileId, albumId); loadAlbums(); toast('Добавлено в альбом'); }
+    catch (e) { toast(e.message, 'err'); }
+  }
+  async function removeFromAlbum(fileId, albumId) {
+    try { await apiPost('/api/albums/items/remove', { album: albumId, fileIds: [fileId] }); membership.removeLocal(fileId, albumId); loadAlbums(); toast('Убрано из альбома'); }
+    catch (e) { toast(e.message, 'err'); }
+  }
+
+  function fileMenu(entry) {
+    const m = entry.media || {};
+    const isMedia = m.kind === 'photo' || m.kind === 'video';
+    const inAlbums = membership.of(entry.fileId);
+    const available = albums.filter(a => !inAlbums.has(a.id));
+    const present = albums.filter(a => inAlbums.has(a.id));
+    const out = [
+      { label: 'Копировать ссылку', icon: 'link', onClick: () => copyLink(entry.fileId) },
+      { label: 'Переименовать', icon: 'pencil', onClick: () => startRename(entry, false) },
+    ];
+    if (isMedia) {
+      out.push({
+        label: 'Добавить в альбом', icon: 'plus',
+        submenu: available.length ? available.map(a => ({ label: a.name, onClick: () => addToAlbum(entry.fileId, a.id) }))
+          : [{ label: albums.length ? 'Уже во всех альбомах' : 'Нет альбомов', disabled: true }]
+      });
+      if (present.length) out.push({ label: 'Удалить из альбома', icon: 'x', submenu: present.map(a => ({ label: a.name, onClick: () => removeFromAlbum(entry.fileId, a.id) })) });
+    }
+    out.push({ label: 'Свойства', icon: 'info', onClick: () => setProps(m) });
+    out.push({ divider: true });
+    out.push({ label: 'Удалить', icon: 'trash', danger: true, onClick: () => requestDelete(entry, false) });
+    return out;
+  }
+  function dirMenu(dir) {
+    return [
+      { label: 'Переименовать', icon: 'pencil', onClick: () => startRename(dir, true) },
+      { divider: true },
+      { label: 'Удалить', icon: 'trash', danger: true, onClick: () => requestDelete(dir, true) },
+    ];
   }
   async function doUpload() {
     const files = await pickFiles({});
@@ -461,10 +521,12 @@ function App() {
                   </tr></thead>
                   <tbody>
                     {dirs.map(d => <DirRow key={d.id} dir={d} onOpen={openDir}
-                      onRename={(t) => startRename(t, true)} onDelete={deleteDir}/>)}
+                      onRename={(t) => startRename(t, true)} onDelete={(t) => requestDelete(t, true)}
+                      onMenu={(ev, t) => openAt(ev, dirMenu(t))}/>)}
                     {files.map(e => <FileRow key={e.entryId} entry={e} selected={sel && sel.entryId === e.entryId}
                       onSelect={setSel} onDownload={download}
-                      onRename={(t) => startRename(t, false)} onDelete={deleteEntry}/>)}
+                      onRename={(t) => startRename(t, false)} onDelete={(t) => requestDelete(t, false)}
+                      onMenu={(ev, t) => openAt(ev, fileMenu(t))}/>)}
                   </tbody>
                 </table>}
           </div>
@@ -472,7 +534,7 @@ function App() {
 
         <aside className="files-inspector">
           <Inspector entry={sel} onOpen={setLightbox} onDownload={download}
-            onRename={(t) => startRename(t, false)} onDelete={deleteEntry}/>
+            onRename={(t) => startRename(t, false)} onDelete={(t) => requestDelete(t, false)}/>
         </aside>
       </div>
 
@@ -499,6 +561,16 @@ function App() {
             onKeyDown={e => { if (e.key === 'Enter') doRename(); }}/>
         </Modal>
       )}
+
+      {confirmDel && <ConfirmModal title={confirmDel.isDir ? 'Удалить папку?' : 'Удалить в корзину?'} danger confirmLabel="Удалить"
+        message={confirmDel.isDir
+          ? `Папка «${confirmDel.target.name}» и файлы внутри попадут в корзину (14 дней).`
+          : `«${confirmDel.target.name}» будет перемещён в корзину.`}
+        onClose={() => setConfirmDel(null)} onConfirm={doConfirmDelete}/>}
+
+      {props && <PropertiesModal fileId={props.id} fallback={props} onClose={() => setProps(null)}/>}
+
+      {menu}
 
       {lightbox && <Lightbox media={lightbox} onClose={() => setLightbox(null)}/>}
     </AppShell>

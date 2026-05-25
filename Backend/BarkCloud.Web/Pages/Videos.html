@@ -212,7 +212,10 @@
 <script type="text/babel">
 const { AppShell, Icon, apiGet, apiPost, pickFiles, uploadFile,
         MediaThumb, Lightbox, Modal, useToast, EmptyState, Loading,
-        plural, dateLabel, AlbumCard, AlbumFormModal, AlbumDetail } = window;
+        plural, dateLabel, AlbumCard, AlbumFormModal, AlbumDetail,
+        useInfiniteMedia, useMediaActions } = window;
+
+const RECENT_FOLDER = 'Недавно загруженные';
 
 function fmtSize(bytes) {
   if (!bytes) return '0 Б';
@@ -232,10 +235,10 @@ function resLabel(m) {
 }
 function shortDate(iso) { return iso ? dateLabel(new Date(iso)) : ''; }
 
-function VideoCard({ m, onOpen }) {
+function VideoCard({ m, onOpen, onMenu }) {
   const res = resLabel(m);
   return (
-    <div className="vcard" onClick={() => onOpen(m)}>
+    <div className="vcard" onClick={() => onOpen(m)} onContextMenu={(e) => onMenu(e, m)}>
       <div className="vthumb">
         <MediaThumb media={m} sizes="(max-width: 700px) 100vw, 320px"/>
         <button className="play"><Icon.play size={22}/></button>
@@ -252,46 +255,67 @@ function VideoCard({ m, onOpen }) {
 
 function App() {
   const [tab, setTab] = React.useState('videos');     // videos | albums
-  const [videos, setVideos] = React.useState(null);
   const [albums, setAlbums] = React.useState(null);
   const [openAlbum, setOpenAlbum] = React.useState(null);
-  const [lightbox, setLightbox] = React.useState(null);
+  const [lightbox, setLightbox] = React.useState(null); // индекс в videos | null
   const [creating, setCreating] = React.useState(false);
   const [upload, setUpload] = React.useState(null);
   const [toastNode, toast] = useToast();
 
-  const loadVideos = React.useCallback(() => {
-    apiGet('/api/cloud/media?kind=video')
-      .then(d => setVideos(d.items || []))
-      .catch(e => { toast(e.message, 'err'); setVideos([]); });
-  }, [toast]);
+  const { items: videos, loading, done, sentinelRef, removeItem, updateItem, reload } = useInfiniteMedia('video', toast);
+
   const loadAlbums = React.useCallback(() => {
     apiGet('/api/albums')
       .then(d => setAlbums(d.albums || []))
       .catch(e => { toast(e.message, 'err'); setAlbums([]); });
   }, [toast]);
 
-  React.useEffect(() => { loadVideos(); loadAlbums(); }, [loadVideos, loadAlbums]);
+  React.useEffect(() => { loadAlbums(); }, [loadAlbums]);
+
+  const actionsCtx = useMediaActions({
+    albums: albums || [], toast,
+    onRenamed: (m, name) => updateItem(m.id, { entryNames: [name, ...((m.entryNames || []).slice(1))] }),
+    onRemoved: (m) => removeItem(m.id),
+    reloadAlbums: loadAlbums
+  });
+
+  // Загруженные видео кладём в папку «Недавно загруженные» (создаётся при отсутствии) —
+  // чтобы появилась запись каталога и работали переименование/удаление в корзину.
+  async function ensureRecentFolder() {
+    const d = await apiGet('/api/cloud/list?dir=');
+    const found = (d.dirs || []).find(x => x.name === RECENT_FOLDER);
+    if (found) return found.id;
+    const created = await apiPost('/api/cloud/dir', { name: RECENT_FOLDER });
+    return created.id;
+  }
 
   async function doUpload() {
     const files = await pickFiles({ accept: 'video/*' });
     if (!files.length) return;
+    let folderId = null;
+    try { folderId = await ensureRecentFolder(); } catch (e) { /* без папки — видео всё равно попадёт в галерею */ }
     let done = 0;
     for (const f of files) {
       setUpload({ current: done + 1, total: files.length, pct: 0 });
-      try { await uploadFile(f, p => setUpload({ current: done + 1, total: files.length, pct: Math.round(p * 100) })); }
+      try {
+        const res = await uploadFile(f, p => setUpload({ current: done + 1, total: files.length, pct: Math.round(p * 100) }));
+        if (folderId && res && res.fileId) {
+          try { await apiPost('/api/cloud/attach', { dir: folderId, fileId: res.fileId, name: res.name || f.name }); }
+          catch (e) { /* attach best-effort */ }
+        }
+      }
       catch (e) { toast(`«${f.name}»: ${e.message}`, 'err'); }
       done++;
     }
     setUpload(null);
     toast(`Загружено: ${done} ${plural(done,'видео','видео','видео')}`);
-    loadVideos();
+    reload();
   }
 
-  const featured = videos && videos.length ? videos[0] : null;
-  const totalSize = videos ? videos.reduce((s, v) => s + (v.size || 0), 0) : 0;
+  const featured = videos.length ? videos[0] : null;
+  const totalSize = videos.reduce((s, v) => s + (v.size || 0), 0);
   const stats = [
-    { k: 'Всего видео', v: videos ? String(videos.length) : '—' },
+    { k: 'Всего видео', v: videos.length ? (videos.length + (done ? '' : '+')) : '—' },
     { k: 'Занято видео', v: fmtSize(totalSize) },
     { k: 'Альбомов', v: albums ? String(albums.length) : '—' },
   ];
@@ -311,6 +335,7 @@ function App() {
       actions={actions}
     >
       {toastNode}
+      {actionsCtx.overlay}
 
       {/* Stats */}
       <div className="stat-strip">
@@ -327,7 +352,7 @@ function App() {
         <div className="chip-row">
           <button className={"chip" + (tab==='videos'?' active':'')} onClick={() => { setTab('videos'); setOpenAlbum(null); }}>
             {tab==='videos' && <Icon.check size={16}/>} Все видео
-            {videos && <span className="count">{videos.length}</span>}
+            <span className="count">{videos.length}{done ? '' : '+'}</span>
           </button>
           <button className={"chip" + (tab==='albums'?' active':'')} onClick={() => setTab('albums')}>
             {tab==='albums' && <Icon.check size={16}/>} Альбомы
@@ -347,7 +372,7 @@ function App() {
       {/* ── Вкладка АЛЬБОМЫ ── */}
       {tab === 'albums' && (
         openAlbum
-          ? <AlbumDetail album={openAlbum} candidates={videos || []} toast={toast}
+          ? <AlbumDetail album={openAlbum} candidates={videos} toast={toast}
               onBack={() => setOpenAlbum(null)} onChanged={() => loadAlbums()}/>
           : albums === null ? <Loading/> :
             <div className="album-grid">
@@ -361,13 +386,13 @@ function App() {
 
       {/* ── Вкладка ВСЕ ВИДЕО ── */}
       {tab === 'videos' && (
-        videos === null ? <Loading/> :
+        (loading && videos.length === 0) ? <Loading/> :
         videos.length === 0
           ? <EmptyState icon="video" title="Пока нет видео" hint="Загрузите ролики — обложкой станет кадр из видео."
               action={<button className="btn primary" onClick={doUpload}><Icon.upload size={16}/> Загрузить видео</button>}/>
           : <>
               {featured && (
-                <div className="featured-vid" onClick={() => setLightbox(featured)}>
+                <div className="featured-vid" onClick={() => setLightbox(0)} onContextMenu={(e) => actionsCtx.openMenu(e, featured)}>
                   <MediaThumb media={featured} sizes="100vw"/>
                   <div className="overlay">
                     <div className="kicker">
@@ -392,14 +417,18 @@ function App() {
               </div>
 
               <div className="vid-grid">
-                {videos.map(m => <VideoCard key={m.id} m={m} onOpen={setLightbox}/>)}
+                {videos.map((m, idx) => <VideoCard key={m.id} m={m}
+                  onOpen={() => setLightbox(idx)} onMenu={actionsCtx.openMenu}/>)}
+              </div>
+              <div ref={sentinelRef} className="infinite-sentinel">
+                {loading && videos.length > 0 && <Loading label="Загрузка…"/>}
               </div>
             </>
       )}
 
       {creating && <AlbumFormModal onClose={() => setCreating(false)}
         onSaved={() => { setCreating(false); setTab('albums'); loadAlbums(); toast('Альбом создан'); }} toast={toast}/>}
-      {lightbox && <Lightbox media={lightbox} onClose={() => setLightbox(null)}/>}
+      {lightbox !== null && <Lightbox items={videos} index={lightbox} onClose={() => setLightbox(null)}/>}
     </AppShell>
   );
 }

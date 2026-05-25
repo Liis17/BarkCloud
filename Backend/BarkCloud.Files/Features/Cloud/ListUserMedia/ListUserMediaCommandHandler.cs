@@ -97,8 +97,8 @@ public class ListUserMediaCommandHandler : IRequestHandler<ListUserMediaCommand,
 
         var entries = await _context.CloudFileEntries
             .AsNoTracking()
-            .Where(e => e.OwnerId == ownerId && pageFileIds.Contains(e.FileId))
-            .Select(e => new { e.FileId, e.Name, e.CreatedAt })
+            .Where(e => e.OwnerId == ownerId && pageFileIds.Contains(e.FileId) && !e.IsDeleted)
+            .Select(e => new { e.Id, e.FileId, e.Name, e.CreatedAt })
             .ToListAsync(cancellationToken);
 
         var entriesByFileId = entries
@@ -111,6 +111,9 @@ public class ListUserMediaCommandHandler : IRequestHandler<ListUserMediaCommand,
                     Names = g.OrderByDescending(x => x.CreatedAt)
                             .Take(MaxEntryNames)
                             .Select(x => x.Name)
+                            .ToList(),
+                    Ids = g.OrderByDescending(x => x.CreatedAt)
+                            .Select(x => x.Id.ToString())
                             .ToList()
                 });
 
@@ -126,6 +129,7 @@ public class ListUserMediaCommandHandler : IRequestHandler<ListUserMediaCommand,
             {
                 item.EntriesCount = meta.Count;
                 item.EntryNames.AddRange(meta.Names);
+                item.EntryIds.AddRange(meta.Ids);
             }
 
             response.Items.Add(item);
