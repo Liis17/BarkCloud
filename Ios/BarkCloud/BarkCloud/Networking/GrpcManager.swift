@@ -2,28 +2,61 @@ import Foundation
 import GRPCCore
 import GRPCNIOTransportHTTP2
 
+/// Эндпоинты микросервисов. nginx терминирует TLS и маршрутизирует gRPC по портам
+/// (см. Backend/nginx/cloud.barkfluff.conf): Identity :7020, Users :7021, Files :7025.
 enum GrpcEndpoint {
-    static let identityHost = "cloud.barkfluff.com"
+    static let host = "cloud.barkfluff.com"
     static let identityPort = 7020
+    static let usersPort = 7021
+    static let filesPort = 7025
     static let useTLS = true
     static let allowSelfSigned = true
 }
 
+/// Управляет gRPC-клиентами ко всем сервисам. На каждый порт — один кэшированный
+/// `GRPCClient` (общий транспорт + интерсепторы), поверх которого создаются
+/// типизированные стабы. FilesApi / CloudApi / AlbumApi живут на одном порту (:7025)
+/// и делят общий клиент.
 actor GrpcManager {
-    typealias IdentityClient = Barkcloud_Identity_IdentityApi.Client<HTTP2ClientTransport.Posix>
+    typealias Transport = HTTP2ClientTransport.Posix
+    typealias IdentityClient = Barkcloud_Identity_IdentityApi.Client<Transport>
+    typealias UsersClient = Barkcloud_Users_UsersApi.Client<Transport>
+    typealias FilesClient = Barkcloud_Files_FilesApi.Client<Transport>
+    typealias CloudClient = Barkcloud_Files_CloudApi.Client<Transport>
+    typealias AlbumClient = Barkcloud_Files_AlbumApi.Client<Transport>
 
     private let tokenProvider: @Sendable () async -> String?
-    private var identity: (client: GRPCCore.GRPCClient<HTTP2ClientTransport.Posix>, stub: IdentityClient)?
-    private var runTask: Task<Void, Error>?
+    private var clients: [Int: GRPCClient<Transport>] = [:]
+    private var runTasks: [Int: Task<Void, Error>] = [:]
 
     init(tokenProvider: @escaping @Sendable () async -> String?) {
         self.tokenProvider = tokenProvider
     }
 
     func identityStub() async throws -> IdentityClient {
-        if let existing = identity { return existing.stub }
+        IdentityClient(wrapping: try await client(port: GrpcEndpoint.identityPort))
+    }
 
-        let transportSecurity: HTTP2ClientTransport.Posix.TransportSecurity
+    func usersStub() async throws -> UsersClient {
+        UsersClient(wrapping: try await client(port: GrpcEndpoint.usersPort))
+    }
+
+    func filesStub() async throws -> FilesClient {
+        FilesClient(wrapping: try await client(port: GrpcEndpoint.filesPort))
+    }
+
+    func cloudStub() async throws -> CloudClient {
+        CloudClient(wrapping: try await client(port: GrpcEndpoint.filesPort))
+    }
+
+    func albumStub() async throws -> AlbumClient {
+        AlbumClient(wrapping: try await client(port: GrpcEndpoint.filesPort))
+    }
+
+    private func client(port: Int) async throws -> GRPCClient<Transport> {
+        if let existing = clients[port] { return existing }
+
+        let transportSecurity: Transport.TransportSecurity
         if GrpcEndpoint.useTLS {
             transportSecurity = .tls { config in
                 if GrpcEndpoint.allowSelfSigned {
@@ -34,8 +67,8 @@ actor GrpcManager {
             transportSecurity = .plaintext
         }
 
-        let transport = try HTTP2ClientTransport.Posix(
-            target: .dns(host: GrpcEndpoint.identityHost, port: GrpcEndpoint.identityPort),
+        let transport = try Transport(
+            target: .dns(host: GrpcEndpoint.host, port: port),
             transportSecurity: transportSecurity
         )
 
@@ -47,20 +80,17 @@ actor GrpcManager {
             XIpInterceptor()
         ]
 
-        let client = GRPCCore.GRPCClient(transport: transport, interceptors: interceptors)
-        let stub = Barkcloud_Identity_IdentityApi.Client(wrapping: client)
-        identity = (client, stub)
-
-        runTask = Task { [client] in
+        let client = GRPCClient(transport: transport, interceptors: interceptors)
+        clients[port] = client
+        runTasks[port] = Task { [client] in
             try await client.runConnections()
         }
-
-        return stub
+        return client
     }
 
     func shutdown() async {
-        if let runTask { runTask.cancel() }
-        identity = nil
-        runTask = nil
+        for task in runTasks.values { task.cancel() }
+        runTasks.removeAll()
+        clients.removeAll()
     }
 }

@@ -1,27 +1,30 @@
 import Foundation
 import Observation
 
-/// Папка облачного хранилища (зеркалит `DirectoryInfo` из `files_api.proto`).
-struct ServerFolder: Identifiable, Hashable {
-    let id: String
-    let name: String
-}
-
-struct FilesRootUiState {
-    /// Пока `true` — список папок сервера рисуется скелетон-строками (.redacted).
-    var serverFoldersLoading: Bool = true
-    var serverFolders: [ServerFolder] = []
-}
-
 @MainActor
 @Observable
 final class FilesRootViewModel {
-    var state = FilesRootUiState()
+    struct UiState {
+        var isLoading = true
+        var folderCount = 0
+        var fileCount = 0
+        var failed = false
+    }
 
-    /// TODO: подключить `CloudApi.ListDirectory(root)` и сложить subdirs в
-    /// `state.serverFolders`, затем `serverFoldersLoading = false`.
-    /// Пока получение с сервера не реализовано — остаёмся в скелетон-режиме.
-    func loadServerFolders() async {
-        // no-op (server retrieval not implemented yet)
+    var state = UiState()
+    private var didLoad = false
+
+    /// Краткая сводка по корню облака (для подписи карточки-входа).
+    func loadSummary(cloud: CloudRepository) async {
+        guard !didLoad else { return }
+        didLoad = true
+        do {
+            let listing = try await cloud.listDirectory("")
+            state.folderCount = listing.subdirs.count
+            state.fileCount = listing.files.count
+        } catch {
+            state.failed = true
+        }
+        state.isLoading = false
     }
 }

@@ -1,12 +1,8 @@
 import SwiftUI
 
 struct FilesRootScreen: View {
+    @Environment(AppEnvironment.self) private var env
     @State private var vm = FilesRootViewModel()
-
-    /// Имена-плейсхолдеры разной длины для скелетон-строк (всегда под .redacted, не видны).
-    private static let skeletonFolderNames = [
-        "Документы", "Фотографии 2024", "Музыка", "Загрузки", "Проекты",
-    ]
 
     var body: some View {
         ScrollView {
@@ -35,55 +31,27 @@ struct FilesRootScreen: View {
             .padding(.vertical, 24)
         }
         .navigationTitle(String(localized: "files_root_title"))
-        .task { await vm.loadServerFolders() }
+        .task { await vm.loadSummary(cloud: env.cloudRepository) }
     }
 
     @ViewBuilder
     private var serverFolders: some View {
-        if vm.state.serverFoldersLoading {
-            // Скелетон-строки, пока получение с сервера не реализовано.
-            // verbatim-тексты под .redacted не отображаются — задают ширину плашек.
-            VStack(spacing: 8) {
-                ForEach(Self.skeletonFolderNames, id: \.self) { name in
-                    folderRow(name: name)
-                }
-            }
-            .redacted(reason: .placeholder)
-        } else if vm.state.serverFolders.isEmpty {
+        NavigationLink {
+            CloudBrowserScreen(directoryID: "", title: String(localized: "files_cloud_storage"))
+        } label: {
             cardRow(
-                iconName: "cloud.slash",
-                title: String(localized: "files_section_server"),
-                subtitle: String(localized: "files_server_empty")
+                iconName: "cloud",
+                title: String(localized: "files_cloud_storage"),
+                subtitle: cloudSubtitle
             )
-            .opacity(0.6)
-        } else {
-            VStack(spacing: 8) {
-                ForEach(vm.state.serverFolders) { folder in
-                    folderRow(name: folder.name)
-                }
-            }
         }
+        .buttonStyle(.plain)
     }
 
-    @ViewBuilder
-    private func folderRow(name: String) -> some View {
-        HStack(spacing: 16) {
-            Image(systemName: "folder")
-                .font(.system(size: 22))
-                .frame(width: 40, height: 40)
-                .foregroundStyle(AppColors.accent)
-                .background(AppColors.accent.opacity(0.12))
-                .clipShape(RoundedRectangle(cornerRadius: 10))
-            Text(verbatim: name)
-                .font(AppTypography.titleMedium)
-                .lineLimit(1)
-            Spacer()
-            Image(systemName: "chevron.right")
-                .foregroundStyle(AppColors.onSurfaceVariant)
-        }
-        .padding(16)
-        .background(AppColors.onSurface.opacity(0.04))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+    private var cloudSubtitle: String {
+        if vm.state.isLoading { return String(localized: "files_loading") }
+        if vm.state.failed { return String(localized: "files_server_empty") }
+        return FormatUtils.formatChildCount(vm.state.folderCount + vm.state.fileCount)
     }
 
     @ViewBuilder

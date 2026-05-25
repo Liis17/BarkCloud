@@ -1,11 +1,16 @@
 import SwiftUI
+import PhotosUI
 
 /// Сетка медиа в 3 столбика с квадратными ячейками. Используется вкладками
-/// Фото и Видео. Пока данные с сервера не реализованы — рисует скелетоны.
+/// Фото и Видео: загружает реальные данные через `CloudApi.ListUserMedia`
+/// (cursor-пагинация), показывает превью, открывает оригинал и грузит новые файлы.
 struct MediaGridScreen: View {
     let kind: MediaKind
 
-    @State private var vm: MediaGridViewModel
+    @Environment(AppEnvironment.self) private var env
+    @State private var vm: MediaGridViewModel?
+    @State private var pickerItems: [PhotosPickerItem] = []
+    @State private var selected: MediaItem?
 
     private static let columnCount = 3
     private static let spacing: CGFloat = 2
@@ -15,32 +20,52 @@ struct MediaGridScreen: View {
         count: columnCount
     )
 
-    init(kind: MediaKind) {
-        self.kind = kind
-        _vm = State(initialValue: MediaGridViewModel(kind: kind))
-    }
-
     var body: some View {
         Group {
-            if !vm.state.isPlaceholder && vm.state.items.isEmpty {
-                emptyState
+            if let vm {
+                content(vm)
             } else {
-                grid
+                ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .navigationTitle(String(localized: kind.titleKey))
-        .navigationBarTitleDisplayMode(.inline)
-        .task { await vm.load() }
+        .toolbar { uploadButton }
+        .task {
+            if vm == nil {
+                vm = MediaGridViewModel(kind: kind, cloud: env.cloudRepository)
+            }
+            await vm?.loadIfNeeded()
+        }
+        .onChange(of: pickerItems) { _, items in handlePick(items) }
+        .fullScreenCover(item: $selected) { item in viewer(item) }
     }
 
-    private var grid: some View {
+    @ViewBuilder
+    private func content(_ vm: MediaGridViewModel) -> some View {
+        if !vm.state.isPlaceholder && vm.state.items.isEmpty {
+            emptyState
+        } else {
+            grid(vm)
+        }
+    }
+
+    private func grid(_ vm: MediaGridViewModel) -> some View {
         ScrollView {
             LazyVGrid(columns: columns, spacing: Self.spacing) {
                 ForEach(vm.state.items) { item in
-                    MediaCell(item: item)
+                    MediaThumb(thumbnailURL: item.thumbnailURL, isVideo: item.isVideo)
+                        .onTapGesture {
+                            if !vm.state.isPlaceholder { selected = item }
+                        }
+                        .onAppear {
+                            Task { await vm.loadMoreIfNeeded(current: item) }
+                        }
                 }
             }
             .redacted(reason: vm.state.isPlaceholder ? .placeholder : [])
+
+            if vm.state.isLoadingMore {
+                ProgressView().padding()
+            }
         }
     }
 
@@ -57,36 +82,48 @@ struct MediaGridScreen: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding()
     }
-}
 
-/// Квадратная ячейка сетки: скелетон (серый прямоугольник) или превью.
-private struct MediaCell: View {
-    let item: MediaItem
+    @ToolbarContentBuilder
+    private var uploadButton: some ToolbarContent {
+        ToolbarItem(placement: .topBarTrailing) {
+            if vm?.state.isUploading == true {
+                ProgressView()
+            } else {
+                PhotosPicker(
+                    selection: $pickerItems,
+                    maxSelectionCount: 10,
+                    matching: kind.isVideo ? .videos : .images
+                ) {
+                    Image(systemName: "plus")
+                }
+            }
+        }
+    }
 
-    var body: some View {
-        RoundedRectangle(cornerRadius: 4)
-            .fill(AppColors.onSurface.opacity(0.08))
-            .aspectRatio(1, contentMode: .fit)
-            .overlay {
-                if let url = item.thumbnailURL {
-                    AsyncImage(url: url) { image in
-                        image.resizable().aspectRatio(contentMode: .fill)
-                    } placeholder: {
-                        Color.clear
+    private func viewer(_ item: MediaItem) -> some View {
+        NavigationStack {
+            RemoteFilePreviewScreen(fileID: item.id, fileName: item.fileName, transfer: env.fileTransfer)
+                .toolbar {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button(String(localized: "action_close")) { selected = nil }
                     }
-                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                }
+        }
+    }
+
+    private func handlePick(_ items: [PhotosPickerItem]) {
+        guard !items.isEmpty else { return }
+        Task {
+            var files: [(data: Data, fileName: String)] = []
+            for item in items {
+                if let data = try? await item.loadTransferable(type: Data.self) {
+                    let ext = item.supportedContentTypes.first?.preferredFilenameExtension
+                        ?? (kind.isVideo ? "mp4" : "jpg")
+                    files.append((data, "\(UUID().uuidString).\(ext)"))
                 }
             }
-            .overlay(alignment: .bottomTrailing) {
-                // Бейдж видео — только при реальных данных (под .placeholder скрыт).
-                if item.isVideo && item.thumbnailURL != nil {
-                    Image(systemName: "play.circle.fill")
-                        .font(.system(size: 18))
-                        .foregroundStyle(.white)
-                        .shadow(radius: 2)
-                        .padding(6)
-                }
-            }
-            .clipped()
+            pickerItems = []
+            await vm?.upload(files)
+        }
     }
 }
