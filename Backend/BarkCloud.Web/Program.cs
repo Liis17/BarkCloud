@@ -47,13 +47,17 @@ var identityAddress = builder.Configuration["IdentityService:Host"] ?? "http://c
 var usersAddress = builder.Configuration["UsersService:Host"] ?? $"http://cloud-users:{EnvPort("USERS_PORT", 7001)}";
 var filesAddress = builder.Configuration["FilesService:Host"] ?? $"http://cloud-files:{EnvPort("FILES_PORT", 7005)}";
 
+// Внутренний HTTP1-эндпоинт Files (тот же хост, что и gRPC, но порт Http1Port) для прокси-загрузки
+// байтов внутри docker-сети — минуя nginx/TLS и зависимость от ExternalEndpoint:Host.
+builder.Configuration["FilesService:Http1Base"] = $"http://{new Uri(filesAddress).Host}:{EnvPort("FILES_HTTP1PORT", 7026)}";
+
 builder.Services.AddGrpcClient<IdentityApi.IdentityApiClient>(o => o.Address = new Uri(identityAddress));
 builder.Services.AddGrpcClient<UsersApi.UsersApiClient>(o => o.Address = new Uri(usersAddress));
 builder.Services.AddGrpcClient<FilesApi.FilesApiClient>(o => o.Address = new Uri(filesAddress));
 builder.Services.AddGrpcClient<CloudApi.CloudApiClient>(o => o.Address = new Uri(filesAddress));
 builder.Services.AddGrpcClient<AlbumApi.AlbumApiClient>(o => o.Address = new Uri(filesAddress));
 
-// HttpClient для прокси-загрузки байтов в Files (адрес — публичный upload-URL из GetUploadUrl).
+// HttpClient для прокси-загрузки байтов в Files (на внутренний HTTP1-эндпоинт).
 builder.Services.AddHttpClient("files-upload");
 
 // Загрузка файлов до 512 МБ: снимаем дефолтные лимиты тела запроса и multipart-формы.

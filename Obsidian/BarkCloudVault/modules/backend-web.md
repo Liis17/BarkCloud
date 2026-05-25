@@ -80,7 +80,7 @@ Parent: [[index]] · See also: [[api/identity-api]] · [[api/users-api]] · [[ap
 - Каталоги (CloudApi): `GET cloud/list?dir=`, `POST cloud/dir`/`dir/rename`/`dir/move`/`dir/delete`, `POST cloud/attach`, `POST cloud/entry/rename`/`entry/move`/`entry/delete`.
 - Галерея (CloudApi): `GET cloud/media?kind=photo|video&limit=&cursorAt=&cursorId=` (`ListUserMedia`, cursor-пагинация).
 - Альбомы (AlbumApi): `GET albums`, `GET albums/items?album=&kind=`, `POST albums`/`albums/update`/`albums/delete`/`albums/items/add`/`albums/items/remove`.
-- Файлы (FilesApi): `POST files/upload` — **прокси-загрузка** (получает upload-URL через `GetUploadUrl`, стримит байты `HttpClient`-ом на публичный URL, возвращает `fileId`; без CORS на Files); `GET files/download?ids=` — временные ссылки на оригинал(ы) через `GetTempDownloadUrl`.
+- Файлы (FilesApi): `POST files/upload` — **прокси-загрузка**: `GetUploadUrl` → стрим байтов `HttpClient`-ом на **внутренний HTTP1-эндпоинт** Files `FilesService:Http1Base` (= хост из `FilesService:Host` + порт `FILES_HTTP1PORT`, по умолч. `7026`) `/upload/{fileId}` — минуя nginx/TLS и `ExternalEndpoint:Host`; публичный `upload.Url` — fallback. Возвращает `fileId`. `GET files/download?ids=` — временные ссылки на оригинал(ы) через `GetTempDownloadUrl`.
 
 UI: в сетке — превью (`<img srcset sizes>`, размер под блок и DPR), при открытии — оригинал (Lightbox через `files/download`).
 Загрузка фото идёт в галерею; на `/files` после загрузки файл привязывается к текущей папке (`cloud/attach`).
@@ -125,5 +125,5 @@ UI: в сетке — превью (`<img srcset sizes>`, размер под б
 
 - `Shared` (Общие) пока отдаётся с demo-fallback — нет RPC шаринга в Files API.
 - Длительность видео не приходит из Files API — в карточках видео показываются только разрешение (по `image_width/height`) и размер.
-- Загрузка проксируется через веб-сервер на публичный upload-URL из `GetUploadUrl`; если этот URL недоступен из контейнера web, понадобится конфиг внутреннего HTTP-базиса Files (`cloud-files:7026`).
+- Превью/оригиналы грузит **браузер** по абсолютным URL `{ExternalEndpoint:Host}/web/download/{id}` — этот ключ Files должен быть с правильной схемой/портом (`https://…:7025`), иначе превью отдадут nginx-ошибку. Загрузка байтов от этого ключа уже **не** зависит (идёт на внутренний `cloud-files:7026`).
 - 2FA-шаг переносит логин/пароль в скрытых полях формы — упрощение MVP, стоит заменить на короткоживущий pending-токен.
