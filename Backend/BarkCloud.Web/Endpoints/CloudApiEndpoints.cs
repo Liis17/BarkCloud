@@ -220,7 +220,8 @@ public static class CloudApiEndpoints
         // ───────────────────────── Файлы: загрузка / оригинал ─────────────────────────
 
         // Прокси-загрузка: получаем upload-URL у Files и стримим туда байты (same-origin, без CORS).
-        api.MapPost("/files/upload", async (HttpContext http, AuthGateway auth, FilesApi.FilesApiClient files, IHttpClientFactory httpFactory) =>
+        // Байты льём на ВНУТРЕННИЙ HTTP1-эндпоинт Files (минуя nginx/TLS); публичный upload.Url — fallback.
+        api.MapPost("/files/upload", async (HttpContext http, AuthGateway auth, FilesApi.FilesApiClient files, IHttpClientFactory httpFactory, IConfiguration config) =>
             await Guarded(http, auth, async token =>
             {
                 var form = await http.Request.ReadFormAsync();
@@ -230,6 +231,9 @@ public static class CloudApiEndpoints
 
                 var upload = await files.GetUploadUrlAsync(new GetUploadUrlRequest { FileType = UploadFileType.CloudFile }, token);
 
+                var http1Base = config["FilesService:Http1Base"];
+                var uploadUrl = string.IsNullOrEmpty(http1Base) ? upload.Url : $"{http1Base}/upload/{upload.FileId}";
+
                 using var content = new MultipartFormDataContent();
                 var part = new StreamContent(file.OpenReadStream());
                 part.Headers.ContentType = new MediaTypeHeaderValue(
@@ -237,7 +241,7 @@ public static class CloudApiEndpoints
                 content.Add(part, "file", file.FileName);
 
                 var client = httpFactory.CreateClient("files-upload");
-                using var resp = await client.PostAsync(upload.Url, content);
+                using var resp = await client.PostAsync(uploadUrl, content);
                 var responseBody = await resp.Content.ReadAsStringAsync();
 
                 if (!resp.IsSuccessStatusCode)
