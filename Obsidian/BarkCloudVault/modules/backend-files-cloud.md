@@ -10,6 +10,8 @@ NextCloud-подобная иерархия папок и файловых за�
 
 **Инвариант «одна директория на файл»**: блоб владельца может быть привязан максимум к одной директории. Гарантируется уникальным индексом `CloudFileEntries(OwnerId, FileId)` и проверкой в `AttachFile` (`FileAlreadyAttachedException`). Альбомы — отдельный слой many-to-many ([[modules/backend-files]]).
 
+**Корзина (soft-delete)**: удаление файла/папки не удаляет данные сразу, а помечает записи `CloudFileEntry` как `IsDeleted` с датами `DeletedAt`/`PurgeAt` (хранение 14 дней). Уникальные индексы — **частичные** (`WHERE IsDeleted = false`), поэтому запись в корзине не блокирует повторную загрузку файла/имени. Записи в корзине исключаются из иерархии, галереи и альбомов, но `Uploaders` сохраняются (квота не освобождается). Окончательная зачистка (БД + S3 + превью + альбомы) — `TrashPurgeService` + фоновый `TrashCleanupService` (раз в 6 ч). См. [[modules/backend-files]].
+
 ## Domain
 
 `Backend/BarkCloud.Files/Domain/`
@@ -28,15 +30,19 @@ NextCloud-подобная иерархия папок и файловых за�
 - `Guid FileId` — ссылка на реальный `UploadFile`
 - `string Name` — отображаемое имя записи (не меняет `UploadFile.Filename`)
 - `DateTime CreatedAt`
+- `bool IsDeleted` — запись в корзине (исключается из всех «живых» выборок и частичных уникальных индексов)
+- `DateTime? DeletedAt` — когда перемещена в корзину
+- `DateTime? PurgeAt` — когда будет удалена окончательно (`DeletedAt` + 14 дней)
 
 ## Persistence
 
 `Backend/BarkCloud.Files/Persistence/CloudHierarchyStorage.cs`:
 - Константа `RootDirectoryId = Guid.Empty` — синтетический корень для уникального индекса
-- Методы доступа к `CloudDirectories` и `CloudFileEntries` (`Get*`, `*AsNoTracking`, и др.)
+- Методы доступа к `CloudDirectories` и `CloudFileEntries` (`Get*`, `*AsNoTracking`, и др.). «Живые» выборки (`ListFilesInDirectory`, `GetFileEntriesInDirectories`, `FileEntryNameExists`, `FileEntryExistsForFile`) фильтруют `!IsDeleted`
+- Методы корзины: `GetTrashedEntry`, `ListTrashedPage`, `GetAllTrashedEntries`, `GetExpiredTrashedEntries` (для воркера), `GetEffectivelyTrashedFileIds` (для скрытия из галереи/альбомов)
 - Подключён к `FilesContext` (`CloudDirectories`, `CloudFileEntries` DbSet'ы)
 
-Миграция: `Persistence/Migrations/20260518174041_AddCloudDirectories.cs`.
+Миграции: `Persistence/Migrations/20260518174041_AddCloudDirectories.cs`; `20260525213058_AddTrashToCloudFileEntries.cs` (поля корзины + частичные уникальные индексы `WHERE IsDeleted = false` + индекс по `PurgeAt WHERE IsDeleted = true`).
 
 ## Host (gRPC)
 
@@ -61,13 +67,20 @@ NextCloud-подобная иерархия папок и файловых за�
 - `AttachFile` — привязать существующий `UploadFile` к папке (создаёт `CloudFileEntry`); отказывает, если файл уже привязан к директории владельца (`FileAlreadyAttachedException`)
 - `RenameFileEntry` — изменить отображаемое имя записи
 - `MoveFileEntry` — перенести в другую папку
-- `DeleteFileEntry` — удалить запись (не удаляет сам `UploadFile`, декремент `Uploaders` только если у владельца не осталось других копий)
+- `DeleteFileEntry` — **перемещает запись в корзину** (soft-delete: `IsDeleted/DeletedAt/PurgeAt`). `Uploaders`/квота сохраняются, блоб не трогается
+- `DeleteDirectory` — рекурсивно: файлы поддерева → в корзину, сами папки удаляются сразу (restore вернёт файлы в корень)
 
 > `CopyFileEntry` **удалён** в рамках инварианта «одна директория на файл».
 
+### Корзина
+- `ListTrash` — список записей в корзине (от свежеудалённых к старым); cursor-пагинация `(DeletedAt + entry_id)`; `TrashEntry` = `FileEntryInfo` + `UploadFileInfo` + `deleted_at`/`purge_at`
+- `RestoreFromTrash` — восстановить запись (в исходную папку или, если она удалена, в корень; конфликт имени разрешается суффиксом; отказ при нарушении инварианта одной директории)
+- `DeleteFromTrash` — удалить запись из корзины навсегда (немедленно) → `TrashPurgeService`
+- `EmptyTrash` — очистить корзину владельца целиком → `TrashPurgeService`
+
 ### Галерея
 - `ListUserImages` — **[deprecated]** все изображения пользователя; cursor-пагинация. Исключает превью-блобы. Заменён на `ListUserMedia`
-- `ListUserMedia` — медиа пользователя по `MediaKind` (PHOTO/VIDEO) от новых к старым; cursor-пагинация; исключает превью-блобы (`!FilePreviews.Any(p => p.PreviewFileId == f.Id)`)
+- `ListUserMedia` — медиа пользователя по `MediaKind` (PHOTO/VIDEO) от новых к старым; cursor-пагинация; исключает превью-блобы (`!FilePreviews.Any(p => p.PreviewFileId == f.Id)`) и «эффективно удалённые» файлы (все записи владельца в корзине)
 - `SetVideoThumbnail` — заменить превью видео загруженной картинкой (проверка владения, пересоздание `FilePreview` через `PreviewPersistenceService`)
 
 ### Навигация

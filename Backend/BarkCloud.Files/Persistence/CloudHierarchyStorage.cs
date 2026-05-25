@@ -126,18 +126,19 @@ public class CloudHierarchyStorage
     {
         return await _context.CloudFileEntries
             .AsNoTracking()
-            .AnyAsync(x => x.OwnerId == ownerId && x.DirectoryId == directoryId && x.Name == name, cancellationToken);
+            .AnyAsync(x => x.OwnerId == ownerId && x.DirectoryId == directoryId && x.Name == name && !x.IsDeleted, cancellationToken);
     }
 
     /// <summary>
-    /// Проверяет, есть ли у владельца уже запись для данного файла в любой директории.
+    /// Проверяет, есть ли у владельца уже живая запись для данного файла в любой директории.
     /// Гарантирует инвариант «один блоб владельца — максимум одна запись в иерархии».
+    /// Записи в корзине игнорируются: их можно вытеснить повторной загрузкой того же файла.
     /// </summary>
     public async Task<bool> FileEntryExistsForFile(long ownerId, Guid fileId, CancellationToken cancellationToken = default)
     {
         return await _context.CloudFileEntries
             .AsNoTracking()
-            .AnyAsync(x => x.OwnerId == ownerId && x.FileId == fileId, cancellationToken);
+            .AnyAsync(x => x.OwnerId == ownerId && x.FileId == fileId && !x.IsDeleted, cancellationToken);
     }
 
     public async Task<CloudFileEntry> AddFileEntry(CloudFileEntry entry, CancellationToken cancellationToken = default)
@@ -163,13 +164,14 @@ public class CloudHierarchyStorage
     {
         return await _context.CloudFileEntries
             .AsNoTracking()
-            .Where(x => x.OwnerId == ownerId && x.DirectoryId == directoryId)
+            .Where(x => x.OwnerId == ownerId && x.DirectoryId == directoryId && !x.IsDeleted)
             .OrderBy(x => x.Name)
             .ToListAsync(cancellationToken);
     }
 
     /// <summary>
-    /// Возвращает все CloudFileEntry, лежащие в любой из указанных директорий.
+    /// Возвращает все живые CloudFileEntry, лежащие в любой из указанных директорий
+    /// (записи в корзине исключаются — их не нужно перемещать в корзину повторно).
     /// </summary>
     public async Task<List<CloudFileEntry>> GetFileEntriesInDirectories(long ownerId, IReadOnlyCollection<Guid> directoryIds, CancellationToken cancellationToken = default)
     {
@@ -177,13 +179,96 @@ public class CloudHierarchyStorage
             return new List<CloudFileEntry>();
 
         return await _context.CloudFileEntries
-            .Where(x => x.OwnerId == ownerId && directoryIds.Contains(x.DirectoryId))
+            .Where(x => x.OwnerId == ownerId && directoryIds.Contains(x.DirectoryId) && !x.IsDeleted)
             .ToListAsync(cancellationToken);
     }
 
     public void RemoveFileEntries(IEnumerable<CloudFileEntry> entries)
     {
         _context.CloudFileEntries.RemoveRange(entries);
+    }
+
+    // ===== Корзина =====
+
+    /// <summary>
+    /// Трэш-запись (в корзине или нет) по идентификатору — для restore / purge.
+    /// </summary>
+    public async Task<CloudFileEntry?> GetTrashedEntry(Guid id, CancellationToken cancellationToken = default)
+    {
+        return await _context.CloudFileEntries
+            .FirstOrDefaultAsync(x => x.Id == id && x.IsDeleted, cancellationToken);
+    }
+
+    /// <summary>
+    /// Страница записей в корзине владельца, отсортированных по (DeletedAt desc, Id desc),
+    /// с cursor-пагинацией. Возвращает limit+1 элемент для определения наличия следующей страницы.
+    /// </summary>
+    public async Task<List<CloudFileEntry>> ListTrashedPage(
+        long ownerId, DateTime? cursorDeletedAt, Guid? cursorEntryId, int limit, CancellationToken cancellationToken = default)
+    {
+        var query = _context.CloudFileEntries
+            .AsNoTracking()
+            .Where(x => x.OwnerId == ownerId && x.IsDeleted);
+
+        if (cursorDeletedAt.HasValue && cursorEntryId.HasValue)
+        {
+            var cursorAt = DateTime.SpecifyKind(cursorDeletedAt.Value, DateTimeKind.Utc);
+            var cursorId = cursorEntryId.Value;
+            query = query.Where(x =>
+                x.DeletedAt < cursorAt
+                || (x.DeletedAt == cursorAt && x.Id.ToString().CompareTo(cursorId.ToString()) < 0));
+        }
+
+        return await query
+            .OrderByDescending(x => x.DeletedAt)
+            .ThenByDescending(x => x.Id)
+            .Take(limit + 1)
+            .ToListAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Все записи владельца в корзине (для «Очистить корзину»).
+    /// </summary>
+    public async Task<List<CloudFileEntry>> GetAllTrashedEntries(long ownerId, CancellationToken cancellationToken = default)
+    {
+        return await _context.CloudFileEntries
+            .Where(x => x.OwnerId == ownerId && x.IsDeleted)
+            .ToListAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Пачка просроченных записей корзины (PurgeAt в прошлом) — для фонового воркера.
+    /// </summary>
+    public async Task<List<CloudFileEntry>> GetExpiredTrashedEntries(DateTime now, int batchSize, CancellationToken cancellationToken = default)
+    {
+        return await _context.CloudFileEntries
+            .Where(x => x.IsDeleted && x.PurgeAt != null && x.PurgeAt <= now)
+            .OrderBy(x => x.PurgeAt)
+            .Take(batchSize)
+            .ToListAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Из набора <paramref name="fileIds"/> возвращает те, что для владельца «эффективно в корзине»:
+    /// есть запись в корзине и нет ни одной живой записи. Используется для скрытия таких файлов
+    /// из галереи и альбомов.
+    /// </summary>
+    public async Task<HashSet<Guid>> GetEffectivelyTrashedFileIds(long ownerId, IReadOnlyCollection<Guid> fileIds, CancellationToken cancellationToken = default)
+    {
+        if (fileIds.Count == 0)
+            return new HashSet<Guid>();
+
+        var states = await _context.CloudFileEntries
+            .AsNoTracking()
+            .Where(x => x.OwnerId == ownerId && fileIds.Contains(x.FileId))
+            .Select(x => new { x.FileId, x.IsDeleted })
+            .ToListAsync(cancellationToken);
+
+        return states
+            .GroupBy(x => x.FileId)
+            .Where(g => g.Any(x => x.IsDeleted) && g.All(x => x.IsDeleted))
+            .Select(g => g.Key)
+            .ToHashSet();
     }
 
     /// <summary>

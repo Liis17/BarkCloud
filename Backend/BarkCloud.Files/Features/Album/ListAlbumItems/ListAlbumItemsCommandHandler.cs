@@ -19,6 +19,7 @@ public class ListAlbumItemsCommandHandler : IRequestHandler<ListAlbumItemsComman
 
     private readonly AlbumStorage _storage;
     private readonly UploadedFilesStorage _filesStorage;
+    private readonly CloudHierarchyStorage _hierarchyStorage;
     private readonly UserContext _userContext;
     private readonly RunSettings _runSettings;
     private readonly IConfiguration _configuration;
@@ -27,6 +28,7 @@ public class ListAlbumItemsCommandHandler : IRequestHandler<ListAlbumItemsComman
     public ListAlbumItemsCommandHandler(
         AlbumStorage storage,
         UploadedFilesStorage filesStorage,
+        CloudHierarchyStorage hierarchyStorage,
         UserContext userContext,
         RunSettings runSettings,
         IConfiguration configuration,
@@ -34,6 +36,7 @@ public class ListAlbumItemsCommandHandler : IRequestHandler<ListAlbumItemsComman
     {
         _storage = storage;
         _filesStorage = filesStorage;
+        _hierarchyStorage = hierarchyStorage;
         _userContext = userContext;
         _runSettings = runSettings;
         _configuration = configuration;
@@ -64,12 +67,18 @@ public class ListAlbumItemsCommandHandler : IRequestHandler<ListAlbumItemsComman
         var fileIds = page.Select(x => x.FileId).Distinct().ToList();
         var files = (await _filesStorage.GetFiles(fileIds)).ToDictionary(f => f.Id);
         var previewsByFile = await _filesStorage.GetPreviewsForFiles(fileIds, cancellationToken);
+        // Файлы, находящиеся в корзине, не показываем в альбоме.
+        var trashedFileIds = await _hierarchyStorage.GetEffectivelyTrashedFileIds(ownerId, fileIds, cancellationToken);
         var baseUrl = FileUrlHelper.GetPublicBaseUrl(_configuration, _runSettings);
 
         foreach (var item in page)
         {
             // Пропускаем осиротевшие ссылки (файл удалён из облака).
             if (!files.TryGetValue(item.FileId, out var file))
+                continue;
+
+            // Пропускаем файлы в корзине.
+            if (trashedFileIds.Contains(item.FileId))
                 continue;
 
             // Опциональный фильтр по типу медиа.

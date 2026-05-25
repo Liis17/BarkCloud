@@ -102,6 +102,48 @@ public static class CloudApiEndpoints
                 return Results.Json(new { ok = true }, Json);
             }));
 
+        // ───────────────────────── Корзина ─────────────────────────
+
+        api.MapGet("/cloud/trash", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud,
+            int? limit, string? cursorAt, string? cursorId) =>
+            await Guarded(http, auth, async token =>
+            {
+                var req = new ListTrashRequest { Limit = limit is > 0 and <= 200 ? limit.Value : 60 };
+                if (DateTimeOffset.TryParse(cursorAt, out var dt))
+                    req.CursorDeletedAt = Timestamp.FromDateTimeOffset(dt.ToUniversalTime());
+                if (!string.IsNullOrEmpty(cursorId))
+                    req.CursorEntryId = cursorId;
+
+                var resp = await cloud.ListTrashAsync(req, token);
+                return Results.Json(new
+                {
+                    items = resp.Items.Select(CloudJson.Trash).ToArray(),
+                    nextCursorAt = resp.NextCursorDeletedAt?.ToDateTimeOffset(),
+                    nextCursorId = resp.NextCursorEntryId
+                }, Json);
+            }));
+
+        api.MapPost("/cloud/trash/restore", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud, EntryIdReq body) =>
+            await Guarded(http, auth, async token =>
+            {
+                await cloud.RestoreFromTrashAsync(new RestoreFromTrashRequest { EntryId = body.EntryId }, token);
+                return Results.Json(new { ok = true }, Json);
+            }));
+
+        api.MapPost("/cloud/trash/purge", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud, EntryIdReq body) =>
+            await Guarded(http, auth, async token =>
+            {
+                await cloud.DeleteFromTrashAsync(new DeleteFromTrashRequest { EntryId = body.EntryId }, token);
+                return Results.Json(new { ok = true }, Json);
+            }));
+
+        api.MapPost("/cloud/trash/empty", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud) =>
+            await Guarded(http, auth, async token =>
+            {
+                await cloud.EmptyTrashAsync(new EmptyTrashRequest(), token);
+                return Results.Json(new { ok = true }, Json);
+            }));
+
         // ───────────────────────── Галерея (фото / видео) ─────────────────────────
 
         api.MapGet("/cloud/media", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud,

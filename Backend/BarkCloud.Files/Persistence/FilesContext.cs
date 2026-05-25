@@ -44,11 +44,20 @@ public class FilesContext : DbContext
 
         modelBuilder.Entity<CloudFileEntry>(b =>
         {
-            // Уникальность имени файла-записи в рамках одной директории владельца
-            b.HasIndex(x => new { x.OwnerId, x.DirectoryId, x.Name }).IsUnique();
+            // Уникальность имени файла-записи в рамках одной директории владельца.
+            // Частичный индекс: записи в корзине (IsDeleted) исключаются, чтобы не блокировать
+            // повторную загрузку файла с тем же именем.
+            b.HasIndex(x => new { x.OwnerId, x.DirectoryId, x.Name })
+                .IsUnique()
+                .HasFilter("\"IsDeleted\" = false");
             b.HasIndex(x => new { x.OwnerId, x.DirectoryId });
-            // Инвариант «одна директория на файл»: у владельца не более одной записи на блоб.
-            b.HasIndex(x => new { x.OwnerId, x.FileId }).IsUnique();
+            // Инвариант «одна директория на файл»: у владельца не более одной живой записи на блоб.
+            b.HasIndex(x => new { x.OwnerId, x.FileId })
+                .IsUnique()
+                .HasFilter("\"IsDeleted\" = false");
+            // Скан фоновым воркером просроченных записей корзины.
+            b.HasIndex(x => x.PurgeAt)
+                .HasFilter("\"IsDeleted\" = true");
         });
 
         modelBuilder.Entity<FilePreview>(b =>

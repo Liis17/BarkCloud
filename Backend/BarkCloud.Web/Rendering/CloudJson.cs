@@ -77,6 +77,17 @@ public static class CloudJson
         media = e.File is null ? null : Media(e.File)
     };
 
+    /// <summary>Запись в корзине: метаданные + карточка файла + даты удаления/окончательной зачистки.</summary>
+    public static object Trash(TrashEntry e) => new
+    {
+        entryId = e.Entry.Id,
+        fileId = e.Entry.FileId,
+        name = e.Entry.Name,
+        deletedAt = Iso(e.DeletedAt),
+        purgeAt = Iso(e.PurgeAt),
+        media = e.File is null ? null : Media(e.File)
+    };
+
     private static string MediaKindName(MediaKind kind) => kind switch
     {
         MediaKind.Photo => "photo",

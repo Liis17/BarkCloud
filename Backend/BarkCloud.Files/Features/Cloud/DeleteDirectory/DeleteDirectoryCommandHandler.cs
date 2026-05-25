@@ -1,34 +1,32 @@
 using BarkCloud.Files.Persistence;
+using BarkCloud.Files.Services;
 using BarkCloud.GrpcServer.XAuth;
 using BarkCloud.Proto.Files;
 using BarkCloud.Shared.Exceptions.Files;
 
 using MediatR;
 
-using Microsoft.EntityFrameworkCore;
-
 using DirectoryNotFoundException = BarkCloud.Shared.Exceptions.Files.DirectoryNotFoundException;
 
 namespace BarkCloud.Files.Features.Cloud.DeleteDirectory;
 
+/// <summary>
+/// Удаляет папку рекурсивно: все файлы поддерева перемещаются в корзину (мягкое удаление,
+/// сохраняют владение/квоту и подлежат восстановлению), а сами папки удаляются сразу.
+/// Восстановление файла из удалённой папки вернёт его в корень владельца.
+/// </summary>
 public class DeleteDirectoryCommandHandler : IRequestHandler<DeleteDirectoryCommand, CloudEmpty>
 {
     private readonly CloudHierarchyStorage _storage;
-    private readonly UploadedFilesStorage _filesStorage;
-    private readonly FilesContext _context;
     private readonly UserContext _userContext;
     private readonly ILogger<DeleteDirectoryCommandHandler> _logger;
 
     public DeleteDirectoryCommandHandler(
         CloudHierarchyStorage storage,
-        UploadedFilesStorage filesStorage,
-        FilesContext context,
         UserContext userContext,
         ILogger<DeleteDirectoryCommandHandler> logger)
     {
         _storage = storage;
-        _filesStorage = filesStorage;
-        _context = context;
         _userContext = userContext;
         _logger = logger;
     }
@@ -47,50 +45,25 @@ public class DeleteDirectoryCommandHandler : IRequestHandler<DeleteDirectoryComm
         var subtree = await _storage.GetSubtree(ownerId, root.Id, cancellationToken);
         var subtreeIds = subtree.Select(d => d.Id).ToList();
 
-        // Все файлы-записи во всём поддереве
+        // Все живые файлы-записи во всём поддереве → в корзину.
         var entries = await _storage.GetFileEntriesInDirectories(ownerId, subtreeIds, cancellationToken);
 
-        // Декремент Uploaders для каждого затронутого UploadFile
-        var fileIds = entries.Select(e => e.FileId).Distinct().ToList();
-        if (fileIds.Count > 0)
+        var now = DateTime.UtcNow;
+        var purgeAt = now + TrashPurgeService.Retention;
+        foreach (var entry in entries)
         {
-            var uploadFiles = await _context.UploadedFiles
-                .Where(f => fileIds.Contains(f.Id))
-                .ToListAsync(cancellationToken);
-
-            foreach (var uf in uploadFiles)
-            {
-                // Один и тот же OwnerId хранится в Uploaders ровно один раз (см. AddUploaderToFile),
-                // поэтому даже если у нас несколько entry на один UploadFile — снимаем owner-а единожды.
-                uf.Uploaders.Remove(ownerId);
-            }
-
-            // Декремент и для превью-файлов, привязанных к удаляемым оригиналам.
-            var previewFileIds = await _context.FilePreviews
-                .AsNoTracking()
-                .Where(p => fileIds.Contains(p.OriginalFileId))
-                .Select(p => p.PreviewFileId)
-                .Distinct()
-                .ToListAsync(cancellationToken);
-
-            if (previewFileIds.Count > 0)
-            {
-                var previewFiles = await _context.UploadedFiles
-                    .Where(f => previewFileIds.Contains(f.Id))
-                    .ToListAsync(cancellationToken);
-
-                foreach (var pf in previewFiles)
-                    pf.Uploaders.Remove(ownerId);
-            }
+            entry.IsDeleted = true;
+            entry.DeletedAt = now;
+            entry.PurgeAt = purgeAt;
         }
 
-        _storage.RemoveFileEntries(entries);
+        // Папки удаляем сразу (структура не сохраняется; restore вернёт файлы в корень).
         _storage.RemoveDirectories(subtree);
 
         await _storage.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation(
-            "Удалена папка {DirectoryId} рекурсивно (директорий: {DirCount}, файлов: {FileCount}, Owner: {OwnerId})",
+            "Удалена папка {DirectoryId} рекурсивно (директорий: {DirCount}, файлов в корзину: {FileCount}, Owner: {OwnerId})",
             root.Id, subtree.Count, entries.Count, ownerId);
 
         return new CloudEmpty();

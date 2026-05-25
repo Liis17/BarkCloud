@@ -59,6 +59,9 @@ public class ListUserImagesCommandHandler : IRequestHandler<ListUserImagesComman
                         && f.Type == DomainUploadFileType.CloudFile
                         // Превью-блобы (PreviewFileId из FilePreviews) не должны протекать в галерею.
                         && !_context.FilePreviews.Any(p => p.PreviewFileId == f.Id)
+                        // «Эффективно удалённые» (все записи владельца в корзине) скрываем.
+                        && !(_context.CloudFileEntries.Any(e => e.OwnerId == ownerId && e.FileId == f.Id && e.IsDeleted)
+                             && !_context.CloudFileEntries.Any(e => e.OwnerId == ownerId && e.FileId == f.Id && !e.IsDeleted))
                         && (
                             (f.ImageWidth != null && f.ImageWidth > 0)
                             || (f.Filename != null && (

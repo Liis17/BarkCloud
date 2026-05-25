@@ -39,6 +39,12 @@ Package: `barkcloud.files`
 | `ListUserMedia(ListUserMediaRequest) → ListUserMediaResponse` | Медиа пользователя по типу (`kind` = PHOTO/VIDEO) от новых к старым; cursor-пагинация (`cursor_created_at` + `cursor_file_id`); фильтр по `MediaKind`, исключает превью-блобы |
 | `SetVideoThumbnail(SetVideoThumbnailRequest) → CloudEmpty` | Заменить превью видео загруженной картинкой (`video_file_id`, `source_image_file_id`); пересоздаёт `FilePreview` из источника |
 | `GetPath(GetPathRequest) → PathResponse` | Построить путь до объекта в иерархии |
+| `ListTrash(ListTrashRequest) → ListTrashResponse` | Список файлов в корзине (от свежеудалённых); cursor `(cursor_deleted_at + cursor_entry_id)`; `TrashEntry` содержит `entry`, `file`, `deleted_at`, `purge_at` |
+| `RestoreFromTrash(RestoreFromTrashRequest) → CloudEmpty` | Восстановить файл из корзины (в исходную папку либо в корень, если она удалена) |
+| `DeleteFromTrash(DeleteFromTrashRequest) → CloudEmpty` | Удалить файл из корзины навсегда (немедленно: БД + альбомы + осиротевший блоб из S3) |
+| `EmptyTrash(EmptyTrashRequest) → CloudEmpty` | Очистить корзину владельца целиком |
+
+> **Корзина**: `DeleteFileEntry`/`DeleteDirectory` теперь не удаляют сразу, а помечают записи как удалённые (`IsDeleted`, `DeletedAt`, `PurgeAt = DeletedAt + 14 дней`). Файлы в корзине скрыты из иерархии, галереи и альбомов, но сохраняют квоту. Окончательная зачистка — по `DeleteFromTrash`/`EmptyTrash` или фоновым `TrashCleanupService` (раз в 6 ч). Подробнее — [[modules/backend-files-cloud]].
 
 > **Инвариант «одна директория на файл»**: `CopyFileEntry` удалён, `AttachFile` отказывает (`FileAlreadyAttachedException`), если у владельца уже есть `CloudFileEntry` для этого `FileId`. Уникальный индекс `(OwnerId, FileId)`.
 

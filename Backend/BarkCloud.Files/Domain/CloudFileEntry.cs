@@ -32,4 +32,20 @@ public class CloudFileEntry
     public string Name { get; set; } = "";
 
     public DateTime CreatedAt { get; set; }
+
+    /// <summary>
+    /// Запись находится в корзине (мягко удалена). Такие записи исключаются из всех
+    /// «живых» выборок (иерархия, галерея, альбомы) и из частичных уникальных индексов.
+    /// </summary>
+    public bool IsDeleted { get; set; }
+
+    /// <summary>
+    /// Когда запись была перемещена в корзину (null, пока не удалена).
+    /// </summary>
+    public DateTime? DeletedAt { get; set; }
+
+    /// <summary>
+    /// Когда запись будет окончательно удалена фоновым воркером (DeletedAt + срок хранения).
+    /// </summary>
+    public DateTime? PurgeAt { get; set; }
 }

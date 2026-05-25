@@ -60,7 +60,9 @@ public class Program
         builder.Services.AddSingleton<VideoThumbnailExtractor>();
         builder.Services.AddScoped<PreviewPersistenceService>();
         builder.Services.AddScoped<AlbumViewBuilder>();
+        builder.Services.AddScoped<TrashPurgeService>();
         builder.Services.AddHostedService<TempFileCleanupService>();
+        builder.Services.AddHostedService<TrashCleanupService>();
 
         // Путь к бинарям ffmpeg/ffprobe в образе (см. Dockerfile). По умолчанию — /usr/local/bin.
         FFMpegCore.GlobalFFOptions.Configure(o =>

@@ -85,7 +85,7 @@ const NAV_SHARE = [
   {key:'starred', href:'/files', label:'Избранное', icon:'star'},
 ];
 const NAV_OTHER = [
-  {key:'trash', href:'/files', label:'Корзина', icon:'trash'},
+  {key:'trash', href:'/trash', label:'Корзина', icon:'trash'},
   {key:'settings', href:'/settings', label:'Настройки', icon:'settings'},
 ];
 

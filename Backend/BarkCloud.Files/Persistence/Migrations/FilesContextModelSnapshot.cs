@@ -129,11 +129,17 @@ namespace BarkCloud.Files.Persistence.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<Guid>("DirectoryId")
                         .HasColumnType("uuid");
 
                     b.Property<Guid>("FileId")
                         .HasColumnType("uuid");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -142,15 +148,23 @@ namespace BarkCloud.Files.Persistence.Migrations
                     b.Property<long>("OwnerId")
                         .HasColumnType("bigint");
 
+                    b.Property<DateTime?>("PurgeAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("PurgeAt")
+                        .HasFilter("\"IsDeleted\" = true");
 
                     b.HasIndex("OwnerId", "DirectoryId");
 
                     b.HasIndex("OwnerId", "FileId")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("\"IsDeleted\" = false");
 
                     b.HasIndex("OwnerId", "DirectoryId", "Name")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("\"IsDeleted\" = false");
 
                     b.ToTable("CloudFileEntries");
                 });
