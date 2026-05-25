@@ -125,5 +125,6 @@ UI: в сетке — превью (`<img srcset sizes>`, размер под б
 
 - `Shared` (Общие) пока отдаётся с demo-fallback — нет RPC шаринга в Files API.
 - Длительность видео не приходит из Files API — в карточках видео показываются только разрешение (по `image_width/height`) и размер.
-- Превью/оригиналы грузит **браузер** по абсолютным URL `{ExternalEndpoint:Host}/web/download/{id}` — этот ключ Files должен быть с правильной схемой/портом (`https://…:7025`), иначе превью отдадут nginx-ошибку. Загрузка байтов от этого ключа уже **не** зависит (идёт на внутренний `cloud-files:7026`).
+- Превью/оригиналы грузит **браузер** по абсолютным URL `{ExternalEndpoint:Host}/web/download/{id}` — ключ Files `ExternalEndpoint:Host` обязан быть `https://cloud.barkfluff.com:7025` (со схемой **https**), иначе на https-странице превью — mixed-content и блокируются браузером. Загрузка байтов от этого ключа уже **не** зависит (идёт на внутренний `cloud-files:7026`).
+- Аплоад большого файла: nginx-vhost фронта веб-клиента (`cloud.barkfluff.com:443` → cloud-web) должен иметь `client_max_body_size 512m;` (по умолчанию 1 МБ → `413`). Этот vhost — вне репозитория (`nginx/cloud.barkfluff.conf` покрывает только gRPC-порты 7020/7021/7025). На стороне .NET лимиты уже сняты в `Program.cs` (Kestrel `MaxRequestBodySize` + `FormOptions.MultipartBodyLengthLimit` = 512 МБ).
 - 2FA-шаг переносит логин/пароль в скрытых полях формы — упрощение MVP, стоит заменить на короткоживущий pending-токен.
