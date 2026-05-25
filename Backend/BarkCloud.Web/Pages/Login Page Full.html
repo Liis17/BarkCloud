@@ -19,7 +19,7 @@
     server.online       — boolean (JSON), влияет на индикатор
     form.email          — предзаполненный email (при ошибке / remember-me)
     form.attempts_left  — "3"
-    flash.kind          — "" | "error" | "2fa"  (определяет экран)
+    flash.kind          — "" | "error" | "2fa" | "register" | "register_confirm" | "forgot" | "forgot_confirm"  (определяет экран)
     sso.enabled         — boolean (JSON)
     year                — "2026"
   -->
@@ -569,7 +569,7 @@ function LoginCard({ state, showSSO }) {
         <div className="field">
           <div className="field-label">
             <span>Пароль</span>
-            <a className="hint" href="#">Забыли?</a>
+            <a className="hint" href="/forgot">Забыли?</a>
           </div>
           <div className="input-wrap has-icon">
             <input
@@ -622,7 +622,7 @@ function RegisterCard({ error }) {
         <div className="label">Регистрация в <span className="name">BarkCloud</span></div>
       </div>
       <h1>Создать<br/><span className="accent">аккаунт</span></h1>
-      <p className="sub">Личный сервер. Без подтверждений — сразу в облако.</p>
+      <p className="sub">Личный сервер. Подтвердите почту — и вы в облаке.</p>
 
       {error && (
         <div className="err-banner">
@@ -682,6 +682,105 @@ function RegisterCard({ error }) {
   );
 }
 
+function RegisterConfirmCard({ error }) {
+  return (
+    <div className={"glass" + (error ? " has-error" : "")}>
+      <a className="back-link" href="/register"><BackArrow/> Назад</a>
+      <div className="glass-header">
+        <div className="mark"><KeyIcon/></div>
+        <div className="label">Шаг 2 из 2 — <span className="name">Подтверждение</span></div>
+      </div>
+      <h1>Код<br/>из письма</h1>
+      <p className="sub">Мы отправили 6-значный код на {"{{ form.email }}"}.</p>
+
+      {error && (
+        <div className="err-banner">
+          <AlertIcon/>
+          <div style={{fontWeight:600}}>{error}</div>
+        </div>
+      )}
+
+      <form method="post" action="/register/confirm" style={{display:'flex',flexDirection:'column',gap:22}}>
+        <input type="hidden" name="code_id" defaultValue={"{{ form.code_id }}"}/>
+        <input type="hidden" name="email" defaultValue={"{{ form.email }}"}/>
+        <input type="hidden" name="password" defaultValue={"{{ form.password }}"}/>
+        <OtpRow/>
+        <button type="submit" className="btn-primary">Подтвердить <ArrowIcon/></button>
+      </form>
+      <p className="otp-resend">Не получили код? <a href="/register">Отправить снова</a></p>
+    </div>
+  );
+}
+
+function ForgotCard({ error }) {
+  return (
+    <div className={"glass" + (error ? " has-error" : "")}>
+      <a className="back-link" href="/login"><BackArrow/> Назад</a>
+      <div className="glass-header">
+        <div className="mark"><KeyIcon/></div>
+        <div className="label">Восстановление <span className="name">пароля</span></div>
+      </div>
+      <h1>Забыли<br/><span className="accent">пароль?</span></h1>
+      <p className="sub">Введите почту или логин — пришлём код для сброса.</p>
+
+      {error && (
+        <div className="err-banner">
+          <AlertIcon/>
+          <div style={{fontWeight:600}}>{error}</div>
+        </div>
+      )}
+
+      <form method="post" action="/forgot" style={{display:'flex',flexDirection:'column',gap:14}}>
+        <div className="field">
+          <div className="field-label"><span>Email или логин</span></div>
+          <div className="input-wrap">
+            <input type="text" name="login" placeholder="admin@local.net" defaultValue={"{{ form.login }}"} autoComplete="username"/>
+          </div>
+        </div>
+        <button type="submit" className="btn-primary">Отправить код <ArrowIcon/></button>
+      </form>
+    </div>
+  );
+}
+
+function ForgotConfirmCard({ error }) {
+  const [showPw, setShowPw] = React.useState(false);
+  return (
+    <div className={"glass" + (error ? " has-error" : "")}>
+      <a className="back-link" href="/forgot"><BackArrow/> Назад</a>
+      <div className="glass-header">
+        <div className="mark"><KeyIcon/></div>
+        <div className="label">Шаг 2 из 2 — <span className="name">Новый пароль</span></div>
+      </div>
+      <h1>Код и<br/>новый пароль</h1>
+      <p className="sub">Введите код из письма и придумайте новый пароль.</p>
+
+      {error && (
+        <div className="err-banner">
+          <AlertIcon/>
+          <div style={{fontWeight:600}}>{error}</div>
+        </div>
+      )}
+
+      <form method="post" action="/forgot/confirm" style={{display:'flex',flexDirection:'column',gap:18}}>
+        <input type="hidden" name="reset_id" defaultValue={"{{ form.reset_id }}"}/>
+        <input type="hidden" name="login" defaultValue={"{{ form.login }}"}/>
+        <OtpRow/>
+        <div className="field">
+          <div className="field-label"><span>Новый пароль</span></div>
+          <div className="input-wrap has-icon">
+            <input type={showPw ? "text" : "password"} name="password" placeholder="не короче 6 символов" autoComplete="new-password"/>
+            <button type="button" className="eye-btn" onClick={() => setShowPw(s => !s)} aria-label="Показать пароль">
+              <EyeIcon open={showPw}/>
+            </button>
+          </div>
+        </div>
+        <button type="submit" className="btn-primary">Сменить пароль <ArrowIcon/></button>
+      </form>
+    </div>
+  );
+}
+
 function App() {
   // Параметры экрана входа. На проде сервер может подставить
   // state = "error" | "2fa" | "register" | "default" и свой акцентный цвет.
@@ -725,10 +824,16 @@ function App() {
         {/* Main */}
         <main className="center-wrap">
           <div style={{display:'flex', flexDirection:'column', alignItems:'center'}}>
-            {t.state === 'register'
-              ? <RegisterCard error={'{{ form.error }}'}/>
-              : <LoginCard state={t.state} showSSO={t.showSSO}/>}
-            {t.state === 'register'
+            {(() => {
+              switch (t.state) {
+                case 'register':         return <RegisterCard error={'{{ form.error }}'}/>;
+                case 'register_confirm': return <RegisterConfirmCard error={'{{ form.error }}'}/>;
+                case 'forgot':           return <ForgotCard error={'{{ form.error }}'}/>;
+                case 'forgot_confirm':   return <ForgotConfirmCard error={'{{ form.error }}'}/>;
+                default:                 return <LoginCard state={t.state} showSSO={t.showSSO}/>;
+              }
+            })()}
+            {t.state === 'register' || t.state === 'register_confirm'
               ? <p className="below-card">Уже есть аккаунт? <a href="/login">Войти →</a></p>
               : <p className="below-card">Нет аккаунта? <a href="/register">Создать аккаунт →</a></p>}
           </div>

@@ -60,7 +60,7 @@ public static class WebEndpoints
             return Results.Redirect("/login");
         });
 
-        // ───────── Регистрация (без подтверждения по почте и 2FA) ─────────
+        // ───────── Регистрация (с подтверждением кодом по почте) ─────────
 
         app.MapGet("/register", async (HttpContext http, AuthGateway auth, PageService pages, IConfiguration config) =>
         {
@@ -71,6 +71,7 @@ public static class WebEndpoints
             return Results.Content(html, "text/html; charset=utf-8");
         });
 
+        // Шаг 1: создаёт черновик и отправляет код на почту → экран ввода кода.
         app.MapPost("/register", async (HttpContext http, RegistrationGateway registration, PageService pages, IConfiguration config) =>
         {
             var form = await http.Request.ReadFormAsync();
@@ -80,13 +81,85 @@ public static class WebEndpoints
             var email = form["email"].ToString();
             var password = form["password"].ToString();
 
-            var result = await registration.RegisterAsync(http, firstName, lastName, username, email, password);
+            var result = await registration.BeginAsync(http, firstName, lastName, username, email, password);
+
+            if (result.Outcome == RegistrationOutcome.PendingConfirmation)
+            {
+                var confirm = await pages.RenderAsync(LoginPage,
+                    RegisterConfirmVars(http, config, result.CodeId!, email, password, null));
+                return Results.Content(confirm, "text/html; charset=utf-8");
+            }
+
+            var html = await pages.RenderAsync(LoginPage,
+                RegisterVars(http, config, result.Message, firstName, lastName, username, email));
+            return Results.Content(html, "text/html; charset=utf-8");
+        });
+
+        // Шаг 2: проверяет код, ставит пароль и открывает сессию.
+        app.MapPost("/register/confirm", async (HttpContext http, RegistrationGateway registration, PageService pages, IConfiguration config) =>
+        {
+            var form = await http.Request.ReadFormAsync();
+            var codeId = form["code_id"].ToString();
+            var code = form["otp"].ToString();
+            var password = form["password"].ToString();
+            var email = form["email"].ToString();
+
+            var result = await registration.ConfirmAsync(http, codeId, code, password);
 
             if (result.Outcome == RegistrationOutcome.Success)
                 return Results.Redirect("/photos");
 
             var html = await pages.RenderAsync(LoginPage,
-                RegisterVars(http, config, result.Message, firstName, lastName, username, email));
+                RegisterConfirmVars(http, config, codeId, email, password, result.Message ?? "Не удалось подтвердить код."));
+            return Results.Content(html, "text/html; charset=utf-8");
+        });
+
+        // ───────── Восстановление пароля «Забыли пароль?» (код по почте) ─────────
+
+        app.MapGet("/forgot", async (HttpContext http, AuthGateway auth, PageService pages, IConfiguration config) =>
+        {
+            if (await auth.AuthenticateAsync(http) is not null)
+                return Results.Redirect("/photos");
+
+            var html = await pages.RenderAsync(LoginPage, ForgotVars(http, config, null, ""));
+            return Results.Content(html, "text/html; charset=utf-8");
+        });
+
+        // Шаг 1: отправляет код сброса на почту → экран ввода кода и нового пароля.
+        app.MapPost("/forgot", async (HttpContext http, PasswordResetGateway reset, PageService pages, IConfiguration config) =>
+        {
+            var form = await http.Request.ReadFormAsync();
+            var login = form["login"].ToString();
+
+            var result = await reset.BeginAsync(http, login);
+
+            if (result.Outcome == PasswordResetOutcome.PendingConfirmation)
+            {
+                var confirm = await pages.RenderAsync(LoginPage,
+                    ForgotConfirmVars(http, config, result.ResetId!, login, null));
+                return Results.Content(confirm, "text/html; charset=utf-8");
+            }
+
+            var html = await pages.RenderAsync(LoginPage, ForgotVars(http, config, result.Message, login));
+            return Results.Content(html, "text/html; charset=utf-8");
+        });
+
+        // Шаг 2: проверяет код, ставит новый пароль и открывает сессию.
+        app.MapPost("/forgot/confirm", async (HttpContext http, PasswordResetGateway reset, PageService pages, IConfiguration config) =>
+        {
+            var form = await http.Request.ReadFormAsync();
+            var resetId = form["reset_id"].ToString();
+            var code = form["otp"].ToString();
+            var password = form["password"].ToString();
+            var login = form["login"].ToString();
+
+            var result = await reset.ConfirmAsync(http, resetId, code, password);
+
+            if (result.Outcome == PasswordResetOutcome.Success)
+                return Results.Redirect("/photos");
+
+            var html = await pages.RenderAsync(LoginPage,
+                ForgotConfirmVars(http, config, resetId, login, result.Message ?? "Не удалось подтвердить код."));
             return Results.Content(html, "text/html; charset=utf-8");
         });
 
@@ -175,6 +248,48 @@ public static class WebEndpoints
             ["form.last_name"] = lastName,
             ["form.username"] = username,
             ["form.email"] = email,
+            ["year"] = DateTime.UtcNow.Year.ToString()
+        };
+
+    private static Dictionary<string, string?> RegisterConfirmVars(
+        HttpContext http, IConfiguration config, string codeId, string email, string password, string? error)
+        => new()
+        {
+            ["app.version"] = config.Value("App:Version", "v1.0.0"),
+            ["server.host"] = config.Value("App:PublicHost", http.Request.Host.Value),
+            ["server.tls"] = config.Value("App:TlsLabel", "TLS 1.3"),
+            ["flash.kind"] = "register_confirm",
+            ["form.error"] = error ?? "",
+            ["form.code_id"] = codeId,
+            ["form.email"] = email,
+            ["form.password"] = password,
+            ["year"] = DateTime.UtcNow.Year.ToString()
+        };
+
+    private static Dictionary<string, string?> ForgotVars(
+        HttpContext http, IConfiguration config, string? error, string login)
+        => new()
+        {
+            ["app.version"] = config.Value("App:Version", "v1.0.0"),
+            ["server.host"] = config.Value("App:PublicHost", http.Request.Host.Value),
+            ["server.tls"] = config.Value("App:TlsLabel", "TLS 1.3"),
+            ["flash.kind"] = "forgot",
+            ["form.error"] = error ?? "",
+            ["form.login"] = login,
+            ["year"] = DateTime.UtcNow.Year.ToString()
+        };
+
+    private static Dictionary<string, string?> ForgotConfirmVars(
+        HttpContext http, IConfiguration config, string resetId, string login, string? error)
+        => new()
+        {
+            ["app.version"] = config.Value("App:Version", "v1.0.0"),
+            ["server.host"] = config.Value("App:PublicHost", http.Request.Host.Value),
+            ["server.tls"] = config.Value("App:TlsLabel", "TLS 1.3"),
+            ["flash.kind"] = "forgot_confirm",
+            ["form.error"] = error ?? "",
+            ["form.reset_id"] = resetId,
+            ["form.login"] = login,
             ["year"] = DateTime.UtcNow.Year.ToString()
         };
 }

@@ -24,10 +24,25 @@ public sealed record LoginResult(LoginOutcome Outcome, string? Message = null);
 public enum RegistrationOutcome
 {
     Success,
+    PendingConfirmation,
     UsernameTaken,
     EmailTaken,
     ValidationError,
+    CodeInvalid,
+    CodeExpired,
     Error
 }
 
-public sealed record RegistrationResult(RegistrationOutcome Outcome, string? Message = null);
+public sealed record RegistrationResult(RegistrationOutcome Outcome, string? Message = null, string? CodeId = null);
+
+public enum PasswordResetOutcome
+{
+    Success,
+    PendingConfirmation,
+    ValidationError,
+    CodeInvalid,
+    CodeExpired,
+    Error
+}
+
+public sealed record PasswordResetResult(PasswordResetOutcome Outcome, string? Message = null, string? ResetId = null);

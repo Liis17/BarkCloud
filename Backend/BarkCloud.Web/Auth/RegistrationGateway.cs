@@ -7,17 +7,22 @@ using Grpc.Core;
 namespace BarkCloud.Web.Auth;
 
 /// <summary>
-/// Регистрация веб-пользователя без подтверждения по почте и без 2FA.
-/// Собирает подтверждённый аккаунт через серверные (inter-service) API и сразу
-/// открывает сессию: AddDraftUser → ConfirmUser → ForceSetPasswordServer → CreateSessionForUserServer.
-/// Вызовы авторизуются сервисным токеном (см. <see cref="ServiceToken"/>).
+/// Регистрация веб-пользователя с подтверждением по почте — через клиентский Identity API,
+/// тем же flow, что и мобильные клиенты:
+/// CreateAccount (код на почту) → ConfirmAccount → CreateToken → SetPassword → сессия.
+/// Двухшаговый процесс: <see cref="BeginAsync"/> отправляет код, <see cref="ConfirmAsync"/> подтверждает.
 /// </summary>
 public sealed class RegistrationGateway
 {
     private const int MinPasswordLength = 6;
 
+    // x-error-code из трейлеров gRPC (см. *Exception в Shared.Exceptions.Identity)
+    private const string ErrCodeIncorrect = "4396D597-D605-4040-AF0F-D9168F0CA034";
+    private const string ErrCodeExpired = "7AABF347-1210-4B14-A93B-2BA8574D74E7";
+    private const string ErrCodeNotFound = "56D9BB63-DA40-40DE-9C56-7487A1A437D0";
+
     private readonly UsersServerApi.UsersServerApiClient _users;
-    private readonly IdentityServerApi.IdentityServerApiClient _identity;
+    private readonly IdentityApi.IdentityApiClient _identity;
     private readonly AuthGateway _auth;
     private readonly string _appName;
     private readonly string _appVersion;
@@ -25,7 +30,7 @@ public sealed class RegistrationGateway
 
     public RegistrationGateway(
         UsersServerApi.UsersServerApiClient users,
-        IdentityServerApi.IdentityServerApiClient identity,
+        IdentityApi.IdentityApiClient identity,
         AuthGateway auth,
         IConfiguration configuration,
         ILogger<RegistrationGateway> logger)
@@ -38,7 +43,8 @@ public sealed class RegistrationGateway
         _logger = logger;
     }
 
-    public async Task<RegistrationResult> RegisterAsync(
+    /// <summary>Шаг 1: валидация, проверка занятости и отправка кода подтверждения на почту.</summary>
+    public async Task<RegistrationResult> BeginAsync(
         HttpContext http, string firstName, string lastName, string username, string email, string password)
     {
         username = username.Trim();
@@ -59,56 +65,81 @@ public sealed class RegistrationGateway
             if ((await _users.CheckExistEmailAsync(new CheckExistEmailRequest { Email = email })).Exist)
                 return new RegistrationResult(RegistrationOutcome.EmailTaken, "Аккаунт с такой почтой уже существует.");
 
-            var draft = new AddDraftUserRequest
+            var device = BrowserContext.BuildDeviceInfo(http, _auth.GetOrCreateDeviceId(http), _appName, _appVersion);
+
+            var response = await _identity.CreateAccountAsync(new CreateAccountRequest
             {
                 FirstName = firstName.Trim(),
                 LastName = lastName.Trim(),
                 Username = username,
                 Email = email
-            };
+            }, device.ToMetadata());
 
-            long userId;
+            _logger.LogInformation(
+                "Код подтверждения отправлен для регистрации {Username}, CodeId {CodeId}", username, response.CodeId);
+
+            return new RegistrationResult(RegistrationOutcome.PendingConfirmation, CodeId: response.CodeId);
+        }
+        catch (RpcException ex)
+        {
+            _logger.LogWarning("Регистрация (шаг 1) не выполнена: {Status} {Detail}", ex.StatusCode, ex.Status.Detail);
+            return new RegistrationResult(RegistrationOutcome.Error, Friendly(ex, "Не удалось создать аккаунт. Попробуйте позже."));
+        }
+    }
+
+    /// <summary>Шаг 2: проверяет код, открывает сессию и устанавливает пароль.</summary>
+    public async Task<RegistrationResult> ConfirmAsync(HttpContext http, string codeId, string code, string password)
+    {
+        if (string.IsNullOrWhiteSpace(code))
+            return new RegistrationResult(RegistrationOutcome.CodeInvalid, "Введите код из письма.", CodeId: codeId);
+
+        var device = BrowserContext.BuildDeviceInfo(http, _auth.GetOrCreateDeviceId(http), _appName, _appVersion);
+
+        try
+        {
+            var confirmed = await _identity.ConfirmAccountAsync(new ConfirmAccountRequest
+            {
+                CodeId = codeId,
+                CodeValue = code.Trim()
+            }, device.ToMetadata());
+
+            // ConfirmAccount возвращает только refresh — получаем access для SetPassword.
+            var tokenResponse = await _identity.CreateTokenAsync(new CreateTokenRequest
+            {
+                RefreshToken = confirmed.RefreshToken.Value
+            });
+            var access = tokenResponse.AccessToken;
+
             try
             {
-                userId = (await _users.AddDraftUserAsync(draft)).UserId;
+                await _identity.SetPasswordAsync(new SetPasswordRequest { Password = password, OldPassword = "" },
+                    BrowserContext.UserToken(access.Value));
             }
             catch (RpcException ex)
             {
-                // черновик мог остаться от незавершённой попытки — переопределяем его данные
-                _logger.LogInformation("AddDraftUser не прошёл ({Status}), пробую OverrideDraftUser", ex.StatusCode);
-                userId = (await _users.OverrideDraftUserAsync(draft)).UserId;
+                // Пользователь уже зарегистрирован и залогинен; пароль можно задать позже в настройках.
+                _logger.LogWarning(
+                    "Не удалось установить пароль при регистрации: {Status} {Detail}", ex.StatusCode, ex.Status.Detail);
             }
 
-            await _users.ConfirmUserAsync(new ConfirmUserRequest { UserId = userId });
+            _auth.IssueSession(http, access, confirmed.RefreshToken, persistent: true);
 
-            await _identity.ForceSetPasswordServerAsync(new ForceSetPasswordServerRequest
-            {
-                UserId = userId,
-                NewPassword = password
-            });
-
-            var deviceId = _auth.GetOrCreateDeviceId(http);
-            var device = BrowserContext.BuildDeviceInfo(http, deviceId, _appName, _appVersion);
-
-            var session = await _identity.CreateSessionForUserServerAsync(new CreateSessionForUserServerRequest
-            {
-                UserId = userId,
-                DeviceId = deviceId,
-                DeviceName = device.DeviceName,
-                OperationSystem = device.Os,
-                AppName = $"{device.AppName} v.{device.AppVersion}",
-                IpAddress = device.Ip
-            });
-
-            _auth.IssueSession(http, session.AccessToken, session.RefreshToken, persistent: true);
-
-            _logger.LogInformation("Зарегистрирован пользователь {UserId} ({Username})", userId, username);
+            _logger.LogInformation("Регистрация подтверждена, сессия открыта (CodeId {CodeId})", codeId);
             return new RegistrationResult(RegistrationOutcome.Success);
         }
         catch (RpcException ex)
         {
-            _logger.LogWarning("Регистрация не выполнена: {Status} {Detail}", ex.StatusCode, ex.Status.Detail);
-            return new RegistrationResult(RegistrationOutcome.Error, "Не удалось создать аккаунт. Попробуйте позже.");
+            var outcome = ex.Trailers.GetValue("x-error-code") switch
+            {
+                ErrCodeIncorrect => RegistrationOutcome.CodeInvalid,
+                ErrCodeExpired or ErrCodeNotFound => RegistrationOutcome.CodeExpired,
+                _ => RegistrationOutcome.Error
+            };
+            _logger.LogWarning("Подтверждение регистрации не выполнено: {Status} {Detail}", ex.StatusCode, ex.Status.Detail);
+            return new RegistrationResult(outcome, Friendly(ex, "Не удалось подтвердить код."), CodeId: codeId);
         }
     }
+
+    private static string Friendly(RpcException ex, string fallback)
+        => string.IsNullOrWhiteSpace(ex.Status.Detail) ? fallback : ex.Status.Detail;
 }
