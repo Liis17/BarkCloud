@@ -347,6 +347,11 @@
     .sys-toast { position:fixed; left:50%; bottom:32px; transform:translateX(-50%); display:flex; align-items:center; gap:10px; padding:14px 20px; border-radius:var(--r-md); font-size:14px; font-weight:500; z-index:1200; box-shadow:0 4px 16px rgba(0,0,0,.2); max-width:520px; }
     .sys-toast.ok { background:var(--md-success-container); color:var(--md-on-success-container); }
     .sys-toast.err { background:var(--md-error-container); color:var(--md-on-error-container); }
+
+    .sys-banner { display:flex; align-items:flex-start; gap:10px; padding:12px 16px; border-radius:var(--r-md); font-size:13px; margin-bottom:16px; }
+    .sys-banner.err { background:var(--md-error-container); color:var(--md-on-error-container); }
+    .sys-section-label { font-size:11px; letter-spacing:.5px; text-transform:uppercase; font-weight:600; color:var(--md-on-surface-variant); margin:4px 0 8px; }
+    .sys-note { font-size:13px; color:var(--md-on-surface-variant); margin:6px 0 12px; line-height:1.5; }
   </style>
 </head>
 <body>
@@ -526,6 +531,7 @@ function SystemSection() {
   const [unlockErr, setUnlockErr] = React.useState('');
   const [unlocking, setUnlocking] = React.useState(false);
   const [services, setServices] = React.useState(null); // null = идёт загрузка
+  const [dockerErr, setDockerErr] = React.useState(null);
   const [busy, setBusy] = React.useState({});
   const [toast, setToast] = React.useState(null);
   const [progress, setProgress] = React.useState(null);
@@ -536,9 +542,16 @@ function SystemSection() {
   const loadServices = React.useCallback(async () => {
     try {
       const r = await fetch('/api/system/services', { credentials: 'same-origin', cache: 'no-cache' });
-      if (r.ok) setServices(await r.json());
-      else { if (r.status === 403) setUnlocked(false); setServices([]); }
-    } catch (e) { setServices([]); }
+      if (r.ok) {
+        const snap = await r.json();
+        setServices(snap.services || []);
+        setDockerErr(snap.dockerOk ? null : (snap.error || 'Docker недоступен'));
+      } else if (r.status === 403) {
+        setUnlocked(false);
+      } else {
+        setServices([]); setDockerErr(`Сервер ответил ${r.status}`);
+      }
+    } catch (e) { setServices([]); setDockerErr(String(e)); }
   }, []);
 
   React.useEffect(() => { if (unlocked) { setServices(null); loadServices(); } }, [unlocked, loadServices]);
@@ -621,39 +634,60 @@ function SystemSection() {
       <span className="spin"/> Загрузка состояния сервисов…
     </div>;
   } else {
-    body = <>
-      <div className="svc-list">
-        {services.map(s => {
-          const isBusy = !!busy[s.service];
-          const running = s.state === 'running';
-          return (
-            <div key={s.service} className="svc-row">
-              <div className="svc-main">
-                <div className="svc-ic"><Icon.server size={20}/></div>
-                <div className="svc-info">
-                  <div className="svc-name">{SVC_LABELS[s.service] || s.service} <SvcStatus state={s.state}/></div>
-                  {s.image && <div className="svc-img" title={s.image}>{s.image}</div>}
-                </div>
-              </div>
-              <div className="svc-actions">
-                {isBusy ? <span className="spin" style={{ margin: '0 11px' }}/> : <>
-                  <button className="iconb" title="Обновить"
-                    onClick={() => s.isWeb ? webSelf('update') : svcAction(s.service, 'update')}><Icon.download size={20}/></button>
-                  <button className="iconb" title="Перезапустить"
-                    onClick={() => s.isWeb ? webSelf('restart') : svcAction(s.service, 'restart')}><Icon.refresh size={20}/></button>
-                  {!s.isWeb && (running
-                    ? <button className="iconb" title="Остановить" onClick={() => svcAction(s.service, 'stop')}><Icon.power size={20}/></button>
-                    : <button className="iconb" title="Запустить" onClick={() => svcAction(s.service, 'start')}><Icon.play size={20}/></button>)}
-                </>}
-              </div>
-            </div>
-          );
-        })}
+    const micros = services.filter(s => !s.isWeb);
+    const web = services.find(s => s.isWeb);
+
+    const renderRow = (s, actions) => (
+      <div key={s.service} className="svc-row">
+        <div className="svc-main">
+          <div className="svc-ic"><Icon.server size={20}/></div>
+          <div className="svc-info">
+            <div className="svc-name">{SVC_LABELS[s.service] || s.service} <SvcStatus state={s.state}/></div>
+            {s.image && <div className="svc-img" title={s.image}>{s.image}</div>}
+          </div>
+        </div>
+        <div className="svc-actions">
+          {busy[s.service] ? <span className="spin" style={{ margin: '0 11px' }}/> : actions(s.state === 'running')}
+        </div>
       </div>
-      <hr className="divider"/>
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-        <button className="btn primary" onClick={updateAll}><Icon.download size={16}/> Обновить всё</button>
+    );
+
+    body = <>
+      {dockerErr && (
+        <div className="sys-banner err">
+          <Icon.x size={18}/>
+          <span>Docker недоступен: {dockerErr}</span>
+        </div>
+      )}
+
+      {/* Микросервисы приложения */}
+      <div className="sys-section-label">Микросервисы</div>
+      <div className="svc-list">
+        {micros.map(s => renderRow(s, (running) => <>
+          <button className="iconb" title="Обновить" onClick={() => svcAction(s.service, 'update')}><Icon.download size={20}/></button>
+          <button className="iconb" title="Перезапустить" onClick={() => svcAction(s.service, 'restart')}><Icon.refresh size={20}/></button>
+          {running
+            ? <button className="iconb" title="Остановить" onClick={() => svcAction(s.service, 'stop')}><Icon.power size={20}/></button>
+            : <button className="iconb" title="Запустить" onClick={() => svcAction(s.service, 'start')}><Icon.play size={20}/></button>}
+        </>))}
+      </div>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginTop: 6 }}>
+        <button className="btn primary" onClick={updateAll} disabled={!micros.length}><Icon.download size={16}/> Обновить микросервисы</button>
         <button className="btn" onClick={() => { setServices(null); loadServices(); }}><Icon.refresh size={16}/> Обновить статус</button>
+      </div>
+
+      <hr className="divider"/>
+
+      {/* Веб-клиент — отдельно: его обновление перезапускает страницу */}
+      <div className="sys-section-label">Веб-клиент</div>
+      {web && <div className="svc-list">{renderRow(web, () => <span style={{ fontSize: 12, color: 'var(--md-on-surface-variant)' }}>ниже ↓</span>)}</div>}
+      <div className="sys-note">
+        Обновление перезапускает веб-клиент: страница ненадолго станет недоступна и перезагрузится сама.
+        Выполняйте его <b>после</b> обновления остальных сервисов.
+      </div>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+        <button className="btn primary" onClick={() => webSelf('update')}><Icon.download size={16}/> Обновить веб-клиент</button>
+        <button className="btn" onClick={() => webSelf('restart')}><Icon.refresh size={16}/> Перезапустить веб-клиент</button>
         <button className="btn text" onClick={doLock} style={{ marginLeft: 'auto' }}><Icon.lock size={16}/> Заблокировать</button>
       </div>
     </>;

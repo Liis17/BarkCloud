@@ -10,6 +10,9 @@ public sealed record ServiceActionResult(bool Success, string Message, string? E
 /// <summary>Статус управляемого сервиса (для UI).</summary>
 public sealed record ServiceStatus(string Service, string Container, string State, string Status, string Image, bool IsWeb);
 
+/// <summary>Снимок состояния сервисов + доступность Docker (чтобы UI не оставался пустым при сбое).</summary>
+public sealed record ServicesSnapshot(IReadOnlyList<ServiceStatus> Services, bool DockerOk, string? Error);
+
 /// <summary>
 /// Управление обновлением/перезапуском микросервисов бэкенда на той же машине через
 /// смонтированный docker.sock (CLI <c>docker</c> / <c>docker compose</c>). Порт логики
@@ -48,9 +51,12 @@ public sealed class DockerService
     // ───────────────────────── Статус ─────────────────────────
 
     /// <summary>Статусы всех управляемых сервисов (running/exited/not_found и тег образа).</summary>
-    public async Task<IReadOnlyList<ServiceStatus>> GetServicesStatusAsync()
+    public async Task<ServicesSnapshot> GetServicesStatusAsync()
     {
         var byName = new Dictionary<string, (string State, string Status, string Image)>();
+        var dockerOk = true;
+        string? error = null;
+
         try
         {
             var json = await RunDockerCommandAsync("ps", "--all", "--format", "{{json .}}");
@@ -71,21 +77,25 @@ public sealed class DockerService
         }
         catch (Exception ex)
         {
+            // Не валим запрос (иначе UI получает пустую страницу) — отдаём список сервисов и причину сбоя Docker.
+            dockerOk = false;
+            error = ex.Message;
             _logger.LogError(ex, "Не удалось получить список контейнеров");
-            throw;
         }
 
-        return Managed.Select(m =>
+        var services = Managed.Select(m =>
         {
             var found = byName.TryGetValue(m.Container, out var info);
             return new ServiceStatus(
                 m.Service,
                 m.Container,
-                found ? info.State : "not_found",
-                found ? info.Status : "Контейнер не найден",
+                found ? info.State : (dockerOk ? "not_found" : "unavailable"),
+                found ? info.Status : (dockerOk ? "Контейнер не найден" : "Docker недоступен"),
                 found ? info.Image : "",
                 m.Service == WebService);
         }).ToList();
+
+        return new ServicesSnapshot(services, dockerOk, error);
     }
 
     // ───────────────────────── Обновление ─────────────────────────
@@ -198,7 +208,13 @@ public sealed class DockerService
 
             await TryRemoveContainerAsync(helperName);
 
-            var args = new List<string> { "run", "-d", "--rm", "--name", helperName, "--user", "root", "-v", $"{dockerSock}:/var/run/docker.sock" };
+            var args = new List<string>
+            {
+                "run", "-d", "--rm", "--name", helperName, "--user", "root",
+                "-e", "DOCKER_HOST=unix:///var/run/docker.sock",
+                "-e", "DOCKER_CONFIG=/root/.docker",
+                "-v", $"{dockerSock}:/var/run/docker.sock",
+            };
 
             // helper тянет образ из приватного registry — пробросим креды docker, если они смонтированы в web
             var dockerConfig = await GetMountSourceAsync(WebContainer, "/root/.docker/config.json");
@@ -295,6 +311,9 @@ public sealed class DockerService
         };
         // docker CLI (root) ищет креды registry в /root/.docker/config.json
         startInfo.Environment["DOCKER_CONFIG"] = "/root/.docker";
+        // Подключаемся напрямую к смонтированному сокету и игнорируем currentContext из config.json
+        // (на хосте это "desktop-linux", чьих метаданных внутри контейнера нет — иначе CLI падает).
+        startInfo.Environment["DOCKER_HOST"] = "unix:///var/run/docker.sock";
         foreach (var arg in args) startInfo.ArgumentList.Add(arg);
 
         using var process = new Process { StartInfo = startInfo };
