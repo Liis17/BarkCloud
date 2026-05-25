@@ -6,8 +6,11 @@ using BarkCloud.Shared.Auth;
 using BarkCloud.Shared.Identity;
 using BarkCloud.Web;
 using BarkCloud.Web.Auth;
+using BarkCloud.Web.Endpoints;
 using BarkCloud.Web.Infrastructure;
 using BarkCloud.Web.Rendering;
+
+using Microsoft.AspNetCore.Http.Features;
 
 // gRPC к микросервисам идёт по docker-сети без TLS (h2c) — разрешаем HTTP/2 поверх http://
 AppContext.SetSwitch("System.Net.Http.SocketsHttpHandler.Http2UnencryptedSupport", true);
@@ -48,6 +51,15 @@ builder.Services.AddGrpcClient<IdentityApi.IdentityApiClient>(o => o.Address = n
 builder.Services.AddGrpcClient<UsersApi.UsersApiClient>(o => o.Address = new Uri(usersAddress));
 builder.Services.AddGrpcClient<FilesApi.FilesApiClient>(o => o.Address = new Uri(filesAddress));
 builder.Services.AddGrpcClient<CloudApi.CloudApiClient>(o => o.Address = new Uri(filesAddress));
+builder.Services.AddGrpcClient<AlbumApi.AlbumApiClient>(o => o.Address = new Uri(filesAddress));
+
+// HttpClient для прокси-загрузки байтов в Files (адрес — публичный upload-URL из GetUploadUrl).
+builder.Services.AddHttpClient("files-upload");
+
+// Загрузка файлов до 512 МБ: снимаем дефолтные лимиты тела запроса и multipart-формы.
+const long maxUpload = 536_870_912; // 512 МБ
+builder.WebHost.ConfigureKestrel(o => o.Limits.MaxRequestBodySize = maxUpload);
+builder.Services.Configure<FormOptions>(o => o.MultipartBodyLengthLimit = maxUpload);
 
 // Серверные (inter-service) API для регистрации без почты. Авторизуются сервисным
 // токеном, который Web подписывает общим JWT-секретом (как Configuration).
@@ -56,6 +68,8 @@ var serviceToken = ServiceToken.Generate(builder.Configuration);
 builder.Services.AddGrpcClient<UsersServerApi.UsersServerApiClient>(o => o.Address = new Uri(usersAddress))
     .AddInterceptor(() => new JwtClientInterceptor(serviceToken));
 builder.Services.AddGrpcClient<IdentityServerApi.IdentityServerApiClient>(o => o.Address = new Uri(identityAddress))
+    .AddInterceptor(() => new JwtClientInterceptor(serviceToken));
+builder.Services.AddGrpcClient<FilesServerApi.FilesServerApiClient>(o => o.Address = new Uri(filesAddress))
     .AddInterceptor(() => new JwtClientInterceptor(serviceToken));
 
 builder.Services.AddSingleton<TemplateRenderer>();
@@ -69,6 +83,8 @@ builder.Services.AddScoped<PageDataBuilder>();
 var app = builder.Build();
 
 app.MapWebEndpoints();
+app.MapCloudApiEndpoints();
 app.MapSystemEndpoints();
+app.MapSettingsEndpoints();
 
 app.Run();

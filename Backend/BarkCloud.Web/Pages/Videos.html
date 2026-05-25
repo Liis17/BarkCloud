@@ -8,6 +8,10 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,wght@8..144,300;8..144,400;8..144,500;8..144,600;8..144,700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="shared.css"/>
+  <script>
+    /* Тема применяется до рендера, чтобы не было мигания. Источник — localStorage (bark_theme: light|dark|auto). */
+    (function(){try{var t=localStorage.getItem('bark_theme')||'auto';var d=t==='dark'||(t==='auto'&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);if(d)document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();
+  </script>
   <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
   <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
   <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
@@ -15,23 +19,6 @@
   <style>
     .vid-toolbar { display:flex; align-items:center; gap:14px; margin-bottom: 24px; flex-wrap: wrap; }
     .vid-toolbar .right { margin-left:auto; display:flex; gap:8px; align-items:center; }
-
-    .sort-dd {
-      display:flex; align-items:center; gap:8px;
-      height: 40px;
-      padding: 0 16px;
-      border: 1px solid var(--md-outline);
-      border-radius: var(--r-full);
-      background: transparent;
-      font-family: inherit;
-      font-size: 14px;
-      font-weight: 500;
-      color: var(--md-on-surface);
-      cursor: pointer;
-      transition: background var(--d-short);
-    }
-    .sort-dd:hover { background: color-mix(in srgb, var(--md-on-surface) 6%, transparent); }
-    .sort-dd .lbl { color: var(--md-on-surface-variant); }
 
     /* Featured */
     .featured-vid {
@@ -223,77 +210,96 @@
 </script>
 
 <script type="text/babel">
-const { AppShell, Icon } = window;
+const { AppShell, Icon, apiGet, apiPost, pickFiles, uploadFile,
+        MediaThumb, Lightbox, Modal, useToast, EmptyState, Loading,
+        plural, dateLabel, AlbumCard, AlbumFormModal, AlbumDetail } = window;
 
-function loadServerData() {
-  try {
-    const raw = document.getElementById('server-data')?.textContent?.trim();
-    if (!raw || raw.startsWith('{{')) return null;
-    return JSON.parse(raw);
-  } catch (e) { console.warn('server-data parse failed', e); return null; }
+function fmtSize(bytes) {
+  if (!bytes) return '0 Б';
+  const u = ['Б', 'КБ', 'МБ', 'ГБ', 'ТБ'];
+  let i = 0, v = bytes;
+  while (v >= 1024 && i < u.length - 1) { v /= 1024; i++; }
+  return (i === 0 ? v.toFixed(0) : v.toFixed(v < 10 ? 1 : 0)).replace('.', ',') + ' ' + u[i];
 }
-const SERVER_DATA = loadServerData();
+function resLabel(m) {
+  const h = m.height || 0;
+  if (h >= 2160) return '4K';
+  if (h >= 1440) return '1440p';
+  if (h >= 1080) return '1080p';
+  if (h >= 720) return '720p';
+  if (h > 0) return 'SD';
+  return '';
+}
+function shortDate(iso) { return iso ? dateLabel(new Date(iso)) : ''; }
 
-const FILTERS = SERVER_DATA?.filters ?? [
-  {key:'all', label:'Все', count:'186'},
-  {key:'4k', label:'4K и HDR', count:'42'},
-  {key:'short', label:'Короткие', count:'94'},
-  {key:'long', label:'Длинные'},
-  {key:'screen', label:'Запись экрана', count:'21'},
-  {key:'unedited', label:'Не обработано', count:'8'},
-];
-
-const TINTS = [
-  ['#A8C99A','#3A5A3A'], ['#B4A3D6','#3F2E66'], ['#E8A87C','#5F2F14'],
-  ['#E0BB6F','#6F4A1E'], ['#8FAFCC','#2A4360'], ['#D696B0','#4E2238'],
-  ['#8FC3BB','#1F4540'], ['#C8A78C','#4F3024'], ['#7E9FC3','#1E3550'],
-];
-
-const VIDEOS = SERVER_DATA?.videos ?? [
-  {title:'Утренняя пробежка в парке Горького', dur:'12:34', res:'4K · 60 кадров/с', date:'Сегодня', size:'2,1 ГБ', t:0},
-  {title:'Дикий пляж, drone shot', dur:'4:18', res:'4K HDR', date:'14 мая', size:'890 МБ', t:1},
-  {title:'Выступление на конференции — финальный мастер', dur:'48:02', res:'1080p', date:'12 мая', size:'4,6 ГБ', t:2},
-  {title:'Запись экрана: новая фича сборщика', dur:'7:25', res:'Экран', date:'12 мая', size:'310 МБ', t:3},
-  {title:'Дочка играет на пианино — первый этюд', dur:'2:08', res:'1080p', date:'11 мая', size:'420 МБ', t:4},
-  {title:'Прогулка по старому городу, Прага', dur:'18:42', res:'4K', date:'5 мая', size:'3,8 ГБ', t:5},
-  {title:'Тестовый рендер VFX, версия 04', dur:'0:24', res:'4K HDR', date:'2 мая', size:'180 МБ', t:6},
-  {title:'Гроза с балкона, замедление 240 fps', dur:'1:12', res:'Slo-mo', date:'28 апр', size:'620 МБ', t:7},
-  {title:'Котик и лазерная указка, ч.2', dur:'3:30', res:'1080p', date:'24 апр', size:'520 МБ', t:8},
-  {title:'Дорога на работу, таймлапс', dur:'0:42', res:'Timelapse', date:'21 апр', size:'140 МБ', t:0},
-  {title:'Концерт, второй ряд — полный сет', dur:'1:14:22', res:'1080p', date:'18 апр', size:'7,2 ГБ', t:1},
-  {title:'Семейный обед, бабушкин день рождения', dur:'24:51', res:'1080p · 60 кадров/с', date:'12 апр', size:'5,4 ГБ', t:3},
-];
-
-const STATS = SERVER_DATA?.stats ?? [
-  {k:'Всего видео', v:'186', d:'+12 за месяц'},
-  {k:'4K и HDR', v:'42', d:'+3 за неделю'},
-  {k:'Хронометраж', v:'48 ч 12 м'},
-  {k:'Занято', v:'94,6 ГБ', d:'из 312,4 ГБ медиа'},
-];
-
-const FEATURED = SERVER_DATA?.featured ?? {
-  title: 'Дикий пляж — рассвет, drone shot',
-  kicker: '★ Выбор недели',
-  uploadedAt: 'Загружено 14 мая, 14:08',
-  dur: '4:18',
-  quality: '4K HDR · 60 кадров/с',
-  size: '890 МБ',
-  codec: 'H.265',
-  gps: '55,74° N · 37,62° E',
-  resBadge: '4K HDR',
-  tint: ['#E8A87C','#5A2810'],
-};
-
-const SECTION_META = SERVER_DATA?.sectionMeta ?? '12 из 186 · сортировка по дате';
-const SORT_LABEL = SERVER_DATA?.sort ?? 'Новые сначала';
+function VideoCard({ m, onOpen }) {
+  const res = resLabel(m);
+  return (
+    <div className="vcard" onClick={() => onOpen(m)}>
+      <div className="vthumb">
+        <MediaThumb media={m} sizes="(max-width: 700px) 100vw, 320px"/>
+        <button className="play"><Icon.play size={22}/></button>
+        {res && <div className="res">{res}</div>}
+      </div>
+      <div className="vt">{m.name}</div>
+      <div className="vmeta">
+        <span>{shortDate(m.createdAt)}</span><span className="dot">·</span>
+        <span>{m.sizeLabel || fmtSize(m.size)}</span>
+      </div>
+    </div>
+  );
+}
 
 function App() {
-  const [filter, setFilter] = React.useState('all');
+  const [tab, setTab] = React.useState('videos');     // videos | albums
+  const [videos, setVideos] = React.useState(null);
+  const [albums, setAlbums] = React.useState(null);
+  const [openAlbum, setOpenAlbum] = React.useState(null);
+  const [lightbox, setLightbox] = React.useState(null);
+  const [creating, setCreating] = React.useState(false);
+  const [upload, setUpload] = React.useState(null);
+  const [toastNode, toast] = useToast();
+
+  const loadVideos = React.useCallback(() => {
+    apiGet('/api/cloud/media?kind=video')
+      .then(d => setVideos(d.items || []))
+      .catch(e => { toast(e.message, 'err'); setVideos([]); });
+  }, [toast]);
+  const loadAlbums = React.useCallback(() => {
+    apiGet('/api/albums')
+      .then(d => setAlbums(d.albums || []))
+      .catch(e => { toast(e.message, 'err'); setAlbums([]); });
+  }, [toast]);
+
+  React.useEffect(() => { loadVideos(); loadAlbums(); }, [loadVideos, loadAlbums]);
+
+  async function doUpload() {
+    const files = await pickFiles({ accept: 'video/*' });
+    if (!files.length) return;
+    let done = 0;
+    for (const f of files) {
+      setUpload({ current: done + 1, total: files.length, pct: 0 });
+      try { await uploadFile(f, p => setUpload({ current: done + 1, total: files.length, pct: Math.round(p * 100) })); }
+      catch (e) { toast(`«${f.name}»: ${e.message}`, 'err'); }
+      done++;
+    }
+    setUpload(null);
+    toast(`Загружено: ${done} ${plural(done,'видео','видео','видео')}`);
+    loadVideos();
+  }
+
+  const featured = videos && videos.length ? videos[0] : null;
+  const totalSize = videos ? videos.reduce((s, v) => s + (v.size || 0), 0) : 0;
+  const stats = [
+    { k: 'Всего видео', v: videos ? String(videos.length) : '—' },
+    { k: 'Занято видео', v: fmtSize(totalSize) },
+    { k: 'Альбомов', v: albums ? String(albums.length) : '—' },
+  ];
 
   const actions = (
     <>
-      <button className="btn outlined"><Icon.filter size={16}/> Фильтр</button>
-      <button className="btn primary"><Icon.upload size={16}/> Загрузить видео</button>
+      {tab === 'albums' && <button className="btn outlined" onClick={() => setCreating(true)}><Icon.plus size={16}/> Альбом</button>}
+      <button className="btn primary" onClick={doUpload}><Icon.upload size={16}/> Загрузить видео</button>
     </>
   );
 
@@ -304,13 +310,14 @@ function App() {
       title="Видео"
       actions={actions}
     >
+      {toastNode}
+
       {/* Stats */}
       <div className="stat-strip">
-        {STATS.map((s,i) => (
+        {stats.map((s, i) => (
           <div key={i} className="stat">
             <div className="k">{s.k}</div>
             <div className="v">{s.v}</div>
-            {s.d && <div className="delta">{s.d}</div>}
           </div>
         ))}
       </div>
@@ -318,74 +325,81 @@ function App() {
       {/* Toolbar */}
       <div className="vid-toolbar">
         <div className="chip-row">
-          {FILTERS.map(f => (
-            <button key={f.key}
-              className={"chip" + (filter === f.key ? " active" : "")}
-              onClick={() => setFilter(f.key)}>
-              {filter === f.key && <Icon.check size={16}/>}
-              {f.label}
-              {f.count && <span className="count">{f.count}</span>}
-            </button>
-          ))}
-        </div>
-        <div className="right">
-          <button className="sort-dd">
-            <span className="lbl">Сорт.:</span>
-            <span>{SORT_LABEL}</span>
-            <Icon.chevDown size={16}/>
+          <button className={"chip" + (tab==='videos'?' active':'')} onClick={() => { setTab('videos'); setOpenAlbum(null); }}>
+            {tab==='videos' && <Icon.check size={16}/>} Все видео
+            {videos && <span className="count">{videos.length}</span>}
+          </button>
+          <button className={"chip" + (tab==='albums'?' active':'')} onClick={() => setTab('albums')}>
+            {tab==='albums' && <Icon.check size={16}/>} Альбомы
+            {albums && <span className="count">{albums.length}</span>}
           </button>
         </div>
       </div>
 
-      {/* Featured */}
-      <div className="featured-vid">
-        <div className="thumb" style={{'--tint-a':FEATURED.tint?.[0]||'#E8A87C','--tint-b':FEATURED.tint?.[1]||'#5A2810'}}/>
-        <div className="overlay">
-          <div className="kicker">
-            <span className="pin">{FEATURED.kicker}</span>
-            <span>{FEATURED.uploadedAt}</span>
-          </div>
-          <div className="title">{FEATURED.title}</div>
-          <div className="meta-row">
-            <span><span className="key">Длит.</span> {FEATURED.dur}</span>
-            <span><span className="key">Качество</span> {FEATURED.quality}</span>
-            <span><span className="key">Размер</span> {FEATURED.size}</span>
-            <span><span className="key">Кодек</span> {FEATURED.codec}</span>
-            {FEATURED.gps && <span><span className="key">GPS</span> {FEATURED.gps}</span>}
-          </div>
+      {upload && (
+        <div className="upload-banner">
+          <span className="spinner"/>
+          Загрузка {upload.current}/{upload.total}…
+          <div className="bar"><div className="bar-fill" style={{width: upload.pct + '%'}}/></div>
         </div>
-        <button className="play-btn"><Icon.play size={36}/></button>
-        <div className="res-badge">{FEATURED.resBadge}</div>
-        <div className="duration">{FEATURED.dur}</div>
-      </div>
+      )}
 
-      {/* Section header */}
-      <div className="section-head">
-        <h2>Недавнее</h2>
-        <div className="meta">{SECTION_META}</div>
-      </div>
-
-      {/* Video grid */}
-      <div className="vid-grid">
-        {VIDEOS.map((v, i) => {
-          const tint = TINTS[v.t % TINTS.length];
-          return (
-            <div key={i} className="vcard">
-              <div className="vthumb">
-                <div className="thumb" style={{'--tint-a':tint[0],'--tint-b':tint[1]}}/>
-                <button className="play"><Icon.play size={22}/></button>
-                <div className="res">{v.res}</div>
-                <div className="dur">{v.dur}</div>
-              </div>
-              <div className="vt">{v.title}</div>
-              <div className="vmeta">
-                <span>{v.date}</span><span className="dot">·</span>
-                <span>{v.size}</span>
+      {/* ── Вкладка АЛЬБОМЫ ── */}
+      {tab === 'albums' && (
+        openAlbum
+          ? <AlbumDetail album={openAlbum} candidates={videos || []} toast={toast}
+              onBack={() => setOpenAlbum(null)} onChanged={() => loadAlbums()}/>
+          : albums === null ? <Loading/> :
+            <div className="album-grid">
+              {albums.map(a => <AlbumCard key={a.id} album={a} onOpen={(al) => setOpenAlbum(al)}/>)}
+              <div className="album-card new-album" onClick={() => setCreating(true)}>
+                <Icon.plus size={28}/>
+                <span>Создать альбом</span>
               </div>
             </div>
-          );
-        })}
-      </div>
+      )}
+
+      {/* ── Вкладка ВСЕ ВИДЕО ── */}
+      {tab === 'videos' && (
+        videos === null ? <Loading/> :
+        videos.length === 0
+          ? <EmptyState icon="video" title="Пока нет видео" hint="Загрузите ролики — обложкой станет кадр из видео."
+              action={<button className="btn primary" onClick={doUpload}><Icon.upload size={16}/> Загрузить видео</button>}/>
+          : <>
+              {featured && (
+                <div className="featured-vid" onClick={() => setLightbox(featured)}>
+                  <MediaThumb media={featured} sizes="100vw"/>
+                  <div className="overlay">
+                    <div className="kicker">
+                      <span className="pin">★ Последнее</span>
+                      <span>{shortDate(featured.createdAt)}</span>
+                    </div>
+                    <div className="title">{featured.name}</div>
+                    <div className="meta-row">
+                      {resLabel(featured) && <span><span className="key">Качество</span> {resLabel(featured)}</span>}
+                      <span><span className="key">Размер</span> {featured.sizeLabel || fmtSize(featured.size)}</span>
+                      {featured.width > 0 && <span><span className="key">Кадр</span> {featured.width}×{featured.height}</span>}
+                    </div>
+                  </div>
+                  <button className="play-btn"><Icon.play size={36}/></button>
+                  {resLabel(featured) && <div className="res-badge">{resLabel(featured)}</div>}
+                </div>
+              )}
+
+              <div className="section-head">
+                <h2>Все видео</h2>
+                <div className="meta">{videos.length} {plural(videos.length,'ролик','ролика','роликов')}</div>
+              </div>
+
+              <div className="vid-grid">
+                {videos.map(m => <VideoCard key={m.id} m={m} onOpen={setLightbox}/>)}
+              </div>
+            </>
+      )}
+
+      {creating && <AlbumFormModal onClose={() => setCreating(false)}
+        onSaved={() => { setCreating(false); setTab('albums'); loadAlbums(); toast('Альбом создан'); }} toast={toast}/>}
+      {lightbox && <Lightbox media={lightbox} onClose={() => setLightbox(null)}/>}
     </AppShell>
   );
 }
