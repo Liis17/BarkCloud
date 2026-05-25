@@ -121,10 +121,11 @@ CLOUD_FILE = 2;   // обычный файл пользовательского 
   - `kind`: `MEDIA_KIND_PHOTO` или `MEDIA_KIND_VIDEO`.
   - пагинация — см. §1.
 - Вернётся: `ListUserMediaResponse { items[], next_cursor_created_at, next_cursor_file_id }`
-  - `items[i]` = `UserImageItem { file: UploadFileInfo, entries_count, entry_names[] }`
+  - `items[i]` = `UserImageItem { file: UploadFileInfo, entries_count, entry_names[], entry_ids[] }`
     - `file` — карточка (с превью, размерами, `media_kind`).
-    - `entries_count` — в скольких записях каталога лежит файл (0 — не в каталоге).
+    - `entries_count` — в скольких **живых** записях каталога лежит файл (0 — не в каталоге; записи в корзине не считаются).
     - `entry_names` — до 5 имён записей.
+    - `entry_ids` — id живых записей владельца (для переименования/удаления элемента галереи через `RenameFileEntry`/`DeleteFileEntry` без доп. листинга каталога).
 
 > `ListUserImages` — устаревший аналог для фото; используйте `ListUserMedia(MEDIA_KIND_PHOTO)`.
 

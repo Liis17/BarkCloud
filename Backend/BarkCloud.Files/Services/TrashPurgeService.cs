@@ -52,11 +52,15 @@ public class TrashPurgeService
             .ToList();
         var entryIds = entries.Select(e => e.Id).ToList();
 
-        // 1. Убираем файлы из альбомов владельца и удаляем сами записи иерархии.
+        // 1. Убираем файлы из альбомов и избранного владельца, удаляем сами записи иерархии.
         foreach (var pair in pairs)
         {
             await _context.AlbumItems
                 .Where(a => a.OwnerId == pair.OwnerId && a.FileId == pair.FileId)
+                .ExecuteDeleteAsync(cancellationToken);
+
+            await _context.FavoriteFiles
+                .Where(f => f.OwnerId == pair.OwnerId && f.FileId == pair.FileId)
                 .ExecuteDeleteAsync(cancellationToken);
         }
 

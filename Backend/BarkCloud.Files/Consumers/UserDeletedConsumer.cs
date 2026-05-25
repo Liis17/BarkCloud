@@ -48,16 +48,17 @@ public class UserDeletedConsumer(
             await context.SaveChangesAsync();
         }
 
-        // Удаляем владельческие данные иерархии и альбомов.
+        // Удаляем владельческие данные иерархии, альбомов и избранного.
         var entries = await context.CloudFileEntries.Where(x => x.OwnerId == userId).ExecuteDeleteAsync();
         var dirs = await context.CloudDirectories.Where(x => x.OwnerId == userId).ExecuteDeleteAsync();
         var albumItems = await context.AlbumItems.Where(x => x.OwnerId == userId).ExecuteDeleteAsync();
         var albums = await context.Albums.Where(x => x.OwnerId == userId).ExecuteDeleteAsync();
+        var favorites = await context.FavoriteFiles.Where(x => x.OwnerId == userId).ExecuteDeleteAsync();
 
         metrics.Increment("accounts_cleaned_files");
 
         logger.LogInformation(
-            "Данные Files для пользователя {UserId} очищены: блобов откреплено {Files}, записей {Entries}, папок {Dirs}, альбомов {Albums} (элементов {AlbumItems})",
-            userId, files.Count, entries, dirs, albums, albumItems);
+            "Данные Files для пользователя {UserId} очищены: блобов откреплено {Files}, записей {Entries}, папок {Dirs}, альбомов {Albums} (элементов {AlbumItems}), избранного {Favorites}",
+            userId, files.Count, entries, dirs, albums, albumItems, favorites);
     }
 }

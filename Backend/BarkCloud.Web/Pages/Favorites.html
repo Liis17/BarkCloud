@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BarkCloud — Избранное</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,wght@8..144,300;8..144,400;8..144,500;8..144,600;8..144,700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="shared.css"/>
+  <script>
+    /* Тема применяется до рендера, чтобы не было мигания. Источник — localStorage (bark_theme: light|dark|auto). */
+    (function(){try{var t=localStorage.getItem('bark_theme')||'auto';var d=t==='dark'||(t==='auto'&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);if(d)document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();
+  </script>
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+  <script type="text/babel" src="shared.jsx"></script>
+  <style>
+    .date-group { margin-bottom: 36px; }
+    .date-head {
+      display:flex; align-items:baseline; justify-content:space-between;
+      margin-bottom: 16px;
+    }
+    .date-head h3 { font-size: 22px; font-weight: 500; line-height: 28px; color: var(--md-on-surface); }
+    .date-head .right { font-size: 13px; color: var(--md-on-surface-variant); }
+
+    /* Плитка документа/прочего файла внутри квадратной ячейки сетки */
+    .fav-doc {
+      width: 100%; height: 100%;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+      background: var(--md-surface-container-high);
+      color: var(--md-on-surface-variant);
+      padding: 12px; text-align: center;
+    }
+    .fav-doc .ext { font-size: 12px; font-weight: 600; letter-spacing: .4px; }
+    .fav-doc .nm  { font-size: 11px; color: var(--md-outline); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* Кнопка «убрать из избранного» поверх ячейки (на hover) */
+    .fav-unstar {
+      position: absolute; top: 6px; right: 6px;
+      width: 30px; height: 30px; border: none; border-radius: 50%;
+      background: rgba(0,0,0,.55); color: #FFD54F;
+      display: flex; align-items: center; justify-content: center; cursor: pointer;
+      opacity: 0; transition: opacity var(--d-short);
+    }
+    .photo:hover .fav-unstar { opacity: 1; }
+    .fav-unstar:hover { background: rgba(0,0,0,.78); }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="application/json" id="server-data">
+{{{ page_data_json }}}
+</script>
+
+<script type="text/babel">
+const { AppShell, Icon, apiGet, apiPost,
+        MediaThumb, Lightbox, useToast, EmptyState, Loading,
+        GRID_SIZES, plural, groupByDate } = window;
+
+// Файл можно открыть в просмотрщике, только если это фото/видео с готовым превью.
+const viewable = (m) => (m.previews && m.previews.length > 0) && (m.kind === 'photo' || m.kind === 'video');
+
+function FavCard({ m, onOpen, onUnstar }) {
+  return (
+    <div className="photo" onClick={() => onOpen(m)}>
+      {viewable(m)
+        ? <MediaThumb media={m} sizes={GRID_SIZES} />
+        : <div className="fav-doc">
+            <Icon.file size={40}/>
+            <span className="ext">{m.ext || 'FILE'}</span>
+            <span className="nm">{m.name}</span>
+          </div>}
+      {m.kind === 'video' && <div className="vbadge"><Icon.play size={10}/> видео</div>}
+      <button className="fav-unstar" title="Убрать из избранного"
+        onClick={(e) => { e.stopPropagation(); onUnstar(m); }}>
+        <Icon.star size={16}/>
+      </button>
+    </div>
+  );
+}
+
+function App() {
+  const [items, setItems] = React.useState(null);
+  const [lightbox, setLightbox] = React.useState(null);
+  const [toastNode, toast] = useToast();
+
+  const load = React.useCallback(() => {
+    setItems(null);
+    apiGet('/api/cloud/favorites')
+      .then(d => setItems(d.items || []))
+      .catch(e => { toast(e.message, 'err'); setItems([]); });
+  }, [toast]);
+  React.useEffect(load, [load]);
+
+  async function download(m) {
+    try {
+      const d = await apiGet('/api/files/download?ids=' + encodeURIComponent(m.id));
+      const url = d.urls && d.urls[m.id];
+      if (url) window.open(url, '_blank');
+      else toast('Ссылка недоступна', 'err');
+    } catch (e) { toast(e.message, 'err'); }
+  }
+
+  function open(m) {
+    if (viewable(m)) setLightbox(m);
+    else download(m);
+  }
+
+  async function unstar(m) {
+    try {
+      await apiPost('/api/cloud/favorites/remove', { fileId: m.id });
+      setItems(list => (list || []).filter(x => x.id !== m.id));
+      toast('Убрано из избранного');
+    } catch (e) { toast(e.message, 'err'); }
+  }
+
+  const groups = React.useMemo(() => items ? groupByDate(items) : [], [items]);
+
+  return (
+    <AppShell
+      page="favorites"
+      kicker={<><span>Совместное</span><span className="sep">/</span><span className="cur">Избранное</span></>}
+      title="Избранное"
+    >
+      {toastNode}
+
+      {items === null ? <Loading/> :
+        items.length === 0
+          ? <EmptyState icon="star" title="Пока нет избранного"
+              hint="Помеченные файлы будут появляться здесь."/>
+          : groups.map(g => (
+              <div key={g.key} className="date-group">
+                <div className="date-head">
+                  <h3>{g.label}</h3>
+                  <div className="right"><span>{g.items.length} {plural(g.items.length,'файл','файла','файлов')}</span></div>
+                </div>
+                <div className="photo-grid">
+                  {g.items.map(m => <FavCard key={m.id} m={m} onOpen={open} onUnstar={unstar}/>)}
+                </div>
+              </div>
+            ))
+      }
+
+      {lightbox && <Lightbox media={lightbox} onClose={() => setLightbox(null)}/>}
+    </AppShell>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

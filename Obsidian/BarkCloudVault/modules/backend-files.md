@@ -26,6 +26,7 @@ Parent: [[index]] · See also: [[api/files-api]] · [[modules/backend-files-clou
 - `CloudFileEntry.cs` — запись о файле в иерархии → [[modules/backend-files-cloud]]
 - `Album.cs` — альбом (универсальная коллекция фото/видео): `Name`, `Description`, `CoverFileId`
 - `AlbumItem.cs` — привязка файла к альбому (many-to-many)
+- `FavoriteFile.cs` — отметка «избранное» на уровне пользователя (`OwnerId`+`FileId`, уникальна). Привязка к блобу, а не к записи иерархии → покрывает и фото/видео из галереи, и файлы/документы из папок
 
 ### Host
 - `FilesApiService.cs` — клиентский gRPC `FilesApi`
@@ -40,7 +41,7 @@ Parent: [[index]] · See also: [[api/files-api]] · [[modules/backend-files-clou
 - `PreviewPersistenceService.cs` — сохранение превью (дедуп по SHA256 + S3 + `FilePreview`); общий для загрузки и `SetVideoThumbnail`
 - `AlbumViewBuilder.cs` — сборка `AlbumInfo` (счётчик элементов + URL превью обложки) батчем
 - `TempFileCleanupService.cs` — фоновая очистка временных файлов (BackgroundService)
-- `TrashPurgeService.cs` — окончательная зачистка корзины: снятие `Uploaders`, удаление из альбомов (`AlbumItems`), удаление записей/превью и **физическое удаление осиротевших блобов из S3**. Общий для ручных RPC и воркера. Константа `Retention = 14 дней`
+- `TrashPurgeService.cs` — окончательная зачистка корзины: снятие `Uploaders`, удаление из альбомов (`AlbumItems`) и из избранного (`FavoriteFiles`), удаление записей/превью и **физическое удаление осиротевших блобов из S3**. Общий для ручных RPC и воркера. Константа `Retention = 14 дней`
 - `TrashCleanupService.cs` — фоновый воркер (BackgroundService, раз в 6 ч): зачищает записи корзины с истёкшим `PurgeAt` через `TrashPurgeService`
 
 ### Infrastructure
@@ -52,18 +53,20 @@ Parent: [[index]] · See also: [[api/files-api]] · [[modules/backend-files-clou
 - `BucketS3Options.cs` — настройки S3-бакета
 
 ### Persistence
-- `FilesContext.cs`, `FilesContextFactory.cs` — EF Core DbContext (содержит `UploadedFiles`, `FileHashes`, `TempFiles`, `CloudDirectories`, `CloudFileEntries`, `FilePreviews`, `Albums`, `AlbumItems`)
+- `FilesContext.cs`, `FilesContextFactory.cs` — EF Core DbContext (содержит `UploadedFiles`, `FileHashes`, `TempFiles`, `CloudDirectories`, `CloudFileEntries`, `FilePreviews`, `Albums`, `AlbumItems`, `FavoriteFiles`)
 - `UploadedFilesStorage.cs`
 - `FileHashesStorage.cs`
 - `TempFilesStorage.cs`
 - `CloudHierarchyStorage.cs` — см. [[modules/backend-files-cloud]]; метод `FileEntryExistsForFile` для инварианта одной директории
 - `AlbumStorage.cs` — CRUD альбомов и их элементов, cursor-пагинация
+- `FavoriteFilesStorage.cs` — избранное: `Exists`/`Add`/`Remove`/`ListPage` (cursor-пагинация), по образцу item-методов `AlbumStorage`
 - `Migrations/`:
   - `20260518172338_InitialCreate.cs`
   - `20260518174041_AddCloudDirectories.cs` — добавляет таблицы Cloud
   - `20260518180038_AddFilePreviews.cs` — таблица `FilePreviews`
   - `20260524204149_AddMediaKindAndAlbums.cs` — колонка `MediaKind` (+ бэкафилл), таблицы `Albums`/`AlbumItems`, уникальный индекс `CloudFileEntries(OwnerId, FileId)` с дедупликацией
   - `20260525213058_AddTrashToCloudFileEntries.cs` — корзина: колонки `IsDeleted`/`DeletedAt`/`PurgeAt` в `CloudFileEntries`, частичные уникальные индексы (`WHERE IsDeleted = false`), индекс по `PurgeAt` (`WHERE IsDeleted = true`)
+  - `20260525223410_AddFavoriteFiles.cs` — таблица `FavoriteFiles` (уник. индекс `(OwnerId, FileId)`, индекс `(OwnerId, CreatedAt)`)
 
 ### Exceptions (локальные)
 - `FileAlreadyUploadedException.cs`
@@ -71,7 +74,7 @@ Parent: [[index]] · See also: [[api/files-api]] · [[modules/backend-files-clou
 
 ### Consumers
 - `SessionRevokedConsumer.cs` — слушает `SessionRevokedEvent` из [[modules/shared-queue]]
-- `UserDeletedConsumer.cs` — по `UserDeleted` (из [[modules/backend-users]]) снимает пользователя из `Uploaders` всех его блобов (освобождает квоту) и удаляет его `CloudDirectories`/`CloudFileEntries`/`Albums`/`AlbumItems`. Физическое удаление осиротевших S3-блобов не делает (как и ручное удаление)
+- `UserDeletedConsumer.cs` — по `UserDeleted` (из [[modules/backend-users]]) снимает пользователя из `Uploaders` всех его блобов (освобождает квоту) и удаляет его `CloudDirectories`/`CloudFileEntries`/`Albums`/`AlbumItems`/`FavoriteFiles`. Физическое удаление осиротевших S3-блобов не делает (как и ручное удаление)
 
 ### Прочее
 - `Extensions/FileExtensions.cs`, `Extensions/ServiceCollectionExtensions.cs`
@@ -97,7 +100,7 @@ Parent: [[index]] · See also: [[api/files-api]] · [[modules/backend-files-clou
 
 ### Облачная иерархия + галерея (вложенно в `Features/Cloud/`)
 
-`CreateDirectory`, `RenameDirectory`, `MoveDirectory`, `DeleteDirectory`, `ListDirectory`, `ListDirectoryDetailed`, `AttachFile`, `RenameFileEntry`, `MoveFileEntry`, `DeleteFileEntry`, `GetPath`, `ListUserImages` (deprecated), `ListUserMedia` (фото/видео по `MediaKind`), `SetVideoThumbnail`. **Корзина**: `ListTrash`, `RestoreFromTrash`, `DeleteFromTrash`, `EmptyTrash` (`DeleteFileEntry`/`DeleteDirectory` теперь soft-delete). `CopyFileEntry` **удалён** (инвариант одной директории). Подробнее — [[modules/backend-files-cloud]].
+`CreateDirectory`, `RenameDirectory`, `MoveDirectory`, `DeleteDirectory`, `ListDirectory`, `ListDirectoryDetailed`, `AttachFile`, `RenameFileEntry`, `MoveFileEntry`, `DeleteFileEntry`, `GetPath`, `ListUserImages` (deprecated), `ListUserMedia` (фото/видео по `MediaKind`), `SetVideoThumbnail`. **Корзина**: `ListTrash`, `RestoreFromTrash`, `DeleteFromTrash`, `EmptyTrash` (`DeleteFileEntry`/`DeleteDirectory` теперь soft-delete). **Избранное**: `AddFavorite`/`RemoveFavorite` (по `file_id`, идемпотентны), `ListFavorites` (cursor-пагинация, исключает корзину и осиротевшие ссылки). `CopyFileEntry` **удалён** (инвариант одной директории). Подробнее — [[modules/backend-files-cloud]].
 
 ### Альбомы (вложенно в `Features/Album/`)
 

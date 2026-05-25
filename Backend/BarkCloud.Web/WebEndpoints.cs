@@ -176,6 +176,9 @@ public static class WebEndpoints
         app.MapGet("/trash", (HttpContext http, AuthGateway auth, PageDataBuilder data, PageService pages) =>
             ServePage(http, auth, data, pages, "Trash.html", _ => Task.FromResult(string.Empty)));
 
+        app.MapGet("/favorites", (HttpContext http, AuthGateway auth, PageDataBuilder data, PageService pages) =>
+            ServePage(http, auth, data, pages, "Favorites.html", _ => Task.FromResult(string.Empty)));
+
         app.MapGet("/settings", (HttpContext http, AuthGateway auth, PageDataBuilder data, PageService pages) =>
             ServePage(http, auth, data, pages, "Settings.html", user => data.BuildSettingsJsonAsync(user, http)));
 

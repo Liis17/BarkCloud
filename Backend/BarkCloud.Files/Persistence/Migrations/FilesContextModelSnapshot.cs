@@ -169,6 +169,31 @@ namespace BarkCloud.Files.Persistence.Migrations
                     b.ToTable("CloudFileEntries");
                 });
 
+            modelBuilder.Entity("BarkCloud.Files.Domain.FavoriteFile", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("FileId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("OwnerId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OwnerId", "CreatedAt");
+
+                    b.HasIndex("OwnerId", "FileId")
+                        .IsUnique();
+
+                    b.ToTable("FavoriteFiles");
+                });
+
             modelBuilder.Entity("BarkCloud.Files.Domain.FileHash", b =>
                 {
                     b.Property<Guid>("FileId")

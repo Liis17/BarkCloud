@@ -25,6 +25,8 @@ public class FilesContext : DbContext
 
     public DbSet<AlbumItem> AlbumItems { get; set; }
 
+    public DbSet<FavoriteFile> FavoriteFiles { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<TempFile>()
@@ -85,6 +87,14 @@ public class FilesContext : DbContext
             b.HasIndex(x => new { x.AlbumId, x.AddedAt });
             // Обратный поиск «в каких альбомах файл».
             b.HasIndex(x => x.FileId);
+        });
+
+        modelBuilder.Entity<FavoriteFile>(b =>
+        {
+            // Один файл — максимум один раз в избранном пользователя (идемпотентность + защита от дублей).
+            b.HasIndex(x => new { x.OwnerId, x.FileId }).IsUnique();
+            // Cursor-пагинация списка избранного по дате добавления.
+            b.HasIndex(x => new { x.OwnerId, x.CreatedAt });
         });
     }
 }

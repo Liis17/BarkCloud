@@ -62,6 +62,7 @@ public sealed class PageDataBuilder
             ["user.initials"] = "?",
             ["user.display_name"] = "Пользователь",
             ["user.role"] = "",
+            ["user.avatar_url"] = "",
             ["storage.used_label"] = "0 Б",
             ["storage.total_label"] = "0 Б",
             ["storage.percent"] = "0",
@@ -84,6 +85,9 @@ public sealed class PageDataBuilder
             vars["user.display_name"] = string.IsNullOrEmpty(name) ? profile.Username : name;
             vars["user.role"] = profile.Username;
             vars["user.initials"] = Format.Initials(profile.FirstName, profile.LastName);
+            vars["user.avatar_url"] = string.IsNullOrEmpty(profile.ProfilePicturePreview)
+                ? profile.ProfilePicture ?? ""
+                : profile.ProfilePicturePreview;
         }
         catch (RpcException ex)
         {

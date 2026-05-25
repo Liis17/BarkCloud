@@ -14,23 +14,39 @@ namespace BarkCloud.Web.Rendering;
 public static class CloudJson
 {
     /// <summary>Карточка файла-блоба: id (он же fileId), имя, тип, размер, превью для srcset.</summary>
-    public static object Media(UploadFileInfo f)
+    public static object Media(UploadFileInfo f) => Card(f);
+
+    /// <summary>
+    /// Карточка элемента галереи: карточка файла + сведения о записях каталога владельца
+    /// (entryIds/entryNames нужны фронту для переименования/удаления из галереи).
+    /// </summary>
+    public static object MediaItem(UserImageItem i)
+    {
+        var card = Card(i.File);
+        card["entriesCount"] = i.EntriesCount;
+        card["entryNames"] = i.EntryNames.ToArray();
+        card["entryIds"] = i.EntryIds.ToArray();
+        return card;
+    }
+
+    /// <summary>Базовая карточка блоба в виде словаря (чтобы галерея могла дополнить её entry-полями).</summary>
+    private static Dictionary<string, object?> Card(UploadFileInfo f)
     {
         var (iconKind, ext) = FileKind.Classify(f.FileName);
 
-        return new
+        return new Dictionary<string, object?>
         {
-            id = f.Id,
-            name = f.FileName,
-            ext,
-            kind = MediaKindName(f.MediaKind), // photo / video / document / audio / other
-            iconKind,                          // img / vid / doc / pdf / zip / code / audio (для Files)
-            size = f.FileSize,
-            sizeLabel = Format.Size(f.FileSize),
-            width = f.ImageWidth,
-            height = f.ImageHeight,
+            ["id"] = f.Id,
+            ["name"] = f.FileName,
+            ["ext"] = ext,
+            ["kind"] = MediaKindName(f.MediaKind), // photo / video / document / audio / other
+            ["iconKind"] = iconKind,               // img / vid / doc / pdf / zip / code / audio (для Files)
+            ["size"] = f.FileSize,
+            ["sizeLabel"] = Format.Size(f.FileSize),
+            ["width"] = f.ImageWidth,
+            ["height"] = f.ImageHeight,
             // массив для <img srcset> — только превью с готовым URL, по возрастанию ширины
-            previews = f.Previews
+            ["previews"] = f.Previews
                 .Where(p => !string.IsNullOrEmpty(p.PreviewUrl))
                 .OrderBy(p => p.TargetWidth)
                 .Select(p => new
@@ -40,8 +56,8 @@ public static class CloudJson
                     url = p.PreviewUrl
                 })
                 .ToArray(),
-            createdAt = Iso(f.CreatedAt),
-            uploadedAt = Iso(f.UploadedAt)
+            ["createdAt"] = Iso(f.CreatedAt),
+            ["uploadedAt"] = Iso(f.UploadedAt)
         };
     }
 
