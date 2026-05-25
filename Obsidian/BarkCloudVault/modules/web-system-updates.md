@@ -23,8 +23,9 @@ Parent: [[modules/backend-web]] · See also: [[index]] · [[structure/infrastruc
 - **Обновить сервис:** `docker compose -p <project> --env-file /.env -f /docker-compose.yml pull <svc>` → `up --force-recreate -d <svc>` → `docker image prune -f`.
 - **Обновить всё:** последовательно `configuration → identity → users → files` (web исключён).
 - **restart / start / stop:** `docker <action> <container>` по белому списку (web запрещён — только self-методы).
-- **Self-update / self-restart веба:** detached **helper-контейнер** из образа самого web (`docker run -d --rm` с `sh -c "sleep 2 && docker compose … pull web && … up --force-recreate -d web"`). Веб не может пересоздать себя изнутри. Host-пути для `-v` берутся через `docker inspect` mount'ов `cloud-web`; имя compose-проекта — из метки `com.docker.compose.project`.
-- Креды приватного registry: `DOCKER_CONFIG=/root/.docker`; на хосте нужен `docker login docker.barkfluff.com:5000`, его `~/.docker/config.json` смонтирован в `cloud-web`.
+- **Self-restart веба:** detached **helper-контейнер** из образа самого web (`docker run -d --rm` c `sh -c "sleep 2 && docker restart cloud-web"`). Веб не может перезапустить себя изнутри. Имя compose-проекта — из метки `com.docker.compose.project`.
+- **Self-update веба (`pull web` + `up --force-recreate`) — временно отключён.** На Windows Docker Desktop хелпер-контейнер (Linux) не может пересоздать `cloud-web` с правильными хостовыми путями: трюк BarkFluff «монтировать compose по тому же пути, что на хосте» работает только на Linux (на Windows путь `C:\…` невалиден как destination Linux-контейнера и не резолвится как абсолютный в compose). Кнопка «Обновить веб-клиент» в UI неактивна; веб обновляется на хосте вручную (`docker compose pull web && up -d web`). Код `UpdateWebSelfAsync` оставлен для Linux-деплоя.
+- Registry `docker.barkfluff.com:5000` **публичный на pull** (auth нужен только для push в CI), поэтому креды не требуются. `DOCKER_CONFIG=/tmp/barkcloud-docker` (пустой) — чтобы CLI не читал `config.json` хоста с `"credsStore": "desktop"` и не звал отсутствующий `docker-credential-desktop`. `config.json` хоста больше не монтируется.
 
 ## Эндпоинты (`SystemEndpoints.cs`)
 
@@ -44,7 +45,7 @@ Parent: [[modules/backend-web]] · See also: [[index]] · [[structure/infrastruc
 ## Инфраструктура
 
 - `BarkCloud.Web/Dockerfile.slim` (**его использует prod-CI** `build-backend-web.yml`) и `Dockerfile`: финальный образ `aspnet:10.0-alpine` + `apk add docker-cli docker-cli-compose icu-libs tzdata` (chiseled не подходит — нет shell/пакетов), `DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false`, без `USER` (root задаётся в compose).
-- `docker-compose.yml` сервис `web`: `user: root`, volumes `docker.sock`/`./docker-compose.yml`/`./.env`/`~/.docker/config.json`, env `App__AdminPassword`.
+- `docker-compose.yml` сервис `web`: `user: root`, volumes `docker.sock`/`./docker-compose.yml`/`./.env` (монтирование `~/.docker/config.json` убрано — registry публичный), env `App__AdminPassword`.
 - `sample.env`: `WEB_ADMIN_PASSWORD`.
 
 ## Компромисс безопасности
