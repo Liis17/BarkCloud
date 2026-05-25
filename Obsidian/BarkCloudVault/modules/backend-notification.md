@@ -45,4 +45,4 @@ Publisher — [[modules/backend-identity]] (`NotificationQueueSender` → `IPubl
 
 ## Окружение
 
-`ASPNETCORE_ENVIRONMENT`, `CONFIGURATION_SERVICE_URL`. Из [[modules/backend-configuration]] приходят: `RunSettings:Port` (дефолт 7022), общие `RabbitMQ:*` и `Seq` (ServiceId.Unknown), а также `Email:*` для `ServiceId.Notification`. SMTP-настройки (`Email:*`) — секреты: Seed создаёт пустые записи, реальные значения вписываются в БД configuration вручную после первого старта.
+`ASPNETCORE_ENVIRONMENT`, `CONFIGURATION_SERVICE_URL`. Из [[modules/backend-configuration]] приходят: `RunSettings:Port` (дефолт 7022), общие `RabbitMQ:*` и `Seq` (ServiceId.Unknown), а также `Email:*` для `ServiceId.Notification`. SMTP-настройки (`Email:*` — `Host`, `Port`, `SenderEmail`, `SenderPassword`) — секреты: Configuration при каждом старте досевает недостающие ключи в БД пустыми (идемпотентно, без дубликатов — см. `EnsureSeedAsync` в [[modules/backend-configuration]]), реальные значения вписываются в БД configuration вручную.

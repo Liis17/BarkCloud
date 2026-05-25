@@ -17,7 +17,8 @@ Parent: [[index]] · See also: [[api/configuration-api]]
 - `Host/ConfigurationApiService.cs` — реализация gRPC `ConfigurationApi`
 - `Infrastructure/ConfigurationContext.cs` — EF Core DbContext
 - `Infrastructure/ConfigurationContextFactory.cs` — фабрика контекста (для EF Tools)
-- `Infrastructure/ConfigurationDefaultsPopulator.cs` — заливка дефолтных значений
+- `Infrastructure/ConfigurationSeed.cs` — эталонный список всех ожидаемых ключей (`Section`/`Key`/`ServiceId`), включая SMTP-поля `Email:*` для Notification
+- `Infrastructure/ConfigurationDefaultsPopulator.cs` — заливка дефолтных значений. `EnsureSeedAsync` при **каждом** старте сверяет таблицу с `ConfigurationSeed` и досевает только недостающие ключи (по тройке `Section/Key/ServiceId`), без дубликатов — новые ключи доезжают и в уже существующую БД. `PopulateDefaultsAsync` заполняет пустые записи дефолтами (кроме секретов вроде `Email:SenderPassword`)
 - `Infrastructure/ConfigurationStorage.cs` — слой доступа к данным
 - `Persistence/Migrations/20260518172647_InitialCreate.cs` — единственная миграция
 - `Dockerfile`, `Dockerfile.slim`

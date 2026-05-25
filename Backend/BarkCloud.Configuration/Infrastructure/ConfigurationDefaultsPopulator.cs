@@ -101,24 +101,39 @@ public class ConfigurationDefaultsPopulator
     }
 
     /// <summary>
-    /// При пустой таблице создаёт записи для всех ожидаемых ключей (Section/Key/ServiceId)
-    /// с пустым Value. Дальше <see cref="PopulateDefaultsAsync"/> заполнит их дефолтами.
+    /// Сверяет таблицу с эталонным списком ожидаемых ключей (<see cref="ConfigurationSeed"/>)
+    /// и добавляет только недостающие записи (по тройке Section/Key/ServiceId) с пустым Value.
+    /// Выполняется при каждом старте, поэтому новые ключи (например, SMTP-поля Notification)
+    /// доезжают в уже существующую БД, а дубликаты не создаются.
+    /// Дальше <see cref="PopulateDefaultsAsync"/> заполнит новые записи дефолтами.
     /// </summary>
     public async Task EnsureSeedAsync()
     {
-        var hasAny = await _context.Configurations.AnyAsync();
-        if (hasAny)
+        var seedItems = ConfigurationSeed.BuildSeedItems();
+
+        var existingKeys = (await _context.Configurations
+                .Select(c => new { c.Section, c.Key, c.ServiceId })
+                .ToListAsync())
+            .Select(c => (c.Section, c.Key, c.ServiceId))
+            .ToHashSet();
+
+        var missing = seedItems
+            .Where(item => !existingKeys.Contains((item.Section, item.Key, item.ServiceId)))
+            .ToList();
+
+        if (missing.Count == 0)
         {
-            _logger.LogInformation("Таблица Configurations уже содержит записи, seed не требуется");
+            _logger.LogInformation("Все ожидаемые конфигурации уже присутствуют, seed не требуется");
             return;
         }
 
-        var seedItems = ConfigurationSeed.BuildSeedItems();
-        await _context.Configurations.AddRangeAsync(seedItems);
+        await _context.Configurations.AddRangeAsync(missing);
         await _context.SaveChangesAsync();
 
-        _metrics?.Add("configurations_seeded_total", seedItems.Count);
-        _logger.LogInformation("Засеяно пустых записей конфигурации: {Count}", seedItems.Count);
+        _metrics?.Add("configurations_seeded_total", missing.Count);
+        _logger.LogInformation(
+            "Добавлено недостающих записей конфигурации: {Count} (из {Total} ожидаемых)",
+            missing.Count, seedItems.Count);
     }
 
     public async Task PopulateDefaultsAsync()
