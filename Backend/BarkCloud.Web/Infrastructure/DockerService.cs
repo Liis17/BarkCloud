@@ -309,8 +309,10 @@ public sealed class DockerService
             StandardOutputEncoding = Encoding.UTF8,
             StandardErrorEncoding = Encoding.UTF8,
         };
-        // docker CLI (root) ищет креды registry в /root/.docker/config.json
-        startInfo.Environment["DOCKER_CONFIG"] = "/root/.docker";
+        // Registry публичный (auth нужен только для push в CI), креды для pull не требуются.
+        // Пустой DOCKER_CONFIG, чтобы CLI не читал config.json хоста с "credsStore": "desktop"
+        // и не пытался вызвать docker-credential-desktop (которого нет в alpine-контейнере).
+        startInfo.Environment["DOCKER_CONFIG"] = "/tmp/barkcloud-docker";
         // Подключаемся напрямую к смонтированному сокету и игнорируем currentContext из config.json
         // (на хосте это "desktop-linux", чьих метаданных внутри контейнера нет — иначе CLI падает).
         startInfo.Environment["DOCKER_HOST"] = "unix:///var/run/docker.sock";

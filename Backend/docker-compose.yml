@@ -100,8 +100,6 @@ services:
       # compose-файл и .env нужны для `docker compose pull/up`; монтируем по тем же путям, что админка BarkFluff.
       - ./docker-compose.yml:/docker-compose.yml:ro
       - ./.env:/.env:ro
-      # Креды приватного registry для pull. Требуется `docker login docker.barkfluff.com:5000` на хосте.
-      - ~/.docker/config.json:/root/.docker/config.json:ro
     ports:
       - "${WEB_PORT}:8080"
     networks:
