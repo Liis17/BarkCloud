@@ -50,7 +50,7 @@ Parent: [[index]] · See also: [[api/identity-api]] · [[api/users-api]] · [[ap
 
 ### Корень
 - `Program.cs` — `LoadConfiguration(ServiceId.Web)`, DI gRPC-клиентов (Identity/Users/Files/Cloud/**Album** + серверные `UsersServerApi`/`FilesServerApi` с `JwtClientInterceptor` — для проверки занятости и аватара), `AddHttpClient("files-upload")` для прокси-загрузки, лимиты тела запроса 512 МБ (Kestrel + `FormOptions`), регистрация сервисов (+ `AuthGateway`, `RegistrationGateway`, `PasswordResetGateway`, `AdminGate`, `DockerService`), `MapWebEndpoints` + `MapCloudApiEndpoints` + `MapSystemEndpoints` + `MapSettingsEndpoints`, включение h2c.
-- `WebEndpoints.cs` — маршруты страниц: `/`, `/login` (GET/POST), `/logout`, `/register` (GET/POST), `/register/confirm` (POST), `/forgot` (GET/POST), `/forgot/confirm` (POST), `/photos`, `/files`, `/settings`, `/videos`, `/shared`, `/shared.jsx`, `/shared.css`. Для `/photos`/`/files`/`/videos` `page_data_json` пустой — данные грузятся на клиенте через `/api`.
+- `WebEndpoints.cs` — маршруты страниц: `/`, `/login` (GET/POST), `/logout`, `/register` (GET/POST), `/register/confirm` (POST), `/forgot` (GET/POST), `/forgot/confirm` (POST), `/photos`, `/files`, `/trash`, `/settings`, `/videos`, `/shared`, `/shared.jsx`, `/shared.css`. Для `/photos`/`/files`/`/trash`/`/videos` `page_data_json` пустой — данные грузятся на клиенте через `/api`.
 - `Endpoints/CloudApiEndpoints.cs` — группа `/api/*` для Фото/Видео/Файлов (см. раздел «Фото/Видео/Файлы»).
 - `SystemEndpoints.cs` — `/healthz` + группа `/api/system/*` (обновление/перезапуск бэкенда). См. [[modules/web-system-updates]].
 - `SettingsEndpoints.cs` — группа `/api/settings/*` для действий страницы настроек (см. раздел «Настройки»).
@@ -71,11 +71,11 @@ Parent: [[index]] · See also: [[api/identity-api]] · [[api/users-api]] · [[ap
 ### Rendering
 - `PageService.cs` — чтение и рендер файлов из `Pages/`.
 - `PageDataBuilder.cs` — сбор серверных данных: каркас (`Users.GetUser` + `Files.GetUserStorageInfo`) и Settings (профиль + bio + email через `UsersServerApi.GetUserContacts`, флаги 2FA `ListOtpVerification`, приватность `GetPrivacySettings`, сессии с `deviceId`, storage). Фото/Видео/Файлы серверно больше не собираются — они грузятся на клиенте через `/api`.
-- `CloudJson.cs` — единый маппинг gRPC-типов Files → JSON-карточки (`Media`/`Dir`/`Album`/`Entry`), общий для `/api`. `Media` отдаёт `previews[]` (128/512/1024 с URL) для `srcset`.
+- `CloudJson.cs` — единый маппинг gRPC-типов Files → JSON-карточки (`Media`/`Dir`/`Album`/`Entry`/`Trash`), общий для `/api`. `Media` отдаёт `previews[]` (128/512/1024 с URL) для `srcset`; `Trash` добавляет `deletedAt`/`purgeAt`.
 - `Format.cs`, `FileKind.cs` — форматирование размеров/дат и классификация файлов.
 
 ### Pages
-- `Login Page Full.html`, `Photos.html`, `Files.html`, `Settings.html`, `Videos.html`, `Shared.html`, `shared.jsx`, `shared.css` — React+Babel страницы; сервер заполняет `{{ … }}` (каркас) и `{{{ page_data_json }}}` (только Settings; Фото/Видео/Файлы грузят данные сами через `fetch('/api/…')`).
+- `Login Page Full.html`, `Photos.html`, `Files.html`, `Trash.html`, `Settings.html`, `Videos.html`, `Shared.html`, `shared.jsx`, `shared.css` — React+Babel страницы; сервер заполняет `{{ … }}` (каркас) и `{{{ page_data_json }}}` (только Settings; Фото/Видео/Файлы/Корзина грузят данные сами через `fetch('/api/…')`). `Trash.html` — страница «Корзина»: список удалённых файлов с датами удаления/окончательной зачистки, действия «Восстановить»/«Удалить навсегда»/«Очистить корзину».
 - `shared.jsx` экспортирует в `window` не только каркас (`AppShell`/`Sidebar`/…), но и data-слой и общий UI: `api`/`apiGet`/`apiPost`/`pickFiles`/`uploadFile`, `MediaThumb` (превью через `srcset`+`sizes` — браузер сам выбирает ширину под блок), `Lightbox` (оригинал через `GetTempDownloadUrl`), `Modal`, `useToast`, `EmptyState`, `Loading`, а также общие для Фото/Видео компоненты альбомов: `AlbumCard`/`AlbumFormModal`/`PickMediaModal`/`AlbumDetail` + хелперы `plural`/`dateLabel`/`groupByDate`.
 - Навигация в `shared.jsx` ведёт на чистые роуты (`/photos`, `/files`, `/settings`, …), а не на `*.html`.
 - Логин-страница — многорежимная по `flash.kind`: `register` (`RegisterCard`, POST `/register`), `register_confirm` (`RegisterConfirmCard`, ввод кода, POST `/register/confirm`), `forgot` (`ForgotCard`, POST `/forgot`), `forgot_confirm` (`ForgotConfirmCard`, код + новый пароль, POST `/forgot/confirm`). Шаги подтверждения переиспользуют компонент `OtpRow` и несут `code_id`/`reset_id`/пароль в скрытых полях.
@@ -88,7 +88,8 @@ Parent: [[index]] · See also: [[api/identity-api]] · [[api/users-api]] · [[ap
 Эндпоинты — `Endpoints/CloudApiEndpoints.cs` (группа `/api`), паттерн как у `/api/settings/*`: `AuthGateway.AuthenticateAsync`
 → gRPC с пользовательским токеном (`BrowserContext.UserToken`); доменные ошибки (`FailedPrecondition` + `x-error-code`) → `400 { error, code }`.
 
-- Каталоги (CloudApi): `GET cloud/list?dir=`, `POST cloud/dir`/`dir/rename`/`dir/move`/`dir/delete`, `POST cloud/attach`, `POST cloud/entry/rename`/`entry/move`/`entry/delete`.
+- Каталоги (CloudApi): `GET cloud/list?dir=`, `POST cloud/dir`/`dir/rename`/`dir/move`/`dir/delete`, `POST cloud/attach`, `POST cloud/entry/rename`/`entry/move`/`entry/delete` (удаление файла/папки = перемещение в корзину).
+- Корзина (CloudApi): `GET cloud/trash?limit=&cursorAt=&cursorId=` (`ListTrash`), `POST cloud/trash/restore`/`trash/purge` (по `entryId`), `POST cloud/trash/empty`.
 - Галерея (CloudApi): `GET cloud/media?kind=photo|video&limit=&cursorAt=&cursorId=` (`ListUserMedia`, cursor-пагинация).
 - Альбомы (AlbumApi): `GET albums`, `GET albums/items?album=&kind=`, `POST albums`/`albums/update`/`albums/delete`/`albums/items/add`/`albums/items/remove`.
 - Файлы (FilesApi): `POST files/upload` — **прокси-загрузка**: `GetUploadUrl` → стрим байтов `HttpClient`-ом на **внутренний HTTP1-эндпоинт** Files `FilesService:Http1Base` (= хост из `FilesService:Host` + порт `FILES_HTTP1PORT`, по умолч. `7026`) `/upload/{fileId}` — минуя nginx/TLS и `ExternalEndpoint:Host`; публичный `upload.Url` — fallback. Возвращает `fileId`. `GET files/download?ids=` — временные ссылки на оригинал(ы) через `GetTempDownloadUrl`.

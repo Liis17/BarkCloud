@@ -373,13 +373,13 @@ function App() {
     } catch (e) { toast(e.message, 'err'); }
   }
   async function deleteDir(dir) {
-    if (!window.confirm(`Удалить папку «${dir.name}» со всем содержимым?`)) return;
-    try { await apiPost('/api/cloud/dir/delete', { id: dir.id }); load(); toast('Папка удалена'); }
+    if (!window.confirm(`Удалить папку «${dir.name}»? Файлы внутри попадут в корзину на 14 дней.`)) return;
+    try { await apiPost('/api/cloud/dir/delete', { id: dir.id }); load(); toast('Папка удалена, файлы в корзине'); }
     catch (e) { toast(e.message, 'err'); }
   }
   async function deleteEntry(entry) {
-    if (!window.confirm(`Убрать «${entry.name}» из каталога?`)) return;
-    try { await apiPost('/api/cloud/entry/delete', { entryId: entry.entryId }); load(); toast('Удалено'); }
+    if (!window.confirm(`Переместить «${entry.name}» в корзину? Через 14 дней файл удалится навсегда.`)) return;
+    try { await apiPost('/api/cloud/entry/delete', { entryId: entry.entryId }); load(); toast('Перемещено в корзину'); }
     catch (e) { toast(e.message, 'err'); }
   }
   async function download(entry) {

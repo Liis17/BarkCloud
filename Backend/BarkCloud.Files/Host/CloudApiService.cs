@@ -2,7 +2,10 @@ using BarkCloud.Files.Features.Cloud.AttachFile;
 using BarkCloud.Files.Features.Cloud.CreateDirectory;
 using BarkCloud.Files.Features.Cloud.DeleteDirectory;
 using BarkCloud.Files.Features.Cloud.DeleteFileEntry;
+using BarkCloud.Files.Features.Cloud.DeleteFromTrash;
+using BarkCloud.Files.Features.Cloud.EmptyTrash;
 using BarkCloud.Files.Features.Cloud.GetPath;
+using BarkCloud.Files.Features.Cloud.ListTrash;
 using BarkCloud.Files.Features.Cloud.ListDirectory;
 using BarkCloud.Files.Features.Cloud.ListDirectoryDetailed;
 using BarkCloud.Files.Features.Cloud.ListUserImages;
@@ -11,6 +14,7 @@ using BarkCloud.Files.Features.Cloud.MoveDirectory;
 using BarkCloud.Files.Features.Cloud.MoveFileEntry;
 using BarkCloud.Files.Features.Cloud.RenameDirectory;
 using BarkCloud.Files.Features.Cloud.RenameFileEntry;
+using BarkCloud.Files.Features.Cloud.RestoreFromTrash;
 using BarkCloud.Files.Features.Cloud.SetVideoThumbnail;
 using BarkCloud.Proto.Files;
 using BarkCloud.Shared.Identity;
@@ -196,6 +200,51 @@ public class CloudApiService : CloudApi.CloudApiBase
         };
 
         return _mediator.Send(command);
+    }
+
+    public override Task<ListTrashResponse> ListTrash(ListTrashRequest request, ServerCallContext context)
+    {
+        DateTime? cursorDeletedAt = null;
+        Guid? cursorEntryId = null;
+        if (request.CursorDeletedAt is not null && !string.IsNullOrWhiteSpace(request.CursorEntryId))
+        {
+            cursorDeletedAt = request.CursorDeletedAt.ToDateTime();
+            cursorEntryId = Guid.Parse(request.CursorEntryId);
+        }
+
+        var command = new ListTrashCommand
+        {
+            Limit = request.Limit,
+            CursorDeletedAt = cursorDeletedAt,
+            CursorEntryId = cursorEntryId
+        };
+
+        return _mediator.Send(command);
+    }
+
+    public override Task<CloudEmpty> RestoreFromTrash(RestoreFromTrashRequest request, ServerCallContext context)
+    {
+        var command = new RestoreFromTrashCommand
+        {
+            EntryId = Guid.Parse(request.EntryId)
+        };
+
+        return _mediator.Send(command);
+    }
+
+    public override Task<CloudEmpty> DeleteFromTrash(DeleteFromTrashRequest request, ServerCallContext context)
+    {
+        var command = new DeleteFromTrashCommand
+        {
+            EntryId = Guid.Parse(request.EntryId)
+        };
+
+        return _mediator.Send(command);
+    }
+
+    public override Task<CloudEmpty> EmptyTrash(EmptyTrashRequest request, ServerCallContext context)
+    {
+        return _mediator.Send(new EmptyTrashCommand());
     }
 
     public override Task<PathResponse> GetPath(GetPathRequest request, ServerCallContext context)

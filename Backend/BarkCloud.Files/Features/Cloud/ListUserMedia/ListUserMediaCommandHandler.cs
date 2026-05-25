@@ -55,13 +55,16 @@ public class ListUserMediaCommandHandler : IRequestHandler<ListUserMediaCommand,
         var limit = request.Limit <= 0 ? DefaultLimit : Math.Min(request.Limit, MaxLimit);
         var kind = request.Kind;
 
-        // Файлы владельца нужного медиа-типа, исключая превью-блобы.
+        // Файлы владельца нужного медиа-типа, исключая превью-блобы и «эффективно удалённые»
+        // (все записи владельца на файл — в корзине; файлы без записи или с живой записью остаются).
         var query = _context.UploadedFiles
             .AsNoTracking()
             .Where(f => f.Uploaders.Contains(ownerId)
                         && f.Type == Domain.UploadFileType.CloudFile
                         && f.MediaKind == kind
-                        && !_context.FilePreviews.Any(p => p.PreviewFileId == f.Id));
+                        && !_context.FilePreviews.Any(p => p.PreviewFileId == f.Id)
+                        && !(_context.CloudFileEntries.Any(e => e.OwnerId == ownerId && e.FileId == f.Id && e.IsDeleted)
+                             && !_context.CloudFileEntries.Any(e => e.OwnerId == ownerId && e.FileId == f.Id && !e.IsDeleted)));
 
         if (request.CursorCreatedAt.HasValue && request.CursorFileId.HasValue)
         {

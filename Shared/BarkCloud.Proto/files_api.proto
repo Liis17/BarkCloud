@@ -35,6 +35,12 @@ service CloudApi {
   rpc GetPath              (GetPathRequest)              returns (PathResponse);             // Построить путь до объекта в иерархии
 
   rpc SetVideoThumbnail    (SetVideoThumbnailRequest)    returns (CloudEmpty);               // Заменить превью видео загруженной картинкой
+
+  // ───────── Корзина ─────────
+  rpc ListTrash            (ListTrashRequest)            returns (ListTrashResponse);        // Список файлов в корзине (от новых к старым)
+  rpc RestoreFromTrash     (RestoreFromTrashRequest)     returns (CloudEmpty);               // Восстановить файл из корзины
+  rpc DeleteFromTrash      (DeleteFromTrashRequest)      returns (CloudEmpty);               // Удалить файл из корзины навсегда (немедленно)
+  rpc EmptyTrash           (EmptyTrashRequest)           returns (CloudEmpty);               // Очистить корзину целиком
 }
 
 service FilesServerApi {
@@ -280,6 +286,38 @@ message ListUserMediaResponse {
 message SetVideoThumbnailRequest {
   string video_file_id = 1;         // идентификатор видео-файла
   string source_image_file_id = 2;  // загруженная пользователем картинка-кадр для нового превью
+}
+
+// ============ Корзина ============
+
+message ListTrashRequest {
+  int32 limit = 1;                                  // 1..200, default 50
+  google.protobuf.Timestamp cursor_deleted_at = 2;  // exclusive; пусто = с самых свежеудалённых
+  string cursor_entry_id = 3;                       // tie-breaker для стабильной cursor-пагинации
+}
+
+message TrashEntry {
+  FileEntryInfo entry = 1;                  // id / directory_id / file_id / name / created_at
+  UploadFileInfo file = 2;                  // полная информация о блобе (URL, размеры, превью)
+  google.protobuf.Timestamp deleted_at = 3; // когда перемещён в корзину
+  google.protobuf.Timestamp purge_at = 4;   // когда будет удалён окончательно
+}
+
+message ListTrashResponse {
+  repeated TrashEntry items = 1;
+  google.protobuf.Timestamp next_cursor_deleted_at = 2; // пусто = больше нет страниц
+  string next_cursor_entry_id = 3;
+}
+
+message RestoreFromTrashRequest {
+  string entry_id = 1;
+}
+
+message DeleteFromTrashRequest {
+  string entry_id = 1;
+}
+
+message EmptyTrashRequest {
 }
 
 message GetPathRequest {

@@ -32,6 +32,20 @@ public class S3Uploader
     }
 
     /// <summary>
+    /// Удаляет объект из S3/MinIO. Идемпотентно: для отсутствующего ключа S3 возвращает успех.
+    /// </summary>
+    public async Task DeleteAsync(string bucket, string key)
+    {
+        var client = _registry.GetClientForBucket(bucket);
+
+        await client.DeleteObjectAsync(new DeleteObjectRequest
+        {
+            BucketName = bucket,
+            Key = key
+        });
+    }
+
+    /// <summary>
     /// Скачивает объект из S3 и отдаёт поток без буферизации в памяти.
     /// Возвращаемый поток владеет <see cref="GetObjectResponse"/>: при его Dispose/DisposeAsync
     /// корректно освобождаются HTTP-соединение и метаданные ответа AWS SDK.
