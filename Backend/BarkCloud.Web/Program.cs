@@ -65,13 +65,12 @@ const long maxUpload = 536_870_912; // 512 МБ
 builder.WebHost.ConfigureKestrel(o => o.Limits.MaxRequestBodySize = maxUpload);
 builder.Services.Configure<FormOptions>(o => o.MultipartBodyLengthLimit = maxUpload);
 
-// Серверные (inter-service) API для регистрации без почты. Авторизуются сервисным
-// токеном, который Web подписывает общим JWT-секретом (как Configuration).
+// Серверные (inter-service) API. Авторизуются сервисным токеном, который Web
+// подписывает общим JWT-секретом (как Configuration): проверка занятости юзернейма/почты
+// при регистрации (Users) и загрузка аватара (Files).
 var serviceToken = ServiceToken.Generate(builder.Configuration);
 
 builder.Services.AddGrpcClient<UsersServerApi.UsersServerApiClient>(o => o.Address = new Uri(usersAddress))
-    .AddInterceptor(() => new JwtClientInterceptor(serviceToken));
-builder.Services.AddGrpcClient<IdentityServerApi.IdentityServerApiClient>(o => o.Address = new Uri(identityAddress))
     .AddInterceptor(() => new JwtClientInterceptor(serviceToken));
 builder.Services.AddGrpcClient<FilesServerApi.FilesServerApiClient>(o => o.Address = new Uri(filesAddress))
     .AddInterceptor(() => new JwtClientInterceptor(serviceToken));
@@ -82,6 +81,7 @@ builder.Services.AddSingleton<AdminGate>();
 builder.Services.AddSingleton<DockerService>();
 builder.Services.AddScoped<AuthGateway>();
 builder.Services.AddScoped<RegistrationGateway>();
+builder.Services.AddScoped<PasswordResetGateway>();
 builder.Services.AddScoped<PageDataBuilder>();
 
 var app = builder.Build();

@@ -21,26 +21,36 @@ Parent: [[index]] · See also: [[api/identity-api]] · [[api/users-api]] · [[ap
 - Истёк access → автоматический refresh через `IdentityApi.CreateToken`.
 - Логин → `IdentityApi.Auth` (с device-заголовками `x-device-name`/`x-os-name`/`x-app-name`/`x-app-version`, base64). Поддержан 2FA-шаг.
 
-## Регистрация (без подтверждения по почте и 2FA)
+## Регистрация (с подтверждением кодом по почте)
 
-В BarkCloud **нет** сервиса уведомлений (был только в BarkFluff), поэтому email-флоу `CreateAccount`/`ConfirmAccount` не используется. Аккаунт собирается целиком на стороне Web через **серверные (inter-service) API** и пользователь сразу логинится:
+В BarkCloud **есть** сервис уведомлений [[modules/backend-notification]] (паритет с BarkFluff), поэтому Web использует штатный клиентский email-флоу `IdentityApi` — тот же, что и мобильные клиенты. Двухшаговый процесс (`Auth/RegistrationGateway.cs`):
 
+**Шаг 1 — `BeginAsync` (POST `/register`):**
 1. `UsersServerApi.CheckExistUsername` / `CheckExistEmail` — проверка занятости.
-2. `UsersServerApi.AddDraftUser` (при остатке черновика → `OverrideDraftUser`) → `userId`.
-3. `UsersServerApi.ConfirmUser` → пользователь подтверждён.
-4. `IdentityServerApi.ForceSetPasswordServer` → пароль (без OTP).
-5. `IdentityServerApi.CreateSessionForUserServer` → access+refresh, регистрирует устройство.
-6. `AuthGateway.IssueSession` ставит cookie → редирект на `/photos`.
+2. `IdentityApi.CreateAccount(first/last/username/email)` с device-метаданными → Identity создаёт черновик, шлёт письмо `ConfirmationRegistration` с 6-значным кодом, возвращает `code_id`.
+3. Рендер экрана ввода кода (`flash.kind=register_confirm`); `code_id` и пароль несутся в скрытых полях формы (как в 2FA-шаге).
 
-Серверные вызовы авторизуются **сервисным JWT** (`TokenType=Service`), который Web подписывает общим `JwtSettings:SecretKey` сам (`Infrastructure/ServiceToken.cs`) — это снимает зависимость от засева `*Service:Token` в Configuration (на существующей БД seed не перезапускается). Email-уведомления внутри серверных обработчиков обёрнуты в try/catch, поэтому отсутствие Notifications регистрацию не ломает.
+**Шаг 2 — `ConfirmAsync` (POST `/register/confirm`):**
+1. `IdentityApi.ConfirmAccount(code_id, code)` → `refresh_token` (Identity шлёт `SuccessfulRegistration`).
+2. `IdentityApi.CreateToken(refresh)` → `access_token` (ConfirmAccount отдаёт только refresh).
+3. `IdentityApi.SetPassword(password, old="")` с access-токеном. Для нового пользователя это первая установка пароля → письмо `PasswordChanged` **не** шлётся.
+4. `AuthGateway.IssueSession` ставит cookie → редирект на `/photos`.
 
-> Цена подхода: Web держит привилегированный сервисный токен (может создавать сессии и менять пароли любому пользователю). Для self-host приемлемо.
+> Раньше регистрация шла в обход почты через серверные API (`AddDraftUser → ConfirmUser → ForceSetPasswordServer → CreateSessionForUserServer`) — это не спрашивало код и ошибочно слало письмо «Пароль изменён администратором» (`ForceSetPasswordServer`). Заменено на клиентский флоу выше; серверный `IdentityServerApi`-клиент в Web больше не используется.
+
+## Восстановление пароля «Забыли пароль?» (код по почте)
+
+Двухшаговый флоу через клиентский `IdentityApi` (`Auth/PasswordResetGateway.cs`); ссылки «Забыли?» на странице логина ведут на `/forgot`.
+
+**Шаг 1 — `BeginAsync` (POST `/forgot`):** `IdentityApi.ResetPassword(email|username, OtpTypeId.Email)` с device-метаданными → письмо `ResetPassword` с кодом, `reset_id`. Identity анти-энумерационно отдаёт dummy `reset_id` даже для несуществующего пользователя → всегда показываем экран ввода кода (`flash.kind=forgot_confirm`).
+
+**Шаг 2 — `ConfirmAsync` (POST `/forgot/confirm`):** `IdentityApi.ConfirmResetPassword(reset_id, code)` → access+refresh (Identity очищает старый хеш пароля) → `IdentityApi.SetPassword(newPassword, old="")` (старый пароль не нужен — хеш очищен) → `AuthGateway.IssueSession` → `/photos`. Новый пароль вводится на шаге 2; `reset_id` несётся в скрытом поле.
 
 ## Файлы
 
 ### Корень
-- `Program.cs` — `LoadConfiguration(ServiceId.Web)`, DI gRPC-клиентов (Identity/Users/Files/Cloud/**Album** + серверные `UsersServerApi`/`IdentityServerApi`/`FilesServerApi` с `JwtClientInterceptor`), `AddHttpClient("files-upload")` для прокси-загрузки, лимиты тела запроса 512 МБ (Kestrel + `FormOptions`), регистрация сервисов (+ `AdminGate`, `DockerService`), `MapWebEndpoints` + `MapCloudApiEndpoints` + `MapSystemEndpoints` + `MapSettingsEndpoints`, включение h2c.
-- `WebEndpoints.cs` — маршруты страниц: `/`, `/login` (GET/POST), `/logout`, `/register` (GET/POST), `/photos`, `/files`, `/settings`, `/videos`, `/shared`, `/shared.jsx`, `/shared.css`. Для `/photos`/`/files`/`/videos` `page_data_json` пустой — данные грузятся на клиенте через `/api`.
+- `Program.cs` — `LoadConfiguration(ServiceId.Web)`, DI gRPC-клиентов (Identity/Users/Files/Cloud/**Album** + серверные `UsersServerApi`/`FilesServerApi` с `JwtClientInterceptor` — для проверки занятости и аватара), `AddHttpClient("files-upload")` для прокси-загрузки, лимиты тела запроса 512 МБ (Kestrel + `FormOptions`), регистрация сервисов (+ `AuthGateway`, `RegistrationGateway`, `PasswordResetGateway`, `AdminGate`, `DockerService`), `MapWebEndpoints` + `MapCloudApiEndpoints` + `MapSystemEndpoints` + `MapSettingsEndpoints`, включение h2c.
+- `WebEndpoints.cs` — маршруты страниц: `/`, `/login` (GET/POST), `/logout`, `/register` (GET/POST), `/register/confirm` (POST), `/forgot` (GET/POST), `/forgot/confirm` (POST), `/photos`, `/files`, `/settings`, `/videos`, `/shared`, `/shared.jsx`, `/shared.css`. Для `/photos`/`/files`/`/videos` `page_data_json` пустой — данные грузятся на клиенте через `/api`.
 - `Endpoints/CloudApiEndpoints.cs` — группа `/api/*` для Фото/Видео/Файлов (см. раздел «Фото/Видео/Файлы»).
 - `SystemEndpoints.cs` — `/healthz` + группа `/api/system/*` (обновление/перезапуск бэкенда). См. [[modules/web-system-updates]].
 - `SettingsEndpoints.cs` — группа `/api/settings/*` для действий страницы настроек (см. раздел «Настройки»).
@@ -48,8 +58,9 @@ Parent: [[index]] · See also: [[api/identity-api]] · [[api/users-api]] · [[ap
 ### Auth
 - `AuthGateway.cs` — cookie, локальная валидация JWT, refresh, логин/логаут, `IssueSession` (общая выдача cookie сессии), `ClearSession` (удаление cookie без обращения в Identity — после удаления аккаунта).
 - `AdminGate.cs` — гейт админ-действий по паролю `App:AdminPassword` (cookie `bark_admin`, HMAC на `JwtSettings:SecretKey`). См. [[modules/web-system-updates]].
-- `RegistrationGateway.cs` — регистрация без почты через серверные API (см. раздел «Регистрация»).
-- `WebUser.cs` — модель пользователя + `LoginOutcome`/`LoginResult` + `RegistrationOutcome`/`RegistrationResult`.
+- `RegistrationGateway.cs` — регистрация с кодом по почте через клиентский `IdentityApi` (`BeginAsync`/`ConfirmAsync`, см. раздел «Регистрация»).
+- `PasswordResetGateway.cs` — восстановление пароля «Забыли пароль?» через клиентский `IdentityApi` (`BeginAsync`/`ConfirmAsync`, см. раздел «Восстановление пароля»).
+- `WebUser.cs` — модель пользователя + `LoginOutcome`/`LoginResult` + `RegistrationOutcome`/`RegistrationResult` + `PasswordResetOutcome`/`PasswordResetResult`.
 
 ### Infrastructure
 - `TemplateRenderer.cs` — рендер плейсхолдеров `{{ }}` / `{{{ }}}` / `| default("…")` с JS-экранированием (не задевает JSX `style={{…}}`).
@@ -67,7 +78,7 @@ Parent: [[index]] · See also: [[api/identity-api]] · [[api/users-api]] · [[ap
 - `Login Page Full.html`, `Photos.html`, `Files.html`, `Settings.html`, `Videos.html`, `Shared.html`, `shared.jsx`, `shared.css` — React+Babel страницы; сервер заполняет `{{ … }}` (каркас) и `{{{ page_data_json }}}` (только Settings; Фото/Видео/Файлы грузят данные сами через `fetch('/api/…')`).
 - `shared.jsx` экспортирует в `window` не только каркас (`AppShell`/`Sidebar`/…), но и data-слой и общий UI: `api`/`apiGet`/`apiPost`/`pickFiles`/`uploadFile`, `MediaThumb` (превью через `srcset`+`sizes` — браузер сам выбирает ширину под блок), `Lightbox` (оригинал через `GetTempDownloadUrl`), `Modal`, `useToast`, `EmptyState`, `Loading`, а также общие для Фото/Видео компоненты альбомов: `AlbumCard`/`AlbumFormModal`/`PickMediaModal`/`AlbumDetail` + хелперы `plural`/`dateLabel`/`groupByDate`.
 - Навигация в `shared.jsx` ведёт на чистые роуты (`/photos`, `/files`, `/settings`, …), а не на `*.html`.
-- Логин-страница содержит экран регистрации как состояние `flash.kind = "register"` (компонент `RegisterCard`, POST `/register`).
+- Логин-страница — многорежимная по `flash.kind`: `register` (`RegisterCard`, POST `/register`), `register_confirm` (`RegisterConfirmCard`, ввод кода, POST `/register/confirm`), `forgot` (`ForgotCard`, POST `/forgot`), `forgot_confirm` (`ForgotConfirmCard`, код + новый пароль, POST `/forgot/confirm`). Шаги подтверждения переиспользуют компонент `OtpRow` и несут `code_id`/`reset_id`/пароль в скрытых полях.
 - **Тема** (light/dark/auto): `shared.css` содержит тёмную палитру `:root[data-theme="dark"]`; каждая страница приложения (кроме логина) в `<head>` имеет синхронный bootstrap-скрипт, который до рендера читает `localStorage.bark_theme` и ставит `data-theme`. Выбор темы — вкладка «Внешний вид» в настройках (хранится локально в браузере, без бэкенда).
 
 ## Фото / Видео / Файлы (данные и /api)
@@ -127,4 +138,4 @@ UI: в сетке — превью (`<img srcset sizes>`, размер под б
 - Длительность видео не приходит из Files API — в карточках видео показываются только разрешение (по `image_width/height`) и размер.
 - Превью/оригиналы грузит **браузер** по абсолютным URL `{ExternalEndpoint:Host}/web/download/{id}` — ключ Files `ExternalEndpoint:Host` обязан быть `https://cloud.barkfluff.com:7025` (со схемой **https**), иначе на https-странице превью — mixed-content и блокируются браузером. Загрузка байтов от этого ключа уже **не** зависит (идёт на внутренний `cloud-files:7026`).
 - Аплоад большого файла: nginx-vhost фронта веб-клиента (`cloud.barkfluff.com:443` → cloud-web) должен иметь `client_max_body_size 512m;` (по умолчанию 1 МБ → `413`). Этот vhost — вне репозитория (`nginx/cloud.barkfluff.conf` покрывает только gRPC-порты 7020/7021/7025). На стороне .NET лимиты уже сняты в `Program.cs` (Kestrel `MaxRequestBodySize` + `FormOptions.MultipartBodyLengthLimit` = 512 МБ).
-- 2FA-шаг переносит логин/пароль в скрытых полях формы — упрощение MVP, стоит заменить на короткоживущий pending-токен.
+- Шаги с кодом (2FA-логин, подтверждение регистрации, сброс пароля) переносят логин/пароль/`code_id`/`reset_id` в скрытых полях формы — упрощение MVP, стоит заменить на короткоживущий pending-токен/серверное состояние.
