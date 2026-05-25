@@ -1,0 +1,321 @@
+using System.Net.Http.Headers;
+using System.Text.Json;
+
+using BarkCloud.Proto.Files;
+using BarkCloud.Web.Auth;
+using BarkCloud.Web.Infrastructure;
+using BarkCloud.Web.Rendering;
+
+using Google.Protobuf.WellKnownTypes;
+
+using Grpc.Core;
+
+namespace BarkCloud.Web.Endpoints;
+
+/// <summary>
+/// Same-origin JSON-API для React-страниц (Фото / Видео / Файлы). Проксирует вызовы
+/// в Files-сервис (CloudApi / AlbumApi / FilesApi) с пользовательским токеном из cookie.
+/// Загрузка файла идёт через веб-сервер (без CORS на Files).
+/// </summary>
+public static class CloudApiEndpoints
+{
+    // дефолтный энкодер экранирует < > & — безопасно; имена свойств уже в нужном регистре
+    private static readonly JsonSerializerOptions Json = new();
+
+    public static void MapCloudApiEndpoints(this WebApplication app)
+    {
+        var api = app.MapGroup("/api");
+
+        // ───────────────────────── Каталоги ─────────────────────────
+
+        api.MapGet("/cloud/list", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud, string? dir) =>
+            await Guarded(http, auth, async token =>
+            {
+                var req = new ListDirectoryRequest();
+                if (!string.IsNullOrEmpty(dir)) req.DirectoryId = dir;
+
+                var listing = await cloud.ListDirectoryDetailedAsync(req, token);
+                return Results.Json(new
+                {
+                    dirs = listing.Subdirs.Select(CloudJson.Dir).ToArray(),
+                    files = listing.Files.Select(CloudJson.Entry).ToArray()
+                }, Json);
+            }));
+
+        api.MapPost("/cloud/dir", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud, DirCreate body) =>
+            await Guarded(http, auth, async token =>
+            {
+                var info = await cloud.CreateDirectoryAsync(
+                    new CreateDirectoryRequest { ParentId = body.ParentId ?? "", Name = body.Name }, token);
+                return Results.Json(CloudJson.Dir(info), Json);
+            }));
+
+        api.MapPost("/cloud/dir/rename", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud, RenameReq body) =>
+            await Guarded(http, auth, async token =>
+            {
+                await cloud.RenameDirectoryAsync(new RenameDirectoryRequest { DirectoryId = body.Id, NewName = body.Name }, token);
+                return Results.Json(new { ok = true }, Json);
+            }));
+
+        api.MapPost("/cloud/dir/move", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud, MoveReq body) =>
+            await Guarded(http, auth, async token =>
+            {
+                await cloud.MoveDirectoryAsync(new MoveDirectoryRequest { DirectoryId = body.Id, NewParentId = body.ParentId ?? "" }, token);
+                return Results.Json(new { ok = true }, Json);
+            }));
+
+        api.MapPost("/cloud/dir/delete", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud, IdReq body) =>
+            await Guarded(http, auth, async token =>
+            {
+                await cloud.DeleteDirectoryAsync(new DeleteDirectoryRequest { DirectoryId = body.Id }, token);
+                return Results.Json(new { ok = true }, Json);
+            }));
+
+        // ───────────────────────── Записи файлов в каталоге ─────────────────────────
+
+        api.MapPost("/cloud/attach", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud, AttachReq body) =>
+            await Guarded(http, auth, async token =>
+            {
+                await cloud.AttachFileAsync(
+                    new AttachFileRequest { DirectoryId = body.Dir ?? "", FileId = body.FileId, Name = body.Name }, token);
+                return Results.Json(new { ok = true }, Json);
+            }));
+
+        api.MapPost("/cloud/entry/rename", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud, EntryRenameReq body) =>
+            await Guarded(http, auth, async token =>
+            {
+                await cloud.RenameFileEntryAsync(new RenameFileEntryRequest { EntryId = body.EntryId, NewName = body.Name }, token);
+                return Results.Json(new { ok = true }, Json);
+            }));
+
+        api.MapPost("/cloud/entry/move", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud, EntryMoveReq body) =>
+            await Guarded(http, auth, async token =>
+            {
+                await cloud.MoveFileEntryAsync(new MoveFileEntryRequest { EntryId = body.EntryId, NewDirectoryId = body.Dir ?? "" }, token);
+                return Results.Json(new { ok = true }, Json);
+            }));
+
+        api.MapPost("/cloud/entry/delete", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud, EntryIdReq body) =>
+            await Guarded(http, auth, async token =>
+            {
+                await cloud.DeleteFileEntryAsync(new DeleteFileEntryRequest { EntryId = body.EntryId }, token);
+                return Results.Json(new { ok = true }, Json);
+            }));
+
+        // ───────────────────────── Галерея (фото / видео) ─────────────────────────
+
+        api.MapGet("/cloud/media", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud,
+            string? kind, int? limit, string? cursorAt, string? cursorId) =>
+            await Guarded(http, auth, async token =>
+            {
+                var req = new ListUserMediaRequest
+                {
+                    Kind = kind == "video" ? MediaKind.Video : MediaKind.Photo,
+                    Limit = limit is > 0 and <= 200 ? limit.Value : 60
+                };
+                if (DateTimeOffset.TryParse(cursorAt, out var dt))
+                    req.CursorCreatedAt = Timestamp.FromDateTimeOffset(dt.ToUniversalTime());
+                if (!string.IsNullOrEmpty(cursorId))
+                    req.CursorFileId = cursorId;
+
+                var resp = await cloud.ListUserMediaAsync(req, token);
+                return Results.Json(new
+                {
+                    items = resp.Items.Where(i => i.File is not null).Select(i => CloudJson.Media(i.File)).ToArray(),
+                    nextCursorAt = resp.NextCursorCreatedAt?.ToDateTimeOffset(),
+                    nextCursorId = resp.NextCursorFileId
+                }, Json);
+            }));
+
+        // ───────────────────────── Альбомы ─────────────────────────
+
+        api.MapGet("/albums", async (HttpContext http, AuthGateway auth, AlbumApi.AlbumApiClient albums,
+            int? limit, string? cursorAt, string? cursorId) =>
+            await Guarded(http, auth, async token =>
+            {
+                var req = new ListAlbumsRequest { Limit = limit is > 0 and <= 200 ? limit.Value : 60 };
+                if (DateTimeOffset.TryParse(cursorAt, out var dt))
+                    req.CursorUpdatedAt = Timestamp.FromDateTimeOffset(dt.ToUniversalTime());
+                if (!string.IsNullOrEmpty(cursorId))
+                    req.CursorAlbumId = cursorId;
+
+                var resp = await albums.ListAlbumsAsync(req, token);
+                return Results.Json(new
+                {
+                    albums = resp.Albums.Select(CloudJson.Album).ToArray(),
+                    nextCursorAt = resp.NextCursorUpdatedAt?.ToDateTimeOffset(),
+                    nextCursorId = resp.NextCursorAlbumId
+                }, Json);
+            }));
+
+        api.MapGet("/albums/items", async (HttpContext http, AuthGateway auth, AlbumApi.AlbumApiClient albums,
+            string album, string? kind, int? limit, string? cursorAt, string? cursorId) =>
+            await Guarded(http, auth, async token =>
+            {
+                var req = new ListAlbumItemsRequest
+                {
+                    AlbumId = album,
+                    Limit = limit is > 0 and <= 200 ? limit.Value : 100
+                };
+                if (kind == "photo") req.KindFilter = MediaKind.Photo;
+                else if (kind == "video") req.KindFilter = MediaKind.Video;
+                if (DateTimeOffset.TryParse(cursorAt, out var dt))
+                    req.CursorAddedAt = Timestamp.FromDateTimeOffset(dt.ToUniversalTime());
+                if (!string.IsNullOrEmpty(cursorId))
+                    req.CursorFileId = cursorId;
+
+                var resp = await albums.ListAlbumItemsAsync(req, token);
+                return Results.Json(new
+                {
+                    items = resp.Items.Where(i => i.File is not null).Select(i => CloudJson.Media(i.File)).ToArray(),
+                    nextCursorAt = resp.NextCursorAddedAt?.ToDateTimeOffset(),
+                    nextCursorId = resp.NextCursorFileId
+                }, Json);
+            }));
+
+        api.MapPost("/albums", async (HttpContext http, AuthGateway auth, AlbumApi.AlbumApiClient albums, AlbumCreate body) =>
+            await Guarded(http, auth, async token =>
+            {
+                var info = await albums.CreateAlbumAsync(
+                    new CreateAlbumRequest { Name = body.Name, Description = body.Description ?? "" }, token);
+                return Results.Json(CloudJson.Album(info), Json);
+            }));
+
+        api.MapPost("/albums/update", async (HttpContext http, AuthGateway auth, AlbumApi.AlbumApiClient albums, AlbumUpdate body) =>
+            await Guarded(http, auth, async token =>
+            {
+                var req = new UpdateAlbumRequest { AlbumId = body.Album };
+                if (body.Name is not null) req.Name = body.Name;
+                if (body.Description is not null) req.Description = body.Description;
+                if (body.CoverFileId is not null) req.CoverFileId = body.CoverFileId;
+                var info = await albums.UpdateAlbumAsync(req, token);
+                return Results.Json(CloudJson.Album(info), Json);
+            }));
+
+        api.MapPost("/albums/delete", async (HttpContext http, AuthGateway auth, AlbumApi.AlbumApiClient albums, AlbumIdReq body) =>
+            await Guarded(http, auth, async token =>
+            {
+                await albums.DeleteAlbumAsync(new DeleteAlbumRequest { AlbumId = body.Album }, token);
+                return Results.Json(new { ok = true }, Json);
+            }));
+
+        api.MapPost("/albums/items/add", async (HttpContext http, AuthGateway auth, AlbumApi.AlbumApiClient albums, AlbumItems body) =>
+            await Guarded(http, auth, async token =>
+            {
+                var req = new AddItemsToAlbumRequest { AlbumId = body.Album };
+                req.FileIds.AddRange(body.FileIds ?? []);
+                await albums.AddItemsToAlbumAsync(req, token);
+                return Results.Json(new { ok = true }, Json);
+            }));
+
+        api.MapPost("/albums/items/remove", async (HttpContext http, AuthGateway auth, AlbumApi.AlbumApiClient albums, AlbumItems body) =>
+            await Guarded(http, auth, async token =>
+            {
+                var req = new RemoveItemsFromAlbumRequest { AlbumId = body.Album };
+                req.FileIds.AddRange(body.FileIds ?? []);
+                await albums.RemoveItemsFromAlbumAsync(req, token);
+                return Results.Json(new { ok = true }, Json);
+            }));
+
+        // ───────────────────────── Файлы: загрузка / оригинал ─────────────────────────
+
+        // Прокси-загрузка: получаем upload-URL у Files и стримим туда байты (same-origin, без CORS).
+        api.MapPost("/files/upload", async (HttpContext http, AuthGateway auth, FilesApi.FilesApiClient files, IHttpClientFactory httpFactory) =>
+            await Guarded(http, auth, async token =>
+            {
+                var form = await http.Request.ReadFormAsync();
+                var file = form.Files["file"];
+                if (file is null || file.Length == 0)
+                    return Results.BadRequest(new { error = "Файл не выбран или пустой." });
+
+                var upload = await files.GetUploadUrlAsync(new GetUploadUrlRequest { FileType = UploadFileType.CloudFile }, token);
+
+                using var content = new MultipartFormDataContent();
+                var part = new StreamContent(file.OpenReadStream());
+                part.Headers.ContentType = new MediaTypeHeaderValue(
+                    string.IsNullOrEmpty(file.ContentType) ? "application/octet-stream" : file.ContentType);
+                content.Add(part, "file", file.FileName);
+
+                var client = httpFactory.CreateClient("files-upload");
+                using var resp = await client.PostAsync(upload.Url, content);
+                var responseBody = await resp.Content.ReadAsStringAsync();
+
+                if (!resp.IsSuccessStatusCode)
+                    return Results.Json(new { error = responseBody }, Json, statusCode: (int)resp.StatusCode);
+
+                // ответ upload: { "fileId": "<guid>" } — берём именно его (мог измениться при дедупликации)
+                string? fileId = null;
+                try
+                {
+                    using var doc = JsonDocument.Parse(responseBody);
+                    if (doc.RootElement.TryGetProperty("fileId", out var fid))
+                        fileId = fid.GetString();
+                }
+                catch (JsonException) { /* ниже отдадим ошибку */ }
+
+                if (string.IsNullOrEmpty(fileId))
+                    return Results.Json(new { error = "Не удалось разобрать ответ загрузки." }, Json, statusCode: 502);
+
+                return Results.Json(new { fileId, name = file.FileName }, Json);
+            })).DisableAntiforgery();
+
+        // Временная ссылка(и) на оригинал(ы) для просмотра/скачивания.
+        api.MapGet("/files/download", async (HttpContext http, AuthGateway auth, FilesApi.FilesApiClient files, string ids) =>
+            await Guarded(http, auth, async token =>
+            {
+                var idList = ids.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                var req = new GetTempDownloadUrlRequest();
+                req.FileIds.AddRange(idList);
+
+                var resp = await files.GetTempDownloadUrlAsync(req, token);
+                return Results.Json(new
+                {
+                    urls = resp.FileUrls.ToDictionary(f => f.FileId, f => f.Url)
+                }, Json);
+            }));
+    }
+
+    // ───────────────────────── Инфраструктура ─────────────────────────
+
+    /// <summary>Авторизация по cookie + единая обработка gRPC-ошибок.</summary>
+    private static async Task<IResult> Guarded(HttpContext http, AuthGateway auth, Func<Metadata, Task<IResult>> action)
+    {
+        var user = await auth.AuthenticateAsync(http);
+        if (user is null)
+            return Results.Json(new { error = "Не авторизован" }, Json, statusCode: 401);
+
+        try
+        {
+            return await action(BrowserContext.UserToken(user.AccessToken));
+        }
+        catch (RpcException ex) when (ex.StatusCode == StatusCode.FailedPrecondition)
+        {
+            // доменная ошибка: ErrorCode (GUID) в trailing-метадате
+            var code = ex.Trailers.GetValue("x-error-code");
+            return Results.Json(new { error = ex.Status.Detail, code }, Json, statusCode: 400);
+        }
+        catch (RpcException ex) when (ex.StatusCode == StatusCode.Unauthenticated)
+        {
+            return Results.Json(new { error = "Не авторизован" }, Json, statusCode: 401);
+        }
+        catch (RpcException ex)
+        {
+            return Results.Json(new { error = ex.Status.Detail }, Json, statusCode: 502);
+        }
+    }
+
+    // ───────────────────────── DTO тел запросов ─────────────────────────
+
+    private sealed record DirCreate(string? ParentId, string Name);
+    private sealed record RenameReq(string Id, string Name);
+    private sealed record MoveReq(string Id, string? ParentId);
+    private sealed record IdReq(string Id);
+    private sealed record AttachReq(string? Dir, string FileId, string Name);
+    private sealed record EntryRenameReq(string EntryId, string Name);
+    private sealed record EntryMoveReq(string EntryId, string? Dir);
+    private sealed record EntryIdReq(string EntryId);
+    private sealed record AlbumCreate(string Name, string? Description);
+    private sealed record AlbumUpdate(string Album, string? Name, string? Description, string? CoverFileId);
+    private sealed record AlbumIdReq(string Album);
+    private sealed record AlbumItems(string Album, string[]? FileIds);
+}

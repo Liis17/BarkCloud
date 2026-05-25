@@ -91,17 +91,18 @@ public static class WebEndpoints
         });
 
         // ───────── Защищённые страницы ─────────
+        // Фото/Видео/Файлы — данные подгружаются на клиенте через /api (см. CloudApiEndpoints),
+        // поэтому серверный page_data_json для них пустой. Settings остаётся серверным.
 
         app.MapGet("/photos", (HttpContext http, AuthGateway auth, PageDataBuilder data, PageService pages) =>
-            ServePage(http, auth, data, pages, "Photos.html", data.BuildPhotosJsonAsync));
+            ServePage(http, auth, data, pages, "Photos.html", _ => Task.FromResult(string.Empty)));
 
         app.MapGet("/files", (HttpContext http, AuthGateway auth, PageDataBuilder data, PageService pages) =>
-            ServePage(http, auth, data, pages, "Files.html", data.BuildFilesJsonAsync));
+            ServePage(http, auth, data, pages, "Files.html", _ => Task.FromResult(string.Empty)));
 
         app.MapGet("/settings", (HttpContext http, AuthGateway auth, PageDataBuilder data, PageService pages) =>
             ServePage(http, auth, data, pages, "Settings.html", user => data.BuildSettingsJsonAsync(user, http)));
 
-        // Видео и Общие пока без backing-данных — отдаём каркас, страница использует свой demo-fallback
         app.MapGet("/videos", (HttpContext http, AuthGateway auth, PageDataBuilder data, PageService pages) =>
             ServePage(http, auth, data, pages, "Videos.html", _ => Task.FromResult(string.Empty)));
 

@@ -160,6 +160,14 @@ public sealed class AuthGateway
         Delete(http, RefreshCookie);
     }
 
+    /// <summary>Удаляет cookie сессии без обращения в Identity. Для случаев, когда сессия
+    /// уже отозвана на стороне сервера (например, после удаления аккаунта).</summary>
+    public void ClearSession(HttpContext http)
+    {
+        Delete(http, AccessCookie);
+        Delete(http, RefreshCookie);
+    }
+
     private bool TryReadUser(string token, out WebUser? user, out bool expired)
     {
         user = null;

@@ -20,16 +20,9 @@ public sealed class PageDataBuilder
 {
     private static readonly JsonSerializerOptions Json = new(); // дефолтный энкодер экранирует < > & — безопасно в <script>
 
-    private static readonly string[][] Tints =
-    [
-        ["#A8C99A", "#4A6F4A"], ["#B4A3D6", "#5B4889"], ["#E8A87C", "#7A4A2E"],
-        ["#E0BB6F", "#8A5E2A"], ["#8FAFCC", "#3F5A7E"], ["#D696B0", "#6F3552"],
-        ["#8FC3BB", "#2F5C56"], ["#C8A78C", "#6F4A3A"], ["#7E9FC3", "#2A436A"]
-    ];
-
     private readonly UsersApi.UsersApiClient _users;
+    private readonly UsersServerApi.UsersServerApiClient _usersServer;
     private readonly FilesApi.FilesApiClient _files;
-    private readonly CloudApi.CloudApiClient _cloud;
     private readonly IdentityApi.IdentityApiClient _identity;
     private readonly AdminGate _admin;
     private readonly IConfiguration _config;
@@ -37,16 +30,16 @@ public sealed class PageDataBuilder
 
     public PageDataBuilder(
         UsersApi.UsersApiClient users,
+        UsersServerApi.UsersServerApiClient usersServer,
         FilesApi.FilesApiClient files,
-        CloudApi.CloudApiClient cloud,
         IdentityApi.IdentityApiClient identity,
         AdminGate admin,
         IConfiguration config,
         ILogger<PageDataBuilder> logger)
     {
         _users = users;
+        _usersServer = usersServer;
         _files = files;
-        _cloud = cloud;
         _identity = identity;
         _admin = admin;
         _config = config;
@@ -124,13 +117,33 @@ public sealed class PageDataBuilder
         try { profile = (await _users.GetUserAsync(new GetUserRequest { UserId = user.UserId }, token)).User; }
         catch (RpcException ex) { _logger.LogWarning("Settings/GetUser: {Status}", ex.StatusCode); }
 
-        var twoFa = false;
+        // Email хранится в Users, но недоступен через клиентский GetUser — берём серверным API.
+        var email = "";
+        try { email = (await _usersServer.GetUserContactsAsync(new GetUserContactsRequest { UserId = user.UserId })).Contact?.Email ?? ""; }
+        catch (RpcException ex) { _logger.LogWarning("Settings/GetUserContacts: {Status}", ex.StatusCode); }
+
+        bool authenticator = false, emailOtp = false;
         try
         {
             var otp = await _identity.ListOtpVerificationAsync(new ListOtpVerificationRequest(), token);
-            twoFa = otp.AuthenticatorEnabled || otp.EmailEnabled;
+            authenticator = otp.AuthenticatorEnabled;
+            emailOtp = otp.EmailEnabled;
         }
         catch (RpcException ex) { _logger.LogWarning("Settings/ListOtp: {Status}", ex.StatusCode); }
+
+        object privacy = new { profileVisibility = 0, emailVisibility = 0, lastSeenVisibility = 0, searchableByUsername = true };
+        try
+        {
+            var p = (await _users.GetPrivacySettingsAsync(new GetPrivacySettingsRequest(), token)).Settings;
+            privacy = new
+            {
+                profileVisibility = (int)p.ProfileVisibility,
+                emailVisibility = (int)p.EmailVisibility,
+                lastSeenVisibility = (int)p.LastSeenVisibility,
+                searchableByUsername = p.SearchableByUsername
+            };
+        }
+        catch (RpcException ex) { _logger.LogWarning("Settings/GetPrivacy: {Status}", ex.StatusCode); }
 
         var sessions = new List<object>();
         try
@@ -141,7 +154,9 @@ public sealed class PageDataBuilder
                 var device = !string.IsNullOrEmpty(s.CustomName) ? s.CustomName : s.OriginalName;
                 sessions.Add(new
                 {
+                    deviceId = s.DeviceId,
                     device = string.IsNullOrEmpty(device) ? s.AppName : device,
+                    os = s.OperationSystem,
                     location = string.IsNullOrEmpty(s.Location) ? s.AppName : $"{s.Location} · {s.AppName}",
                     when = Format.Relative(s.CreatedAt.ToDateTimeOffset()),
                     current = !string.IsNullOrEmpty(user.DeviceId) && s.DeviceId == user.DeviceId
@@ -163,19 +178,22 @@ public sealed class PageDataBuilder
             profile = new
             {
                 initials = profile is null ? "?" : Format.Initials(profile.FirstName, profile.LastName),
+                firstName = profile?.FirstName ?? "",
+                lastName = profile?.LastName ?? "",
                 name = string.IsNullOrEmpty(displayName) ? profile?.Username ?? "" : displayName,
-                email = "",
+                email,
                 username = profile?.Username ?? "",
-                timezone = ""
+                bio = profile?.Bio ?? "",
+                avatarUrl = profile?.ProfilePicture ?? "",
+                avatarPreviewUrl = profile?.ProfilePicturePreview ?? ""
             },
             security = new
             {
-                passwordChanged = "—",
-                passwordStrength = "Задан",
-                twoFa,
-                e2e = true,
-                backupCodes = "—"
+                twoFa = authenticator || emailOtp,
+                authenticator,
+                emailOtp
             },
+            privacy,
             storage = storageBlock,
             sessions,
             sessionsHeader = $"{sessions.Count} {Plural(sessions.Count, "устройство", "устройства", "устройств")} с активным доступом",
@@ -189,136 +207,6 @@ public sealed class PageDataBuilder
                 version = _config.Value("App:Version", "v1.0.0"),
                 edition = _config.Value("App:Edition", "self-host")
             }
-        };
-
-        return JsonSerializer.Serialize(payload, Json);
-    }
-
-    // ───────────────────────── Files ─────────────────────────
-
-    public async Task<string> BuildFilesJsonAsync(WebUser user)
-    {
-        var token = BrowserContext.UserToken(user.AccessToken);
-
-        DirectoryListingDetailed listing;
-        try
-        {
-            listing = await _cloud.ListDirectoryDetailedAsync(new ListDirectoryRequest(), token);
-        }
-        catch (RpcException ex)
-        {
-            _logger.LogWarning("Files/ListDirectoryDetailed: {Status}", ex.StatusCode);
-            return string.Empty; // demo-fallback на странице
-        }
-
-        var files = new List<object>();
-
-        foreach (var dir in listing.Subdirs)
-        {
-            files.Add(new
-            {
-                id = dir.Id,
-                kind = "folder",
-                ext = "DIR",
-                name = dir.Name,
-                meta = "",
-                size = "",
-                mod = Format.Date(dir.UpdatedAt.ToDateTimeOffset()),
-                ago = Format.Relative(dir.UpdatedAt.ToDateTimeOffset()),
-                owner = "Я",
-                tone = "p",
-                shared = "—",
-                star = false
-            });
-        }
-
-        foreach (var item in listing.Files)
-        {
-            var (kind, ext) = FileKind.Classify(item.Entry.Name);
-            var uploaded = item.File.UploadedAt.ToDateTimeOffset();
-
-            files.Add(new
-            {
-                id = item.Entry.Id,
-                kind,
-                ext,
-                name = item.Entry.Name,
-                meta = "",
-                size = Format.Size(item.File.FileSize),
-                mod = Format.Date(uploaded),
-                ago = Format.Relative(uploaded),
-                owner = "Я",
-                tone = "p",
-                shared = "—",
-                star = false
-            });
-        }
-
-        var selectedId = listing.Subdirs.Count > 0
-            ? listing.Subdirs[0].Id
-            : listing.Files.Count > 0 ? listing.Files[0].Entry.Id : "";
-
-        var payload = new
-        {
-            tabs = new object[]
-            {
-                new { key = "all", label = "Всё", count = files.Count },
-                new { key = "recent", label = "Недавнее" },
-                new { key = "starred", label = "Избранное" },
-                new { key = "shared", label = "Общие" },
-                new { key = "trash", label = "Корзина" }
-            },
-            breadcrumb = Array.Empty<object>(),
-            files,
-            selectedId
-        };
-
-        return JsonSerializer.Serialize(payload, Json);
-    }
-
-    // ───────────────────────── Photos ─────────────────────────
-
-    public async Task<string> BuildPhotosJsonAsync(WebUser user)
-    {
-        var token = BrowserContext.UserToken(user.AccessToken);
-
-        ListUserImagesResponse images;
-        try
-        {
-            images = await _cloud.ListUserImagesAsync(new ListUserImagesRequest { Limit = 60 }, token);
-        }
-        catch (RpcException ex)
-        {
-            _logger.LogWarning("Photos/ListUserImages: {Status}", ex.StatusCode);
-            return string.Empty; // demo-fallback на странице
-        }
-
-        var today = DateTimeOffset.UtcNow.ToLocalTime().Date;
-        var groups = images.Items
-            .Where(i => i.File is not null)
-            .GroupBy(i => i.File.UploadedAt.ToDateTimeOffset().ToLocalTime().Date)
-            .OrderByDescending(g => g.Key)
-            .Select((g, gi) => new
-            {
-                label = g.Key == today ? $"Сегодня, {Format.Date(g.First().File.UploadedAt.ToDateTimeOffset())}"
-                    : g.Key == today.AddDays(-1) ? "Вчера"
-                    : Format.Date(g.First().File.UploadedAt.ToDateTimeOffset()),
-                meta = $"{g.Count()} {Plural(g.Count(), "фото", "фото", "фото")}",
-                photos = g.Select((item, pi) => new
-                {
-                    tint = Tints[(gi + pi) % Tints.Length],
-                    url = PreviewUrl(item.File),
-                    fav = false
-                }).Cast<object>().ToArray()
-            })
-            .Cast<object>()
-            .ToArray();
-
-        var payload = new
-        {
-            filters = new object[] { new { key = "all", label = "Все фото", count = images.Items.Count } },
-            groups,
-            memoriesUpdated = Format.Time(DateTimeOffset.UtcNow)
         };
 
         return JsonSerializer.Serialize(payload, Json);
@@ -377,21 +265,6 @@ public sealed class PageDataBuilder
         };
 
         return (block, limit);
-    }
-
-    private static string PreviewUrl(UploadFileInfo file)
-    {
-        if (file.Previews.Count > 0)
-        {
-            // ближайшее к 512px превью
-            var best = file.Previews
-                .OrderBy(p => Math.Abs(p.TargetWidth - 512))
-                .First();
-            if (!string.IsNullOrEmpty(best.PreviewUrl))
-                return best.PreviewUrl;
-        }
-
-        return file.FileUrl;
     }
 
     private static long ResolveLimit(long storageLimit, int limitGb)

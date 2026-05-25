@@ -8,6 +8,10 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,wght@8..144,300;8..144,400;8..144,500;8..144,600;8..144,700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="shared.css"/>
+  <script>
+    /* Тема применяется до рендера, чтобы не было мигания. Источник — localStorage (bark_theme: light|dark|auto). */
+    (function(){try{var t=localStorage.getItem('bark_theme')||'auto';var d=t==='dark'||(t==='auto'&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);if(d)document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();
+  </script>
   <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
   <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
   <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
@@ -352,45 +356,58 @@
     .sys-banner.err { background:var(--md-error-container); color:var(--md-on-error-container); }
     .sys-section-label { font-size:11px; letter-spacing:.5px; text-transform:uppercase; font-weight:600; color:var(--md-on-surface-variant); margin:4px 0 8px; }
     .sys-note { font-size:13px; color:var(--md-on-surface-variant); margin:6px 0 12px; line-height:1.5; }
+
+    /* ─── Доп. элементы рабочих настроек ─── */
+    .avatar-big { overflow: hidden; }
+    .avatar-big img { width:100%; height:100%; object-fit:cover; display:block; }
+
+    .field-row textarea, .form-stack textarea {
+      width:100%; background:var(--md-surface-container); border:none; border-bottom:1px solid var(--md-outline);
+      border-radius:var(--r-xs) var(--r-xs) 0 0; color:var(--md-on-surface); font-family:inherit; font-size:15px;
+      padding:14px 16px; outline:none; resize:vertical; min-height:84px; transition:border-color var(--d-short);
+    }
+    .field-row textarea:focus, .form-stack textarea:focus { border-bottom:2px solid var(--md-primary); padding-bottom:13px; }
+    .char-counter { font-size:12px; color:var(--md-on-surface-variant); text-align:right; margin-top:4px; }
+
+    .pill-info.err { background:var(--md-error-container); color:var(--md-on-error-container); }
+
+    .form-stack { display:flex; flex-direction:column; gap:14px; max-width:460px; }
+    .form-stack label { font-size:13px; color:var(--md-on-surface-variant); margin-bottom:-8px; }
+    .form-stack input {
+      background:var(--md-surface-container); border:none; border-bottom:1px solid var(--md-outline);
+      border-radius:var(--r-xs) var(--r-xs) 0 0; color:var(--md-on-surface); font-family:inherit; font-size:15px;
+      padding:14px 16px; outline:none; transition:border-color var(--d-short);
+    }
+    .form-stack input:focus { border-bottom:2px solid var(--md-primary); padding-bottom:13px; }
+
+    .uname-wrap { display:flex; flex-direction:column; gap:8px; }
+    .uname-wrap .row { display:flex; gap:10px; align-items:center; }
+    .uname-wrap input { flex:1; }
+
+    .qr-wrap { display:flex; flex-direction:column; align-items:center; gap:14px; margin:18px 0; }
+    .qr-wrap img { width:200px; height:200px; border-radius:var(--r-md); background:#fff; padding:8px; }
+    .qr-code { font-family:'Roboto Mono',monospace; font-size:13px; color:var(--md-on-surface-variant); word-break:break-all; text-align:center; max-width:320px; }
+    .dlg-input { width:100%; background:var(--md-surface-container); border:none; border-bottom:1px solid var(--md-outline); border-radius:var(--r-xs) var(--r-xs) 0 0; color:var(--md-on-surface); font-family:inherit; font-size:15px; padding:14px 16px; outline:none; margin-top:8px; }
+    .dlg-input:focus { border-bottom:2px solid var(--md-primary); padding-bottom:13px; }
+    .dlg-actions.two { justify-content:space-between; }
   </style>
 </head>
 <body>
 <div id="root"></div>
 
 <!--
-  ╔════════════════════════════════════════════════════════════════════╗
-  ║ SERVER PAYLOAD (Settings.html)                                     ║
-  ╠════════════════════════════════════════════════════════════════════╣
-  ║ JSON-схема:                                                        ║
-  ║   {                                                                ║
-  ║     "profile": {                                                   ║
-  ║       "initials": "АК", "name": "Антон К.",                        ║
-  ║       "email": "anton@cloud.bark.io",                              ║
-  ║       "username": "admin",                                         ║
-  ║       "timezone": "Europe/Moscow · UTC+3"                          ║
-  ║     },                                                             ║
-  ║     "security": {                                                  ║
-  ║       "passwordChanged": "18 февраля 2026",                        ║
-  ║       "passwordStrength": "18 символов · стойкий",                 ║
-  ║       "twoFa": true, "e2e": true,                                  ║
-  ║       "backupCodes": "6 из 10 использованы"                        ║
-  ║     },                                                             ║
-  ║     "storage": {                                                   ║
-  ║       "used": "312,4", "total": "500", "unit": "ГБ",               ║
-  ║       "percent": 62, "forecast": "ноябрь 2026",                    ║
-  ║       "breakdown": [{ k, v, color, pct }, ...],                    ║
-  ║       "freeLabel": "187,6 ГБ",                                     ║
-  ║       "autoUpload": true, "devicesCount": "4 устройства",          ║
-  ║       "trashLabel": "1,2 ГБ · 184 файла"                           ║
-  ║     },                                                             ║
-  ║     "notifications": {                                             ║
-  ║       "emailAddress": "anton@cloud.bark.io",                       ║
-  ║       "emailOn": true, "pushOn": false, ...                        ║
-  ║     },                                                             ║
-  ║     "sessions": [{ device, browser, location, when, current? }],   ║
-  ║     "sessionsHeader": "5 устройств с активным доступом"            ║
-  ║   }                                                                ║
-  ╚════════════════════════════════════════════════════════════════════╝
+  SERVER PAYLOAD (Settings.html) — формируется в PageDataBuilder.BuildSettingsJsonAsync:
+  {
+    "profile":  { initials, firstName, lastName, name, email(ro), username, bio, avatarUrl, avatarPreviewUrl },
+    "security": { twoFa, authenticator, emailOtp },
+    "privacy":  { profileVisibility, emailVisibility, lastSeenVisibility, searchableByUsername },  // 0=Всем,1=Контактам,2=Никому
+    "storage":  { used, total, unit, percent, breakdown:[{k,v,color,pct}], freeLabel },
+    "sessions": [{ deviceId, device, os, location, when, current? }],
+    "sessionsHeader": "...",
+    "admin":    { enabled, unlocked },
+    "system":   { version, edition }
+  }
+  Действия идут через REST /api/settings/* (см. SettingsEndpoints.cs).
 -->
 <script type="application/json" id="server-data">
 {{{ page_data_json }}}
@@ -408,61 +425,38 @@ function loadServerData() {
 }
 const SERVER_DATA = loadServerData();
 
-// ─── Profile ───
+// ─── Данные с сервера (схема — в комментарии выше) ───
 const PROFILE = SERVER_DATA?.profile ?? {
-  initials: 'АК',
-  name: 'Антон К.',
-  email: 'anton@cloud.bark.io',
-  username: 'admin',
-  timezone: 'Europe/Moscow · UTC+3',
+  initials: '?', firstName: '', lastName: '', name: '', email: '', username: '', bio: '', avatarUrl: '', avatarPreviewUrl: '',
 };
+const SECURITY = SERVER_DATA?.security ?? { twoFa: false, authenticator: false, emailOtp: false };
+const PRIVACY = SERVER_DATA?.privacy ?? { profileVisibility: 0, emailVisibility: 0, lastSeenVisibility: 0, searchableByUsername: true };
+const STORAGE = SERVER_DATA?.storage ?? { used: '0', total: '0', unit: 'ГБ', percent: 0, breakdown: [], freeLabel: '0 Б' };
+const SESSIONS_INIT = SERVER_DATA?.sessions ?? [];
 
-// ─── Security ───
-const SECURITY = SERVER_DATA?.security ?? {
-  passwordChanged: '18 февраля 2026',
-  passwordStrength: '18 символов · стойкий',
-  twoFa: true,
-  e2e: true,
-  backupCodes: '6 из 10 использованы',
-};
+// ─── HTTP к /api/settings/* ───
+async function apiJson(method, path, body) {
+  const r = await fetch(path, {
+    method, credentials: 'same-origin',
+    headers: body ? { 'Content-Type': 'application/json' } : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  let data = null; try { data = await r.json(); } catch (e) {}
+  return { ok: r.ok, status: r.status, data };
+}
+const apiGet = (p) => apiJson('GET', p);
+const apiPost = (p, b) => apiJson('POST', p, b);
+const errMsg = (res, fallback) => (res.data && res.data.message) || fallback || 'Ошибка';
 
-// ─── Storage ───
-const STORAGE = SERVER_DATA?.storage ?? {
-  used: '312,4', total: '500', unit: 'ГБ',
-  percent: 62, forecast: 'ноябрь 2026',
-  breakdown: [
-    {k:'Фото',    v:'152 ГБ',    color:'#9A4F1E',          pct:30},
-    {k:'Видео',   v:'94,6 ГБ',   color:'#7B5DA8',          pct:18},
-    {k:'Файлы',   v:'42,1 ГБ',   color:'#3F8E58',          pct:9},
-    {k:'Архивы',  v:'18,8 ГБ',   color:'#C9A03B',          pct:4},
-    {k:'Прочее',  v:'4,9 ГБ',    color:'var(--md-outline)',pct:1.5},
-  ],
-  freeLabel: '187,6 ГБ',
-  autoUpload: true,
-  devicesCount: '4 устройства',
-  trashLabel: '1,2 ГБ · 184 файла',
-};
-
-// ─── Notifications ───
-const NOTIFICATIONS = SERVER_DATA?.notifications ?? {
-  emailAddress: 'anton@cloud.bark.io',
-  emailOn: true,
-  pushOn: false,
-  newShare: true,
-  comments: true,
-  systemEvents: true,
-  marketing: false,
-};
-
-// ─── Sessions ───
-const SESSIONS = SERVER_DATA?.sessions ?? [
-  {device:'MacBook Pro · Safari 18',         location:'Москва · 95.31.42.117', when:'сейчас',           current:true},
-  {device:'iPhone 15 Pro · BarkCloud iOS',   location:'Москва',                 when:'2 часа назад'},
-  {device:'iPad Air · BarkCloud iOS',        location:'Москва',                 when:'вчера 22:14'},
-  {device:'Linux Workstation · Firefox 128', location:'Москва',                 when:'12 мая'},
-  {device:'Android · BarkCloud 4.2.1',       location:'Санкт-Петербург',        when:'28 апреля'},
-];
-const SESSIONS_HEADER = SERVER_DATA?.sessionsHeader ?? '5 устройств с активным доступом';
+// ─── Тема (light/dark/auto) — хранится локально ───
+function applyTheme(t) {
+  const dark = t === 'dark' || (t === 'auto' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  if (dark) document.documentElement.setAttribute('data-theme', 'dark');
+  else document.documentElement.removeAttribute('data-theme');
+}
+function currentTheme() {
+  try { return localStorage.getItem('bark_theme') || 'auto'; } catch (e) { return 'auto'; }
+}
 
 // ─── Обслуживание (обновление бэкенда) ───
 const ADMIN = SERVER_DATA?.admin ?? { enabled: false, unlocked: false };
@@ -474,17 +468,18 @@ const SVC_LABELS = {
 const NAV = [
   {key:'account', label:'Аккаунт', icon:'user'},
   {key:'security', label:'Безопасность', icon:'lock'},
+  {key:'privacy', label:'Приватность', icon:'eye'},
   {key:'storage', label:'Хранилище', icon:'server'},
-  {key:'appearance', label:'Внешний вид', icon:'palette'},
-  {key:'notifications', label:'Уведомления', icon:'bell'},
   {key:'sessions', label:'Устройства и сессии', icon:'device'},
-  {key:'language', label:'Язык и регион', icon:'globe'},
-  {key:'api', label:'API и интеграции', icon:'key'},
-  {key:'system', label:'Обслуживание', icon:'server'},
+  {key:'appearance', label:'Внешний вид', icon:'palette'},
+  ...(ADMIN.enabled ? [{key:'system', label:'Обслуживание', icon:'server'}] : []),
 ];
+const NAV_KEYS = NAV.map(n => n.key);
 
-function Toggle({ on, onChange }) {
-  return <div className={"toggle" + (on ? ' on' : '')} onClick={() => onChange(!on)}/>;
+function Toggle({ on, onChange, disabled }) {
+  return <div className={"toggle" + (on ? ' on' : '')}
+    onClick={() => { if (!disabled) onChange(!on); }}
+    style={disabled ? { opacity: .5, cursor: 'default' } : null}/>;
 }
 
 function Field({ label, help, children, end }) {
@@ -750,21 +745,559 @@ function SystemSection() {
   );
 }
 
-function App() {
-  const [section, setSection] = React.useState('account');
-  const [twoFa, setTwoFa] = React.useState(SECURITY.twoFa);
-  const [e2e, setE2e] = React.useState(SECURITY.e2e);
-  const [autoUpload, setAutoUpload] = React.useState(STORAGE.autoUpload);
-  const [emailNotif, setEmailNotif] = React.useState(NOTIFICATIONS.emailOn);
-  const [pushNotif, setPushNotif] = React.useState(NOTIFICATIONS.pushOn);
-  const [theme, setTheme] = React.useState('light');
-  const [accent, setAccent] = React.useState('#9A4F1E');
+// ─────────── Общие мелкие компоненты ───────────
 
-  const go = (key) => {
-    setSection(key);
-    const el = document.getElementById('sec-' + key);
-    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+function pluralRu(n, one, few, many) {
+  const m10 = n % 10, m100 = n % 100;
+  if (m10 === 1 && m100 !== 11) return one;
+  if (m10 >= 2 && m10 <= 4 && (m100 < 10 || m100 >= 20)) return few;
+  return many;
+}
+
+function Toast({ toast }) {
+  if (!toast) return null;
+  return (
+    <div className={"sys-toast " + toast.kind}>
+      {toast.kind === 'ok' ? <Icon.check size={18}/> : <Icon.x size={18}/>}
+      <span>{toast.msg}</span>
+    </div>
+  );
+}
+
+function SaveBtn({ saving, onClick, disabled, children, icon }) {
+  return (
+    <button className="btn primary" onClick={onClick} disabled={saving || disabled}>
+      {saving ? <span className="spin"/> : (icon || null)} {children}
+    </button>
+  );
+}
+
+// ─────────── Аккаунт ───────────
+
+function AccountTab({ flash }) {
+  const [firstName, setFirstName] = React.useState(PROFILE.firstName || '');
+  const [lastName, setLastName] = React.useState(PROFILE.lastName || '');
+  const [savingName, setSavingName] = React.useState(false);
+
+  const [bio, setBio] = React.useState(PROFILE.bio || '');
+  const [savingBio, setSavingBio] = React.useState(false);
+
+  const [username, setUsername] = React.useState(PROFILE.username || '');
+  const [baseUsername, setBaseUsername] = React.useState(PROFILE.username || '');
+  const [uStatus, setUStatus] = React.useState('idle'); // idle|checking|ok|taken|invalid
+  const [savingUser, setSavingUser] = React.useState(false);
+
+  const [avatarUrl, setAvatarUrl] = React.useState(PROFILE.avatarPreviewUrl || PROFILE.avatarUrl || '');
+  const [avatarBusy, setAvatarBusy] = React.useState(false);
+  const fileRef = React.useRef(null);
+
+  const [delOpen, setDelOpen] = React.useState(false);
+  const [delText, setDelText] = React.useState('');
+  const [deleting, setDeleting] = React.useState(false);
+
+  React.useEffect(() => {
+    const u = username.trim();
+    if (u === baseUsername) { setUStatus('idle'); return; }
+    if (u.length < 3) { setUStatus('invalid'); return; }
+    setUStatus('checking');
+    const id = setTimeout(async () => {
+      const res = await apiGet('/api/settings/profile/username-available?u=' + encodeURIComponent(u));
+      if (res.ok && res.data) setUStatus(res.data.available ? 'ok' : 'taken');
+      else setUStatus('idle');
+    }, 400);
+    return () => clearTimeout(id);
+  }, [username, baseUsername]);
+
+  async function saveName() {
+    setSavingName(true);
+    const res = await apiPost('/api/settings/profile/name', { firstName: firstName.trim(), lastName: lastName.trim() });
+    setSavingName(false);
+    flash(res.ok ? 'ok' : 'err', res.ok ? 'Имя сохранено' : errMsg(res));
+  }
+  async function saveBio() {
+    setSavingBio(true);
+    const res = await apiPost('/api/settings/profile/bio', { bio });
+    setSavingBio(false);
+    flash(res.ok ? 'ok' : 'err', res.ok ? 'Описание сохранено' : errMsg(res));
+  }
+  async function saveUsername() {
+    setSavingUser(true);
+    const res = await apiPost('/api/settings/profile/username', { username: username.trim() });
+    setSavingUser(false);
+    if (res.ok) { setBaseUsername(username.trim()); setUStatus('idle'); flash('ok', 'Имя пользователя изменено'); }
+    else flash('err', errMsg(res));
+  }
+  async function onPickFile(e) {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    setAvatarBusy(true);
+    const fd = new FormData(); fd.append('file', file);
+    const r = await fetch('/api/settings/avatar', { method: 'POST', credentials: 'same-origin', body: fd });
+    let data = null; try { data = await r.json(); } catch (e2) {}
+    setAvatarBusy(false);
+    if (r.ok && data) { setAvatarUrl(data.avatarPreviewUrl || data.avatarUrl || ''); flash('ok', 'Аватар обновлён'); }
+    else flash('err', (data && data.message) || 'Не удалось загрузить аватар');
+  }
+  async function removeAvatar() {
+    setAvatarBusy(true);
+    const res = await apiPost('/api/settings/avatar/remove');
+    setAvatarBusy(false);
+    if (res.ok) { setAvatarUrl(''); flash('ok', 'Аватар удалён'); }
+    else flash('err', errMsg(res));
+  }
+  async function doDelete() {
+    setDeleting(true);
+    const res = await apiPost('/api/settings/account/delete');
+    if (res.ok) { window.location = '/login'; return; }
+    setDeleting(false);
+    flash('err', errMsg(res));
+  }
+
+  const uPill = uStatus === 'checking' ? <span className="pill-info warn">Проверка…</span>
+    : uStatus === 'ok' ? <span className="pill-info ok"><Icon.check size={12}/> Свободно</span>
+    : uStatus === 'taken' ? <span className="pill-info err"><Icon.x size={12}/> Занято</span>
+    : uStatus === 'invalid' ? <span className="pill-info err">Минимум 3 символа</span>
+    : null;
+
+  return (
+    <>
+      <div className="set-card">
+        <div className="set-card-head"><h3>Профиль</h3><div className="sub">Имя, фото и описание, видимые другим</div></div>
+        <div className="set-card-body">
+          <div style={{display:'flex', gap:20, alignItems:'center'}}>
+            <div className="avatar-big">{avatarUrl ? <img src={avatarUrl} alt=""/> : PROFILE.initials}</div>
+            <div style={{display:'flex', flexDirection:'column', gap:8, flex:1}}>
+              <div style={{fontSize:14, color:'var(--md-on-surface-variant)'}}>Изменить аватар. Рекомендуется не меньше 256×256.</div>
+              <div style={{display:'flex', gap:8, alignItems:'center'}}>
+                <input ref={fileRef} type="file" accept="image/*" style={{display:'none'}} onChange={onPickFile}/>
+                <button className="btn" onClick={()=>fileRef.current && fileRef.current.click()} disabled={avatarBusy}>
+                  {avatarBusy ? <span className="spin"/> : <Icon.upload size={16}/>} Загрузить
+                </button>
+                {avatarUrl && <button className="btn text" onClick={removeAvatar} disabled={avatarBusy}>Удалить</button>}
+              </div>
+            </div>
+          </div>
+          <hr className="divider"/>
+          <div className="form-stack">
+            <label>Имя</label>
+            <input type="text" value={firstName} onChange={e=>setFirstName(e.target.value)} placeholder="Имя"/>
+            <label>Фамилия</label>
+            <input type="text" value={lastName} onChange={e=>setLastName(e.target.value)} placeholder="Фамилия"/>
+            <div><SaveBtn saving={savingName} onClick={saveName} icon={<Icon.check size={16}/>}>Сохранить имя</SaveBtn></div>
+          </div>
+          <hr className="divider"/>
+          <Field label="Email" help="Используется для входа, изменить нельзя">
+            <input type="email" value={PROFILE.email || ''} disabled placeholder="—" style={{opacity:.6, cursor:'not-allowed'}}/>
+          </Field>
+        </div>
+      </div>
+
+      <div className="set-card">
+        <div className="set-card-head"><h3>Имя пользователя</h3><div className="sub">Уникальный @username для поиска и ссылок</div></div>
+        <div className="set-card-body">
+          <div className="uname-wrap">
+            <div className="row">
+              <input type="text" value={username} onChange={e=>setUsername(e.target.value.replace(/\s/g,''))} placeholder="username"/>
+              {uPill}
+            </div>
+            <div>
+              <SaveBtn saving={savingUser} onClick={saveUsername} disabled={uStatus !== 'ok'} icon={<Icon.check size={16}/>}>Сменить имя пользователя</SaveBtn>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="set-card">
+        <div className="set-card-head"><h3>О себе</h3><div className="sub">Короткое описание профиля (до 200 символов)</div></div>
+        <div className="set-card-body">
+          <textarea value={bio} maxLength={200} onChange={e=>setBio(e.target.value)} placeholder="Расскажите о себе…"/>
+          <div className="char-counter">{bio.length}/200</div>
+          <div><SaveBtn saving={savingBio} onClick={saveBio} icon={<Icon.check size={16}/>}>Сохранить описание</SaveBtn></div>
+        </div>
+      </div>
+
+      <div className="set-card danger">
+        <div className="set-card-head"><h3>Опасная зона</h3><div className="sub">Действие нельзя отменить</div></div>
+        <div className="set-card-body">
+          <div className="danger-row">
+            <div className="info">
+              <div className="t">Удалить аккаунт безвозвратно</div>
+              <div className="d">Профиль, устройства, файлы и история удаляются. Восстановление невозможно.</div>
+            </div>
+            <button className="danger-btn" onClick={()=>{ setDelText(''); setDelOpen(true); }}>Удалить</button>
+          </div>
+        </div>
+      </div>
+
+      {delOpen && (
+        <div className="sys-scrim" onClick={()=>!deleting && setDelOpen(false)}>
+          <div className="sys-dialog" onClick={e=>e.stopPropagation()}>
+            <h3>Удалить аккаунт?</h3>
+            <div className="sub">Это необратимо. Введите <b>УДАЛИТЬ</b> для подтверждения.</div>
+            <input className="dlg-input" value={delText} onChange={e=>setDelText(e.target.value)} placeholder="УДАЛИТЬ" autoFocus/>
+            <div className="dlg-actions two">
+              <button className="btn text" onClick={()=>setDelOpen(false)} disabled={deleting}>Отмена</button>
+              <button className="danger-btn" onClick={doDelete} disabled={deleting || delText.trim() !== 'УДАЛИТЬ'}>
+                {deleting ? <span className="spin"/> : null} Удалить навсегда
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+// ─────────── Безопасность ───────────
+
+function SecurityTab({ flash }) {
+  const [auth2fa, setAuth2fa] = React.useState(SECURITY.authenticator);
+  const [email2fa, setEmail2fa] = React.useState(SECURITY.emailOtp);
+
+  const [pwdOpen, setPwdOpen] = React.useState(false);
+  const [oldPwd, setOldPwd] = React.useState('');
+  const [newPwd, setNewPwd] = React.useState('');
+  const [confirmPwd, setConfirmPwd] = React.useState('');
+  const [savingPwd, setSavingPwd] = React.useState(false);
+
+  const [enableDlg, setEnableDlg] = React.useState(null); // { otpType, qr, code }
+  const [enableCode, setEnableCode] = React.useState('');
+  const [enableBusy, setEnableBusy] = React.useState(false);
+
+  const [disableDlg, setDisableDlg] = React.useState(null); // { otpType }
+  const [disableCode, setDisableCode] = React.useState('');
+  const [disableBusy, setDisableBusy] = React.useState(false);
+
+  async function refresh2fa() {
+    const res = await apiGet('/api/settings/security/2fa');
+    if (res.ok && res.data) { setAuth2fa(res.data.authenticator); setEmail2fa(res.data.email); }
+  }
+  async function savePassword() {
+    if (newPwd.length < 6) { flash('err', 'Пароль слишком короткий (мин. 6)'); return; }
+    if (newPwd !== confirmPwd) { flash('err', 'Пароли не совпадают'); return; }
+    setSavingPwd(true);
+    const res = await apiPost('/api/settings/security/password', { oldPassword: oldPwd, newPassword: newPwd });
+    setSavingPwd(false);
+    if (res.ok) { setPwdOpen(false); setOldPwd(''); setNewPwd(''); setConfirmPwd(''); flash('ok', 'Пароль изменён'); }
+    else flash('err', errMsg(res));
+  }
+  async function startEnable(otpType) {
+    setEnableBusy(true);
+    const res = await apiPost('/api/settings/security/2fa/enable', { otpType });
+    setEnableBusy(false);
+    if (res.ok && res.data) { setEnableCode(''); setEnableDlg({ otpType, qr: res.data.qr, code: res.data.code }); }
+    else flash('err', errMsg(res));
+  }
+  async function confirmEnable() {
+    setEnableBusy(true);
+    const res = await apiPost('/api/settings/security/2fa/confirm', { otpCode: enableCode.trim() });
+    setEnableBusy(false);
+    if (res.ok) { setEnableDlg(null); flash('ok', 'Двухфакторная включена'); refresh2fa(); }
+    else flash('err', errMsg(res));
+  }
+  async function startDisable(otpType) {
+    if (otpType === 2) {
+      const res = await apiPost('/api/settings/security/2fa/disable', { otpType, otpCode: '' });
+      if (res.ok) { flash('ok', 'Email-2FA отключена'); refresh2fa(); }
+      else flash('err', errMsg(res));
+      return;
+    }
+    setDisableCode(''); setDisableDlg({ otpType });
+  }
+  async function confirmDisable() {
+    setDisableBusy(true);
+    const res = await apiPost('/api/settings/security/2fa/disable', { otpType: disableDlg.otpType, otpCode: disableCode.trim() });
+    setDisableBusy(false);
+    if (res.ok) { setDisableDlg(null); flash('ok', 'Двухфакторная отключена'); refresh2fa(); }
+    else flash('err', errMsg(res));
+  }
+
+  return (
+    <>
+      <div className="set-card">
+        <div className="set-card-head"><h3>Пароль</h3><div className="sub">Смена пароля для входа</div></div>
+        <div className="set-card-body">
+          {!pwdOpen
+            ? <div><button className="btn" onClick={()=>setPwdOpen(true)}><Icon.key size={16}/> Сменить пароль</button></div>
+            : <div className="form-stack">
+                <label>Текущий пароль</label>
+                <input type="password" value={oldPwd} onChange={e=>setOldPwd(e.target.value)} autoFocus/>
+                <label>Новый пароль</label>
+                <input type="password" value={newPwd} onChange={e=>setNewPwd(e.target.value)}/>
+                <label>Повторите новый пароль</label>
+                <input type="password" value={confirmPwd} onChange={e=>setConfirmPwd(e.target.value)}/>
+                <div style={{display:'flex', gap:8}}>
+                  <SaveBtn saving={savingPwd} onClick={savePassword} icon={<Icon.check size={16}/>}>Сохранить</SaveBtn>
+                  <button className="btn text" onClick={()=>{setPwdOpen(false); setOldPwd(''); setNewPwd(''); setConfirmPwd('');}} disabled={savingPwd}>Отмена</button>
+                </div>
+              </div>}
+        </div>
+      </div>
+
+      <div className="set-card">
+        <div className="set-card-head"><h3>Двухфакторная аутентификация</h3><div className="sub">Дополнительный код при входе</div></div>
+        <div className="set-card-body">
+          <Field label="Приложение-аутентификатор" help="Google Authenticator · TOTP"
+            end={<Toggle on={auth2fa} onChange={(v)=> v ? startEnable(1) : startDisable(1)} disabled={enableBusy}/>}>
+            {auth2fa && <span className="pill-info ok"><Icon.check size={12}/> Включено</span>}
+          </Field>
+          <Field label="Коды по email" help="Одноразовый код на почту"
+            end={<Toggle on={email2fa} onChange={(v)=> v ? startEnable(2) : startDisable(2)} disabled={enableBusy}/>}>
+            {email2fa && <span className="pill-info ok"><Icon.check size={12}/> Включено</span>}
+          </Field>
+        </div>
+      </div>
+
+      {enableDlg && (
+        <div className="sys-scrim" onClick={()=>!enableBusy && setEnableDlg(null)}>
+          <div className="sys-dialog" onClick={e=>e.stopPropagation()}>
+            <h3>Включение 2FA</h3>
+            <div className="sub">{enableDlg.qr ? 'Отсканируйте QR в приложении-аутентификаторе и введите код из него.' : 'Введите код, отправленный на вашу почту.'}</div>
+            <div className="qr-wrap">
+              {enableDlg.qr && <img src={"data:image/png;base64," + enableDlg.qr} alt="QR"/>}
+              {enableDlg.code && <div className="qr-code">Ключ: {enableDlg.code}</div>}
+            </div>
+            <input className="dlg-input" value={enableCode} onChange={e=>setEnableCode(e.target.value)} placeholder="Код подтверждения" autoFocus
+              onKeyDown={e=>{ if(e.key==='Enter') confirmEnable(); }}/>
+            <div className="dlg-actions two">
+              <button className="btn text" onClick={()=>setEnableDlg(null)} disabled={enableBusy}>Отмена</button>
+              <button className="btn primary" onClick={confirmEnable} disabled={enableBusy || !enableCode.trim()}>
+                {enableBusy ? <span className="spin"/> : null} Подтвердить
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {disableDlg && (
+        <div className="sys-scrim" onClick={()=>!disableBusy && setDisableDlg(null)}>
+          <div className="sys-dialog" onClick={e=>e.stopPropagation()}>
+            <h3>Отключить 2FA</h3>
+            <div className="sub">Введите текущий код из приложения-аутентификатора.</div>
+            <input className="dlg-input" value={disableCode} onChange={e=>setDisableCode(e.target.value)} placeholder="Код" autoFocus
+              onKeyDown={e=>{ if(e.key==='Enter') confirmDisable(); }}/>
+            <div className="dlg-actions two">
+              <button className="btn text" onClick={()=>setDisableDlg(null)} disabled={disableBusy}>Отмена</button>
+              <button className="btn primary" onClick={confirmDisable} disabled={disableBusy || !disableCode.trim()}>
+                {disableBusy ? <span className="spin"/> : null} Отключить
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+// ─────────── Приватность ───────────
+
+const VIS_OPTS = [{v:0,l:'Всем'},{v:1,l:'Контактам'},{v:2,l:'Никому'}];
+
+function PrivacyTab({ flash }) {
+  const [p, setP] = React.useState(PRIVACY);
+  const [saving, setSaving] = React.useState(false);
+  const set = (k, v) => setP(prev => ({ ...prev, [k]: v }));
+
+  async function save() {
+    setSaving(true);
+    const res = await apiPost('/api/settings/privacy', {
+      profileVisibility: p.profileVisibility, emailVisibility: p.emailVisibility,
+      lastSeenVisibility: p.lastSeenVisibility, searchableByUsername: p.searchableByUsername,
+    });
+    setSaving(false);
+    if (res.ok && res.data) setP(res.data);
+    flash(res.ok ? 'ok' : 'err', res.ok ? 'Настройки приватности сохранены' : errMsg(res));
+  }
+
+  const sel = (k) => (
+    <select value={p[k]} onChange={e=>set(k, parseInt(e.target.value, 10))}>
+      {VIS_OPTS.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
+    </select>
+  );
+
+  return (
+    <div className="set-card">
+      <div className="set-card-head"><h3>Приватность</h3><div className="sub">Кто видит ваши данные</div></div>
+      <div className="set-card-body">
+        <Field label="Профиль" help="Аватар, имя и описание">{sel('profileVisibility')}</Field>
+        <Field label="Email" help="Видимость адреса почты">{sel('emailVisibility')}</Field>
+        <Field label="Был в сети" help="Время последнего захода">{sel('lastSeenVisibility')}</Field>
+        <Field label="Поиск по имени пользователя" help="Можно ли найти вас через поиск"
+          end={<Toggle on={p.searchableByUsername} onChange={v=>set('searchableByUsername', v)}/>}><span/></Field>
+        <hr className="divider"/>
+        <div><SaveBtn saving={saving} onClick={save} icon={<Icon.check size={16}/>}>Сохранить</SaveBtn></div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────── Хранилище (только чтение) ───────────
+
+function StorageTab() {
+  return (
+    <div className="set-card">
+      <div className="set-card-head">
+        <h3>Хранилище</h3>
+        <div className="sub" style={{display:'flex', alignItems:'center', gap:10, flexWrap:'wrap'}}>
+          <span>{STORAGE.used} из {STORAGE.total} {STORAGE.unit} использовано</span>
+          <span className="pill-info warn">{STORAGE.percent}%</span>
+        </div>
+      </div>
+      <div className="set-card-body">
+        <div className="stor-bar">
+          {STORAGE.breakdown.map((b, i) => <span key={i} style={{width:`${b.pct}%`, background:b.color}}/>)}
+        </div>
+        <div className="stor-legend">
+          {STORAGE.breakdown.map((b, i) => (
+            <div key={i} className="item"><span className="sw" style={{background:b.color}}/><span className="k">{b.k}</span><span className="v">{b.v}</span></div>
+          ))}
+          <div className="item"><span className="sw" style={{background:'var(--md-surface-container-high)', border:'1px solid var(--md-outline-variant)'}}/><span className="k">Свободно</span><span className="v">{STORAGE.freeLabel}</span></div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────── Устройства и сессии ───────────
+
+function SessionsTab({ flash }) {
+  const [sessions, setSessions] = React.useState(SESSIONS_INIT);
+  const [busy, setBusy] = React.useState({});
+  const [renaming, setRenaming] = React.useState(null);
+  const [renameVal, setRenameVal] = React.useState('');
+  const [revokingAll, setRevokingAll] = React.useState(false);
+
+  async function revoke(s) {
+    if (!window.confirm(`Завершить сессию «${s.device}»?`)) return;
+    setBusy(b => ({ ...b, [s.deviceId]: true }));
+    const res = await apiPost('/api/settings/sessions/revoke', { deviceId: s.deviceId });
+    setBusy(b => ({ ...b, [s.deviceId]: false }));
+    if (res.ok) { setSessions(prev => prev.filter(x => x.deviceId !== s.deviceId)); flash('ok', 'Сессия завершена'); }
+    else flash('err', errMsg(res));
+  }
+  async function revokeOthers() {
+    if (!window.confirm('Завершить все сессии, кроме текущей?')) return;
+    setRevokingAll(true);
+    const res = await apiPost('/api/settings/sessions/revoke-others');
+    if (res.ok) {
+      const fresh = await apiGet('/api/settings/sessions');
+      if (fresh.ok && fresh.data) setSessions(fresh.data.sessions || []);
+      flash('ok', `Завершено сессий: ${res.data ? res.data.revoked : 0}`);
+    } else flash('err', errMsg(res));
+    setRevokingAll(false);
+  }
+  async function saveRename(s) {
+    const name = renameVal.trim();
+    setBusy(b => ({ ...b, [s.deviceId]: true }));
+    const res = await apiPost('/api/settings/devices/rename', { deviceId: s.deviceId, customName: name });
+    setBusy(b => ({ ...b, [s.deviceId]: false }));
+    if (res.ok) {
+      setSessions(prev => prev.map(x => x.deviceId === s.deviceId ? { ...x, device: name || x.device } : x));
+      setRenaming(null); flash('ok', 'Устройство переименовано');
+    } else flash('err', errMsg(res));
+  }
+
+  const header = sessions.length
+    ? `${sessions.length} ${pluralRu(sessions.length, 'устройство', 'устройства', 'устройств')} с активным доступом`
+    : 'Нет активных сессий';
+
+  return (
+    <div className="set-card">
+      <div className="set-card-head"><h3>Устройства и сессии</h3><div className="sub">{header}</div></div>
+      <div className="set-card-body" style={{paddingTop:6}}>
+        {sessions.length === 0 && <div style={{color:'var(--md-on-surface-variant)', fontSize:14}}>Список пуст или сервис недоступен.</div>}
+        {sessions.map((s) => (
+          <div key={s.deviceId || s.device} className={"session-row" + (s.current ? ' curr' : '')}>
+            <div className="si"><Icon.device size={20}/></div>
+            <div style={{minWidth:0}}>
+              {renaming === s.deviceId
+                ? <input className="dlg-input" style={{marginTop:0}} value={renameVal} autoFocus
+                    onChange={e=>setRenameVal(e.target.value)}
+                    onKeyDown={e=>{ if(e.key==='Enter') saveRename(s); if(e.key==='Escape') setRenaming(null); }}/>
+                : <div className="who">{s.device}</div>}
+              <div className="meta">{[s.os, s.location, s.when].filter(Boolean).join(' · ')}</div>
+            </div>
+            {s.current ? <span className="badge-curr">Текущая</span> : <span style={{width:80}}/>}
+            <div style={{display:'flex', gap:6, justifyContent:'flex-end'}}>
+              {busy[s.deviceId]
+                ? <span className="spin" style={{margin:'0 8px'}}/>
+                : renaming === s.deviceId
+                  ? <button className="btn text" onClick={()=>saveRename(s)}>Сохранить</button>
+                  : <>
+                      {s.deviceId && <button className="btn text" title="Переименовать" onClick={()=>{ setRenameVal(s.device); setRenaming(s.deviceId); }}><Icon.pencil size={16}/></button>}
+                      {!s.current && s.deviceId && <button className="disc" onClick={()=>revoke(s)}>Отключить</button>}
+                    </>}
+            </div>
+          </div>
+        ))}
+        <div style={{marginTop:12}}>
+          <button className="btn" onClick={revokeOthers} disabled={revokingAll || sessions.length <= 1}>
+            {revokingAll ? <span className="spin"/> : null} Выйти со всех устройств, кроме этого
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────── Внешний вид (тема) ───────────
+
+function AppearanceTab() {
+  const [theme, setTheme] = React.useState(currentTheme());
+  function pick(t) {
+    setTheme(t);
+    try { localStorage.setItem('bark_theme', t); } catch (e) {}
+    applyTheme(t);
+  }
+  return (
+    <div className="set-card">
+      <div className="set-card-head"><h3>Внешний вид</h3><div className="sub">Тема оформления (сохраняется в этом браузере)</div></div>
+      <div className="set-card-body">
+        <Field label="Тема">
+          <div className="theme-row">
+            <div className={"theme-swatch light" + (theme==='light' ? ' on' : '')} onClick={()=>pick('light')} title="Светлая"/>
+            <div className={"theme-swatch dark" + (theme==='dark' ? ' on' : '')} onClick={()=>pick('dark')} title="Тёмная"/>
+            <div className={"theme-swatch auto" + (theme==='auto' ? ' on' : '')} onClick={()=>pick('auto')} title="Как в системе"/>
+          </div>
+        </Field>
+        <div style={{fontSize:13, color:'var(--md-on-surface-variant)'}}>
+          {theme==='light' ? 'Светлая тема.' : theme==='dark' ? 'Тёмная тема.' : 'Тема следует настройкам системы.'}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────── Корневой компонент ───────────
+
+function App() {
+  const validInitial = () => {
+    const h = (window.location.hash || '').replace('#', '');
+    return NAV_KEYS.indexOf(h) >= 0 ? h : 'account';
   };
+  const [section, setSection] = React.useState(validInitial());
+  const [toast, setToast] = React.useState(null);
+  const flash = React.useCallback((kind, msg) => { setToast({ kind, msg }); setTimeout(() => setToast(null), 4200); }, []);
+
+  React.useEffect(() => {
+    const onHash = () => { const h = (window.location.hash || '').replace('#', ''); if (NAV_KEYS.indexOf(h) >= 0) setSection(h); };
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, []);
+
+  const go = (key) => { setSection(key); window.location.hash = key; };
+
+  let content;
+  switch (section) {
+    case 'security':   content = <SecurityTab flash={flash}/>; break;
+    case 'privacy':    content = <PrivacyTab flash={flash}/>; break;
+    case 'storage':    content = <StorageTab/>; break;
+    case 'sessions':   content = <SessionsTab flash={flash}/>; break;
+    case 'appearance': content = <AppearanceTab/>; break;
+    case 'system':     content = <SystemSection/>; break;
+    default:           content = <AccountTab flash={flash}/>;
+  }
 
   return (
     <AppShell
@@ -772,10 +1305,8 @@ function App() {
       kicker={<><span>Прочее</span><span className="sep">/</span><span className="cur">Настройки</span></>}
       title="Настройки"
       search={false}
-      actions={<button className="btn primary"><Icon.check size={16}/> Сохранить</button>}
     >
       <div className="settings-shell">
-        {/* Left nav */}
         <div className="set-nav">
           <div className="set-nav-label">Разделы</div>
           {NAV.map(n => {
@@ -788,205 +1319,9 @@ function App() {
             );
           })}
         </div>
-
-        {/* Right content */}
-        <div className="set-content">
-
-          {/* ACCOUNT */}
-          <div className="set-card">
-            <div className="set-card-head">
-              <h3>Профиль</h3>
-              <div className="sub">Имя и фото, видимые другим участникам</div>
-            </div>
-            <div className="set-card-body">
-              <div style={{display:'flex', gap:20, alignItems:'center'}}>
-                <div className="avatar-big">{PROFILE.initials}</div>
-                <div style={{display:'flex', flexDirection:'column', gap:8, flex:1}}>
-                  <div style={{fontSize:14, color:'var(--md-on-surface-variant)'}}>Изменить аватар. Рекомендуется не меньше 256×256.</div>
-                  <div style={{display:'flex', gap:8}}>
-                    <button className="btn"><Icon.upload size={16}/> Загрузить</button>
-                    <button className="btn text">Удалить</button>
-                  </div>
-                </div>
-              </div>
-              <hr className="divider"/>
-              <Field label="Имя" help="Будет видно другим"><input type="text" defaultValue={PROFILE.name}/></Field>
-              <Field label="Email" help="Используется для входа"><input type="email" defaultValue={PROFILE.email}/></Field>
-              <Field label="Имя в системе" help="Изменить нельзя"><input type="text" defaultValue={PROFILE.username} disabled style={{opacity:.55, cursor:'not-allowed'}}/></Field>
-              <Field label="Часовой пояс"><input type="text" defaultValue={PROFILE.timezone}/></Field>
-            </div>
-          </div>
-
-          {/* SECURITY */}
-          <div className="set-card">
-            <div className="set-card-head">
-              <h3>Безопасность</h3>
-              <div className="sub">Пароль, двухфакторка и шифрование</div>
-            </div>
-            <div className="set-card-body">
-              <Field label="Пароль" help={`Последний раз изменён ${SECURITY.passwordChanged}`}>
-                <span className="pill-info ok"><Icon.check size={12}/> {SECURITY.passwordStrength}</span>
-              </Field>
-              <div>
-                <button className="btn"><Icon.key size={16}/> Сменить пароль</button>
-              </div>
-              <hr className="divider"/>
-              <Field label="Двухфакторная (2FA)" help="Через приложение-аутентификатор" end={<Toggle on={twoFa} onChange={setTwoFa}/>}>
-                {twoFa && <span className="pill-info ok"><Icon.check size={12}/> Включена, TOTP</span>}
-              </Field>
-              <Field label="Сквозное шифрование" help="E2E для приватных папок" end={<Toggle on={e2e} onChange={setE2e}/>}>
-                <span className="pill-info ok"><Icon.lock size={12}/> AES-256</span>
-              </Field>
-              <Field label="Резервные коды" help={SECURITY.backupCodes}>
-                <button className="btn"><Icon.download size={16}/> Скачать новые</button>
-              </Field>
-            </div>
-          </div>
-
-          {/* STORAGE */}
-          <div className="set-card">
-            <div className="set-card-head">
-              <h3>Хранилище</h3>
-              <div className="sub" style={{display:'flex', alignItems:'center', gap:10, flexWrap:'wrap'}}>
-                <span>{STORAGE.used} из {STORAGE.total} {STORAGE.unit} использовано</span>
-                <span className="pill-info warn">{STORAGE.percent}% · прогноз лимита — {STORAGE.forecast}</span>
-              </div>
-            </div>
-            <div className="set-card-body">
-              <div className="stor-bar">
-                {STORAGE.breakdown.map((b, i) => (
-                  <span key={i} style={{width:`${b.pct}%`, background:b.color}}/>
-                ))}
-              </div>
-              <div className="stor-legend">
-                {STORAGE.breakdown.map((b, i) => (
-                  <div key={i} className="item">
-                    <span className="sw" style={{background:b.color}}/>
-                    <span className="k">{b.k}</span><span className="v">{b.v}</span>
-                  </div>
-                ))}
-                <div className="item"><span className="sw" style={{background:'var(--md-surface-container-high)', border:'1px solid var(--md-outline-variant)'}}/><span className="k">Свободно</span><span className="v">{STORAGE.freeLabel}</span></div>
-              </div>
-              <hr className="divider"/>
-              <Field label="Автозагрузка с устройств" help="С телефонов и планшетов" end={<Toggle on={autoUpload} onChange={setAutoUpload}/>}><span className="pill-info ok"><Icon.check size={12}/> {STORAGE.devicesCount}</span></Field>
-              <Field label="Корзина" help="Хранится 30 дней"><div style={{display:'flex', alignItems:'center', gap:14}}><span style={{color:'var(--md-on-surface)', fontSize:14}}>{STORAGE.trashLabel}</span><button className="btn text">Очистить</button></div></Field>
-            </div>
-          </div>
-
-          {/* APPEARANCE */}
-          <div className="set-card">
-            <div className="set-card-head">
-              <h3>Внешний вид</h3>
-              <div className="sub">Тема, акцент, плотность интерфейса</div>
-            </div>
-            <div className="set-card-body">
-              <Field label="Тема">
-                <div className="theme-row">
-                  <div className={"theme-swatch light" + (theme==='light' ? ' on' : '')} onClick={()=>setTheme('light')}/>
-                  <div className={"theme-swatch dark" + (theme==='dark' ? ' on' : '')} onClick={()=>setTheme('dark')}/>
-                  <div className={"theme-swatch auto" + (theme==='auto' ? ' on' : '')} onClick={()=>setTheme('auto')}/>
-                </div>
-              </Field>
-              <Field label="Акцент">
-                <div className="accent-row">
-                  {['#9A4F1E','#7B5DA8','#3F8E58','#2E6FA8','#A04067','#C9A03B'].map(c => (
-                    <div key={c} className={"accent-sw" + (accent===c ? ' on' : '')} style={{background:c}} onClick={()=>setAccent(c)}/>
-                  ))}
-                </div>
-              </Field>
-              <Field label="Плотность">
-                <div className="chip-row">
-                  <button className="chip">Свободная</button>
-                  <button className="chip active"><Icon.check size={16}/>Стандартная</button>
-                  <button className="chip">Плотная</button>
-                </div>
-              </Field>
-              <Field label="Анимации" help="Переходы и spring-движение" end={<Toggle on={true} onChange={()=>{}}/>}><span/></Field>
-            </div>
-          </div>
-
-          {/* NOTIFICATIONS */}
-          <div className="set-card">
-            <div className="set-card-head">
-              <h3>Уведомления</h3>
-              <div className="sub">Что и куда присылать</div>
-            </div>
-            <div className="set-card-body">
-              <Field label="Email-уведомления" help={NOTIFICATIONS.emailAddress} end={<Toggle on={emailNotif} onChange={setEmailNotif}/>}><span/></Field>
-              <Field label="Push в браузер" end={<Toggle on={pushNotif} onChange={setPushNotif}/>}><span/></Field>
-              <Field label="Веб-хуки" help="Slack, Discord или собственный URL"><button className="btn"><Icon.plus size={16}/> Добавить</button></Field>
-              <hr className="divider"/>
-              <Field label="Новый общий доступ" end={<Toggle on={NOTIFICATIONS.newShare} onChange={()=>{}}/>}><span/></Field>
-              <Field label="Комментарии" end={<Toggle on={NOTIFICATIONS.comments} onChange={()=>{}}/>}><span/></Field>
-              <Field label="Системные события" help="Превышение квоты, входы" end={<Toggle on={NOTIFICATIONS.systemEvents} onChange={()=>{}}/>}><span/></Field>
-              <Field label="Маркетинг" end={<Toggle on={NOTIFICATIONS.marketing} onChange={()=>{}}/>}><span/></Field>
-            </div>
-          </div>
-
-          {/* SESSIONS */}
-          <div className="set-card">
-            <div className="set-card-head">
-              <h3>Активные сессии</h3>
-              <div className="sub">{SESSIONS_HEADER}</div>
-            </div>
-            <div className="set-card-body" style={{paddingTop: 6}}>
-              {SESSIONS.map((s, i) => (
-                <div key={i} className={"session-row" + (s.current ? ' curr' : '')}>
-                  <div className="si"><Icon.device size={20}/></div>
-                  <div>
-                    <div className="who">{s.device}</div>
-                    <div className="meta">{s.location} · {s.when}</div>
-                  </div>
-                  {s.current
-                    ? <span className="badge-curr">Текущая</span>
-                    : <span style={{width: 110}}/>}
-                  {s.current
-                    ? <span style={{width: 110}}/>
-                    : <button className="disc">Отключить</button>}
-                </div>
-              ))}
-              <div style={{marginTop: 12}}>
-                <button className="btn">Выйти со всех устройств, кроме этого</button>
-              </div>
-            </div>
-          </div>
-
-          {/* SYSTEM / MAINTENANCE */}
-          <SystemSection/>
-
-          {/* DANGER ZONE */}
-          <div className="set-card danger">
-            <div className="set-card-head">
-              <h3>Опасная зона</h3>
-              <div className="sub">Действия здесь нельзя отменить</div>
-            </div>
-            <div className="set-card-body">
-              <div className="danger-row">
-                <div className="info">
-                  <div className="t">Скачать архив всех данных</div>
-                  <div className="d">ZIP со всеми вашими файлами, метаданными и историей. Подготовка занимает около 6 часов.</div>
-                </div>
-                <button className="danger-btn outlined">Запросить экспорт</button>
-              </div>
-              <div className="danger-row">
-                <div className="info">
-                  <div className="t">Деактивировать аккаунт</div>
-                  <div className="d">Профиль скрывается, файлы сохраняются. Можно восстановить в течение 90 дней.</div>
-                </div>
-                <button className="danger-btn outlined">Деактивировать</button>
-              </div>
-              <div className="danger-row">
-                <div className="info">
-                  <div className="t">Удалить аккаунт безвозвратно</div>
-                  <div className="d">Все файлы, общие доступы и история удаляются за 24 часа. Восстановление невозможно.</div>
-                </div>
-                <button className="danger-btn">Удалить</button>
-              </div>
-            </div>
-          </div>
-
-        </div>
+        <div className="set-content">{content}</div>
       </div>
+      <Toast toast={toast}/>
     </AppShell>
   );
 }

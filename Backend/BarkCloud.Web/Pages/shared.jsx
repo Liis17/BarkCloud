@@ -206,7 +206,392 @@ function AppShell({ page, kicker, title, actions, children, footerStatus, search
   );
 }
 
+/* ════════════════════════════════════════════════════════════════════════
+ *  DATA LAYER — same-origin /api (проксирует в Files-сервис с токеном из cookie)
+ * ════════════════════════════════════════════════════════════════════════ */
+
+async function api(path, opts = {}) {
+  const res = await fetch(path, {
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) },
+    ...opts,
+  });
+  if (res.status === 401) { window.location.href = '/login'; throw new Error('unauthorized'); }
+
+  const text = await res.text();
+  let data = null;
+  if (text) { try { data = JSON.parse(text); } catch (e) { /* не-JSON ответ */ } }
+
+  if (!res.ok) {
+    const err = new Error((data && data.error) || ('Ошибка ' + res.status));
+    if (data && data.code) err.code = data.code;
+    throw err;
+  }
+  return data;
+}
+const apiGet = (path) => api(path);
+const apiPost = (path, body) => api(path, { method: 'POST', body: JSON.stringify(body || {}) });
+
+/* Открыть системный диалог выбора файлов */
+function pickFiles({ accept, multiple = true } = {}) {
+  return new Promise((resolve) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.multiple = multiple;
+    if (accept) input.accept = accept;
+    input.style.display = 'none';
+    document.body.appendChild(input);
+    input.onchange = () => {
+      const files = Array.from(input.files || []);
+      document.body.removeChild(input);
+      resolve(files);
+    };
+    input.click();
+  });
+}
+
+/* Загрузка одного файла с прогрессом (XHR — fetch не отдаёт upload-progress) */
+function uploadFile(file, onProgress) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/api/files/upload');
+    xhr.withCredentials = true;
+    xhr.upload.onprogress = (e) => { if (e.lengthComputable && onProgress) onProgress(e.loaded / e.total); };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try { resolve(JSON.parse(xhr.responseText)); }
+        catch (e) { reject(new Error('Некорректный ответ загрузки')); }
+      } else if (xhr.status === 401) {
+        window.location.href = '/login';
+        reject(new Error('unauthorized'));
+      } else {
+        let msg = 'Ошибка ' + xhr.status;
+        try { const d = JSON.parse(xhr.responseText); if (d.error) msg = d.error; } catch (e) {}
+        reject(new Error(msg));
+      }
+    };
+    xhr.onerror = () => reject(new Error('Сетевая ошибка загрузки'));
+    const fd = new FormData();
+    fd.append('file', file, file.name);
+    xhr.send(fd);
+  });
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+ *  SHARED UI — превью, лайтбокс, модалка, тосты
+ * ════════════════════════════════════════════════════════════════════════ */
+
+/* Превью медиа. Браузер сам выбирает ширину под размер блока (srcset + sizes + DPR). */
+function MediaThumb({ media, sizes = '200px', className = 'thumb', alt = '' }) {
+  const previews = (media && media.previews) || [];
+  if (!previews.length) {
+    return <div className={className} style={{ '--tint-a': '#C8A78C', '--tint-b': '#6F4A3A' }} />;
+  }
+  const srcSet = previews.map(p => `${p.url} ${p.w}w`).join(', ');
+  const fallback = previews[previews.length - 1].url; // самое широкое
+  return (
+    <img className={className} src={fallback} srcSet={srcSet} sizes={sizes}
+      alt={alt || (media && media.name) || ''} loading="lazy" style={{ objectFit: 'cover' }} />
+  );
+}
+
+/* Полноэкранный просмотр ОРИГИНАЛА (временная ссылка через /api/files/download) */
+function Lightbox({ media, onClose }) {
+  const [url, setUrl] = React.useState(null);
+  const [err, setErr] = React.useState(null);
+  const fileId = media && media.id;
+
+  React.useEffect(() => {
+    let alive = true;
+    setUrl(null); setErr(null);
+    if (!fileId) return;
+    apiGet('/api/files/download?ids=' + encodeURIComponent(fileId))
+      .then(d => { if (alive) setUrl((d.urls && d.urls[fileId]) || null); })
+      .catch(e => { if (alive) setErr(e.message); });
+    return () => { alive = false; };
+  }, [fileId]);
+
+  React.useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose && onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  if (!media) return null;
+  const isVideo = media.kind === 'video';
+  return (
+    <div className="lightbox" onClick={onClose}>
+      <button className="lb-close icon-btn" onClick={onClose} title="Закрыть"><Icon.x size={24} /></button>
+      <div className="lb-stage" onClick={e => e.stopPropagation()}>
+        {err && <div className="lb-msg">Не удалось загрузить оригинал: {err}</div>}
+        {!err && !url && <div className="lb-msg"><span className="spinner" /> Загрузка оригинала…</div>}
+        {url && isVideo && <video src={url} controls autoPlay />}
+        {url && !isVideo && <img src={url} alt={media.name || ''} />}
+      </div>
+      {url && <a className="lb-download btn" href={url} download={media.name}><Icon.download size={16} /> Скачать</a>}
+    </div>
+  );
+}
+
+/* Модальное окно (Esc / клик по фону — закрыть) */
+function Modal({ title, children, onClose, actions, wide }) {
+  React.useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose && onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className={"modal" + (wide ? " wide" : "")} onClick={e => e.stopPropagation()}>
+        <div className="modal-head">
+          <h3>{title}</h3>
+          <button className="icon-btn" onClick={onClose} title="Закрыть"><Icon.x size={20} /></button>
+        </div>
+        <div className="modal-body">{children}</div>
+        {actions && <div className="modal-actions">{actions}</div>}
+      </div>
+    </div>
+  );
+}
+
+/* Тосты. Возвращает [node, push(msg, kind)] */
+function useToast() {
+  const [toasts, setToasts] = React.useState([]);
+  const push = React.useCallback((msg, kind = 'ok') => {
+    const id = Math.random().toString(36).slice(2);
+    setToasts(t => [...t, { id, msg, kind }]);
+    setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 4200);
+  }, []);
+  const node = (
+    <div className="toast-stack">
+      {toasts.map(t => <div key={t.id} className={"toast " + t.kind}>{t.msg}</div>)}
+    </div>
+  );
+  return [node, push];
+}
+
+/* Состояние пустоты / загрузки списка */
+function EmptyState({ icon = 'cloud', title, hint, action }) {
+  const IconC = Icon[icon] || Icon.cloud;
+  return (
+    <div className="empty-state">
+      <div className="es-icon"><IconC size={40} /></div>
+      <div className="es-title">{title}</div>
+      {hint && <div className="es-hint">{hint}</div>}
+      {action}
+    </div>
+  );
+}
+function Loading({ label = 'Загрузка…' }) {
+  return <div className="loading"><span className="spinner" /> {label}</div>;
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+ *  ОБЩЕЕ: даты, склонения, альбомы (используются на Фото и Видео)
+ * ════════════════════════════════════════════════════════════════════════ */
+
+const GRID_SIZES = '(max-width: 700px) 33vw, (max-width: 1280px) 20vw, 180px';
+
+function plural(n, one, few, many) {
+  const m10 = n % 10, m100 = n % 100;
+  if (m10 === 1 && m100 !== 11) return one;
+  if (m10 >= 2 && m10 <= 4 && (m100 < 10 || m100 >= 20)) return few;
+  return many;
+}
+
+const ruDate = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
+function dateLabel(d) {
+  if (!d) return 'Без даты';
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const day = new Date(d); day.setHours(0, 0, 0, 0);
+  const diff = Math.round((today - day) / 86400000);
+  if (diff === 0) return 'Сегодня';
+  if (diff === 1) return 'Вчера';
+  return ruDate.format(d);
+}
+function groupByDate(items) {
+  const groups = [];
+  const byKey = new Map();
+  for (const m of items) {
+    const d = m.createdAt ? new Date(m.createdAt) : null;
+    const key = d ? d.toDateString() : 'unknown';
+    if (!byKey.has(key)) {
+      const g = { key, label: dateLabel(d), items: [] };
+      byKey.set(key, g);
+      groups.push(g);
+    }
+    byKey.get(key).items.push(m);
+  }
+  return groups;
+}
+
+function AlbumCard({ album, onOpen }) {
+  return (
+    <div className="album-card" onClick={() => onOpen(album)}>
+      {album.coverUrl
+        ? <img className="thumb" src={album.coverUrl} alt="" loading="lazy" style={{ objectFit: 'cover' }} />
+        : <div className="thumb" style={{ '--tint-a': '#B4A3D6', '--tint-b': '#5B4889' }} />}
+      <div className="overlay">
+        <div className="badge">Альбом</div>
+        <div className="a-name">{album.name}</div>
+        <div className="a-meta">{album.count} {plural(album.count, 'элемент', 'элемента', 'элементов')}{album.description ? ' · ' + album.description : ''}</div>
+      </div>
+    </div>
+  );
+}
+
+/* Создание / редактирование альбома */
+function AlbumFormModal({ album, onClose, onSaved, toast }) {
+  const [name, setName] = React.useState(album ? album.name : '');
+  const [description, setDescription] = React.useState(album ? album.description : '');
+  const [busy, setBusy] = React.useState(false);
+
+  async function save() {
+    if (!name.trim()) { toast('Введите название', 'err'); return; }
+    setBusy(true);
+    try {
+      const saved = album
+        ? await apiPost('/api/albums/update', { album: album.id, name, description })
+        : await apiPost('/api/albums', { name, description });
+      onSaved(saved);
+    } catch (e) { toast(e.message, 'err'); }
+    finally { setBusy(false); }
+  }
+
+  return (
+    <Modal title={album ? 'Редактировать альбом' : 'Новый альбом'} onClose={onClose}
+      actions={<>
+        <button className="btn text" onClick={onClose}>Отмена</button>
+        <button className="btn primary" onClick={save} disabled={busy}>{busy ? '…' : 'Сохранить'}</button>
+      </>}>
+      <label className="field-label">Название</label>
+      <input type="text" value={name} onChange={e => setName(e.target.value)} autoFocus placeholder="Например: Отпуск 2026" />
+      <label className="field-label">Описание</label>
+      <textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="Необязательно" />
+    </Modal>
+  );
+}
+
+/* Выбор медиа для добавления в альбом */
+function PickMediaModal({ candidates, exclude, onClose, onAdd, toast, title = 'Добавить в альбом' }) {
+  const [sel, setSel] = React.useState(() => new Set());
+  const [busy, setBusy] = React.useState(false);
+  const available = candidates.filter(p => !exclude.has(p.id));
+
+  function toggle(id) {
+    setSel(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  }
+  async function add() {
+    if (!sel.size) { onClose(); return; }
+    setBusy(true);
+    try { await onAdd([...sel]); }
+    catch (e) { toast(e.message, 'err'); }
+    finally { setBusy(false); }
+  }
+
+  return (
+    <Modal wide title={title} onClose={onClose}
+      actions={<>
+        <button className="btn text" onClick={onClose}>Отмена</button>
+        <button className="btn primary" onClick={add} disabled={busy}>Добавить{sel.size ? ` (${sel.size})` : ''}</button>
+      </>}>
+      {available.length === 0
+        ? <div style={{ color: 'var(--md-on-surface-variant)', padding: '12px 0' }}>Нет элементов для добавления.</div>
+        : <div className="pick-grid">
+          {available.map(p => (
+            <div key={p.id} className={"pick-cell" + (sel.has(p.id) ? ' on' : '')} onClick={() => toggle(p.id)}>
+              <MediaThumb media={p} sizes="120px" />
+              {sel.has(p.id) && <div className="pick-check"><Icon.check size={14} /></div>}
+            </div>
+          ))}
+        </div>}
+    </Modal>
+  );
+}
+
+/* Просмотр альбома: сетка элементов, обложка, добавить/убрать, переименовать, удалить */
+function AlbumDetail({ album, candidates, gridSizes = GRID_SIZES, onBack, onChanged, toast }) {
+  const [items, setItems] = React.useState(null);
+  const [lightbox, setLightbox] = React.useState(null);
+  const [editing, setEditing] = React.useState(false);
+  const [picking, setPicking] = React.useState(false);
+
+  const load = React.useCallback(() => {
+    setItems(null);
+    apiGet('/api/albums/items?album=' + encodeURIComponent(album.id))
+      .then(d => setItems(d.items || []))
+      .catch(e => { toast(e.message, 'err'); setItems([]); });
+  }, [album.id]);
+  React.useEffect(load, [load]);
+
+  const excludeIds = React.useMemo(() => new Set((items || []).map(i => i.id)), [items]);
+
+  async function addItems(fileIds) {
+    await apiPost('/api/albums/items/add', { album: album.id, fileIds });
+    setPicking(false); load(); onChanged(); toast('Добавлено в альбом');
+  }
+  async function removeItem(id) {
+    try { await apiPost('/api/albums/items/remove', { album: album.id, fileIds: [id] }); load(); onChanged(); }
+    catch (e) { toast(e.message, 'err'); }
+  }
+  async function setCover(id) {
+    try { await apiPost('/api/albums/update', { album: album.id, coverFileId: id }); onChanged(); toast('Обложка обновлена'); }
+    catch (e) { toast(e.message, 'err'); }
+  }
+  async function removeAlbum() {
+    if (!window.confirm('Удалить альбом? Файлы останутся в облаке.')) return;
+    try { await apiPost('/api/albums/delete', { album: album.id }); onChanged(); onBack(); }
+    catch (e) { toast(e.message, 'err'); }
+  }
+
+  return (
+    <div>
+      <div className="date-head" style={{ marginBottom: 18 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <button className="icon-btn" onClick={onBack} title="Назад"><Icon.arrow size={20} style={{ transform: 'rotate(180deg)' }} /></button>
+          <div>
+            <h3>{album.name}</h3>
+            {album.description && <div style={{ fontSize: 13, color: 'var(--md-on-surface-variant)' }}>{album.description}</div>}
+          </div>
+        </div>
+        <div className="right" style={{ gap: 8 }}>
+          <button className="btn outlined" onClick={() => setPicking(true)}><Icon.plus size={16} /> Добавить</button>
+          <button className="btn outlined" onClick={() => setEditing(true)}><Icon.pencil size={16} /> Изменить</button>
+          <button className="btn text" onClick={removeAlbum}><Icon.trash size={16} /> Удалить</button>
+        </div>
+      </div>
+
+      {items === null ? <Loading /> :
+        items.length === 0
+          ? <EmptyState icon="photo" title="Альбом пуст" hint="Добавьте фото или видео из вашей галереи."
+            action={<button className="btn primary" onClick={() => setPicking(true)}><Icon.plus size={16} /> Добавить</button>} />
+          : <div className="photo-grid">
+            {items.map(m => (
+              <div key={m.id} className="photo" onClick={() => setLightbox(m)}>
+                <MediaThumb media={m} sizes={gridSizes} />
+                {m.kind === 'video' && <div className="vbadge"><Icon.play size={10} /> видео</div>}
+                <div className="item-tools">
+                  <button title="Сделать обложкой" onClick={(e) => { e.stopPropagation(); setCover(m.id); }}><Icon.star size={15} /></button>
+                  <button title="Убрать из альбома" onClick={(e) => { e.stopPropagation(); removeItem(m.id); }}><Icon.x size={15} /></button>
+                </div>
+              </div>
+            ))}
+          </div>}
+
+      {editing && <AlbumFormModal album={album} onClose={() => setEditing(false)}
+        onSaved={() => { setEditing(false); onChanged(); toast('Сохранено'); }} toast={toast} />}
+      {picking && <PickMediaModal candidates={candidates} exclude={excludeIds}
+        onClose={() => setPicking(false)} onAdd={addItems} toast={toast} />}
+      {lightbox && <Lightbox media={lightbox} onClose={() => setLightbox(null)} />}
+    </div>
+  );
+}
+
 /* Export to global scope */
 Object.assign(window, {
-  Icon, AppShell, Sidebar, Topbar, Footbar
+  Icon, AppShell, Sidebar, Topbar, Footbar,
+  api, apiGet, apiPost, pickFiles, uploadFile,
+  MediaThumb, Lightbox, Modal, useToast, EmptyState, Loading,
+  GRID_SIZES, plural, dateLabel, groupByDate,
+  AlbumCard, AlbumFormModal, PickMediaModal, AlbumDetail
 });
