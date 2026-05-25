@@ -1130,19 +1130,6 @@ internal enum Barkcloud_Files_CloudApi: Sendable {
                 type: .unary
             )
         }
-        /// Namespace for "CopyFileEntry" metadata.
-        internal enum CopyFileEntry: Sendable {
-            /// Request type for "CopyFileEntry".
-            internal typealias Input = Barkcloud_Files_CopyFileEntryRequest
-            /// Response type for "CopyFileEntry".
-            internal typealias Output = Barkcloud_Files_CloudEmpty
-            /// Descriptor for "CopyFileEntry".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
-                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.CloudApi"),
-                method: "CopyFileEntry",
-                type: .unary
-            )
-        }
         /// Namespace for "DeleteFileEntry" metadata.
         internal enum DeleteFileEntry: Sendable {
             /// Request type for "DeleteFileEntry".
@@ -1169,6 +1156,19 @@ internal enum Barkcloud_Files_CloudApi: Sendable {
                 type: .unary
             )
         }
+        /// Namespace for "ListUserMedia" metadata.
+        internal enum ListUserMedia: Sendable {
+            /// Request type for "ListUserMedia".
+            internal typealias Input = Barkcloud_Files_ListUserMediaRequest
+            /// Response type for "ListUserMedia".
+            internal typealias Output = Barkcloud_Files_ListUserMediaResponse
+            /// Descriptor for "ListUserMedia".
+            internal static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.CloudApi"),
+                method: "ListUserMedia",
+                type: .unary
+            )
+        }
         /// Namespace for "GetPath" metadata.
         internal enum GetPath: Sendable {
             /// Request type for "GetPath".
@@ -1179,6 +1179,19 @@ internal enum Barkcloud_Files_CloudApi: Sendable {
             internal static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.CloudApi"),
                 method: "GetPath",
+                type: .unary
+            )
+        }
+        /// Namespace for "SetVideoThumbnail" metadata.
+        internal enum SetVideoThumbnail: Sendable {
+            /// Request type for "SetVideoThumbnail".
+            internal typealias Input = Barkcloud_Files_SetVideoThumbnailRequest
+            /// Response type for "SetVideoThumbnail".
+            internal typealias Output = Barkcloud_Files_CloudEmpty
+            /// Descriptor for "SetVideoThumbnail".
+            internal static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.CloudApi"),
+                method: "SetVideoThumbnail",
                 type: .unary
             )
         }
@@ -1193,10 +1206,11 @@ internal enum Barkcloud_Files_CloudApi: Sendable {
             AttachFile.descriptor,
             RenameFileEntry.descriptor,
             MoveFileEntry.descriptor,
-            CopyFileEntry.descriptor,
             DeleteFileEntry.descriptor,
             ListUserImages.descriptor,
-            GetPath.descriptor
+            ListUserMedia.descriptor,
+            GetPath.descriptor,
+            SetVideoThumbnail.descriptor
         ]
     }
 }
@@ -1384,24 +1398,6 @@ extension Barkcloud_Files_CloudApi {
             context: GRPCCore.ServerContext
         ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty>
 
-        /// Handle the "CopyFileEntry" method.
-        ///
-        /// > Source IDL Documentation:
-        /// >
-        /// > Скопировать запись (один блоб → новая запись в другой папке)
-        ///
-        /// - Parameters:
-        ///   - request: A streaming request of `Barkcloud_Files_CopyFileEntryRequest` messages.
-        ///   - context: Context providing information about the RPC.
-        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
-        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
-        ///     to an internal error.
-        /// - Returns: A streaming response of `Barkcloud_Files_CloudEmpty` messages.
-        func copyFileEntry(
-            request: GRPCCore.StreamingServerRequest<Barkcloud_Files_CopyFileEntryRequest>,
-            context: GRPCCore.ServerContext
-        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty>
-
         /// Handle the "DeleteFileEntry" method.
         ///
         /// > Source IDL Documentation:
@@ -1424,7 +1420,7 @@ extension Barkcloud_Files_CloudApi {
         ///
         /// > Source IDL Documentation:
         /// >
-        /// > Все изображения пользователя от новых к старым (cursor pagination)
+        /// > [DEPRECATED] Все изображения пользователя; используйте ListUserMedia(PHOTO)
         ///
         /// - Parameters:
         ///   - request: A streaming request of `Barkcloud_Files_ListUserImagesRequest` messages.
@@ -1437,6 +1433,24 @@ extension Barkcloud_Files_CloudApi {
             request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ListUserImagesRequest>,
             context: GRPCCore.ServerContext
         ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_ListUserImagesResponse>
+
+        /// Handle the "ListUserMedia" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Медиа пользователя по типу (фото / видео) от новых к старым (cursor pagination)
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Files_ListUserMediaRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Files_ListUserMediaResponse` messages.
+        func listUserMedia(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ListUserMediaRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_ListUserMediaResponse>
 
         /// Handle the "GetPath" method.
         ///
@@ -1455,6 +1469,24 @@ extension Barkcloud_Files_CloudApi {
             request: GRPCCore.StreamingServerRequest<Barkcloud_Files_GetPathRequest>,
             context: GRPCCore.ServerContext
         ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_PathResponse>
+
+        /// Handle the "SetVideoThumbnail" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Заменить превью видео загруженной картинкой
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Files_SetVideoThumbnailRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Files_CloudEmpty` messages.
+        func setVideoThumbnail(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Files_SetVideoThumbnailRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty>
     }
 
     /// Service protocol for the "barkcloud.files.CloudApi" service.
@@ -1627,24 +1659,6 @@ extension Barkcloud_Files_CloudApi {
             context: GRPCCore.ServerContext
         ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty>
 
-        /// Handle the "CopyFileEntry" method.
-        ///
-        /// > Source IDL Documentation:
-        /// >
-        /// > Скопировать запись (один блоб → новая запись в другой папке)
-        ///
-        /// - Parameters:
-        ///   - request: A request containing a single `Barkcloud_Files_CopyFileEntryRequest` message.
-        ///   - context: Context providing information about the RPC.
-        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
-        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
-        ///     to an internal error.
-        /// - Returns: A response containing a single `Barkcloud_Files_CloudEmpty` message.
-        func copyFileEntry(
-            request: GRPCCore.ServerRequest<Barkcloud_Files_CopyFileEntryRequest>,
-            context: GRPCCore.ServerContext
-        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty>
-
         /// Handle the "DeleteFileEntry" method.
         ///
         /// > Source IDL Documentation:
@@ -1667,7 +1681,7 @@ extension Barkcloud_Files_CloudApi {
         ///
         /// > Source IDL Documentation:
         /// >
-        /// > Все изображения пользователя от новых к старым (cursor pagination)
+        /// > [DEPRECATED] Все изображения пользователя; используйте ListUserMedia(PHOTO)
         ///
         /// - Parameters:
         ///   - request: A request containing a single `Barkcloud_Files_ListUserImagesRequest` message.
@@ -1680,6 +1694,24 @@ extension Barkcloud_Files_CloudApi {
             request: GRPCCore.ServerRequest<Barkcloud_Files_ListUserImagesRequest>,
             context: GRPCCore.ServerContext
         ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_ListUserImagesResponse>
+
+        /// Handle the "ListUserMedia" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Медиа пользователя по типу (фото / видео) от новых к старым (cursor pagination)
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_ListUserMediaRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Files_ListUserMediaResponse` message.
+        func listUserMedia(
+            request: GRPCCore.ServerRequest<Barkcloud_Files_ListUserMediaRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_ListUserMediaResponse>
 
         /// Handle the "GetPath" method.
         ///
@@ -1698,6 +1730,24 @@ extension Barkcloud_Files_CloudApi {
             request: GRPCCore.ServerRequest<Barkcloud_Files_GetPathRequest>,
             context: GRPCCore.ServerContext
         ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_PathResponse>
+
+        /// Handle the "SetVideoThumbnail" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Заменить превью видео загруженной картинкой
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_SetVideoThumbnailRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Files_CloudEmpty` message.
+        func setVideoThumbnail(
+            request: GRPCCore.ServerRequest<Barkcloud_Files_SetVideoThumbnailRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty>
     }
 
     /// Simple service protocol for the "barkcloud.files.CloudApi" service.
@@ -1868,24 +1918,6 @@ extension Barkcloud_Files_CloudApi {
             context: GRPCCore.ServerContext
         ) async throws -> Barkcloud_Files_CloudEmpty
 
-        /// Handle the "CopyFileEntry" method.
-        ///
-        /// > Source IDL Documentation:
-        /// >
-        /// > Скопировать запись (один блоб → новая запись в другой папке)
-        ///
-        /// - Parameters:
-        ///   - request: A `Barkcloud_Files_CopyFileEntryRequest` message.
-        ///   - context: Context providing information about the RPC.
-        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
-        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
-        ///     to an internal error.
-        /// - Returns: A `Barkcloud_Files_CloudEmpty` to respond with.
-        func copyFileEntry(
-            request: Barkcloud_Files_CopyFileEntryRequest,
-            context: GRPCCore.ServerContext
-        ) async throws -> Barkcloud_Files_CloudEmpty
-
         /// Handle the "DeleteFileEntry" method.
         ///
         /// > Source IDL Documentation:
@@ -1908,7 +1940,7 @@ extension Barkcloud_Files_CloudApi {
         ///
         /// > Source IDL Documentation:
         /// >
-        /// > Все изображения пользователя от новых к старым (cursor pagination)
+        /// > [DEPRECATED] Все изображения пользователя; используйте ListUserMedia(PHOTO)
         ///
         /// - Parameters:
         ///   - request: A `Barkcloud_Files_ListUserImagesRequest` message.
@@ -1921,6 +1953,24 @@ extension Barkcloud_Files_CloudApi {
             request: Barkcloud_Files_ListUserImagesRequest,
             context: GRPCCore.ServerContext
         ) async throws -> Barkcloud_Files_ListUserImagesResponse
+
+        /// Handle the "ListUserMedia" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Медиа пользователя по типу (фото / видео) от новых к старым (cursor pagination)
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Files_ListUserMediaRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Files_ListUserMediaResponse` to respond with.
+        func listUserMedia(
+            request: Barkcloud_Files_ListUserMediaRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Files_ListUserMediaResponse
 
         /// Handle the "GetPath" method.
         ///
@@ -1939,6 +1989,24 @@ extension Barkcloud_Files_CloudApi {
             request: Barkcloud_Files_GetPathRequest,
             context: GRPCCore.ServerContext
         ) async throws -> Barkcloud_Files_PathResponse
+
+        /// Handle the "SetVideoThumbnail" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Заменить превью видео загруженной картинкой
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Files_SetVideoThumbnailRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Files_CloudEmpty` to respond with.
+        func setVideoThumbnail(
+            request: Barkcloud_Files_SetVideoThumbnailRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Files_CloudEmpty
     }
 }
 
@@ -2046,17 +2114,6 @@ extension Barkcloud_Files_CloudApi.StreamingServiceProtocol {
             }
         )
         router.registerHandler(
-            forMethod: Barkcloud_Files_CloudApi.Method.CopyFileEntry.descriptor,
-            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_CopyFileEntryRequest>(),
-            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_CloudEmpty>(),
-            handler: { request, context in
-                try await self.copyFileEntry(
-                    request: request,
-                    context: context
-                )
-            }
-        )
-        router.registerHandler(
             forMethod: Barkcloud_Files_CloudApi.Method.DeleteFileEntry.descriptor,
             deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_DeleteFileEntryRequest>(),
             serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_CloudEmpty>(),
@@ -2079,11 +2136,33 @@ extension Barkcloud_Files_CloudApi.StreamingServiceProtocol {
             }
         )
         router.registerHandler(
+            forMethod: Barkcloud_Files_CloudApi.Method.ListUserMedia.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_ListUserMediaRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_ListUserMediaResponse>(),
+            handler: { request, context in
+                try await self.listUserMedia(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
             forMethod: Barkcloud_Files_CloudApi.Method.GetPath.descriptor,
             deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_GetPathRequest>(),
             serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_PathResponse>(),
             handler: { request, context in
                 try await self.getPath(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
+            forMethod: Barkcloud_Files_CloudApi.Method.SetVideoThumbnail.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_SetVideoThumbnailRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_CloudEmpty>(),
+            handler: { request, context in
+                try await self.setVideoThumbnail(
                     request: request,
                     context: context
                 )
@@ -2194,17 +2273,6 @@ extension Barkcloud_Files_CloudApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func copyFileEntry(
-        request: GRPCCore.StreamingServerRequest<Barkcloud_Files_CopyFileEntryRequest>,
-        context: GRPCCore.ServerContext
-    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty> {
-        let response = try await self.copyFileEntry(
-            request: GRPCCore.ServerRequest(stream: request),
-            context: context
-        )
-        return GRPCCore.StreamingServerResponse(single: response)
-    }
-
     internal func deleteFileEntry(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Files_DeleteFileEntryRequest>,
         context: GRPCCore.ServerContext
@@ -2227,11 +2295,33 @@ extension Barkcloud_Files_CloudApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
+    internal func listUserMedia(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ListUserMediaRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_ListUserMediaResponse> {
+        let response = try await self.listUserMedia(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
     internal func getPath(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Files_GetPathRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_PathResponse> {
         let response = try await self.getPath(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    internal func setVideoThumbnail(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Files_SetVideoThumbnailRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty> {
+        let response = try await self.setVideoThumbnail(
             request: GRPCCore.ServerRequest(stream: request),
             context: context
         )
@@ -2359,19 +2449,6 @@ extension Barkcloud_Files_CloudApi.SimpleServiceProtocol {
         )
     }
 
-    internal func copyFileEntry(
-        request: GRPCCore.ServerRequest<Barkcloud_Files_CopyFileEntryRequest>,
-        context: GRPCCore.ServerContext
-    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty> {
-        return GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty>(
-            message: try await self.copyFileEntry(
-                request: request.message,
-                context: context
-            ),
-            metadata: [:]
-        )
-    }
-
     internal func deleteFileEntry(
         request: GRPCCore.ServerRequest<Barkcloud_Files_DeleteFileEntryRequest>,
         context: GRPCCore.ServerContext
@@ -2398,12 +2475,38 @@ extension Barkcloud_Files_CloudApi.SimpleServiceProtocol {
         )
     }
 
+    internal func listUserMedia(
+        request: GRPCCore.ServerRequest<Barkcloud_Files_ListUserMediaRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_ListUserMediaResponse> {
+        return GRPCCore.ServerResponse<Barkcloud_Files_ListUserMediaResponse>(
+            message: try await self.listUserMedia(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
     internal func getPath(
         request: GRPCCore.ServerRequest<Barkcloud_Files_GetPathRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_PathResponse> {
         return GRPCCore.ServerResponse<Barkcloud_Files_PathResponse>(
             message: try await self.getPath(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    internal func setVideoThumbnail(
+        request: GRPCCore.ServerRequest<Barkcloud_Files_SetVideoThumbnailRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty> {
+        return GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty>(
+            message: try await self.setVideoThumbnail(
                 request: request.message,
                 context: context
             ),
@@ -2628,29 +2731,6 @@ extension Barkcloud_Files_CloudApi {
             onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result
         ) async throws -> Result where Result: Sendable
 
-        /// Call the "CopyFileEntry" method.
-        ///
-        /// > Source IDL Documentation:
-        /// >
-        /// > Скопировать запись (один блоб → новая запись в другой папке)
-        ///
-        /// - Parameters:
-        ///   - request: A request containing a single `Barkcloud_Files_CopyFileEntryRequest` message.
-        ///   - serializer: A serializer for `Barkcloud_Files_CopyFileEntryRequest` messages.
-        ///   - deserializer: A deserializer for `Barkcloud_Files_CloudEmpty` messages.
-        ///   - options: Options to apply to this RPC.
-        ///   - handleResponse: A closure which handles the response, the result of which is
-        ///       returned to the caller. Returning from the closure will cancel the RPC if it
-        ///       hasn't already finished.
-        /// - Returns: The result of `handleResponse`.
-        func copyFileEntry<Result>(
-            request: GRPCCore.ClientRequest<Barkcloud_Files_CopyFileEntryRequest>,
-            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_CopyFileEntryRequest>,
-            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CloudEmpty>,
-            options: GRPCCore.CallOptions,
-            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result
-        ) async throws -> Result where Result: Sendable
-
         /// Call the "DeleteFileEntry" method.
         ///
         /// > Source IDL Documentation:
@@ -2678,7 +2758,7 @@ extension Barkcloud_Files_CloudApi {
         ///
         /// > Source IDL Documentation:
         /// >
-        /// > Все изображения пользователя от новых к старым (cursor pagination)
+        /// > [DEPRECATED] Все изображения пользователя; используйте ListUserMedia(PHOTO)
         ///
         /// - Parameters:
         ///   - request: A request containing a single `Barkcloud_Files_ListUserImagesRequest` message.
@@ -2695,6 +2775,29 @@ extension Barkcloud_Files_CloudApi {
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_ListUserImagesResponse>,
             options: GRPCCore.CallOptions,
             onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListUserImagesResponse>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "ListUserMedia" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Медиа пользователя по типу (фото / видео) от новых к старым (cursor pagination)
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_ListUserMediaRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_ListUserMediaRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_ListUserMediaResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func listUserMedia<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_ListUserMediaRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_ListUserMediaRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_ListUserMediaResponse>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListUserMediaResponse>) async throws -> Result
         ) async throws -> Result where Result: Sendable
 
         /// Call the "GetPath" method.
@@ -2718,6 +2821,29 @@ extension Barkcloud_Files_CloudApi {
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_PathResponse>,
             options: GRPCCore.CallOptions,
             onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_PathResponse>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "SetVideoThumbnail" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Заменить превью видео загруженной картинкой
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_SetVideoThumbnailRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_SetVideoThumbnailRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_CloudEmpty` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func setVideoThumbnail<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_SetVideoThumbnailRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_SetVideoThumbnailRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CloudEmpty>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result
         ) async throws -> Result where Result: Sendable
     }
 
@@ -3043,40 +3169,6 @@ extension Barkcloud_Files_CloudApi {
             )
         }
 
-        /// Call the "CopyFileEntry" method.
-        ///
-        /// > Source IDL Documentation:
-        /// >
-        /// > Скопировать запись (один блоб → новая запись в другой папке)
-        ///
-        /// - Parameters:
-        ///   - request: A request containing a single `Barkcloud_Files_CopyFileEntryRequest` message.
-        ///   - serializer: A serializer for `Barkcloud_Files_CopyFileEntryRequest` messages.
-        ///   - deserializer: A deserializer for `Barkcloud_Files_CloudEmpty` messages.
-        ///   - options: Options to apply to this RPC.
-        ///   - handleResponse: A closure which handles the response, the result of which is
-        ///       returned to the caller. Returning from the closure will cancel the RPC if it
-        ///       hasn't already finished.
-        /// - Returns: The result of `handleResponse`.
-        internal func copyFileEntry<Result>(
-            request: GRPCCore.ClientRequest<Barkcloud_Files_CopyFileEntryRequest>,
-            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_CopyFileEntryRequest>,
-            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CloudEmpty>,
-            options: GRPCCore.CallOptions = .defaults,
-            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
-                try response.message
-            }
-        ) async throws -> Result where Result: Sendable {
-            try await self.client.unary(
-                request: request,
-                descriptor: Barkcloud_Files_CloudApi.Method.CopyFileEntry.descriptor,
-                serializer: serializer,
-                deserializer: deserializer,
-                options: options,
-                onResponse: handleResponse
-            )
-        }
-
         /// Call the "DeleteFileEntry" method.
         ///
         /// > Source IDL Documentation:
@@ -3115,7 +3207,7 @@ extension Barkcloud_Files_CloudApi {
         ///
         /// > Source IDL Documentation:
         /// >
-        /// > Все изображения пользователя от новых к старым (cursor pagination)
+        /// > [DEPRECATED] Все изображения пользователя; используйте ListUserMedia(PHOTO)
         ///
         /// - Parameters:
         ///   - request: A request containing a single `Barkcloud_Files_ListUserImagesRequest` message.
@@ -3138,6 +3230,40 @@ extension Barkcloud_Files_CloudApi {
             try await self.client.unary(
                 request: request,
                 descriptor: Barkcloud_Files_CloudApi.Method.ListUserImages.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "ListUserMedia" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Медиа пользователя по типу (фото / видео) от новых к старым (cursor pagination)
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_ListUserMediaRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_ListUserMediaRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_ListUserMediaResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        internal func listUserMedia<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_ListUserMediaRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_ListUserMediaRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_ListUserMediaResponse>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListUserMediaResponse>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Files_CloudApi.Method.ListUserMedia.descriptor,
                 serializer: serializer,
                 deserializer: deserializer,
                 options: options,
@@ -3172,6 +3298,40 @@ extension Barkcloud_Files_CloudApi {
             try await self.client.unary(
                 request: request,
                 descriptor: Barkcloud_Files_CloudApi.Method.GetPath.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "SetVideoThumbnail" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Заменить превью видео загруженной картинкой
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_SetVideoThumbnailRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_SetVideoThumbnailRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_CloudEmpty` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        internal func setVideoThumbnail<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_SetVideoThumbnailRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_SetVideoThumbnailRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CloudEmpty>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Files_CloudApi.Method.SetVideoThumbnail.descriptor,
                 serializer: serializer,
                 deserializer: deserializer,
                 options: options,
@@ -3445,35 +3605,6 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
         )
     }
 
-    /// Call the "CopyFileEntry" method.
-    ///
-    /// > Source IDL Documentation:
-    /// >
-    /// > Скопировать запись (один блоб → новая запись в другой папке)
-    ///
-    /// - Parameters:
-    ///   - request: A request containing a single `Barkcloud_Files_CopyFileEntryRequest` message.
-    ///   - options: Options to apply to this RPC.
-    ///   - handleResponse: A closure which handles the response, the result of which is
-    ///       returned to the caller. Returning from the closure will cancel the RPC if it
-    ///       hasn't already finished.
-    /// - Returns: The result of `handleResponse`.
-    internal func copyFileEntry<Result>(
-        request: GRPCCore.ClientRequest<Barkcloud_Files_CopyFileEntryRequest>,
-        options: GRPCCore.CallOptions = .defaults,
-        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
-            try response.message
-        }
-    ) async throws -> Result where Result: Sendable {
-        try await self.copyFileEntry(
-            request: request,
-            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_CopyFileEntryRequest>(),
-            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_CloudEmpty>(),
-            options: options,
-            onResponse: handleResponse
-        )
-    }
-
     /// Call the "DeleteFileEntry" method.
     ///
     /// > Source IDL Documentation:
@@ -3507,7 +3638,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///
     /// > Source IDL Documentation:
     /// >
-    /// > Все изображения пользователя от новых к старым (cursor pagination)
+    /// > [DEPRECATED] Все изображения пользователя; используйте ListUserMedia(PHOTO)
     ///
     /// - Parameters:
     ///   - request: A request containing a single `Barkcloud_Files_ListUserImagesRequest` message.
@@ -3527,6 +3658,35 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
             request: request,
             serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_ListUserImagesRequest>(),
             deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_ListUserImagesResponse>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "ListUserMedia" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Медиа пользователя по типу (фото / видео) от новых к старым (cursor pagination)
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Files_ListUserMediaRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    internal func listUserMedia<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Files_ListUserMediaRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListUserMediaResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.listUserMedia(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_ListUserMediaRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_ListUserMediaResponse>(),
             options: options,
             onResponse: handleResponse
         )
@@ -3556,6 +3716,35 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
             request: request,
             serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_GetPathRequest>(),
             deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_PathResponse>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "SetVideoThumbnail" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Заменить превью видео загруженной картинкой
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Files_SetVideoThumbnailRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    internal func setVideoThumbnail<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Files_SetVideoThumbnailRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.setVideoThumbnail(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_SetVideoThumbnailRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_CloudEmpty>(),
             options: options,
             onResponse: handleResponse
         )
@@ -3862,39 +4051,6 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
         )
     }
 
-    /// Call the "CopyFileEntry" method.
-    ///
-    /// > Source IDL Documentation:
-    /// >
-    /// > Скопировать запись (один блоб → новая запись в другой папке)
-    ///
-    /// - Parameters:
-    ///   - message: request message to send.
-    ///   - metadata: Additional metadata to send, defaults to empty.
-    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
-    ///   - handleResponse: A closure which handles the response, the result of which is
-    ///       returned to the caller. Returning from the closure will cancel the RPC if it
-    ///       hasn't already finished.
-    /// - Returns: The result of `handleResponse`.
-    internal func copyFileEntry<Result>(
-        _ message: Barkcloud_Files_CopyFileEntryRequest,
-        metadata: GRPCCore.Metadata = [:],
-        options: GRPCCore.CallOptions = .defaults,
-        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
-            try response.message
-        }
-    ) async throws -> Result where Result: Sendable {
-        let request = GRPCCore.ClientRequest<Barkcloud_Files_CopyFileEntryRequest>(
-            message: message,
-            metadata: metadata
-        )
-        return try await self.copyFileEntry(
-            request: request,
-            options: options,
-            onResponse: handleResponse
-        )
-    }
-
     /// Call the "DeleteFileEntry" method.
     ///
     /// > Source IDL Documentation:
@@ -3932,7 +4088,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///
     /// > Source IDL Documentation:
     /// >
-    /// > Все изображения пользователя от новых к старым (cursor pagination)
+    /// > [DEPRECATED] Все изображения пользователя; используйте ListUserMedia(PHOTO)
     ///
     /// - Parameters:
     ///   - message: request message to send.
@@ -3955,6 +4111,39 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
             metadata: metadata
         )
         return try await self.listUserImages(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "ListUserMedia" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Медиа пользователя по типу (фото / видео) от новых к старым (cursor pagination)
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    internal func listUserMedia<Result>(
+        _ message: Barkcloud_Files_ListUserMediaRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListUserMediaResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Files_ListUserMediaRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.listUserMedia(
             request: request,
             options: options,
             onResponse: handleResponse
@@ -3988,6 +4177,39 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
             metadata: metadata
         )
         return try await self.getPath(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "SetVideoThumbnail" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Заменить превью видео загруженной картинкой
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    internal func setVideoThumbnail<Result>(
+        _ message: Barkcloud_Files_SetVideoThumbnailRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Files_SetVideoThumbnailRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.setVideoThumbnail(
             request: request,
             options: options,
             onResponse: handleResponse
@@ -4981,6 +5203,1665 @@ extension Barkcloud_Files_FilesServerApi.ClientProtocol {
             metadata: metadata
         )
         return try await self.uploadAvatarServer(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+}
+
+// MARK: - barkcloud.files.AlbumApi
+
+/// Namespace containing generated types for the "barkcloud.files.AlbumApi" service.
+@available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+internal enum Barkcloud_Files_AlbumApi: Sendable {
+    /// Service descriptor for the "barkcloud.files.AlbumApi" service.
+    internal static let descriptor = GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.AlbumApi")
+    /// Namespace for method metadata.
+    internal enum Method: Sendable {
+        /// Namespace for "CreateAlbum" metadata.
+        internal enum CreateAlbum: Sendable {
+            /// Request type for "CreateAlbum".
+            internal typealias Input = Barkcloud_Files_CreateAlbumRequest
+            /// Response type for "CreateAlbum".
+            internal typealias Output = Barkcloud_Files_AlbumInfo
+            /// Descriptor for "CreateAlbum".
+            internal static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.AlbumApi"),
+                method: "CreateAlbum",
+                type: .unary
+            )
+        }
+        /// Namespace for "UpdateAlbum" metadata.
+        internal enum UpdateAlbum: Sendable {
+            /// Request type for "UpdateAlbum".
+            internal typealias Input = Barkcloud_Files_UpdateAlbumRequest
+            /// Response type for "UpdateAlbum".
+            internal typealias Output = Barkcloud_Files_AlbumInfo
+            /// Descriptor for "UpdateAlbum".
+            internal static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.AlbumApi"),
+                method: "UpdateAlbum",
+                type: .unary
+            )
+        }
+        /// Namespace for "DeleteAlbum" metadata.
+        internal enum DeleteAlbum: Sendable {
+            /// Request type for "DeleteAlbum".
+            internal typealias Input = Barkcloud_Files_DeleteAlbumRequest
+            /// Response type for "DeleteAlbum".
+            internal typealias Output = Barkcloud_Files_CloudEmpty
+            /// Descriptor for "DeleteAlbum".
+            internal static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.AlbumApi"),
+                method: "DeleteAlbum",
+                type: .unary
+            )
+        }
+        /// Namespace for "AddItemsToAlbum" metadata.
+        internal enum AddItemsToAlbum: Sendable {
+            /// Request type for "AddItemsToAlbum".
+            internal typealias Input = Barkcloud_Files_AddItemsToAlbumRequest
+            /// Response type for "AddItemsToAlbum".
+            internal typealias Output = Barkcloud_Files_CloudEmpty
+            /// Descriptor for "AddItemsToAlbum".
+            internal static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.AlbumApi"),
+                method: "AddItemsToAlbum",
+                type: .unary
+            )
+        }
+        /// Namespace for "RemoveItemsFromAlbum" metadata.
+        internal enum RemoveItemsFromAlbum: Sendable {
+            /// Request type for "RemoveItemsFromAlbum".
+            internal typealias Input = Barkcloud_Files_RemoveItemsFromAlbumRequest
+            /// Response type for "RemoveItemsFromAlbum".
+            internal typealias Output = Barkcloud_Files_CloudEmpty
+            /// Descriptor for "RemoveItemsFromAlbum".
+            internal static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.AlbumApi"),
+                method: "RemoveItemsFromAlbum",
+                type: .unary
+            )
+        }
+        /// Namespace for "ListAlbums" metadata.
+        internal enum ListAlbums: Sendable {
+            /// Request type for "ListAlbums".
+            internal typealias Input = Barkcloud_Files_ListAlbumsRequest
+            /// Response type for "ListAlbums".
+            internal typealias Output = Barkcloud_Files_ListAlbumsResponse
+            /// Descriptor for "ListAlbums".
+            internal static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.AlbumApi"),
+                method: "ListAlbums",
+                type: .unary
+            )
+        }
+        /// Namespace for "ListAlbumItems" metadata.
+        internal enum ListAlbumItems: Sendable {
+            /// Request type for "ListAlbumItems".
+            internal typealias Input = Barkcloud_Files_ListAlbumItemsRequest
+            /// Response type for "ListAlbumItems".
+            internal typealias Output = Barkcloud_Files_ListAlbumItemsResponse
+            /// Descriptor for "ListAlbumItems".
+            internal static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.AlbumApi"),
+                method: "ListAlbumItems",
+                type: .unary
+            )
+        }
+        /// Descriptors for all methods in the "barkcloud.files.AlbumApi" service.
+        internal static let descriptors: [GRPCCore.MethodDescriptor] = [
+            CreateAlbum.descriptor,
+            UpdateAlbum.descriptor,
+            DeleteAlbum.descriptor,
+            AddItemsToAlbum.descriptor,
+            RemoveItemsFromAlbum.descriptor,
+            ListAlbums.descriptor,
+            ListAlbumItems.descriptor
+        ]
+    }
+}
+
+@available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+extension GRPCCore.ServiceDescriptor {
+    /// Service descriptor for the "barkcloud.files.AlbumApi" service.
+    internal static let barkcloud_files_AlbumApi = GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.AlbumApi")
+}
+
+// MARK: barkcloud.files.AlbumApi (server)
+
+@available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+extension Barkcloud_Files_AlbumApi {
+    /// Streaming variant of the service protocol for the "barkcloud.files.AlbumApi" service.
+    ///
+    /// This protocol is the lowest-level of the service protocols generated for this service
+    /// giving you the most flexibility over the implementation of your service. This comes at
+    /// the cost of more verbose and less strict APIs. Each RPC requires you to implement it in
+    /// terms of a request stream and response stream. Where only a single request or response
+    /// message is expected, you are responsible for enforcing this invariant is maintained.
+    ///
+    /// Where possible, prefer using the stricter, less-verbose ``ServiceProtocol``
+    /// or ``SimpleServiceProtocol`` instead.
+    internal protocol StreamingServiceProtocol: GRPCCore.RegistrableRPCService {
+        /// Handle the "CreateAlbum" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Создать альбом
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Files_CreateAlbumRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Files_AlbumInfo` messages.
+        func createAlbum(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Files_CreateAlbumRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_AlbumInfo>
+
+        /// Handle the "UpdateAlbum" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Изменить имя / описание / обложку
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Files_UpdateAlbumRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Files_AlbumInfo` messages.
+        func updateAlbum(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Files_UpdateAlbumRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_AlbumInfo>
+
+        /// Handle the "DeleteAlbum" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Удалить альбом
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Files_DeleteAlbumRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Files_CloudEmpty` messages.
+        func deleteAlbum(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Files_DeleteAlbumRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty>
+
+        /// Handle the "AddItemsToAlbum" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Добавить фото/видео в альбом
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Files_AddItemsToAlbumRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Files_CloudEmpty` messages.
+        func addItemsToAlbum(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Files_AddItemsToAlbumRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty>
+
+        /// Handle the "RemoveItemsFromAlbum" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Убрать фото/видео из альбома
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Files_RemoveItemsFromAlbumRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Files_CloudEmpty` messages.
+        func removeItemsFromAlbum(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Files_RemoveItemsFromAlbumRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty>
+
+        /// Handle the "ListAlbums" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Список альбомов (обложка / описание / счётчик)
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Files_ListAlbumsRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Files_ListAlbumsResponse` messages.
+        func listAlbums(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ListAlbumsRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_ListAlbumsResponse>
+
+        /// Handle the "ListAlbumItems" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Содержимое альбома (фото/видео с превью)
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Files_ListAlbumItemsRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Files_ListAlbumItemsResponse` messages.
+        func listAlbumItems(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ListAlbumItemsRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_ListAlbumItemsResponse>
+    }
+
+    /// Service protocol for the "barkcloud.files.AlbumApi" service.
+    ///
+    /// This protocol is higher level than ``StreamingServiceProtocol`` but lower level than
+    /// the ``SimpleServiceProtocol``, it provides access to request and response metadata and
+    /// trailing response metadata. If you don't need these then consider using
+    /// the ``SimpleServiceProtocol``. If you need fine grained control over your RPCs then
+    /// use ``StreamingServiceProtocol``.
+    internal protocol ServiceProtocol: Barkcloud_Files_AlbumApi.StreamingServiceProtocol {
+        /// Handle the "CreateAlbum" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Создать альбом
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_CreateAlbumRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Files_AlbumInfo` message.
+        func createAlbum(
+            request: GRPCCore.ServerRequest<Barkcloud_Files_CreateAlbumRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_AlbumInfo>
+
+        /// Handle the "UpdateAlbum" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Изменить имя / описание / обложку
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_UpdateAlbumRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Files_AlbumInfo` message.
+        func updateAlbum(
+            request: GRPCCore.ServerRequest<Barkcloud_Files_UpdateAlbumRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_AlbumInfo>
+
+        /// Handle the "DeleteAlbum" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Удалить альбом
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_DeleteAlbumRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Files_CloudEmpty` message.
+        func deleteAlbum(
+            request: GRPCCore.ServerRequest<Barkcloud_Files_DeleteAlbumRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty>
+
+        /// Handle the "AddItemsToAlbum" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Добавить фото/видео в альбом
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_AddItemsToAlbumRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Files_CloudEmpty` message.
+        func addItemsToAlbum(
+            request: GRPCCore.ServerRequest<Barkcloud_Files_AddItemsToAlbumRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty>
+
+        /// Handle the "RemoveItemsFromAlbum" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Убрать фото/видео из альбома
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_RemoveItemsFromAlbumRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Files_CloudEmpty` message.
+        func removeItemsFromAlbum(
+            request: GRPCCore.ServerRequest<Barkcloud_Files_RemoveItemsFromAlbumRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty>
+
+        /// Handle the "ListAlbums" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Список альбомов (обложка / описание / счётчик)
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_ListAlbumsRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Files_ListAlbumsResponse` message.
+        func listAlbums(
+            request: GRPCCore.ServerRequest<Barkcloud_Files_ListAlbumsRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_ListAlbumsResponse>
+
+        /// Handle the "ListAlbumItems" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Содержимое альбома (фото/видео с превью)
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_ListAlbumItemsRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Files_ListAlbumItemsResponse` message.
+        func listAlbumItems(
+            request: GRPCCore.ServerRequest<Barkcloud_Files_ListAlbumItemsRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_ListAlbumItemsResponse>
+    }
+
+    /// Simple service protocol for the "barkcloud.files.AlbumApi" service.
+    ///
+    /// This is the highest level protocol for the service. The API is the easiest to use but
+    /// doesn't provide access to request or response metadata. If you need access to these
+    /// then use ``ServiceProtocol`` instead.
+    internal protocol SimpleServiceProtocol: Barkcloud_Files_AlbumApi.ServiceProtocol {
+        /// Handle the "CreateAlbum" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Создать альбом
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Files_CreateAlbumRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Files_AlbumInfo` to respond with.
+        func createAlbum(
+            request: Barkcloud_Files_CreateAlbumRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Files_AlbumInfo
+
+        /// Handle the "UpdateAlbum" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Изменить имя / описание / обложку
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Files_UpdateAlbumRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Files_AlbumInfo` to respond with.
+        func updateAlbum(
+            request: Barkcloud_Files_UpdateAlbumRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Files_AlbumInfo
+
+        /// Handle the "DeleteAlbum" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Удалить альбом
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Files_DeleteAlbumRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Files_CloudEmpty` to respond with.
+        func deleteAlbum(
+            request: Barkcloud_Files_DeleteAlbumRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Files_CloudEmpty
+
+        /// Handle the "AddItemsToAlbum" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Добавить фото/видео в альбом
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Files_AddItemsToAlbumRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Files_CloudEmpty` to respond with.
+        func addItemsToAlbum(
+            request: Barkcloud_Files_AddItemsToAlbumRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Files_CloudEmpty
+
+        /// Handle the "RemoveItemsFromAlbum" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Убрать фото/видео из альбома
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Files_RemoveItemsFromAlbumRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Files_CloudEmpty` to respond with.
+        func removeItemsFromAlbum(
+            request: Barkcloud_Files_RemoveItemsFromAlbumRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Files_CloudEmpty
+
+        /// Handle the "ListAlbums" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Список альбомов (обложка / описание / счётчик)
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Files_ListAlbumsRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Files_ListAlbumsResponse` to respond with.
+        func listAlbums(
+            request: Barkcloud_Files_ListAlbumsRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Files_ListAlbumsResponse
+
+        /// Handle the "ListAlbumItems" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Содержимое альбома (фото/видео с превью)
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Files_ListAlbumItemsRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Files_ListAlbumItemsResponse` to respond with.
+        func listAlbumItems(
+            request: Barkcloud_Files_ListAlbumItemsRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Files_ListAlbumItemsResponse
+    }
+}
+
+// Default implementation of 'registerMethods(with:)'.
+@available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+extension Barkcloud_Files_AlbumApi.StreamingServiceProtocol {
+    internal func registerMethods<Transport>(with router: inout GRPCCore.RPCRouter<Transport>) where Transport: GRPCCore.ServerTransport {
+        router.registerHandler(
+            forMethod: Barkcloud_Files_AlbumApi.Method.CreateAlbum.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_CreateAlbumRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_AlbumInfo>(),
+            handler: { request, context in
+                try await self.createAlbum(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
+            forMethod: Barkcloud_Files_AlbumApi.Method.UpdateAlbum.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_UpdateAlbumRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_AlbumInfo>(),
+            handler: { request, context in
+                try await self.updateAlbum(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
+            forMethod: Barkcloud_Files_AlbumApi.Method.DeleteAlbum.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_DeleteAlbumRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_CloudEmpty>(),
+            handler: { request, context in
+                try await self.deleteAlbum(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
+            forMethod: Barkcloud_Files_AlbumApi.Method.AddItemsToAlbum.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_AddItemsToAlbumRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_CloudEmpty>(),
+            handler: { request, context in
+                try await self.addItemsToAlbum(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
+            forMethod: Barkcloud_Files_AlbumApi.Method.RemoveItemsFromAlbum.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_RemoveItemsFromAlbumRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_CloudEmpty>(),
+            handler: { request, context in
+                try await self.removeItemsFromAlbum(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
+            forMethod: Barkcloud_Files_AlbumApi.Method.ListAlbums.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_ListAlbumsRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_ListAlbumsResponse>(),
+            handler: { request, context in
+                try await self.listAlbums(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
+            forMethod: Barkcloud_Files_AlbumApi.Method.ListAlbumItems.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_ListAlbumItemsRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_ListAlbumItemsResponse>(),
+            handler: { request, context in
+                try await self.listAlbumItems(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+    }
+}
+
+// Default implementation of streaming methods from 'StreamingServiceProtocol'.
+@available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+extension Barkcloud_Files_AlbumApi.ServiceProtocol {
+    internal func createAlbum(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Files_CreateAlbumRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_AlbumInfo> {
+        let response = try await self.createAlbum(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    internal func updateAlbum(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Files_UpdateAlbumRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_AlbumInfo> {
+        let response = try await self.updateAlbum(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    internal func deleteAlbum(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Files_DeleteAlbumRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty> {
+        let response = try await self.deleteAlbum(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    internal func addItemsToAlbum(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Files_AddItemsToAlbumRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty> {
+        let response = try await self.addItemsToAlbum(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    internal func removeItemsFromAlbum(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Files_RemoveItemsFromAlbumRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty> {
+        let response = try await self.removeItemsFromAlbum(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    internal func listAlbums(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ListAlbumsRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_ListAlbumsResponse> {
+        let response = try await self.listAlbums(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    internal func listAlbumItems(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ListAlbumItemsRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_ListAlbumItemsResponse> {
+        let response = try await self.listAlbumItems(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+}
+
+// Default implementation of methods from 'ServiceProtocol'.
+@available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+extension Barkcloud_Files_AlbumApi.SimpleServiceProtocol {
+    internal func createAlbum(
+        request: GRPCCore.ServerRequest<Barkcloud_Files_CreateAlbumRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_AlbumInfo> {
+        return GRPCCore.ServerResponse<Barkcloud_Files_AlbumInfo>(
+            message: try await self.createAlbum(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    internal func updateAlbum(
+        request: GRPCCore.ServerRequest<Barkcloud_Files_UpdateAlbumRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_AlbumInfo> {
+        return GRPCCore.ServerResponse<Barkcloud_Files_AlbumInfo>(
+            message: try await self.updateAlbum(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    internal func deleteAlbum(
+        request: GRPCCore.ServerRequest<Barkcloud_Files_DeleteAlbumRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty> {
+        return GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty>(
+            message: try await self.deleteAlbum(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    internal func addItemsToAlbum(
+        request: GRPCCore.ServerRequest<Barkcloud_Files_AddItemsToAlbumRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty> {
+        return GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty>(
+            message: try await self.addItemsToAlbum(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    internal func removeItemsFromAlbum(
+        request: GRPCCore.ServerRequest<Barkcloud_Files_RemoveItemsFromAlbumRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty> {
+        return GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty>(
+            message: try await self.removeItemsFromAlbum(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    internal func listAlbums(
+        request: GRPCCore.ServerRequest<Barkcloud_Files_ListAlbumsRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_ListAlbumsResponse> {
+        return GRPCCore.ServerResponse<Barkcloud_Files_ListAlbumsResponse>(
+            message: try await self.listAlbums(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    internal func listAlbumItems(
+        request: GRPCCore.ServerRequest<Barkcloud_Files_ListAlbumItemsRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_ListAlbumItemsResponse> {
+        return GRPCCore.ServerResponse<Barkcloud_Files_ListAlbumItemsResponse>(
+            message: try await self.listAlbumItems(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+}
+
+// MARK: barkcloud.files.AlbumApi (client)
+
+@available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+extension Barkcloud_Files_AlbumApi {
+    /// Generated client protocol for the "barkcloud.files.AlbumApi" service.
+    ///
+    /// You don't need to implement this protocol directly, use the generated
+    /// implementation, ``Client``.
+    internal protocol ClientProtocol: Sendable {
+        /// Call the "CreateAlbum" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Создать альбом
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_CreateAlbumRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_CreateAlbumRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_AlbumInfo` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func createAlbum<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_CreateAlbumRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_CreateAlbumRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_AlbumInfo>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_AlbumInfo>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "UpdateAlbum" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Изменить имя / описание / обложку
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_UpdateAlbumRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_UpdateAlbumRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_AlbumInfo` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func updateAlbum<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_UpdateAlbumRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_UpdateAlbumRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_AlbumInfo>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_AlbumInfo>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "DeleteAlbum" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Удалить альбом
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_DeleteAlbumRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_DeleteAlbumRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_CloudEmpty` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func deleteAlbum<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_DeleteAlbumRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_DeleteAlbumRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CloudEmpty>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "AddItemsToAlbum" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Добавить фото/видео в альбом
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_AddItemsToAlbumRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_AddItemsToAlbumRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_CloudEmpty` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func addItemsToAlbum<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_AddItemsToAlbumRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_AddItemsToAlbumRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CloudEmpty>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "RemoveItemsFromAlbum" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Убрать фото/видео из альбома
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_RemoveItemsFromAlbumRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_RemoveItemsFromAlbumRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_CloudEmpty` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func removeItemsFromAlbum<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_RemoveItemsFromAlbumRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_RemoveItemsFromAlbumRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CloudEmpty>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "ListAlbums" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Список альбомов (обложка / описание / счётчик)
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_ListAlbumsRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_ListAlbumsRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_ListAlbumsResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func listAlbums<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_ListAlbumsRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_ListAlbumsRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_ListAlbumsResponse>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListAlbumsResponse>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "ListAlbumItems" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Содержимое альбома (фото/видео с превью)
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_ListAlbumItemsRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_ListAlbumItemsRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_ListAlbumItemsResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func listAlbumItems<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_ListAlbumItemsRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_ListAlbumItemsRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_ListAlbumItemsResponse>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListAlbumItemsResponse>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+    }
+
+    /// Generated client for the "barkcloud.files.AlbumApi" service.
+    ///
+    /// The ``Client`` provides an implementation of ``ClientProtocol`` which wraps
+    /// a `GRPCCore.GRPCCClient`. The underlying `GRPCClient` provides the long-lived
+    /// means of communication with the remote peer.
+    internal struct Client<Transport>: ClientProtocol where Transport: GRPCCore.ClientTransport {
+        private let client: GRPCCore.GRPCClient<Transport>
+
+        /// Creates a new client wrapping the provided `GRPCCore.GRPCClient`.
+        ///
+        /// - Parameters:
+        ///   - client: A `GRPCCore.GRPCClient` providing a communication channel to the service.
+        internal init(wrapping client: GRPCCore.GRPCClient<Transport>) {
+            self.client = client
+        }
+
+        /// Call the "CreateAlbum" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Создать альбом
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_CreateAlbumRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_CreateAlbumRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_AlbumInfo` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        internal func createAlbum<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_CreateAlbumRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_CreateAlbumRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_AlbumInfo>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_AlbumInfo>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Files_AlbumApi.Method.CreateAlbum.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "UpdateAlbum" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Изменить имя / описание / обложку
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_UpdateAlbumRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_UpdateAlbumRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_AlbumInfo` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        internal func updateAlbum<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_UpdateAlbumRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_UpdateAlbumRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_AlbumInfo>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_AlbumInfo>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Files_AlbumApi.Method.UpdateAlbum.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "DeleteAlbum" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Удалить альбом
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_DeleteAlbumRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_DeleteAlbumRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_CloudEmpty` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        internal func deleteAlbum<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_DeleteAlbumRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_DeleteAlbumRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CloudEmpty>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Files_AlbumApi.Method.DeleteAlbum.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "AddItemsToAlbum" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Добавить фото/видео в альбом
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_AddItemsToAlbumRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_AddItemsToAlbumRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_CloudEmpty` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        internal func addItemsToAlbum<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_AddItemsToAlbumRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_AddItemsToAlbumRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CloudEmpty>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Files_AlbumApi.Method.AddItemsToAlbum.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "RemoveItemsFromAlbum" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Убрать фото/видео из альбома
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_RemoveItemsFromAlbumRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_RemoveItemsFromAlbumRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_CloudEmpty` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        internal func removeItemsFromAlbum<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_RemoveItemsFromAlbumRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_RemoveItemsFromAlbumRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CloudEmpty>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Files_AlbumApi.Method.RemoveItemsFromAlbum.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "ListAlbums" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Список альбомов (обложка / описание / счётчик)
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_ListAlbumsRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_ListAlbumsRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_ListAlbumsResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        internal func listAlbums<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_ListAlbumsRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_ListAlbumsRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_ListAlbumsResponse>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListAlbumsResponse>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Files_AlbumApi.Method.ListAlbums.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "ListAlbumItems" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Содержимое альбома (фото/видео с превью)
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_ListAlbumItemsRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_ListAlbumItemsRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_ListAlbumItemsResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        internal func listAlbumItems<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_ListAlbumItemsRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_ListAlbumItemsRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_ListAlbumItemsResponse>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListAlbumItemsResponse>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Files_AlbumApi.Method.ListAlbumItems.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+    }
+}
+
+// Helpers providing default arguments to 'ClientProtocol' methods.
+@available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+extension Barkcloud_Files_AlbumApi.ClientProtocol {
+    /// Call the "CreateAlbum" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Создать альбом
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Files_CreateAlbumRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    internal func createAlbum<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Files_CreateAlbumRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_AlbumInfo>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.createAlbum(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_CreateAlbumRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_AlbumInfo>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "UpdateAlbum" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Изменить имя / описание / обложку
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Files_UpdateAlbumRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    internal func updateAlbum<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Files_UpdateAlbumRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_AlbumInfo>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.updateAlbum(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_UpdateAlbumRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_AlbumInfo>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "DeleteAlbum" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Удалить альбом
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Files_DeleteAlbumRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    internal func deleteAlbum<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Files_DeleteAlbumRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.deleteAlbum(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_DeleteAlbumRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_CloudEmpty>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "AddItemsToAlbum" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Добавить фото/видео в альбом
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Files_AddItemsToAlbumRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    internal func addItemsToAlbum<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Files_AddItemsToAlbumRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.addItemsToAlbum(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_AddItemsToAlbumRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_CloudEmpty>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "RemoveItemsFromAlbum" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Убрать фото/видео из альбома
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Files_RemoveItemsFromAlbumRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    internal func removeItemsFromAlbum<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Files_RemoveItemsFromAlbumRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.removeItemsFromAlbum(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_RemoveItemsFromAlbumRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_CloudEmpty>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "ListAlbums" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Список альбомов (обложка / описание / счётчик)
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Files_ListAlbumsRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    internal func listAlbums<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Files_ListAlbumsRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListAlbumsResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.listAlbums(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_ListAlbumsRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_ListAlbumsResponse>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "ListAlbumItems" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Содержимое альбома (фото/видео с превью)
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Files_ListAlbumItemsRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    internal func listAlbumItems<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Files_ListAlbumItemsRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListAlbumItemsResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.listAlbumItems(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_ListAlbumItemsRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_ListAlbumItemsResponse>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+}
+
+// Helpers providing sugared APIs for 'ClientProtocol' methods.
+@available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+extension Barkcloud_Files_AlbumApi.ClientProtocol {
+    /// Call the "CreateAlbum" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Создать альбом
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    internal func createAlbum<Result>(
+        _ message: Barkcloud_Files_CreateAlbumRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_AlbumInfo>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Files_CreateAlbumRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.createAlbum(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "UpdateAlbum" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Изменить имя / описание / обложку
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    internal func updateAlbum<Result>(
+        _ message: Barkcloud_Files_UpdateAlbumRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_AlbumInfo>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Files_UpdateAlbumRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.updateAlbum(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "DeleteAlbum" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Удалить альбом
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    internal func deleteAlbum<Result>(
+        _ message: Barkcloud_Files_DeleteAlbumRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Files_DeleteAlbumRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.deleteAlbum(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "AddItemsToAlbum" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Добавить фото/видео в альбом
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    internal func addItemsToAlbum<Result>(
+        _ message: Barkcloud_Files_AddItemsToAlbumRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Files_AddItemsToAlbumRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.addItemsToAlbum(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "RemoveItemsFromAlbum" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Убрать фото/видео из альбома
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    internal func removeItemsFromAlbum<Result>(
+        _ message: Barkcloud_Files_RemoveItemsFromAlbumRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Files_RemoveItemsFromAlbumRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.removeItemsFromAlbum(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "ListAlbums" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Список альбомов (обложка / описание / счётчик)
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    internal func listAlbums<Result>(
+        _ message: Barkcloud_Files_ListAlbumsRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListAlbumsResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Files_ListAlbumsRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.listAlbums(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "ListAlbumItems" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Содержимое альбома (фото/видео с превью)
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    internal func listAlbumItems<Result>(
+        _ message: Barkcloud_Files_ListAlbumItemsRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListAlbumItemsResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Files_ListAlbumItemsRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.listAlbumItems(
             request: request,
             options: options,
             onResponse: handleResponse

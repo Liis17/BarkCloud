@@ -41,6 +41,18 @@ final class AuthRepository: Sendable {
         }
     }
 
+    /// Серверный отзыв текущей сессии. Использует auth-контекст из интерсепторов
+    /// (`x-auth-token` + устройство), поэтому вызывается до очистки токенов.
+    /// Best-effort: ошибки игнорируются — сессия могла истечь или отсутствует сеть.
+    func logout() async {
+        do {
+            let stub = try await grpc.identityStub()
+            _ = try await stub.logout(Barkcloud_Identity_LogoutRequest())
+        } catch {
+            // best-effort: локальная очистка всё равно выполнится
+        }
+    }
+
     @MainActor
     private func persist(_ response: Barkcloud_Identity_AuthResponse) {
         let access = response.accessToken

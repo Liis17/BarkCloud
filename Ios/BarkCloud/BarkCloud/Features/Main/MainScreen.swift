@@ -1,12 +1,13 @@
 import SwiftUI
 
 struct MainScreen: View {
+    let onSignOut: () -> Void
     @State private var selection: MainDestination = .default
 
     var body: some View {
         TabView(selection: $selection) {
             NavigationStack {
-                MediaGridScreen(kind: .photo)
+                MediaTabScreen(kind: .photo)
             }
             .tabItem {
                 Label {
@@ -18,7 +19,7 @@ struct MainScreen: View {
             .tag(MainDestination.photos)
 
             NavigationStack {
-                MediaGridScreen(kind: .video)
+                MediaTabScreen(kind: .video)
             }
             .tabItem {
                 Label {
@@ -51,7 +52,7 @@ struct MainScreen: View {
                 }
                 .tag(MainDestination.shared)
 
-            PlaceholderScreen(destination: .settings)
+            SettingsScreen(onSignOut: onSignOut)
                 .tabItem {
                     Label {
                         Text(MainDestination.settings.labelKey)

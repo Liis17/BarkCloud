@@ -7,7 +7,7 @@ struct RootView: View {
     var body: some View {
         Group {
             if isAuthenticated || env.sessionStore.hasValidRefreshToken() {
-                MainScreen()
+                MainScreen(onSignOut: { isAuthenticated = false })
             } else {
                 LoginScreen(onAuthenticated: { isAuthenticated = true })
             }

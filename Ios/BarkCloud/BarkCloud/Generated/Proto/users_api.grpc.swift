@@ -98,6 +98,71 @@ internal enum Barkcloud_Users_UsersApi: Sendable {
                 type: .unary
             )
         }
+        /// Namespace for "ChangeBio" metadata.
+        internal enum ChangeBio: Sendable {
+            /// Request type for "ChangeBio".
+            internal typealias Input = Barkcloud_Users_ChangeBioRequest
+            /// Response type for "ChangeBio".
+            internal typealias Output = Barkcloud_Users_ChangeBioResponse
+            /// Descriptor for "ChangeBio".
+            internal static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.users.UsersApi"),
+                method: "ChangeBio",
+                type: .unary
+            )
+        }
+        /// Namespace for "SearchUsers" metadata.
+        internal enum SearchUsers: Sendable {
+            /// Request type for "SearchUsers".
+            internal typealias Input = Barkcloud_Users_SearchUsersRequest
+            /// Response type for "SearchUsers".
+            internal typealias Output = Barkcloud_Users_SearchUsersResponse
+            /// Descriptor for "SearchUsers".
+            internal static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.users.UsersApi"),
+                method: "SearchUsers",
+                type: .unary
+            )
+        }
+        /// Namespace for "DeleteAccount" metadata.
+        internal enum DeleteAccount: Sendable {
+            /// Request type for "DeleteAccount".
+            internal typealias Input = Barkcloud_Users_DeleteAccountRequest
+            /// Response type for "DeleteAccount".
+            internal typealias Output = Barkcloud_Users_DeleteAccountResponse
+            /// Descriptor for "DeleteAccount".
+            internal static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.users.UsersApi"),
+                method: "DeleteAccount",
+                type: .unary
+            )
+        }
+        /// Namespace for "GetPrivacySettings" metadata.
+        internal enum GetPrivacySettings: Sendable {
+            /// Request type for "GetPrivacySettings".
+            internal typealias Input = Barkcloud_Users_GetPrivacySettingsRequest
+            /// Response type for "GetPrivacySettings".
+            internal typealias Output = Barkcloud_Users_GetPrivacySettingsResponse
+            /// Descriptor for "GetPrivacySettings".
+            internal static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.users.UsersApi"),
+                method: "GetPrivacySettings",
+                type: .unary
+            )
+        }
+        /// Namespace for "UpdatePrivacySettings" metadata.
+        internal enum UpdatePrivacySettings: Sendable {
+            /// Request type for "UpdatePrivacySettings".
+            internal typealias Input = Barkcloud_Users_UpdatePrivacySettingsRequest
+            /// Response type for "UpdatePrivacySettings".
+            internal typealias Output = Barkcloud_Users_UpdatePrivacySettingsResponse
+            /// Descriptor for "UpdatePrivacySettings".
+            internal static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.users.UsersApi"),
+                method: "UpdatePrivacySettings",
+                type: .unary
+            )
+        }
         /// Namespace for "GetDevices" metadata.
         internal enum GetDevices: Sendable {
             /// Request type for "GetDevices".
@@ -137,6 +202,32 @@ internal enum Barkcloud_Users_UsersApi: Sendable {
                 type: .unary
             )
         }
+        /// Namespace for "DeleteDevice" metadata.
+        internal enum DeleteDevice: Sendable {
+            /// Request type for "DeleteDevice".
+            internal typealias Input = Barkcloud_Users_DeleteDeviceRequest
+            /// Response type for "DeleteDevice".
+            internal typealias Output = Barkcloud_Users_DeleteDeviceResponse
+            /// Descriptor for "DeleteDevice".
+            internal static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.users.UsersApi"),
+                method: "DeleteDevice",
+                type: .unary
+            )
+        }
+        /// Namespace for "SetFirebaseToken" metadata.
+        internal enum SetFirebaseToken: Sendable {
+            /// Request type for "SetFirebaseToken".
+            internal typealias Input = Barkcloud_Users_SetFirebaseTokenRequest
+            /// Response type for "SetFirebaseToken".
+            internal typealias Output = Barkcloud_Users_SetFirebaseTokenResponse
+            /// Descriptor for "SetFirebaseToken".
+            internal static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.users.UsersApi"),
+                method: "SetFirebaseToken",
+                type: .unary
+            )
+        }
         /// Descriptors for all methods in the "barkcloud.users.UsersApi" service.
         internal static let descriptors: [GRPCCore.MethodDescriptor] = [
             GetUser.descriptor,
@@ -145,9 +236,16 @@ internal enum Barkcloud_Users_UsersApi: Sendable {
             CheckExistEmail.descriptor,
             ChangeName.descriptor,
             ChangeUsername.descriptor,
+            ChangeBio.descriptor,
+            SearchUsers.descriptor,
+            DeleteAccount.descriptor,
+            GetPrivacySettings.descriptor,
+            UpdatePrivacySettings.descriptor,
             GetDevices.descriptor,
             GetCurrentDevice.descriptor,
-            RenameDevice.descriptor
+            RenameDevice.descriptor,
+            DeleteDevice.descriptor,
+            SetFirebaseToken.descriptor
         ]
     }
 }
@@ -285,6 +383,96 @@ extension Barkcloud_Users_UsersApi {
             context: GRPCCore.ServerContext
         ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Users_ChangeUsernameResponse>
 
+        /// Handle the "ChangeBio" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Изменить описание (bio)
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Users_ChangeBioRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Users_ChangeBioResponse` messages.
+        func changeBio(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Users_ChangeBioRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Users_ChangeBioResponse>
+
+        /// Handle the "SearchUsers" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Найти пользователей по юзернейму/имени
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Users_SearchUsersRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Users_SearchUsersResponse` messages.
+        func searchUsers(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Users_SearchUsersRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Users_SearchUsersResponse>
+
+        /// Handle the "DeleteAccount" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Удалить (деактивировать) собственный аккаунт
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Users_DeleteAccountRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Users_DeleteAccountResponse` messages.
+        func deleteAccount(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Users_DeleteAccountRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Users_DeleteAccountResponse>
+
+        /// Handle the "GetPrivacySettings" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Получить настройки приватности
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Users_GetPrivacySettingsRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Users_GetPrivacySettingsResponse` messages.
+        func getPrivacySettings(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Users_GetPrivacySettingsRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Users_GetPrivacySettingsResponse>
+
+        /// Handle the "UpdatePrivacySettings" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Обновить настройки приватности
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Users_UpdatePrivacySettingsRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Users_UpdatePrivacySettingsResponse` messages.
+        func updatePrivacySettings(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Users_UpdatePrivacySettingsRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Users_UpdatePrivacySettingsResponse>
+
         /// Handle the "GetDevices" method.
         ///
         /// > Source IDL Documentation:
@@ -338,6 +526,42 @@ extension Barkcloud_Users_UsersApi {
             request: GRPCCore.StreamingServerRequest<Barkcloud_Users_RenameDeviceRequest>,
             context: GRPCCore.ServerContext
         ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Users_RenameDeviceResponse>
+
+        /// Handle the "DeleteDevice" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Удалить собственное устройство (отвязать)
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Users_DeleteDeviceRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Users_DeleteDeviceResponse` messages.
+        func deleteDevice(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Users_DeleteDeviceRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Users_DeleteDeviceResponse>
+
+        /// Handle the "SetFirebaseToken" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Сохранить push-токен (Firebase) для текущего устройства
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Users_SetFirebaseTokenRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Users_SetFirebaseTokenResponse` messages.
+        func setFirebaseToken(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Users_SetFirebaseTokenRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Users_SetFirebaseTokenResponse>
     }
 
     /// Service protocol for the "barkcloud.users.UsersApi" service.
@@ -460,6 +684,96 @@ extension Barkcloud_Users_UsersApi {
             context: GRPCCore.ServerContext
         ) async throws -> GRPCCore.ServerResponse<Barkcloud_Users_ChangeUsernameResponse>
 
+        /// Handle the "ChangeBio" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Изменить описание (bio)
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Users_ChangeBioRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Users_ChangeBioResponse` message.
+        func changeBio(
+            request: GRPCCore.ServerRequest<Barkcloud_Users_ChangeBioRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Users_ChangeBioResponse>
+
+        /// Handle the "SearchUsers" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Найти пользователей по юзернейму/имени
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Users_SearchUsersRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Users_SearchUsersResponse` message.
+        func searchUsers(
+            request: GRPCCore.ServerRequest<Barkcloud_Users_SearchUsersRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Users_SearchUsersResponse>
+
+        /// Handle the "DeleteAccount" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Удалить (деактивировать) собственный аккаунт
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Users_DeleteAccountRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Users_DeleteAccountResponse` message.
+        func deleteAccount(
+            request: GRPCCore.ServerRequest<Barkcloud_Users_DeleteAccountRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Users_DeleteAccountResponse>
+
+        /// Handle the "GetPrivacySettings" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Получить настройки приватности
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Users_GetPrivacySettingsRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Users_GetPrivacySettingsResponse` message.
+        func getPrivacySettings(
+            request: GRPCCore.ServerRequest<Barkcloud_Users_GetPrivacySettingsRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Users_GetPrivacySettingsResponse>
+
+        /// Handle the "UpdatePrivacySettings" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Обновить настройки приватности
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Users_UpdatePrivacySettingsRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Users_UpdatePrivacySettingsResponse` message.
+        func updatePrivacySettings(
+            request: GRPCCore.ServerRequest<Barkcloud_Users_UpdatePrivacySettingsRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Users_UpdatePrivacySettingsResponse>
+
         /// Handle the "GetDevices" method.
         ///
         /// > Source IDL Documentation:
@@ -513,6 +827,42 @@ extension Barkcloud_Users_UsersApi {
             request: GRPCCore.ServerRequest<Barkcloud_Users_RenameDeviceRequest>,
             context: GRPCCore.ServerContext
         ) async throws -> GRPCCore.ServerResponse<Barkcloud_Users_RenameDeviceResponse>
+
+        /// Handle the "DeleteDevice" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Удалить собственное устройство (отвязать)
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Users_DeleteDeviceRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Users_DeleteDeviceResponse` message.
+        func deleteDevice(
+            request: GRPCCore.ServerRequest<Barkcloud_Users_DeleteDeviceRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Users_DeleteDeviceResponse>
+
+        /// Handle the "SetFirebaseToken" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Сохранить push-токен (Firebase) для текущего устройства
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Users_SetFirebaseTokenRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Users_SetFirebaseTokenResponse` message.
+        func setFirebaseToken(
+            request: GRPCCore.ServerRequest<Barkcloud_Users_SetFirebaseTokenRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Users_SetFirebaseTokenResponse>
     }
 
     /// Simple service protocol for the "barkcloud.users.UsersApi" service.
@@ -633,6 +983,96 @@ extension Barkcloud_Users_UsersApi {
             context: GRPCCore.ServerContext
         ) async throws -> Barkcloud_Users_ChangeUsernameResponse
 
+        /// Handle the "ChangeBio" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Изменить описание (bio)
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Users_ChangeBioRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Users_ChangeBioResponse` to respond with.
+        func changeBio(
+            request: Barkcloud_Users_ChangeBioRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Users_ChangeBioResponse
+
+        /// Handle the "SearchUsers" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Найти пользователей по юзернейму/имени
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Users_SearchUsersRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Users_SearchUsersResponse` to respond with.
+        func searchUsers(
+            request: Barkcloud_Users_SearchUsersRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Users_SearchUsersResponse
+
+        /// Handle the "DeleteAccount" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Удалить (деактивировать) собственный аккаунт
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Users_DeleteAccountRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Users_DeleteAccountResponse` to respond with.
+        func deleteAccount(
+            request: Barkcloud_Users_DeleteAccountRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Users_DeleteAccountResponse
+
+        /// Handle the "GetPrivacySettings" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Получить настройки приватности
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Users_GetPrivacySettingsRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Users_GetPrivacySettingsResponse` to respond with.
+        func getPrivacySettings(
+            request: Barkcloud_Users_GetPrivacySettingsRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Users_GetPrivacySettingsResponse
+
+        /// Handle the "UpdatePrivacySettings" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Обновить настройки приватности
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Users_UpdatePrivacySettingsRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Users_UpdatePrivacySettingsResponse` to respond with.
+        func updatePrivacySettings(
+            request: Barkcloud_Users_UpdatePrivacySettingsRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Users_UpdatePrivacySettingsResponse
+
         /// Handle the "GetDevices" method.
         ///
         /// > Source IDL Documentation:
@@ -686,6 +1126,42 @@ extension Barkcloud_Users_UsersApi {
             request: Barkcloud_Users_RenameDeviceRequest,
             context: GRPCCore.ServerContext
         ) async throws -> Barkcloud_Users_RenameDeviceResponse
+
+        /// Handle the "DeleteDevice" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Удалить собственное устройство (отвязать)
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Users_DeleteDeviceRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Users_DeleteDeviceResponse` to respond with.
+        func deleteDevice(
+            request: Barkcloud_Users_DeleteDeviceRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Users_DeleteDeviceResponse
+
+        /// Handle the "SetFirebaseToken" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Сохранить push-токен (Firebase) для текущего устройства
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Users_SetFirebaseTokenRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Users_SetFirebaseTokenResponse` to respond with.
+        func setFirebaseToken(
+            request: Barkcloud_Users_SetFirebaseTokenRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Users_SetFirebaseTokenResponse
     }
 }
 
@@ -760,6 +1236,61 @@ extension Barkcloud_Users_UsersApi.StreamingServiceProtocol {
             }
         )
         router.registerHandler(
+            forMethod: Barkcloud_Users_UsersApi.Method.ChangeBio.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Users_ChangeBioRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Users_ChangeBioResponse>(),
+            handler: { request, context in
+                try await self.changeBio(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
+            forMethod: Barkcloud_Users_UsersApi.Method.SearchUsers.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Users_SearchUsersRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Users_SearchUsersResponse>(),
+            handler: { request, context in
+                try await self.searchUsers(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
+            forMethod: Barkcloud_Users_UsersApi.Method.DeleteAccount.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Users_DeleteAccountRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Users_DeleteAccountResponse>(),
+            handler: { request, context in
+                try await self.deleteAccount(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
+            forMethod: Barkcloud_Users_UsersApi.Method.GetPrivacySettings.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Users_GetPrivacySettingsRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Users_GetPrivacySettingsResponse>(),
+            handler: { request, context in
+                try await self.getPrivacySettings(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
+            forMethod: Barkcloud_Users_UsersApi.Method.UpdatePrivacySettings.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Users_UpdatePrivacySettingsRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Users_UpdatePrivacySettingsResponse>(),
+            handler: { request, context in
+                try await self.updatePrivacySettings(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
             forMethod: Barkcloud_Users_UsersApi.Method.GetDevices.descriptor,
             deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Users_GetDevicesRequest>(),
             serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Users_GetDevicesResponse>(),
@@ -787,6 +1318,28 @@ extension Barkcloud_Users_UsersApi.StreamingServiceProtocol {
             serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Users_RenameDeviceResponse>(),
             handler: { request, context in
                 try await self.renameDevice(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
+            forMethod: Barkcloud_Users_UsersApi.Method.DeleteDevice.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Users_DeleteDeviceRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Users_DeleteDeviceResponse>(),
+            handler: { request, context in
+                try await self.deleteDevice(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
+            forMethod: Barkcloud_Users_UsersApi.Method.SetFirebaseToken.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Users_SetFirebaseTokenRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Users_SetFirebaseTokenResponse>(),
+            handler: { request, context in
+                try await self.setFirebaseToken(
                     request: request,
                     context: context
                 )
@@ -864,6 +1417,61 @@ extension Barkcloud_Users_UsersApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
+    internal func changeBio(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Users_ChangeBioRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Users_ChangeBioResponse> {
+        let response = try await self.changeBio(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    internal func searchUsers(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Users_SearchUsersRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Users_SearchUsersResponse> {
+        let response = try await self.searchUsers(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    internal func deleteAccount(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Users_DeleteAccountRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Users_DeleteAccountResponse> {
+        let response = try await self.deleteAccount(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    internal func getPrivacySettings(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Users_GetPrivacySettingsRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Users_GetPrivacySettingsResponse> {
+        let response = try await self.getPrivacySettings(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    internal func updatePrivacySettings(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Users_UpdatePrivacySettingsRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Users_UpdatePrivacySettingsResponse> {
+        let response = try await self.updatePrivacySettings(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
     internal func getDevices(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Users_GetDevicesRequest>,
         context: GRPCCore.ServerContext
@@ -891,6 +1499,28 @@ extension Barkcloud_Users_UsersApi.ServiceProtocol {
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Users_RenameDeviceResponse> {
         let response = try await self.renameDevice(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    internal func deleteDevice(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Users_DeleteDeviceRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Users_DeleteDeviceResponse> {
+        let response = try await self.deleteDevice(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    internal func setFirebaseToken(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Users_SetFirebaseTokenRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Users_SetFirebaseTokenResponse> {
+        let response = try await self.setFirebaseToken(
             request: GRPCCore.ServerRequest(stream: request),
             context: context
         )
@@ -979,6 +1609,71 @@ extension Barkcloud_Users_UsersApi.SimpleServiceProtocol {
         )
     }
 
+    internal func changeBio(
+        request: GRPCCore.ServerRequest<Barkcloud_Users_ChangeBioRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Users_ChangeBioResponse> {
+        return GRPCCore.ServerResponse<Barkcloud_Users_ChangeBioResponse>(
+            message: try await self.changeBio(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    internal func searchUsers(
+        request: GRPCCore.ServerRequest<Barkcloud_Users_SearchUsersRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Users_SearchUsersResponse> {
+        return GRPCCore.ServerResponse<Barkcloud_Users_SearchUsersResponse>(
+            message: try await self.searchUsers(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    internal func deleteAccount(
+        request: GRPCCore.ServerRequest<Barkcloud_Users_DeleteAccountRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Users_DeleteAccountResponse> {
+        return GRPCCore.ServerResponse<Barkcloud_Users_DeleteAccountResponse>(
+            message: try await self.deleteAccount(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    internal func getPrivacySettings(
+        request: GRPCCore.ServerRequest<Barkcloud_Users_GetPrivacySettingsRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Users_GetPrivacySettingsResponse> {
+        return GRPCCore.ServerResponse<Barkcloud_Users_GetPrivacySettingsResponse>(
+            message: try await self.getPrivacySettings(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    internal func updatePrivacySettings(
+        request: GRPCCore.ServerRequest<Barkcloud_Users_UpdatePrivacySettingsRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Users_UpdatePrivacySettingsResponse> {
+        return GRPCCore.ServerResponse<Barkcloud_Users_UpdatePrivacySettingsResponse>(
+            message: try await self.updatePrivacySettings(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
     internal func getDevices(
         request: GRPCCore.ServerRequest<Barkcloud_Users_GetDevicesRequest>,
         context: GRPCCore.ServerContext
@@ -1011,6 +1706,32 @@ extension Barkcloud_Users_UsersApi.SimpleServiceProtocol {
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Users_RenameDeviceResponse> {
         return GRPCCore.ServerResponse<Barkcloud_Users_RenameDeviceResponse>(
             message: try await self.renameDevice(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    internal func deleteDevice(
+        request: GRPCCore.ServerRequest<Barkcloud_Users_DeleteDeviceRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Users_DeleteDeviceResponse> {
+        return GRPCCore.ServerResponse<Barkcloud_Users_DeleteDeviceResponse>(
+            message: try await self.deleteDevice(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    internal func setFirebaseToken(
+        request: GRPCCore.ServerRequest<Barkcloud_Users_SetFirebaseTokenRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Users_SetFirebaseTokenResponse> {
+        return GRPCCore.ServerResponse<Barkcloud_Users_SetFirebaseTokenResponse>(
+            message: try await self.setFirebaseToken(
                 request: request.message,
                 context: context
             ),
@@ -1170,6 +1891,121 @@ extension Barkcloud_Users_UsersApi {
             onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Users_ChangeUsernameResponse>) async throws -> Result
         ) async throws -> Result where Result: Sendable
 
+        /// Call the "ChangeBio" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Изменить описание (bio)
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Users_ChangeBioRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Users_ChangeBioRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Users_ChangeBioResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func changeBio<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Users_ChangeBioRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Users_ChangeBioRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Users_ChangeBioResponse>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Users_ChangeBioResponse>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "SearchUsers" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Найти пользователей по юзернейму/имени
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Users_SearchUsersRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Users_SearchUsersRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Users_SearchUsersResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func searchUsers<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Users_SearchUsersRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Users_SearchUsersRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Users_SearchUsersResponse>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Users_SearchUsersResponse>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "DeleteAccount" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Удалить (деактивировать) собственный аккаунт
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Users_DeleteAccountRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Users_DeleteAccountRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Users_DeleteAccountResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func deleteAccount<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Users_DeleteAccountRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Users_DeleteAccountRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Users_DeleteAccountResponse>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Users_DeleteAccountResponse>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "GetPrivacySettings" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Получить настройки приватности
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Users_GetPrivacySettingsRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Users_GetPrivacySettingsRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Users_GetPrivacySettingsResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func getPrivacySettings<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Users_GetPrivacySettingsRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Users_GetPrivacySettingsRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Users_GetPrivacySettingsResponse>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Users_GetPrivacySettingsResponse>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "UpdatePrivacySettings" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Обновить настройки приватности
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Users_UpdatePrivacySettingsRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Users_UpdatePrivacySettingsRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Users_UpdatePrivacySettingsResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func updatePrivacySettings<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Users_UpdatePrivacySettingsRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Users_UpdatePrivacySettingsRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Users_UpdatePrivacySettingsResponse>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Users_UpdatePrivacySettingsResponse>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
         /// Call the "GetDevices" method.
         ///
         /// > Source IDL Documentation:
@@ -1237,6 +2073,52 @@ extension Barkcloud_Users_UsersApi {
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Users_RenameDeviceResponse>,
             options: GRPCCore.CallOptions,
             onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Users_RenameDeviceResponse>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "DeleteDevice" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Удалить собственное устройство (отвязать)
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Users_DeleteDeviceRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Users_DeleteDeviceRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Users_DeleteDeviceResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func deleteDevice<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Users_DeleteDeviceRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Users_DeleteDeviceRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Users_DeleteDeviceResponse>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Users_DeleteDeviceResponse>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "SetFirebaseToken" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Сохранить push-токен (Firebase) для текущего устройства
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Users_SetFirebaseTokenRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Users_SetFirebaseTokenRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Users_SetFirebaseTokenResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func setFirebaseToken<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Users_SetFirebaseTokenRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Users_SetFirebaseTokenRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Users_SetFirebaseTokenResponse>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Users_SetFirebaseTokenResponse>) async throws -> Result
         ) async throws -> Result where Result: Sendable
     }
 
@@ -1464,6 +2346,176 @@ extension Barkcloud_Users_UsersApi {
             )
         }
 
+        /// Call the "ChangeBio" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Изменить описание (bio)
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Users_ChangeBioRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Users_ChangeBioRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Users_ChangeBioResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        internal func changeBio<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Users_ChangeBioRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Users_ChangeBioRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Users_ChangeBioResponse>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Users_ChangeBioResponse>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Users_UsersApi.Method.ChangeBio.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "SearchUsers" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Найти пользователей по юзернейму/имени
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Users_SearchUsersRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Users_SearchUsersRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Users_SearchUsersResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        internal func searchUsers<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Users_SearchUsersRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Users_SearchUsersRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Users_SearchUsersResponse>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Users_SearchUsersResponse>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Users_UsersApi.Method.SearchUsers.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "DeleteAccount" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Удалить (деактивировать) собственный аккаунт
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Users_DeleteAccountRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Users_DeleteAccountRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Users_DeleteAccountResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        internal func deleteAccount<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Users_DeleteAccountRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Users_DeleteAccountRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Users_DeleteAccountResponse>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Users_DeleteAccountResponse>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Users_UsersApi.Method.DeleteAccount.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "GetPrivacySettings" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Получить настройки приватности
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Users_GetPrivacySettingsRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Users_GetPrivacySettingsRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Users_GetPrivacySettingsResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        internal func getPrivacySettings<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Users_GetPrivacySettingsRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Users_GetPrivacySettingsRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Users_GetPrivacySettingsResponse>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Users_GetPrivacySettingsResponse>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Users_UsersApi.Method.GetPrivacySettings.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "UpdatePrivacySettings" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Обновить настройки приватности
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Users_UpdatePrivacySettingsRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Users_UpdatePrivacySettingsRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Users_UpdatePrivacySettingsResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        internal func updatePrivacySettings<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Users_UpdatePrivacySettingsRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Users_UpdatePrivacySettingsRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Users_UpdatePrivacySettingsResponse>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Users_UpdatePrivacySettingsResponse>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Users_UsersApi.Method.UpdatePrivacySettings.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
         /// Call the "GetDevices" method.
         ///
         /// > Source IDL Documentation:
@@ -1559,6 +2611,74 @@ extension Barkcloud_Users_UsersApi {
             try await self.client.unary(
                 request: request,
                 descriptor: Barkcloud_Users_UsersApi.Method.RenameDevice.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "DeleteDevice" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Удалить собственное устройство (отвязать)
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Users_DeleteDeviceRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Users_DeleteDeviceRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Users_DeleteDeviceResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        internal func deleteDevice<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Users_DeleteDeviceRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Users_DeleteDeviceRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Users_DeleteDeviceResponse>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Users_DeleteDeviceResponse>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Users_UsersApi.Method.DeleteDevice.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "SetFirebaseToken" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Сохранить push-токен (Firebase) для текущего устройства
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Users_SetFirebaseTokenRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Users_SetFirebaseTokenRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Users_SetFirebaseTokenResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        internal func setFirebaseToken<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Users_SetFirebaseTokenRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Users_SetFirebaseTokenRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Users_SetFirebaseTokenResponse>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Users_SetFirebaseTokenResponse>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Users_UsersApi.Method.SetFirebaseToken.descriptor,
                 serializer: serializer,
                 deserializer: deserializer,
                 options: options,
@@ -1745,6 +2865,151 @@ extension Barkcloud_Users_UsersApi.ClientProtocol {
         )
     }
 
+    /// Call the "ChangeBio" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Изменить описание (bio)
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Users_ChangeBioRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    internal func changeBio<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Users_ChangeBioRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Users_ChangeBioResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.changeBio(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Users_ChangeBioRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Users_ChangeBioResponse>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "SearchUsers" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Найти пользователей по юзернейму/имени
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Users_SearchUsersRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    internal func searchUsers<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Users_SearchUsersRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Users_SearchUsersResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.searchUsers(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Users_SearchUsersRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Users_SearchUsersResponse>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "DeleteAccount" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Удалить (деактивировать) собственный аккаунт
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Users_DeleteAccountRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    internal func deleteAccount<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Users_DeleteAccountRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Users_DeleteAccountResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.deleteAccount(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Users_DeleteAccountRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Users_DeleteAccountResponse>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "GetPrivacySettings" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Получить настройки приватности
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Users_GetPrivacySettingsRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    internal func getPrivacySettings<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Users_GetPrivacySettingsRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Users_GetPrivacySettingsResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.getPrivacySettings(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Users_GetPrivacySettingsRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Users_GetPrivacySettingsResponse>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "UpdatePrivacySettings" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Обновить настройки приватности
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Users_UpdatePrivacySettingsRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    internal func updatePrivacySettings<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Users_UpdatePrivacySettingsRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Users_UpdatePrivacySettingsResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.updatePrivacySettings(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Users_UpdatePrivacySettingsRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Users_UpdatePrivacySettingsResponse>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
     /// Call the "GetDevices" method.
     ///
     /// > Source IDL Documentation:
@@ -1827,6 +3092,64 @@ extension Barkcloud_Users_UsersApi.ClientProtocol {
             request: request,
             serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Users_RenameDeviceRequest>(),
             deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Users_RenameDeviceResponse>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "DeleteDevice" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Удалить собственное устройство (отвязать)
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Users_DeleteDeviceRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    internal func deleteDevice<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Users_DeleteDeviceRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Users_DeleteDeviceResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.deleteDevice(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Users_DeleteDeviceRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Users_DeleteDeviceResponse>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "SetFirebaseToken" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Сохранить push-токен (Firebase) для текущего устройства
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Users_SetFirebaseTokenRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    internal func setFirebaseToken<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Users_SetFirebaseTokenRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Users_SetFirebaseTokenResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.setFirebaseToken(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Users_SetFirebaseTokenRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Users_SetFirebaseTokenResponse>(),
             options: options,
             onResponse: handleResponse
         )
@@ -2034,6 +3357,171 @@ extension Barkcloud_Users_UsersApi.ClientProtocol {
         )
     }
 
+    /// Call the "ChangeBio" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Изменить описание (bio)
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    internal func changeBio<Result>(
+        _ message: Barkcloud_Users_ChangeBioRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Users_ChangeBioResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Users_ChangeBioRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.changeBio(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "SearchUsers" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Найти пользователей по юзернейму/имени
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    internal func searchUsers<Result>(
+        _ message: Barkcloud_Users_SearchUsersRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Users_SearchUsersResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Users_SearchUsersRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.searchUsers(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "DeleteAccount" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Удалить (деактивировать) собственный аккаунт
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    internal func deleteAccount<Result>(
+        _ message: Barkcloud_Users_DeleteAccountRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Users_DeleteAccountResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Users_DeleteAccountRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.deleteAccount(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "GetPrivacySettings" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Получить настройки приватности
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    internal func getPrivacySettings<Result>(
+        _ message: Barkcloud_Users_GetPrivacySettingsRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Users_GetPrivacySettingsResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Users_GetPrivacySettingsRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.getPrivacySettings(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "UpdatePrivacySettings" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Обновить настройки приватности
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    internal func updatePrivacySettings<Result>(
+        _ message: Barkcloud_Users_UpdatePrivacySettingsRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Users_UpdatePrivacySettingsResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Users_UpdatePrivacySettingsRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.updatePrivacySettings(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
     /// Call the "GetDevices" method.
     ///
     /// > Source IDL Documentation:
@@ -2127,6 +3615,72 @@ extension Barkcloud_Users_UsersApi.ClientProtocol {
             metadata: metadata
         )
         return try await self.renameDevice(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "DeleteDevice" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Удалить собственное устройство (отвязать)
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    internal func deleteDevice<Result>(
+        _ message: Barkcloud_Users_DeleteDeviceRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Users_DeleteDeviceResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Users_DeleteDeviceRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.deleteDevice(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "SetFirebaseToken" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Сохранить push-токен (Firebase) для текущего устройства
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    internal func setFirebaseToken<Result>(
+        _ message: Barkcloud_Users_SetFirebaseTokenRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Users_SetFirebaseTokenResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Users_SetFirebaseTokenRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.setFirebaseToken(
             request: request,
             options: options,
             onResponse: handleResponse
