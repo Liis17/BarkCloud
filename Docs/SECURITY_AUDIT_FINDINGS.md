@@ -41,8 +41,8 @@
 
 | ID | Severity | Сервис | Находка | Файл:строка | Статус |
 |----|----------|--------|---------|-------------|--------|
-| C1 | Critical | Configuration | Нет аутентификации/авторизации; раздаёт все секреты любому в сети; gRPC reflection включён | `Program.cs`, `Host/ConfigurationApiService.cs:30`, `Infrastructure/ConfigurationSeed.cs:38-93` | ✅ |
-| C2 | Critical | Notification | Глобально отключена проверка TLS-сертификата SMTP (MITM email-кодов) | `Senders/EmailSender.cs:37-38` | ✅ |
+| C1 | Critical | Configuration | Нет аутентификации/авторизации; раздаёт все секреты любому в сети; gRPC reflection включён | `Program.cs`, `Host/ConfigurationApiService.cs:30`, `Infrastructure/ConfigurationSeed.cs:38-93` | ✅ 🔧 исправлено |
+| C2 | Critical | Notification | Глобально отключена проверка TLS-сертификата SMTP (MITM email-кодов) | `Senders/EmailSender.cs:37-38` | ✅ 🔧 исправлено |
 | H1 | High | Identity (все) | Нет rate-limiting/лок-аута на Auth/OTP/Reset; брутфорс пароля и 6-значных кодов | `Features/Auth/*`, `Features/ConfirmResetPassword/*`; rate-limiter нет нигде в backend | ✅ |
 | H2 | High | Files | IDOR: `GetTempDownloadUrl` не проверяет владельца `FileIds` | `Host/FilesApiService.cs:43-54`, `Features/GetTempDownloadUrl/GetTempDownloadUrlCommandHandler.cs:35` | ✅ |
 | H3 | High | Files | Квота хранилища не проверяется при загрузке | `Features/UploadFile/UploadFileCommandHandler.cs` | ✅ |
@@ -77,9 +77,15 @@
 **Воспроизведение.** С любого узла в `barkcloud-network` (или при доступности порта) вызвать
 `grpcurl`/клиент `ConfigurationApi.GetConfiguration {service_id: 0}` — вернётся `JwtSettings:SecretKey`.
 **Риск.** Полная компрометация: с секретом подделывается Service-токен (см. M1) → доступ ко всему.
-**Рекомендация.** Подключить `AddXAuth`/`UseXAuth` и `[Authorize(Policy=Service)]`; отключить gRPC
-reflection в проде; шифровать секреты at-rest; не возвращать секреты не относящемуся `ServiceId`;
-рассмотреть отдельный секрет-стор/mTLS между сервисами.
+**Рекомендация.** ⚠️ JWT-авторизация (`[Authorize(Service)]`) здесь невозможна: сервис получает
+JWT-секрет именно из этого вызова на старте (bootstrap «курица и яйцо»). Правильный путь —
+**предразделённый bootstrap-ключ из окружения** (или mTLS), плюс отключить gRPC reflection в проде,
+шифровать секреты at-rest и не возвращать секреты не относящемуся `ServiceId`.
+**🔧 Исправлено (этот коммит).** Добавлен `ConfigurationAccessInterceptor` — проверка заголовка
+`x-config-access-key` против env `CONFIGURATION_ACCESS_KEY` в постоянном времени (внешним слоем, до
+`ServerExceptionInterceptor`); клиент `LoadConfiguration` шлёт ключ; reflection включается только в
+`Development`; ключ прокинут через `x-common-variables` в обоих compose и добавлен в `sample.env`.
+Если ключ не задан — доступ открыт + warning (неблокирующая миграция; для защиты ключ обязателен).
 
 ### C2 — SMTP без валидации сертификата `[Critical]`
 **Факт.** `EmailSender.SendEmail` на каждом вызове ставит
@@ -89,6 +95,10 @@ process-wide отключение проверки TLS-сертификата.
 пароля → обход аутентификации/2FA. Глобальная установка затрагивает и любой другой TLS в процессе.
 **Рекомендация.** Удалить callback; использовать `MailKit` с корректной проверкой сертификата и
 `SecureSocketOptions`; при необходимости — доверенный CA, а не «доверять всем».
+**🔧 Исправлено (этот коммит).** Удалены строки
+`ServicePointManager.ServerCertificateValidationCallback = (...) => true;` в `EmailSender.cs` —
+восстановлена штатная проверка TLS-сертификата против системного хранилища доверия. Самоподписанный
+SMTP теперь требует доверенного CA (не «доверять всем»).
 
 ### H1 — Нет защиты от брутфорса `[High]`
 **Факт.** Во всём backend нет `AddRateLimiter`/`RateLimiter` (grep по всем `.cs` пуст). В Identity
