@@ -110,6 +110,33 @@ struct PathCrumb: Identifiable, Hashable, Sendable {
     let name: String
 }
 
+/// Запись в корзине (зеркалит `TrashEntry`). `id` — entry_id записи.
+struct TrashItem: Identifiable, Hashable, Sendable {
+    let id: String        // entry_id
+    let fileID: String    // ID блоба
+    let name: String
+    let asset: MediaAsset
+    let deletedAt: Date
+    let purgeAt: Date
+
+    init(_ t: Barkcloud_Files_TrashEntry) {
+        self.id = t.entry.id
+        self.fileID = t.entry.fileID
+        self.name = t.entry.name
+        self.asset = MediaAsset(t.file)
+        self.deletedAt = t.hasDeletedAt ? t.deletedAt.date : Date(timeIntervalSince1970: 0)
+        self.purgeAt = t.hasPurgeAt ? t.purgeAt.date : Date(timeIntervalSince1970: 0)
+    }
+}
+
+/// Страница корзины с курсором пагинации.
+struct TrashPage: Sendable {
+    let items: [TrashItem]
+    let nextCursorDeletedAt: Date?
+    let nextCursorEntryID: String
+    var hasMore: Bool { nextCursorDeletedAt != nil }
+}
+
 /// Карточка альбома (зеркалит `AlbumInfo`).
 struct AlbumCard: Identifiable, Hashable, Sendable {
     let id: String

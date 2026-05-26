@@ -38,6 +38,19 @@ final class CloudRepository: Sendable {
         )
     }
 
+    /// Пакетная проверка наличия файлов в облаке по SHA256-хешам (без побочных
+    /// эффектов). Возвращает словарь нормализованный_хеш → есть ли в облаке.
+    func checkFileHashes(_ hashes: [String]) async throws -> [String: Bool] {
+        guard !hashes.isEmpty else { return [:] }
+        let stub = try await grpc.filesStub()
+        var req = Barkcloud_Files_CheckFileHashesRequest()
+        req.fileHashes = hashes
+        let resp = try await stub.checkFileHashes(req)
+        var map: [String: Bool] = [:]
+        for result in resp.results { map[result.fileHash] = result.exists }
+        return map
+    }
+
     // MARK: - Каталоги
 
     /// Содержимое папки с полной информацией о файлах (превью/размеры). `""` = корень.
@@ -125,6 +138,48 @@ final class CloudRepository: Sendable {
         var req = Barkcloud_Files_DeleteFileEntryRequest()
         req.entryID = entryID
         _ = try await stub.deleteFileEntry(req)
+    }
+
+    // MARK: - Корзина
+
+    /// Список файлов в корзине (от свежеудалённых к старым), cursor-пагинация.
+    func listTrash(
+        limit: Int32 = 50,
+        cursorDeletedAt: Date? = nil,
+        cursorEntryID: String = ""
+    ) async throws -> TrashPage {
+        let stub = try await grpc.cloudStub()
+        var req = Barkcloud_Files_ListTrashRequest()
+        req.limit = limit
+        if let cursorDeletedAt {
+            req.cursorDeletedAt = Google_Protobuf_Timestamp(date: cursorDeletedAt)
+        }
+        req.cursorEntryID = cursorEntryID
+        let resp = try await stub.listTrash(req)
+        return TrashPage(
+            items: resp.items.map(TrashItem.init),
+            nextCursorDeletedAt: resp.hasNextCursorDeletedAt ? resp.nextCursorDeletedAt.date : nil,
+            nextCursorEntryID: resp.nextCursorEntryID
+        )
+    }
+
+    func restoreFromTrash(entryID: String) async throws {
+        let stub = try await grpc.cloudStub()
+        var req = Barkcloud_Files_RestoreFromTrashRequest()
+        req.entryID = entryID
+        _ = try await stub.restoreFromTrash(req)
+    }
+
+    func deleteFromTrash(entryID: String) async throws {
+        let stub = try await grpc.cloudStub()
+        var req = Barkcloud_Files_DeleteFromTrashRequest()
+        req.entryID = entryID
+        _ = try await stub.deleteFromTrash(req)
+    }
+
+    func emptyTrash() async throws {
+        let stub = try await grpc.cloudStub()
+        _ = try await stub.emptyTrash(Barkcloud_Files_EmptyTrashRequest())
     }
 
     // MARK: - Загрузка

@@ -22,10 +22,18 @@ final class ProfileViewModel {
             !(user?.profilePicture.isEmpty ?? true)
         }
 
-        var avatarURL: URL? {
-            guard let user else { return nil }
-            let raw = user.profilePicturePreview.isEmpty ? user.profilePicture : user.profilePicturePreview
-            return raw.isEmpty ? nil : URL(string: raw)
+        /// Кандидаты для загрузки аватара по приоритету: сначала превью (легче),
+        /// затем полное изображение. Каждый URL нормализуется на актуальный хост
+        /// Files (сохранённая в БД ссылка могла указывать на устаревший хост).
+        var avatarCandidateURLs: [URL] {
+            guard let user else { return [] }
+            var result: [URL] = []
+            for raw in [user.profilePicturePreview, user.profilePicture] {
+                if let url = GrpcEndpoint.normalizedFileDownloadURL(raw), !result.contains(url) {
+                    result.append(url)
+                }
+            }
+            return result
         }
     }
 

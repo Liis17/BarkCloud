@@ -41,32 +41,31 @@ struct MediaGridScreen: View {
 
     @ViewBuilder
     private func content(_ vm: MediaGridViewModel) -> some View {
-        if !vm.state.isPlaceholder && vm.state.items.isEmpty {
-            emptyState
-        } else {
-            grid(vm)
-        }
-    }
-
-    private func grid(_ vm: MediaGridViewModel) -> some View {
         ScrollView {
-            LazyVGrid(columns: columns, spacing: Self.spacing) {
-                ForEach(vm.state.items) { item in
-                    MediaThumb(thumbnailURL: item.thumbnailURL, isVideo: item.isVideo)
-                        .onTapGesture {
-                            if !vm.state.isPlaceholder { selected = item }
-                        }
-                        .onAppear {
-                            Task { await vm.loadMoreIfNeeded(current: item) }
-                        }
+            if !vm.state.isPlaceholder && vm.state.items.isEmpty {
+                emptyState
+                    .containerRelativeFrame(.vertical)
+            } else {
+                LazyVGrid(columns: columns, spacing: Self.spacing) {
+                    ForEach(vm.state.items) { item in
+                        MediaThumb(thumbnailURL: item.thumbnailURL, isVideo: item.isVideo)
+                            .onTapGesture {
+                                if !vm.state.isPlaceholder { selected = item }
+                            }
+                            .onAppear {
+                                Task { await vm.loadMoreIfNeeded(current: item) }
+                            }
+                    }
+                }
+                .redacted(reason: vm.state.isPlaceholder ? .placeholder : [])
+
+                if vm.state.isLoadingMore {
+                    ProgressView().padding()
                 }
             }
-            .redacted(reason: vm.state.isPlaceholder ? .placeholder : [])
-
-            if vm.state.isLoadingMore {
-                ProgressView().padding()
-            }
         }
+        // Потянуть вниз — перезагрузить список (фото/видео).
+        .refreshable { await vm.reload() }
     }
 
     private var emptyState: some View {

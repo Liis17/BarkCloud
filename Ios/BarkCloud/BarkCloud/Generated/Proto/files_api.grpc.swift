@@ -59,6 +59,19 @@ internal enum Barkcloud_Files_FilesApi: Sendable {
                 type: .unary
             )
         }
+        /// Namespace for "CheckFileHashes" metadata.
+        internal enum CheckFileHashes: Sendable {
+            /// Request type for "CheckFileHashes".
+            internal typealias Input = Barkcloud_Files_CheckFileHashesRequest
+            /// Response type for "CheckFileHashes".
+            internal typealias Output = Barkcloud_Files_CheckFileHashesResponse
+            /// Descriptor for "CheckFileHashes".
+            internal static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.FilesApi"),
+                method: "CheckFileHashes",
+                type: .unary
+            )
+        }
         /// Namespace for "GetUserStorageInfo" metadata.
         internal enum GetUserStorageInfo: Sendable {
             /// Request type for "GetUserStorageInfo".
@@ -77,6 +90,7 @@ internal enum Barkcloud_Files_FilesApi: Sendable {
             GetUploadUrl.descriptor,
             GetTempDownloadUrl.descriptor,
             CheckFileHash.descriptor,
+            CheckFileHashes.descriptor,
             GetUserStorageInfo.descriptor
         ]
     }
@@ -156,6 +170,24 @@ extension Barkcloud_Files_FilesApi {
             request: GRPCCore.StreamingServerRequest<Barkcloud_Files_CheckFileHashRequest>,
             context: GRPCCore.ServerContext
         ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CheckFileHashResponse>
+
+        /// Handle the "CheckFileHashes" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Пакетная проверка наличия файлов по списку SHA256-хешей (без побочных эффектов)
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Files_CheckFileHashesRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Files_CheckFileHashesResponse` messages.
+        func checkFileHashes(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Files_CheckFileHashesRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CheckFileHashesResponse>
 
         /// Handle the "GetUserStorageInfo" method.
         ///
@@ -238,6 +270,24 @@ extension Barkcloud_Files_FilesApi {
             context: GRPCCore.ServerContext
         ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CheckFileHashResponse>
 
+        /// Handle the "CheckFileHashes" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Пакетная проверка наличия файлов по списку SHA256-хешей (без побочных эффектов)
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_CheckFileHashesRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Files_CheckFileHashesResponse` message.
+        func checkFileHashes(
+            request: GRPCCore.ServerRequest<Barkcloud_Files_CheckFileHashesRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CheckFileHashesResponse>
+
         /// Handle the "GetUserStorageInfo" method.
         ///
         /// > Source IDL Documentation:
@@ -317,6 +367,24 @@ extension Barkcloud_Files_FilesApi {
             context: GRPCCore.ServerContext
         ) async throws -> Barkcloud_Files_CheckFileHashResponse
 
+        /// Handle the "CheckFileHashes" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Пакетная проверка наличия файлов по списку SHA256-хешей (без побочных эффектов)
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Files_CheckFileHashesRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Files_CheckFileHashesResponse` to respond with.
+        func checkFileHashes(
+            request: Barkcloud_Files_CheckFileHashesRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Files_CheckFileHashesResponse
+
         /// Handle the "GetUserStorageInfo" method.
         ///
         /// > Source IDL Documentation:
@@ -375,6 +443,17 @@ extension Barkcloud_Files_FilesApi.StreamingServiceProtocol {
             }
         )
         router.registerHandler(
+            forMethod: Barkcloud_Files_FilesApi.Method.CheckFileHashes.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_CheckFileHashesRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_CheckFileHashesResponse>(),
+            handler: { request, context in
+                try await self.checkFileHashes(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
             forMethod: Barkcloud_Files_FilesApi.Method.GetUserStorageInfo.descriptor,
             deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_GetUserStorageInfoRequest>(),
             serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_GetUserStorageInfoResponse>(),
@@ -418,6 +497,17 @@ extension Barkcloud_Files_FilesApi.ServiceProtocol {
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CheckFileHashResponse> {
         let response = try await self.checkFileHash(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    internal func checkFileHashes(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Files_CheckFileHashesRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CheckFileHashesResponse> {
+        let response = try await self.checkFileHashes(
             request: GRPCCore.ServerRequest(stream: request),
             context: context
         )
@@ -471,6 +561,19 @@ extension Barkcloud_Files_FilesApi.SimpleServiceProtocol {
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CheckFileHashResponse> {
         return GRPCCore.ServerResponse<Barkcloud_Files_CheckFileHashResponse>(
             message: try await self.checkFileHash(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    internal func checkFileHashes(
+        request: GRPCCore.ServerRequest<Barkcloud_Files_CheckFileHashesRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CheckFileHashesResponse> {
+        return GRPCCore.ServerResponse<Barkcloud_Files_CheckFileHashesResponse>(
+            message: try await self.checkFileHashes(
                 request: request.message,
                 context: context
             ),
@@ -568,6 +671,29 @@ extension Barkcloud_Files_FilesApi {
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CheckFileHashResponse>,
             options: GRPCCore.CallOptions,
             onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CheckFileHashResponse>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "CheckFileHashes" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Пакетная проверка наличия файлов по списку SHA256-хешей (без побочных эффектов)
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_CheckFileHashesRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_CheckFileHashesRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_CheckFileHashesResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func checkFileHashes<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_CheckFileHashesRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_CheckFileHashesRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CheckFileHashesResponse>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CheckFileHashesResponse>) async throws -> Result
         ) async throws -> Result where Result: Sendable
 
         /// Call the "GetUserStorageInfo" method.
@@ -712,6 +838,40 @@ extension Barkcloud_Files_FilesApi {
             )
         }
 
+        /// Call the "CheckFileHashes" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Пакетная проверка наличия файлов по списку SHA256-хешей (без побочных эффектов)
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_CheckFileHashesRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_CheckFileHashesRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_CheckFileHashesResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        internal func checkFileHashes<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_CheckFileHashesRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_CheckFileHashesRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CheckFileHashesResponse>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CheckFileHashesResponse>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Files_FilesApi.Method.CheckFileHashes.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
         /// Call the "GetUserStorageInfo" method.
         ///
         /// > Source IDL Documentation:
@@ -833,6 +993,35 @@ extension Barkcloud_Files_FilesApi.ClientProtocol {
             request: request,
             serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_CheckFileHashRequest>(),
             deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_CheckFileHashResponse>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "CheckFileHashes" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Пакетная проверка наличия файлов по списку SHA256-хешей (без побочных эффектов)
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Files_CheckFileHashesRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    internal func checkFileHashes<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Files_CheckFileHashesRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CheckFileHashesResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.checkFileHashes(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_CheckFileHashesRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_CheckFileHashesResponse>(),
             options: options,
             onResponse: handleResponse
         )
@@ -964,6 +1153,39 @@ extension Barkcloud_Files_FilesApi.ClientProtocol {
             metadata: metadata
         )
         return try await self.checkFileHash(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "CheckFileHashes" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Пакетная проверка наличия файлов по списку SHA256-хешей (без побочных эффектов)
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    internal func checkFileHashes<Result>(
+        _ message: Barkcloud_Files_CheckFileHashesRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CheckFileHashesResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Files_CheckFileHashesRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.checkFileHashes(
             request: request,
             options: options,
             onResponse: handleResponse
@@ -1195,6 +1417,97 @@ internal enum Barkcloud_Files_CloudApi: Sendable {
                 type: .unary
             )
         }
+        /// Namespace for "ListTrash" metadata.
+        internal enum ListTrash: Sendable {
+            /// Request type for "ListTrash".
+            internal typealias Input = Barkcloud_Files_ListTrashRequest
+            /// Response type for "ListTrash".
+            internal typealias Output = Barkcloud_Files_ListTrashResponse
+            /// Descriptor for "ListTrash".
+            internal static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.CloudApi"),
+                method: "ListTrash",
+                type: .unary
+            )
+        }
+        /// Namespace for "RestoreFromTrash" metadata.
+        internal enum RestoreFromTrash: Sendable {
+            /// Request type for "RestoreFromTrash".
+            internal typealias Input = Barkcloud_Files_RestoreFromTrashRequest
+            /// Response type for "RestoreFromTrash".
+            internal typealias Output = Barkcloud_Files_CloudEmpty
+            /// Descriptor for "RestoreFromTrash".
+            internal static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.CloudApi"),
+                method: "RestoreFromTrash",
+                type: .unary
+            )
+        }
+        /// Namespace for "DeleteFromTrash" metadata.
+        internal enum DeleteFromTrash: Sendable {
+            /// Request type for "DeleteFromTrash".
+            internal typealias Input = Barkcloud_Files_DeleteFromTrashRequest
+            /// Response type for "DeleteFromTrash".
+            internal typealias Output = Barkcloud_Files_CloudEmpty
+            /// Descriptor for "DeleteFromTrash".
+            internal static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.CloudApi"),
+                method: "DeleteFromTrash",
+                type: .unary
+            )
+        }
+        /// Namespace for "EmptyTrash" metadata.
+        internal enum EmptyTrash: Sendable {
+            /// Request type for "EmptyTrash".
+            internal typealias Input = Barkcloud_Files_EmptyTrashRequest
+            /// Response type for "EmptyTrash".
+            internal typealias Output = Barkcloud_Files_CloudEmpty
+            /// Descriptor for "EmptyTrash".
+            internal static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.CloudApi"),
+                method: "EmptyTrash",
+                type: .unary
+            )
+        }
+        /// Namespace for "AddFavorite" metadata.
+        internal enum AddFavorite: Sendable {
+            /// Request type for "AddFavorite".
+            internal typealias Input = Barkcloud_Files_AddFavoriteRequest
+            /// Response type for "AddFavorite".
+            internal typealias Output = Barkcloud_Files_CloudEmpty
+            /// Descriptor for "AddFavorite".
+            internal static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.CloudApi"),
+                method: "AddFavorite",
+                type: .unary
+            )
+        }
+        /// Namespace for "RemoveFavorite" metadata.
+        internal enum RemoveFavorite: Sendable {
+            /// Request type for "RemoveFavorite".
+            internal typealias Input = Barkcloud_Files_RemoveFavoriteRequest
+            /// Response type for "RemoveFavorite".
+            internal typealias Output = Barkcloud_Files_CloudEmpty
+            /// Descriptor for "RemoveFavorite".
+            internal static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.CloudApi"),
+                method: "RemoveFavorite",
+                type: .unary
+            )
+        }
+        /// Namespace for "ListFavorites" metadata.
+        internal enum ListFavorites: Sendable {
+            /// Request type for "ListFavorites".
+            internal typealias Input = Barkcloud_Files_ListFavoritesRequest
+            /// Response type for "ListFavorites".
+            internal typealias Output = Barkcloud_Files_ListFavoritesResponse
+            /// Descriptor for "ListFavorites".
+            internal static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.CloudApi"),
+                method: "ListFavorites",
+                type: .unary
+            )
+        }
         /// Descriptors for all methods in the "barkcloud.files.CloudApi" service.
         internal static let descriptors: [GRPCCore.MethodDescriptor] = [
             CreateDirectory.descriptor,
@@ -1210,7 +1523,14 @@ internal enum Barkcloud_Files_CloudApi: Sendable {
             ListUserImages.descriptor,
             ListUserMedia.descriptor,
             GetPath.descriptor,
-            SetVideoThumbnail.descriptor
+            SetVideoThumbnail.descriptor,
+            ListTrash.descriptor,
+            RestoreFromTrash.descriptor,
+            DeleteFromTrash.descriptor,
+            EmptyTrash.descriptor,
+            AddFavorite.descriptor,
+            RemoveFavorite.descriptor,
+            ListFavorites.descriptor
         ]
     }
 }
@@ -1487,6 +1807,132 @@ extension Barkcloud_Files_CloudApi {
             request: GRPCCore.StreamingServerRequest<Barkcloud_Files_SetVideoThumbnailRequest>,
             context: GRPCCore.ServerContext
         ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty>
+
+        /// Handle the "ListTrash" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > ───────── Корзина ─────────
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Files_ListTrashRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Files_ListTrashResponse` messages.
+        func listTrash(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ListTrashRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_ListTrashResponse>
+
+        /// Handle the "RestoreFromTrash" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Восстановить файл из корзины
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Files_RestoreFromTrashRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Files_CloudEmpty` messages.
+        func restoreFromTrash(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Files_RestoreFromTrashRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty>
+
+        /// Handle the "DeleteFromTrash" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Удалить файл из корзины навсегда (немедленно)
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Files_DeleteFromTrashRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Files_CloudEmpty` messages.
+        func deleteFromTrash(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Files_DeleteFromTrashRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty>
+
+        /// Handle the "EmptyTrash" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Очистить корзину целиком
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Files_EmptyTrashRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Files_CloudEmpty` messages.
+        func emptyTrash(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Files_EmptyTrashRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty>
+
+        /// Handle the "AddFavorite" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > ───────── Избранное ─────────
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Files_AddFavoriteRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Files_CloudEmpty` messages.
+        func addFavorite(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Files_AddFavoriteRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty>
+
+        /// Handle the "RemoveFavorite" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Убрать файл из избранного
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Files_RemoveFavoriteRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Files_CloudEmpty` messages.
+        func removeFavorite(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Files_RemoveFavoriteRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty>
+
+        /// Handle the "ListFavorites" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Все избранные файлы (от новых к старым)
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Files_ListFavoritesRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Files_ListFavoritesResponse` messages.
+        func listFavorites(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ListFavoritesRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_ListFavoritesResponse>
     }
 
     /// Service protocol for the "barkcloud.files.CloudApi" service.
@@ -1748,6 +2194,132 @@ extension Barkcloud_Files_CloudApi {
             request: GRPCCore.ServerRequest<Barkcloud_Files_SetVideoThumbnailRequest>,
             context: GRPCCore.ServerContext
         ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty>
+
+        /// Handle the "ListTrash" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > ───────── Корзина ─────────
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_ListTrashRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Files_ListTrashResponse` message.
+        func listTrash(
+            request: GRPCCore.ServerRequest<Barkcloud_Files_ListTrashRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_ListTrashResponse>
+
+        /// Handle the "RestoreFromTrash" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Восстановить файл из корзины
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_RestoreFromTrashRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Files_CloudEmpty` message.
+        func restoreFromTrash(
+            request: GRPCCore.ServerRequest<Barkcloud_Files_RestoreFromTrashRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty>
+
+        /// Handle the "DeleteFromTrash" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Удалить файл из корзины навсегда (немедленно)
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_DeleteFromTrashRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Files_CloudEmpty` message.
+        func deleteFromTrash(
+            request: GRPCCore.ServerRequest<Barkcloud_Files_DeleteFromTrashRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty>
+
+        /// Handle the "EmptyTrash" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Очистить корзину целиком
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_EmptyTrashRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Files_CloudEmpty` message.
+        func emptyTrash(
+            request: GRPCCore.ServerRequest<Barkcloud_Files_EmptyTrashRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty>
+
+        /// Handle the "AddFavorite" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > ───────── Избранное ─────────
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_AddFavoriteRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Files_CloudEmpty` message.
+        func addFavorite(
+            request: GRPCCore.ServerRequest<Barkcloud_Files_AddFavoriteRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty>
+
+        /// Handle the "RemoveFavorite" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Убрать файл из избранного
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_RemoveFavoriteRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Files_CloudEmpty` message.
+        func removeFavorite(
+            request: GRPCCore.ServerRequest<Barkcloud_Files_RemoveFavoriteRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty>
+
+        /// Handle the "ListFavorites" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Все избранные файлы (от новых к старым)
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_ListFavoritesRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Files_ListFavoritesResponse` message.
+        func listFavorites(
+            request: GRPCCore.ServerRequest<Barkcloud_Files_ListFavoritesRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_ListFavoritesResponse>
     }
 
     /// Simple service protocol for the "barkcloud.files.CloudApi" service.
@@ -2007,6 +2579,132 @@ extension Barkcloud_Files_CloudApi {
             request: Barkcloud_Files_SetVideoThumbnailRequest,
             context: GRPCCore.ServerContext
         ) async throws -> Barkcloud_Files_CloudEmpty
+
+        /// Handle the "ListTrash" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > ───────── Корзина ─────────
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Files_ListTrashRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Files_ListTrashResponse` to respond with.
+        func listTrash(
+            request: Barkcloud_Files_ListTrashRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Files_ListTrashResponse
+
+        /// Handle the "RestoreFromTrash" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Восстановить файл из корзины
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Files_RestoreFromTrashRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Files_CloudEmpty` to respond with.
+        func restoreFromTrash(
+            request: Barkcloud_Files_RestoreFromTrashRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Files_CloudEmpty
+
+        /// Handle the "DeleteFromTrash" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Удалить файл из корзины навсегда (немедленно)
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Files_DeleteFromTrashRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Files_CloudEmpty` to respond with.
+        func deleteFromTrash(
+            request: Barkcloud_Files_DeleteFromTrashRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Files_CloudEmpty
+
+        /// Handle the "EmptyTrash" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Очистить корзину целиком
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Files_EmptyTrashRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Files_CloudEmpty` to respond with.
+        func emptyTrash(
+            request: Barkcloud_Files_EmptyTrashRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Files_CloudEmpty
+
+        /// Handle the "AddFavorite" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > ───────── Избранное ─────────
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Files_AddFavoriteRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Files_CloudEmpty` to respond with.
+        func addFavorite(
+            request: Barkcloud_Files_AddFavoriteRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Files_CloudEmpty
+
+        /// Handle the "RemoveFavorite" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Убрать файл из избранного
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Files_RemoveFavoriteRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Files_CloudEmpty` to respond with.
+        func removeFavorite(
+            request: Barkcloud_Files_RemoveFavoriteRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Files_CloudEmpty
+
+        /// Handle the "ListFavorites" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Все избранные файлы (от новых к старым)
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Files_ListFavoritesRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Files_ListFavoritesResponse` to respond with.
+        func listFavorites(
+            request: Barkcloud_Files_ListFavoritesRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Files_ListFavoritesResponse
     }
 }
 
@@ -2168,6 +2866,83 @@ extension Barkcloud_Files_CloudApi.StreamingServiceProtocol {
                 )
             }
         )
+        router.registerHandler(
+            forMethod: Barkcloud_Files_CloudApi.Method.ListTrash.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_ListTrashRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_ListTrashResponse>(),
+            handler: { request, context in
+                try await self.listTrash(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
+            forMethod: Barkcloud_Files_CloudApi.Method.RestoreFromTrash.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_RestoreFromTrashRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_CloudEmpty>(),
+            handler: { request, context in
+                try await self.restoreFromTrash(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
+            forMethod: Barkcloud_Files_CloudApi.Method.DeleteFromTrash.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_DeleteFromTrashRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_CloudEmpty>(),
+            handler: { request, context in
+                try await self.deleteFromTrash(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
+            forMethod: Barkcloud_Files_CloudApi.Method.EmptyTrash.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_EmptyTrashRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_CloudEmpty>(),
+            handler: { request, context in
+                try await self.emptyTrash(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
+            forMethod: Barkcloud_Files_CloudApi.Method.AddFavorite.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_AddFavoriteRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_CloudEmpty>(),
+            handler: { request, context in
+                try await self.addFavorite(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
+            forMethod: Barkcloud_Files_CloudApi.Method.RemoveFavorite.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_RemoveFavoriteRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_CloudEmpty>(),
+            handler: { request, context in
+                try await self.removeFavorite(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
+            forMethod: Barkcloud_Files_CloudApi.Method.ListFavorites.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_ListFavoritesRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_ListFavoritesResponse>(),
+            handler: { request, context in
+                try await self.listFavorites(
+                    request: request,
+                    context: context
+                )
+            }
+        )
     }
 }
 
@@ -2322,6 +3097,83 @@ extension Barkcloud_Files_CloudApi.ServiceProtocol {
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty> {
         let response = try await self.setVideoThumbnail(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    internal func listTrash(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ListTrashRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_ListTrashResponse> {
+        let response = try await self.listTrash(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    internal func restoreFromTrash(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Files_RestoreFromTrashRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty> {
+        let response = try await self.restoreFromTrash(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    internal func deleteFromTrash(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Files_DeleteFromTrashRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty> {
+        let response = try await self.deleteFromTrash(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    internal func emptyTrash(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Files_EmptyTrashRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty> {
+        let response = try await self.emptyTrash(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    internal func addFavorite(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Files_AddFavoriteRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty> {
+        let response = try await self.addFavorite(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    internal func removeFavorite(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Files_RemoveFavoriteRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty> {
+        let response = try await self.removeFavorite(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    internal func listFavorites(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ListFavoritesRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_ListFavoritesResponse> {
+        let response = try await self.listFavorites(
             request: GRPCCore.ServerRequest(stream: request),
             context: context
         )
@@ -2507,6 +3359,97 @@ extension Barkcloud_Files_CloudApi.SimpleServiceProtocol {
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty> {
         return GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty>(
             message: try await self.setVideoThumbnail(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    internal func listTrash(
+        request: GRPCCore.ServerRequest<Barkcloud_Files_ListTrashRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_ListTrashResponse> {
+        return GRPCCore.ServerResponse<Barkcloud_Files_ListTrashResponse>(
+            message: try await self.listTrash(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    internal func restoreFromTrash(
+        request: GRPCCore.ServerRequest<Barkcloud_Files_RestoreFromTrashRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty> {
+        return GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty>(
+            message: try await self.restoreFromTrash(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    internal func deleteFromTrash(
+        request: GRPCCore.ServerRequest<Barkcloud_Files_DeleteFromTrashRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty> {
+        return GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty>(
+            message: try await self.deleteFromTrash(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    internal func emptyTrash(
+        request: GRPCCore.ServerRequest<Barkcloud_Files_EmptyTrashRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty> {
+        return GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty>(
+            message: try await self.emptyTrash(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    internal func addFavorite(
+        request: GRPCCore.ServerRequest<Barkcloud_Files_AddFavoriteRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty> {
+        return GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty>(
+            message: try await self.addFavorite(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    internal func removeFavorite(
+        request: GRPCCore.ServerRequest<Barkcloud_Files_RemoveFavoriteRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty> {
+        return GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty>(
+            message: try await self.removeFavorite(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    internal func listFavorites(
+        request: GRPCCore.ServerRequest<Barkcloud_Files_ListFavoritesRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_ListFavoritesResponse> {
+        return GRPCCore.ServerResponse<Barkcloud_Files_ListFavoritesResponse>(
+            message: try await self.listFavorites(
                 request: request.message,
                 context: context
             ),
@@ -2844,6 +3787,167 @@ extension Barkcloud_Files_CloudApi {
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CloudEmpty>,
             options: GRPCCore.CallOptions,
             onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "ListTrash" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > ───────── Корзина ─────────
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_ListTrashRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_ListTrashRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_ListTrashResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func listTrash<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_ListTrashRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_ListTrashRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_ListTrashResponse>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListTrashResponse>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "RestoreFromTrash" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Восстановить файл из корзины
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_RestoreFromTrashRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_RestoreFromTrashRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_CloudEmpty` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func restoreFromTrash<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_RestoreFromTrashRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_RestoreFromTrashRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CloudEmpty>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "DeleteFromTrash" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Удалить файл из корзины навсегда (немедленно)
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_DeleteFromTrashRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_DeleteFromTrashRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_CloudEmpty` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func deleteFromTrash<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_DeleteFromTrashRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_DeleteFromTrashRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CloudEmpty>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "EmptyTrash" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Очистить корзину целиком
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_EmptyTrashRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_EmptyTrashRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_CloudEmpty` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func emptyTrash<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_EmptyTrashRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_EmptyTrashRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CloudEmpty>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "AddFavorite" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > ───────── Избранное ─────────
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_AddFavoriteRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_AddFavoriteRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_CloudEmpty` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func addFavorite<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_AddFavoriteRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_AddFavoriteRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CloudEmpty>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "RemoveFavorite" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Убрать файл из избранного
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_RemoveFavoriteRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_RemoveFavoriteRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_CloudEmpty` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func removeFavorite<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_RemoveFavoriteRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_RemoveFavoriteRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CloudEmpty>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "ListFavorites" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Все избранные файлы (от новых к старым)
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_ListFavoritesRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_ListFavoritesRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_ListFavoritesResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func listFavorites<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_ListFavoritesRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_ListFavoritesRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_ListFavoritesResponse>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListFavoritesResponse>) async throws -> Result
         ) async throws -> Result where Result: Sendable
     }
 
@@ -3338,6 +4442,244 @@ extension Barkcloud_Files_CloudApi {
                 onResponse: handleResponse
             )
         }
+
+        /// Call the "ListTrash" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > ───────── Корзина ─────────
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_ListTrashRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_ListTrashRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_ListTrashResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        internal func listTrash<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_ListTrashRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_ListTrashRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_ListTrashResponse>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListTrashResponse>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Files_CloudApi.Method.ListTrash.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "RestoreFromTrash" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Восстановить файл из корзины
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_RestoreFromTrashRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_RestoreFromTrashRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_CloudEmpty` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        internal func restoreFromTrash<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_RestoreFromTrashRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_RestoreFromTrashRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CloudEmpty>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Files_CloudApi.Method.RestoreFromTrash.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "DeleteFromTrash" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Удалить файл из корзины навсегда (немедленно)
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_DeleteFromTrashRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_DeleteFromTrashRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_CloudEmpty` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        internal func deleteFromTrash<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_DeleteFromTrashRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_DeleteFromTrashRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CloudEmpty>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Files_CloudApi.Method.DeleteFromTrash.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "EmptyTrash" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Очистить корзину целиком
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_EmptyTrashRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_EmptyTrashRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_CloudEmpty` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        internal func emptyTrash<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_EmptyTrashRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_EmptyTrashRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CloudEmpty>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Files_CloudApi.Method.EmptyTrash.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "AddFavorite" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > ───────── Избранное ─────────
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_AddFavoriteRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_AddFavoriteRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_CloudEmpty` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        internal func addFavorite<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_AddFavoriteRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_AddFavoriteRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CloudEmpty>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Files_CloudApi.Method.AddFavorite.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "RemoveFavorite" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Убрать файл из избранного
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_RemoveFavoriteRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_RemoveFavoriteRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_CloudEmpty` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        internal func removeFavorite<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_RemoveFavoriteRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_RemoveFavoriteRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CloudEmpty>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Files_CloudApi.Method.RemoveFavorite.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "ListFavorites" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Все избранные файлы (от новых к старым)
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_ListFavoritesRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_ListFavoritesRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_ListFavoritesResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        internal func listFavorites<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_ListFavoritesRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_ListFavoritesRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_ListFavoritesResponse>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListFavoritesResponse>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Files_CloudApi.Method.ListFavorites.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
     }
 }
 
@@ -3745,6 +5087,209 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
             request: request,
             serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_SetVideoThumbnailRequest>(),
             deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_CloudEmpty>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "ListTrash" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > ───────── Корзина ─────────
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Files_ListTrashRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    internal func listTrash<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Files_ListTrashRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListTrashResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.listTrash(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_ListTrashRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_ListTrashResponse>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "RestoreFromTrash" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Восстановить файл из корзины
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Files_RestoreFromTrashRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    internal func restoreFromTrash<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Files_RestoreFromTrashRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.restoreFromTrash(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_RestoreFromTrashRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_CloudEmpty>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "DeleteFromTrash" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Удалить файл из корзины навсегда (немедленно)
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Files_DeleteFromTrashRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    internal func deleteFromTrash<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Files_DeleteFromTrashRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.deleteFromTrash(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_DeleteFromTrashRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_CloudEmpty>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "EmptyTrash" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Очистить корзину целиком
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Files_EmptyTrashRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    internal func emptyTrash<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Files_EmptyTrashRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.emptyTrash(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_EmptyTrashRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_CloudEmpty>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "AddFavorite" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > ───────── Избранное ─────────
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Files_AddFavoriteRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    internal func addFavorite<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Files_AddFavoriteRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.addFavorite(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_AddFavoriteRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_CloudEmpty>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "RemoveFavorite" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Убрать файл из избранного
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Files_RemoveFavoriteRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    internal func removeFavorite<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Files_RemoveFavoriteRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.removeFavorite(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_RemoveFavoriteRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_CloudEmpty>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "ListFavorites" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Все избранные файлы (от новых к старым)
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Files_ListFavoritesRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    internal func listFavorites<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Files_ListFavoritesRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListFavoritesResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.listFavorites(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_ListFavoritesRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_ListFavoritesResponse>(),
             options: options,
             onResponse: handleResponse
         )
@@ -4210,6 +5755,237 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
             metadata: metadata
         )
         return try await self.setVideoThumbnail(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "ListTrash" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > ───────── Корзина ─────────
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    internal func listTrash<Result>(
+        _ message: Barkcloud_Files_ListTrashRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListTrashResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Files_ListTrashRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.listTrash(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "RestoreFromTrash" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Восстановить файл из корзины
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    internal func restoreFromTrash<Result>(
+        _ message: Barkcloud_Files_RestoreFromTrashRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Files_RestoreFromTrashRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.restoreFromTrash(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "DeleteFromTrash" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Удалить файл из корзины навсегда (немедленно)
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    internal func deleteFromTrash<Result>(
+        _ message: Barkcloud_Files_DeleteFromTrashRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Files_DeleteFromTrashRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.deleteFromTrash(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "EmptyTrash" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Очистить корзину целиком
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    internal func emptyTrash<Result>(
+        _ message: Barkcloud_Files_EmptyTrashRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Files_EmptyTrashRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.emptyTrash(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "AddFavorite" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > ───────── Избранное ─────────
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    internal func addFavorite<Result>(
+        _ message: Barkcloud_Files_AddFavoriteRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Files_AddFavoriteRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.addFavorite(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "RemoveFavorite" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Убрать файл из избранного
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    internal func removeFavorite<Result>(
+        _ message: Barkcloud_Files_RemoveFavoriteRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Files_RemoveFavoriteRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.removeFavorite(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "ListFavorites" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Все избранные файлы (от новых к старым)
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    internal func listFavorites<Result>(
+        _ message: Barkcloud_Files_ListFavoritesRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListFavoritesResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Files_ListFavoritesRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.listFavorites(
             request: request,
             options: options,
             onResponse: handleResponse

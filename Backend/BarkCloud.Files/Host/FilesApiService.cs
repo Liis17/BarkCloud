@@ -1,4 +1,5 @@
 using BarkCloud.Files.Features.CheckFileHash;
+using BarkCloud.Files.Features.CheckFileHashes;
 using BarkCloud.Files.Features.GetTempDownloadUrl;
 using BarkCloud.Files.Features.GetUploadUrl;
 using BarkCloud.Files.Features.GetUserStorageInfo;
@@ -57,6 +58,16 @@ public class FilesApiService : FilesApi.FilesApiBase
         var command = new CheckFileHashCommand()
         {
             FileHash = request.FileHash
+        };
+
+        return await _mediator.Send(command);
+    }
+
+    public override async Task<CheckFileHashesResponse> CheckFileHashes(CheckFileHashesRequest request, ServerCallContext context)
+    {
+        var command = new CheckFileHashesCommand()
+        {
+            FileHashes = request.FileHashes.ToList()
         };
 
         return await _mediator.Send(command);

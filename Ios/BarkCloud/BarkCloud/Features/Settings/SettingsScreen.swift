@@ -138,8 +138,8 @@ struct SettingsScreen: View {
     private func avatarCircle(_ vm: ProfileViewModel) -> some View {
         let size: CGFloat = 96
         ZStack {
-            if let url = vm.state.avatarURL {
-                RemoteImage(url: url) {
+            if !vm.state.avatarCandidateURLs.isEmpty {
+                FallbackRemoteImage(urls: vm.state.avatarCandidateURLs) {
                     placeholderAvatar
                 }
                 .frame(width: size, height: size)

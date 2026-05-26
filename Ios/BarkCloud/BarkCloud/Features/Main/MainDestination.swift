@@ -1,51 +1,43 @@
 import Foundation
 import SwiftUI
 
+/// Пять вкладок нижней навигации. Порядок = порядок в таб-баре.
+/// По умолчанию открывается «Альбомы».
 enum MainDestination: Hashable, CaseIterable {
-    case photos
-    case videos
-    case files
-    case shared
-    case settings
+    case gallery   // локальная медиатека устройства (PhotoKit)
+    case files     // файлы: устройство + облако + общие
+    case albums    // облачные медиа: Фото / Видео / Альбомы
+    case trash     // корзина облака
+    case settings  // профиль и настройки
 
-    static let `default`: MainDestination = .files
+    static let `default`: MainDestination = .albums
 
     var labelKey: LocalizedStringResource {
         switch self {
-        case .photos: return "tab_photos"
-        case .videos: return "tab_videos"
+        case .gallery: return "tab_gallery"
         case .files: return "tab_files"
-        case .shared: return "tab_shared"
+        case .albums: return "tab_albums"
+        case .trash: return "tab_trash"
         case .settings: return "tab_settings"
-        }
-    }
-
-    var placeholderKey: LocalizedStringResource {
-        switch self {
-        case .photos: return "placeholder_photos"
-        case .videos: return "placeholder_videos"
-        case .files: return "placeholder_files"
-        case .shared: return "placeholder_shared"
-        case .settings: return "placeholder_settings"
         }
     }
 
     var iconOutlined: String {
         switch self {
-        case .photos: return "photo.on.rectangle"
-        case .videos: return "play.rectangle"
+        case .gallery: return "photo.on.rectangle"
         case .files: return "folder"
-        case .shared: return "person.2"
+        case .albums: return "rectangle.stack"
+        case .trash: return "trash"
         case .settings: return "gearshape"
         }
     }
 
     var iconFilled: String {
         switch self {
-        case .photos: return "photo.on.rectangle.fill"
-        case .videos: return "play.rectangle.fill"
+        case .gallery: return "photo.on.rectangle.fill"
         case .files: return "folder.fill"
-        case .shared: return "person.2.fill"
+        case .albums: return "rectangle.stack.fill"
+        case .trash: return "trash.fill"
         case .settings: return "gearshape.fill"
         }
     }
