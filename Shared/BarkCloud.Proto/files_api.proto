@@ -13,6 +13,8 @@ service FilesApi {
 
   rpc CheckFileHash(CheckFileHashRequest) returns(CheckFileHashResponse); // Проверить существует ли файл с таким хешем
 
+  rpc CheckFileHashes(CheckFileHashesRequest) returns(CheckFileHashesResponse); // Пакетная проверка наличия файлов по списку SHA256-хешей (без побочных эффектов)
+
   rpc GetUserStorageInfo(GetUserStorageInfoRequest) returns(GetUserStorageInfoResponse); // Получить информацию о хранилище пользователя
 }
 
@@ -172,6 +174,19 @@ message CheckFileHashRequest {
 
 message CheckFileHashResponse {
   string file_id = 1; // Идентификатор файла если найден, пустая строка если не найден
+}
+
+message CheckFileHashesRequest {
+  repeated string file_hashes = 1; // SHA256 хеши файлов (hex строки по 64 символа)
+}
+
+message HashCheckResult {
+  string file_hash = 1; // исходный хеш (нормализован к нижнему регистру)
+  bool exists = 2;      // true — файл с таким хешем есть в хранилище
+}
+
+message CheckFileHashesResponse {
+  repeated HashCheckResult results = 1; // результат по каждому уникальному валидному хешу
 }
 
 message GetUserStorageInfoRequest {

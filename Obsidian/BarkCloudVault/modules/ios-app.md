@@ -4,7 +4,7 @@ Parent: [[index]]
 
 ## Назначение
 
-Нативный iOS-клиент BarkCloud (SwiftUI, Swift 5, iOS 18+). Полный паритет с Android-клиентом ([[modules/android-app]]): Login+OTP, 5-табовый Main с Files по умолчанию, локальный файл-браузер, медиа-сетки. gRPC через grpc-swift 2. Все PR 1–6 реализованы.
+Нативный iOS-клиент BarkCloud (SwiftUI, Swift 5, iOS 18+). gRPC через grpc-swift 2. Login+OTP, серверная интеграция профиля/медиа/облака. 5-табовая навигация: **Галерея** (медиатека устройства, PhotoKit), **Файлы** (устройство + облако + общие), **Альбомы** (default; облачные Фото/Видео/Альбомы), **Корзина** (облако), **Настройки**.
 
 ## Расположение
 
@@ -44,18 +44,19 @@ BarkCloud/
 │   └── AlbumRepository.swift       AlbumApi: список/содержимое альбомов, create/update/delete, add/remove items
 ├── Features/
 │   ├── Login/                      LoginScreen + LoginUiState + LoginViewModel (логин/пароль + OTP)
-│   ├── Main/                       MainScreen (TabView, 5 destinations; Settings → SettingsScreen, onSignOut), MainDestination
-│   ├── Placeholder/                PlaceholderScreen (только таб Shared)
-│   ├── Shared/                     RemoteImage (self-signed AsyncImage-замена + NSCache), FilePreviewController/RemoteFilePreviewScreen (QuickLook), MediaThumb
+│   ├── Main/                       MainScreen (TabView, 5 табов: Галерея/Файлы/Альбомы(default)/Корзина/Настройки), MainDestination
+│   ├── Gallery/                    GalleryScreen+VM (медиатека устройства PhotoKit: сетка фото+видео, выбор, загрузка в облако), DeviceMediaViews (PHImageManager-загрузчик + ячейка + полноэкранный просмотр фото/видео)
+│   ├── Shared/                     RemoteImage (self-signed AsyncImage-замена + NSCache), FilePreviewController/RemoteFilePreviewScreen (QuickLook), MediaThumb, ComingSoonScreen (универсальная заглушка «скоро»)
 │   ├── Settings/                   SettingsScreen + ProfileViewModel (профиль/аватар/хранилище/выход/удаление), EditProfileScreen, PrivacySettingsScreen, DevicesScreen
-│   ├── Media/                      Фото/Видео: сегмент «Всё / Альбомы»
+│   ├── Trash/                      TrashScreen+VM (корзина облака: ListTrash + cursor-пагинация, restore/delete-forever свайпом, EmptyTrash)
+│   ├── Media/                      таб «Альбомы»: CloudMediaScreen с переключателем Фото/Видео/Альбомы
 │   │   ├── MediaKind.swift         enum { photo, video }: titleKey, emptyKey, isVideo
 │   │   ├── MediaItem.swift         модель (id=file_id, thumbnailURL?, isVideo, fileName) + init(asset:) + placeholders
-│   │   ├── MediaTabScreen.swift    сегмент-контейнер: MediaGridScreen / AlbumsGridScreen
+│   │   ├── MediaTabScreen.swift    CloudMediaScreen: 3-сегментный переключатель → MediaGridScreen(.photo/.video) / AlbumsGridScreen(nil)
 │   │   ├── MediaGridViewModel.swift @Observable: ListUserMedia + cursor-пагинация + загрузка
 │   │   ├── MediaGridScreen.swift   LazyVGrid 3 кол. (MediaThumb), PhotosPicker-загрузка, полноэкранный просмотр
-│   │   └── Albums/                 AlbumsViewModel, AlbumsGridScreen (карточки), AlbumDetailScreen+VM (items, обложка, add/remove)
-│   └── Files/                      файл-браузер (локальный + облачный)
+│   │   └── Albums/                 AlbumsViewModel, AlbumsGridScreen (kind: MediaKind? — nil=без фильтра), AlbumDetailScreen+VM (items, обложка, add/remove)
+│   └── Files/                      файл-браузер (локальный + облачный + «Общие файлы»→ComingSoonScreen)
 │       ├── Domain/                 FsEntry, FsSort
 │       ├── Data/                   LocalFileRepository (actor), FileShareHelper, MimeIcon, StoragePermission
 │       └── UI/                     FilesRootScreen/ViewModel (вход в облако), CloudBrowserScreen/ViewModel/UiState (навигация+CRUD+upload), LocalBrowserScreen/ViewModel, FsRowItem, FormatUtils, PickFolderDialog, ThumbnailLoader
@@ -116,7 +117,7 @@ BarkCloud/
 | `OkHttp + grpc-okhttp + grpc-kotlin` | `GRPCCore + GRPCNIOTransportHTTP2 + GRPCProtobuf` |
 | `Coil + VideoFrameDecoder` | `QLThumbnailGenerator + NSCache` (PR 6) |
 | `Material3 Theme` | SwiftUI `.tint` + asset-catalog accent |
-| `androidx.navigation.compose NavHost` | SwiftUI `NavigationStack` (Files-таб) + `TabView` (5 табов) |
+| `androidx.navigation.compose NavHost` | SwiftUI `NavigationStack` (на таб) + `TabView` (5 табов: Галерея/Файлы/Альбомы/Корзина/Настройки, default = Альбомы) |
 | `FileProvider + ACTION_SEND` | `UIActivityViewController` через `UIViewControllerRepresentable` (PR 5) |
 | `BuildConfig.IDENTITY_API_ADDRESS = https://cloud.barkfluff.com:7020` | `GrpcEndpoint` в `GrpcManager`: `cloud.barkfluff.com:7020`, `useTLS = true`, `allowSelfSigned = true` (TLS терминируется на nginx) |
 
@@ -125,7 +126,12 @@ BarkCloud/
 Облачный функционал подключён к боевому бэкенду (см. [[api/files-client-guide]], [[api/users-client-guide]]):
 
 - **Настройки** (`Features/Settings/`) — таб «Настройки» вместо заглушки: профиль (`GetUser`),
-  аватар через PhotosPicker (`USER_AVATAR` → upload → `SetProfilePicture`; удаление — `SetProfilePicture("")`),
+  аватар через PhotosPicker (`USER_AVATAR` → upload → `SetProfilePicture`; удаление — `SetProfilePicture("")`).
+  Отображение аватара устойчиво: `FallbackRemoteImage` пробует по очереди `profile_picture_preview`,
+  затем `profile_picture` (с проверкой HTTP-статуса), а каждый URL прогоняется через
+  `GrpcEndpoint.normalizedFileDownloadURL` — сохранённая в БД ссылка могла быть сгенерирована при
+  прежней конфигурации `ExternalEndpoint:Host`, поэтому хост/порт пересобираются на актуальный
+  `cloud.barkfluff.com:7025/web/download/{id}`.
   редактирование имени/юзернейма/bio (`ChangeName`/`ChangeUsername`+`CheckExistUsername`/`ChangeBio`),
   приватность (`Get/UpdatePrivacySettings`), устройства (`GetDevices`/`GetCurrentDevice`/`RenameDevice`/`DeleteDevice`),
   хранилище (`GetUserStorageInfo`), выход и удаление аккаунта (`DeleteAccount`).
@@ -136,16 +142,30 @@ BarkCloud/
   + `InsecureHTTP.clearCaches()` (URL-кэш/куки) → `onSignOut()` → Login. Удаление аккаунта
   использует `resetLocalState()` без серверного `Logout` (аккаунт уже удалён). На время операции —
   блокирующий оверлей (`isProcessing`), защищающий от повторных нажатий.
-- **Вкладки Фото/Видео** (`Features/Media/`) — сегмент «Всё / Альбомы» (`MediaTabScreen`).
-  «Всё»: реальная сетка `CloudApi.ListUserMedia(kind)` с cursor-пагинацией и догрузкой при скролле,
+- **Галерея** (`Features/Gallery/`) — таб №1, локальная медиатека устройства через **PhotoKit**
+  (`PHAsset`, разрешение `NSPhotoLibraryUsageDescription` в build-settings pbxproj). Сетка фото+видео
+  (`PHCachingImageManager`), тап → полноэкранный просмотр (фото — `requestImage`, видео — `requestPlayerItem`+`VideoPlayer`),
+  режим выбора → загрузка выбранных в облако (`PHAssetResourceManager.requestData` → `CloudRepository.uploadFile`).
+  Ячейка (`DeviceMediaThumb`) имеет `.contentShape(Rectangle())` — иначе `scaledToFill`-картинка
+  выходит за рамку и перехватывает тапы соседней строки. **Иконка облака**: лениво (по появлению ячейки)
+  считается потоковый SHA256 оригинала и пакетно (дебаунс 400 мс, чанки по 500) проверяется через
+  `FilesApi.CheckFileHashes` — если файл с таким хешем уже в облаке, рисуется `checkmark.icloud.fill`.
+  Хеш считается тем же ресурсом, что и при загрузке, поэтому совпадает с серверным.
+- **Альбомы** (`Features/Media/`, таб №3, по умолчанию) — `CloudMediaScreen` с переключателем
+  **Фото / Видео / Альбомы**. Фото/Видео: `CloudApi.ListUserMedia(kind)` с cursor-пагинацией и догрузкой,
   превью через `RemoteImage`, тап → полноэкранный QuickLook (`GetTempDownloadUrl` → download),
-  загрузка из PhotosPicker (`GetUploadUrl(CLOUD_FILE)` → HTTP). «Альбомы»: `AlbumApi` —
-  карточки (`ListAlbums`), открытие (`ListAlbumItems` с `kind_filter`), создание, добавление файлов,
-  смена обложки, удаление элементов/альбома.
-- **Файлы → «Облачное хранилище»** — карточка-вход в `CloudBrowserScreen`: навигация по папкам
-  (`ListDirectoryDetailed`), хлебные крошки (`GetPath`), CRUD папок/записей, перемещение через
-  `CloudMovePicker`, загрузка фото/видео (PhotosPicker) и документов (`.fileImporter`) в текущую папку,
-  открытие/скачивание файла в QuickLook.
+  загрузка из PhotosPicker (`GetUploadUrl(CLOUD_FILE)` → HTTP). Альбомы (`AlbumApi`, `kind=nil` — без
+  фильтра): карточки (`ListAlbums`), открытие (`ListAlbumItems`), создание, добавление файлов,
+  смена обложки, удаление элементов/альбома. Во всех трёх под-вкладках — pull-to-refresh
+  (`.refreshable` → `reload()`), работает и на пустом состоянии.
+- **Корзина** (`Features/Trash/`, таб №4) — `CloudApi.ListTrash` с cursor-пагинацией, превью/иконка
+  по типу, дата удаления и срок очистки; свайп — `RestoreFromTrash` / `DeleteFromTrash`; в тулбаре —
+  `EmptyTrash` с подтверждением и блокирующим оверлеем.
+- **Файлы** (`Features/Files/`, таб №2) — секции: «На устройстве» (`LocalBrowserScreen`),
+  «Облачное хранилище» (карточка-вход в `CloudBrowserScreen`: навигация по папкам
+  `ListDirectoryDetailed`, хлебные крошки `GetPath`, CRUD папок/записей, перемещение через
+  `CloudMovePicker`, загрузка фото/видео (PhotosPicker) и документов (`.fileImporter`), открытие/скачивание
+  в QuickLook) и «Общие файлы» → `ComingSoonScreen` (на бэкенде нет API расшаривания — заглушка «скоро»).
 
 **Важно для превью/скачивания**: файловый сервис на `:7025` с self-signed TLS — превью и оригиналы
 грузятся через `InsecureHTTP.session` (`AsyncImage` их бы отверг), поэтому в сетках используется
@@ -173,7 +193,7 @@ SPM-пакеты подключены — сгенерённые символы 
 - **PR 1** ✅ — Setup: deployment target, каркас (App/Session/Theme), strings catalog, proto config, sync script.
 - **PR 2** ✅ — gRPC infra: интерсепторы (auth + 4 device), GrpcManager, AuthRepository.
 - **PR 3** ✅ — Login: полный экран с OTP-flow.
-- **PR 4** ✅ — Main tabs (TabView, 5 destinations, PlaceholderScreen).
+- **PR 4** ✅ — Main tabs (TabView, 5 destinations). Переработаны: Галерея/Файлы/Альбомы/Корзина/Настройки (PlaceholderScreen удалён, заменён `ComingSoonScreen`).
 - **PR 5** ✅ — Local file browser: Domain, Data (FileManager), UI (CRUD, multi-select, share).
 - **PR 6** ✅ — Polish: QuickLook thumbnails, плюралы, snackbar.
 - **PR 7** ✅ — Серверная интеграция: multi-endpoint gRPC (Users :7021, Files :7025), `FileTransferService`/`InsecureURLSession`/`RemoteImage`, репозитории `UserRepository`/`CloudRepository`/`AlbumRepository`; экраны Настройки/профиль/приватность/устройства, аватар, медиа-галерея с пагинацией и просмотром, альбомы, облачный файловый менеджер, загрузки фото/видео/документов.

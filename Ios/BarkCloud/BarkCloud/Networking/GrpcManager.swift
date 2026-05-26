@@ -11,6 +11,25 @@ enum GrpcEndpoint {
     static let filesPort = 7025
     static let useTLS = true
     static let allowSelfSigned = true
+
+    /// База HTTP-раздачи файлов через nginx (`/web/download/{id}`, `/web/upload/{id}`).
+    static var filesWebBase: String { "https://\(host):\(filesPort)/web" }
+
+    /// Перестраивает ссылку скачивания файла на актуальный эндпоинт Files.
+    /// Часть ссылок (например, URL аватара) хранится в БД и была сгенерирована
+    /// при прежней конфигурации `ExternalEndpoint:Host` — она может указывать на
+    /// недостижимый/устаревший хост. Берём идентификатор файла из пути
+    /// `.../download/{id}` и собираем ссылку заново на текущем хосте. Если путь не
+    /// похож на ссылку скачивания — возвращаем исходный URL без изменений.
+    static func normalizedFileDownloadURL(_ raw: String) -> URL? {
+        guard !raw.isEmpty else { return nil }
+        guard let comps = URLComponents(string: raw) else { return URL(string: raw) }
+        let parts = comps.path.split(separator: "/").map(String.init)
+        if let idx = parts.lastIndex(of: "download"), idx + 1 < parts.count {
+            return URL(string: "\(filesWebBase)/download/\(parts[idx + 1])")
+        }
+        return URL(string: raw)
+    }
 }
 
 /// Управляет gRPC-клиентами ко всем сервисам. На каждый порт — один кэшированный

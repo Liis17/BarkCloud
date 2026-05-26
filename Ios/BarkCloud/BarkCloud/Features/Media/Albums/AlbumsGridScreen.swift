@@ -1,9 +1,9 @@
 import SwiftUI
 
-/// Сетка карточек альбомов (одни и те же альбомы на вкладках Фото и Видео;
-/// `kind` определяет фильтр содержимого при открытии).
+/// Сетка карточек альбомов. `kind` определяет фильтр содержимого при открытии
+/// альбома: `nil` — показывать и фото, и видео (режим «Альбомы»).
 struct AlbumsGridScreen: View {
-    let kind: MediaKind
+    let kind: MediaKind?
 
     @Environment(AppEnvironment.self) private var env
     @State private var vm: AlbumsViewModel?
@@ -43,15 +43,19 @@ struct AlbumsGridScreen: View {
         if vm.state.isLoading {
             ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if vm.state.albums.isEmpty {
-            VStack(spacing: 16) {
-                Image(systemName: "rectangle.stack")
-                    .font(.system(size: 56))
-                    .foregroundStyle(AppColors.onSurfaceVariant)
-                Text("albums_list_empty")
-                    .font(AppTypography.titleMedium)
-                    .foregroundStyle(AppColors.onSurfaceVariant)
+            ScrollView {
+                VStack(spacing: 16) {
+                    Image(systemName: "rectangle.stack")
+                        .font(.system(size: 56))
+                        .foregroundStyle(AppColors.onSurfaceVariant)
+                    Text("albums_list_empty")
+                        .font(AppTypography.titleMedium)
+                        .foregroundStyle(AppColors.onSurfaceVariant)
+                }
+                .frame(maxWidth: .infinity)
+                .containerRelativeFrame(.vertical)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .refreshable { await vm.reload() }
         } else {
             ScrollView {
                 LazyVGrid(columns: Self.columns, spacing: 12) {
@@ -68,6 +72,8 @@ struct AlbumsGridScreen: View {
                 .padding(16)
                 if vm.state.isLoadingMore { ProgressView().padding() }
             }
+            // Потянуть вниз — перезагрузить список альбомов.
+            .refreshable { await vm.reload() }
         }
     }
 }

@@ -67,3 +67,56 @@ extension RemoteImage where Placeholder == Color {
         self.init(url: url, contentMode: contentMode) { Color.primary.opacity(0.08) }
     }
 }
+
+/// Картинка, которая пробует загрузиться по нескольким URL по очереди и берёт
+/// первый успешный ответ (HTTP 2xx + валидное изображение). Нужна для аватара:
+/// сначала пробуем превью, при недоступности — полное изображение. В отличие от
+/// `RemoteImage`, проверяет HTTP-статус, чтобы не принять 404-страницу за картинку.
+struct FallbackRemoteImage<Placeholder: View>: View {
+    let urls: [URL]
+    let contentMode: ContentMode
+    @ViewBuilder var placeholder: () -> Placeholder
+
+    @State private var image: UIImage?
+
+    init(urls: [URL], contentMode: ContentMode = .fill, @ViewBuilder placeholder: @escaping () -> Placeholder) {
+        self.urls = urls
+        self.contentMode = contentMode
+        self.placeholder = placeholder
+    }
+
+    var body: some View {
+        Group {
+            if let image {
+                Image(uiImage: image)
+                    .resizable()
+                    .aspectRatio(contentMode: contentMode)
+            } else {
+                placeholder()
+            }
+        }
+        .task(id: urls) { await load() }
+    }
+
+    private func load() async {
+        for url in urls {
+            if let cached = RemoteImageCache.shared.image(for: url) {
+                image = cached
+                return
+            }
+            do {
+                let (data, response) = try await InsecureHTTP.session.data(from: url)
+                if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
+                    continue
+                }
+                guard let ui = UIImage(data: data) else { continue }
+                RemoteImageCache.shared.store(ui, for: url)
+                guard !Task.isCancelled else { return }
+                image = ui
+                return
+            } catch {
+                continue
+            }
+        }
+    }
+}

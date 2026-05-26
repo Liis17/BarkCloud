@@ -26,6 +26,10 @@ struct FilesRootScreen: View {
                 section(titleKey: "files_section_server") {
                     serverFolders
                 }
+
+                section(titleKey: "files_section_shared") {
+                    sharedFiles
+                }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 24)
@@ -43,6 +47,20 @@ struct FilesRootScreen: View {
                 iconName: "cloud",
                 title: String(localized: "files_cloud_storage"),
                 subtitle: cloudSubtitle
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private var sharedFiles: some View {
+        NavigationLink {
+            ComingSoonScreen(titleKey: "files_shared_title", iconName: "person.2")
+        } label: {
+            cardRow(
+                iconName: "person.2",
+                title: String(localized: "files_shared_title"),
+                subtitle: String(localized: "files_shared_subtitle")
             )
         }
         .buttonStyle(.plain)

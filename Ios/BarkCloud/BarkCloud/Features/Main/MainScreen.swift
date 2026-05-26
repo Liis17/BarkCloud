@@ -7,60 +7,40 @@ struct MainScreen: View {
     var body: some View {
         TabView(selection: $selection) {
             NavigationStack {
-                MediaTabScreen(kind: .photo)
+                GalleryScreen()
             }
-            .tabItem {
-                Label {
-                    Text(MainDestination.photos.labelKey)
-                } icon: {
-                    Image(systemName: selection == .photos ? MainDestination.photos.iconFilled : MainDestination.photos.iconOutlined)
-                }
-            }
-            .tag(MainDestination.photos)
-
-            NavigationStack {
-                MediaTabScreen(kind: .video)
-            }
-            .tabItem {
-                Label {
-                    Text(MainDestination.videos.labelKey)
-                } icon: {
-                    Image(systemName: selection == .videos ? MainDestination.videos.iconFilled : MainDestination.videos.iconOutlined)
-                }
-            }
-            .tag(MainDestination.videos)
+            .tabItem { tabLabel(.gallery) }
+            .tag(MainDestination.gallery)
 
             NavigationStack {
                 FilesRootScreen()
             }
-            .tabItem {
-                Label {
-                    Text(MainDestination.files.labelKey)
-                } icon: {
-                    Image(systemName: selection == .files ? MainDestination.files.iconFilled : MainDestination.files.iconOutlined)
-                }
-            }
+            .tabItem { tabLabel(.files) }
             .tag(MainDestination.files)
 
-            PlaceholderScreen(destination: .shared)
-                .tabItem {
-                    Label {
-                        Text(MainDestination.shared.labelKey)
-                    } icon: {
-                        Image(systemName: selection == .shared ? MainDestination.shared.iconFilled : MainDestination.shared.iconOutlined)
-                    }
-                }
-                .tag(MainDestination.shared)
+            NavigationStack {
+                CloudMediaScreen()
+            }
+            .tabItem { tabLabel(.albums) }
+            .tag(MainDestination.albums)
+
+            NavigationStack {
+                TrashScreen()
+            }
+            .tabItem { tabLabel(.trash) }
+            .tag(MainDestination.trash)
 
             SettingsScreen(onSignOut: onSignOut)
-                .tabItem {
-                    Label {
-                        Text(MainDestination.settings.labelKey)
-                    } icon: {
-                        Image(systemName: selection == .settings ? MainDestination.settings.iconFilled : MainDestination.settings.iconOutlined)
-                    }
-                }
+                .tabItem { tabLabel(.settings) }
                 .tag(MainDestination.settings)
+        }
+    }
+
+    private func tabLabel(_ destination: MainDestination) -> some View {
+        Label {
+            Text(destination.labelKey)
+        } icon: {
+            Image(systemName: selection == destination ? destination.iconFilled : destination.iconOutlined)
         }
     }
 }

@@ -21,17 +21,21 @@ final class AlbumDetailViewModel {
 
     private let albums: AlbumRepository
     private let cloud: CloudRepository
-    private let kind: MediaKind
+    private let kind: MediaKind?
     private var didLoad = false
 
-    init(album: AlbumCard, kind: MediaKind, albums: AlbumRepository, cloud: CloudRepository) {
+    init(album: AlbumCard, kind: MediaKind?, albums: AlbumRepository, cloud: CloudRepository) {
         self.state = UiState(album: album)
         self.albums = albums
         self.cloud = cloud
         self.kind = kind
     }
 
-    private var apiKind: CloudMediaKind { kind.isVideo ? .video : .photo }
+    /// `nil` — без фильтра по типу (показывать и фото, и видео).
+    private var apiKind: CloudMediaKind? {
+        guard let kind else { return nil }
+        return kind.isVideo ? .video : .photo
+    }
 
     func loadIfNeeded() async {
         guard !didLoad else { return }
@@ -134,7 +138,7 @@ final class AlbumDetailViewModel {
 
 struct AlbumDetailScreen: View {
     let album: AlbumCard
-    let kind: MediaKind
+    let kind: MediaKind?
 
     @Environment(AppEnvironment.self) private var env
     @Environment(\.dismiss) private var dismiss
@@ -228,7 +232,7 @@ struct AlbumDetailScreen: View {
             if vm?.state.isUploading == true {
                 ProgressView()
             } else {
-                PhotosPicker(selection: $pickerItems, maxSelectionCount: 10, matching: kind.isVideo ? .videos : .images) {
+                PhotosPicker(selection: $pickerItems, maxSelectionCount: 10, matching: pickerFilter) {
                     Image(systemName: "plus")
                 }
             }
@@ -263,6 +267,15 @@ struct AlbumDetailScreen: View {
         }
     }
 
+    /// Фильтр выбора в `PhotosPicker`: по типу вкладки, либо фото+видео в режиме «Альбомы».
+    private var pickerFilter: PHPickerFilter {
+        switch kind {
+        case .video: return .videos
+        case .photo: return .images
+        case nil: return .any(of: [.images, .videos])
+        }
+    }
+
     private func handlePick(_ items: [PhotosPickerItem]) {
         guard !items.isEmpty else { return }
         Task {
@@ -270,7 +283,7 @@ struct AlbumDetailScreen: View {
             for item in items {
                 if let data = try? await item.loadTransferable(type: Data.self) {
                     let ext = item.supportedContentTypes.first?.preferredFilenameExtension
-                        ?? (kind.isVideo ? "mp4" : "jpg")
+                        ?? (kind?.isVideo == true ? "mp4" : "jpg")
                     files.append((data, "\(UUID().uuidString).\(ext)"))
                 }
             }

@@ -45,6 +45,25 @@ public class FileHashesStorage
     }
 
     /// <summary>
+    /// Пакетная проверка: из переданного набора хешей возвращает те, что есть в
+    /// хранилище. Один запрос (WHERE Hash IN ...), без побочных эффектов.
+    /// Ожидает уже нормализованные (lowercase) хеши.
+    /// </summary>
+    public async Task<HashSet<string>> GetExistingHashes(IReadOnlyCollection<string> hashes)
+    {
+        if (hashes.Count == 0)
+            return new HashSet<string>();
+
+        var found = await _context.FileHashes
+            .AsNoTracking()
+            .Where(x => hashes.Contains(x.Hash))
+            .Select(x => x.Hash)
+            .ToListAsync();
+
+        return found.ToHashSet();
+    }
+
+    /// <summary>
     /// Gets the FileHash by FileId.
     /// </summary>
     public async Task<FileHash?> GetHashByFileId(Guid fileId)
