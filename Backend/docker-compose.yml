@@ -3,6 +3,7 @@ version: '3.8'
 x-common-variables: &common-variables
   CONFIGURATION_SERVICE_URL: "${CONFIGURATION_SERVICE_URL}"
   ASPNETCORE_ENVIRONMENT: "${ASPNETCORE_ENVIRONMENT}"
+  CONFIGURATION_ACCESS_KEY: "${CONFIGURATION_ACCESS_KEY}"
 
 services:
   # === Основные микросервисы (prod-образы) ===
