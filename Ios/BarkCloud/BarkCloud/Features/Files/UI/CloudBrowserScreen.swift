@@ -76,15 +76,20 @@ struct CloudBrowserScreen: View {
         if vm.state.isLoading {
             ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if vm.state.isEmpty {
-            VStack(spacing: 16) {
-                Image(systemName: "folder")
-                    .font(.system(size: 56))
-                    .foregroundStyle(AppColors.onSurfaceVariant)
-                Text("cloud_empty_folder")
-                    .font(AppTypography.titleMedium)
-                    .foregroundStyle(AppColors.onSurfaceVariant)
+            ScrollView {
+                VStack(spacing: 16) {
+                    Image(systemName: "folder")
+                        .font(.system(size: 56))
+                        .foregroundStyle(AppColors.onSurfaceVariant)
+                    Text("cloud_empty_folder")
+                        .font(AppTypography.titleMedium)
+                        .foregroundStyle(AppColors.onSurfaceVariant)
+                }
+                .frame(maxWidth: .infinity)
+                .containerRelativeFrame(.vertical)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            // Потянуть вниз — перезагрузить даже пустую папку.
+            .refreshable { await vm.reload() }
         } else {
             List {
                 ForEach(vm.state.subdirs) { dir in
@@ -117,6 +122,8 @@ struct CloudBrowserScreen: View {
                 }
             }
             .listStyle(.plain)
+            // Потянуть вниз — перезагрузить содержимое папки.
+            .refreshable { await vm.reload() }
         }
     }
 

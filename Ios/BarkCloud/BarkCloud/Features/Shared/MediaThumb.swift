@@ -28,10 +28,15 @@ struct SquareThumbClip<Content: View>: View {
 }
 
 /// Квадратная ячейка-превью медиа (фото/видео) с бейджем видео.
-/// Используется сетками галереи и альбомов.
+/// Используется сетками галереи и альбомов. В режиме мультивыбора
+/// (`isSelecting`) рисует индикатор выбора и подсветку выбранного.
 struct MediaThumb: View {
     let thumbnailURL: URL?
     let isVideo: Bool
+    /// Включён режим выбора — показываем индикатор-галочку.
+    var isSelecting: Bool = false
+    /// Ячейка выбрана (только при `isSelecting`).
+    var isSelected: Bool = false
 
     var body: some View {
         SquareThumbClip(cornerRadius: 4) {
@@ -50,6 +55,21 @@ struct MediaThumb: View {
                     .foregroundStyle(.white)
                     .shadow(radius: 2)
                     .padding(6)
+            }
+        }
+        .overlay(alignment: .topTrailing) {
+            if isSelecting {
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 20))
+                    .foregroundStyle(isSelected ? AppColors.accent : .white)
+                    .shadow(radius: 2)
+                    .padding(6)
+            }
+        }
+        .overlay {
+            if isSelecting && isSelected {
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(AppColors.accent.opacity(0.25))
             }
         }
     }

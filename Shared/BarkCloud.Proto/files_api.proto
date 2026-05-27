@@ -33,6 +33,7 @@ service CloudApi {
 
   rpc ListUserImages       (ListUserImagesRequest)       returns (ListUserImagesResponse);   // [DEPRECATED] Все изображения пользователя; используйте ListUserMedia(PHOTO)
   rpc ListUserMedia        (ListUserMediaRequest)        returns (ListUserMediaResponse);     // Медиа пользователя по типу (фото / видео) от новых к старым (cursor pagination)
+  rpc DeleteUserMedia      (DeleteUserMediaRequest)      returns (CloudEmpty);                // Удалить медиа из галереи по file_id: живые записи каталога → в корзину; если записей нет — снять владельца (жёстко)
 
   rpc GetPath              (GetPathRequest)              returns (PathResponse);             // Построить путь до объекта в иерархии
 
@@ -258,6 +259,10 @@ message MoveFileEntryRequest {
 
 message DeleteFileEntryRequest {
   string entry_id = 1;
+}
+
+message DeleteUserMediaRequest {
+  string file_id = 1; // id блоба из ListUserMedia
 }
 
 // ============ Детальный листинг и галерея ============

@@ -4,6 +4,7 @@ using BarkCloud.Files.Features.Cloud.CreateDirectory;
 using BarkCloud.Files.Features.Cloud.DeleteDirectory;
 using BarkCloud.Files.Features.Cloud.DeleteFileEntry;
 using BarkCloud.Files.Features.Cloud.DeleteFromTrash;
+using BarkCloud.Files.Features.Cloud.DeleteUserMedia;
 using BarkCloud.Files.Features.Cloud.EmptyTrash;
 using BarkCloud.Files.Features.Cloud.GetPath;
 using BarkCloud.Files.Features.Cloud.ListFavorites;
@@ -148,6 +149,16 @@ public class CloudApiService : CloudApi.CloudApiBase
         var command = new DeleteFileEntryCommand
         {
             EntryId = Guid.Parse(request.EntryId)
+        };
+
+        return _mediator.Send(command);
+    }
+
+    public override Task<CloudEmpty> DeleteUserMedia(DeleteUserMediaRequest request, ServerCallContext context)
+    {
+        var command = new DeleteUserMediaCommand
+        {
+            FileId = Guid.Parse(request.FileId)
         };
 
         return _mediator.Send(command);

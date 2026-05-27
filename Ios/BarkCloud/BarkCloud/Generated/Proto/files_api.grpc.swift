@@ -1391,6 +1391,19 @@ internal enum Barkcloud_Files_CloudApi: Sendable {
                 type: .unary
             )
         }
+        /// Namespace for "DeleteUserMedia" metadata.
+        internal enum DeleteUserMedia: Sendable {
+            /// Request type for "DeleteUserMedia".
+            internal typealias Input = Barkcloud_Files_DeleteUserMediaRequest
+            /// Response type for "DeleteUserMedia".
+            internal typealias Output = Barkcloud_Files_CloudEmpty
+            /// Descriptor for "DeleteUserMedia".
+            internal static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.CloudApi"),
+                method: "DeleteUserMedia",
+                type: .unary
+            )
+        }
         /// Namespace for "GetPath" metadata.
         internal enum GetPath: Sendable {
             /// Request type for "GetPath".
@@ -1522,6 +1535,7 @@ internal enum Barkcloud_Files_CloudApi: Sendable {
             DeleteFileEntry.descriptor,
             ListUserImages.descriptor,
             ListUserMedia.descriptor,
+            DeleteUserMedia.descriptor,
             GetPath.descriptor,
             SetVideoThumbnail.descriptor,
             ListTrash.descriptor,
@@ -1771,6 +1785,24 @@ extension Barkcloud_Files_CloudApi {
             request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ListUserMediaRequest>,
             context: GRPCCore.ServerContext
         ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_ListUserMediaResponse>
+
+        /// Handle the "DeleteUserMedia" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Удалить медиа из галереи по file_id: живые записи каталога → в корзину; если записей нет — снять владельца (жёстко)
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Files_DeleteUserMediaRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Files_CloudEmpty` messages.
+        func deleteUserMedia(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Files_DeleteUserMediaRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty>
 
         /// Handle the "GetPath" method.
         ///
@@ -2159,6 +2191,24 @@ extension Barkcloud_Files_CloudApi {
             context: GRPCCore.ServerContext
         ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_ListUserMediaResponse>
 
+        /// Handle the "DeleteUserMedia" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Удалить медиа из галереи по file_id: живые записи каталога → в корзину; если записей нет — снять владельца (жёстко)
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_DeleteUserMediaRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Files_CloudEmpty` message.
+        func deleteUserMedia(
+            request: GRPCCore.ServerRequest<Barkcloud_Files_DeleteUserMediaRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty>
+
         /// Handle the "GetPath" method.
         ///
         /// > Source IDL Documentation:
@@ -2544,6 +2594,24 @@ extension Barkcloud_Files_CloudApi {
             context: GRPCCore.ServerContext
         ) async throws -> Barkcloud_Files_ListUserMediaResponse
 
+        /// Handle the "DeleteUserMedia" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Удалить медиа из галереи по file_id: живые записи каталога → в корзину; если записей нет — снять владельца (жёстко)
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Files_DeleteUserMediaRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Files_CloudEmpty` to respond with.
+        func deleteUserMedia(
+            request: Barkcloud_Files_DeleteUserMediaRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Files_CloudEmpty
+
         /// Handle the "GetPath" method.
         ///
         /// > Source IDL Documentation:
@@ -2845,6 +2913,17 @@ extension Barkcloud_Files_CloudApi.StreamingServiceProtocol {
             }
         )
         router.registerHandler(
+            forMethod: Barkcloud_Files_CloudApi.Method.DeleteUserMedia.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_DeleteUserMediaRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_CloudEmpty>(),
+            handler: { request, context in
+                try await self.deleteUserMedia(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
             forMethod: Barkcloud_Files_CloudApi.Method.GetPath.descriptor,
             deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_GetPathRequest>(),
             serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_PathResponse>(),
@@ -3075,6 +3154,17 @@ extension Barkcloud_Files_CloudApi.ServiceProtocol {
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_ListUserMediaResponse> {
         let response = try await self.listUserMedia(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    internal func deleteUserMedia(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Files_DeleteUserMediaRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty> {
+        let response = try await self.deleteUserMedia(
             request: GRPCCore.ServerRequest(stream: request),
             context: context
         )
@@ -3333,6 +3423,19 @@ extension Barkcloud_Files_CloudApi.SimpleServiceProtocol {
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_ListUserMediaResponse> {
         return GRPCCore.ServerResponse<Barkcloud_Files_ListUserMediaResponse>(
             message: try await self.listUserMedia(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    internal func deleteUserMedia(
+        request: GRPCCore.ServerRequest<Barkcloud_Files_DeleteUserMediaRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty> {
+        return GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty>(
+            message: try await self.deleteUserMedia(
                 request: request.message,
                 context: context
             ),
@@ -3741,6 +3844,29 @@ extension Barkcloud_Files_CloudApi {
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_ListUserMediaResponse>,
             options: GRPCCore.CallOptions,
             onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListUserMediaResponse>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "DeleteUserMedia" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Удалить медиа из галереи по file_id: живые записи каталога → в корзину; если записей нет — снять владельца (жёстко)
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_DeleteUserMediaRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_DeleteUserMediaRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_CloudEmpty` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func deleteUserMedia<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_DeleteUserMediaRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_DeleteUserMediaRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CloudEmpty>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result
         ) async throws -> Result where Result: Sendable
 
         /// Call the "GetPath" method.
@@ -4368,6 +4494,40 @@ extension Barkcloud_Files_CloudApi {
             try await self.client.unary(
                 request: request,
                 descriptor: Barkcloud_Files_CloudApi.Method.ListUserMedia.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "DeleteUserMedia" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Удалить медиа из галереи по file_id: живые записи каталога → в корзину; если записей нет — снять владельца (жёстко)
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_DeleteUserMediaRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_DeleteUserMediaRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_CloudEmpty` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        internal func deleteUserMedia<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_DeleteUserMediaRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_DeleteUserMediaRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CloudEmpty>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Files_CloudApi.Method.DeleteUserMedia.descriptor,
                 serializer: serializer,
                 deserializer: deserializer,
                 options: options,
@@ -5034,6 +5194,35 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
         )
     }
 
+    /// Call the "DeleteUserMedia" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Удалить медиа из галереи по file_id: живые записи каталога → в корзину; если записей нет — снять владельца (жёстко)
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Files_DeleteUserMediaRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    internal func deleteUserMedia<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Files_DeleteUserMediaRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.deleteUserMedia(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_DeleteUserMediaRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_CloudEmpty>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
     /// Call the "GetPath" method.
     ///
     /// > Source IDL Documentation:
@@ -5689,6 +5878,39 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
             metadata: metadata
         )
         return try await self.listUserMedia(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "DeleteUserMedia" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Удалить медиа из галереи по file_id: живые записи каталога → в корзину; если записей нет — снять владельца (жёстко)
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    internal func deleteUserMedia<Result>(
+        _ message: Barkcloud_Files_DeleteUserMediaRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Files_DeleteUserMediaRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.deleteUserMedia(
             request: request,
             options: options,
             onResponse: handleResponse

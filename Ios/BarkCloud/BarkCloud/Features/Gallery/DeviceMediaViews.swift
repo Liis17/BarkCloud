@@ -23,22 +23,6 @@ final class DeviceMediaImageLoader: @unchecked Sendable {
         }
     }
 
-    func fullImage(for asset: PHAsset) async -> UIImage? {
-        await withCheckedContinuation { cont in
-            let options = PHImageRequestOptions()
-            options.deliveryMode = .highQualityFormat
-            options.isNetworkAccessAllowed = true
-            manager.requestImage(
-                for: asset,
-                targetSize: PHImageManagerMaximumSize,
-                contentMode: .aspectFit,
-                options: options
-            ) { image, _ in
-                cont.resume(returning: image)
-            }
-        }
-    }
-
     func playerItem(for asset: PHAsset) async -> AVPlayerItem? {
         await withCheckedContinuation { cont in
             let options = PHVideoRequestOptions()
@@ -47,6 +31,37 @@ final class DeviceMediaImageLoader: @unchecked Sendable {
             manager.requestPlayerItem(forVideo: asset, options: options) { item, _ in
                 cont.resume(returning: item)
             }
+        }
+    }
+
+    /// Экспортирует оригинал фото-ассета во временный файл и возвращает его URL.
+    /// Нужен для QuickLook-просмотра (`FilePreviewController`), который даёт
+    /// нативные фишки iOS: выделение объекта на фото, Live Text, зум, шаринг.
+    /// Поток пишется на диск чанками (без удержания всего файла в памяти);
+    /// приоритет ресурсов тот же, что при загрузке в облако — имя файла
+    /// сохраняет расширение, чтобы QuickLook определил тип.
+    func exportPhotoToTempFile(for asset: PHAsset) async -> URL? {
+        let resources = PHAssetResource.assetResources(for: asset)
+        let preferred: [PHAssetResourceType] = [.photo, .fullSizePhoto]
+        let resource = preferred.compactMap { type in resources.first { $0.type == type } }.first
+            ?? resources.first
+        guard let resource else { return nil }
+
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let fileURL = dir.appendingPathComponent(resource.originalFilename)
+
+        let options = PHAssetResourceRequestOptions()
+        options.isNetworkAccessAllowed = true
+        do {
+            try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
+                PHAssetResourceManager.default().writeData(for: resource, toFile: fileURL, options: options) { error in
+                    if let error { cont.resume(throwing: error) } else { cont.resume() }
+                }
+            }
+            return fileURL
+        } catch {
+            return nil
         }
     }
 }
@@ -117,30 +132,36 @@ struct DeviceMediaThumb: View {
     }
 }
 
-/// Полноэкранный просмотр ассета устройства: фото — изображение, видео — плеер.
+/// Полноэкранный просмотр ассета устройства: фото — через QuickLook
+/// (`FilePreviewController`), что даёт нативные фишки iOS (выделение объекта,
+/// Live Text, зум, шаринг) — как в просмотрщике Альбомов; видео — плеер.
 struct DeviceMediaViewer: View {
     let asset: PHAsset
 
-    @State private var image: UIImage?
+    @State private var photoURL: URL?
     @State private var player: AVPlayer?
     @State private var failed = false
 
     var body: some View {
-        ZStack {
-            Color.black.ignoresSafeArea()
+        Group {
             if asset.mediaType == .video {
-                if let player {
-                    VideoPlayer(player: player).ignoresSafeArea()
-                } else {
-                    statusView
+                ZStack {
+                    Color.black.ignoresSafeArea()
+                    if let player {
+                        VideoPlayer(player: player).ignoresSafeArea()
+                    } else {
+                        statusView
+                    }
                 }
             } else {
-                if let image {
-                    Image(uiImage: image)
-                        .resizable()
-                        .scaledToFit()
+                if let photoURL {
+                    FilePreviewController(fileURL: photoURL)
+                        .ignoresSafeArea()
                 } else {
-                    statusView
+                    ZStack {
+                        Color.black.ignoresSafeArea()
+                        statusView
+                    }
                 }
             }
         }
@@ -167,8 +188,8 @@ struct DeviceMediaViewer: View {
                 failed = true
             }
         } else {
-            image = await DeviceMediaImageLoader.shared.fullImage(for: asset)
-            if image == nil { failed = true }
+            photoURL = await DeviceMediaImageLoader.shared.exportPhotoToTempFile(for: asset)
+            if photoURL == nil { failed = true }
         }
     }
 }
