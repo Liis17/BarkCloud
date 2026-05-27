@@ -26,6 +26,48 @@ public static class CloudApiEndpoints
     {
         var api = app.MapGroup("/api");
 
+        // ───────────────────────── Каркас (профиль/хранилище/версия) ─────────────────────────
+
+        // Данные общего каркаса SPA (Sidebar/Topbar/Footbar). Раньше инлайнились в shared.jsx
+        // через плейсхолдеры {{ }}; теперь SPA грузит их через /api/me при монтировании AppShell.
+        api.MapGet("/me", async (HttpContext http, AuthGateway auth, PageDataBuilder data) =>
+        {
+            var user = await auth.AuthenticateAsync(http);
+            if (user is null)
+                return Results.Json(new { error = "Не авторизован" }, Json, statusCode: 401);
+
+            var v = await data.BuildShellAsync(user, http);
+            int.TryParse(v.GetValueOrDefault("storage.percent"), out var percent);
+
+            return Results.Json(new
+            {
+                user = new
+                {
+                    initials = v.GetValueOrDefault("user.initials"),
+                    displayName = v.GetValueOrDefault("user.display_name"),
+                    role = v.GetValueOrDefault("user.role"),
+                    avatarUrl = v.GetValueOrDefault("user.avatar_url")
+                },
+                storage = new
+                {
+                    usedLabel = v.GetValueOrDefault("storage.used_label"),
+                    totalLabel = v.GetValueOrDefault("storage.total_label"),
+                    percent
+                },
+                app = new
+                {
+                    version = v.GetValueOrDefault("app.version"),
+                    edition = v.GetValueOrDefault("app.edition")
+                },
+                server = new { host = v.GetValueOrDefault("server.host") },
+                sync = new
+                {
+                    status = v.GetValueOrDefault("sync.status"),
+                    lastAt = v.GetValueOrDefault("sync.last_at")
+                }
+            }, Json);
+        });
+
         // ───────────────────────── Каталоги ─────────────────────────
 
         api.MapGet("/cloud/list", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud, string? dir) =>

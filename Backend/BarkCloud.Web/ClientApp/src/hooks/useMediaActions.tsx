@@ -1,0 +1,162 @@
+import React from 'react';
+import { ContextMenu, type ContextItem } from '../components/ui/ContextMenu';
+import { RenameModal } from '../components/ui/RenameModal';
+import { ConfirmModal } from '../components/ui/ConfirmModal';
+import { PropertiesModal } from '../components/ui/PropertiesModal';
+import { useAlbumMembership } from './useAlbumMembership';
+import { apiGet, apiPost } from '../lib/api';
+import type { Album, MediaItem } from '../lib/types';
+import type { ToastPush } from './useToast';
+
+interface DownloadResponse {
+  urls: Record<string, string | null>;
+}
+
+interface UseMediaActionsArgs {
+  albums?: Album[];
+  toast: ToastPush;
+  onRenamed?: (media: MediaItem, name: string) => void;
+  onRemoved?: (media: MediaItem) => void;
+  reloadAlbums?: () => void;
+}
+
+/** Полный набор действий контекстного меню для медиа галереи (Фото/Видео). */
+export function useMediaActions({ albums, toast, onRenamed, onRemoved, reloadAlbums }: UseMediaActionsArgs) {
+  const [menu, setMenu] = React.useState<{ x: number; y: number; media: MediaItem } | null>(null);
+  const [rename, setRename] = React.useState<MediaItem | null>(null);
+  const [confirm, setConfirm] = React.useState<MediaItem | null>(null);
+  const [props, setProps] = React.useState<MediaItem | null>(null);
+  const membership = useAlbumMembership(albums);
+
+  const openMenu = React.useCallback(
+    (e: React.MouseEvent, media: MediaItem) => {
+      e.preventDefault();
+      e.stopPropagation();
+      membership.ensureLoaded();
+      setMenu({ x: e.clientX, y: e.clientY, media });
+    },
+    [membership],
+  );
+
+  async function copyLink(m: MediaItem) {
+    try {
+      const d = await apiGet<DownloadResponse>('/api/files/download?ids=' + encodeURIComponent(m.id));
+      const url = d.urls && d.urls[m.id];
+      if (!url) throw new Error('Ссылка недоступна');
+      await navigator.clipboard.writeText(url);
+      toast('Ссылка скопирована (временная)');
+    } catch (e) {
+      toast((e as Error).message || 'Не удалось скопировать', 'err');
+    }
+  }
+  async function doRename(m: MediaItem, name: string) {
+    const entryId = m.entryIds && m.entryIds[0];
+    if (!entryId) {
+      toast('Файл не привязан к папке', 'err');
+      return;
+    }
+    try {
+      await apiPost('/api/cloud/entry/rename', { entryId, name });
+      setRename(null);
+      onRenamed && onRenamed(m, name);
+      toast('Переименовано');
+    } catch (e) {
+      toast((e as Error).message, 'err');
+    }
+  }
+  async function doDelete(m: MediaItem) {
+    const ids = (m.entryIds || []).slice();
+    if (!ids.length) {
+      toast('Файл не привязан к папке', 'err');
+      return;
+    }
+    try {
+      for (const eid of ids) await apiPost('/api/cloud/entry/delete', { entryId: eid });
+      setConfirm(null);
+      onRemoved && onRemoved(m);
+      toast('Перемещено в корзину');
+    } catch (e) {
+      toast((e as Error).message, 'err');
+    }
+  }
+  async function addToAlbum(m: MediaItem, albumId: string) {
+    try {
+      await apiPost('/api/albums/items/add', { album: albumId, fileIds: [m.id] });
+      membership.addLocal(m.id, albumId);
+      reloadAlbums && reloadAlbums();
+      toast('Добавлено в альбом');
+    } catch (e) {
+      toast((e as Error).message, 'err');
+    }
+  }
+  async function removeFromAlbum(m: MediaItem, albumId: string) {
+    try {
+      await apiPost('/api/albums/items/remove', { album: albumId, fileIds: [m.id] });
+      membership.removeLocal(m.id, albumId);
+      reloadAlbums && reloadAlbums();
+      toast('Убрано из альбома');
+    } catch (e) {
+      toast((e as Error).message, 'err');
+    }
+  }
+
+  function buildItems(m: MediaItem): ContextItem[] {
+    const isMedia = m.kind === 'photo' || m.kind === 'video';
+    const hasEntry = (m.entryIds || []).length > 0;
+    const inAlbums = membership.of(m.id);
+    const available = (albums || []).filter((a) => !inAlbums.has(a.id));
+    const present = (albums || []).filter((a) => inAlbums.has(a.id));
+    const out: ContextItem[] = [
+      { label: 'Копировать ссылку', icon: 'link', onClick: () => copyLink(m) },
+      { label: 'Переименовать', icon: 'pencil', disabled: !hasEntry, onClick: () => setRename(m) },
+    ];
+    if (isMedia) {
+      out.push({
+        label: 'Добавить в альбом',
+        icon: 'plus',
+        submenu: available.length
+          ? available.map((a) => ({ label: a.name, onClick: () => addToAlbum(m, a.id) }))
+          : [{ label: albums && albums.length ? 'Уже во всех альбомах' : 'Нет альбомов', disabled: true }],
+      });
+      if (present.length) {
+        out.push({
+          label: 'Удалить из альбома',
+          icon: 'x',
+          submenu: present.map((a) => ({ label: a.name, onClick: () => removeFromAlbum(m, a.id) })),
+        });
+      }
+    }
+    out.push({ label: 'Свойства', icon: 'info', onClick: () => setProps(m) });
+    out.push({ divider: true });
+    out.push({ label: 'Удалить', icon: 'trash', danger: true, disabled: !hasEntry, onClick: () => setConfirm(m) });
+    return out;
+  }
+
+  const overlay = (
+    <>
+      {menu && <ContextMenu x={menu.x} y={menu.y} items={buildItems(menu.media)} onClose={() => setMenu(null)} />}
+      {rename && (
+        <RenameModal
+          title="Переименовать"
+          label="Имя"
+          initial={(rename.entryNames && rename.entryNames[0]) || rename.name}
+          onClose={() => setRename(null)}
+          onSave={(name) => doRename(rename, name)}
+        />
+      )}
+      {confirm && (
+        <ConfirmModal
+          title="Удалить в корзину?"
+          danger
+          confirmLabel="Удалить"
+          message={`«${(confirm.entryNames && confirm.entryNames[0]) || confirm.name}» будет перемещён в корзину.`}
+          onClose={() => setConfirm(null)}
+          onConfirm={() => doDelete(confirm)}
+        />
+      )}
+      {props && <PropertiesModal fileId={props.id} fallback={props} onClose={() => setProps(null)} />}
+    </>
+  );
+
+  return { overlay, openMenu };
+}

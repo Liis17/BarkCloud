@@ -164,64 +164,9 @@ public static class WebEndpoints
         });
 
         // ───────── Защищённые страницы ─────────
-        // Фото/Видео/Файлы — данные подгружаются на клиенте через /api (см. CloudApiEndpoints),
-        // поэтому серверный page_data_json для них пустой. Settings остаётся серверным.
-
-        app.MapGet("/photos", (HttpContext http, AuthGateway auth, PageDataBuilder data, PageService pages) =>
-            ServePage(http, auth, data, pages, "Photos.html", _ => Task.FromResult(string.Empty)));
-
-        app.MapGet("/files", (HttpContext http, AuthGateway auth, PageDataBuilder data, PageService pages) =>
-            ServePage(http, auth, data, pages, "Files.html", _ => Task.FromResult(string.Empty)));
-
-        app.MapGet("/trash", (HttpContext http, AuthGateway auth, PageDataBuilder data, PageService pages) =>
-            ServePage(http, auth, data, pages, "Trash.html", _ => Task.FromResult(string.Empty)));
-
-        app.MapGet("/favorites", (HttpContext http, AuthGateway auth, PageDataBuilder data, PageService pages) =>
-            ServePage(http, auth, data, pages, "Favorites.html", _ => Task.FromResult(string.Empty)));
-
-        app.MapGet("/settings", (HttpContext http, AuthGateway auth, PageDataBuilder data, PageService pages) =>
-            ServePage(http, auth, data, pages, "Settings.html", user => data.BuildSettingsJsonAsync(user, http)));
-
-        app.MapGet("/videos", (HttpContext http, AuthGateway auth, PageDataBuilder data, PageService pages) =>
-            ServePage(http, auth, data, pages, "Videos.html", _ => Task.FromResult(string.Empty)));
-
-        app.MapGet("/shared", (HttpContext http, AuthGateway auth, PageDataBuilder data, PageService pages) =>
-            ServePage(http, auth, data, pages, "Shared.html", _ => Task.FromResult(string.Empty)));
-
-        // ───────── Статические ресурсы страниц ─────────
-
-        app.MapGet("/shared.jsx", async (HttpContext http, AuthGateway auth, PageDataBuilder data, PageService pages) =>
-        {
-            var user = await auth.AuthenticateAsync(http);
-            IReadOnlyDictionary<string, string?> vars = user is null
-                ? new Dictionary<string, string?>()
-                : await data.BuildShellAsync(user, http);
-
-            var js = await pages.RenderAsync("shared.jsx", vars);
-            return Results.Content(js, "application/javascript; charset=utf-8");
-        });
-
-        app.MapGet("/shared.css", async (PageService pages) =>
-            Results.Content(await pages.ReadRawAsync("shared.css"), "text/css; charset=utf-8"));
-    }
-
-    private static async Task<IResult> ServePage(
-        HttpContext http,
-        AuthGateway auth,
-        PageDataBuilder data,
-        PageService pages,
-        string file,
-        Func<WebUser, Task<string>> jsonFactory)
-    {
-        var user = await auth.AuthenticateAsync(http);
-        if (user is null)
-            return Results.Redirect("/login");
-
-        var vars = await data.BuildShellAsync(user, http);
-        vars["page_data_json"] = await jsonFactory(user);
-
-        var html = await pages.RenderAsync(file, vars);
-        return Results.Content(html, "text/html; charset=utf-8");
+        // Страницы приложения (/photos, /videos, /files, /favorites, /trash, /settings, /shared)
+        // отдаёт React-SPA через SPA-fallback в Program.cs (UseStaticFiles + MapFallback).
+        // Данные грузятся на клиенте через /api (включая /api/me и /api/settings/full).
     }
 
     private static Dictionary<string, string?> LoginVars(

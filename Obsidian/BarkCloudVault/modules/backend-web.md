@@ -6,13 +6,15 @@ Parent: [[index]] · See also: [[api/identity-api]] · [[api/users-api]] · [[ap
 
 ## Назначение
 
-Веб-клиент BarkCloud: HTTP-сервер, который отдаёт браузеру HTML-страницы из `Pages/` и выступает gRPC-**клиентом** к микросервисам по docker-сети. Не gRPC-сервер — браузер общается с ним по HTTP/1.1, а наружу к Identity/Users/Files уходят gRPC-вызовы (h2c).
+Веб-клиент BarkCloud: HTTP-сервер, который отдаёт браузеру **React-SPA** (собранный бандл из `wwwroot/`) и выступает gRPC-**клиентом** к микросервисам по docker-сети. Не gRPC-сервер — браузер общается с ним по HTTP/1.1, а наружу к Identity/Users/Files уходят gRPC-вызовы (h2c).
 
-Поток: нет валидного токена в cookie → страница логина; валидный токен → главная страница (Фото). Серверные данные подставляются в шаблонные плейсхолдеры страниц.
+**Архитектура frontend:** одно React-SPA на TypeScript (исходники в `ClientApp/`, сборка Vite → `wwwroot/`). Переключение вкладок — client-side routing (`react-router-dom`), без перезагрузки страницы: каркас (Sidebar/Topbar/Footbar) остаётся смонтированным, меняется только контент (`<Outlet/>`). Данные грузятся через `/api`. Страницы **входа** (`/login`, `/register`, `/forgot`) остались **серверными** (`Login Page Full.html`, React+Babel inline).
+
+Поток: нет валидного токена в cookie → редирект на серверный `/login`; валидный токен → SPA-маршрут (по умолчанию `/photos`). Каркас и настройки SPA получает через `/api/me` и `/api/settings/full` (раньше — серверные плейсхолдеры `{{ }}`).
 
 ## Расположение
 
-`Backend/BarkCloud.Web/`
+`Backend/BarkCloud.Web/` (бэкенд) · `Backend/BarkCloud.Web/ClientApp/` (исходники React-SPA) · `Backend/BarkCloud.Web/wwwroot/` (собранный бандл, в git не хранится — пересобирается)
 
 ## Аутентификация
 
@@ -49,11 +51,11 @@ Parent: [[index]] · See also: [[api/identity-api]] · [[api/users-api]] · [[ap
 ## Файлы
 
 ### Корень
-- `Program.cs` — `LoadConfiguration(ServiceId.Web)`, DI gRPC-клиентов (Identity/Users/Files/Cloud/**Album** + серверные `UsersServerApi`/`FilesServerApi` с `JwtClientInterceptor` — для проверки занятости и аватара), `AddHttpClient("files-upload")` для прокси-загрузки, лимиты тела запроса 512 МБ (Kestrel + `FormOptions`), регистрация сервисов (+ `AuthGateway`, `RegistrationGateway`, `PasswordResetGateway`, `AdminGate`, `DockerService`), `MapWebEndpoints` + `MapCloudApiEndpoints` + `MapSystemEndpoints` + `MapSettingsEndpoints`, включение h2c.
-- `WebEndpoints.cs` — маршруты страниц: `/`, `/login` (GET/POST), `/logout`, `/register` (GET/POST), `/register/confirm` (POST), `/forgot` (GET/POST), `/forgot/confirm` (POST), `/photos`, `/files`, `/trash`, `/favorites`, `/settings`, `/videos`, `/shared`, `/shared.jsx`, `/shared.css`. Для `/photos`/`/files`/`/trash`/`/favorites`/`/videos` `page_data_json` пустой — данные грузятся на клиенте через `/api`.
-- `Endpoints/CloudApiEndpoints.cs` — группа `/api/*` для Фото/Видео/Файлов (см. раздел «Фото/Видео/Файлы»).
+- `Program.cs` — `LoadConfiguration(ServiceId.Web)`, DI gRPC-клиентов (Identity/Users/Files/Cloud/**Album** + серверные `UsersServerApi`/`FilesServerApi` с `JwtClientInterceptor` — для проверки занятости и аватара), `AddHttpClient("files-upload")` для прокси-загрузки, лимиты тела запроса 512 МБ (Kestrel + `FormOptions`), регистрация сервисов (+ `AuthGateway`, `RegistrationGateway`, `PasswordResetGateway`, `AdminGate`, `DockerService`), `MapWebEndpoints` + `MapCloudApiEndpoints` + `MapSystemEndpoints` + `MapSettingsEndpoints`, включение h2c. **`UseStaticFiles()`** отдаёт бандл SPA из `wwwroot/`. **`MapFallback`** — SPA-fallback: любой неизвестный путь (кроме `/api/*`) проверяет cookie (`AuthGateway.AuthenticateAsync`, заодно refresh) → не авторизован → редирект `/login`; иначе отдаёт `wwwroot/index.html`.
+- `WebEndpoints.cs` — только серверные маршруты: `/` (редирект на `/photos` или `/login`), блок логина (`/login` GET/POST, `/logout`, `/register` GET/POST, `/register/confirm` POST, `/forgot` GET/POST, `/forgot/confirm` POST) + `LoginVars/RegisterVars/...`. Маршруты приложения (`/photos`, `/videos`, `/files`, `/favorites`, `/trash`, `/settings`, `/shared`) отдаёт SPA через `MapFallback`; прежние page-эндпоинты, `ServePage`, `/shared.jsx`, `/shared.css` **удалены**.
+- `Endpoints/CloudApiEndpoints.cs` — группа `/api/*` для Фото/Видео/Файлов (см. раздел «Фото/Видео/Файлы») + **`GET /api/me`** (каркас: профиль/аватар/хранилище/версия/хост — собирает `PageDataBuilder.BuildShellAsync`).
 - `SystemEndpoints.cs` — `/healthz` + группа `/api/system/*` (обновление/перезапуск бэкенда). См. [[modules/web-system-updates]].
-- `SettingsEndpoints.cs` — группа `/api/settings/*` для действий страницы настроек (см. раздел «Настройки»).
+- `SettingsEndpoints.cs` — группа `/api/settings/*` для действий страницы настроек (см. раздел «Настройки») + **`GET /api/settings/full`** (полное состояние страницы настроек — `PageDataBuilder.BuildSettingsJsonAsync`).
 
 ### Auth
 - `AuthGateway.cs` — cookie, локальная валидация JWT, refresh, логин/логаут, `IssueSession` (общая выдача cookie сессии), `ClearSession` (удаление cookie без обращения в Identity — после удаления аккаунта).
@@ -63,31 +65,38 @@ Parent: [[index]] · See also: [[api/identity-api]] · [[api/users-api]] · [[ap
 - `WebUser.cs` — модель пользователя + `LoginOutcome`/`LoginResult` + `RegistrationOutcome`/`RegistrationResult` + `PasswordResetOutcome`/`PasswordResetResult`.
 
 ### Infrastructure
-- `TemplateRenderer.cs` — рендер плейсхолдеров `{{ }}` / `{{{ }}}` / `| default("…")` с JS-экранированием (не задевает JSX `style={{…}}`).
+- `TemplateRenderer.cs` — рендер плейсхолдеров `{{ }}` / `{{{ }}}` / `| default("…")` с JS-экранированием. Используется только для серверной страницы логина.
 - `DeviceInfo.cs`, `BrowserContext.cs` — построение device-метаданных из запроса браузера.
 - `ServiceToken.cs` — генерация сервисного JWT (`TokenType=Service`) из общего `JwtSettings:SecretKey`.
 - `DockerService.cs` — управление контейнерами бэкенда через `docker.sock` (pull/up/restart/start/stop, self-update веба через helper-контейнер). См. [[modules/web-system-updates]].
 
 ### Rendering
-- `PageService.cs` — чтение и рендер файлов из `Pages/`.
-- `PageDataBuilder.cs` — сбор серверных данных: каркас (`Users.GetUser` + `Files.GetUserStorageInfo`) и Settings (профиль + bio + email через `UsersServerApi.GetUserContacts`, флаги 2FA `ListOtpVerification`, приватность `GetPrivacySettings`, сессии с `deviceId`, storage). Фото/Видео/Файлы серверно больше не собираются — они грузятся на клиенте через `/api`.
+- `PageService.cs` — чтение и рендер файлов из `Pages/` (теперь только `Login Page Full.html`).
+- `PageDataBuilder.cs` — сбор серверных данных, отдаётся клиенту как JSON: каркас `BuildShellAsync` (`Users.GetUser` + `Files.GetUserStorageInfo`) → `GET /api/me`; `BuildSettingsJsonAsync` (профиль + bio + email через `UsersServerApi.GetUserContacts`, флаги 2FA `ListOtpVerification`, приватность `GetPrivacySettings`, сессии с `deviceId`, storage) → `GET /api/settings/full`.
 - `CloudJson.cs` — единый маппинг gRPC-типов Files → JSON-карточки (`Media`/`Dir`/`Album`/`Entry`/`Trash`), общий для `/api`. `Media` отдаёт `previews[]` (128/512/1024 с URL) для `srcset`; `Trash` добавляет `deletedAt`/`purgeAt`.
 - `Format.cs`, `FileKind.cs` — форматирование размеров/дат и классификация файлов.
 
-### Pages
-- `Login Page Full.html`, `Photos.html`, `Files.html`, `Trash.html`, `Favorites.html`, `Settings.html`, `Videos.html`, `Shared.html`, `shared.jsx`, `shared.css` — React+Babel страницы; сервер заполняет `{{ … }}` (каркас) и `{{{ page_data_json }}}` (только Settings; Фото/Видео/Файлы/Корзина/Избранное грузят данные сами через `fetch('/api/…')`). `Trash.html` — страница «Корзина»: список удалённых файлов с датами удаления/окончательной зачистки, действия «Восстановить»/«Удалить навсегда»/«Очистить корзину». `Favorites.html` — страница «Избранное»: сетка превью (как Фото; для документов — плитка-иконка типа файла), группировка по датам, клик по медиа → `Lightbox`, по документу → скачивание, снятие звезды на hover.
-- `shared.jsx` экспортирует в `window` не только каркас (`AppShell`/`Sidebar`/…), но и data-слой и общий UI: `api`/`apiGet`/`apiPost`/`pickFiles`/`uploadFile`, `MediaThumb` (превью через `srcset`+`sizes` — браузер сам выбирает ширину под блок), `Lightbox` (оригинал через `GetTempDownloadUrl`), `Modal`, `useToast`, `EmptyState`, `Loading`, а также общие для Фото/Видео компоненты альбомов: `AlbumCard`/`AlbumFormModal`/`PickMediaModal`/`AlbumDetail` + хелперы `plural`/`dateLabel`/`groupByDate`.
-- Навигация в `shared.jsx` ведёт на чистые роуты (`/photos`, `/files`, `/settings`, …), а не на `*.html`.
-- Логин-страница — многорежимная по `flash.kind`: `register` (`RegisterCard`, POST `/register`), `register_confirm` (`RegisterConfirmCard`, ввод кода, POST `/register/confirm`), `forgot` (`ForgotCard`, POST `/forgot`), `forgot_confirm` (`ForgotConfirmCard`, код + новый пароль, POST `/forgot/confirm`). Шаги подтверждения переиспользуют компонент `OtpRow` и несут `code_id`/`reset_id`/пароль в скрытых полях.
-- **Тема** (light/dark/auto): `shared.css` содержит тёмную палитру `:root[data-theme="dark"]`; каждая страница приложения (кроме логина) в `<head>` имеет синхронный bootstrap-скрипт, который до рендера читает `localStorage.bark_theme` и ставит `data-theme`. Выбор темы — вкладка «Внешний вид» в настройках (хранится локально в браузере, без бэкенда).
+### Pages (серверный логин)
+- `Login Page Full.html` — единственная серверная страница (React+Babel inline через CDN, самодостаточна, не зависит от SPA). Многорежимная по `flash.kind`: `register` (`RegisterCard`, POST `/register`), `register_confirm` (`RegisterConfirmCard`, ввод кода, POST `/register/confirm`), `forgot` (`ForgotCard`, POST `/forgot`), `forgot_confirm` (`ForgotConfirmCard`, код + новый пароль, POST `/forgot/confirm`). Шаги подтверждения переиспользуют `OtpRow` и несут `code_id`/`reset_id`/пароль в скрытых полях. Сервер заполняет `{{ … }}` через `TemplateRenderer`.
+
+### Frontend (React-SPA, `ClientApp/`)
+- **Стек:** Vite + React 18 + TypeScript + `react-router-dom` v6. Сборка `npm run build` (`tsc --noEmit && vite build`) → `wwwroot/`. Dev: `npm run dev` (Vite на 5173, proxy `/api`,`/login`,… → `http://localhost:5148`).
+- **Роутинг** (`src/main.tsx`): `BrowserRouter` → layout-route `AppShell` + вложенные маршруты `photos`/`videos`/`files`/`favorites`/`trash`/`shared`/`settings` (`index` → `/photos`). Навигация в `Sidebar` через `NavLink` — без перезагрузки; меняется только `<Outlet/>`.
+- **Каркас** (`src/components/shell/`): `AppShell` (грузит `/api/me`, держит контексты `ShellContext`/`PageHeaderContext`), `Sidebar`/`Topbar`/`Footbar`. Страницы задают заголовок Topbar через `usePageHeader`.
+- **Общие компоненты** (`src/components/`): `Icon`, `MediaThumb` (srcset+sizes), `Lightbox` (оригинал через `/api/files/download`), `Modal`/`EmptyState`/`Loading`/`ContextMenu`/`RenameModal`/`ConfirmModal`/`PropertiesModal`, альбомы (`AlbumCard`/`AlbumFormModal`/`PickMediaModal`/`AlbumDetail`).
+- **Хуки** (`src/hooks/`): `useToast`, `useContextMenu`, `useInfiniteMedia` (cursor-пагинация + IntersectionObserver), `useAlbumMembership`, `useMediaActions`, `useShell`, `usePageHeader`.
+- **data-слой** (`src/lib/api.ts`): `api`/`apiGet`/`apiPost`/`pickFiles`/`uploadFile`, `ApiError`; 401 → `window.location='/login'`. Типы — `src/lib/types.ts`; форматирование — `src/lib/format.ts`; тема — `src/lib/theme.ts`.
+- **Стили:** `src/styles/shared.css` (перенос прежнего shared.css, палитра Material 3 + тёмная `:root[data-theme="dark"]`) + `src/styles/pages.css` (page-specific). Импортируются один раз в `main.tsx`.
+- **Тема** (light/dark/auto): bootstrap-скрипт в `<head>` `ClientApp/index.html` до рендера читает `localStorage.bark_theme` → `data-theme` (без мигания). Выбор — вкладка «Внешний вид» (`lib/theme.ts`, локально, без бэкенда).
 
 ## Фото / Видео / Файлы (данные и /api)
 
-Страницы `/photos`, `/videos`, `/files` — клиентские: при монтировании грузят данные через `fetch('/api/…')`,
+Маршруты SPA `/photos`, `/videos`, `/files` при монтировании грузят данные через `fetch('/api/…')`,
 все действия (загрузка, создание/редактирование альбомов и папок, навигация) тоже идут через `/api`.
 Эндпоинты — `Endpoints/CloudApiEndpoints.cs` (группа `/api`), паттерн как у `/api/settings/*`: `AuthGateway.AuthenticateAsync`
 → gRPC с пользовательским токеном (`BrowserContext.UserToken`); доменные ошибки (`FailedPrecondition` + `x-error-code`) → `400 { error, code }`.
 
+- Каркас (CloudApi): `GET me` — данные Sidebar/Topbar/Footbar (профиль/аватар/хранилище/версия/хост) для `AppShell` SPA.
 - Каталоги (CloudApi): `GET cloud/list?dir=`, `POST cloud/dir`/`dir/rename`/`dir/move`/`dir/delete`, `POST cloud/attach`, `POST cloud/entry/rename`/`entry/move`/`entry/delete` (удаление файла/папки = перемещение в корзину).
 - Корзина (CloudApi): `GET cloud/trash?limit=&cursorAt=&cursorId=` (`ListTrash`), `POST cloud/trash/restore`/`trash/purge` (по `entryId`), `POST cloud/trash/empty`.
 - Галерея (CloudApi): `GET cloud/media?kind=photo|video&limit=&cursorAt=&cursorId=` (`ListUserMedia`, cursor-пагинация). Карточка галереи (`CloudJson.MediaItem`) несёт `entryIds`/`entryNames`/`entriesCount` (поле `UserImageItem.entry_ids` в proto) — нужны контекстному меню для переименования/удаления элемента галереи через `entry/rename`·`entry/delete`.
@@ -98,12 +107,12 @@ Parent: [[index]] · See also: [[api/identity-api]] · [[api/users-api]] · [[ap
 
 UI: в сетке — превью (`MediaThumb`: `<img srcset sizes>` поверх MD3-иконки-плейсхолдера по типу медиа, проявляется по `onLoad`). Галереи `/photos`·`/videos` грузятся бесконечной прокруткой (`useInfiniteMedia` + `IntersectionObserver`, cursor-пагинация). При открытии — оригинал в `Lightbox`: листание (боковые кнопки/`←`/`→`), зум фото колесом + drag-pan, перемотка видео `←`/`→` на ±5 c.
 Загрузка фото/видео на `/photos`·`/videos` кладётся в авто-папку **«Недавно загруженные»** (создаётся при отсутствии, `cloud/attach` к ней) — чтобы у медиа была запись каталога и работали корзина/переименование; документы на `/files` привязываются к текущей папке.
-ПКМ по карточке (фото/видео/файл/папка) даёт контекстное меню (`ContextMenu`/`useMediaActions` в `shared.jsx`): копировать ссылку (временная), переименовать (`RenameModal`), удалить в корзину (`ConfirmModal`), свойства (`PropertiesModal` → `files/info`), для фото/видео — добавить/удалить из альбома (submenu; членство считается клиентски через `ListAlbumItems`). Аватар пользователя в `sb-user` берётся из `user.avatar_url` (`PageDataBuilder.BuildShellAsync` → `ProfilePicturePreview`), с фоллбэком на инициалы.
+ПКМ по карточке (фото/видео/файл/папка) даёт контекстное меню (`ContextMenu`/`useMediaActions` в `ClientApp/src`): копировать ссылку (временная), переименовать (`RenameModal`), удалить в корзину (`ConfirmModal`), свойства (`PropertiesModal` → `files/info`), для фото/видео — добавить/удалить из альбома (submenu; членство считается клиентски через `ListAlbumItems`). Аватар пользователя в `sb-user` берётся из `user.avatar_url` (`PageDataBuilder.BuildShellAsync` → `ProfilePicturePreview`), с фоллбэком на инициалы.
 Альбомы общие для Фото и Видео (`ListAlbums`). Шаринг/EXIF/история активности в Files API отсутствуют — в инспекторе Files не показываются.
 
 ## Настройки (рабочие параметры)
 
-Страница `/settings` — настоящие вкладки (левая навигация `.set-nav`, состояние в URL hash, рендерится только активная секция). Вкладки: Аккаунт, Безопасность, Приватность, Хранилище, Устройства и сессии, Внешний вид, Обслуживание (только если задан `App:AdminPassword`).
+Маршрут SPA `/settings` (`pages/SettingsPage.tsx`) — настоящие вкладки (левая навигация `.set-nav`, активная секция в URL hash, рендерится только она). Данные грузятся на mount через `GET /api/settings/full` (раньше — серверный `page_data_json`). Вкладки: Аккаунт, Безопасность, Приватность, Хранилище, Устройства и сессии, Внешний вид, Обслуживание (только если задан `App:AdminPassword`).
 
 Действия идут через REST `/api/settings/*` (`SettingsEndpoints.cs`) — паттерн как у `/api/system/*`: проверка `AuthGateway.AuthenticateAsync`, затем gRPC с токеном пользователя (`BrowserContext.UserToken`), ошибки маппятся в `BadRequest { message }`. Эндпоинты:
 
@@ -132,8 +141,8 @@ UI: в сетке — превью (`MediaThumb`: `<img srcset sizes>` пове�
 
 ## Инфраструктура
 
-- `Dockerfile` / `Dockerfile.slim`, сервис `web` в `docker-compose.yml` и `docker-compose-dev.yml`.
-- CI: `.github/workflows/build-backend-web.yml`.
+- `Dockerfile` (полная сборка в контейнере — добавлена стадия `node:22-alpine` для сборки SPA → `wwwroot`, копируется в dotnet-стадию перед `publish`) / `Dockerfile.slim` (CI копирует готовый `publish/`, без изменений). `.dockerignore` в корне исключает `node_modules`/`bin`/`obj`/`wwwroot`. Сервис `web` в `docker-compose.yml` и `docker-compose-dev.yml`.
+- CI: `.github/workflows/build-backend-web.yml` — перед `dotnet publish` шаги `actions/setup-node@v4` + `npm ci` + `npm run build` (в `ClientApp`), бандл попадает в `wwwroot` и включается в publish (`Sdk.Web`).
 - Для раздела «Обслуживание» финальный образ `Dockerfile` переведён на `aspnet:10.0-alpine` + `docker-cli`/`docker-cli-compose`, а сервис `web` в `docker-compose.yml` получает `user: root` и монтирует `docker.sock` / compose / `.env` / `~/.docker/config.json`. Подробности и компромисс безопасности — [[modules/web-system-updates]].
 
 ## Ограничения / TODO
