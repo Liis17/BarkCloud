@@ -1,0 +1,9 @@
+# Сборочный мусор и локальные артефакты не нужны в docker-контексте.
+**/bin
+**/obj
+**/node_modules
+**/.vs
+.git
+.github
+# SPA-бандл пересобирается в node-стадии Dockerfile веб-клиента.
+Backend/BarkCloud.Web/wwwroot
