@@ -13,11 +13,9 @@ enum FileTransferError: Error {
 /// `InsecureHTTP.session` (self-signed TLS).
 final class FileTransferService: Sendable {
     private let grpc: GrpcManager
-    private let tokenProvider: @Sendable () async -> String?
 
-    init(grpc: GrpcManager, tokenProvider: @escaping @Sendable () async -> String?) {
+    init(grpc: GrpcManager) {
         self.grpc = grpc
-        self.tokenProvider = tokenProvider
     }
 
     // MARK: - gRPC (FilesApi)
@@ -61,7 +59,7 @@ final class FileTransferService: Sendable {
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        if let token = await tokenProvider(), !token.isEmpty {
+        if let token = await grpc.validAccessToken(), !token.isEmpty {
             request.setValue(token, forHTTPHeaderField: "x-auth-token")
         }
         let boundary = "Boundary-\(UUID().uuidString)"

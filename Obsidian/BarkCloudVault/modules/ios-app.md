@@ -20,21 +20,21 @@ BarkCloud/
 ├── App/
 │   ├── BarkCloudApp.swift          @main, инжектит AppEnvironment в RootView
 │   ├── AppEnvironment.swift        @Observable service locator (sessionStore, grpcManager, authRepository, localFileRepository, fileTransfer, userRepository, cloudRepository, albumRepository)
-│   └── RootView.swift              gate: hasValidRefreshToken ? Main : Login
+│   └── RootView.swift              gate: !sessionExpired && (hasValidRefreshToken || isAuthenticated) ? Main : Login
 ├── Session/
-│   └── SessionStore.swift          Keychain (kSecClassGenericPassword, service "com.barkfluff.BarkCloud.tokens")
+│   └── SessionStore.swift          Keychain (kSecClassGenericPassword, service "com.barkfluff.BarkCloud.tokens"); snapshot()/saveRefreshedAccessToken()/invalidate(), наблюдаемый флаг sessionExpired
 ├── Networking/                     gRPC: GrpcManager (actor) + интерсепторы
-│   ├── GrpcManager.swift           multi-endpoint: Identity :7020 / Users :7021 / Files(Cloud/Album) :7025, TLS allowSelfSigned, кэш GRPCClient по порту, стабы identity/users/files/cloud/album
+│   ├── GrpcManager.swift           multi-endpoint: Identity :7020 / Users :7021 / Files(Cloud/Album) :7025, TLS allowSelfSigned, кэш GRPCClient по порту, стабы identity/users/files/cloud/album; **проактивное авто-обновление access-токена** (Identity.CreateToken, сериализовано через refreshTask)
 │   ├── InsecureURLSession.swift    URLSession, доверяющий self-signed TLS (для HTTP upload/download и превью)
 │   ├── FileTransferService.swift   FilesApi (GetUploadUrl/GetTempDownloadUrl/StorageInfo) + HTTP multipart upload (поле `file`) / download оригинала
 │   ├── CloudErrorCodes.swift       GUID-коды доменных ошибок Files/Users + domainErrorMessage(_:)
-│   ├── AuthInterceptor.swift       x-auth-token (динамически)
+│   ├── AuthInterceptor.swift       x-auth-token — токен берёт у GrpcManager по имени метода (с проактивным refresh; CreateToken → nil, без рекурсии)
 │   ├── XAppInterceptor / XDeviceInterceptor / XIpInterceptor / XOsInterceptor — device-метаданные
 │   ├── Base64Header.swift          base64-кодирование значений заголовков
 │   ├── AuthErrorCodes.swift        GUID-коды OTP_REQUIRED / INVALID_CREDENTIALS
 │   └── GrpcError.swift             извлечение x-error-code из trailing-metadata
 ├── Data/Auth/
-│   ├── AuthRepository.swift        IdentityApi.Auth, сохранение токенов в SessionStore
+│   ├── AuthRepository.swift        IdentityApi.Auth, сохранение токенов в SessionStore (+ сброс sessionExpired). Обновление access-токена (CreateToken) — внутри GrpcManager
 │   └── AuthResult.swift            enum: success / otpRequired / invalidCredentials / otherError
 ├── Data/Users/
 │   └── UserRepository.swift        UsersApi: профиль, имя/юзернейм/bio, приватность, устройства, удаление аккаунта, аватар (через FileTransferService)
@@ -46,7 +46,7 @@ BarkCloud/
 │   ├── Login/                      LoginScreen + LoginUiState + LoginViewModel (логин/пароль + OTP)
 │   ├── Main/                       MainScreen (TabView, 5 табов: Галерея/Файлы/Альбомы(default)/Корзина/Настройки), MainDestination
 │   ├── Gallery/                    GalleryScreen+VM (медиатека устройства PhotoKit: сетка фото+видео, выбор, загрузка в облако), DeviceMediaViews (PHImageManager-загрузчик + ячейка + полноэкранный просмотр фото/видео)
-│   ├── Shared/                     RemoteImage (self-signed AsyncImage-замена + NSCache), FilePreviewController/RemoteFilePreviewScreen (QuickLook), MediaThumb, ComingSoonScreen (универсальная заглушка «скоро»)
+│   ├── Shared/                     RemoteImage (self-signed AsyncImage-замена + NSCache), FilePreviewController/RemoteFilePreviewScreen (QuickLook), MediaThumb + SquareThumbClip (квадратная обрезка fill-картинки с корректным хит-тестом), ComingSoonScreen (универсальная заглушка «скоро»)
 │   ├── Settings/                   SettingsScreen + ProfileViewModel (профиль/аватар/хранилище/выход/удаление), EditProfileScreen, PrivacySettingsScreen, DevicesScreen
 │   ├── Trash/                      TrashScreen+VM (корзина облака: ListTrash + cursor-пагинация, restore/delete-forever свайпом, EmptyTrash)
 │   ├── Media/                      таб «Альбомы»: CloudMediaScreen с переключателем Фото/Видео/Альбомы
@@ -125,6 +125,18 @@ BarkCloud/
 
 Облачный функционал подключён к боевому бэкенду (см. [[api/files-client-guide]], [[api/users-client-guide]]):
 
+- **Авто-обновление токена** (`Networking/GrpcManager.swift`, образец — iOS-клиент Barkfluff,
+  `BFNetworking/Auth/{AuthInterceptor,TokenRefreshCoordinator}`). Раньше при истечении access-токена
+  авторизация «слетала» — обновления не было. Теперь `AuthInterceptor` перед каждым запросом запрашивает
+  токен у `GrpcManager.accessToken(forMethod:)`, который **проактивно** обновляет его, если до истечения
+  осталось < 60 c (или токена нет): читает снимок `SessionStore.snapshot()`, при необходимости вызывает
+  `Identity.CreateToken(refresh_token)` и сохраняет новый access-токен (`saveRefreshedAccessToken`).
+  Обновление **сериализовано** полем `refreshTask` (актор-изоляция `GrpcManager`): при пачке параллельных
+  запросов `CreateToken` вызывается один раз, остальные ждут результат. Рекурсия исключена — для метода
+  `CreateToken` интерсептор не прикрепляет токен и не запускает refresh. Тот же путь (`grpc.validAccessToken()`)
+  использует HTTP-аплоад в `FileTransferService`. Если refresh-токен истёк локально или сервер ответил
+  `UNAUTHENTICATED` — `SessionStore.invalidate()` чистит токены и поднимает наблюдаемый `sessionExpired`,
+  и `RootView` уводит на экран логина. Успешная авторизация сбрасывает флаг (`AuthRepository.persist`).
 - **Настройки** (`Features/Settings/`) — таб «Настройки» вместо заглушки: профиль (`GetUser`),
   аватар через PhotosPicker (`USER_AVATAR` → upload → `SetProfilePicture`; удаление — `SetProfilePicture("")`).
   Отображение аватара устойчиво: `FallbackRemoteImage` пробует по очереди `profile_picture_preview`,
@@ -146,8 +158,14 @@ BarkCloud/
   (`PHAsset`, разрешение `NSPhotoLibraryUsageDescription` в build-settings pbxproj). Сетка фото+видео
   (`PHCachingImageManager`), тап → полноэкранный просмотр (фото — `requestImage`, видео — `requestPlayerItem`+`VideoPlayer`),
   режим выбора → загрузка выбранных в облако (`PHAssetResourceManager.requestData` → `CloudRepository.uploadFile`).
-  Ячейка (`DeviceMediaThumb`) имеет `.contentShape(Rectangle())` — иначе `scaledToFill`-картинка
-  выходит за рамку и перехватывает тапы соседней строки. **Иконка облака**: лениво (по появлению ячейки)
+  **Баг тапа по соседней строке в сетках** (`Features/Shared/MediaThumb.swift` → `SquareThumbClip`):
+  у `RemoteImage(contentMode:.fill)`/`scaledToFill` фрейм картинки переполняет квадрат ячейки по большей
+  стороне; `.clipped()`/`.clipShape` прячут переполнение лишь визуально, но НЕ обрезают хит-тест — и
+  невидимый «хвост» картинки нижней строки перехватывает тап по текущей ячейке (`.contentShape(Rectangle())`
+  на родителе это не лечит). `SquareThumbClip` задаёт содержимому явный квадратный фрейм через
+  `GeometryReader` + `.clipped()`, поэтому область нажатий совпадает с ячейкой. Применён во всех сеточных
+  ячейках: `MediaThumb` (фото/видео + альбомы), `DeviceMediaThumb` (галерея устройства), `AlbumCardView`
+  (обложки альбомов). **Иконка облака**: лениво (по появлению ячейки)
   считается потоковый SHA256 оригинала и пакетно (дебаунс 400 мс, чанки по 500) проверяется через
   `FilesApi.CheckFileHashes` — если файл с таким хешем уже в облаке, рисуется `checkmark.icloud.fill`.
   Хеш считается тем же ресурсом, что и при загрузке, поэтому совпадает с серверным.

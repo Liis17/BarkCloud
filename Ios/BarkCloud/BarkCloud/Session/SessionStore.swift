@@ -7,6 +7,20 @@ import Observation
 final class SessionStore {
     private let service = "com.barkfluff.BarkCloud.tokens"
 
+    /// Снимок всех токенов и их сроков — читается актором `GrpcManager` за один
+    /// hop на главный поток при проактивной проверке/обновлении токена.
+    struct Snapshot: Sendable {
+        var accessToken: String?
+        var accessTokenExpiresAt: Date?
+        var refreshToken: String?
+        var refreshTokenExpiresAt: Date?
+    }
+
+    /// Поднимается, когда обновить access-токен окончательно не удалось
+    /// (refresh-токен истёк или отозван сервером). `RootView` реагирует переходом
+    /// на экран логина. Сбрасывается при новой авторизации.
+    var sessionExpired = false
+
     private enum Key: String {
         case accessToken = "access_token"
         case accessTokenExpiresAt = "access_token_exp"
@@ -38,6 +52,28 @@ final class SessionStore {
         guard let token = refreshToken, !token.isEmpty else { return false }
         guard let exp = refreshTokenExpiresAt else { return true }
         return exp > Date()
+    }
+
+    /// Атомарный снимок токенов (один проход по Keychain).
+    func snapshot() -> Snapshot {
+        Snapshot(
+            accessToken: accessToken,
+            accessTokenExpiresAt: accessTokenExpiresAt,
+            refreshToken: refreshToken,
+            refreshTokenExpiresAt: refreshTokenExpiresAt
+        )
+    }
+
+    /// Сохранить обновлённый access-токен (refresh-токен не трогаем).
+    func saveRefreshedAccessToken(_ value: String, expiresAt: Date?) {
+        accessToken = value
+        accessTokenExpiresAt = expiresAt
+    }
+
+    /// Сессия мертва: чистим токены и поднимаем флаг для перехода на логин.
+    func invalidate() {
+        clearSession()
+        sessionExpired = true
     }
 
     func clearSession() {

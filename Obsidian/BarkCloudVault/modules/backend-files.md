@@ -93,7 +93,8 @@ Parent: [[index]] · See also: [[api/files-api]] · [[modules/backend-files-clou
 | `UploadFile` | Серверная загрузка файла |
 | `GetTempDownloadUrl` | Временные ссылки на скачивание + превью |
 | `DownloadFile` | Скачивание (через контроллер) |
-| `CheckFileHash` | Проверка дедупликации |
+| `CheckFileHash` | Проверка дедупликации (одиночный; добавляет юзера в uploaders) |
+| `CheckFileHashes` | Пакетная проверка наличия по списку SHA256-хешей (без побочных эффектов; для пассивной индикации «в облаке») |
 | `GetFileData` / `GetFilesData` | Метаданные файла(ов) |
 | `GetUserStorageInfo` / `GetUserStorageInfoServer` | Информация о квоте |
 | `UploadAvatarServer` | Загрузка аватара пользователя (служебный) |
