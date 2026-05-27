@@ -2,6 +2,7 @@ using BarkCloud.GrpcServer.Settings;
 using BarkCloud.Proto.Configuration;
 using BarkCloud.Shared.Identity;
 
+using Grpc.Core;
 using Grpc.Net.Client;
 
 using Microsoft.AspNetCore.Builder;
@@ -69,7 +70,17 @@ public static class WebApplicationBuilderExtensions
         using var channel = GrpcChannel.ForAddress(configurationServiceAddress);
         var configurationApiClient = new ConfigurationApi.ConfigurationApiClient(channel);
 
-        var config = configurationApiClient.GetConfiguration(new GetConfigurationRequest { ServiceId = (int)serviceId });
+        // Предразделённый bootstrap-ключ для доступа к Configuration (раздаёт секреты).
+        // Не приходит из самого Configuration — берётся из окружения, поэтому пригоден на старте.
+        var accessKey = Environment.GetEnvironmentVariable("CONFIGURATION_ACCESS_KEY");
+        Metadata? headers = null;
+        if (!string.IsNullOrEmpty(accessKey))
+        {
+            headers = new Metadata { { "x-config-access-key", accessKey } };
+        }
+
+        var config = configurationApiClient.GetConfiguration(
+            new GetConfigurationRequest { ServiceId = (int)serviceId }, headers);
 
         var configurationDictionary = new Dictionary<string, string>();
 

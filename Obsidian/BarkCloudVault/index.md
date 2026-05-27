@@ -39,6 +39,10 @@
 ### 📱 Модули — iOS
 - [[modules/ios-app]] — Нативный iOS-клиент (SwiftUI, Swift 5, iOS 18+), полный паритет с Android — реализован
 
+### 🛡 Аудит
+- `Docs/SECURITY_PERFORMANCE_AUDIT.md` — Пошаговый план аудита безопасности и производительности (Backend + Web + инфраструктура): сквозные этапы E1–E10, проверки по каждому микросервису, нагрузочное тестирование, шаблон отчёта и приложение с известными горячими точками (file:line).
+- `Docs/SECURITY_AUDIT_FINDINGS.md` — Отчёт по выполненному аудиту: находки с верификацией по коду (2 Critical, 6 High, 7 Medium, 6 Low), поправки к предварительным находкам, производительность, матрица покрытия и приоритеты ремедиации.
+
 ### 🔧 API & gRPC
 - [[api/configuration-api]] — gRPC API сервиса Configuration
 - [[api/identity-api]] — gRPC API сервиса Identity (Auth, OTP, RefreshToken)
