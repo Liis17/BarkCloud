@@ -62,62 +62,58 @@ struct DeviceMediaThumb: View {
     @State private var image: UIImage?
 
     var body: some View {
-        RoundedRectangle(cornerRadius: 4)
-            .fill(AppColors.onSurface.opacity(0.08))
-            .aspectRatio(1, contentMode: .fit)
-            .overlay {
-                if let image {
-                    Image(uiImage: image)
-                        .resizable()
-                        .scaledToFill()
-                        .clipShape(RoundedRectangle(cornerRadius: 4))
-                }
+        // `SquareThumbClip` даёт картинке строго квадратный фрейм: при `scaledToFill`
+        // она иначе переполняет квадрат и её невидимый «хвост» перехватывает тапы по
+        // соседней строке сетки (визуальная обрезка хит-тест не ограничивает).
+        SquareThumbClip(cornerRadius: 4) {
+            if let image {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                AppColors.onSurface.opacity(0.08)
             }
-            .overlay(alignment: .bottomTrailing) {
-                if asset.mediaType == .video {
-                    Image(systemName: "play.circle.fill")
-                        .font(.system(size: 18))
-                        .foregroundStyle(.white)
-                        .shadow(radius: 2)
-                        .padding(6)
-                }
+        }
+        .overlay(alignment: .bottomTrailing) {
+            if asset.mediaType == .video {
+                Image(systemName: "play.circle.fill")
+                    .font(.system(size: 18))
+                    .foregroundStyle(.white)
+                    .shadow(radius: 2)
+                    .padding(6)
             }
-            .overlay(alignment: .topLeading) {
-                if isInCloud {
-                    Image(systemName: "checkmark.icloud.fill")
-                        .font(.system(size: 16))
-                        .foregroundStyle(.white)
-                        .shadow(radius: 2)
-                        .padding(6)
-                }
+        }
+        .overlay(alignment: .topLeading) {
+            if isInCloud {
+                Image(systemName: "checkmark.icloud.fill")
+                    .font(.system(size: 16))
+                    .foregroundStyle(.white)
+                    .shadow(radius: 2)
+                    .padding(6)
             }
-            .overlay(alignment: .topTrailing) {
-                if isSelecting {
-                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                        .font(.system(size: 20))
-                        .foregroundStyle(isSelected ? AppColors.accent : .white)
-                        .shadow(radius: 2)
-                        .padding(6)
-                }
+        }
+        .overlay(alignment: .topTrailing) {
+            if isSelecting {
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 20))
+                    .foregroundStyle(isSelected ? AppColors.accent : .white)
+                    .shadow(radius: 2)
+                    .padding(6)
             }
-            .overlay {
-                if isSelecting && isSelected {
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(AppColors.accent.opacity(0.25))
-                }
+        }
+        .overlay {
+            if isSelecting && isSelected {
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(AppColors.accent.opacity(0.25))
             }
-            .clipped()
-            // Ограничиваем область нажатия рамкой ячейки: при `scaledToFill`
-            // картинка выходит за пределы квадрата и иначе перехватывает тапы по
-            // соседней строке сетки.
-            .contentShape(Rectangle())
-            .task(id: asset.localIdentifier) {
-                let side = 130 * UIScreen.main.scale
-                image = await DeviceMediaImageLoader.shared.thumbnail(
-                    for: asset,
-                    targetSize: CGSize(width: side, height: side)
-                )
-            }
+        }
+        .task(id: asset.localIdentifier) {
+            let side = 130 * UIScreen.main.scale
+            image = await DeviceMediaImageLoader.shared.thumbnail(
+                for: asset,
+                targetSize: CGSize(width: side, height: side)
+            )
+        }
     }
 }
 

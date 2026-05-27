@@ -15,11 +15,8 @@ final class AppEnvironment {
 
     init() {
         let session = SessionStore()
-        let tokenProvider: @Sendable () async -> String? = { [weak session] in
-            await MainActor.run { session?.accessToken }
-        }
-        let grpc = GrpcManager(tokenProvider: tokenProvider)
-        let transfer = FileTransferService(grpc: grpc, tokenProvider: tokenProvider)
+        let grpc = GrpcManager(session: session)
+        let transfer = FileTransferService(grpc: grpc)
 
         self.sessionStore = session
         self.grpcManager = grpc

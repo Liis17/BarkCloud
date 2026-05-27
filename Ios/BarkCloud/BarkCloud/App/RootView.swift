@@ -6,12 +6,14 @@ struct RootView: View {
 
     var body: some View {
         Group {
-            if isAuthenticated || env.sessionStore.hasValidRefreshToken() {
+            if !env.sessionStore.sessionExpired,
+               isAuthenticated || env.sessionStore.hasValidRefreshToken() {
                 MainScreen(onSignOut: { isAuthenticated = false })
             } else {
                 LoginScreen(onAuthenticated: { isAuthenticated = true })
             }
         }
         .animation(.default, value: isAuthenticated)
+        .animation(.default, value: env.sessionStore.sessionExpired)
     }
 }

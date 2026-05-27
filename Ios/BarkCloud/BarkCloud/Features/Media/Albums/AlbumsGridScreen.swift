@@ -83,20 +83,20 @@ private struct AlbumCardView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            RoundedRectangle(cornerRadius: 10)
-                .fill(AppColors.onSurface.opacity(0.08))
-                .aspectRatio(1, contentMode: .fit)
-                .overlay {
-                    if let url = album.coverPreviewURL {
-                        RemoteImage(url: url, contentMode: .fill) { Color.clear }
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                    } else {
-                        Image(systemName: "photo.stack")
-                            .font(.system(size: 36))
-                            .foregroundStyle(AppColors.onSurfaceVariant)
+            SquareThumbClip(cornerRadius: 10) {
+                if let url = album.coverPreviewURL {
+                    RemoteImage(url: url, contentMode: .fill) {
+                        AppColors.onSurface.opacity(0.08)
                     }
+                } else {
+                    AppColors.onSurface.opacity(0.08)
+                        .overlay {
+                            Image(systemName: "photo.stack")
+                                .font(.system(size: 36))
+                                .foregroundStyle(AppColors.onSurfaceVariant)
+                        }
                 }
-                .clipped()
+            }
             Text(verbatim: album.name)
                 .font(AppTypography.titleMedium)
                 .lineLimit(1)

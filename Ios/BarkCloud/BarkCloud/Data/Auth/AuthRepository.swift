@@ -61,6 +61,7 @@ final class AuthRepository: Sendable {
         session.accessTokenExpiresAt = access.hasExpirationDate ? Self.date(from: access.expirationDate) : nil
         session.refreshToken = refresh.value
         session.refreshTokenExpiresAt = refresh.hasExpirationDate ? Self.date(from: refresh.expirationDate) : nil
+        session.sessionExpired = false
     }
 
     private static func date(from ts: SwiftProtobuf.Google_Protobuf_Timestamp) -> Date {
