@@ -1,6 +1,6 @@
 namespace BarkCloud.Web.Rendering;
 
-/// <summary>Сопоставление расширения файла визуальному типу (см. .file-icon в Files.html).</summary>
+/// <summary>Сопоставление расширения файла визуальному типу (см. .file-icon в ClientApp/src/styles/pages.css).</summary>
 public static class FileKind
 {
     public static (string Kind, string Ext) Classify(string fileName)

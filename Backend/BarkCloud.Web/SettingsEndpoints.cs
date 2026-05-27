@@ -34,6 +34,19 @@ public static class SettingsEndpoints
     {
         var api = app.MapGroup("/api/settings");
 
+        // ───────── Полное состояние страницы настроек ─────────
+
+        // Раньше собиралось серверно и инлайнилось в Settings.html (page_data_json).
+        // Теперь SPA грузит его через /api/settings/full при монтировании страницы настроек.
+        api.MapGet("/full", async (HttpContext http, AuthGateway auth, PageDataBuilder data) =>
+        {
+            var user = await auth.AuthenticateAsync(http);
+            if (user is null) return Results.Unauthorized();
+
+            var json = await data.BuildSettingsJsonAsync(user, http);
+            return Results.Content(json, "application/json; charset=utf-8");
+        });
+
         // ───────── Профиль ─────────
 
         api.MapPost("/profile/name", (HttpContext http, AuthGateway auth, UsersApi.UsersApiClient users, NameBody body) =>

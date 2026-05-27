@@ -1,4 +1,13 @@
 # syntax=docker/dockerfile:1
+
+# Стадия сборки React-SPA (Vite). outDir в vite.config.ts = ../wwwroot → /wwwroot.
+FROM node:22-alpine AS client
+WORKDIR /client
+COPY Backend/BarkCloud.Web/ClientApp/package.json Backend/BarkCloud.Web/ClientApp/package-lock.json ./
+RUN npm ci
+COPY Backend/BarkCloud.Web/ClientApp/ ./
+RUN npm run build
+
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
@@ -10,6 +19,8 @@ COPY ["Shared/BarkCloud.Shared.Identity/BarkCloud.Shared.Identity.csproj", "Shar
 RUN --mount=type=cache,target=/root/.nuget/packages,sharing=locked \
     dotnet restore "Backend/BarkCloud.Web/BarkCloud.Web.csproj"
 COPY . .
+# Собранный SPA из node-стадии (Microsoft.NET.Sdk.Web включит wwwroot в publish).
+COPY --from=client /wwwroot ./Backend/BarkCloud.Web/wwwroot
 WORKDIR "/src/Backend/BarkCloud.Web"
 RUN --mount=type=cache,target=/root/.nuget/packages,sharing=locked \
     dotnet publish "BarkCloud.Web.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false

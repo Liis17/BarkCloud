@@ -64,6 +64,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: "⚙️ Установка Node.js 22"
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: "🎨 Сборка React-SPA (Vite → wwwroot)"
+        working-directory: Backend/BarkCloud.Web/ClientApp
+        run: |
+          npm ci
+          npm run build
+
       - name: "⚙️ dotnet publish (Linux Release)"
         run: |
           dotnet publish Backend/BarkCloud.Web/BarkCloud.Web.csproj \
