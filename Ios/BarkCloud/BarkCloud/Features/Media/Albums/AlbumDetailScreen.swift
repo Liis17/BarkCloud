@@ -1,5 +1,5 @@
 import SwiftUI
-import PhotosUI
+import Photos
 
 @MainActor
 @Observable
@@ -75,13 +75,17 @@ final class AlbumDetailViewModel {
         state.isLoadingMore = false
     }
 
-    /// Загрузить новые файлы в облако и добавить их в альбом.
-    func uploadAndAdd(_ files: [(data: Data, fileName: String)]) async {
-        guard !files.isEmpty else { return }
+    /// Загрузить выбранные в кастомном пикере ассеты устройства и добавить их в
+    /// альбом. Читаем оригинал через `DeviceAssetResource`; `uploadFile` дедуплицирует
+    /// блоб по хешу и возвращает существующий `file_id`, так что «уже загруженное»
+    /// фото можно добавить в альбом без повторной заливки.
+    func uploadAndAddAssets(_ assets: [PHAsset]) async {
+        guard !assets.isEmpty else { return }
         state.isUploading = true
         var fileIDs: [String] = []
-        for file in files {
-            if let id = try? await cloud.uploadFile(data: file.data, fileName: file.fileName) {
+        for asset in assets {
+            if let pair = try? await DeviceAssetResource.originalData(for: asset),
+               let id = try? await cloud.uploadFile(data: pair.0, fileName: pair.1) {
                 fileIDs.append(id)
             }
         }
@@ -144,7 +148,7 @@ struct AlbumDetailScreen: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var vm: AlbumDetailViewModel?
-    @State private var pickerItems: [PhotosPickerItem] = []
+    @State private var showPicker = false
     @State private var selected: MediaItem?
     @State private var showRename = false
     @State private var renameText = ""
@@ -169,7 +173,15 @@ struct AlbumDetailScreen: View {
             }
             await vm?.loadIfNeeded()
         }
-        .onChange(of: pickerItems) { _, items in handlePick(items) }
+        .sheet(isPresented: $showPicker) {
+            DeviceAssetPickerScreen(
+                filter: pickerFilter,
+                confirmTitle: String(localized: "albums_add"),
+                blockAlreadyUploaded: false
+            ) { assets in
+                Task { await vm?.uploadAndAddAssets(assets) }
+            }
+        }
         .fullScreenCover(item: $selected) { item in viewer(item) }
         .alert(String(localized: "albums_rename_title"), isPresented: $showRename) {
             TextField(String(localized: "albums_name_placeholder"), text: $renameText)
@@ -232,7 +244,9 @@ struct AlbumDetailScreen: View {
             if vm?.state.isUploading == true {
                 ProgressView()
             } else {
-                PhotosPicker(selection: $pickerItems, maxSelectionCount: 10, matching: pickerFilter) {
+                Button {
+                    showPicker = true
+                } label: {
                     Image(systemName: "plus")
                 }
             }
@@ -267,28 +281,12 @@ struct AlbumDetailScreen: View {
         }
     }
 
-    /// Фильтр выбора в `PhotosPicker`: по типу вкладки, либо фото+видео в режиме «Альбомы».
-    private var pickerFilter: PHPickerFilter {
+    /// Фильтр кастомного пикера: по типу вкладки, либо фото+видео в режиме «Альбомы».
+    private var pickerFilter: DeviceAssetPickerFilter {
         switch kind {
-        case .video: return .videos
-        case .photo: return .images
-        case nil: return .any(of: [.images, .videos])
-        }
-    }
-
-    private func handlePick(_ items: [PhotosPickerItem]) {
-        guard !items.isEmpty else { return }
-        Task {
-            var files: [(data: Data, fileName: String)] = []
-            for item in items {
-                if let data = try? await item.loadTransferable(type: Data.self) {
-                    let ext = item.supportedContentTypes.first?.preferredFilenameExtension
-                        ?? (kind?.isVideo == true ? "mp4" : "jpg")
-                    files.append((data, "\(UUID().uuidString).\(ext)"))
-                }
-            }
-            pickerItems = []
-            await vm?.uploadAndAdd(files)
+        case .video: return .video
+        case .photo: return .photo
+        case nil: return .any
         }
     }
 }

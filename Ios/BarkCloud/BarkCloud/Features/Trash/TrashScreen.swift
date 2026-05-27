@@ -41,7 +41,11 @@ struct TrashScreen: View {
         if vm.state.isLoading {
             ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if vm.state.items.isEmpty {
-            emptyState
+            ScrollView {
+                emptyState.containerRelativeFrame(.vertical)
+            }
+            // Потянуть вниз — перезагрузить корзину даже когда она пуста.
+            .refreshable { await vm.reload() }
         } else {
             list(vm)
         }
@@ -73,6 +77,8 @@ struct TrashScreen: View {
             }
         }
         .listStyle(.plain)
+        // Потянуть вниз — перезагрузить корзину.
+        .refreshable { await vm.reload() }
         .overlay(alignment: .bottom) { snackbar(vm) }
     }
 

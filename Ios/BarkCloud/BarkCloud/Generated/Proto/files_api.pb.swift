@@ -701,6 +701,19 @@ struct Barkcloud_Files_DeleteFileEntryRequest: Sendable {
   init() {}
 }
 
+struct Barkcloud_Files_DeleteUserMediaRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  /// id блоба из ListUserMedia
+  var fileID: String = String()
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+}
+
 struct Barkcloud_Files_FileEntryDetailed: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -2766,6 +2779,36 @@ extension Barkcloud_Files_DeleteFileEntryRequest: SwiftProtobuf.Message, SwiftPr
 
   static func ==(lhs: Barkcloud_Files_DeleteFileEntryRequest, rhs: Barkcloud_Files_DeleteFileEntryRequest) -> Bool {
     if lhs.entryID != rhs.entryID {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Barkcloud_Files_DeleteUserMediaRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".DeleteUserMediaRequest"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}file_id\0")
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.fileID) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.fileID.isEmpty {
+      try visitor.visitSingularStringField(value: self.fileID, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: Barkcloud_Files_DeleteUserMediaRequest, rhs: Barkcloud_Files_DeleteUserMediaRequest) -> Bool {
+    if lhs.fileID != rhs.fileID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

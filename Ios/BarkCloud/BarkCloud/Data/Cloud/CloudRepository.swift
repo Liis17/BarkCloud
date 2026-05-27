@@ -38,6 +38,15 @@ final class CloudRepository: Sendable {
         )
     }
 
+    /// Удалить медиа из галереи по `file_id`. На сервере: живые записи каталога →
+    /// в корзину (восстановимо); если записей нет — снять владельца (жёстко).
+    func deleteUserMedia(fileID: String) async throws {
+        let stub = try await grpc.cloudStub()
+        var req = Barkcloud_Files_DeleteUserMediaRequest()
+        req.fileID = fileID
+        _ = try await stub.deleteUserMedia(req)
+    }
+
     /// Пакетная проверка наличия файлов в облаке по SHA256-хешам (без побочных
     /// эффектов). Возвращает словарь нормализованный_хеш → есть ли в облаке.
     func checkFileHashes(_ hashes: [String]) async throws -> [String: Bool] {
