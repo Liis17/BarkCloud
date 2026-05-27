@@ -37,8 +37,13 @@ public class Program
             builder.SetRunningAddress(builder.Configuration);
         }
 
+        builder.Services.AddSingleton<ConfigurationAccessInterceptor>();
+
         builder.Services.AddGrpc(options =>
         {
+            // Гейт доступа — внешним слоем, до ServerExceptionInterceptor: иначе его catch-all
+            // переотобразил бы RpcException(Unauthenticated) в Unknown.
+            options.Interceptors.Add<ConfigurationAccessInterceptor>();
             options.Interceptors.Add<ServerExceptionInterceptor>();
         });
 
@@ -149,7 +154,12 @@ public class Program
             }
         }
 
-        app.MapGrpcReflectionService();
+        // gRPC reflection облегчает разведку сервиса — оставляем только для Development.
+        if (app.Environment.IsDevelopment())
+        {
+            app.MapGrpcReflectionService();
+        }
+
         app.UseRouting();
 
         app.MapGrpcService<ConfigurationApiService>();

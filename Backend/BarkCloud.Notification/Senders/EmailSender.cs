@@ -34,9 +34,6 @@ public class EmailSender
 
         try
         {
-            ServicePointManager.ServerCertificateValidationCallback =
-                (sender, certificate, chain, errors) => true;
-
             using var smtpClient = new SmtpClient(_emailConfiguration.Host, _emailConfiguration.Port)
             {
                 Credentials = new NetworkCredential(_emailConfiguration.SenderEmail, _emailConfiguration.SenderPassword),
