@@ -8,25 +8,24 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.res.stringResource
 import androidx.navigation.NavController
+import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.currentBackStackEntryAsState
 
 @Composable
 fun MainBottomBar(navController: NavController) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
-    val currentRoute = navBackStackEntry?.destination?.route
+    val currentDestination = navBackStackEntry?.destination
 
     NavigationBar {
         MainDestination.entries.forEach { destination ->
-            val selected = when (destination) {
-                MainDestination.Files -> currentRoute == destination.route ||
-                    currentRoute?.startsWith("files/") == true
-                else -> currentRoute == destination.route
-            }
+            // Вкладка активна, если её граф присутствует в иерархии текущего назначения
+            // (включая вложенные экраны вроде files/local).
+            val selected = currentDestination?.hierarchy?.any { it.route == destination.route } == true
             NavigationBarItem(
                 selected = selected,
                 onClick = {
-                    if (currentRoute != destination.route) {
+                    if (!selected) {
                         navController.navigate(destination.route) {
                             popUpTo(navController.graph.findStartDestination().id) {
                                 saveState = true

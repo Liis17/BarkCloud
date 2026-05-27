@@ -25,6 +25,21 @@ android {
             "IDENTITY_API_ADDRESS",
             "\"https://cloud.barkfluff.com:7020\""
         )
+        buildConfigField(
+            "String",
+            "USERS_API_ADDRESS",
+            "\"https://cloud.barkfluff.com:7021\""
+        )
+        buildConfigField(
+            "String",
+            "FILES_API_ADDRESS",
+            "\"https://cloud.barkfluff.com:7025\""
+        )
+        buildConfigField(
+            "String",
+            "FILES_WEB_BASE",
+            "\"https://cloud.barkfluff.com:7025/web\""
+        )
     }
 
     buildTypes {
@@ -105,6 +120,13 @@ configurations.configureEach {
         ) {
             useVersion(libs.versions.kotlin.get())
         }
+        // Material 3 Expressive API публичен только в ветке 1.4.0-alpha (в стабильной 1.4.0
+        // он internal). Стабильная версия «выше» альфы, поэтому форсим явно.
+        if (requested.group == "androidx.compose.material3" &&
+            (requested.name == "material3" || requested.name == "material3-android")
+        ) {
+            useVersion(libs.versions.material3Expressive.get())
+        }
     }
 }
 
@@ -137,6 +159,10 @@ dependencies {
 
     implementation(libs.coil.compose)
     implementation(libs.coil.video)
+    implementation(libs.coil.network.okhttp)
+    implementation(libs.okhttp)
+
+    implementation(libs.androidx.graphics.shapes)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.espresso.core)

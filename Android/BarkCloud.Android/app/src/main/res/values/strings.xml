@@ -16,19 +16,105 @@
     <string name="login_error_network">Не удалось связаться с сервером</string>
     <string name="login_coming_soon">Скоро</string>
 
-    <!-- Bottom navigation -->
-    <string name="tab_photos">Фото</string>
-    <string name="tab_videos">Видео</string>
+    <!-- Bottom navigation (5 табов, как в iOS) -->
+    <string name="tab_gallery">Галерея</string>
     <string name="tab_files">Файлы</string>
-    <string name="tab_shared">Общие</string>
+    <string name="tab_albums">Альбомы</string>
+    <string name="tab_trash">Корзина</string>
     <string name="tab_settings">Настройки</string>
 
-    <!-- Placeholders -->
-    <string name="placeholder_photos">Скоро здесь будут фото</string>
-    <string name="placeholder_videos">Скоро здесь будут видео</string>
-    <string name="placeholder_files">Скоро здесь будут файлы</string>
-    <string name="placeholder_shared">Скоро здесь будут общие папки</string>
-    <string name="placeholder_settings">Скоро здесь будут настройки</string>
+    <!-- Coming soon -->
+    <string name="coming_soon_message">Скоро здесь появится этот раздел</string>
+
+    <!-- Trash -->
+    <string name="trash_empty_action">Очистить корзину</string>
+    <string name="trash_empty_title">Очистить корзину?</string>
+    <string name="trash_empty_message">Все файлы будут удалены безвозвратно.</string>
+    <string name="trash_restore">Восстановить</string>
+    <string name="trash_delete_forever">Удалить навсегда</string>
+    <string name="trash_empty_list">Корзина пуста</string>
+    <string name="trash_deleted_at">Удалён: %1$s</string>
+    <string name="trash_purge_at">Очистка: %1$s</string>
+
+    <!-- Cloud files -->
+    <string name="files_section_cloud">Облако</string>
+    <string name="cloud_storage_title">Облачное хранилище</string>
+    <string name="cloud_storage_subtitle">Файлы в облаке</string>
+    <string name="files_shared_title">Общие файлы</string>
+    <string name="cloud_upload_media">Загрузить медиа</string>
+    <string name="cloud_upload_document">Загрузить документ</string>
+
+    <!-- Tabs extra -->
+    <string name="tab_favorites">Избранное</string>
+    <string name="favorites_empty">В избранном пусто</string>
+    <string name="favorites_remove">Убрать из избранного</string>
+
+    <!-- Media / Albums -->
+    <string name="media_segment_photos">Фото</string>
+    <string name="media_segment_videos">Видео</string>
+    <string name="media_segment_albums">Альбомы</string>
+    <string name="media_add_favorite">В избранное</string>
+    <string name="albums_create_title">Новый альбом</string>
+    <string name="albums_create_hint">Название</string>
+    <string name="albums_create_confirm">Создать</string>
+    <string name="albums_rename">Переименовать</string>
+    <string name="albums_delete_title">Удалить альбом?</string>
+    <string name="albums_set_cover">Сделать обложкой</string>
+    <string name="albums_remove_item">Убрать из альбома</string>
+
+    <!-- Gallery -->
+    <string name="gallery_upload_selected">Загрузить (%1$d)</string>
+    <string name="gallery_permission_message">Чтобы показать вашу медиатеку, разрешите доступ к фото и видео.</string>
+    <string name="gallery_permission_grant">Разрешить доступ</string>
+
+    <!-- Common -->
+    <string name="common_cancel">Отмена</string>
+    <string name="common_save">Сохранить</string>
+    <string name="common_delete">Удалить</string>
+    <string name="common_error_generic">Что-то пошло не так</string>
+    <string name="common_retry">Повторить</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Настройки</string>
+    <string name="settings_edit_profile">Редактировать профиль</string>
+    <string name="settings_privacy">Приватность</string>
+    <string name="settings_devices">Устройства</string>
+    <string name="settings_storage_title">Хранилище</string>
+    <string name="settings_storage_usage">%1$s из %2$s</string>
+    <string name="settings_avatar_change">Сменить фото</string>
+    <string name="settings_avatar_remove">Удалить фото</string>
+    <string name="settings_sign_out">Выйти</string>
+    <string name="settings_sign_out_title">Выйти из аккаунта?</string>
+    <string name="settings_sign_out_message">Потребуется снова войти.</string>
+    <string name="settings_delete_account">Удалить аккаунт</string>
+    <string name="settings_delete_account_title">Удалить аккаунт?</string>
+    <string name="settings_delete_account_message">Все данные будут удалены безвозвратно.</string>
+
+    <!-- Edit profile -->
+    <string name="edit_profile_title">Профиль</string>
+    <string name="edit_profile_first_name">Имя</string>
+    <string name="edit_profile_last_name">Фамилия</string>
+    <string name="edit_profile_username">Юзернейм</string>
+    <string name="edit_profile_bio">О себе</string>
+    <string name="edit_profile_bio_counter">%1$d/200</string>
+    <string name="edit_profile_username_taken">Юзернейм уже занят</string>
+    <string name="edit_profile_saved">Профиль обновлён</string>
+
+    <!-- Privacy -->
+    <string name="privacy_title">Приватность</string>
+    <string name="privacy_profile">Профиль</string>
+    <string name="privacy_email">Email</string>
+    <string name="privacy_last_seen">Был(а) в сети</string>
+    <string name="privacy_searchable">Поиск по юзернейму</string>
+    <string name="privacy_everyone">Все</string>
+    <string name="privacy_contacts">Контакты</string>
+    <string name="privacy_nobody">Никто</string>
+
+    <!-- Devices -->
+    <string name="devices_title">Устройства</string>
+    <string name="devices_current">Текущее устройство</string>
+    <string name="devices_rename">Переименовать</string>
+    <string name="devices_rename_hint">Имя устройства</string>
 
     <!-- Files section -->
     <string name="files_section_on_device">На устройстве</string>

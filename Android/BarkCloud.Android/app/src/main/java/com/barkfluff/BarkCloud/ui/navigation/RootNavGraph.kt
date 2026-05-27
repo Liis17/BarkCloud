@@ -37,7 +37,14 @@ fun RootNavGraph() {
             )
         }
         composable(ROUTE_MAIN) {
-            MainScreen()
+            MainScreen(
+                onSignOut = {
+                    navController.navigate(ROUTE_LOGIN) {
+                        popUpTo(ROUTE_MAIN) { inclusive = true }
+                        launchSingleTop = true
+                    }
+                },
+            )
         }
     }
 }

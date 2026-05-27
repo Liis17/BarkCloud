@@ -16,8 +16,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.CloudOff
+import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.LockOpen
 import androidx.compose.material.icons.outlined.Storage
 import androidx.compose.material3.Button
@@ -50,6 +51,8 @@ import com.barkfluff.BarkCloud.files.data.StoragePermission
 @Composable
 fun FilesRootScreen(
     onOpenLocal: (String) -> Unit,
+    onOpenCloud: () -> Unit,
+    onOpenShared: () -> Unit,
 ) {
     val context = LocalContext.current
     val viewModel: FilesRootViewModel = viewModel()
@@ -98,9 +101,50 @@ fun FilesRootScreen(
             }
             item { Spacer(modifier = Modifier.height(24.dp)) }
             item {
-                SectionHeader(stringResource(R.string.files_section_server))
+                SectionHeader(stringResource(R.string.files_section_cloud))
             }
-            item { ServerFoldersPlaceholder() }
+            item {
+                NavCard(
+                    icon = Icons.Outlined.Cloud,
+                    title = stringResource(R.string.cloud_storage_title),
+                    subtitle = stringResource(R.string.cloud_storage_subtitle),
+                    onClick = onOpenCloud,
+                )
+            }
+            item { Spacer(modifier = Modifier.height(8.dp)) }
+            item {
+                NavCard(
+                    icon = Icons.Outlined.Group,
+                    title = stringResource(R.string.files_shared_title),
+                    subtitle = null,
+                    onClick = onOpenShared,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun NavCard(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    subtitle: String?,
+    onClick: () -> Unit,
+) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(16.dp)) {
+            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(28.dp))
+            Spacer(Modifier.width(16.dp))
+            Column(Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.titleMedium)
+                if (subtitle != null) {
+                    Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            Icon(Icons.Outlined.Folder, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -187,34 +231,4 @@ private fun OnDeviceCard(
     }
 }
 
-@Composable
-private fun ServerFoldersPlaceholder() {
-    Card(
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-        ),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(24.dp),
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.CloudOff,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(40.dp),
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = stringResource(R.string.files_server_empty),
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
 
