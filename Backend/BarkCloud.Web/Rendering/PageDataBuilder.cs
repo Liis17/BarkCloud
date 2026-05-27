@@ -46,7 +46,7 @@ public sealed class PageDataBuilder
         _logger = logger;
     }
 
-    // ───────────────────────── Общий каркас (shared.jsx) ─────────────────────────
+    // ───────────────────────── Общий каркас (GET /api/me) ─────────────────────────
 
     public async Task<Dictionary<string, string?>> BuildShellAsync(WebUser user, HttpContext http)
     {

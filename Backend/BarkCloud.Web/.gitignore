@@ -1,0 +1,2 @@
+# Бандл SPA генерируется из ClientApp (Vite) и пересобирается в CI — в git не храним.
+wwwroot/

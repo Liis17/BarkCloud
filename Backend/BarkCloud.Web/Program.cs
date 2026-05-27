@@ -86,9 +86,29 @@ builder.Services.AddScoped<PageDataBuilder>();
 
 var app = builder.Build();
 
+// Бандл React-SPA из wwwroot (собирается Vite из ClientApp). Отдаём статику до эндпоинтов.
+app.UseStaticFiles();
+
 app.MapWebEndpoints();
 app.MapCloudApiEndpoints();
 app.MapSystemEndpoints();
 app.MapSettingsEndpoints();
+
+// SPA-fallback: любой неизвестный путь (кроме /api/*) отдаёт index.html SPA.
+// Неавторизованный заход/refresh на маршрут приложения → редирект на серверный /login
+// (AuthGateway также обновляет access-токен по refresh-cookie).
+app.MapFallback(async (HttpContext http, AuthGateway auth) =>
+{
+    if (http.Request.Path.StartsWithSegments("/api"))
+        return Results.NotFound();
+
+    if (await auth.AuthenticateAsync(http) is null)
+        return Results.Redirect("/login");
+
+    var index = app.Environment.WebRootFileProvider.GetFileInfo("index.html");
+    return index.Exists && index.PhysicalPath is not null
+        ? Results.File(index.PhysicalPath, "text/html; charset=utf-8")
+        : Results.NotFound();
+});
 
 app.Run();
