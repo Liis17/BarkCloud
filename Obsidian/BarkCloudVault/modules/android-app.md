@@ -4,7 +4,20 @@ Parent: [[index]] · See also: [[modules/shared-proto]] · [[api/identity-api]] 
 
 ## Назначение
 
-Нативный Android-клиент BarkCloud (Kotlin, Jetpack Compose, Material 3). Реализованы: вход с поддержкой OTP-шага (2FA), 5-табовый главный экран (Files по умолчанию) и локальный файл-браузер. gRPC-связь с микросервисами через сгенерированные из общих proto-стабы. Полный паритет с [[modules/ios-app]].
+Нативный Android-клиент BarkCloud (Kotlin, Jetpack Compose, **Material 3 Expressive**). Достигнут функциональный паритет с [[modules/ios-app]]: вход+OTP, 5 табов как в iOS (**Галерея / Файлы / Альбомы(по умолчанию) / Корзина / Настройки**), облачные медиа с пагинацией, альбомы (CRUD), облачный файл-браузер (CRUD/перемещение/загрузка), корзина, профиль/аватар/приватность/устройства, избранное. gRPC-связь со всеми микросервисами (Identity :7020, Users :7021, Files/Cloud/Album :7025) + HTTP-слой для upload/download/превью по self-signed TLS.
+
+## Реализованный функционал (паритет с iOS)
+
+> Реализовано фазами 1–4F (2026-05-27). Весь код компилируется (`./gradlew :app:assembleDebug`). Подробности и решения — в авто-памяти `android-ios-parity` и плане `bubbly-coalescing-hedgehog.md`.
+
+- **Material 3 Expressive** (`ui/theme/`): `MaterialExpressiveTheme` + `MotionScheme.expressive()`, фирменный seed поверх expressive-схемы + dynamic color (Android 12+). Требует material3 **1.4.0-alpha18** (форс в `app/build.gradle.kts` через `resolutionStrategy`; в стабильной 1.4.0 Expressive-API `internal`).
+- **gRPC/сеть** (`grpc/`, `net/`): `GrpcManager` (мульти-эндпоинт, кэш каналов), `GrpcEndpoint.normalizedFileDownloadURL`, `InsecureTls` (общий trust-all), `InsecureHttp` (OkHttp), `FileTransferService` (multipart upload стримингом по Uri / download). Coil настроен на trust-all OkHttp (`OkHttpNetworkFetcherFactory`) для превью с :7025.
+- **Данные** (`data/cloud/`, `data/users/`): `CloudModels` (MediaAsset/Album/Trash/Favorite…), `CloudRepository` (медиа/каталоги/корзина/избранное/upload), `AlbumRepository`, `UserRepository`, `SessionManager` (logout+очистка). Зарегистрированы в `BarkCloudApplication`.
+- **UI-экраны** (`ui/`): `gallery/` (MediaStore+SHA256-бейдж «в облаке» через `CheckFileHashes`), `media/`+`albums/` (сегменты Фото/Видео/Альбомы, cursor-пагинация, CRUD альбомов, контекстное меню избранного), `files/` (`CloudBrowserScreen` + `CloudMovePicker`), `trash/` (свайпы restore/delete-forever, empty), `settings/` (профиль/аватар/приватность/устройства/выход/удаление), `favorites/`. Общие компоненты — `ui/components/` (`RemoteImage`, `MediaThumb`, `CloudMediaViewer`, `ComingSoonScreen`, `TextInputDialog`, `rememberRemoteOpener`).
+- **Навигация** (`ui/main/`): 5 табов через вложенные графы (per-tab back-stack), pill-NavigationBar; sign-out проброшен `RootNavGraph → MainScreen → SettingsScreen`.
+- «Общие файлы» → `ComingSoonScreen` (бэкенд не поддерживает расшаривание), как и на iOS.
+
+⚠️ Не проверено в рантайме на устройстве (forward-совместимость material3-alpha с Compose из BOM; реальное поведение self-signed превью/upload). Ниже — описание исходного каркаса (вход + локальный браузер), частично устарело.
 
 ## Расположение
 

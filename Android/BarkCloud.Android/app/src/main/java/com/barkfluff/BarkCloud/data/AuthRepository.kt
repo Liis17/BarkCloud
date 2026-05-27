@@ -2,6 +2,7 @@ package com.barkfluff.BarkCloud.data
 
 import barkcloud.identity.IdentityApiOuterClass.AuthRequest
 import barkcloud.identity.IdentityApiOuterClass.AuthResponse
+import barkcloud.identity.IdentityApiOuterClass.LogoutRequest
 import com.barkfluff.BarkCloud.grpc.AuthErrorCodes
 import com.barkfluff.BarkCloud.grpc.GrpcManager
 import com.barkfluff.BarkCloud.grpc.errorCode
@@ -40,6 +41,12 @@ class AuthRepository(
         } catch (e: Exception) {
             AuthResult.OtherError(e.message ?: e::class.java.simpleName)
         }
+    }
+
+    /** Отзыв текущей сессии на сервере (best-effort: ошибки игнорируются). */
+    suspend fun logout() = withContext(Dispatchers.IO) {
+        runCatching { grpcManager.identityStub().logout(LogoutRequest.getDefaultInstance()) }
+        Unit
     }
 
     private fun buildAuthRequest(
