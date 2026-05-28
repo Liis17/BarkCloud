@@ -101,7 +101,7 @@ struct MediaGridScreen: View {
             }
         }
         // Потянуть вниз — перезагрузить список (фото/видео).
-        .refreshable { await vm.reload() }
+        .barkRefreshable { await vm.reload() }
     }
 
     private var emptyState: some View {
