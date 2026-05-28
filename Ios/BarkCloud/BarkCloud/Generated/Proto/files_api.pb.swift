@@ -217,73 +217,114 @@ struct Barkcloud_Files_GetFileDataResponse: Sendable {
   fileprivate var _fileInfo: Barkcloud_Files_UploadFileInfo? = nil
 }
 
-struct Barkcloud_Files_UploadFileInfo: Sendable {
+struct Barkcloud_Files_UploadFileInfo: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// Идентификатор файла
-  var id: String = String()
+  var id: String {
+    get {_storage._id}
+    set {_uniqueStorage()._id = newValue}
+  }
 
   /// Идентификаторы пользователей загрузивших файл
-  var uploaders: [Int64] = []
+  var uploaders: [Int64] {
+    get {_storage._uploaders}
+    set {_uniqueStorage()._uploaders = newValue}
+  }
 
   /// Время создания
   var createdAt: SwiftProtobuf.Google_Protobuf_Timestamp {
-    get {_createdAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
-    set {_createdAt = newValue}
+    get {_storage._createdAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_uniqueStorage()._createdAt = newValue}
   }
   /// Returns true if `createdAt` has been explicitly set.
-  var hasCreatedAt: Bool {self._createdAt != nil}
+  var hasCreatedAt: Bool {_storage._createdAt != nil}
   /// Clears the value of `createdAt`. Subsequent reads from it will return its default value.
-  mutating func clearCreatedAt() {self._createdAt = nil}
+  mutating func clearCreatedAt() {_uniqueStorage()._createdAt = nil}
 
   /// время загрузки
   var uploadedAt: SwiftProtobuf.Google_Protobuf_Timestamp {
-    get {_uploadedAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
-    set {_uploadedAt = newValue}
+    get {_storage._uploadedAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_uniqueStorage()._uploadedAt = newValue}
   }
   /// Returns true if `uploadedAt` has been explicitly set.
-  var hasUploadedAt: Bool {self._uploadedAt != nil}
+  var hasUploadedAt: Bool {_storage._uploadedAt != nil}
   /// Clears the value of `uploadedAt`. Subsequent reads from it will return its default value.
-  mutating func clearUploadedAt() {self._uploadedAt = nil}
+  mutating func clearUploadedAt() {_uniqueStorage()._uploadedAt = nil}
 
   /// Etag S3
-  var etag: String = String()
+  var etag: String {
+    get {_storage._etag}
+    set {_uniqueStorage()._etag = newValue}
+  }
 
   /// Тип загруженного файла
-  var type: Barkcloud_Files_UploadFileType = .unknown
+  var type: Barkcloud_Files_UploadFileType {
+    get {_storage._type}
+    set {_uniqueStorage()._type = newValue}
+  }
 
   /// Имя файла
-  var fileName: String = String()
+  var fileName: String {
+    get {_storage._fileName}
+    set {_uniqueStorage()._fileName = newValue}
+  }
 
   /// Ссылка на загрузку файла
-  var fileURL: String = String()
+  var fileURL: String {
+    get {_storage._fileURL}
+    set {_uniqueStorage()._fileURL = newValue}
+  }
 
   /// [DEPRECATED] Ссылка на «главное» превью; см. previews для мультиразмерных
-  var previewURL: String = String()
+  var previewURL: String {
+    get {_storage._previewURL}
+    set {_uniqueStorage()._previewURL = newValue}
+  }
 
   /// Размер файла в байтах
-  var fileSize: Int64 = 0
+  var fileSize: Int64 {
+    get {_storage._fileSize}
+    set {_uniqueStorage()._fileSize = newValue}
+  }
 
   /// Превью изображения/видео (если есть) — 128 / 512 / 1024 по ширине
-  var previews: [Barkcloud_Files_FilePreviewInfo] = []
+  var previews: [Barkcloud_Files_FilePreviewInfo] {
+    get {_storage._previews}
+    set {_uniqueStorage()._previews = newValue}
+  }
 
   /// Ширина изображения/кадра в пикселях (0 если не медиа)
-  var imageWidth: Int32 = 0
+  var imageWidth: Int32 {
+    get {_storage._imageWidth}
+    set {_uniqueStorage()._imageWidth = newValue}
+  }
 
   /// Высота изображения/кадра в пикселях (0 если не медиа)
-  var imageHeight: Int32 = 0
+  var imageHeight: Int32 {
+    get {_storage._imageHeight}
+    set {_uniqueStorage()._imageHeight = newValue}
+  }
 
   /// Категория медиа (фото / видео / документ / аудио)
-  var mediaKind: Barkcloud_Files_MediaKind = .other
+  var mediaKind: Barkcloud_Files_MediaKind {
+    get {_storage._mediaKind}
+    set {_uniqueStorage()._mediaKind = newValue}
+  }
+
+  /// Имя устройства, с которого файл был загружен (первая успешная загрузка блоба)
+  var uploadDeviceName: String {
+    get {_storage._uploadDeviceName}
+    set {_uniqueStorage()._uploadDeviceName = newValue}
+  }
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   init() {}
 
-  fileprivate var _createdAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
-  fileprivate var _uploadedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+  fileprivate var _storage = _StorageClass.defaultInstance
 }
 
 struct Barkcloud_Files_FilePreviewInfo: Sendable {
@@ -714,36 +755,37 @@ struct Barkcloud_Files_DeleteUserMediaRequest: Sendable {
   init() {}
 }
 
-struct Barkcloud_Files_FileEntryDetailed: @unchecked Sendable {
+struct Barkcloud_Files_FileEntryDetailed: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// id / directory_id / file_id / name / created_at
   var entry: Barkcloud_Files_FileEntryInfo {
-    get {_storage._entry ?? Barkcloud_Files_FileEntryInfo()}
-    set {_uniqueStorage()._entry = newValue}
+    get {_entry ?? Barkcloud_Files_FileEntryInfo()}
+    set {_entry = newValue}
   }
   /// Returns true if `entry` has been explicitly set.
-  var hasEntry: Bool {_storage._entry != nil}
+  var hasEntry: Bool {self._entry != nil}
   /// Clears the value of `entry`. Subsequent reads from it will return its default value.
-  mutating func clearEntry() {_uniqueStorage()._entry = nil}
+  mutating func clearEntry() {self._entry = nil}
 
   /// полная информация о блобе (URL, размеры, превью)
   var file: Barkcloud_Files_UploadFileInfo {
-    get {_storage._file ?? Barkcloud_Files_UploadFileInfo()}
-    set {_uniqueStorage()._file = newValue}
+    get {_file ?? Barkcloud_Files_UploadFileInfo()}
+    set {_file = newValue}
   }
   /// Returns true if `file` has been explicitly set.
-  var hasFile: Bool {_storage._file != nil}
+  var hasFile: Bool {self._file != nil}
   /// Clears the value of `file`. Subsequent reads from it will return its default value.
-  mutating func clearFile() {_uniqueStorage()._file = nil}
+  mutating func clearFile() {self._file = nil}
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   init() {}
 
-  fileprivate var _storage = _StorageClass.defaultInstance
+  fileprivate var _entry: Barkcloud_Files_FileEntryInfo? = nil
+  fileprivate var _file: Barkcloud_Files_UploadFileInfo? = nil
 }
 
 struct Barkcloud_Files_DirectoryListingDetailed: Sendable {
@@ -788,44 +830,35 @@ struct Barkcloud_Files_ListUserImagesRequest: Sendable {
   fileprivate var _cursorCreatedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
 }
 
-struct Barkcloud_Files_UserImageItem: @unchecked Sendable {
+struct Barkcloud_Files_UserImageItem: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// карточка по UploadFile
   var file: Barkcloud_Files_UploadFileInfo {
-    get {_storage._file ?? Barkcloud_Files_UploadFileInfo()}
-    set {_uniqueStorage()._file = newValue}
+    get {_file ?? Barkcloud_Files_UploadFileInfo()}
+    set {_file = newValue}
   }
   /// Returns true if `file` has been explicitly set.
-  var hasFile: Bool {_storage._file != nil}
+  var hasFile: Bool {self._file != nil}
   /// Clears the value of `file`. Subsequent reads from it will return its default value.
-  mutating func clearFile() {_uniqueStorage()._file = nil}
+  mutating func clearFile() {self._file = nil}
 
   /// сколько копий записи у владельца
-  var entriesCount: Int32 {
-    get {_storage._entriesCount}
-    set {_uniqueStorage()._entriesCount = newValue}
-  }
+  var entriesCount: Int32 = 0
 
   /// имена в папках, до 5 шт.
-  var entryNames: [String] {
-    get {_storage._entryNames}
-    set {_uniqueStorage()._entryNames = newValue}
-  }
+  var entryNames: [String] = []
 
   /// id записей каталога владельца (для rename/delete из галереи)
-  var entryIds: [String] {
-    get {_storage._entryIds}
-    set {_uniqueStorage()._entryIds = newValue}
-  }
+  var entryIds: [String] = []
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   init() {}
 
-  fileprivate var _storage = _StorageClass.defaultInstance
+  fileprivate var _file: Barkcloud_Files_UploadFileInfo? = nil
 }
 
 struct Barkcloud_Files_ListUserImagesResponse: Sendable {
@@ -955,56 +988,59 @@ struct Barkcloud_Files_ListTrashRequest: Sendable {
   fileprivate var _cursorDeletedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
 }
 
-struct Barkcloud_Files_TrashEntry: @unchecked Sendable {
+struct Barkcloud_Files_TrashEntry: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// id / directory_id / file_id / name / created_at
   var entry: Barkcloud_Files_FileEntryInfo {
-    get {_storage._entry ?? Barkcloud_Files_FileEntryInfo()}
-    set {_uniqueStorage()._entry = newValue}
+    get {_entry ?? Barkcloud_Files_FileEntryInfo()}
+    set {_entry = newValue}
   }
   /// Returns true if `entry` has been explicitly set.
-  var hasEntry: Bool {_storage._entry != nil}
+  var hasEntry: Bool {self._entry != nil}
   /// Clears the value of `entry`. Subsequent reads from it will return its default value.
-  mutating func clearEntry() {_uniqueStorage()._entry = nil}
+  mutating func clearEntry() {self._entry = nil}
 
   /// полная информация о блобе (URL, размеры, превью)
   var file: Barkcloud_Files_UploadFileInfo {
-    get {_storage._file ?? Barkcloud_Files_UploadFileInfo()}
-    set {_uniqueStorage()._file = newValue}
+    get {_file ?? Barkcloud_Files_UploadFileInfo()}
+    set {_file = newValue}
   }
   /// Returns true if `file` has been explicitly set.
-  var hasFile: Bool {_storage._file != nil}
+  var hasFile: Bool {self._file != nil}
   /// Clears the value of `file`. Subsequent reads from it will return its default value.
-  mutating func clearFile() {_uniqueStorage()._file = nil}
+  mutating func clearFile() {self._file = nil}
 
   /// когда перемещён в корзину
   var deletedAt: SwiftProtobuf.Google_Protobuf_Timestamp {
-    get {_storage._deletedAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
-    set {_uniqueStorage()._deletedAt = newValue}
+    get {_deletedAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_deletedAt = newValue}
   }
   /// Returns true if `deletedAt` has been explicitly set.
-  var hasDeletedAt: Bool {_storage._deletedAt != nil}
+  var hasDeletedAt: Bool {self._deletedAt != nil}
   /// Clears the value of `deletedAt`. Subsequent reads from it will return its default value.
-  mutating func clearDeletedAt() {_uniqueStorage()._deletedAt = nil}
+  mutating func clearDeletedAt() {self._deletedAt = nil}
 
   /// когда будет удалён окончательно
   var purgeAt: SwiftProtobuf.Google_Protobuf_Timestamp {
-    get {_storage._purgeAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
-    set {_uniqueStorage()._purgeAt = newValue}
+    get {_purgeAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_purgeAt = newValue}
   }
   /// Returns true if `purgeAt` has been explicitly set.
-  var hasPurgeAt: Bool {_storage._purgeAt != nil}
+  var hasPurgeAt: Bool {self._purgeAt != nil}
   /// Clears the value of `purgeAt`. Subsequent reads from it will return its default value.
-  mutating func clearPurgeAt() {_uniqueStorage()._purgeAt = nil}
+  mutating func clearPurgeAt() {self._purgeAt = nil}
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   init() {}
 
-  fileprivate var _storage = _StorageClass.defaultInstance
+  fileprivate var _entry: Barkcloud_Files_FileEntryInfo? = nil
+  fileprivate var _file: Barkcloud_Files_UploadFileInfo? = nil
+  fileprivate var _deletedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+  fileprivate var _purgeAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
 }
 
 struct Barkcloud_Files_ListTrashResponse: Sendable {
@@ -1120,36 +1156,37 @@ struct Barkcloud_Files_ListFavoritesRequest: Sendable {
   fileprivate var _cursorFavoritedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
 }
 
-struct Barkcloud_Files_FavoriteEntry: @unchecked Sendable {
+struct Barkcloud_Files_FavoriteEntry: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// полная информация о блобе (URL, размеры, превью)
   var file: Barkcloud_Files_UploadFileInfo {
-    get {_storage._file ?? Barkcloud_Files_UploadFileInfo()}
-    set {_uniqueStorage()._file = newValue}
+    get {_file ?? Barkcloud_Files_UploadFileInfo()}
+    set {_file = newValue}
   }
   /// Returns true if `file` has been explicitly set.
-  var hasFile: Bool {_storage._file != nil}
+  var hasFile: Bool {self._file != nil}
   /// Clears the value of `file`. Subsequent reads from it will return its default value.
-  mutating func clearFile() {_uniqueStorage()._file = nil}
+  mutating func clearFile() {self._file = nil}
 
   /// когда файл добавлен в избранное
   var favoritedAt: SwiftProtobuf.Google_Protobuf_Timestamp {
-    get {_storage._favoritedAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
-    set {_uniqueStorage()._favoritedAt = newValue}
+    get {_favoritedAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_favoritedAt = newValue}
   }
   /// Returns true if `favoritedAt` has been explicitly set.
-  var hasFavoritedAt: Bool {_storage._favoritedAt != nil}
+  var hasFavoritedAt: Bool {self._favoritedAt != nil}
   /// Clears the value of `favoritedAt`. Subsequent reads from it will return its default value.
-  mutating func clearFavoritedAt() {_uniqueStorage()._favoritedAt = nil}
+  mutating func clearFavoritedAt() {self._favoritedAt = nil}
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   init() {}
 
-  fileprivate var _storage = _StorageClass.defaultInstance
+  fileprivate var _file: Barkcloud_Files_UploadFileInfo? = nil
+  fileprivate var _favoritedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
 }
 
 struct Barkcloud_Files_ListFavoritesResponse: Sendable {
@@ -1521,36 +1558,37 @@ struct Barkcloud_Files_ListAlbumItemsRequest: Sendable {
   fileprivate var _kindFilter: Barkcloud_Files_MediaKind? = nil
 }
 
-struct Barkcloud_Files_AlbumItemEntry: @unchecked Sendable {
+struct Barkcloud_Files_AlbumItemEntry: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// полная информация о файле (URL, превью, размеры)
   var file: Barkcloud_Files_UploadFileInfo {
-    get {_storage._file ?? Barkcloud_Files_UploadFileInfo()}
-    set {_uniqueStorage()._file = newValue}
+    get {_file ?? Barkcloud_Files_UploadFileInfo()}
+    set {_file = newValue}
   }
   /// Returns true if `file` has been explicitly set.
-  var hasFile: Bool {_storage._file != nil}
+  var hasFile: Bool {self._file != nil}
   /// Clears the value of `file`. Subsequent reads from it will return its default value.
-  mutating func clearFile() {_uniqueStorage()._file = nil}
+  mutating func clearFile() {self._file = nil}
 
   /// когда добавлен в альбом
   var addedAt: SwiftProtobuf.Google_Protobuf_Timestamp {
-    get {_storage._addedAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
-    set {_uniqueStorage()._addedAt = newValue}
+    get {_addedAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_addedAt = newValue}
   }
   /// Returns true if `addedAt` has been explicitly set.
-  var hasAddedAt: Bool {_storage._addedAt != nil}
+  var hasAddedAt: Bool {self._addedAt != nil}
   /// Clears the value of `addedAt`. Subsequent reads from it will return its default value.
-  mutating func clearAddedAt() {_uniqueStorage()._addedAt = nil}
+  mutating func clearAddedAt() {self._addedAt = nil}
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   init() {}
 
-  fileprivate var _storage = _StorageClass.defaultInstance
+  fileprivate var _file: Barkcloud_Files_UploadFileInfo? = nil
+  fileprivate var _addedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
 }
 
 struct Barkcloud_Files_ListAlbumItemsResponse: Sendable {
@@ -1817,98 +1855,167 @@ extension Barkcloud_Files_GetFileDataResponse: SwiftProtobuf.Message, SwiftProto
 
 extension Barkcloud_Files_UploadFileInfo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = _protobuf_package + ".UploadFileInfo"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}uploaders\0\u{3}created_at\0\u{3}uploaded_at\0\u{1}etag\0\u{1}type\0\u{3}file_name\0\u{3}file_url\0\u{3}preview_url\0\u{3}file_size\0\u{1}previews\0\u{3}image_width\0\u{3}image_height\0\u{3}media_kind\0")
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}uploaders\0\u{3}created_at\0\u{3}uploaded_at\0\u{1}etag\0\u{1}type\0\u{3}file_name\0\u{3}file_url\0\u{3}preview_url\0\u{3}file_size\0\u{1}previews\0\u{3}image_width\0\u{3}image_height\0\u{3}media_kind\0\u{3}upload_device_name\0")
+
+  fileprivate class _StorageClass {
+    var _id: String = String()
+    var _uploaders: [Int64] = []
+    var _createdAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+    var _uploadedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+    var _etag: String = String()
+    var _type: Barkcloud_Files_UploadFileType = .unknown
+    var _fileName: String = String()
+    var _fileURL: String = String()
+    var _previewURL: String = String()
+    var _fileSize: Int64 = 0
+    var _previews: [Barkcloud_Files_FilePreviewInfo] = []
+    var _imageWidth: Int32 = 0
+    var _imageHeight: Int32 = 0
+    var _mediaKind: Barkcloud_Files_MediaKind = .other
+    var _uploadDeviceName: String = String()
+
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+
+    private init() {}
+
+    init(copying source: _StorageClass) {
+      _id = source._id
+      _uploaders = source._uploaders
+      _createdAt = source._createdAt
+      _uploadedAt = source._uploadedAt
+      _etag = source._etag
+      _type = source._type
+      _fileName = source._fileName
+      _fileURL = source._fileURL
+      _previewURL = source._previewURL
+      _fileSize = source._fileSize
+      _previews = source._previews
+      _imageWidth = source._imageWidth
+      _imageHeight = source._imageHeight
+      _mediaKind = source._mediaKind
+      _uploadDeviceName = source._uploadDeviceName
+    }
+  }
+
+  fileprivate mutating func _uniqueStorage() -> _StorageClass {
+    if !isKnownUniquelyReferenced(&_storage) {
+      _storage = _StorageClass(copying: _storage)
+    }
+    return _storage
+  }
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.id) }()
-      case 2: try { try decoder.decodeRepeatedInt64Field(value: &self.uploaders) }()
-      case 3: try { try decoder.decodeSingularMessageField(value: &self._createdAt) }()
-      case 4: try { try decoder.decodeSingularMessageField(value: &self._uploadedAt) }()
-      case 5: try { try decoder.decodeSingularStringField(value: &self.etag) }()
-      case 6: try { try decoder.decodeSingularEnumField(value: &self.type) }()
-      case 7: try { try decoder.decodeSingularStringField(value: &self.fileName) }()
-      case 8: try { try decoder.decodeSingularStringField(value: &self.fileURL) }()
-      case 9: try { try decoder.decodeSingularStringField(value: &self.previewURL) }()
-      case 10: try { try decoder.decodeSingularInt64Field(value: &self.fileSize) }()
-      case 11: try { try decoder.decodeRepeatedMessageField(value: &self.previews) }()
-      case 12: try { try decoder.decodeSingularInt32Field(value: &self.imageWidth) }()
-      case 13: try { try decoder.decodeSingularInt32Field(value: &self.imageHeight) }()
-      case 14: try { try decoder.decodeSingularEnumField(value: &self.mediaKind) }()
-      default: break
+    _ = _uniqueStorage()
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      while let fieldNumber = try decoder.nextFieldNumber() {
+        // The use of inline closures is to circumvent an issue where the compiler
+        // allocates stack space for every case branch when no optimizations are
+        // enabled. https://github.com/apple/swift-protobuf/issues/1034
+        switch fieldNumber {
+        case 1: try { try decoder.decodeSingularStringField(value: &_storage._id) }()
+        case 2: try { try decoder.decodeRepeatedInt64Field(value: &_storage._uploaders) }()
+        case 3: try { try decoder.decodeSingularMessageField(value: &_storage._createdAt) }()
+        case 4: try { try decoder.decodeSingularMessageField(value: &_storage._uploadedAt) }()
+        case 5: try { try decoder.decodeSingularStringField(value: &_storage._etag) }()
+        case 6: try { try decoder.decodeSingularEnumField(value: &_storage._type) }()
+        case 7: try { try decoder.decodeSingularStringField(value: &_storage._fileName) }()
+        case 8: try { try decoder.decodeSingularStringField(value: &_storage._fileURL) }()
+        case 9: try { try decoder.decodeSingularStringField(value: &_storage._previewURL) }()
+        case 10: try { try decoder.decodeSingularInt64Field(value: &_storage._fileSize) }()
+        case 11: try { try decoder.decodeRepeatedMessageField(value: &_storage._previews) }()
+        case 12: try { try decoder.decodeSingularInt32Field(value: &_storage._imageWidth) }()
+        case 13: try { try decoder.decodeSingularInt32Field(value: &_storage._imageHeight) }()
+        case 14: try { try decoder.decodeSingularEnumField(value: &_storage._mediaKind) }()
+        case 15: try { try decoder.decodeSingularStringField(value: &_storage._uploadDeviceName) }()
+        default: break
+        }
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.id.isEmpty {
-      try visitor.visitSingularStringField(value: self.id, fieldNumber: 1)
-    }
-    if !self.uploaders.isEmpty {
-      try visitor.visitPackedInt64Field(value: self.uploaders, fieldNumber: 2)
-    }
-    try { if let v = self._createdAt {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
-    } }()
-    try { if let v = self._uploadedAt {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
-    } }()
-    if !self.etag.isEmpty {
-      try visitor.visitSingularStringField(value: self.etag, fieldNumber: 5)
-    }
-    if self.type != .unknown {
-      try visitor.visitSingularEnumField(value: self.type, fieldNumber: 6)
-    }
-    if !self.fileName.isEmpty {
-      try visitor.visitSingularStringField(value: self.fileName, fieldNumber: 7)
-    }
-    if !self.fileURL.isEmpty {
-      try visitor.visitSingularStringField(value: self.fileURL, fieldNumber: 8)
-    }
-    if !self.previewURL.isEmpty {
-      try visitor.visitSingularStringField(value: self.previewURL, fieldNumber: 9)
-    }
-    if self.fileSize != 0 {
-      try visitor.visitSingularInt64Field(value: self.fileSize, fieldNumber: 10)
-    }
-    if !self.previews.isEmpty {
-      try visitor.visitRepeatedMessageField(value: self.previews, fieldNumber: 11)
-    }
-    if self.imageWidth != 0 {
-      try visitor.visitSingularInt32Field(value: self.imageWidth, fieldNumber: 12)
-    }
-    if self.imageHeight != 0 {
-      try visitor.visitSingularInt32Field(value: self.imageHeight, fieldNumber: 13)
-    }
-    if self.mediaKind != .other {
-      try visitor.visitSingularEnumField(value: self.mediaKind, fieldNumber: 14)
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every if/case branch local when no optimizations
+      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+      // https://github.com/apple/swift-protobuf/issues/1182
+      if !_storage._id.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._id, fieldNumber: 1)
+      }
+      if !_storage._uploaders.isEmpty {
+        try visitor.visitPackedInt64Field(value: _storage._uploaders, fieldNumber: 2)
+      }
+      try { if let v = _storage._createdAt {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
+      } }()
+      try { if let v = _storage._uploadedAt {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
+      } }()
+      if !_storage._etag.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._etag, fieldNumber: 5)
+      }
+      if _storage._type != .unknown {
+        try visitor.visitSingularEnumField(value: _storage._type, fieldNumber: 6)
+      }
+      if !_storage._fileName.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._fileName, fieldNumber: 7)
+      }
+      if !_storage._fileURL.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._fileURL, fieldNumber: 8)
+      }
+      if !_storage._previewURL.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._previewURL, fieldNumber: 9)
+      }
+      if _storage._fileSize != 0 {
+        try visitor.visitSingularInt64Field(value: _storage._fileSize, fieldNumber: 10)
+      }
+      if !_storage._previews.isEmpty {
+        try visitor.visitRepeatedMessageField(value: _storage._previews, fieldNumber: 11)
+      }
+      if _storage._imageWidth != 0 {
+        try visitor.visitSingularInt32Field(value: _storage._imageWidth, fieldNumber: 12)
+      }
+      if _storage._imageHeight != 0 {
+        try visitor.visitSingularInt32Field(value: _storage._imageHeight, fieldNumber: 13)
+      }
+      if _storage._mediaKind != .other {
+        try visitor.visitSingularEnumField(value: _storage._mediaKind, fieldNumber: 14)
+      }
+      if !_storage._uploadDeviceName.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._uploadDeviceName, fieldNumber: 15)
+      }
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: Barkcloud_Files_UploadFileInfo, rhs: Barkcloud_Files_UploadFileInfo) -> Bool {
-    if lhs.id != rhs.id {return false}
-    if lhs.uploaders != rhs.uploaders {return false}
-    if lhs._createdAt != rhs._createdAt {return false}
-    if lhs._uploadedAt != rhs._uploadedAt {return false}
-    if lhs.etag != rhs.etag {return false}
-    if lhs.type != rhs.type {return false}
-    if lhs.fileName != rhs.fileName {return false}
-    if lhs.fileURL != rhs.fileURL {return false}
-    if lhs.previewURL != rhs.previewURL {return false}
-    if lhs.fileSize != rhs.fileSize {return false}
-    if lhs.previews != rhs.previews {return false}
-    if lhs.imageWidth != rhs.imageWidth {return false}
-    if lhs.imageHeight != rhs.imageHeight {return false}
-    if lhs.mediaKind != rhs.mediaKind {return false}
+    if lhs._storage !== rhs._storage {
+      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
+        let _storage = _args.0
+        let rhs_storage = _args.1
+        if _storage._id != rhs_storage._id {return false}
+        if _storage._uploaders != rhs_storage._uploaders {return false}
+        if _storage._createdAt != rhs_storage._createdAt {return false}
+        if _storage._uploadedAt != rhs_storage._uploadedAt {return false}
+        if _storage._etag != rhs_storage._etag {return false}
+        if _storage._type != rhs_storage._type {return false}
+        if _storage._fileName != rhs_storage._fileName {return false}
+        if _storage._fileURL != rhs_storage._fileURL {return false}
+        if _storage._previewURL != rhs_storage._previewURL {return false}
+        if _storage._fileSize != rhs_storage._fileSize {return false}
+        if _storage._previews != rhs_storage._previews {return false}
+        if _storage._imageWidth != rhs_storage._imageWidth {return false}
+        if _storage._imageHeight != rhs_storage._imageHeight {return false}
+        if _storage._mediaKind != rhs_storage._mediaKind {return false}
+        if _storage._uploadDeviceName != rhs_storage._uploadDeviceName {return false}
+        return true
+      }
+      if !storagesAreEqual {return false}
+    }
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -2818,74 +2925,36 @@ extension Barkcloud_Files_FileEntryDetailed: SwiftProtobuf.Message, SwiftProtobu
   static let protoMessageName: String = _protobuf_package + ".FileEntryDetailed"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}entry\0\u{1}file\0")
 
-  fileprivate class _StorageClass {
-    var _entry: Barkcloud_Files_FileEntryInfo? = nil
-    var _file: Barkcloud_Files_UploadFileInfo? = nil
-
-      // This property is used as the initial default value for new instances of the type.
-      // The type itself is protecting the reference to its storage via CoW semantics.
-      // This will force a copy to be made of this reference when the first mutation occurs;
-      // hence, it is safe to mark this as `nonisolated(unsafe)`.
-      static nonisolated(unsafe) let defaultInstance = _StorageClass()
-
-    private init() {}
-
-    init(copying source: _StorageClass) {
-      _entry = source._entry
-      _file = source._file
-    }
-  }
-
-  fileprivate mutating func _uniqueStorage() -> _StorageClass {
-    if !isKnownUniquelyReferenced(&_storage) {
-      _storage = _StorageClass(copying: _storage)
-    }
-    return _storage
-  }
-
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    _ = _uniqueStorage()
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      while let fieldNumber = try decoder.nextFieldNumber() {
-        // The use of inline closures is to circumvent an issue where the compiler
-        // allocates stack space for every case branch when no optimizations are
-        // enabled. https://github.com/apple/swift-protobuf/issues/1034
-        switch fieldNumber {
-        case 1: try { try decoder.decodeSingularMessageField(value: &_storage._entry) }()
-        case 2: try { try decoder.decodeSingularMessageField(value: &_storage._file) }()
-        default: break
-        }
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularMessageField(value: &self._entry) }()
+      case 2: try { try decoder.decodeSingularMessageField(value: &self._file) }()
+      default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every if/case branch local when no optimizations
-      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-      // https://github.com/apple/swift-protobuf/issues/1182
-      try { if let v = _storage._entry {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
-      } }()
-      try { if let v = _storage._file {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
-      } }()
-    }
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    try { if let v = self._entry {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+    } }()
+    try { if let v = self._file {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: Barkcloud_Files_FileEntryDetailed, rhs: Barkcloud_Files_FileEntryDetailed) -> Bool {
-    if lhs._storage !== rhs._storage {
-      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
-        let _storage = _args.0
-        let rhs_storage = _args.1
-        if _storage._entry != rhs_storage._entry {return false}
-        if _storage._file != rhs_storage._file {return false}
-        return true
-      }
-      if !storagesAreEqual {return false}
-    }
+    if lhs._entry != rhs._entry {return false}
+    if lhs._file != rhs._file {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -2974,88 +3043,46 @@ extension Barkcloud_Files_UserImageItem: SwiftProtobuf.Message, SwiftProtobuf._M
   static let protoMessageName: String = _protobuf_package + ".UserImageItem"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}file\0\u{3}entries_count\0\u{3}entry_names\0\u{3}entry_ids\0")
 
-  fileprivate class _StorageClass {
-    var _file: Barkcloud_Files_UploadFileInfo? = nil
-    var _entriesCount: Int32 = 0
-    var _entryNames: [String] = []
-    var _entryIds: [String] = []
-
-      // This property is used as the initial default value for new instances of the type.
-      // The type itself is protecting the reference to its storage via CoW semantics.
-      // This will force a copy to be made of this reference when the first mutation occurs;
-      // hence, it is safe to mark this as `nonisolated(unsafe)`.
-      static nonisolated(unsafe) let defaultInstance = _StorageClass()
-
-    private init() {}
-
-    init(copying source: _StorageClass) {
-      _file = source._file
-      _entriesCount = source._entriesCount
-      _entryNames = source._entryNames
-      _entryIds = source._entryIds
-    }
-  }
-
-  fileprivate mutating func _uniqueStorage() -> _StorageClass {
-    if !isKnownUniquelyReferenced(&_storage) {
-      _storage = _StorageClass(copying: _storage)
-    }
-    return _storage
-  }
-
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    _ = _uniqueStorage()
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      while let fieldNumber = try decoder.nextFieldNumber() {
-        // The use of inline closures is to circumvent an issue where the compiler
-        // allocates stack space for every case branch when no optimizations are
-        // enabled. https://github.com/apple/swift-protobuf/issues/1034
-        switch fieldNumber {
-        case 1: try { try decoder.decodeSingularMessageField(value: &_storage._file) }()
-        case 2: try { try decoder.decodeSingularInt32Field(value: &_storage._entriesCount) }()
-        case 3: try { try decoder.decodeRepeatedStringField(value: &_storage._entryNames) }()
-        case 4: try { try decoder.decodeRepeatedStringField(value: &_storage._entryIds) }()
-        default: break
-        }
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularMessageField(value: &self._file) }()
+      case 2: try { try decoder.decodeSingularInt32Field(value: &self.entriesCount) }()
+      case 3: try { try decoder.decodeRepeatedStringField(value: &self.entryNames) }()
+      case 4: try { try decoder.decodeRepeatedStringField(value: &self.entryIds) }()
+      default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every if/case branch local when no optimizations
-      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-      // https://github.com/apple/swift-protobuf/issues/1182
-      try { if let v = _storage._file {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
-      } }()
-      if _storage._entriesCount != 0 {
-        try visitor.visitSingularInt32Field(value: _storage._entriesCount, fieldNumber: 2)
-      }
-      if !_storage._entryNames.isEmpty {
-        try visitor.visitRepeatedStringField(value: _storage._entryNames, fieldNumber: 3)
-      }
-      if !_storage._entryIds.isEmpty {
-        try visitor.visitRepeatedStringField(value: _storage._entryIds, fieldNumber: 4)
-      }
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    try { if let v = self._file {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+    } }()
+    if self.entriesCount != 0 {
+      try visitor.visitSingularInt32Field(value: self.entriesCount, fieldNumber: 2)
+    }
+    if !self.entryNames.isEmpty {
+      try visitor.visitRepeatedStringField(value: self.entryNames, fieldNumber: 3)
+    }
+    if !self.entryIds.isEmpty {
+      try visitor.visitRepeatedStringField(value: self.entryIds, fieldNumber: 4)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: Barkcloud_Files_UserImageItem, rhs: Barkcloud_Files_UserImageItem) -> Bool {
-    if lhs._storage !== rhs._storage {
-      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
-        let _storage = _args.0
-        let rhs_storage = _args.1
-        if _storage._file != rhs_storage._file {return false}
-        if _storage._entriesCount != rhs_storage._entriesCount {return false}
-        if _storage._entryNames != rhs_storage._entryNames {return false}
-        if _storage._entryIds != rhs_storage._entryIds {return false}
-        return true
-      }
-      if !storagesAreEqual {return false}
-    }
+    if lhs._file != rhs._file {return false}
+    if lhs.entriesCount != rhs.entriesCount {return false}
+    if lhs.entryNames != rhs.entryNames {return false}
+    if lhs.entryIds != rhs.entryIds {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -3281,88 +3308,46 @@ extension Barkcloud_Files_TrashEntry: SwiftProtobuf.Message, SwiftProtobuf._Mess
   static let protoMessageName: String = _protobuf_package + ".TrashEntry"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}entry\0\u{1}file\0\u{3}deleted_at\0\u{3}purge_at\0")
 
-  fileprivate class _StorageClass {
-    var _entry: Barkcloud_Files_FileEntryInfo? = nil
-    var _file: Barkcloud_Files_UploadFileInfo? = nil
-    var _deletedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
-    var _purgeAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
-
-      // This property is used as the initial default value for new instances of the type.
-      // The type itself is protecting the reference to its storage via CoW semantics.
-      // This will force a copy to be made of this reference when the first mutation occurs;
-      // hence, it is safe to mark this as `nonisolated(unsafe)`.
-      static nonisolated(unsafe) let defaultInstance = _StorageClass()
-
-    private init() {}
-
-    init(copying source: _StorageClass) {
-      _entry = source._entry
-      _file = source._file
-      _deletedAt = source._deletedAt
-      _purgeAt = source._purgeAt
-    }
-  }
-
-  fileprivate mutating func _uniqueStorage() -> _StorageClass {
-    if !isKnownUniquelyReferenced(&_storage) {
-      _storage = _StorageClass(copying: _storage)
-    }
-    return _storage
-  }
-
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    _ = _uniqueStorage()
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      while let fieldNumber = try decoder.nextFieldNumber() {
-        // The use of inline closures is to circumvent an issue where the compiler
-        // allocates stack space for every case branch when no optimizations are
-        // enabled. https://github.com/apple/swift-protobuf/issues/1034
-        switch fieldNumber {
-        case 1: try { try decoder.decodeSingularMessageField(value: &_storage._entry) }()
-        case 2: try { try decoder.decodeSingularMessageField(value: &_storage._file) }()
-        case 3: try { try decoder.decodeSingularMessageField(value: &_storage._deletedAt) }()
-        case 4: try { try decoder.decodeSingularMessageField(value: &_storage._purgeAt) }()
-        default: break
-        }
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularMessageField(value: &self._entry) }()
+      case 2: try { try decoder.decodeSingularMessageField(value: &self._file) }()
+      case 3: try { try decoder.decodeSingularMessageField(value: &self._deletedAt) }()
+      case 4: try { try decoder.decodeSingularMessageField(value: &self._purgeAt) }()
+      default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every if/case branch local when no optimizations
-      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-      // https://github.com/apple/swift-protobuf/issues/1182
-      try { if let v = _storage._entry {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
-      } }()
-      try { if let v = _storage._file {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
-      } }()
-      try { if let v = _storage._deletedAt {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
-      } }()
-      try { if let v = _storage._purgeAt {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
-      } }()
-    }
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    try { if let v = self._entry {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+    } }()
+    try { if let v = self._file {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+    } }()
+    try { if let v = self._deletedAt {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
+    } }()
+    try { if let v = self._purgeAt {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: Barkcloud_Files_TrashEntry, rhs: Barkcloud_Files_TrashEntry) -> Bool {
-    if lhs._storage !== rhs._storage {
-      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
-        let _storage = _args.0
-        let rhs_storage = _args.1
-        if _storage._entry != rhs_storage._entry {return false}
-        if _storage._file != rhs_storage._file {return false}
-        if _storage._deletedAt != rhs_storage._deletedAt {return false}
-        if _storage._purgeAt != rhs_storage._purgeAt {return false}
-        return true
-      }
-      if !storagesAreEqual {return false}
-    }
+    if lhs._entry != rhs._entry {return false}
+    if lhs._file != rhs._file {return false}
+    if lhs._deletedAt != rhs._deletedAt {return false}
+    if lhs._purgeAt != rhs._purgeAt {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -3599,74 +3584,36 @@ extension Barkcloud_Files_FavoriteEntry: SwiftProtobuf.Message, SwiftProtobuf._M
   static let protoMessageName: String = _protobuf_package + ".FavoriteEntry"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}file\0\u{3}favorited_at\0")
 
-  fileprivate class _StorageClass {
-    var _file: Barkcloud_Files_UploadFileInfo? = nil
-    var _favoritedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
-
-      // This property is used as the initial default value for new instances of the type.
-      // The type itself is protecting the reference to its storage via CoW semantics.
-      // This will force a copy to be made of this reference when the first mutation occurs;
-      // hence, it is safe to mark this as `nonisolated(unsafe)`.
-      static nonisolated(unsafe) let defaultInstance = _StorageClass()
-
-    private init() {}
-
-    init(copying source: _StorageClass) {
-      _file = source._file
-      _favoritedAt = source._favoritedAt
-    }
-  }
-
-  fileprivate mutating func _uniqueStorage() -> _StorageClass {
-    if !isKnownUniquelyReferenced(&_storage) {
-      _storage = _StorageClass(copying: _storage)
-    }
-    return _storage
-  }
-
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    _ = _uniqueStorage()
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      while let fieldNumber = try decoder.nextFieldNumber() {
-        // The use of inline closures is to circumvent an issue where the compiler
-        // allocates stack space for every case branch when no optimizations are
-        // enabled. https://github.com/apple/swift-protobuf/issues/1034
-        switch fieldNumber {
-        case 1: try { try decoder.decodeSingularMessageField(value: &_storage._file) }()
-        case 2: try { try decoder.decodeSingularMessageField(value: &_storage._favoritedAt) }()
-        default: break
-        }
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularMessageField(value: &self._file) }()
+      case 2: try { try decoder.decodeSingularMessageField(value: &self._favoritedAt) }()
+      default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every if/case branch local when no optimizations
-      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-      // https://github.com/apple/swift-protobuf/issues/1182
-      try { if let v = _storage._file {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
-      } }()
-      try { if let v = _storage._favoritedAt {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
-      } }()
-    }
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    try { if let v = self._file {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+    } }()
+    try { if let v = self._favoritedAt {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: Barkcloud_Files_FavoriteEntry, rhs: Barkcloud_Files_FavoriteEntry) -> Bool {
-    if lhs._storage !== rhs._storage {
-      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
-        let _storage = _args.0
-        let rhs_storage = _args.1
-        if _storage._file != rhs_storage._file {return false}
-        if _storage._favoritedAt != rhs_storage._favoritedAt {return false}
-        return true
-      }
-      if !storagesAreEqual {return false}
-    }
+    if lhs._file != rhs._file {return false}
+    if lhs._favoritedAt != rhs._favoritedAt {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -4317,74 +4264,36 @@ extension Barkcloud_Files_AlbumItemEntry: SwiftProtobuf.Message, SwiftProtobuf._
   static let protoMessageName: String = _protobuf_package + ".AlbumItemEntry"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}file\0\u{3}added_at\0")
 
-  fileprivate class _StorageClass {
-    var _file: Barkcloud_Files_UploadFileInfo? = nil
-    var _addedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
-
-      // This property is used as the initial default value for new instances of the type.
-      // The type itself is protecting the reference to its storage via CoW semantics.
-      // This will force a copy to be made of this reference when the first mutation occurs;
-      // hence, it is safe to mark this as `nonisolated(unsafe)`.
-      static nonisolated(unsafe) let defaultInstance = _StorageClass()
-
-    private init() {}
-
-    init(copying source: _StorageClass) {
-      _file = source._file
-      _addedAt = source._addedAt
-    }
-  }
-
-  fileprivate mutating func _uniqueStorage() -> _StorageClass {
-    if !isKnownUniquelyReferenced(&_storage) {
-      _storage = _StorageClass(copying: _storage)
-    }
-    return _storage
-  }
-
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    _ = _uniqueStorage()
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      while let fieldNumber = try decoder.nextFieldNumber() {
-        // The use of inline closures is to circumvent an issue where the compiler
-        // allocates stack space for every case branch when no optimizations are
-        // enabled. https://github.com/apple/swift-protobuf/issues/1034
-        switch fieldNumber {
-        case 1: try { try decoder.decodeSingularMessageField(value: &_storage._file) }()
-        case 2: try { try decoder.decodeSingularMessageField(value: &_storage._addedAt) }()
-        default: break
-        }
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularMessageField(value: &self._file) }()
+      case 2: try { try decoder.decodeSingularMessageField(value: &self._addedAt) }()
+      default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every if/case branch local when no optimizations
-      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-      // https://github.com/apple/swift-protobuf/issues/1182
-      try { if let v = _storage._file {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
-      } }()
-      try { if let v = _storage._addedAt {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
-      } }()
-    }
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    try { if let v = self._file {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+    } }()
+    try { if let v = self._addedAt {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: Barkcloud_Files_AlbumItemEntry, rhs: Barkcloud_Files_AlbumItemEntry) -> Bool {
-    if lhs._storage !== rhs._storage {
-      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
-        let _storage = _args.0
-        let rhs_storage = _args.1
-        if _storage._file != rhs_storage._file {return false}
-        if _storage._addedAt != rhs_storage._addedAt {return false}
-        return true
-      }
-      if !storagesAreEqual {return false}
-    }
+    if lhs._file != rhs._file {return false}
+    if lhs._addedAt != rhs._addedAt {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
