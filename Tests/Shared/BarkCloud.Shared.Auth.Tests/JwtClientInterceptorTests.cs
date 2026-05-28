@@ -1,5 +1,7 @@
 using BarkCloud.Shared.Auth.Tests._Helpers;
 
+using Grpc.Core;
+
 namespace BarkCloud.Shared.Auth.Tests;
 
 public class JwtClientInterceptorTests
