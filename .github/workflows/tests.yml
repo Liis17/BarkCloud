@@ -1,0 +1,85 @@
+name: "🧪 BarkCloud Tests"
+
+on:
+  push:
+    branches:
+      - dev
+      - master
+      - 'claude/**'
+    paths-ignore:
+      - 'Docs/**'
+      - 'Obsidian/**'
+      - '**.md'
+  pull_request:
+    branches:
+      - dev
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dotnet-tests:
+    name: ".NET unit tests"
+    runs-on: self-hosted
+    steps:
+      - name: "Checkout"
+        uses: actions/checkout@v4
+
+      - name: "Check .NET 10.0 SDK"
+        id: check
+        run: |
+          if ! dotnet --list-sdks 2>/dev/null | grep -q "^10\."; then
+            echo "missing=true" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+          echo "missing=false" >> "$GITHUB_OUTPUT"
+
+      - name: "Restore"
+        run: dotnet restore BarkCloud.slnx
+
+      - name: "Build"
+        run: dotnet build BarkCloud.slnx --no-restore -c Release
+
+      - name: "Test"
+        run: |
+          dotnet test BarkCloud.slnx \
+            --no-build -c Release \
+            --collect:"XPlat Code Coverage" \
+            --logger "trx;LogFileName=test-results.trx" \
+            --results-directory TestResults
+
+      - name: "Upload test results"
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dotnet-test-results
+          path: TestResults/**
+
+  android-tests:
+    name: "Android unit tests"
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Checkout"
+        uses: actions/checkout@v4
+
+      - name: "Setup JDK 17"
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: "Setup Gradle"
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: "Run unit tests"
+        working-directory: Android/BarkCloud.Android
+        run: ./gradlew :app:testDebugUnitTest --stacktrace
+
+      - name: "Upload reports"
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-test-reports
+          path: Android/BarkCloud.Android/app/build/reports/tests/

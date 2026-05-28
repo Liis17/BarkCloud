@@ -5,5 +5,7 @@
 **/.vs
 .git
 .github
+# Юнит-тесты не нужны в продакшен-образах сервисов.
+Tests
 # SPA-бандл пересобирается в node-стадии Dockerfile веб-клиента.
 Backend/BarkCloud.Web/wwwroot
