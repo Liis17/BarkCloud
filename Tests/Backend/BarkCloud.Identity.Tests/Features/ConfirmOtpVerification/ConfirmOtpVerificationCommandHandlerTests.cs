@@ -20,6 +20,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using OtpNet;
 
 using PersistenceOtpNotCreatedException = BarkCloud.Identity.Persistence.Exceptions.OtpNotCreatedException;
+using OtpType = BarkCloud.Identity.Domain.OtpType;
 
 namespace BarkCloud.Identity.Tests.Features.ConfirmOtpVerification;
 
