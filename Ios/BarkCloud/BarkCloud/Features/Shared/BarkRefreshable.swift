@@ -10,11 +10,22 @@ extension View {
     }
 }
 
+/// Состояние индикатора. Reference-тип (`@Observable`), чтобы частые обновления
+/// `pullProgress` из `.onScrollGeometryChange` НЕ инвалидировали `body` модификатора
+/// (он эти поля не читает) — перерисовывается только overlay-хедер. Иначе на каждом
+/// кадре прокрутки пересобирался бы `.refreshable`, отменяя задачу обновления вместе
+/// с gRPC-запросом («the transport threw an unexpected error»).
+@MainActor
+@Observable
+final class BarkRefreshState {
+    var pullProgress: CGFloat = 0
+    var isRefreshing: Bool = false
+}
+
 private struct BarkRefreshableModifier: ViewModifier {
     let action: () async -> Void
 
-    @State private var isRefreshing = false
-    @State private var pullProgress: CGFloat = 0
+    @State private var refreshState = BarkRefreshState()
 
     /// Полная амплитуда pull в pt, при которой `pullProgress` достигает 1.
     private let pullThreshold: CGFloat = 120
@@ -22,23 +33,22 @@ private struct BarkRefreshableModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .refreshable {
-                isRefreshing = true
-                defer { isRefreshing = false }
+                refreshState.isRefreshing = true
+                defer { refreshState.isRefreshing = false }
                 await action()
             }
             .onScrollGeometryChange(for: CGFloat.self) { geo in
-                geo.contentOffset.y
-            } action: { _, y in
-                // contentOffset.y отрицательный при оттягивании вниз.
-                pullProgress = max(0, -y) / pullThreshold
+                // Перетягивание за верх. В покое contentOffset.y == -contentInsets.top
+                // (у List инсет навбара ненулевой), поэтому вычитаем инсет — иначе
+                // прогресс был бы положительным без всякого жеста.
+                geo.contentOffset.y + geo.contentInsets.top
+            } action: { _, topOverscroll in
+                refreshState.pullProgress = max(0, -topOverscroll) / pullThreshold
             }
             .overlay(alignment: .top) {
-                BarkRefreshHeader(
-                    pullProgress: pullProgress,
-                    isRefreshing: isRefreshing
-                )
-                .frame(height: 80)
-                .allowsHitTesting(false)
+                BarkRefreshHeader(state: refreshState)
+                    .frame(height: 80)
+                    .allowsHitTesting(false)
             }
     }
 }

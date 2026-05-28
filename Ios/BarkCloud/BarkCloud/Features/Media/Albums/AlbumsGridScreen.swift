@@ -55,7 +55,7 @@ struct AlbumsGridScreen: View {
                 .frame(maxWidth: .infinity)
                 .containerRelativeFrame(.vertical)
             }
-            .barkRefreshable { await vm.reload() }
+            .barkRefreshable { await vm.reload(showSpinner: false) }
         } else {
             ScrollView {
                 LazyVGrid(columns: Self.columns, spacing: 12) {
@@ -73,7 +73,7 @@ struct AlbumsGridScreen: View {
                 if vm.state.isLoadingMore { ProgressView().padding() }
             }
             // Потянуть вниз — перезагрузить список альбомов.
-            .barkRefreshable { await vm.reload() }
+            .barkRefreshable { await vm.reload(showSpinner: false) }
         }
     }
 }
