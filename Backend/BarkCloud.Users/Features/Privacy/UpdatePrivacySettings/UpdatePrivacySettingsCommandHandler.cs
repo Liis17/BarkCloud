@@ -8,7 +8,7 @@ using MediatR;
 namespace BarkCloud.Users.Features.Privacy.UpdatePrivacySettings;
 
 public class UpdatePrivacySettingsCommandHandler(
-    UsersStorage usersStorage,
+    IUsersStorage usersStorage,
     UserContext userContext,
     ILogger<UpdatePrivacySettingsCommandHandler> logger)
     : IRequestHandler<UpdatePrivacySettingsCommand, UpdatePrivacySettingsResponse>

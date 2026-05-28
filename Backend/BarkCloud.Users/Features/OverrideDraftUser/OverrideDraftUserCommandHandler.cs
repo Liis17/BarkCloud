@@ -8,10 +8,10 @@ namespace BarkCloud.Users.Features.OverrideDraftUser;
 
 public class OverrideDraftUserCommandHandler : IRequestHandler<OverrideDraftUserCommand, AddDraftUserResponse>
 {
-    private readonly UsersStorage _usersStorage;
+    private readonly IUsersStorage _usersStorage;
     private readonly ILogger<OverrideDraftUserCommandHandler> _logger;
 
-    public OverrideDraftUserCommandHandler(UsersStorage usersStorage, ILogger<OverrideDraftUserCommandHandler> logger)
+    public OverrideDraftUserCommandHandler(IUsersStorage usersStorage, ILogger<OverrideDraftUserCommandHandler> logger)
     {
         _usersStorage = usersStorage;
         _logger = logger;

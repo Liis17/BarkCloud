@@ -10,10 +10,10 @@ namespace BarkCloud.Users.Features.FindByLogin;
 public class FindByLoginQueryHandler : IRequestHandler<FindByLoginQuery, FindByLoginResponse>
 {
 
-    private readonly UsersStorage _usersStorage;
+    private readonly IUsersStorage _usersStorage;
     private readonly ILogger<FindByLoginQueryHandler> _logger;
 
-    public FindByLoginQueryHandler(UsersStorage usersStorage, ILogger<FindByLoginQueryHandler> logger)
+    public FindByLoginQueryHandler(IUsersStorage usersStorage, ILogger<FindByLoginQueryHandler> logger)
     {
         _usersStorage = usersStorage;
         _logger = logger;

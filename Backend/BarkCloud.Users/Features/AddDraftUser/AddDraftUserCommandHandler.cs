@@ -12,13 +12,13 @@ namespace BarkCloud.Users.Features.AddDraftUser;
 public class AddDraftUserCommandHandler : IRequestHandler<AddDraftUserCommand, AddDraftUserResponse>
 {
 
-    private readonly UsersStorage _usersStorage;
+    private readonly IUsersStorage _usersStorage;
     private readonly ReservedUsernamesService _reservedUsernamesService;
     private readonly MetricsCollector _metrics;
     private readonly ILogger<AddDraftUserCommandHandler> _logger;
 
     public AddDraftUserCommandHandler(
-        UsersStorage usersStorage,
+        IUsersStorage usersStorage,
         ReservedUsernamesService reservedUsernamesService,
         MetricsCollector metrics,
         ILogger<AddDraftUserCommandHandler> logger)

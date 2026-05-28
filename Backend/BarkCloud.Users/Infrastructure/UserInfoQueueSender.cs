@@ -17,7 +17,7 @@ public class UserInfoQueueSender
     }
 
 
-    public async Task NameChangedEvent(long userId, string newFirstName, string newLastName)
+    public virtual async Task NameChangedEvent(long userId, string newFirstName, string newLastName)
     {
         var userChangeNameEvent = new UserChangedName()
         {
@@ -31,7 +31,7 @@ public class UserInfoQueueSender
         _metrics.Increment("user_name_changed_published");
     }
 
-    public async Task UsernameChangedEvent(long userId, string newUsername)
+    public virtual async Task UsernameChangedEvent(long userId, string newUsername)
     {
         var usernameChangedEvent = new UserChangedUsername()
         {
@@ -44,7 +44,7 @@ public class UserInfoQueueSender
         _metrics.Increment("user_username_changed_published");
     }
 
-    public async Task UserChangedAvatarEvent(long userId, string profilePictureUrl, string profilePicturePreviewUrl)
+    public virtual async Task UserChangedAvatarEvent(long userId, string profilePictureUrl, string profilePicturePreviewUrl)
     {
         var userChangedAvatarEvent = new UserChangedAvatar()
         {
@@ -58,7 +58,7 @@ public class UserInfoQueueSender
         _metrics.Increment("user_avatar_changed_published");
     }
 
-    public async Task BioChangedEvent(long userId, string newBio)
+    public virtual async Task BioChangedEvent(long userId, string newBio)
     {
         var bioChangedEvent = new UserChangedBio()
         {
@@ -71,7 +71,7 @@ public class UserInfoQueueSender
         _metrics.Increment("user_bio_changed_published");
     }
 
-    public async Task UserDeletedEvent(long userId)
+    public virtual async Task UserDeletedEvent(long userId)
     {
         var userDeletedEvent = new UserDeleted()
         {

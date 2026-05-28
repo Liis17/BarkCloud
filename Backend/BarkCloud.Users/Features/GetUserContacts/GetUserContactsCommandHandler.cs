@@ -10,10 +10,10 @@ namespace BarkCloud.Users.Features.GetUserContacts;
 public class GetUserContactsCommandHandler : IRequestHandler<GetUserContactsCommand, GetUserContactsResponse>
 {
 
-    private readonly UsersStorage _usersStorage;
+    private readonly IUsersStorage _usersStorage;
     private readonly ILogger<GetUserContactsCommandHandler> _logger;
 
-    public GetUserContactsCommandHandler(UsersStorage usersStorage, ILogger<GetUserContactsCommandHandler> logger)
+    public GetUserContactsCommandHandler(IUsersStorage usersStorage, ILogger<GetUserContactsCommandHandler> logger)
     {
         _usersStorage = usersStorage;
         _logger = logger;

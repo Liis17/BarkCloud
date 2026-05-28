@@ -41,8 +41,8 @@ public class Program
         builder.Services.AddDbContext<UsersContext>(c
             => c.UseNpgsql(builder.Configuration["UsersDb"]));
 
-        builder.Services.AddTransient<UsersStorage>();
-        builder.Services.AddTransient<DevicesStorage>();
+        builder.Services.AddTransient<IUsersStorage, UsersStorage>();
+        builder.Services.AddTransient<IDevicesStorage, DevicesStorage>();
         builder.Services.AddScoped<UserInfoQueueSender>();
         builder.Services.AddSingleton<ReservedUsernamesService>();
 
