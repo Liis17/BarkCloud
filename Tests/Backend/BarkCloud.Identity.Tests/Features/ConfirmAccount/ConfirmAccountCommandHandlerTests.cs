@@ -74,7 +74,7 @@ public class ConfirmAccountCommandHandlerTests
     {
         _codes.Setup(s => s.GetCode(It.IsAny<Guid>())).ReturnsAsync(new ConfirmationCode
         {
-            Type = ConfirmationCodeType.ResetPassword,
+            Type = ConfirmationCodeType.Unknown,
             Expires = DateTime.UtcNow.AddMinutes(5),
             Value = "0"
         });
