@@ -9,13 +9,13 @@ namespace BarkCloud.Files.Features.GetTempDownloadUrl;
 
 public class GetTempDownloadUrlCommandHandler : IRequestHandler<GetTempDownloadUrlCommand, GetTempDownloadUrlResponse>
 {
-    private readonly UploadedFilesStorage _uploadedFilesStorage;
-    private readonly TempFilesStorage _tempFilesStorage;
+    private readonly IUploadedFilesStorage _uploadedFilesStorage;
+    private readonly ITempFilesStorage _tempFilesStorage;
     private readonly RunSettings _runSettings;
     private readonly IConfiguration _configuration;
     private readonly ILogger<GetTempDownloadUrlCommandHandler> _logger;
 
-    public GetTempDownloadUrlCommandHandler(UploadedFilesStorage uploadedFilesStorage, TempFilesStorage tempFilesStorage,
+    public GetTempDownloadUrlCommandHandler(IUploadedFilesStorage uploadedFilesStorage, ITempFilesStorage tempFilesStorage,
         RunSettings runSettings, IConfiguration configuration, ILogger<GetTempDownloadUrlCommandHandler> logger)
     {
         _uploadedFilesStorage = uploadedFilesStorage;

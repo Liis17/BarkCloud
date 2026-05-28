@@ -16,13 +16,13 @@ public class AlbumViewBuilder
     private const int PreferredCoverWidth = 512;
 
     private readonly AlbumStorage _albumStorage;
-    private readonly UploadedFilesStorage _filesStorage;
+    private readonly IUploadedFilesStorage _filesStorage;
     private readonly RunSettings _runSettings;
     private readonly IConfiguration _configuration;
 
     public AlbumViewBuilder(
         AlbumStorage albumStorage,
-        UploadedFilesStorage filesStorage,
+        IUploadedFilesStorage filesStorage,
         RunSettings runSettings,
         IConfiguration configuration)
     {

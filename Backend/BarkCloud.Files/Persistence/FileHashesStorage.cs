@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace BarkCloud.Files.Persistence;
 
-public class FileHashesStorage
+public class FileHashesStorage : IFileHashesStorage
 {
     private readonly FilesContext _context;
 

@@ -20,14 +20,14 @@ public class TrashPurgeService
     private readonly FilesContext _context;
     private readonly S3Uploader _s3;
     private readonly S3BucketRegistry _bucketRegistry;
-    private readonly FileHashesStorage _hashesStorage;
+    private readonly IFileHashesStorage _hashesStorage;
     private readonly ILogger<TrashPurgeService> _logger;
 
     public TrashPurgeService(
         FilesContext context,
         S3Uploader s3,
         S3BucketRegistry bucketRegistry,
-        FileHashesStorage hashesStorage,
+        IFileHashesStorage hashesStorage,
         ILogger<TrashPurgeService> logger)
     {
         _context = context;

@@ -15,8 +15,8 @@ namespace BarkCloud.Files.Features.UploadFile;
 
 public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, string>
 {
-    private readonly UploadedFilesStorage _filesStorage;
-    private readonly FileHashesStorage _hashesStorage;
+    private readonly IUploadedFilesStorage _filesStorage;
+    private readonly IFileHashesStorage _hashesStorage;
     private readonly S3Uploader _s3Uploader;
     private readonly S3BucketRegistry _bucketRegistry;
     private readonly ImageCompressor _imageCompressor;
@@ -39,8 +39,8 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
     ];
 
     public UploadFileCommandHandler(
-        UploadedFilesStorage filesStorage,
-        FileHashesStorage hashesStorage,
+        IUploadedFilesStorage filesStorage,
+        IFileHashesStorage hashesStorage,
         S3Uploader s3Uploader,
         S3BucketRegistry bucketRegistry,
         ImageCompressor imageCompressor,

@@ -18,20 +18,20 @@ namespace BarkCloud.Files.Features.Cloud.DeleteUserMedia;
 /// </para>
 /// <para>
 /// • Если записей нет (медиа загружено без привязки к папке) — снимает владельца
-///   с блоба (<see cref="UploadedFilesStorage.RemoveUploaderFromFile"/>): жёсткое
+///   с блоба (<see cref="IUploadedFilesStorage.RemoveUploaderFromFile"/>): жёсткое
 ///   удаление из галереи, освобождает квоту, без возможности восстановления.
 /// </para>
 /// </summary>
 public class DeleteUserMediaCommandHandler : IRequestHandler<DeleteUserMediaCommand, CloudEmpty>
 {
     private readonly FilesContext _context;
-    private readonly UploadedFilesStorage _uploadedFiles;
+    private readonly IUploadedFilesStorage _uploadedFiles;
     private readonly UserContext _userContext;
     private readonly ILogger<DeleteUserMediaCommandHandler> _logger;
 
     public DeleteUserMediaCommandHandler(
         FilesContext context,
-        UploadedFilesStorage uploadedFiles,
+        IUploadedFilesStorage uploadedFiles,
         UserContext userContext,
         ILogger<DeleteUserMediaCommandHandler> logger)
     {

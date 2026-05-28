@@ -51,9 +51,9 @@ public class Program
 
         builder.Services.AddControllers();
 
-        builder.Services.AddScoped<UploadedFilesStorage>();
-        builder.Services.AddScoped<TempFilesStorage>();
-        builder.Services.AddScoped<FileHashesStorage>();
+        builder.Services.AddScoped<IUploadedFilesStorage, UploadedFilesStorage>();
+        builder.Services.AddScoped<ITempFilesStorage, TempFilesStorage>();
+        builder.Services.AddScoped<IFileHashesStorage, FileHashesStorage>();
         builder.Services.AddScoped<CloudHierarchyStorage>();
         builder.Services.AddScoped<AlbumStorage>();
         builder.Services.AddScoped<FavoriteFilesStorage>();

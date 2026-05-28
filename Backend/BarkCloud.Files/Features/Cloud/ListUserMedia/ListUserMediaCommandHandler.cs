@@ -27,7 +27,7 @@ public class ListUserMediaCommandHandler : IRequestHandler<ListUserMediaCommand,
     private const int MaxEntryNames = 5;
 
     private readonly FilesContext _context;
-    private readonly UploadedFilesStorage _uploadedFiles;
+    private readonly IUploadedFilesStorage _uploadedFiles;
     private readonly UserContext _userContext;
     private readonly RunSettings _runSettings;
     private readonly IConfiguration _configuration;
@@ -35,7 +35,7 @@ public class ListUserMediaCommandHandler : IRequestHandler<ListUserMediaCommand,
 
     public ListUserMediaCommandHandler(
         FilesContext context,
-        UploadedFilesStorage uploadedFiles,
+        IUploadedFilesStorage uploadedFiles,
         UserContext userContext,
         RunSettings runSettings,
         IConfiguration configuration,

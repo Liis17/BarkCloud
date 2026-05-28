@@ -110,7 +110,7 @@ public class S3BucketRegistry : IDisposable
     /// <summary>
     /// Получает имя бакета для указанного типа файла (реальное имя из конфигурации)
     /// </summary>
-    public string GetBucketName(UploadFileType fileType)
+    public virtual string GetBucketName(UploadFileType fileType)
     {
         var bucketId = GetBucketId(fileType);
 

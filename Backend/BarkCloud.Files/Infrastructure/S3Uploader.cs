@@ -11,7 +11,7 @@ public class S3Uploader
         _registry = registry;
     }
 
-    public async Task<string> UploadAsync(string bucket, string key, Stream data, string contentType)
+    public virtual async Task<string> UploadAsync(string bucket, string key, Stream data, string contentType)
     {
         var client = _registry.GetClientForBucket(bucket);
 
@@ -34,7 +34,7 @@ public class S3Uploader
     /// <summary>
     /// Удаляет объект из S3/MinIO. Идемпотентно: для отсутствующего ключа S3 возвращает успех.
     /// </summary>
-    public async Task DeleteAsync(string bucket, string key)
+    public virtual async Task DeleteAsync(string bucket, string key)
     {
         var client = _registry.GetClientForBucket(bucket);
 
@@ -50,7 +50,7 @@ public class S3Uploader
     /// Возвращаемый поток владеет <see cref="GetObjectResponse"/>: при его Dispose/DisposeAsync
     /// корректно освобождаются HTTP-соединение и метаданные ответа AWS SDK.
     /// </summary>
-    public async Task<Stream> DownloadAsync(string bucket, string key)
+    public virtual async Task<Stream> DownloadAsync(string bucket, string key)
     {
         var client = _registry.GetClientForBucket(bucket);
 
