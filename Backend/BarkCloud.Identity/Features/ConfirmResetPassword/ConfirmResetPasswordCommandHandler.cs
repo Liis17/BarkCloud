@@ -22,10 +22,10 @@ namespace BarkCloud.Identity.Features.ConfirmResetPassword
 
     public class ConfirmResetPasswordCommandHandler : IRequestHandler<ConfirmResetPasswordCommand, ConfirmResetPasswordResponse>
     {
-        private readonly ResetPasswordsStorage _resetPasswordsStorage;
-        private readonly AuthPropertiesStorage _authPropertiesStorage;
-        private readonly PasswordsStorage _passwordsStorage;
-        private readonly RefreshTokensStorage refreshTokensStorage;
+        private readonly IResetPasswordsStorage _resetPasswordsStorage;
+        private readonly IAuthPropertiesStorage _authPropertiesStorage;
+        private readonly IPasswordsStorage _passwordsStorage;
+        private readonly IRefreshTokensStorage refreshTokensStorage;
         private readonly IMediator _mediator;
         private readonly RequestContext requestContext;
         private readonly MetricsCollector _metrics;
@@ -34,8 +34,8 @@ namespace BarkCloud.Identity.Features.ConfirmResetPassword
         private const int ExpDaysRefreshToken = 9999;
 
 
-        public ConfirmResetPasswordCommandHandler(ResetPasswordsStorage resetPasswordsStorage, AuthPropertiesStorage authPropertiesStorage,
-            PasswordsStorage passwordsStorage, RefreshTokensStorage refreshTokensStorage, IMediator mediator, RequestContext requestContext,
+        public ConfirmResetPasswordCommandHandler(IResetPasswordsStorage resetPasswordsStorage, IAuthPropertiesStorage authPropertiesStorage,
+            IPasswordsStorage passwordsStorage, IRefreshTokensStorage refreshTokensStorage, IMediator mediator, RequestContext requestContext,
             MetricsCollector metrics, ILogger<ConfirmResetPasswordCommandHandler> logger)
         {
             _resetPasswordsStorage = resetPasswordsStorage;

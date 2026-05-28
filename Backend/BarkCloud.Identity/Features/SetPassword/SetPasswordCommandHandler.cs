@@ -23,8 +23,8 @@ using Services;
 public class SetPasswordCommandHandler : IRequestHandler<SetPasswordCommand>
 {
     private readonly UserContext _userContext;
-    private readonly PasswordsStorage _passwordsStorage;
-    private readonly RefreshTokensStorage refreshTokensStorage;
+    private readonly IPasswordsStorage _passwordsStorage;
+    private readonly IRefreshTokensStorage refreshTokensStorage;
     private readonly NotificationQueueSender _notificationQueueSender;
     private readonly LocationClient _locationClient;
     private readonly UsersServerApi.UsersServerApiClient _usersClient;
@@ -32,8 +32,8 @@ public class SetPasswordCommandHandler : IRequestHandler<SetPasswordCommand>
     private readonly MetricsCollector _metrics;
     private readonly ILogger<SetPasswordCommandHandler> _logger;
 
-    public SetPasswordCommandHandler(UserContext userContext, PasswordsStorage passwordsStorage,
-        RefreshTokensStorage refreshTokensStorage, NotificationQueueSender notificationQueueSender,
+    public SetPasswordCommandHandler(UserContext userContext, IPasswordsStorage passwordsStorage,
+        IRefreshTokensStorage refreshTokensStorage, NotificationQueueSender notificationQueueSender,
         LocationClient locationClient, UsersServerApi.UsersServerApiClient usersClient, RequestContext requestContext,
         MetricsCollector metrics, ILogger<SetPasswordCommandHandler> logger)
     {

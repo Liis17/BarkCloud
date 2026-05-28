@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Backend\BarkCloud.Files\BarkCloud.Files.csproj" />
+    <ProjectReference Include="..\..\BarkCloud.TestKit\BarkCloud.TestKit.csproj" />
+  </ItemGroup>
+
+</Project>

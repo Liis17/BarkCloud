@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace BarkCloud.Identity.Persistence.Services;
 
-public class RefreshTokensStorage(IdentityContext context)
+public class RefreshTokensStorage(IdentityContext context) : IRefreshTokensStorage
 {
     public async Task<RefreshToken?> FindRefreshToken(string refreshToken)
     {

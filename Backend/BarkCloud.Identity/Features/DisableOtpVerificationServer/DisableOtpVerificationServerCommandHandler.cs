@@ -7,10 +7,10 @@ namespace BarkCloud.Identity.Features.DisableOtpVerificationServer;
 
 public class DisableOtpVerificationServerCommandHandler : IRequestHandler<DisableOtpVerificationServerCommand, DisableOtpVerificationResponse>
 {
-    private readonly AuthPropertiesStorage _authPropertiesStorage;
+    private readonly IAuthPropertiesStorage _authPropertiesStorage;
     private readonly ILogger<DisableOtpVerificationServerCommandHandler> _logger;
 
-    public DisableOtpVerificationServerCommandHandler(AuthPropertiesStorage authPropertiesStorage,
+    public DisableOtpVerificationServerCommandHandler(IAuthPropertiesStorage authPropertiesStorage,
         ILogger<DisableOtpVerificationServerCommandHandler> logger)
     {
         _authPropertiesStorage = authPropertiesStorage;

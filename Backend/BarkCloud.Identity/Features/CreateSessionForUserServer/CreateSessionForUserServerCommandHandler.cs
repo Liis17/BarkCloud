@@ -20,7 +20,7 @@ public class CreateSessionForUserServerCommandHandler(
     UsersServerApi.UsersServerApiClient usersClient,
     IMediator mediator,
     NotificationQueueSender notificationQueueSender,
-    RefreshTokensStorage refreshTokensStorage,
+    IRefreshTokensStorage refreshTokensStorage,
     LocationClient locationClient,
     MetricsCollector metrics,
     ILogger<CreateSessionForUserServerCommandHandler> logger)

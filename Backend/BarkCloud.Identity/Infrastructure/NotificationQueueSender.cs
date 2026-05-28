@@ -13,7 +13,7 @@ public class NotificationQueueSender
         _publishEndpoint = publishEndpoint;
     }
 
-    public async Task SendNotification(Notification notification)
+    public virtual async Task SendNotification(Notification notification)
     {
         if (notification is EmailNotification emailNotification)
         {

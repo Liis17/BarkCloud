@@ -17,7 +17,7 @@ using MediatR;
 namespace BarkCloud.Identity.Features.CreateAccount;
 
 public class CreateAccountCommandHandler(UsersServerApi.UsersServerApiClient usersClient,
-    ConfirmationCodesStorage confirationCodesStorage, NotificationQueueSender notificationQueueSender,
+    IConfirmationCodesStorage confirationCodesStorage, NotificationQueueSender notificationQueueSender,
     RequestContext requestContext, LocationClient locationClient, MetricsCollector metrics,
     ILogger<CreateAccountCommandHandler> logger)
     : IRequestHandler<CreateAccountCommand, CreateAccountResponse>

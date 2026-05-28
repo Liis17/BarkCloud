@@ -58,15 +58,15 @@ public class Program
             }).AddInterceptor(() => new JwtClientInterceptor(builder.Configuration["UsersService:Token"]))
             .AddInterceptor(() => new ExceptionClientInterceptor());
 
-        builder.Services.AddTransient<RefreshTokensStorage>();
+        builder.Services.AddTransient<IRefreshTokensStorage, RefreshTokensStorage>();
         builder.Services.AddTransient<JwtService>();
-        builder.Services.AddTransient<ConfirmationCodesStorage>();
+        builder.Services.AddTransient<IConfirmationCodesStorage, ConfirmationCodesStorage>();
         builder.Services.AddScoped<NotificationQueueSender>();
         builder.Services.AddHttpClient<LocationClient>();
         builder.Services.AddScoped<LocationClient>();
-        builder.Services.AddTransient<AuthPropertiesStorage>();
-        builder.Services.AddTransient<PasswordsStorage>();
-        builder.Services.AddTransient<ResetPasswordsStorage>();
+        builder.Services.AddTransient<IAuthPropertiesStorage, AuthPropertiesStorage>();
+        builder.Services.AddTransient<IPasswordsStorage, PasswordsStorage>();
+        builder.Services.AddTransient<IResetPasswordsStorage, ResetPasswordsStorage>();
 
         builder.Services.AddMassTransit(x =>
         {
