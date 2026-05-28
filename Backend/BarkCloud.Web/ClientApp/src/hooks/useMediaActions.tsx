@@ -1,10 +1,11 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ContextMenu, type ContextItem } from '../components/ui/ContextMenu';
 import { RenameModal } from '../components/ui/RenameModal';
 import { ConfirmModal } from '../components/ui/ConfirmModal';
 import { PropertiesModal } from '../components/ui/PropertiesModal';
 import { useAlbumMembership } from './useAlbumMembership';
-import { apiGet, apiPost } from '../lib/api';
+import { apiGet, apiPost, pickFiles, uploadFile } from '../lib/api';
 import type { Album, MediaItem } from '../lib/types';
 import type { ToastPush } from './useToast';
 
@@ -17,11 +18,19 @@ interface UseMediaActionsArgs {
   toast: ToastPush;
   onRenamed?: (media: MediaItem, name: string) => void;
   onRemoved?: (media: MediaItem) => void;
+  onItemPatched?: (id: string, patch: Partial<MediaItem>) => void;
   reloadAlbums?: () => void;
 }
 
+/** Добавить cache-bust к URL превью, чтобы браузер перезапросил обновлённое изображение. */
+function bustPreviews(m: MediaItem): Partial<MediaItem> {
+  const t = Date.now();
+  return { previews: (m.previews || []).map((p) => ({ ...p, url: p.url + (p.url.includes('?') ? '&' : '?') + 't=' + t })) };
+}
+
 /** Полный набор действий контекстного меню для медиа галереи (Фото/Видео). */
-export function useMediaActions({ albums, toast, onRenamed, onRemoved, reloadAlbums }: UseMediaActionsArgs) {
+export function useMediaActions({ albums, toast, onRenamed, onRemoved, onItemPatched, reloadAlbums }: UseMediaActionsArgs) {
+  const navigate = useNavigate();
   const [menu, setMenu] = React.useState<{ x: number; y: number; media: MediaItem } | null>(null);
   const [rename, setRename] = React.useState<MediaItem | null>(null);
   const [confirm, setConfirm] = React.useState<MediaItem | null>(null);
@@ -99,6 +108,28 @@ export function useMediaActions({ albums, toast, onRenamed, onRemoved, reloadAlb
       toast((e as Error).message, 'err');
     }
   }
+  async function replaceThumb(m: MediaItem) {
+    const [img] = await pickFiles({ accept: 'image/*', multiple: false });
+    if (!img) return;
+    try {
+      const up = await uploadFile(img);
+      await apiPost('/api/cloud/video/thumbnail', { videoFileId: m.id, imageFileId: up.fileId });
+      onItemPatched && onItemPatched(m.id, bustPreviews(m));
+      toast('Превью видео обновлено');
+    } catch (e) {
+      toast((e as Error).message, 'err');
+    }
+  }
+  async function revealInFolder(m: MediaItem) {
+    const entryId = m.entryIds && m.entryIds[0];
+    if (!entryId) return;
+    try {
+      const p = await apiGet<{ segments: { id: string; name: string }[] }>('/api/cloud/path?entry=' + encodeURIComponent(entryId));
+      navigate('/files', { state: { stack: p.segments, selectEntryId: entryId } });
+    } catch (e) {
+      toast((e as Error).message, 'err');
+    }
+  }
 
   function buildItems(m: MediaItem): ContextItem[] {
     const isMedia = m.kind === 'photo' || m.kind === 'video';
@@ -109,7 +140,11 @@ export function useMediaActions({ albums, toast, onRenamed, onRemoved, reloadAlb
     const out: ContextItem[] = [
       { label: 'Копировать ссылку', icon: 'link', onClick: () => copyLink(m) },
       { label: 'Переименовать', icon: 'pencil', disabled: !hasEntry, onClick: () => setRename(m) },
+      { label: 'Показать в папке', icon: 'folder', disabled: !hasEntry, onClick: () => revealInFolder(m) },
     ];
+    if (m.kind === 'video') {
+      out.push({ label: 'Заменить превью', icon: 'photo', onClick: () => replaceThumb(m) });
+    }
     if (isMedia) {
       out.push({
         label: 'Добавить в альбом',
