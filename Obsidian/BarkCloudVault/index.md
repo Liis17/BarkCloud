@@ -14,6 +14,7 @@
 - [[structure/overview]] — Общая структура проекта и дерево директорий
 - [[structure/entrypoints]] — Точки входа и запуск сервисов
 - [[structure/infrastructure]] — Инфраструктура: docker-compose, PostgreSQL, RabbitMQ, MinIO, Seq
+- [[structure/testing]] — Юнит-тесты: расположение, стек (xUnit/Moq/FluentAssertions), стратегия мокирования, CI
 
 ### 📦 Модули — Backend
 - [[modules/backend-configuration]] — Сервис конфигурации (хранит настройки всех микросервисов и зарезервированные юзернеймы)

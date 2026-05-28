@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Shared\BarkCloud.Shared.Identity\BarkCloud.Shared.Identity.csproj" />
+  </ItemGroup>
+
+</Project>

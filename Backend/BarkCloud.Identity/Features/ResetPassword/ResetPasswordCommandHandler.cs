@@ -17,8 +17,8 @@ namespace BarkCloud.Identity.Features.ResetPassword;
 
 public class ResetPasswordCommandHandler : IRequestHandler<ResetPasswordCommand, ResetPasswordResponse>
 {
-    private readonly ResetPasswordsStorage _resetPasswordsStorage;
-    private readonly AuthPropertiesStorage _authPropertiesStorage;
+    private readonly IResetPasswordsStorage _resetPasswordsStorage;
+    private readonly IAuthPropertiesStorage _authPropertiesStorage;
     private readonly UsersServerApi.UsersServerApiClient _usersClient;
     private readonly RequestContext _requestContext;
     private readonly NotificationQueueSender _notificationQueueSender;
@@ -26,8 +26,8 @@ public class ResetPasswordCommandHandler : IRequestHandler<ResetPasswordCommand,
     private readonly MetricsCollector _metrics;
     private readonly ILogger<ResetPasswordCommandHandler> _logger;
 
-    public ResetPasswordCommandHandler(ResetPasswordsStorage resetPasswordsStorage,
-        AuthPropertiesStorage authPropertiesStorage, UsersServerApi.UsersServerApiClient usersApiClient,
+    public ResetPasswordCommandHandler(IResetPasswordsStorage resetPasswordsStorage,
+        IAuthPropertiesStorage authPropertiesStorage, UsersServerApi.UsersServerApiClient usersApiClient,
         RequestContext requestContext, NotificationQueueSender notificationQueueSender, LocationClient locationClient,
         MetricsCollector metrics, ILogger<ResetPasswordCommandHandler> logger)
     {

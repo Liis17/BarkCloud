@@ -21,7 +21,7 @@ namespace BarkCloud.Identity.Features.DisableOtpVerification;
 public class DisableOtpVerificationCommandHandler : IRequestHandler<DisableOtpVerificationCommand, DisableOtpVerificationResponse>
 {
     private readonly UserContext _userContext;
-    private readonly AuthPropertiesStorage _authPropertiesStorage;
+    private readonly IAuthPropertiesStorage _authPropertiesStorage;
     private readonly NotificationQueueSender _notificationQueueSender;
     private readonly LocationClient _locationClient;
     private readonly UsersServerApi.UsersServerApiClient _usersClient;
@@ -29,7 +29,7 @@ public class DisableOtpVerificationCommandHandler : IRequestHandler<DisableOtpVe
     private readonly MetricsCollector _metrics;
     private readonly ILogger<DisableOtpVerificationCommandHandler> _logger;
 
-    public DisableOtpVerificationCommandHandler(UserContext userContext, AuthPropertiesStorage authPropertiesStorage,
+    public DisableOtpVerificationCommandHandler(UserContext userContext, IAuthPropertiesStorage authPropertiesStorage,
         NotificationQueueSender notificationQueueSender, LocationClient locationClient,
         UsersServerApi.UsersServerApiClient usersClient, RequestContext requestContext,
         MetricsCollector metrics, ILogger<DisableOtpVerificationCommandHandler> logger)

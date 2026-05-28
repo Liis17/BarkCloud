@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace BarkCloud.Identity.Persistence.Services;
 
-public class PasswordsStorage
+public class PasswordsStorage : IPasswordsStorage
 {
     private readonly IdentityContext _context;
 

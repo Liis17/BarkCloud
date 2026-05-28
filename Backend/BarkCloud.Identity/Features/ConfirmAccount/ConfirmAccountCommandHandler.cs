@@ -17,8 +17,8 @@ using MediatR;
 
 namespace BarkCloud.Identity.Features.ConfirmAccount;
 
-public class ConfirmAccountCommandHandler(ConfirmationCodesStorage confirmationCodesStorage,
-    UsersServerApi.UsersServerApiClient usersClient, RefreshTokensStorage refreshTokensStorage, RequestContext requestContext,
+public class ConfirmAccountCommandHandler(IConfirmationCodesStorage confirmationCodesStorage,
+    UsersServerApi.UsersServerApiClient usersClient, IRefreshTokensStorage refreshTokensStorage, RequestContext requestContext,
     NotificationQueueSender notificationQueueSender, LocationClient locationClient, MetricsCollector metrics,
     ILogger<ConfirmAccountCommandHandler> logger)
     : IRequestHandler<ConfirmAccountCommand, ConfirmAccountResponse>
