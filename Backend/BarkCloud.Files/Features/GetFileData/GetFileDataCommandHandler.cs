@@ -11,12 +11,12 @@ namespace BarkCloud.Files.Features.GetFileData;
 public class GetFileDataCommandHandler : IRequestHandler<GetFileDataCommand, GetFileDataResponse>
 {
 
-    private readonly UploadedFilesStorage _uploadedFilesStorage;
+    private readonly IUploadedFilesStorage _uploadedFilesStorage;
     private readonly RunSettings _runSettings;
     private readonly IConfiguration _configuration;
     private readonly ILogger<GetFileDataCommandHandler> _logger;
 
-    public GetFileDataCommandHandler(UploadedFilesStorage uploadedFilesStorage, RunSettings runSettings,
+    public GetFileDataCommandHandler(IUploadedFilesStorage uploadedFilesStorage, RunSettings runSettings,
         IConfiguration configuration, ILogger<GetFileDataCommandHandler> logger)
     {
         _uploadedFilesStorage = uploadedFilesStorage;

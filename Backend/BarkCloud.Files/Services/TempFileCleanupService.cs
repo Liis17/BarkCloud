@@ -26,7 +26,7 @@ public class TempFileCleanupService : BackgroundService
             try
             {
                 using var scope = _scopeFactory.CreateScope();
-                var storage = scope.ServiceProvider.GetRequiredService<TempFilesStorage>();
+                var storage = scope.ServiceProvider.GetRequiredService<ITempFilesStorage>();
 
                 var deleted = await storage.DeleteExpiredAsync(stoppingToken);
 

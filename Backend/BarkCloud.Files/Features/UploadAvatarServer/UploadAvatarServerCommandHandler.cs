@@ -14,7 +14,7 @@ namespace BarkCloud.Files.Features.UploadAvatarServer;
 
 public class UploadAvatarServerCommandHandler : IRequestHandler<UploadAvatarServerCommand, UploadAvatarServerResponse>
 {
-    private readonly UploadedFilesStorage _uploadedFilesStorage;
+    private readonly IUploadedFilesStorage _uploadedFilesStorage;
     private readonly S3Uploader _s3Uploader;
     private readonly S3BucketRegistry _bucketRegistry;
     private readonly ImageCompressor _imageCompressor;
@@ -23,7 +23,7 @@ public class UploadAvatarServerCommandHandler : IRequestHandler<UploadAvatarServ
     private readonly ILogger<UploadAvatarServerCommandHandler> _logger;
 
     public UploadAvatarServerCommandHandler(
-        UploadedFilesStorage uploadedFilesStorage,
+        IUploadedFilesStorage uploadedFilesStorage,
         S3Uploader s3Uploader,
         S3BucketRegistry bucketRegistry,
         ImageCompressor imageCompressor,

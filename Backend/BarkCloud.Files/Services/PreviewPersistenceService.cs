@@ -15,15 +15,15 @@ namespace BarkCloud.Files.Services;
 /// </summary>
 public class PreviewPersistenceService
 {
-    private readonly UploadedFilesStorage _filesStorage;
-    private readonly FileHashesStorage _hashesStorage;
+    private readonly IUploadedFilesStorage _filesStorage;
+    private readonly IFileHashesStorage _hashesStorage;
     private readonly S3Uploader _s3Uploader;
     private readonly FilesContext _context;
     private readonly ILogger<PreviewPersistenceService> _logger;
 
     public PreviewPersistenceService(
-        UploadedFilesStorage filesStorage,
-        FileHashesStorage hashesStorage,
+        IUploadedFilesStorage filesStorage,
+        IFileHashesStorage hashesStorage,
         S3Uploader s3Uploader,
         FilesContext context,
         ILogger<PreviewPersistenceService> logger)
@@ -39,7 +39,7 @@ public class PreviewPersistenceService
     /// Сохраняет превью для оригинала <paramref name="original"/>: дедуп по SHA256, заливка в S3,
     /// привязка через FilePreview. Уже существующие превью тех же ширин пропускаются.
     /// </summary>
-    public async Task PersistPreviewsAsync(
+    public virtual async Task PersistPreviewsAsync(
         UploadFile original,
         List<MultiPreviewItem> previews,
         string bucketName,

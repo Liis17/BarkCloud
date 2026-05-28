@@ -23,7 +23,7 @@ public class SetVideoThumbnailCommandHandler : IRequestHandler<SetVideoThumbnail
 {
     private static readonly int[] CloudPreviewWidths = { 1024, 512, 128 };
 
-    private readonly UploadedFilesStorage _filesStorage;
+    private readonly IUploadedFilesStorage _filesStorage;
     private readonly ImageCompressor _imageCompressor;
     private readonly PreviewPersistenceService _previewPersistence;
     private readonly S3Uploader _s3Uploader;
@@ -33,7 +33,7 @@ public class SetVideoThumbnailCommandHandler : IRequestHandler<SetVideoThumbnail
     private readonly ILogger<SetVideoThumbnailCommandHandler> _logger;
 
     public SetVideoThumbnailCommandHandler(
-        UploadedFilesStorage filesStorage,
+        IUploadedFilesStorage filesStorage,
         ImageCompressor imageCompressor,
         PreviewPersistenceService previewPersistence,
         S3Uploader s3Uploader,
