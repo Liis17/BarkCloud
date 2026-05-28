@@ -15,6 +15,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
 using DomainResetPassword = BarkCloud.Identity.Domain.ResetPassword;
+using OtpType = BarkCloud.Identity.Domain.OtpType;
 
 namespace BarkCloud.Identity.Tests.Features.ResetPassword;
 
@@ -90,7 +91,7 @@ public class ResetPasswordCommandHandlerTests
         _authProps.Setup(s => s.CheckOtpEnabled(42)).ReturnsAsync(false);
 
         var act = () => CreateSut().Handle(
-            new ResetPasswordCommand { Username = "u", OtpType = OtpTypeId.Authenticator }, default);
+            new ResetPasswordCommand { Username = "u", OtpType = OtpType.Authenticator }, default);
 
         await act.Should().ThrowAsync<OtpNotCreatedException>();
     }
@@ -106,7 +107,7 @@ public class ResetPasswordCommandHandlerTests
             .ReturnsAsync((DomainResetPassword r) => { r.Id = Guid.NewGuid(); return r; });
 
         var response = await CreateSut().Handle(
-            new ResetPasswordCommand { Username = "u", OtpType = OtpTypeId.Authenticator }, default);
+            new ResetPasswordCommand { Username = "u", OtpType = OtpType.Authenticator }, default);
 
         response.ResetId.Should().NotBeNullOrEmpty();
         _notifications.Verify(n => n.SendNotification(It.IsAny<Notification>()), Times.Never);
@@ -131,7 +132,7 @@ public class ResetPasswordCommandHandlerTests
             .ReturnsAsync((DomainResetPassword r) => { r.Id = Guid.NewGuid(); return r; });
 
         var response = await CreateSut().Handle(
-            new ResetPasswordCommand { Email = "u@e", OtpType = OtpTypeId.Email }, default);
+            new ResetPasswordCommand { Email = "u@e", OtpType = OtpType.Email }, default);
 
         response.ResetId.Should().NotBeNullOrEmpty();
         _notifications.Verify(n => n.SendNotification(It.Is<EmailNotification>(
