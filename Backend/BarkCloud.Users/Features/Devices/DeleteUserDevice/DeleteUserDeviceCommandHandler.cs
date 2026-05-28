@@ -6,7 +6,7 @@ using MediatR;
 namespace BarkCloud.Users.Features.Devices.DeleteUserDevice;
 
 public class DeleteUserDeviceCommandHandler(
-    DevicesStorage devicesStorage,
+    IDevicesStorage devicesStorage,
     ILogger<DeleteUserDeviceCommandHandler> logger)
     : IRequestHandler<DeleteUserDeviceCommand, DeleteUserDeviceResponse>
 {

@@ -8,7 +8,7 @@ using MediatR;
 namespace BarkCloud.Users.Features.Devices.GetUserDevices;
 
 public class GetUserDevicesQueryHandler(
-    DevicesStorage devicesStorage,
+    IDevicesStorage devicesStorage,
     ILogger<GetUserDevicesQueryHandler> logger)
     : IRequestHandler<GetUserDevicesQuery, GetUserDevicesResponse>
 {

@@ -8,10 +8,10 @@ namespace BarkCloud.Users.Features.UpdateStorageLimit;
 
 public class UpdateStorageLimitCommandHandler : IRequestHandler<UpdateStorageLimitCommand, UpdateStorageLimitResponse>
 {
-    private readonly UsersStorage _usersStorage;
+    private readonly IUsersStorage _usersStorage;
     private readonly ILogger<UpdateStorageLimitCommandHandler> _logger;
 
-    public UpdateStorageLimitCommandHandler(UsersStorage usersStorage, ILogger<UpdateStorageLimitCommandHandler> logger)
+    public UpdateStorageLimitCommandHandler(IUsersStorage usersStorage, ILogger<UpdateStorageLimitCommandHandler> logger)
     {
         _usersStorage = usersStorage;
         _logger = logger;

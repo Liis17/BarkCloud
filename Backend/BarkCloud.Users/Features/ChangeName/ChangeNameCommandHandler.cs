@@ -9,11 +9,11 @@ namespace BarkCloud.Users.Features.ChangeName;
 public class ChangeNameCommandHandler : IRequestHandler<ChangeNameCommand>
 {
     private readonly UserContext _userContext;
-    private readonly UsersStorage _usersStorage;
+    private readonly IUsersStorage _usersStorage;
     private readonly UserInfoQueueSender _userInfoQueueSender;
     private readonly ILogger<ChangeNameCommandHandler> _logger;
 
-    public ChangeNameCommandHandler(UserContext userContext, UsersStorage usersStorage, UserInfoQueueSender userInfoQueueSender,
+    public ChangeNameCommandHandler(UserContext userContext, IUsersStorage usersStorage, UserInfoQueueSender userInfoQueueSender,
         ILogger<ChangeNameCommandHandler> logger)
     {
         _userContext = userContext;

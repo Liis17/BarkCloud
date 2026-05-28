@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace BarkCloud.Users.Persistence.Services;
 
-public class UsersStorage
+public class UsersStorage : IUsersStorage
 {
     private readonly UsersContext _usersContext;
 

@@ -10,12 +10,12 @@ namespace BarkCloud.Users.Features.GetUser;
 
 public class GetUserQueryHandler : IRequestHandler<GetUserQuery, GetUserResponse>
 {
-    private readonly UsersStorage _usersStorage;
+    private readonly IUsersStorage _usersStorage;
     private readonly UserContext _userContext;
     private readonly ILogger<GetUserQueryHandler> _logger;
 
     public GetUserQueryHandler(
-        UsersStorage usersStorage,
+        IUsersStorage usersStorage,
         UserContext userContext,
         ILogger<GetUserQueryHandler> logger)
     {

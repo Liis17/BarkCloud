@@ -8,12 +8,12 @@ namespace BarkCloud.Users.Features.SetProfilePictureServer;
 
 public class SetProfilePictureServerCommandHandler : IRequestHandler<SetProfilePictureServerCommand, SetProfilePictureServerResponse>
 {
-    private readonly UsersStorage _usersStorage;
+    private readonly IUsersStorage _usersStorage;
     private readonly UserInfoQueueSender _userInfoQueueSender;
     private readonly ILogger<SetProfilePictureServerCommandHandler> _logger;
 
     public SetProfilePictureServerCommandHandler(
-        UsersStorage usersStorage,
+        IUsersStorage usersStorage,
         UserInfoQueueSender userInfoQueueSender,
         ILogger<SetProfilePictureServerCommandHandler> logger)
     {

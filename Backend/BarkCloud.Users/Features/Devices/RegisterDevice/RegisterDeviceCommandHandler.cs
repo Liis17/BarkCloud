@@ -8,7 +8,7 @@ using MediatR;
 namespace BarkCloud.Users.Features.Devices.RegisterDevice;
 
 public class RegisterDeviceCommandHandler(
-    DevicesStorage devicesStorage,
+    IDevicesStorage devicesStorage,
     ILogger<RegisterDeviceCommandHandler> logger)
     : IRequestHandler<RegisterDeviceCommand, RegisterDeviceResponse>
 {

@@ -9,7 +9,7 @@ using MediatR;
 namespace BarkCloud.Users.Features.Devices.GetCurrentDevice;
 
 public class GetCurrentDeviceQueryHandler(
-    DevicesStorage devicesStorage,
+    IDevicesStorage devicesStorage,
     UserContext userContext,
     ILogger<GetCurrentDeviceQueryHandler> logger)
     : IRequestHandler<GetCurrentDeviceQuery, GetCurrentDeviceResponse>

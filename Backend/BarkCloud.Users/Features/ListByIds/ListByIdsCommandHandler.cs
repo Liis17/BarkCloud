@@ -8,10 +8,10 @@ namespace BarkCloud.Users.Features.ListByIds;
 
 public class ListByIdsCommandHandler : IRequestHandler<ListByIdsCommand, ListByIdsResponse>
 {
-    private readonly UsersStorage _usersStorage;
+    private readonly IUsersStorage _usersStorage;
     private readonly ILogger<ListByIdsCommandHandler> _logger;
 
-    public ListByIdsCommandHandler(UsersStorage usersStorage, ILogger<ListByIdsCommandHandler> logger)
+    public ListByIdsCommandHandler(IUsersStorage usersStorage, ILogger<ListByIdsCommandHandler> logger)
     {
         _usersStorage = usersStorage;
         _logger = logger;
