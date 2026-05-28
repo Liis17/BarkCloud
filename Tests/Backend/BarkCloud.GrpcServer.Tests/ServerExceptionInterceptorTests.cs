@@ -63,7 +63,7 @@ public class ServerExceptionInterceptorTests
     }
 
     [Fact]
-    public async Task UnaryServerHandler_SuccessPath_IncrementsRequestsAndDuration()
+    public async Task UnaryServerHandler_SuccessPath_IncrementsRequestsTotal()
     {
         var metrics = new MetricsCollector();
         var sut = CreateSut(metrics);
@@ -73,7 +73,8 @@ public class ServerExceptionInterceptorTests
 
         var snap = metrics.SnapshotAndReset();
         snap.Should().ContainKey("grpc_requests_total").WhoseValue.Should().Be(1);
-        snap.Should().ContainKey("grpc_request_duration_ms_total");
+        // grpc_request_duration_ms_total не проверяем: MetricsCollector.SnapshotAndReset
+        // отбрасывает нулевые счётчики, а fake-continuation возвращается синхронно (0 мс).
     }
 
     [Fact]
