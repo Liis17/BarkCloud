@@ -9,6 +9,8 @@ import { AlbumDetail } from '../components/albums/AlbumDetail';
 import { useToast } from '../hooks/useToast';
 import { useInfiniteMedia } from '../hooks/useInfiniteMedia';
 import { useMediaActions } from '../hooks/useMediaActions';
+import { useFileDrop } from '../hooks/useFileDrop';
+import { useBulkMedia } from '../hooks/useBulkMedia';
 import { usePageHeader } from '../hooks/usePageHeader';
 import { apiGet, apiPost, pickFiles, uploadFile } from '../lib/api';
 import { GRID_SIZES, plural, groupByDate } from '../lib/format';
@@ -16,10 +18,20 @@ import type { Album, MediaItem } from '../lib/types';
 
 const RECENT_FOLDER = 'Недавно загруженные';
 
-function Photo({ m, onOpen, onMenu }: { m: MediaItem; onOpen: (m: MediaItem) => void; onMenu: (e: React.MouseEvent, m: MediaItem) => void }) {
+function Photo({ m, selecting, checked, onToggle, onOpen, onMenu }: {
+  m: MediaItem;
+  selecting: boolean;
+  checked: boolean;
+  onToggle: (m: MediaItem) => void;
+  onOpen: (m: MediaItem) => void;
+  onMenu: (e: React.MouseEvent, m: MediaItem) => void;
+}) {
   return (
-    <div className="photo" onClick={() => onOpen(m)} onContextMenu={(e) => onMenu(e, m)}>
+    <div className={'photo' + (checked ? ' checked' : '')} onClick={() => (selecting ? onToggle(m) : onOpen(m))} onContextMenu={(e) => onMenu(e, m)}>
       <MediaThumb media={m} sizes={GRID_SIZES} />
+      <button className="selbox" onClick={(e) => { e.stopPropagation(); onToggle(m); }} title="Выбрать">
+        {checked ? <Icon.check size={14} /> : null}
+      </button>
       {m.kind === 'video' && (
         <div className="vbadge">
           <Icon.play size={10} /> видео
@@ -64,6 +76,7 @@ export function PhotosPage() {
     toast,
     onRenamed: (m, name) => updateItem(m.id, { entryNames: [name, ...(m.entryNames || []).slice(1)] }),
     onRemoved: (m) => removeItem(m.id),
+    onItemPatched: updateItem,
     reloadAlbums: loadAlbums,
   });
 
@@ -75,8 +88,8 @@ export function PhotosPage() {
     return created.id;
   }
 
-  async function doUpload() {
-    const files = await pickFiles({ accept: 'image/*' });
+  async function doUpload(dropped?: File[]) {
+    const files = dropped && dropped.length ? dropped : await pickFiles({ accept: 'image/*' });
     if (!files.length) return;
     let folderId: string | null = null;
     try {
@@ -106,6 +119,9 @@ export function PhotosPage() {
     reload();
   }
 
+  const { over, dropHandlers } = useFileDrop((f) => doUpload(f));
+  const bulk = useBulkMedia({ items: photos, albums: albums || [], toast, onRemoved: removeItem, onReloadAlbums: loadAlbums });
+
   const groups = React.useMemo(() => groupByDate(photos), [photos]);
 
   usePageHeader(
@@ -125,7 +141,7 @@ export function PhotosPage() {
               <Icon.plus size={16} /> Альбом
             </button>
           )}
-          <button className="btn primary" onClick={doUpload}>
+          <button className="btn primary" onClick={() => doUpload()}>
             <Icon.upload size={16} /> Загрузить
           </button>
         </>
@@ -138,6 +154,16 @@ export function PhotosPage() {
     <>
       {toastNode}
       {actionsCtx.overlay}
+      {bulk.bar}
+      {bulk.overlay}
+
+      <div className={'dropzone' + (over ? ' drop-over' : '')} {...dropHandlers}>
+        {over && (
+          <div className="drop-overlay">
+            <Icon.upload size={40} />
+            <span>Отпустите фото для загрузки</span>
+          </div>
+        )}
 
       <div className="photos-toolbar">
         <div className="chip-row">
@@ -191,7 +217,7 @@ export function PhotosPage() {
             title="Пока нет фотографий"
             hint="Загрузите снимки — они появятся здесь и в галерее."
             action={
-              <button className="btn primary" onClick={doUpload}>
+              <button className="btn primary" onClick={() => doUpload()}>
                 <Icon.upload size={16} /> Загрузить
               </button>
             }
@@ -213,6 +239,9 @@ export function PhotosPage() {
                     <Photo
                       key={m.id}
                       m={m}
+                      selecting={bulk.active}
+                      checked={bulk.isSelected(m.id)}
+                      onToggle={() => bulk.toggle(m.id)}
                       onOpen={() => setLightbox(photos.findIndex((p) => p.id === m.id))}
                       onMenu={actionsCtx.openMenu}
                     />
@@ -225,6 +254,7 @@ export function PhotosPage() {
             </div>
           </>
         ))}
+      </div>
 
       {creating && (
         <AlbumFormModal

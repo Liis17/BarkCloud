@@ -9,6 +9,8 @@ import { AlbumDetail } from '../components/albums/AlbumDetail';
 import { useToast } from '../hooks/useToast';
 import { useInfiniteMedia } from '../hooks/useInfiniteMedia';
 import { useMediaActions } from '../hooks/useMediaActions';
+import { useFileDrop } from '../hooks/useFileDrop';
+import { useBulkMedia } from '../hooks/useBulkMedia';
 import { usePageHeader } from '../hooks/usePageHeader';
 import { apiGet, apiPost, pickFiles, uploadFile } from '../lib/api';
 import { plural, dateLabel } from '../lib/format';
@@ -40,12 +42,22 @@ function shortDate(iso: string | null): string {
   return iso ? dateLabel(new Date(iso)) : '';
 }
 
-function VideoCard({ m, onOpen, onMenu }: { m: MediaItem; onOpen: (m: MediaItem) => void; onMenu: (e: React.MouseEvent, m: MediaItem) => void }) {
+function VideoCard({ m, selecting, checked, onToggle, onOpen, onMenu }: {
+  m: MediaItem;
+  selecting: boolean;
+  checked: boolean;
+  onToggle: (m: MediaItem) => void;
+  onOpen: (m: MediaItem) => void;
+  onMenu: (e: React.MouseEvent, m: MediaItem) => void;
+}) {
   const res = resLabel(m);
   return (
-    <div className="vcard" onClick={() => onOpen(m)} onContextMenu={(e) => onMenu(e, m)}>
+    <div className={'vcard' + (checked ? ' checked' : '')} onClick={() => (selecting ? onToggle(m) : onOpen(m))} onContextMenu={(e) => onMenu(e, m)}>
       <div className="vthumb">
         <MediaThumb media={m} sizes="(max-width: 700px) 100vw, 320px" />
+        <button className="selbox" onClick={(e) => { e.stopPropagation(); onToggle(m); }} title="Выбрать">
+          {checked ? <Icon.check size={14} /> : null}
+        </button>
         <button className="play">
           <Icon.play size={22} />
         </button>
@@ -96,6 +108,7 @@ export function VideosPage() {
     toast,
     onRenamed: (m, name) => updateItem(m.id, { entryNames: [name, ...(m.entryNames || []).slice(1)] }),
     onRemoved: (m) => removeItem(m.id),
+    onItemPatched: updateItem,
     reloadAlbums: loadAlbums,
   });
 
@@ -107,8 +120,8 @@ export function VideosPage() {
     return created.id;
   }
 
-  async function doUpload() {
-    const files = await pickFiles({ accept: 'video/*' });
+  async function doUpload(dropped?: File[]) {
+    const files = dropped && dropped.length ? dropped : await pickFiles({ accept: 'video/*' });
     if (!files.length) return;
     let folderId: string | null = null;
     try {
@@ -138,6 +151,9 @@ export function VideosPage() {
     reload();
   }
 
+  const { over, dropHandlers } = useFileDrop((f) => doUpload(f));
+  const bulk = useBulkMedia({ items: videos, albums: albums || [], toast, onRemoved: removeItem, onReloadAlbums: loadAlbums });
+
   const featured = videos.length ? videos[0] : null;
   const totalSize = videos.reduce((s, v) => s + (v.size || 0), 0);
   const stats = [
@@ -163,7 +179,7 @@ export function VideosPage() {
               <Icon.plus size={16} /> Альбом
             </button>
           )}
-          <button className="btn primary" onClick={doUpload}>
+          <button className="btn primary" onClick={() => doUpload()}>
             <Icon.upload size={16} /> Загрузить видео
           </button>
         </>
@@ -176,6 +192,16 @@ export function VideosPage() {
     <>
       {toastNode}
       {actionsCtx.overlay}
+      {bulk.bar}
+      {bulk.overlay}
+
+      <div className={'dropzone' + (over ? ' drop-over' : '')} {...dropHandlers}>
+        {over && (
+          <div className="drop-overlay">
+            <Icon.upload size={40} />
+            <span>Отпустите видео для загрузки</span>
+          </div>
+        )}
 
       <div className="stat-strip">
         {stats.map((s, i) => (
@@ -238,7 +264,7 @@ export function VideosPage() {
             title="Пока нет видео"
             hint="Загрузите ролики — обложкой станет кадр из видео."
             action={
-              <button className="btn primary" onClick={doUpload}>
+              <button className="btn primary" onClick={() => doUpload()}>
                 <Icon.upload size={16} /> Загрузить видео
               </button>
             }
@@ -286,7 +312,15 @@ export function VideosPage() {
 
             <div className="vid-grid">
               {videos.map((m, idx) => (
-                <VideoCard key={m.id} m={m} onOpen={() => setLightbox(idx)} onMenu={actionsCtx.openMenu} />
+                <VideoCard
+                  key={m.id}
+                  m={m}
+                  selecting={bulk.active}
+                  checked={bulk.isSelected(m.id)}
+                  onToggle={() => bulk.toggle(m.id)}
+                  onOpen={() => setLightbox(idx)}
+                  onMenu={actionsCtx.openMenu}
+                />
               ))}
             </div>
             <div ref={sentinelRef} className="infinite-sentinel">
@@ -294,6 +328,7 @@ export function VideosPage() {
             </div>
           </>
         ))}
+      </div>
 
       {creating && (
         <AlbumFormModal

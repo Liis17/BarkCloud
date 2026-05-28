@@ -104,6 +104,11 @@ tr.selected .row-actions { opacity: 1; }
 .ftable tbody tr.selected { background: var(--md-secondary-container); }
 .ftable tbody tr.selected:hover { background: color-mix(in srgb, var(--md-on-secondary-container) 10%, var(--md-secondary-container)); }
 .ftable tbody tr.selected td { border-color: transparent; }
+.ftable th.selcell, .ftable td.selcell { width: 44px; padding: 12px 0 12px 24px; text-align: center; }
+.ftable td.selcell { display: table-cell; }
+.ftable .selcell input { width: 16px; height: 16px; cursor: pointer; accent-color: var(--md-primary); }
+.ftable tbody tr.checked { background: color-mix(in srgb, var(--md-primary) 12%, transparent); }
+.ftable tbody tr.checked .row-actions { opacity: 1; }
 
 .breadcrumb { display: flex; align-items: center; gap: 2px; font-size: 14px; flex-wrap: wrap; }
 .breadcrumb a {

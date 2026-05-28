@@ -1,4 +1,5 @@
 import React from 'react';
+import { useLocation } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import { MediaThumb } from '../components/media/MediaThumb';
 import { Lightbox } from '../components/media/Lightbox';
@@ -7,8 +8,11 @@ import { ConfirmModal } from '../components/ui/ConfirmModal';
 import { PropertiesModal } from '../components/ui/PropertiesModal';
 import { EmptyState, Loading } from '../components/ui/EmptyState';
 import { useContextMenu, type ContextItem } from '../components/ui/ContextMenu';
+import { SelectionBar } from '../components/ui/SelectionBar';
 import { useToast } from '../hooks/useToast';
 import { useAlbumMembership } from '../hooks/useAlbumMembership';
+import { useFileDrop } from '../hooks/useFileDrop';
+import { useSelection } from '../hooks/useSelection';
 import { usePageHeader } from '../hooks/usePageHeader';
 import { apiGet, apiPost, pickFiles, uploadFile } from '../lib/api';
 import type { Album, CardFile, DirInfo, Entry, Listing } from '../lib/types';
@@ -35,6 +39,7 @@ function DirRow({ dir, onOpen, onRename, onDelete, onMenu }: {
 }) {
   return (
     <tr onClick={() => onOpen(dir)} onContextMenu={(e) => onMenu(e, dir)}>
+      <td className="selcell" />
       <td className="name">
         <div className="file-icon folder">DIR</div>
         <div className="file-name-col">
@@ -58,9 +63,11 @@ function DirRow({ dir, onOpen, onRename, onDelete, onMenu }: {
   );
 }
 
-function FileRow({ entry, selected, onSelect, onRename, onDelete, onDownload, onMenu }: {
+function FileRow({ entry, selected, bulkChecked, onBulkToggle, onSelect, onRename, onDelete, onDownload, onMenu }: {
   entry: Entry;
   selected: boolean;
+  bulkChecked: boolean;
+  onBulkToggle: (e: Entry) => void;
   onSelect: (e: Entry) => void;
   onRename: (e: Entry) => void;
   onDelete: (e: Entry) => void;
@@ -69,7 +76,10 @@ function FileRow({ entry, selected, onSelect, onRename, onDelete, onDownload, on
 }) {
   const m = entry.media;
   return (
-    <tr className={selected ? 'selected' : ''} onClick={() => onSelect(entry)} onContextMenu={(e) => onMenu(e, entry)}>
+    <tr className={(selected ? 'selected' : '') + (bulkChecked ? ' checked' : '')} onClick={() => onSelect(entry)} onContextMenu={(e) => onMenu(e, entry)}>
+      <td className="selcell" onClick={(e) => e.stopPropagation()}>
+        <input type="checkbox" checked={bulkChecked} onChange={() => onBulkToggle(entry)} />
+      </td>
       <td className="name">
         <div className={'file-icon ' + (m?.iconKind || 'doc')}>{m?.ext || 'FILE'}</div>
         <div className="file-name-col">
@@ -189,7 +199,9 @@ interface UploadState {
 }
 
 export function FilesPage() {
-  const [stack, setStack] = React.useState<{ id: string; name: string }[]>([]);
+  const navState = (useLocation().state || {}) as { stack?: { id: string; name: string }[]; selectEntryId?: string };
+  const [stack, setStack] = React.useState<{ id: string; name: string }[]>(navState.stack || []);
+  const pendingSelect = React.useRef<string | null>(navState.selectEntryId || null);
   const [listing, setListing] = React.useState<Listing | null>(null);
   const [sel, setSel] = React.useState<Entry | null>(null);
   const [lightbox, setLightbox] = React.useState<CardFile | null>(null);
@@ -200,22 +212,33 @@ export function FilesPage() {
   const [albums, setAlbums] = React.useState<Album[]>([]);
   const [props, setProps] = React.useState<CardFile | null>(null);
   const [confirmDel, setConfirmDel] = React.useState<RenameTarget | null>(null);
+  const [bulkConfirm, setBulkConfirm] = React.useState(false);
   const [toastNode, toast] = useToast();
   const { menu, openAt } = useContextMenu();
   const membership = useAlbumMembership(albums);
+  const { over, dropHandlers } = useFileDrop((f) => doUpload(f));
+  const fsel = useSelection();
 
   const currentDir = stack.length ? stack[stack.length - 1].id : '';
 
   const load = React.useCallback(() => {
     setListing(null);
     setSel(null);
+    fsel.clear();
     apiGet<Listing>('/api/cloud/list?dir=' + encodeURIComponent(currentDir))
-      .then((d) => setListing(d))
+      .then((d) => {
+        setListing(d);
+        if (pendingSelect.current) {
+          const hit = d.files.find((e) => e.entryId === pendingSelect.current);
+          pendingSelect.current = null;
+          if (hit) setSel(hit);
+        }
+      })
       .catch((e) => {
         toast((e as Error).message, 'err');
         setListing({ dirs: [], files: [] });
       });
-  }, [currentDir, toast]);
+  }, [currentDir, toast, fsel.clear]);
   React.useEffect(load, [load]);
 
   const loadAlbums = React.useCallback(() => {
@@ -357,8 +380,8 @@ export function FilesPage() {
       { label: 'Удалить', icon: 'trash', danger: true, onClick: () => requestDelete(dir, true) },
     ];
   }
-  async function doUpload() {
-    const files = await pickFiles({});
+  async function doUpload(dropped?: File[]) {
+    const files = dropped && dropped.length ? dropped : await pickFiles({});
     if (!files.length) return;
     let count = 0;
     for (const f of files) {
@@ -374,6 +397,37 @@ export function FilesPage() {
     setUpload(null);
     toast(`Загружено: ${count}`);
     load();
+  }
+
+  async function bulkDelete() {
+    const chosen = (listing?.files || []).filter((e) => fsel.has(e.entryId));
+    let ok = 0;
+    for (const e of chosen) {
+      try {
+        await apiPost('/api/cloud/entry/delete', { entryId: e.entryId });
+        ok++;
+      } catch (err) {
+        toast(`«${e.name}»: ${(err as Error).message}`, 'err');
+      }
+    }
+    setBulkConfirm(false);
+    fsel.clear();
+    if (ok) {
+      toast(`Перемещено в корзину: ${ok}`);
+      load();
+    }
+  }
+  async function bulkCopyLinks() {
+    const ids = (listing?.files || []).filter((e) => fsel.has(e.entryId)).map((e) => e.fileId);
+    try {
+      const d = await apiGet<{ urls: Record<string, string | null> }>('/api/files/download?ids=' + encodeURIComponent(ids.join(',')));
+      const urls = ids.map((id) => d.urls && d.urls[id]).filter((u): u is string => !!u);
+      if (!urls.length) throw new Error('Ссылки недоступны');
+      await navigator.clipboard.writeText(urls.join('\n'));
+      toast(`Скопировано ссылок: ${urls.length} (временные)`);
+    } catch (e) {
+      toast((e as Error).message || 'Не удалось скопировать', 'err');
+    }
   }
 
   usePageHeader(
@@ -392,7 +446,7 @@ export function FilesPage() {
           <button className="btn outlined" onClick={() => { setName(''); setCreating(true); }}>
             <Icon.plus size={16} /> Создать
           </button>
-          <button className="btn primary" onClick={doUpload}>
+          <button className="btn primary" onClick={() => doUpload()}>
             <Icon.upload size={16} /> Загрузить
           </button>
         </>
@@ -404,11 +458,26 @@ export function FilesPage() {
   const dirs = listing ? listing.dirs : [];
   const files = listing ? listing.files : [];
   const isEmpty = listing && !dirs.length && !files.length;
+  const allChecked = files.length > 0 && files.every((e) => fsel.has(e.entryId));
 
   return (
     <>
       {toastNode}
-      <div className="files-shell">
+      <SelectionBar
+        count={fsel.count}
+        onClear={fsel.clear}
+        actions={[
+          { label: 'Копировать ссылки', icon: 'link', onClick: bulkCopyLinks },
+          { label: 'Удалить', icon: 'trash', danger: true, onClick: () => setBulkConfirm(true) },
+        ]}
+      />
+      <div className={'files-shell' + (over ? ' drop-over' : '')} {...dropHandlers}>
+        {over && (
+          <div className="drop-overlay">
+            <Icon.upload size={40} />
+            <span>Отпустите файлы для загрузки</span>
+          </div>
+        )}
         <div className="files-main">
           <div className="files-bar">
             <div className="breadcrumb">
@@ -448,7 +517,7 @@ export function FilesPage() {
                 title="Папка пуста"
                 hint="Загрузите файлы или создайте подпапку."
                 action={
-                  <button className="btn primary" onClick={doUpload}>
+                  <button className="btn primary" onClick={() => doUpload()}>
                     <Icon.upload size={16} /> Загрузить
                   </button>
                 }
@@ -457,6 +526,14 @@ export function FilesPage() {
               <table className="ftable">
                 <thead>
                   <tr>
+                    <th style={{ width: 40 }} className="selcell">
+                      <input
+                        type="checkbox"
+                        checked={allChecked}
+                        disabled={!files.length}
+                        onChange={(e) => fsel.setAll(files.map((f) => f.entryId), e.target.checked)}
+                      />
+                    </th>
                     <th>Имя</th>
                     <th style={{ width: 120 }}>Размер</th>
                     <th style={{ width: 140 }}>Изменён</th>
@@ -479,6 +556,8 @@ export function FilesPage() {
                       key={e.entryId}
                       entry={e}
                       selected={!!sel && sel.entryId === e.entryId}
+                      bulkChecked={fsel.has(e.entryId)}
+                      onBulkToggle={(t) => fsel.toggle(t.entryId)}
                       onSelect={setSel}
                       onDownload={download}
                       onRename={(t) => startRename(t, false)}
@@ -549,6 +628,17 @@ export function FilesPage() {
           }
           onClose={() => setConfirmDel(null)}
           onConfirm={doConfirmDelete}
+        />
+      )}
+
+      {bulkConfirm && (
+        <ConfirmModal
+          title="Удалить в корзину?"
+          danger
+          confirmLabel="Удалить"
+          message={`Выбранные файлы (${fsel.count}) будут перемещены в корзину.`}
+          onClose={() => setBulkConfirm(false)}
+          onConfirm={bulkDelete}
         />
       )}
 

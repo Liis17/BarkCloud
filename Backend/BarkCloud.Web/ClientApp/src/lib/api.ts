@@ -69,10 +69,44 @@ export function pickFiles({ accept, multiple = true }: { accept?: string; multip
 export interface UploadResult {
   fileId: string;
   name: string;
+  deduped?: boolean;
 }
 
-/** Загрузка одного файла с прогрессом (XHR — fetch не отдаёт upload-progress). */
-export function uploadFile(file: File, onProgress?: (frac: number) => void): Promise<UploadResult> {
+/** SHA256 файла в hex. Читает файл целиком в память — допустимо при лимите 512 МБ;
+ *  Web Crypto не умеет инкрементальный digest. null — если crypto недоступен (http) или ошибка. */
+async function sha256Hex(file: File): Promise<string | null> {
+  if (!globalThis.crypto?.subtle) return null;
+  try {
+    const buf = await file.arrayBuffer();
+    const digest = await crypto.subtle.digest('SHA-256', buf);
+    return Array.from(new Uint8Array(digest))
+      .map((b) => b.toString(16).padStart(2, '0'))
+      .join('');
+  } catch {
+    return null;
+  }
+}
+
+/** Загрузка файла с предварительной дедупликацией по хешу: если файл уже в хранилище —
+ *  возвращаем существующий fileId, не передавая байты. Иначе — обычный XHR-аплоад. */
+export async function uploadFile(file: File, onProgress?: (frac: number) => void): Promise<UploadResult> {
+  const hash = await sha256Hex(file);
+  if (hash) {
+    try {
+      const r = await apiPost<{ fileId: string }>('/api/files/check-hash', { hash });
+      if (r.fileId) {
+        onProgress?.(1);
+        return { fileId: r.fileId, name: file.name, deduped: true };
+      }
+    } catch {
+      /* проверка не критична — грузим обычным путём */
+    }
+  }
+  return uploadXhr(file, onProgress);
+}
+
+/** Передача байтов файла через XHR (прогресс — fetch не отдаёт upload-progress). */
+function uploadXhr(file: File, onProgress?: (frac: number) => void): Promise<UploadResult> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open('POST', '/api/files/upload');

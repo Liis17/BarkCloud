@@ -113,6 +113,23 @@ public static class CloudApiEndpoints
                 return Results.Json(new { ok = true }, Json);
             }));
 
+        // Путь до объекта в иерархии (для «Показать в папке» из галереи): segments — папки от корня до файла.
+        api.MapGet("/cloud/path", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud, string? entry, string? dir) =>
+            await Guarded(http, auth, async token =>
+            {
+                var req = new GetPathRequest();
+                if (!string.IsNullOrEmpty(entry)) req.EntryId = entry;
+                else if (!string.IsNullOrEmpty(dir)) req.DirectoryId = dir;
+                else return Results.Json(new { error = "Не указан entry или dir" }, Json, statusCode: 400);
+
+                var resp = await cloud.GetPathAsync(req, token);
+                return Results.Json(new
+                {
+                    segments = resp.Segments.Select(s => new { id = s.Id, name = s.Name }).ToArray(),
+                    fullPath = resp.FullPath
+                }, Json);
+            }));
+
         // ───────────────────────── Записи файлов в каталоге ─────────────────────────
 
         api.MapPost("/cloud/attach", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud, AttachReq body) =>
@@ -209,6 +226,15 @@ public static class CloudApiEndpoints
                     nextCursorAt = resp.NextCursorCreatedAt?.ToDateTimeOffset(),
                     nextCursorId = resp.NextCursorFileId
                 }, Json);
+            }));
+
+        // Заменить превью видео загруженной картинкой-кадром (sourceImageFileId — уже загруженный файл).
+        api.MapPost("/cloud/video/thumbnail", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud, VideoThumbReq body) =>
+            await Guarded(http, auth, async token =>
+            {
+                await cloud.SetVideoThumbnailAsync(
+                    new SetVideoThumbnailRequest { VideoFileId = body.VideoFileId, SourceImageFileId = body.ImageFileId }, token);
+                return Results.Json(new { ok = true }, Json);
             }));
 
         // ───────────────────────── Избранное ─────────────────────────
@@ -337,6 +363,15 @@ public static class CloudApiEndpoints
             }));
 
         // ───────────────────────── Файлы: загрузка / оригинал ─────────────────────────
+
+        // Дедупликация: по SHA256-хешу узнаём, есть ли уже такой файл в хранилище.
+        // Клиент считает хеш в браузере и, если fileId непустой, привязывает существующий файл без загрузки байтов.
+        api.MapPost("/files/check-hash", async (HttpContext http, AuthGateway auth, FilesApi.FilesApiClient files, HashReq body) =>
+            await Guarded(http, auth, async token =>
+            {
+                var resp = await files.CheckFileHashAsync(new CheckFileHashRequest { FileHash = body.Hash ?? "" }, token);
+                return Results.Json(new { fileId = resp.FileId }, Json);
+            }));
 
         // Прокси-загрузка: получаем upload-URL у Files и стримим туда байты (same-origin, без CORS).
         // Байты льём на ВНУТРЕННИЙ HTTP1-эндпоинт Files (минуя nginx/TLS); публичный upload.Url — fallback.
@@ -497,4 +532,6 @@ public static class CloudApiEndpoints
     private sealed record AlbumUpdate(string Album, string? Name, string? Description, string? CoverFileId);
     private sealed record AlbumIdReq(string Album);
     private sealed record AlbumItems(string Album, string[]? FileIds);
+    private sealed record HashReq(string? Hash);
+    private sealed record VideoThumbReq(string VideoFileId, string ImageFileId);
 }
