@@ -46,7 +46,7 @@ BarkCloud/
 │   ├── Login/                      LoginScreen + LoginUiState + LoginViewModel (логин/пароль + OTP)
 │   ├── Main/                       MainScreen (TabView, 5 табов: Галерея/Файлы/Альбомы(default)/Корзина/Настройки), MainDestination
 │   ├── Gallery/                    GalleryScreen+VM (медиатека устройства PhotoKit: сетка фото+видео, выбор, загрузка в облако), DeviceMediaViews (PHImageManager-загрузчик + ячейка + полноэкранный просмотр фото/видео), DeviceAssetResource (общее чтение оригинала+SHA256), CloudPresenceTracker (индикация «уже в облаке»), DeviceAssetPickerScreen (кастомный пикер загрузки — замена PhotosPicker)
-│   ├── Shared/                     RemoteImage (self-signed AsyncImage-замена + NSCache), FilePreviewController/RemoteFilePreviewScreen (QuickLook), MediaThumb + SquareThumbClip (квадратная обрезка fill-картинки с корректным хит-тестом), ComingSoonScreen (универсальная заглушка «скоро»)
+│   ├── Shared/                     RemoteImage (self-signed AsyncImage-замена + NSCache), FilePreviewController/RemoteFilePreviewScreen (QuickLook), MediaThumb + SquareThumbClip (квадратная обрезка fill-картинки с корректным хит-тестом), ComingSoonScreen (универсальная заглушка «скоро»), BarkMascot/BarkRefreshHeader/BarkRefreshable (фирменный pull-to-refresh с пиксельной собачкой)
 │   ├── Settings/                   SettingsScreen + ProfileViewModel (профиль/аватар/хранилище/выход/удаление), EditProfileScreen, PrivacySettingsScreen, DevicesScreen
 │   ├── Trash/                      TrashScreen+VM (корзина облака: ListTrash + cursor-пагинация, restore/delete-forever свайпом, EmptyTrash)
 │   ├── Media/                      таб «Альбомы»: CloudMediaScreen с переключателем Фото/Видео/Альбомы
@@ -203,10 +203,10 @@ BarkCloud/
   фильтра): карточки (`ListAlbums`), открытие (`ListAlbumItems`), создание, добавление файлов тем же
   пикером (в альбом разрешено добавлять и уже загруженное — `uploadFile` дедуплицирует по хешу),
   смена обложки, удаление элементов/альбома. Во всех трёх под-вкладках — pull-to-refresh
-  (`.refreshable` → `reload()`), работает и на пустом состоянии.
+  (`.barkRefreshable` → `reload()`), работает и на пустом состоянии.
 - **Корзина** (`Features/Trash/`, таб №4) — `CloudApi.ListTrash` с cursor-пагинацией, превью/иконка
   по типу, дата удаления и срок очистки; свайп — `RestoreFromTrash` / `DeleteFromTrash`; в тулбаре —
-  `EmptyTrash` с подтверждением и блокирующим оверлеем. Pull-to-refresh (`.refreshable` → `reload()`),
+  `EmptyTrash` с подтверждением и блокирующим оверлеем. Pull-to-refresh (`.barkRefreshable` → `reload()`),
   работает и на пустом состоянии (пустой экран обёрнут в `ScrollView`). **Важно:** `reload()` НЕ поднимает
   `isLoading` — иначе при потягивании экран свернул бы `List` (носитель `.refreshable`) в `ProgressView`,
   SwiftUI отменил бы задачу обновления и gRPC-запрос падал бы с «the transport threw an unexpected error»
@@ -215,7 +215,7 @@ BarkCloud/
   «Облачное хранилище» (карточка-вход в `CloudBrowserScreen`: навигация по папкам
   `ListDirectoryDetailed`, хлебные крошки `GetPath`, CRUD папок/записей, перемещение через
   `CloudMovePicker`, загрузка фото/видео (PhotosPicker) и документов (`.fileImporter`), открытие/скачивание
-  в QuickLook, pull-to-refresh `.refreshable` → `reload(showSpinner: false)` — флаг отключает подъём
+  в QuickLook, pull-to-refresh `.barkRefreshable` → `reload(showSpinner: false)` — флаг отключает подъём
   `isLoading` при потягивании, чтобы не свернуть `List` и не отменить gRPC-запрос; программные обновления
   после CRUD зовут `reload()` со спиннером (и на пустой папке через `ScrollView`))
   и «Общие файлы» → `ComingSoonScreen` (на бэкенде нет API расшаривания — заглушка «скоро»).
