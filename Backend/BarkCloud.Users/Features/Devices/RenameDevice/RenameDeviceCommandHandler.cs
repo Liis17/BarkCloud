@@ -7,7 +7,7 @@ using MediatR;
 namespace BarkCloud.Users.Features.Devices.RenameDevice;
 
 public class RenameDeviceCommandHandler(
-    DevicesStorage devicesStorage,
+    IDevicesStorage devicesStorage,
     UserContext userContext,
     ILogger<RenameDeviceCommandHandler> logger)
     : IRequestHandler<RenameDeviceCommand, RenameDeviceResponse>

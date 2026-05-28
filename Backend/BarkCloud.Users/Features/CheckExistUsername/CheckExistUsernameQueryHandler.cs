@@ -8,11 +8,11 @@ namespace BarkCloud.Users.Features.CheckExistUsername;
 
 public class CheckExistUsernameQueryHandler : IRequestHandler<CheckExistUsernameQuery, CheckExistResponse>
 {
-    private readonly UsersStorage _usersStorage;
+    private readonly IUsersStorage _usersStorage;
     private readonly ReservedUsernamesService _reservedUsernamesService;
     private readonly ILogger<CheckExistUsernameQueryHandler> _logger;
 
-    public CheckExistUsernameQueryHandler(UsersStorage usersStorage, ReservedUsernamesService reservedUsernamesService, ILogger<CheckExistUsernameQueryHandler> logger)
+    public CheckExistUsernameQueryHandler(IUsersStorage usersStorage, ReservedUsernamesService reservedUsernamesService, ILogger<CheckExistUsernameQueryHandler> logger)
     {
         _usersStorage = usersStorage;
         _reservedUsernamesService = reservedUsernamesService;

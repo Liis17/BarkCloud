@@ -12,11 +12,11 @@ public class ChangeBioCommandHandler : IRequestHandler<ChangeBioCommand>
     private const int MaxBioLength = 200;
 
     private readonly UserContext _userContext;
-    private readonly UsersStorage _usersStorage;
+    private readonly IUsersStorage _usersStorage;
     private readonly UserInfoQueueSender _userInfoQueueSender;
     private readonly ILogger<ChangeBioCommandHandler> _logger;
 
-    public ChangeBioCommandHandler(UserContext userContext, UsersStorage usersStorage,
+    public ChangeBioCommandHandler(UserContext userContext, IUsersStorage usersStorage,
         UserInfoQueueSender userInfoQueueSender, ILogger<ChangeBioCommandHandler> logger)
     {
         _userContext = userContext;

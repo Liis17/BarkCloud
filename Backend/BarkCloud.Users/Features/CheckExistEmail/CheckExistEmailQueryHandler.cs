@@ -8,10 +8,10 @@ namespace BarkCloud.Users.Features.CheckExistEmail;
 public class CheckExistEmailQueryHandler : IRequestHandler<CheckExistEmailQuery, CheckExistResponse>
 {
 
-    private readonly UsersStorage _usersStorage;
+    private readonly IUsersStorage _usersStorage;
     private readonly ILogger<CheckExistEmailQueryHandler> _logger;
 
-    public CheckExistEmailQueryHandler(UsersStorage usersStorage, ILogger<CheckExistEmailQueryHandler> logger)
+    public CheckExistEmailQueryHandler(IUsersStorage usersStorage, ILogger<CheckExistEmailQueryHandler> logger)
     {
         _usersStorage = usersStorage;
         _logger = logger;

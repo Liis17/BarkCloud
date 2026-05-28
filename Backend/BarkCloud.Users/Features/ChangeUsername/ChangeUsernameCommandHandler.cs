@@ -12,13 +12,13 @@ public class ChangeUsernameCommandHandler : IRequestHandler<ChangeUsernameComman
 {
 
     private readonly UserContext _userContext;
-    private readonly UsersStorage _usersStorage;
+    private readonly IUsersStorage _usersStorage;
     private readonly ReservedUsernamesService _reservedUsernamesService;
     private readonly UserInfoQueueSender _userInfoQueueSender;
     private readonly ILogger<ChangeUsernameCommandHandler> _logger;
 
 
-    public ChangeUsernameCommandHandler(UserContext userContext, UsersStorage usersStorage, ReservedUsernamesService reservedUsernamesService,
+    public ChangeUsernameCommandHandler(UserContext userContext, IUsersStorage usersStorage, ReservedUsernamesService reservedUsernamesService,
         UserInfoQueueSender userInfoQueueSender, ILogger<ChangeUsernameCommandHandler> logger)
     {
         _userContext = userContext;

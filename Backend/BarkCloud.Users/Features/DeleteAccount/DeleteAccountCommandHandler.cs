@@ -9,13 +9,13 @@ namespace BarkCloud.Users.Features.DeleteAccount;
 
 public class DeleteAccountCommandHandler : IRequestHandler<DeleteAccountCommand>
 {
-    private readonly UsersStorage _usersStorage;
+    private readonly IUsersStorage _usersStorage;
     private readonly UserContext _userContext;
     private readonly UserInfoQueueSender _userInfoQueueSender;
     private readonly MetricsCollector _metrics;
     private readonly ILogger<DeleteAccountCommandHandler> _logger;
 
-    public DeleteAccountCommandHandler(UsersStorage usersStorage, UserContext userContext,
+    public DeleteAccountCommandHandler(IUsersStorage usersStorage, UserContext userContext,
         UserInfoQueueSender userInfoQueueSender, MetricsCollector metrics,
         ILogger<DeleteAccountCommandHandler> logger)
     {
