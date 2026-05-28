@@ -12,13 +12,13 @@ namespace BarkCloud.Files.Features.Cloud.AddFavorite;
 public class AddFavoriteCommandHandler : IRequestHandler<AddFavoriteCommand, CloudEmpty>
 {
     private readonly FavoriteFilesStorage _storage;
-    private readonly UploadedFilesStorage _filesStorage;
+    private readonly IUploadedFilesStorage _filesStorage;
     private readonly UserContext _userContext;
     private readonly ILogger<AddFavoriteCommandHandler> _logger;
 
     public AddFavoriteCommandHandler(
         FavoriteFilesStorage storage,
-        UploadedFilesStorage filesStorage,
+        IUploadedFilesStorage filesStorage,
         UserContext userContext,
         ILogger<AddFavoriteCommandHandler> logger)
     {

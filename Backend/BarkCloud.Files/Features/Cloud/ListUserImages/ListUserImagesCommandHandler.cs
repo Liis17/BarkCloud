@@ -23,7 +23,7 @@ public class ListUserImagesCommandHandler : IRequestHandler<ListUserImagesComman
     private const int MaxEntryNames = 5;
 
     private readonly FilesContext _context;
-    private readonly UploadedFilesStorage _uploadedFiles;
+    private readonly IUploadedFilesStorage _uploadedFiles;
     private readonly UserContext _userContext;
     private readonly RunSettings _runSettings;
     private readonly IConfiguration _configuration;
@@ -31,7 +31,7 @@ public class ListUserImagesCommandHandler : IRequestHandler<ListUserImagesComman
 
     public ListUserImagesCommandHandler(
         FilesContext context,
-        UploadedFilesStorage uploadedFiles,
+        IUploadedFilesStorage uploadedFiles,
         UserContext userContext,
         RunSettings runSettings,
         IConfiguration configuration,

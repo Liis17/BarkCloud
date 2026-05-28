@@ -18,7 +18,7 @@ public class ListAlbumItemsCommandHandler : IRequestHandler<ListAlbumItemsComman
     private const int MaxLimit = 200;
 
     private readonly AlbumStorage _storage;
-    private readonly UploadedFilesStorage _filesStorage;
+    private readonly IUploadedFilesStorage _filesStorage;
     private readonly CloudHierarchyStorage _hierarchyStorage;
     private readonly UserContext _userContext;
     private readonly RunSettings _runSettings;
@@ -27,7 +27,7 @@ public class ListAlbumItemsCommandHandler : IRequestHandler<ListAlbumItemsComman
 
     public ListAlbumItemsCommandHandler(
         AlbumStorage storage,
-        UploadedFilesStorage filesStorage,
+        IUploadedFilesStorage filesStorage,
         CloudHierarchyStorage hierarchyStorage,
         UserContext userContext,
         RunSettings runSettings,

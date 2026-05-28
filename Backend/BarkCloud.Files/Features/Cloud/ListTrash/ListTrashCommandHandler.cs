@@ -21,7 +21,7 @@ public class ListTrashCommandHandler : IRequestHandler<ListTrashCommand, ListTra
     private const int MaxLimit = 200;
 
     private readonly CloudHierarchyStorage _storage;
-    private readonly UploadedFilesStorage _uploadedFiles;
+    private readonly IUploadedFilesStorage _uploadedFiles;
     private readonly UserContext _userContext;
     private readonly RunSettings _runSettings;
     private readonly IConfiguration _configuration;
@@ -29,7 +29,7 @@ public class ListTrashCommandHandler : IRequestHandler<ListTrashCommand, ListTra
 
     public ListTrashCommandHandler(
         CloudHierarchyStorage storage,
-        UploadedFilesStorage uploadedFiles,
+        IUploadedFilesStorage uploadedFiles,
         UserContext userContext,
         RunSettings runSettings,
         IConfiguration configuration,

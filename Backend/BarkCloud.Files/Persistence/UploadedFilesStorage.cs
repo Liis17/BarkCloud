@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace BarkCloud.Files.Persistence;
 
-public class UploadedFilesStorage
+public class UploadedFilesStorage : IUploadedFilesStorage
 {
 
     private readonly FilesContext _context;
@@ -157,5 +157,12 @@ public class UploadedFilesStorage
             .GroupBy(x => x.Type)
             .Select(g => new { Type = g.Key, Size = g.Sum(x => x.Size) })
             .ToDictionaryAsync(x => x.Type, x => x.Size);
+    }
+
+    public async Task<bool> IsPreviewFile(Guid fileId, CancellationToken cancellationToken = default)
+    {
+        return await _context.FilePreviews
+            .AsNoTracking()
+            .AnyAsync(p => p.PreviewFileId == fileId, cancellationToken);
     }
 }
