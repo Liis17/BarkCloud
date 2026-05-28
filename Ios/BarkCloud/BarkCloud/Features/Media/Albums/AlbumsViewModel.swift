@@ -28,8 +28,13 @@ final class AlbumsViewModel {
         await reload()
     }
 
-    func reload() async {
-        state.isLoading = true
+    /// Перезагрузка списка. `showSpinner` поднимает полноэкранный `isLoading`
+    /// (первый показ / после создания). При pull-to-refresh передаём `false` —
+    /// иначе ветка `if isLoading` свернёт `ScrollView` (носитель `.refreshable`)
+    /// в `ProgressView`, SwiftUI отменит задачу обновления, и gRPC-запрос упадёт
+    /// с «the transport threw an unexpected error».
+    func reload(showSpinner: Bool = true) async {
+        if showSpinner { state.isLoading = true }
         do {
             let page = try await albums.listAlbums(limit: 50)
             state.albums = page.albums

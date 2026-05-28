@@ -46,7 +46,7 @@ BarkCloud/
 │   ├── Login/                      LoginScreen + LoginUiState + LoginViewModel (логин/пароль + OTP)
 │   ├── Main/                       MainScreen (TabView, 5 табов: Галерея/Файлы/Альбомы(default)/Корзина/Настройки), MainDestination
 │   ├── Gallery/                    GalleryScreen+VM (медиатека устройства PhotoKit: сетка фото+видео, выбор, загрузка в облако), DeviceMediaViews (PHImageManager-загрузчик + ячейка + полноэкранный просмотр фото/видео), DeviceAssetResource (общее чтение оригинала+SHA256), CloudPresenceTracker (индикация «уже в облаке»), DeviceAssetPickerScreen (кастомный пикер загрузки — замена PhotosPicker)
-│   ├── Shared/                     RemoteImage (self-signed AsyncImage-замена + NSCache), FilePreviewController/RemoteFilePreviewScreen (QuickLook), MediaThumb + SquareThumbClip (квадратная обрезка fill-картинки с корректным хит-тестом), ComingSoonScreen (универсальная заглушка «скоро»), BarkMascot/BarkRefreshHeader/BarkRefreshable (фирменный pull-to-refresh с пиксельной собачкой)
+│   ├── Shared/                     RemoteImage (self-signed AsyncImage-замена + NSCache), FilePreviewController/RemoteFilePreviewScreen (QuickLook), MediaThumb + SquareThumbClip (квадратная обрезка fill-картинки с корректным хит-тестом), ComingSoonScreen (универсальная заглушка «скоро»), BarkMascot/BarkRefreshHeader/BarkRefreshable (фирменный pull-to-refresh с пиксель-арт оранжевой лисой в Canvas — лиса сидит ровно анфас, пушистый хвост справа виляет вверх-вниз непрерывным сдвигом по синусу; виляние идёт и при вытягивании, и при обновлении — TimelineView `.animation` с paused: `!(isRefreshing || progress > 0.001)`, масштаб появления ведётся от `pullProgress`; **критично #1:** `pullProgress` считается как `max(0, -(contentOffset.y + contentInsets.top))/threshold` — именно `+ contentInsets.top`, потому что в покое `List` (TrashScreen) репортит `contentOffset.y == -contentInsets.top` (инсет навбара), и без поправки лиса висела бы постоянно; `ScrollView` (остальные экраны) покоится около 0, поэтому там баг не проявлялся; **критично #2:** прогресс потягивания/флаг обновления хранятся в `@Observable BarkRefreshState`, а НЕ в `@State` модификатора — иначе `onScrollGeometryChange` на каждом кадре прокрутки инвалидировал бы `body` и переприменял `.refreshable`, отменяя задачу обновления вместе с gRPC-запросом → «the transport threw an unexpected error». `body(content:)` эти поля не читает, перерисовывается только overlay-хедер)
 │   ├── Settings/                   SettingsScreen + ProfileViewModel (профиль/аватар/хранилище/выход/удаление), EditProfileScreen, PrivacySettingsScreen, DevicesScreen
 │   ├── Trash/                      TrashScreen+VM (корзина облака: ListTrash + cursor-пагинация, restore/delete-forever свайпом, EmptyTrash)
 │   ├── Media/                      таб «Альбомы»: CloudMediaScreen с переключателем Фото/Видео/Альбомы
@@ -203,7 +203,13 @@ BarkCloud/
   фильтра): карточки (`ListAlbums`), открытие (`ListAlbumItems`), создание, добавление файлов тем же
   пикером (в альбом разрешено добавлять и уже загруженное — `uploadFile` дедуплицирует по хешу),
   смена обложки, удаление элементов/альбома. Во всех трёх под-вкладках — pull-to-refresh
-  (`.barkRefreshable` → `reload()`), работает и на пустом состоянии.
+  (`.barkRefreshable` → `reload()`), работает и на пустом состоянии. **Важно (как в Корзине/Облаке):**
+  у `AlbumsViewModel.reload(showSpinner:)` потягивание передаёт `showSpinner: false` — иначе ветка
+  `if isLoading { ProgressView() }` в `AlbumsGridScreen` свернула бы `ScrollView` (носитель
+  `.refreshable`), SwiftUI отменил бы задачу обновления, и gRPC-запрос падал бы с «the transport threw
+  an unexpected error» (контент пропадал). Спиннер первого показа даёт дефолт `isLoading=true`,
+  программный `reload()` после `create()` идёт со спиннером. Сетки Фото/Видео (`MediaGridViewModel`)
+  этим не страдают — там нет ветки переключения вида по `isLoading`.
 - **Корзина** (`Features/Trash/`, таб №4) — `CloudApi.ListTrash` с cursor-пагинацией, превью/иконка
   по типу, дата удаления и срок очистки; свайп — `RestoreFromTrash` / `DeleteFromTrash`; в тулбаре —
   `EmptyTrash` с подтверждением и блокирующим оверлеем. Pull-to-refresh (`.barkRefreshable` → `reload()`),
