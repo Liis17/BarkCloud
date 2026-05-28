@@ -45,7 +45,7 @@ struct TrashScreen: View {
                 emptyState.containerRelativeFrame(.vertical)
             }
             // Потянуть вниз — перезагрузить корзину даже когда она пуста.
-            .refreshable { await vm.reload() }
+            .barkRefreshable { await vm.reload() }
         } else {
             list(vm)
         }
@@ -78,7 +78,7 @@ struct TrashScreen: View {
         }
         .listStyle(.plain)
         // Потянуть вниз — перезагрузить корзину.
-        .refreshable { await vm.reload() }
+        .barkRefreshable { await vm.reload() }
         .overlay(alignment: .bottom) { snackbar(vm) }
     }
 
