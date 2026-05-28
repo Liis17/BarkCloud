@@ -216,7 +216,7 @@ struct AlbumDetailScreen: View {
             ScrollView {
                 LazyVGrid(columns: Self.columns, spacing: 2) {
                     ForEach(vm.state.items) { item in
-                        MediaThumb(thumbnailURL: item.thumbnailURL, isVideo: item.isVideo)
+                        MediaThumb(fileId: item.id, previewWidth: item.previewWidth, thumbnailURL: item.thumbnailURL, isVideo: item.isVideo)
                             .onTapGesture { selected = item }
                             .onAppear { Task { await vm.loadMoreIfNeeded(current: item) } }
                             .contextMenu {
@@ -272,7 +272,7 @@ struct AlbumDetailScreen: View {
 
     private func viewer(_ item: MediaItem) -> some View {
         NavigationStack {
-            RemoteFilePreviewScreen(fileID: item.id, fileName: item.fileName, transfer: env.fileTransfer)
+            RemoteFilePreviewScreen(fileID: item.id, fileName: item.fileName, transfer: env.fileTransfer, cache: env.fileCache)
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
                         Button(String(localized: "action_close")) { selected = nil }

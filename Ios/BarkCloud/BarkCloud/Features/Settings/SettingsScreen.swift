@@ -71,6 +71,13 @@ struct SettingsScreen: View {
                         settingsRow(icon: "laptopcomputer.and.iphone", titleKey: "settings_devices")
                     }
                     .buttonStyle(.plain)
+
+                    NavigationLink {
+                        CacheSettingsScreen()
+                    } label: {
+                        settingsRow(icon: "internaldrive", titleKey: "settings_cache")
+                    }
+                    .buttonStyle(.plain)
                 }
 
                 storageCard(vm)
@@ -139,7 +146,7 @@ struct SettingsScreen: View {
         let size: CGFloat = 96
         ZStack {
             if !vm.state.avatarCandidateURLs.isEmpty {
-                FallbackRemoteImage(urls: vm.state.avatarCandidateURLs) {
+                FallbackRemoteImage(fileId: vm.state.profilePictureFileID, urls: vm.state.avatarCandidateURLs) {
                     placeholderAvatar
                 }
                 .frame(width: size, height: size)

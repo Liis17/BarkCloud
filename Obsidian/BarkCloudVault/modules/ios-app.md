@@ -42,12 +42,13 @@ BarkCloud/
 │   ├── CloudModels.swift           доменные модели UI: MediaAsset, MediaPage, CloudDirectory, CloudFileEntry, AlbumCard, PathCrumb (+ Timestamp.date)
 │   ├── CloudRepository.swift       CloudApi: ListUserMedia, ListDirectoryDetailed, GetPath, CRUD папок/записей, uploadFile
 │   └── AlbumRepository.swift       AlbumApi: список/содержимое альбомов, create/update/delete, add/remove items
+├── Data/Cache/                     **постоянный дисковый кеш файлов** ([[ios-file-cache]]): CacheVariant, CachedFileEntry (SwiftData @Model), FileCacheService (actor), FileCacheSettings
 ├── Features/
 │   ├── Login/                      LoginScreen + LoginUiState + LoginViewModel (логин/пароль + OTP)
 │   ├── Main/                       MainScreen (TabView, 5 табов: Галерея/Файлы/Альбомы(default)/Корзина/Настройки), MainDestination
 │   ├── Gallery/                    GalleryScreen+VM (медиатека устройства PhotoKit: сетка фото+видео, выбор, загрузка в облако), DeviceMediaViews (PHImageManager-загрузчик + ячейка + полноэкранный просмотр фото/видео), DeviceAssetResource (общее чтение оригинала+SHA256), CloudPresenceTracker (индикация «уже в облаке»), DeviceAssetPickerScreen (кастомный пикер загрузки — замена PhotosPicker)
-│   ├── Shared/                     RemoteImage (self-signed AsyncImage-замена + NSCache), FilePreviewController/RemoteFilePreviewScreen (QuickLook), MediaThumb + SquareThumbClip (квадратная обрезка fill-картинки с корректным хит-тестом), ComingSoonScreen (универсальная заглушка «скоро»), BarkMascot/BarkRefreshHeader/BarkRefreshable (фирменный pull-to-refresh с пиксель-арт оранжевой лисой в Canvas — лиса сидит ровно анфас, пушистый хвост справа виляет вверх-вниз непрерывным сдвигом по синусу; виляние идёт и при вытягивании, и при обновлении — TimelineView `.animation` с paused: `!(isRefreshing || progress > 0.001)`, масштаб появления ведётся от `pullProgress`; **критично #1:** `pullProgress` считается как `max(0, -(contentOffset.y + contentInsets.top))/threshold` — именно `+ contentInsets.top`, потому что в покое `List` (TrashScreen) репортит `contentOffset.y == -contentInsets.top` (инсет навбара), и без поправки лиса висела бы постоянно; `ScrollView` (остальные экраны) покоится около 0, поэтому там баг не проявлялся; **критично #2:** прогресс потягивания/флаг обновления хранятся в `@Observable BarkRefreshState`, а НЕ в `@State` модификатора — иначе `onScrollGeometryChange` на каждом кадре прокрутки инвалидировал бы `body` и переприменял `.refreshable`, отменяя задачу обновления вместе с gRPC-запросом → «the transport threw an unexpected error». `body(content:)` эти поля не читает, перерисовывается только overlay-хедер)
-│   ├── Settings/                   SettingsScreen + ProfileViewModel (профиль/аватар/хранилище/выход/удаление), EditProfileScreen, PrivacySettingsScreen, DevicesScreen
+│   ├── Shared/                     RemoteImage (self-signed AsyncImage-замена + NSCache; cache-aware вариант `RemoteImage(fileId:variant:url:)` и `FallbackRemoteImage(fileId:urls:)` тянут байты через дисковый кеш [[ios-file-cache]]), FilePreviewController/RemoteFilePreviewScreen (QuickLook; оригинал через FileCacheService.loadFile(.original)), MediaThumb (fileId + previewWidth) + SquareThumbClip (квадратная обрезка fill-картинки с корректным хит-тестом), ComingSoonScreen (универсальная заглушка «скоро»), BarkMascot/BarkRefreshHeader/BarkRefreshable (фирменный pull-to-refresh — **полностью свой, без системного `.refreshable`**, поэтому в зазоре нет ни системного спиннера, ни подложки: видна только пиксель-арт оранжевая лиса в Canvas — сидит ровно анфас, пушистый хвост справа виляет вверх-вниз непрерывным сдвигом по синусу; виляние идёт и при вытягивании, и при обновлении — TimelineView `.animation` с paused: `!(isRefreshing || progress > 0.001)`, масштаб появления ведётся от `pullProgress`. Жест: `onScrollGeometryChange` → `pullProgress`, `onScrollPhaseChange` → при отпускании (`.idle`/`.decelerating`) и `pullProgress >= 1` запускает обновление; во время обновления контент опускается на `refreshGap` через `.contentMargins(.top,…,for:.scrollContent)`, чтобы лиса была в чистом зазоре; **критично #1:** `pullProgress` считается как `max(0, -(contentOffset.y + contentInsets.top))/threshold` — именно `+ contentInsets.top`, потому что в покое `List` (TrashScreen) репортит `contentOffset.y == -contentInsets.top` (инсет навбара), и без поправки лиса висела бы постоянно; `ScrollView` (остальные экраны) покоится около 0, поэтому там баг не проявлялся; **критично #2:** прогресс/флаг обновления и сама задача (`Task`) хранятся в `@Observable BarkRefreshState`, а НЕ в `@State` модификатора — `body(content:)` читает только `isRefreshing` (редкий тогл для `contentMargins`), но НЕ `pullProgress`, поэтому прокрутка не пересобирает модификатор; задача обновления живёт в state-объекте и перерисовками view не отменяется (иначе рвался бы gRPC-запрос → «the transport threw an unexpected error»))
+│   ├── Settings/                   SettingsScreen + ProfileViewModel (профиль/аватар/хранилище/выход/удаление), EditProfileScreen, PrivacySettingsScreen, DevicesScreen, CacheSettingsScreen + CacheSettingsViewModel (раздел «Кеш»: размер/записи/лимит/очистка — [[ios-file-cache]])
 │   ├── Trash/                      TrashScreen+VM (корзина облака: ListTrash + cursor-пагинация, restore/delete-forever свайпом, EmptyTrash)
 │   ├── Media/                      таб «Альбомы»: CloudMediaScreen с переключателем Фото/Видео/Альбомы
 │   │   ├── MediaKind.swift         enum { photo, video }: titleKey, emptyKey, isVideo
@@ -183,6 +184,27 @@ BarkCloud/
   `FilesApi.CheckFileHashes` — если файл с таким хешем уже в облаке, рисуется `checkmark.icloud.fill`.
   Хеш считается тем же ресурсом, что и при загрузке, поэтому совпадает с серверным. Эта логика
   инкапсулирована в `CloudPresenceTracker` и переиспользуется кастомным пикером загрузки.
+  **Резервная копия** (`Features/Gallery/Backup/`) — кнопка-облако (`icloud`) в тулбаре правее
+  «Выбрать» открывает модалку `BackupSheet` (плавающая карточка с отступами: `fullScreenCover` +
+  `.presentationBackground(.clear)` + затемнение + `.padding(20)` + `.regularMaterial`). Внутри:
+  карточка квоты (`FileTransferService.storageInfo()` → used/limit, стиль из `SettingsScreen.storageCard`);
+  тогл автозагрузки фото/видео; при включении — статус скана, прогресс-бар загружено/осталось и ряд
+  превью очереди (текущий + 2 следующих, как в Google Photos); кнопка «Освободить место» с оценкой
+  размера и благодарственной анимацией. Ядро — **`BackupManager`** (`@MainActor @Observable`, живёт в
+  `AppEnvironment`, а не во вью — Task'и (`scanTask`/`uploadTask`) хранятся внутри менеджера, чтобы
+  ре-рендер/закрытие модалки их не отменял; тот же урок, что в pull-to-refresh). Скан медиатеки —
+  **прогрессивный**, последовательно (конкурентность 1, чтобы видео не раздували память): для каждого
+  ассета `DeviceAssetResource.streamingSHA256` → пачками по 100 в `CloudRepository.checkFileHashes`;
+  «уже в облаке» → в `reclaimable` (+`DeviceAssetResource.originalByteSize`, новый KVC-хелпер по
+  приватному `fileSize`), иначе → в очередь `pendingUpload`. **Автозагрузка** — только на переднем
+  плане (без BGTaskScheduler/фоновой URLSession): `uploadLoop` берёт следующий ассет → `originalData`
+  → `CloudRepository.uploadFile(toDirectory: ensureRecentUploadsFolder())`; тогл персистится в
+  **`AutoUploadSettings`** (обёртка над `UserDefaults`, ключ `BarkCloud.autoUpload.enabled`), при старте
+  приложения `BackupManager.resumeIfEnabled()` (из `AppEnvironment.init`) докачивает остаток.
+  **«Освободить место»** — `PHPhotoLibrary.shared().performChanges { PHAssetChangeRequest.deleteAssets }`
+  (iOS сам показывает системное подтверждение; отмена → throw, без эффекта); при успехе показывается
+  `SpaceFreedView` — оверлей с пиксель-лисой `BarkMascot` + искрами (`Canvas`/`TimelineView`) и count-up
+  освобождённых байт, авто-скрытие.
 - **Альбомы** (`Features/Media/`, таб №3, по умолчанию) — `CloudMediaScreen` с переключателем
   **Фото / Видео / Альбомы**. Фото/Видео: `CloudApi.ListUserMedia(kind)` с cursor-пагинацией и догрузкой,
   превью через `RemoteImage`, тап → полноэкранный QuickLook (`GetTempDownloadUrl` → download),
@@ -205,24 +227,24 @@ BarkCloud/
   смена обложки, удаление элементов/альбома. Во всех трёх под-вкладках — pull-to-refresh
   (`.barkRefreshable` → `reload()`), работает и на пустом состоянии. **Важно (как в Корзине/Облаке):**
   у `AlbumsViewModel.reload(showSpinner:)` потягивание передаёт `showSpinner: false` — иначе ветка
-  `if isLoading { ProgressView() }` в `AlbumsGridScreen` свернула бы `ScrollView` (носитель
-  `.refreshable`), SwiftUI отменил бы задачу обновления, и gRPC-запрос падал бы с «the transport threw
-  an unexpected error» (контент пропадал). Спиннер первого показа даёт дефолт `isLoading=true`,
+  `if isLoading { ProgressView() }` в `AlbumsGridScreen` свернула бы `ScrollView` (носитель жеста
+  pull-to-refresh и overlay-лисы) в полноэкранный `ProgressView` прямо во время обновления — контент
+  и лиса исчезали бы на месте. Спиннер первого показа даёт дефолт `isLoading=true`,
   программный `reload()` после `create()` идёт со спиннером. Сетки Фото/Видео (`MediaGridViewModel`)
   этим не страдают — там нет ветки переключения вида по `isLoading`.
 - **Корзина** (`Features/Trash/`, таб №4) — `CloudApi.ListTrash` с cursor-пагинацией, превью/иконка
   по типу, дата удаления и срок очистки; свайп — `RestoreFromTrash` / `DeleteFromTrash`; в тулбаре —
   `EmptyTrash` с подтверждением и блокирующим оверлеем. Pull-to-refresh (`.barkRefreshable` → `reload()`),
   работает и на пустом состоянии (пустой экран обёрнут в `ScrollView`). **Важно:** `reload()` НЕ поднимает
-  `isLoading` — иначе при потягивании экран свернул бы `List` (носитель `.refreshable`) в `ProgressView`,
-  SwiftUI отменил бы задачу обновления и gRPC-запрос падал бы с «the transport threw an unexpected error»
-  (спиннер первого показа даёт дефолт `isLoading=true`, спиннер потягивания рисует сам `.refreshable`).
+  `isLoading` — иначе при потягивании экран свернул бы `List` (носитель жеста pull-to-refresh и overlay-лисы)
+  в полноэкранный `ProgressView` прямо во время обновления, и контент с лисой исчезали бы
+  (спиннер первого показа даёт дефолт `isLoading=true`; индикатор потягивания — фирменная лиса в overlay).
 - **Файлы** (`Features/Files/`, таб №2) — секции: «На устройстве» (`LocalBrowserScreen`),
   «Облачное хранилище» (карточка-вход в `CloudBrowserScreen`: навигация по папкам
   `ListDirectoryDetailed`, хлебные крошки `GetPath`, CRUD папок/записей, перемещение через
   `CloudMovePicker`, загрузка фото/видео (PhotosPicker) и документов (`.fileImporter`), открытие/скачивание
   в QuickLook, pull-to-refresh `.barkRefreshable` → `reload(showSpinner: false)` — флаг отключает подъём
-  `isLoading` при потягивании, чтобы не свернуть `List` и не отменить gRPC-запрос; программные обновления
+  `isLoading` при потягивании, чтобы не свернуть `List` (с жестом и лисой) в полноэкранный `ProgressView`; программные обновления
   после CRUD зовут `reload()` со спиннером (и на пустой папке через `ScrollView`))
   и «Общие файлы» → `ComingSoonScreen` (на бэкенде нет API расшаривания — заглушка «скоро»).
 
@@ -241,11 +263,27 @@ BarkCloud/
 cd Ios/BarkCloud
 xcodebuild -project BarkCloud.xcodeproj \
   -scheme BarkCloud \
-  -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.2' \
+  -destination 'platform=iOS Simulator,name=iPhone 17' \
   build
 ```
 
+> Имя симулятора зависит от установленных Runtime'ов: на текущей машине доступны
+> устройства на iOS 26.x (`iPhone 17`, `iPhone Air` и т.д.); `iPhone 16 / iOS 18.2`
+> из ранних заметок более недоступен. Список: `xcrun simctl list devices available`.
+
 SPM-пакеты подключены — сгенерённые символы (`Barkcloud_Identity_*`, `Barkcloud_Users_*`, `Barkcloud_Files_*`) компилируются.
+
+## Тесты
+
+Unit-test таргет `BarkCloudTests` (`Ios/BarkCloud/BarkCloudTests/`, host-based,
+`@testable import BarkCloud`, shared scheme с TestAction). Сейчас покрывает
+обслуживающую логику дискового кеша ([[ios-file-cache]]).
+
+```bash
+cd Ios/BarkCloud
+xcodebuild test -project BarkCloud.xcodeproj -scheme BarkCloud \
+  -destination 'platform=iOS Simulator,name=iPhone 17'
+```
 
 ## История разработки (все PR закрыты)
 

@@ -54,11 +54,18 @@ struct MediaAsset: Identifiable, Hashable, Sendable {
 
     var isVideo: Bool { kind.isVideo }
 
-    /// Превью ближайшее к нужной ширине (или максимальное доступное).
-    func previewURL(preferredWidth: Int) -> URL? {
+    /// Превью ближайшее к нужной ширине (или максимальное доступное) — вместе с его
+    /// фактической шириной. Ширина нужна, чтобы один и тот же файл превью получал
+    /// один ключ дискового кеша независимо от запрошенной ширины.
+    func preview(preferredWidth: Int) -> MediaPreview? {
         guard !previews.isEmpty else { return nil }
         let sorted = previews.sorted { $0.width < $1.width }
-        return (sorted.first { $0.width >= preferredWidth } ?? sorted.last)?.url
+        return sorted.first { $0.width >= preferredWidth } ?? sorted.last
+    }
+
+    /// Превью ближайшее к нужной ширине (или максимальное доступное).
+    func previewURL(preferredWidth: Int) -> URL? {
+        preview(preferredWidth: preferredWidth)?.url
     }
 }
 

@@ -85,7 +85,7 @@ private struct AlbumCardView: View {
         VStack(alignment: .leading, spacing: 6) {
             SquareThumbClip(cornerRadius: 10) {
                 if let url = album.coverPreviewURL {
-                    RemoteImage(url: url, contentMode: .fill) {
+                    RemoteImage(fileId: album.coverFileID, variant: .previewCover, url: url, contentMode: .fill) {
                         AppColors.onSurface.opacity(0.08)
                     }
                 } else {
