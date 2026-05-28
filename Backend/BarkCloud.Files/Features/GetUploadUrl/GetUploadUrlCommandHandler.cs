@@ -1,6 +1,7 @@
 using BarkCloud.Files.Helpers;
 using BarkCloud.Files.Persistence;
 using BarkCloud.GrpcServer.Settings;
+using BarkCloud.GrpcServer.Tracker;
 using BarkCloud.GrpcServer.XAuth;
 using BarkCloud.Proto.Files;
 
@@ -16,15 +17,18 @@ public class GetUploadUrlCommandHandler : IRequestHandler<GetUploadUrlCommand, G
     private readonly RunSettings _runSettings;
     private readonly IConfiguration _configuration;
     private readonly UserContext _userContext;
+    private readonly RequestContext _requestContext;
     private readonly ILogger<GetUploadUrlCommandHandler> _logger;
 
 
     public GetUploadUrlCommandHandler(UploadedFilesStorage uploadedFilesStorage, UserContext userContext,
+        RequestContext requestContext,
         RunSettings runSettings, IConfiguration configuration,
         ILogger<GetUploadUrlCommandHandler> logger)
     {
         _uploadedFilesStorage = uploadedFilesStorage;
         _userContext = userContext;
+        _requestContext = requestContext;
         _runSettings = runSettings;
         _configuration = configuration;
         _logger = logger;
@@ -33,9 +37,10 @@ public class GetUploadUrlCommandHandler : IRequestHandler<GetUploadUrlCommand, G
     public async Task<GetUploadUrlResponse> Handle(GetUploadUrlCommand request, CancellationToken cancellationToken)
     {
         _logger.LogInformation(
-            "Запрос URL для загрузки файла. Тип: {FileType}, UserId: {UserId}",
+            "Запрос URL для загрузки файла. Тип: {FileType}, UserId: {UserId}, Device: {DeviceName}",
             request.Type,
-            _userContext.UserId
+            _userContext.UserId,
+            _requestContext.DeviceName ?? "Unknown"
         );
 
         var uploadFile = new Domain.UploadFile()
@@ -43,6 +48,7 @@ public class GetUploadUrlCommandHandler : IRequestHandler<GetUploadUrlCommand, G
             CreatedAt = DateTime.UtcNow,
             Type = request.Type,
             Uploaders = new List<long> { _userContext.UserId },
+            UploadDeviceName = _requestContext.DeviceName,
         };
 
         var file = await _uploadedFilesStorage.AddToStorage(uploadFile);

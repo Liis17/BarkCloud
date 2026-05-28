@@ -29,6 +29,13 @@ public class UploadFile
 
     public string? Filename { get; set; }
 
+    /// <summary>
+    /// Имя устройства, с которого файл был загружен (читается из gRPC-заголовка x-device-name
+    /// в момент создания записи в RPC GetUploadUrl). При дедупликации блоба сохраняется значение
+    /// первой успешной загрузки этого контента.
+    /// </summary>
+    public string? UploadDeviceName { get; set; }
+
     public long Size { get; set; }
 
     public int? ImageWidth { get; set; }

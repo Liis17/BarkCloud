@@ -82,6 +82,7 @@ export interface Album {
 export interface FileInfo extends CardFile {
   etag?: string;
   previewCount?: number;
+  uploadDeviceName?: string;
 }
 
 /** Ответ курсор-пагинации. */

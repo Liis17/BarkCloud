@@ -33,7 +33,8 @@ public static class UploadFileMapping
                 : FileUrlHelper.GenerateDownloadUrl(publicBaseUrl, file.Id),
             ImageWidth = file.ImageWidth ?? 0,
             ImageHeight = file.ImageHeight ?? 0,
-            MediaKind = (BarkCloud.Proto.Files.MediaKind)(int)file.MediaKind
+            MediaKind = (BarkCloud.Proto.Files.MediaKind)(int)file.MediaKind,
+            UploadDeviceName = file.UploadDeviceName ?? string.Empty
         };
 
         info.Uploaders.AddRange(file.Uploaders);

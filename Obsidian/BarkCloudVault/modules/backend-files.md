@@ -16,7 +16,7 @@ Parent: [[index]] · See also: [[api/files-api]] · [[modules/backend-files-clou
 ## Файлы
 
 ### Domain
-- `UploadFile.cs` — загруженный файл (реальный объект в S3); содержит `MediaKind`
+- `UploadFile.cs` — загруженный файл (реальный объект в S3); содержит `MediaKind`, `UploadDeviceName` (имя устройства, с которого блоб загружен в первый раз — читается из `x-device-name` в `GetUploadUrl`)
 - `UploadFileType.cs` — enum типов: `Unknown=0`, `UserAvatar=1`, `CloudFile=2`
 - `MediaKind.cs` — категория медиа: `Other=0`, `Photo=1`, `Video=2`, `Document=3`, `Audio=4` (заполняется при загрузке по content-type)
 - `FileHash.cs` — хеш для дедупликации
@@ -67,6 +67,7 @@ Parent: [[index]] · See also: [[api/files-api]] · [[modules/backend-files-clou
   - `20260524204149_AddMediaKindAndAlbums.cs` — колонка `MediaKind` (+ бэкафилл), таблицы `Albums`/`AlbumItems`, уникальный индекс `CloudFileEntries(OwnerId, FileId)` с дедупликацией
   - `20260525213058_AddTrashToCloudFileEntries.cs` — корзина: колонки `IsDeleted`/`DeletedAt`/`PurgeAt` в `CloudFileEntries`, частичные уникальные индексы (`WHERE IsDeleted = false`), индекс по `PurgeAt` (`WHERE IsDeleted = true`)
   - `20260525223410_AddFavoriteFiles.cs` — таблица `FavoriteFiles` (уник. индекс `(OwnerId, FileId)`, индекс `(OwnerId, CreatedAt)`)
+  - `20260528041219_AddUploadDeviceName.cs` — nullable-колонка `UploadDeviceName` в `UploadedFiles` (имя устройства загрузки)
 
 ### Exceptions (локальные)
 - `FileAlreadyUploadedException.cs`

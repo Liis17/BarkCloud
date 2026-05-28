@@ -295,6 +295,9 @@ namespace BarkCloud.Files.Persistence.Migrations
                     b.Property<int>("Type")
                         .HasColumnType("integer");
 
+                    b.Property<string>("UploadDeviceName")
+                        .HasColumnType("text");
+
                     b.Property<DateTime?>("UploadedAt")
                         .HasColumnType("timestamp with time zone");
 

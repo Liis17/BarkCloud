@@ -164,6 +164,11 @@ BarkCloud/
   имя сохраняет расширение, чтобы QuickLook определил тип) и отдаёт URL в `FilePreviewController`.
   **Видео** остаётся на `requestPlayerItem`+`VideoPlayer` (тяжёлые файлы на диск не гоняем).
   Режим выбора → загрузка выбранных в облако (`DeviceAssetResource.originalData` → `CloudRepository.uploadFile`).
+  **Медиа привязывается к авто-папке «Недавно загруженные»** (`CloudRepository.ensureRecentUploadsFolder()`:
+  листает корень, ищет папку с именем `recentUploadsFolderName`="Недавно загруженные", создаёт при отсутствии →
+  `uploadFile(toDirectory:)`; best-effort — без папки файл всё равно в галерее по uploader'у). Повторяет
+  `ensureRecentFolder()` веб-клиента (`ClientApp/.../PhotosPage.tsx`), чтобы у медиа была запись каталога
+  (работают корзина/переименование) и оно попадало в эту папку. То же делает вкладка Медиа Фото/Видео.
   Чтение оригинала и потоковый SHA256 вынесены в общий `DeviceAssetResource` (используют и Галерея, и
   кастомный пикер загрузки), а машинерия «уже в облаке» — в `CloudPresenceTracker` (`@Observable`).
   **Баг тапа по соседней строке в сетках** (`Features/Shared/MediaThumb.swift` → `SquareThumbClip`):
@@ -202,12 +207,17 @@ BarkCloud/
 - **Корзина** (`Features/Trash/`, таб №4) — `CloudApi.ListTrash` с cursor-пагинацией, превью/иконка
   по типу, дата удаления и срок очистки; свайп — `RestoreFromTrash` / `DeleteFromTrash`; в тулбаре —
   `EmptyTrash` с подтверждением и блокирующим оверлеем. Pull-to-refresh (`.refreshable` → `reload()`),
-  работает и на пустом состоянии (пустой экран обёрнут в `ScrollView`).
+  работает и на пустом состоянии (пустой экран обёрнут в `ScrollView`). **Важно:** `reload()` НЕ поднимает
+  `isLoading` — иначе при потягивании экран свернул бы `List` (носитель `.refreshable`) в `ProgressView`,
+  SwiftUI отменил бы задачу обновления и gRPC-запрос падал бы с «the transport threw an unexpected error»
+  (спиннер первого показа даёт дефолт `isLoading=true`, спиннер потягивания рисует сам `.refreshable`).
 - **Файлы** (`Features/Files/`, таб №2) — секции: «На устройстве» (`LocalBrowserScreen`),
   «Облачное хранилище» (карточка-вход в `CloudBrowserScreen`: навигация по папкам
   `ListDirectoryDetailed`, хлебные крошки `GetPath`, CRUD папок/записей, перемещение через
   `CloudMovePicker`, загрузка фото/видео (PhotosPicker) и документов (`.fileImporter`), открытие/скачивание
-  в QuickLook, pull-to-refresh `.refreshable` → `reload()` (и на пустой папке через `ScrollView`))
+  в QuickLook, pull-to-refresh `.refreshable` → `reload(showSpinner: false)` — флаг отключает подъём
+  `isLoading` при потягивании, чтобы не свернуть `List` и не отменить gRPC-запрос; программные обновления
+  после CRUD зовут `reload()` со спиннером (и на пустой папке через `ScrollView`))
   и «Общие файлы» → `ComingSoonScreen` (на бэкенде нет API расшаривания — заглушка «скоро»).
 
 **Важно для превью/скачивания**: файловый сервис на `:7025` с self-signed TLS — превью и оригиналы
