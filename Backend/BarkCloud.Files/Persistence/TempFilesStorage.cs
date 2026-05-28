@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace BarkCloud.Files.Persistence;
 
-public class TempFilesStorage
+public class TempFilesStorage : ITempFilesStorage
 {
     private readonly FilesContext _context;
     private readonly IConfiguration _configuration;

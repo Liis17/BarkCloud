@@ -13,7 +13,7 @@ namespace BarkCloud.Files.Features.GetUploadUrl;
 public class GetUploadUrlCommandHandler : IRequestHandler<GetUploadUrlCommand, GetUploadUrlResponse>
 {
 
-    private readonly UploadedFilesStorage _uploadedFilesStorage;
+    private readonly IUploadedFilesStorage _uploadedFilesStorage;
     private readonly RunSettings _runSettings;
     private readonly IConfiguration _configuration;
     private readonly UserContext _userContext;
@@ -21,7 +21,7 @@ public class GetUploadUrlCommandHandler : IRequestHandler<GetUploadUrlCommand, G
     private readonly ILogger<GetUploadUrlCommandHandler> _logger;
 
 
-    public GetUploadUrlCommandHandler(UploadedFilesStorage uploadedFilesStorage, UserContext userContext,
+    public GetUploadUrlCommandHandler(IUploadedFilesStorage uploadedFilesStorage, UserContext userContext,
         RequestContext requestContext,
         RunSettings runSettings, IConfiguration configuration,
         ILogger<GetUploadUrlCommandHandler> logger)

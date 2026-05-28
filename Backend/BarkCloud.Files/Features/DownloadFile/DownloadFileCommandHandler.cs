@@ -6,29 +6,24 @@ using BarkCloud.Files.Persistence;
 
 using MediatR;
 
-using Microsoft.EntityFrameworkCore;
-
 namespace BarkCloud.Files.Features.DownloadFile;
 
 public class DownloadFileCommandHandler : IRequestHandler<DownloadFileCommand, DownloadFileResult>
 {
-    private readonly UploadedFilesStorage _filesStorage;
+    private readonly IUploadedFilesStorage _filesStorage;
     private readonly S3Uploader _s3Uploader;
     private readonly S3BucketRegistry _bucketRegistry;
-    private readonly TempFilesStorage _tempFilesStorage;
-    private readonly FilesContext _context;
+    private readonly ITempFilesStorage _tempFilesStorage;
     private readonly ILogger<DownloadFileCommandHandler> _logger;
 
-    public DownloadFileCommandHandler(UploadedFilesStorage filesStorage, S3Uploader s3Uploader,
-        S3BucketRegistry bucketRegistry, TempFilesStorage tempFilesStorage,
-        FilesContext context,
+    public DownloadFileCommandHandler(IUploadedFilesStorage filesStorage, S3Uploader s3Uploader,
+        S3BucketRegistry bucketRegistry, ITempFilesStorage tempFilesStorage,
         ILogger<DownloadFileCommandHandler> logger)
     {
         _filesStorage = filesStorage;
         _s3Uploader = s3Uploader;
         _bucketRegistry = bucketRegistry;
         _tempFilesStorage = tempFilesStorage;
-        _context = context;
         _logger = logger;
     }
 
@@ -41,9 +36,7 @@ public class DownloadFileCommandHandler : IRequestHandler<DownloadFileCommand, D
         // Проверяем, является ли этот id превью-файлом (FilePreview.PreviewFileId).
         // Превью раздаются публично, потому что URL на них возвращается в GetFileData
         // и предназначен для прямой отдачи в UI без TempFile-ссылок.
-        var isPreviewFile = file is not null && await _context.FilePreviews
-            .AsNoTracking()
-            .AnyAsync(p => p.PreviewFileId == file.Id, cancellationToken);
+        var isPreviewFile = file is not null && await _filesStorage.IsPreviewFile(file.Id, cancellationToken);
 
         // По оригинальному ID можно качать только аватарки и превью-файлы.
         // Остальное (полные cloud-файлы) — только через временные ссылки.

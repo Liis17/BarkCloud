@@ -23,7 +23,7 @@ public class VideoThumbnailExtractor
     /// <summary>
     /// Считывает размеры и длительность видео из файла на диске.
     /// </summary>
-    public async Task<(int Width, int Height, TimeSpan Duration)> ProbeAsync(string filePath, CancellationToken cancellationToken = default)
+    public virtual async Task<(int Width, int Height, TimeSpan Duration)> ProbeAsync(string filePath, CancellationToken cancellationToken = default)
     {
         var info = await FFProbe.AnalyseAsync(filePath, cancellationToken: cancellationToken);
         var video = info.PrimaryVideoStream;
@@ -35,7 +35,7 @@ public class VideoThumbnailExtractor
     /// Если видео короче запрошенного момента — берём середину. Кадр снимается во временный
     /// файл (без System.Drawing — надёжно на Linux), затем считывается и удаляется.
     /// </summary>
-    public async Task<byte[]> ExtractFrameJpegAsync(string filePath, TimeSpan at, CancellationToken cancellationToken = default)
+    public virtual async Task<byte[]> ExtractFrameJpegAsync(string filePath, TimeSpan at, CancellationToken cancellationToken = default)
     {
         var (_, _, duration) = await ProbeAsync(filePath, cancellationToken);
         var capture = duration > TimeSpan.Zero && at >= duration

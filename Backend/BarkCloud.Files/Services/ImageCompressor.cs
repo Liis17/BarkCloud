@@ -122,7 +122,7 @@ public partial class ImageCompressor
     /// Заменяет связку <see cref="EnforceOriginalLimitsAsync"/> + <see cref="CompressImageAsync"/>
     /// + <c>Image.IdentifyAsync</c>, делавшую несколько полных декодирований.
     /// </summary>
-    public async Task<ImageProcessingResult> ProcessImageAllInOneAsync(
+    public virtual async Task<ImageProcessingResult> ProcessImageAllInOneAsync(
         Stream inputStream,
         bool enforceOriginalLimits,
         int? previewWidth,
@@ -200,7 +200,7 @@ public partial class ImageCompressor
     /// (ResizeMode.Max не увеличивает; держать превью «как оригинал» нет смысла).
     /// Все превью кодируются JPEG Quality=75 с белым фоном под альфа-канал.
     /// </summary>
-    public async Task<List<MultiPreviewItem>> GenerateMultiplePreviewsAsync(
+    public virtual async Task<List<MultiPreviewItem>> GenerateMultiplePreviewsAsync(
         Stream inputStream,
         int[] targetWidths,
         CancellationToken cancellationToken = default)

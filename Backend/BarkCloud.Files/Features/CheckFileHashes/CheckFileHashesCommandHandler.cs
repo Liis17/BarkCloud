@@ -14,7 +14,7 @@ namespace BarkCloud.Files.Features.CheckFileHashes;
 /// </summary>
 public partial class CheckFileHashesCommandHandler : IRequestHandler<CheckFileHashesCommand, CheckFileHashesResponse>
 {
-    private readonly FileHashesStorage _hashesStorage;
+    private readonly IFileHashesStorage _hashesStorage;
     private readonly ILogger<CheckFileHashesCommandHandler> _logger;
 
     // Ограничение на размер пакета, чтобы один запрос не разрастался.
@@ -24,7 +24,7 @@ public partial class CheckFileHashesCommandHandler : IRequestHandler<CheckFileHa
     private static partial Regex Sha256HashRegex();
 
     public CheckFileHashesCommandHandler(
-        FileHashesStorage hashesStorage,
+        IFileHashesStorage hashesStorage,
         ILogger<CheckFileHashesCommandHandler> logger)
     {
         _hashesStorage = hashesStorage;

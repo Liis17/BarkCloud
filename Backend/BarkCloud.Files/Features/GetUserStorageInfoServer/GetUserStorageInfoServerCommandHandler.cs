@@ -7,12 +7,12 @@ namespace BarkCloud.Files.Features.GetUserStorageInfoServer;
 
 public class GetUserStorageInfoServerCommandHandler : IRequestHandler<GetUserStorageInfoServerCommand, GetUserStorageInfoResponse>
 {
-    private readonly UploadedFilesStorage _uploadedFilesStorage;
+    private readonly IUploadedFilesStorage _uploadedFilesStorage;
     private readonly BarkCloud.Proto.Users.UsersServerApi.UsersServerApiClient _usersClient;
     private readonly ILogger<GetUserStorageInfoServerCommandHandler> _logger;
 
     public GetUserStorageInfoServerCommandHandler(
-        UploadedFilesStorage uploadedFilesStorage,
+        IUploadedFilesStorage uploadedFilesStorage,
         BarkCloud.Proto.Users.UsersServerApi.UsersServerApiClient usersClient,
         ILogger<GetUserStorageInfoServerCommandHandler> logger)
     {

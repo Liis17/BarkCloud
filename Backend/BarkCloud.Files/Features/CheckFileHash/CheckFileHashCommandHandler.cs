@@ -10,8 +10,8 @@ namespace BarkCloud.Files.Features.CheckFileHash;
 
 public partial class CheckFileHashCommandHandler : IRequestHandler<CheckFileHashCommand, CheckFileHashResponse>
 {
-    private readonly FileHashesStorage _hashesStorage;
-    private readonly UploadedFilesStorage _filesStorage;
+    private readonly IFileHashesStorage _hashesStorage;
+    private readonly IUploadedFilesStorage _filesStorage;
     private readonly UserContext _userContext;
     private readonly ILogger<CheckFileHashCommandHandler> _logger;
 
@@ -20,8 +20,8 @@ public partial class CheckFileHashCommandHandler : IRequestHandler<CheckFileHash
     private static partial Regex Sha256HashRegex();
 
     public CheckFileHashCommandHandler(
-        FileHashesStorage hashesStorage,
-        UploadedFilesStorage filesStorage,
+        IFileHashesStorage hashesStorage,
+        IUploadedFilesStorage filesStorage,
         UserContext userContext,
         ILogger<CheckFileHashCommandHandler> logger)
     {
