@@ -18,10 +18,22 @@ public static class ServiceCollectionExtensions
         return services;
     }
 
-    public static IServiceCollection AddBarkCloudGrpc(this IServiceCollection services)
+    /// <summary>
+    /// Регистрирует <see cref="RequestContext"/> и его аккессор. Аккессор internal для сборки
+    /// BarkCloud.GrpcServer, поэтому хосты других сборок должны регистрировать его через этот метод.
+    /// Требует, чтобы в gRPC-пайплайн был добавлен <see cref="Tracker.RequestContextInterceptor"/>.
+    /// </summary>
+    public static IServiceCollection AddRequestContext(this IServiceCollection services)
     {
         services.AddScoped<IRequestContextAccessor, RequestContextAccessor>();
         services.AddScoped<RequestContext>(sp => sp.GetRequiredService<IRequestContextAccessor>().Current);
+
+        return services;
+    }
+
+    public static IServiceCollection AddBarkCloudGrpc(this IServiceCollection services)
+    {
+        services.AddRequestContext();
 
         services.AddGrpc(options =>
         {
