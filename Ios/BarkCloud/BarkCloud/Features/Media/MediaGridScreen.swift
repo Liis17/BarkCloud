@@ -64,19 +64,6 @@ struct MediaGridScreen: View {
                 onCreateNew: { Task { await vm?.createAlbumAndAddSelected() } }
             )
         }
-        .confirmationDialog(
-            String(localized: "media_delete_title"),
-            isPresented: $showDeleteConfirm,
-            titleVisibility: .visible
-        ) {
-            Button(String(localized: "action_delete"), role: .destructive) {
-                Task { await vm?.deleteSelected() }
-            }
-            Button(String(localized: "action_cancel"), role: .cancel) {}
-        } message: {
-            Text(String(format: NSLocalizedString("media_delete_message", comment: ""),
-                        vm?.state.selection.count ?? 0))
-        }
     }
 
     @ViewBuilder
@@ -161,7 +148,6 @@ struct MediaGridScreen: View {
         .frame(maxWidth: .infinity)
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
-        .background(.regularMaterial)
         .animation(.easeInOut(duration: 0.2), value: vm.state.isProcessing)
     }
 
@@ -194,6 +180,10 @@ struct MediaGridScreen: View {
             }
             .buttonStyle(.borderedProminent)
             .tint(AppColors.error)
+            // Подтверждение удаления — поповером прямо над кнопкой «Удалить».
+            .popover(isPresented: $showDeleteConfirm, arrowEdge: .bottom) {
+                deleteConfirm(vm)
+            }
 
             Button {
                 showAlbumPicker = true
@@ -207,6 +197,30 @@ struct MediaGridScreen: View {
         .controlSize(.large)
         .disabled(!vm.hasSelection)
         .transition(.opacity)
+    }
+
+    /// Поповер подтверждения удаления, привязанный к кнопке «Удалить».
+    private func deleteConfirm(_ vm: MediaGridViewModel) -> some View {
+        VStack(spacing: 14) {
+            Text(String(format: NSLocalizedString("media_delete_message", comment: ""),
+                        vm.state.selection.count))
+                .font(AppTypography.bodyMedium)
+                .foregroundStyle(AppColors.onSurface)
+                .multilineTextAlignment(.center)
+            Button(role: .destructive) {
+                showDeleteConfirm = false
+                Task { await vm.deleteSelected() }
+            } label: {
+                Label("action_delete", systemImage: "trash")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(AppColors.error)
+            .controlSize(.large)
+        }
+        .padding(16)
+        .frame(width: 240)
+        .presentationCompactAdaptation(.popover)
     }
 
     @ViewBuilder

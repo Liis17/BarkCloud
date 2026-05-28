@@ -54,7 +54,7 @@ BarkCloud/
 │   │   ├── MediaItem.swift         модель (id=file_id, thumbnailURL?, isVideo, fileName) + init(asset:) + placeholders
 │   │   ├── MediaTabScreen.swift    CloudMediaScreen: 3-сегментный переключатель → MediaGridScreen(.photo/.video) / AlbumsGridScreen(nil)
 │   │   ├── MediaGridViewModel.swift @Observable: ListUserMedia + cursor-пагинация + загрузка + мультивыбор (selection/isSelecting/isProcessing/deleteDone/deleteTotal): deleteSelected (последовательно DeleteUserMedia(file_id) с прогрессом), addSelectedToAlbum, createAlbumAndAddSelected
-│   │   ├── MediaGridScreen.swift   LazyVGrid 3 кол. (MediaThumb), загрузка через кастомный DeviceAssetPickerScreen (бейджи «уже в облаке»), полноэкранный просмотр; кнопка «Выбрать» → мультивыбор + нижняя панель (Удалить с подтверждением / Добавить в альбом)
+│   │   ├── MediaGridScreen.swift   LazyVGrid 3 кол. (MediaThumb), загрузка через кастомный DeviceAssetPickerScreen (бейджи «уже в облаке»), полноэкранный просмотр; кнопка «Выбрать» → мультивыбор + нижняя панель без фона (Удалить — подтверждение поповером над кнопкой / В альбом)
 │   │   └── Albums/                 AlbumsViewModel, AlbumsGridScreen (kind: MediaKind? — nil=без фильтра), AlbumDetailScreen+VM (items, обложка, add/remove), AlbumPickerSheet (выбор альбома + «создать новый»)
 │   └── Files/                      файл-браузер (локальный + облачный + «Общие файлы»→ComingSoonScreen)
 │       ├── Domain/                 FsEntry, FsSort
@@ -184,10 +184,11 @@ BarkCloud/
   загрузка через кастомный `DeviceAssetPickerScreen` (сетка медиатеки устройства как в Галерее, бейджи
   «уже в облаке» из `CloudPresenceTracker`; в Фото/Видео уже загруженные нельзя выбрать повторно)
   → `DeviceAssetResource.originalData` → `GetUploadUrl(CLOUD_FILE)` → HTTP. **Мультивыбор** в Фото/Видео:
-  кнопка «Выбрать» рядом с «+» включает режим выбора (галочки на `MediaThumb`); нижняя панель появляется с
-  анимацией (`safeAreaInset` + `transition(.move(edge:.bottom))`) — «Удалить» (с подтверждением; последовательно
+  кнопка «Выбрать» рядом с «+» включает режим выбора (галочки на `MediaThumb`); нижняя панель кнопок без фона
+  появляется с анимацией (`safeAreaInset` + `transition(.move(edge:.bottom))`) — «Удалить» (подтверждение —
+  `.popover(arrowEdge:.bottom)` над самой кнопкой, `presentationCompactAdaptation(.popover)`; последовательно
   `CloudApi.DeleteUserMedia(file_id)`, на время операции кнопки заменяются прогресс-баром done/total) и
-  «Добавить в альбом» (`AlbumPickerSheet`: список альбомов + первым пунктом «Создать новый альбом» →
+  «В альбом» (`AlbumPickerSheet`: список альбомов + первым пунктом «Создать новый альбом» →
   `CreateAlbum("Новый альбом"+5 случайных символов)` + `AddItemsToAlbum`). **`DeleteUserMedia`** (новый RPC,
   бэкенд `Backend/BarkCloud.Files/Features/Cloud/DeleteUserMedia/`): живые `CloudFileEntries` владельца → в
   корзину (восстановимо); если записей нет (медиа загружено без привязки к папке) — `RemoveUploaderFromFile`
