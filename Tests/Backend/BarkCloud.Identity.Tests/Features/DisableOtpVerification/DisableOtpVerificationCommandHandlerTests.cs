@@ -20,6 +20,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using OtpNet;
 
 using OtpType = BarkCloud.Identity.Domain.OtpType;
+using OtpNotCreatedException = BarkCloud.Identity.Persistence.Exceptions.OtpNotCreatedException;
 
 namespace BarkCloud.Identity.Tests.Features.DisableOtpVerification;
 
