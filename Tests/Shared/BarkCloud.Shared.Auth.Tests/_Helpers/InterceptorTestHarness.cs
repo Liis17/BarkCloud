@@ -21,18 +21,20 @@ internal static class InterceptorTestHarness
         var context = new ClientInterceptorContext<EmptyMessage, EmptyMessage>(TestMethod, host: null, callOptions);
 
         Metadata? captured = null;
-        AsyncUnaryCallContinuation<EmptyMessage, EmptyMessage> cont = (_, innerCtx) =>
-        {
-            captured = innerCtx.Options.Headers;
-            return new AsyncUnaryCall<EmptyMessage>(
-                Task.FromResult(new EmptyMessage()),
-                Task.FromResult(new Metadata()),
-                () => Status.DefaultSuccess,
-                () => new Metadata(),
-                () => { });
-        };
+        _ = interceptor.AsyncUnaryCall<EmptyMessage, EmptyMessage>(
+            new EmptyMessage(),
+            context,
+            (_, innerCtx) =>
+            {
+                captured = innerCtx.Options.Headers;
+                return new AsyncUnaryCall<EmptyMessage>(
+                    Task.FromResult(new EmptyMessage()),
+                    Task.FromResult(new Metadata()),
+                    () => Status.DefaultSuccess,
+                    () => new Metadata(),
+                    () => { });
+            });
 
-        _ = interceptor.AsyncUnaryCall(new EmptyMessage(), context, cont);
         return captured ?? new Metadata();
     }
 }
