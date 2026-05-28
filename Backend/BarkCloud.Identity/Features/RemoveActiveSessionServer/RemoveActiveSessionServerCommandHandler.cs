@@ -15,14 +15,14 @@ namespace BarkCloud.Identity.Features.RemoveActiveSessionServer;
 
 public class RemoveActiveSessionServerCommandHandler : IRequestHandler<RemoveActiveSessionServerCommand, RemoveActiveSessionResponse>
 {
-    private readonly RefreshTokensStorage _refreshTokensStorage;
+    private readonly IRefreshTokensStorage _refreshTokensStorage;
     private readonly UsersServerApi.UsersServerApiClient _usersClient;
     private readonly IPublishEndpoint _publishEndpoint;
     private readonly JwtSettings _jwtSettings;
     private readonly MetricsCollector _metrics;
     private readonly ILogger<RemoveActiveSessionServerCommandHandler> _logger;
 
-    public RemoveActiveSessionServerCommandHandler(RefreshTokensStorage refreshTokensStorage,
+    public RemoveActiveSessionServerCommandHandler(IRefreshTokensStorage refreshTokensStorage,
         UsersServerApi.UsersServerApiClient usersClient, IPublishEndpoint publishEndpoint,
         JwtSettings jwtSettings, MetricsCollector metrics,
         ILogger<RemoveActiveSessionServerCommandHandler> logger)

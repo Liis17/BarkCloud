@@ -22,7 +22,7 @@ namespace BarkCloud.Identity.Features.ConfirmOtpVerification;
 public class ConfirmOtpVerificationCommandHandler : IRequestHandler<ConfirmOtpVerificationCommand, ConfirmOtpVerificationResponse>
 {
     private readonly UserContext _userContext;
-    private readonly AuthPropertiesStorage _authPropertiesStorage;
+    private readonly IAuthPropertiesStorage _authPropertiesStorage;
     private readonly UsersServerApi.UsersServerApiClient _usersClient;
     private readonly NotificationQueueSender _notificationQueueSender;
     private readonly RequestContext _requestContext;
@@ -30,7 +30,7 @@ public class ConfirmOtpVerificationCommandHandler : IRequestHandler<ConfirmOtpVe
     private readonly MetricsCollector _metrics;
     private readonly ILogger<ConfirmOtpVerificationCommandHandler> _logger;
 
-    public ConfirmOtpVerificationCommandHandler(UserContext userContext, AuthPropertiesStorage authPropertiesStorage,
+    public ConfirmOtpVerificationCommandHandler(UserContext userContext, IAuthPropertiesStorage authPropertiesStorage,
         UsersServerApi.UsersServerApiClient usersClient, NotificationQueueSender notificationQueueSender,
         RequestContext requestContext, LocationClient locationClient, MetricsCollector metrics,
         ILogger<ConfirmOtpVerificationCommandHandler> logger)

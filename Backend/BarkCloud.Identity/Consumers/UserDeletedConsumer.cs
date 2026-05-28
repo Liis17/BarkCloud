@@ -13,11 +13,11 @@ namespace BarkCloud.Identity.Consumers;
 /// и удаляет связанные с пользователем данные Identity (пароль, 2FA, сбросы, коды).
 /// </summary>
 public class UserDeletedConsumer(
-    RefreshTokensStorage refreshTokensStorage,
-    PasswordsStorage passwordsStorage,
-    AuthPropertiesStorage authPropertiesStorage,
-    ResetPasswordsStorage resetPasswordsStorage,
-    ConfirmationCodesStorage confirmationCodesStorage,
+    IRefreshTokensStorage refreshTokensStorage,
+    IPasswordsStorage passwordsStorage,
+    IAuthPropertiesStorage authPropertiesStorage,
+    IResetPasswordsStorage resetPasswordsStorage,
+    IConfirmationCodesStorage confirmationCodesStorage,
     IPublishEndpoint publishEndpoint,
     JwtSettings jwtSettings,
     MetricsCollector metrics,

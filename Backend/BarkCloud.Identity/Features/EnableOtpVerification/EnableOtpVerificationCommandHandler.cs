@@ -22,7 +22,7 @@ namespace BarkCloud.Identity.Features.EnableOtpVerification;
 public class EnableOtpVerificationCommandHandler : IRequestHandler<EnableOtpVerificationCommand, EnableOtpVerificationResponse>
 {
     private readonly UserContext _userContext;
-    private readonly AuthPropertiesStorage _authPropertiesStorage;
+    private readonly IAuthPropertiesStorage _authPropertiesStorage;
     private readonly BarkCloud.Proto.Users.UsersServerApi.UsersServerApiClient _usersClient;
     private readonly NotificationQueueSender _notificationQueueSender;
     private readonly RequestContext _requestContext;
@@ -30,7 +30,7 @@ public class EnableOtpVerificationCommandHandler : IRequestHandler<EnableOtpVeri
     private readonly MetricsCollector _metrics;
     private readonly ILogger<EnableOtpVerificationCommandHandler> _logger;
 
-    public EnableOtpVerificationCommandHandler(UserContext userContext, AuthPropertiesStorage authPropertiesStorage,
+    public EnableOtpVerificationCommandHandler(UserContext userContext, IAuthPropertiesStorage authPropertiesStorage,
         UsersServerApi.UsersServerApiClient usersClient, NotificationQueueSender notificationQueueSender,
         RequestContext requestContext, LocationClient locationClient, MetricsCollector metrics,
         ILogger<EnableOtpVerificationCommandHandler> logger)

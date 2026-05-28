@@ -20,8 +20,8 @@ using OtpNet;
 namespace BarkCloud.Identity.Features.Auth;
 
 public class AuthCommandHandler(UsersServerApi.UsersServerApiClient usersClient,
-    IMediator mediator, AuthPropertiesStorage authPropertiesStorage, NotificationQueueSender notificationQueueSender,
-    RefreshTokensStorage refreshTokensStorage, RequestContext requestContext, PasswordsStorage passwordsStorage,
+    IMediator mediator, IAuthPropertiesStorage authPropertiesStorage, NotificationQueueSender notificationQueueSender,
+    IRefreshTokensStorage refreshTokensStorage, RequestContext requestContext, IPasswordsStorage passwordsStorage,
     LocationClient locationClient, MetricsCollector metrics, ILogger<AuthCommandHandler> logger) : IRequestHandler<AuthCommand, AuthResponse>
 {
 

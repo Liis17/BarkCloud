@@ -18,7 +18,7 @@ public class LocationClient
         _logger = logger;
     }
 
-    public async Task<IpLocation?> GetLocation(string ip)
+    public virtual async Task<IpLocation?> GetLocation(string ip)
     {
         _logger.LogDebug("Запрос геолокации для IP: {IpAddress}", ip);
         _metrics.Increment("geolocation_requests");
