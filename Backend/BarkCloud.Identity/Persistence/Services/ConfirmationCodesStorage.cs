@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace BarkCloud.Identity.Persistence.Services;
 
-public class ConfirmationCodesStorage
+public class ConfirmationCodesStorage : IConfirmationCodesStorage
 {
     private readonly IdentityContext _context;
 

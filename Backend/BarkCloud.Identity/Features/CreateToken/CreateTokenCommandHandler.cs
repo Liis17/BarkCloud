@@ -8,7 +8,7 @@ using MediatR;
 
 namespace BarkCloud.Identity.Features.CreateToken;
 
-public class CreateTokenCommandHandler(RefreshTokensStorage refreshTokensStorage, JwtService jwtService,
+public class CreateTokenCommandHandler(IRefreshTokensStorage refreshTokensStorage, JwtService jwtService,
     MetricsCollector metrics, ILogger<CreateTokenCommandHandler> logger)
     : IRequestHandler<CreateTokenCommand, CreateTokenResponse>
 {

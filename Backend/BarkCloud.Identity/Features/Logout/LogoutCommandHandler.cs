@@ -13,7 +13,7 @@ using MediatR;
 namespace BarkCloud.Identity.Features.Logout;
 
 public class LogoutCommandHandler(
-    RefreshTokensStorage refreshTokensStorage,
+    IRefreshTokensStorage refreshTokensStorage,
     UserContext userContext,
     UsersServerApi.UsersServerApiClient usersClient,
     IPublishEndpoint publishEndpoint,

@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace BarkCloud.Identity.Persistence.Services;
 
-public class ResetPasswordsStorage(IdentityContext context)
+public class ResetPasswordsStorage(IdentityContext context) : IResetPasswordsStorage
 {
     public async Task<ResetPassword?> GetResetPassword(Guid resetId)
     {

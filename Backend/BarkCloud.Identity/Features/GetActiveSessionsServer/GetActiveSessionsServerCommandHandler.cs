@@ -10,11 +10,11 @@ namespace BarkCloud.Identity.Features.GetActiveSessionsServer;
 
 public class GetActiveSessionsServerCommandHandler : IRequestHandler<GetActiveSessionsServerCommand, GetActiveSessionsResponse>
 {
-    private readonly RefreshTokensStorage _refreshTokensStorage;
+    private readonly IRefreshTokensStorage _refreshTokensStorage;
     private readonly UsersServerApi.UsersServerApiClient _usersClient;
     private readonly ILogger<GetActiveSessionsServerCommandHandler> _logger;
 
-    public GetActiveSessionsServerCommandHandler(RefreshTokensStorage refreshTokensStorage,
+    public GetActiveSessionsServerCommandHandler(IRefreshTokensStorage refreshTokensStorage,
         UsersServerApi.UsersServerApiClient usersClient,
         ILogger<GetActiveSessionsServerCommandHandler> logger)
     {

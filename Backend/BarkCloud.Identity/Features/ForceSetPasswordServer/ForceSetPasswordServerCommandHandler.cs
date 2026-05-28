@@ -12,13 +12,13 @@ namespace BarkCloud.Identity.Features.ForceSetPasswordServer;
 
 public class ForceSetPasswordServerCommandHandler : IRequestHandler<ForceSetPasswordServerCommand, ForceSetPasswordServerResponse>
 {
-    private readonly PasswordsStorage _passwordsStorage;
+    private readonly IPasswordsStorage _passwordsStorage;
     private readonly NotificationQueueSender _notificationQueueSender;
     private readonly UsersServerApi.UsersServerApiClient _usersClient;
     private readonly ILogger<ForceSetPasswordServerCommandHandler> _logger;
 
     public ForceSetPasswordServerCommandHandler(
-        PasswordsStorage passwordsStorage,
+        IPasswordsStorage passwordsStorage,
         NotificationQueueSender notificationQueueSender,
         UsersServerApi.UsersServerApiClient usersClient,
         ILogger<ForceSetPasswordServerCommandHandler> logger)

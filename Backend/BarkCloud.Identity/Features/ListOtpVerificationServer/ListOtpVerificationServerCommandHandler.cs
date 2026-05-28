@@ -7,10 +7,10 @@ namespace BarkCloud.Identity.Features.ListOtpVerificationServer;
 
 public class ListOtpVerificationServerCommandHandler : IRequestHandler<ListOtpVerificationServerCommand, ListOtpVerificationResponse>
 {
-    private readonly AuthPropertiesStorage _authPropertiesStorage;
+    private readonly IAuthPropertiesStorage _authPropertiesStorage;
     private readonly ILogger<ListOtpVerificationServerCommandHandler> _logger;
 
-    public ListOtpVerificationServerCommandHandler(AuthPropertiesStorage authPropertiesStorage,
+    public ListOtpVerificationServerCommandHandler(IAuthPropertiesStorage authPropertiesStorage,
         ILogger<ListOtpVerificationServerCommandHandler> logger)
     {
         _authPropertiesStorage = authPropertiesStorage;
