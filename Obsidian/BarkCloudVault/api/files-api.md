@@ -73,6 +73,10 @@ Package: `barkcloud.files`
 - `ListDirectoryRequest.directory_id` — `optional string`, пустая/неуказанная = корень
 - `PathResponse` — путь до объекта
 
+### UploadFileInfo · поле upload_device_name
+
+`UploadFileInfo.upload_device_name` (поле 15) — имя устройства, с которого блоб был загружен. Сервер заполняет его в `GetUploadUrl` из gRPC-заголовка `x-device-name` ([[modules/shared-auth]] · `RequestContext.DeviceName`); хранится на блобе (`UploadFile.UploadDeviceName`). При дедупликации по SHA256 сохраняется значение **первой** успешной загрузки этого контента, так как новая запись блоба удаляется в `UploadFileCommandHandler` и в каталоге используется существующий блоб. В веб-клиенте выводится в модалке «Свойства» (`/api/files/info` → `uploadDeviceName`).
+
 ### MediaKind (proto enum)
 
 `MEDIA_KIND_OTHER=0`, `MEDIA_KIND_PHOTO=1`, `MEDIA_KIND_VIDEO=2`, `MEDIA_KIND_DOCUMENT=3`, `MEDIA_KIND_AUDIO=4`. Заполняется при загрузке по content-type, доступно в `UploadFileInfo.media_kind`. Для видео сервер генерирует превью (кадр на 5-й секунде через FFmpeg) тем же пайплайном, что и для изображений (128/512/1024).

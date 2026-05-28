@@ -32,8 +32,13 @@ final class TrashViewModel {
         await reload()
     }
 
+    /// Перезагрузка списка. Важно: НЕ поднимаем `isLoading` здесь — иначе при
+    /// pull-to-refresh экран свернул бы `List` (носитель `.refreshable`) в
+    /// полноэкранный `ProgressView`, SwiftUI отменил бы задачу обновления, и
+    /// gRPC-запрос упал бы с «the transport threw an unexpected error».
+    /// Спиннер первого показа обеспечивает дефолт `isLoading = true`, спиннер
+    /// потягивания рисует сам `.refreshable`.
     func reload() async {
-        state.isLoading = true
         do {
             let page = try await cloud.listTrash(limit: 50)
             state.items = page.items

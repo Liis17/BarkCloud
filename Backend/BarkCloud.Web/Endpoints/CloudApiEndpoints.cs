@@ -438,7 +438,8 @@ public static class CloudApiEndpoints
                     etag = f.Etag,
                     previewCount = f.Previews.Count,
                     createdAt = f.CreatedAt?.ToDateTimeOffset(),
-                    uploadedAt = f.UploadedAt?.ToDateTimeOffset()
+                    uploadedAt = f.UploadedAt?.ToDateTimeOffset(),
+                    uploadDeviceName = f.UploadDeviceName
                 }, Json);
             }
             catch (RpcException ex) when (ex.StatusCode == StatusCode.NotFound)

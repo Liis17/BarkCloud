@@ -89,7 +89,7 @@ struct CloudBrowserScreen: View {
                 .containerRelativeFrame(.vertical)
             }
             // Потянуть вниз — перезагрузить даже пустую папку.
-            .refreshable { await vm.reload() }
+            .refreshable { await vm.reload(showSpinner: false) }
         } else {
             List {
                 ForEach(vm.state.subdirs) { dir in
@@ -123,7 +123,7 @@ struct CloudBrowserScreen: View {
             }
             .listStyle(.plain)
             // Потянуть вниз — перезагрузить содержимое папки.
-            .refreshable { await vm.reload() }
+            .refreshable { await vm.reload(showSpinner: false) }
         }
     }
 

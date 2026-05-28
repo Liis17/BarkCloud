@@ -104,11 +104,15 @@ final class GalleryViewModel {
         isUploading = true
         uploadDone = 0
         uploadTotal = targets.count
+        // Привязываем медиа к авто-папке «Недавно загруженные» (как веб-клиент),
+        // чтобы у него была запись каталога. Best-effort: без папки файл всё равно
+        // попадёт в галерею.
+        let folderID = try? await cloud.ensureRecentUploadsFolder()
         var anyFailed = false
         for asset in targets {
             do {
                 let (data, name) = try await DeviceAssetResource.originalData(for: asset)
-                _ = try await cloud.uploadFile(data: data, fileName: name)
+                _ = try await cloud.uploadFile(data: data, fileName: name, toDirectory: folderID)
                 // Файл теперь в облаке — сразу показываем иконку.
                 presence.markPresent(asset.localIdentifier)
             } catch {

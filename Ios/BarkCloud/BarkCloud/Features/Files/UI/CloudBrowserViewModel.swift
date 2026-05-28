@@ -35,8 +35,14 @@ final class CloudBrowserViewModel {
         await reload()
     }
 
-    func reload() async {
-        state.isLoading = true
+    /// Перезагрузка содержимого папки. `showSpinner` поднимает полноэкранный
+    /// `ProgressView` — нужно при программных обновлениях (создание/переименование/
+    /// удаление/перемещение). При pull-to-refresh передаём `false`: иначе экран
+    /// свернул бы `List` (носитель `.refreshable`) в `ProgressView`, SwiftUI отменил
+    /// бы задачу обновления и gRPC-запрос упал бы с «the transport threw an
+    /// unexpected error». Спиннер потягивания рисует сам `.refreshable`.
+    func reload(showSpinner: Bool = true) async {
+        if showSpinner { state.isLoading = true }
         do {
             let listing = try await cloud.listDirectory(state.directoryID)
             state.subdirs = listing.subdirs
