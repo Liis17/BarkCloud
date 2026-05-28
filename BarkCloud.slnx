@@ -16,4 +16,23 @@
     <Project Path="Shared/BarkCloud.Shared.Queue/BarkCloud.Shared.Queue.csproj" />
     <Project Path="Shared/BarkCloud.Shared.SecurityUtilities/BarkCloud.Shared.SecurityUtilities.csproj" />
   </Folder>
+  <Folder Name="/Tests/">
+    <Project Path="Tests/BarkCloud.TestKit/BarkCloud.TestKit.csproj" />
+  </Folder>
+  <Folder Name="/Tests/Backend/">
+    <Project Path="Tests/Backend/BarkCloud.Configuration.Tests/BarkCloud.Configuration.Tests.csproj" />
+    <Project Path="Tests/Backend/BarkCloud.Files.Tests/BarkCloud.Files.Tests.csproj" />
+    <Project Path="Tests/Backend/BarkCloud.GrpcServer.Tests/BarkCloud.GrpcServer.Tests.csproj" />
+    <Project Path="Tests/Backend/BarkCloud.Identity.Tests/BarkCloud.Identity.Tests.csproj" />
+    <Project Path="Tests/Backend/BarkCloud.Notification.Tests/BarkCloud.Notification.Tests.csproj" />
+    <Project Path="Tests/Backend/BarkCloud.Users.Tests/BarkCloud.Users.Tests.csproj" />
+    <Project Path="Tests/Backend/BarkCloud.Web.Tests/BarkCloud.Web.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Tests/Shared/">
+    <Project Path="Tests/Shared/BarkCloud.Shared.Auth.Tests/BarkCloud.Shared.Auth.Tests.csproj" />
+    <Project Path="Tests/Shared/BarkCloud.Shared.Exceptions.Tests/BarkCloud.Shared.Exceptions.Tests.csproj" />
+    <Project Path="Tests/Shared/BarkCloud.Shared.Identity.Tests/BarkCloud.Shared.Identity.Tests.csproj" />
+    <Project Path="Tests/Shared/BarkCloud.Shared.Queue.Tests/BarkCloud.Shared.Queue.Tests.csproj" />
+    <Project Path="Tests/Shared/BarkCloud.Shared.SecurityUtilities.Tests/BarkCloud.Shared.SecurityUtilities.Tests.csproj" />
+  </Folder>
 </Solution>
