@@ -5,6 +5,7 @@ using BarkCloud.Files.Infrastructure;
 using BarkCloud.Files.Persistence;
 using BarkCloud.Files.Services;
 using BarkCloud.GrpcServer;
+using BarkCloud.GrpcServer.Tracker;
 using BarkCloud.GrpcServer.XAuth;
 using BarkCloud.Shared.Identity;
 
@@ -30,6 +31,7 @@ public class Program
         builder.Services.AddGrpc(options =>
         {
             options.Interceptors.Add<ServerExceptionInterceptor>();
+            options.Interceptors.Add<RequestContextInterceptor>();
             // Оригинальные файлы изображений от админ-панели могут быть больше дефолтных 4 МБ
             options.MaxReceiveMessageSize = 20 * 1024 * 1024; // 20 МБ
             options.MaxSendMessageSize = 20 * 1024 * 1024;    // 20 МБ
@@ -41,6 +43,7 @@ public class Program
         builder.Services.AddGrpcReflection();
 
         builder.Services.AddXAuth(builder.Configuration);
+        builder.Services.AddRequestContext();
 
         // Регистрируем gRPC клиент для UsersServerApi
         builder.Services.AddGrpcClient<BarkCloud.Proto.Users.UsersServerApi.UsersServerApiClient>(o =>
