@@ -8,7 +8,7 @@ using MediatR;
 namespace BarkCloud.Users.Features.Privacy.GetPrivacySettings;
 
 public class GetPrivacySettingsQueryHandler(
-    UsersStorage usersStorage,
+    IUsersStorage usersStorage,
     UserContext userContext,
     ILogger<GetPrivacySettingsQueryHandler> logger)
     : IRequestHandler<GetPrivacySettingsQuery, GetPrivacySettingsResponse>

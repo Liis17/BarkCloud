@@ -8,12 +8,12 @@ namespace BarkCloud.Users.Features.UpdateProfileServer;
 
 public class UpdateProfileServerCommandHandler : IRequestHandler<UpdateProfileServerCommand, UpdateProfileServerResponse>
 {
-    private readonly UsersStorage _usersStorage;
+    private readonly IUsersStorage _usersStorage;
     private readonly UserInfoQueueSender _userInfoQueueSender;
     private readonly ILogger<UpdateProfileServerCommandHandler> _logger;
 
     public UpdateProfileServerCommandHandler(
-        UsersStorage usersStorage,
+        IUsersStorage usersStorage,
         UserInfoQueueSender userInfoQueueSender,
         ILogger<UpdateProfileServerCommandHandler> logger)
     {

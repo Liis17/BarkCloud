@@ -7,10 +7,10 @@ namespace BarkCloud.Users.Features.ConfirmUser;
 
 public class ConfirmUserCommandHandler : IRequestHandler<ConfirmUserCommand>
 {
-    private readonly UsersStorage _usersStorage;
+    private readonly IUsersStorage _usersStorage;
     private readonly ILogger<ConfirmUserCommandHandler> _logger;
 
-    public ConfirmUserCommandHandler(UsersStorage usersStorage, ILogger<ConfirmUserCommandHandler> logger)
+    public ConfirmUserCommandHandler(IUsersStorage usersStorage, ILogger<ConfirmUserCommandHandler> logger)
     {
         _usersStorage = usersStorage;
         _logger = logger;

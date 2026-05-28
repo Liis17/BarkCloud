@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace BarkCloud.Users.Persistence.Services;
 
-public class DevicesStorage(UsersContext context)
+public class DevicesStorage(UsersContext context) : IDevicesStorage
 {
     public async Task<UserDevice> RegisterOrUpdateDevice(Guid deviceId, long userId, string originalName,
         string? appName, string? operationSystem, string? location)

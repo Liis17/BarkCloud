@@ -13,11 +13,11 @@ public class SearchUsersQueryHandler : IRequestHandler<SearchUsersQuery, SearchU
     private const int DefaultLimit = 20;
     private const int MaxLimit = 50;
 
-    private readonly UsersStorage _usersStorage;
+    private readonly IUsersStorage _usersStorage;
     private readonly UserContext _userContext;
     private readonly ILogger<SearchUsersQueryHandler> _logger;
 
-    public SearchUsersQueryHandler(UsersStorage usersStorage, UserContext userContext,
+    public SearchUsersQueryHandler(IUsersStorage usersStorage, UserContext userContext,
         ILogger<SearchUsersQueryHandler> logger)
     {
         _usersStorage = usersStorage;

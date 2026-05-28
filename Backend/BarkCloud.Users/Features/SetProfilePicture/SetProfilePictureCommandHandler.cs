@@ -13,7 +13,7 @@ namespace BarkCloud.Users.Features.SetProfilePicture;
 public class SetProfilePictureCommandHandler : IRequestHandler<SetProfilePictureCommand, SetProfilePictureResponse>
 {
     private readonly FilesServerApi.FilesServerApiClient _filesServerApiClient;
-    private readonly UsersStorage _usersStorage;
+    private readonly IUsersStorage _usersStorage;
     private readonly UserContext _userContext;
     private readonly UserInfoQueueSender _userInfoQueueSender;
     private readonly MetricsCollector _metrics;
@@ -21,7 +21,7 @@ public class SetProfilePictureCommandHandler : IRequestHandler<SetProfilePicture
 
     public SetProfilePictureCommandHandler(
         FilesServerApi.FilesServerApiClient filesServerApiClient,
-        UsersStorage usersStorage, UserContext userContext, UserInfoQueueSender userInfoQueueSender,
+        IUsersStorage usersStorage, UserContext userContext, UserInfoQueueSender userInfoQueueSender,
         MetricsCollector metrics,
         ILogger<SetProfilePictureCommandHandler> logger)
     {

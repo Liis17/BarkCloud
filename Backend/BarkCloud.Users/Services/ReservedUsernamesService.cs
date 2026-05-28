@@ -13,7 +13,7 @@ public class ReservedUsernamesService
             .ToHashSet();
     }
 
-    public bool IsReserved(string username)
+    public virtual bool IsReserved(string username)
     {
         if (string.IsNullOrWhiteSpace(username))
             return false;

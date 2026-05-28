@@ -7,7 +7,7 @@ using MediatR;
 namespace BarkCloud.Users.Features.Devices.SetFirebaseToken;
 
 public class SetFirebaseTokenCommandHandler(
-    DevicesStorage devicesStorage,
+    IDevicesStorage devicesStorage,
     UserContext userContext,
     ILogger<SetFirebaseTokenCommandHandler> logger)
     : IRequestHandler<SetFirebaseTokenCommand, SetFirebaseTokenResponse>
