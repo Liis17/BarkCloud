@@ -7,11 +7,6 @@ on:
       - master
     paths:
       - 'Backend/BarkCloud.Notification/**'
-      - 'Backend/BarkCloud.GrpcServer/**'
-      - 'Shared/BarkCloud.Shared.Auth/**'
-      - 'Shared/BarkCloud.Shared.Exceptions/**'
-      - 'Shared/BarkCloud.Shared.Identity/**'
-      - 'Shared/BarkCloud.Shared.Queue/**'
       - 'Backend/rebuild.trigger'
   workflow_dispatch:
 
