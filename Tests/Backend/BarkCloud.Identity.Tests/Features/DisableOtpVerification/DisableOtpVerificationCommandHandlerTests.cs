@@ -19,6 +19,8 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 using OtpNet;
 
+using OtpType = BarkCloud.Identity.Domain.OtpType;
+
 namespace BarkCloud.Identity.Tests.Features.DisableOtpVerification;
 
 public class DisableOtpVerificationCommandHandlerTests
