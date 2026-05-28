@@ -35,6 +35,18 @@ final class ProfileViewModel {
             }
             return result
         }
+
+        /// file_id аватара — последний сегмент download-ссылки. Ключ дискового кеша
+        /// аватара; при смене картинки меняется и id, поэтому старый кеш не мешает.
+        var profilePictureFileID: String? {
+            guard let user, !user.profilePicture.isEmpty,
+                  let comps = URLComponents(string: user.profilePicture) else { return nil }
+            let parts = comps.path.split(separator: "/").map(String.init)
+            if let idx = parts.lastIndex(of: "download"), idx + 1 < parts.count {
+                return parts[idx + 1]
+            }
+            return nil
+        }
     }
 
     var state = UiState()

@@ -13,14 +13,30 @@
 		47EF6BDC60833D3F2ADF3D8F /* GRPCNIOTransportHTTP2 in Frameworks */ = {isa = PBXBuildFile; productRef = B516B9C7010DED413CF2FD27 /* GRPCNIOTransportHTTP2 */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		CA11000000000000000000A9 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 23AF70842FBBAEED006005AF /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 23AF708B2FBBAEED006005AF;
+			remoteInfo = BarkCloud;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		23AF708C2FBBAEED006005AF /* BarkCloud.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BarkCloud.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		CA11000000000000000000A2 /* BarkCloudTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BarkCloudTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		23AF708E2FBBAEED006005AF /* BarkCloud */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = BarkCloud;
+			sourceTree = "<group>";
+		};
+		CA11000000000000000000A7 /* BarkCloudTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = BarkCloudTests;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -37,6 +53,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		CA11000000000000000000B0 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -44,6 +67,7 @@
 			isa = PBXGroup;
 			children = (
 				23AF708E2FBBAEED006005AF /* BarkCloud */,
+				CA11000000000000000000A7 /* BarkCloudTests */,
 				23AF708D2FBBAEED006005AF /* Products */,
 			);
 			sourceTree = "<group>";
@@ -52,6 +76,7 @@
 			isa = PBXGroup;
 			children = (
 				23AF708C2FBBAEED006005AF /* BarkCloud.app */,
+				CA11000000000000000000A2 /* BarkCloudTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -86,6 +111,28 @@
 			productReference = 23AF708C2FBBAEED006005AF /* BarkCloud.app */;
 			productType = "com.apple.product-type.application";
 		};
+		CA11000000000000000000A1 /* BarkCloudTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = CA11000000000000000000A4 /* Build configuration list for PBXNativeTarget "BarkCloudTests" */;
+			buildPhases = (
+				CA11000000000000000000A3 /* Sources */,
+				CA11000000000000000000B0 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				CA11000000000000000000A8 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				CA11000000000000000000A7 /* BarkCloudTests */,
+			);
+			name = BarkCloudTests;
+			packageProductDependencies = (
+			);
+			productName = BarkCloudTests;
+			productReference = CA11000000000000000000A2 /* BarkCloudTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -98,6 +145,10 @@
 				TargetAttributes = {
 					23AF708B2FBBAEED006005AF = {
 						CreatedOnToolsVersion = 26.4.1;
+					};
+					CA11000000000000000000A1 = {
+						CreatedOnToolsVersion = 26.4.1;
+						TestTargetID = 23AF708B2FBBAEED006005AF;
 					};
 				};
 			};
@@ -123,6 +174,7 @@
 			projectRoot = "";
 			targets = (
 				23AF708B2FBBAEED006005AF /* BarkCloud */,
+				CA11000000000000000000A1 /* BarkCloudTests */,
 			);
 		};
 /* End PBXProject section */
@@ -167,7 +219,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		CA11000000000000000000A3 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		CA11000000000000000000A8 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 23AF708B2FBBAEED006005AF /* BarkCloud */;
+			targetProxy = CA11000000000000000000A9 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		23AF70952FBBAEEE006005AF /* Debug */ = {
@@ -370,6 +437,48 @@
 			};
 			name = Release;
 		};
+		CA11000000000000000000A5 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 9Y935NYUP9;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.barkfluff.BarkCloudTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/BarkCloud.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/BarkCloud";
+			};
+			name = Debug;
+		};
+		CA11000000000000000000A6 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 9Y935NYUP9;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.barkfluff.BarkCloudTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/BarkCloud.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/BarkCloud";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -387,6 +496,15 @@
 			buildConfigurations = (
 				23AF70982FBBAEEE006005AF /* Debug */,
 				23AF70992FBBAEEE006005AF /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		CA11000000000000000000A4 /* Build configuration list for PBXNativeTarget "BarkCloudTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				CA11000000000000000000A5 /* Debug */,
+				CA11000000000000000000A6 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

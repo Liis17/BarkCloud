@@ -36,6 +36,7 @@ struct RemoteFilePreviewScreen: View {
     let fileID: String
     let fileName: String
     let transfer: FileTransferService
+    let cache: FileCacheService
 
     @State private var localURL: URL?
     @State private var failed = false
@@ -56,9 +57,11 @@ struct RemoteFilePreviewScreen: View {
 
     private func loadOriginal() async {
         do {
-            let urls = try await transfer.tempDownloadURLs(fileIDs: [fileID])
-            guard let remote = urls[fileID] else { failed = true; return }
-            localURL = try await transfer.download(from: remote, suggestedName: fileName)
+            localURL = try await cache.loadFile(fileId: fileID, variant: .original) {
+                let urls = try await transfer.tempDownloadURLs(fileIDs: [fileID])
+                guard let remote = urls[fileID] else { throw FileTransferError.downloadFailed }
+                return remote
+            }
         } catch {
             failed = true
         }

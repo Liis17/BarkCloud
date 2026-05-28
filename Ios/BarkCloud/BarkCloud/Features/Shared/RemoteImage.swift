@@ -19,13 +19,35 @@ final class RemoteImageCache {
 /// сервера) с кэшем в памяти. Замена `AsyncImage`, который отвергает self-signed
 /// сертификат файлового сервиса.
 struct RemoteImage<Placeholder: View>: View {
+    let fileId: String?
+    let variant: CacheVariant?
     let url: URL?
     let contentMode: ContentMode
     @ViewBuilder var placeholder: () -> Placeholder
 
+    @Environment(AppEnvironment.self) private var env
     @State private var image: UIImage?
 
+    /// Cache-aware: при наличии `fileId` байты берутся из дискового кеша
+    /// (`FileCacheService`), а не из сети напрямую.
+    init(
+        fileId: String?,
+        variant: CacheVariant,
+        url: URL?,
+        contentMode: ContentMode = .fill,
+        @ViewBuilder placeholder: @escaping () -> Placeholder
+    ) {
+        self.fileId = fileId
+        self.variant = variant
+        self.url = url
+        self.contentMode = contentMode
+        self.placeholder = placeholder
+    }
+
+    /// Legacy: без дискового кеша (для ссылок без известного `fileId`).
     init(url: URL?, contentMode: ContentMode = .fill, @ViewBuilder placeholder: @escaping () -> Placeholder) {
+        self.fileId = nil
+        self.variant = nil
         self.url = url
         self.contentMode = contentMode
         self.placeholder = placeholder
@@ -48,6 +70,14 @@ struct RemoteImage<Placeholder: View>: View {
         guard let url else { image = nil; return }
         if let cached = RemoteImageCache.shared.image(for: url) {
             image = cached
+            return
+        }
+        if let fileId, let variant {
+            if let data = try? await env.fileCache.loadData(fileId: fileId, variant: variant, sourceURL: url),
+               !Task.isCancelled, let ui = UIImage(data: data) {
+                RemoteImageCache.shared.store(ui, for: url)
+                image = ui
+            }
             return
         }
         do {
@@ -73,13 +103,21 @@ extension RemoteImage where Placeholder == Color {
 /// сначала пробуем превью, при недоступности — полное изображение. В отличие от
 /// `RemoteImage`, проверяет HTTP-статус, чтобы не принять 404-страницу за картинку.
 struct FallbackRemoteImage<Placeholder: View>: View {
+    let fileId: String?
     let urls: [URL]
     let contentMode: ContentMode
     @ViewBuilder var placeholder: () -> Placeholder
 
+    @Environment(AppEnvironment.self) private var env
     @State private var image: UIImage?
 
-    init(urls: [URL], contentMode: ContentMode = .fill, @ViewBuilder placeholder: @escaping () -> Placeholder) {
+    init(
+        fileId: String? = nil,
+        urls: [URL],
+        contentMode: ContentMode = .fill,
+        @ViewBuilder placeholder: @escaping () -> Placeholder
+    ) {
+        self.fileId = fileId
         self.urls = urls
         self.contentMode = contentMode
         self.placeholder = placeholder
@@ -99,10 +137,22 @@ struct FallbackRemoteImage<Placeholder: View>: View {
     }
 
     private func load() async {
-        for url in urls {
+        for (index, url) in urls.enumerated() {
             if let cached = RemoteImageCache.shared.image(for: url) {
                 image = cached
                 return
+            }
+            // Cache-aware путь: первый URL — превью аватара, второй — оригинал.
+            if let fileId {
+                let variant: CacheVariant = index == 0 ? .avatarPreview : .avatar
+                if let data = try? await env.fileCache.loadData(fileId: fileId, variant: variant, sourceURL: url),
+                   let ui = UIImage(data: data) {
+                    RemoteImageCache.shared.store(ui, for: url)
+                    guard !Task.isCancelled else { return }
+                    image = ui
+                    return
+                }
+                continue
             }
             do {
                 let (data, response) = try await InsecureHTTP.session.data(from: url)

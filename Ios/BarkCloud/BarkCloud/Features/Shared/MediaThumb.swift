@@ -31,6 +31,8 @@ struct SquareThumbClip<Content: View>: View {
 /// Используется сетками галереи и альбомов. В режиме мультивыбора
 /// (`isSelecting`) рисует индикатор выбора и подсветку выбранного.
 struct MediaThumb: View {
+    let fileId: String
+    let previewWidth: Int
     let thumbnailURL: URL?
     let isVideo: Bool
     /// Включён режим выбора — показываем индикатор-галочку.
@@ -41,7 +43,7 @@ struct MediaThumb: View {
     var body: some View {
         SquareThumbClip(cornerRadius: 4) {
             if let thumbnailURL {
-                RemoteImage(url: thumbnailURL, contentMode: .fill) {
+                RemoteImage(fileId: fileId, variant: .preview(width: previewWidth), url: thumbnailURL, contentMode: .fill) {
                     AppColors.onSurface.opacity(0.08)
                 }
             } else {

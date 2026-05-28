@@ -76,6 +76,8 @@ struct MediaGridScreen: View {
                 LazyVGrid(columns: columns, spacing: Self.spacing) {
                     ForEach(vm.state.items) { item in
                         MediaThumb(
+                            fileId: item.id,
+                            previewWidth: item.previewWidth,
                             thumbnailURL: item.thumbnailURL,
                             isVideo: item.isVideo,
                             isSelecting: vm.state.isSelecting,
@@ -244,7 +246,7 @@ struct MediaGridScreen: View {
 
     private func viewer(_ item: MediaItem) -> some View {
         NavigationStack {
-            RemoteFilePreviewScreen(fileID: item.id, fileName: item.fileName, transfer: env.fileTransfer)
+            RemoteFilePreviewScreen(fileID: item.id, fileName: item.fileName, transfer: env.fileTransfer, cache: env.fileCache)
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
                         Button(String(localized: "action_close")) { selected = nil }

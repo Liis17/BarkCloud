@@ -61,7 +61,7 @@ struct CloudBrowserScreen: View {
         }
         .fullScreenCover(item: $openFile) { entry in
             NavigationStack {
-                RemoteFilePreviewScreen(fileID: entry.fileID, fileName: entry.name, transfer: env.fileTransfer)
+                RemoteFilePreviewScreen(fileID: entry.fileID, fileName: entry.name, transfer: env.fileTransfer, cache: env.fileCache)
                     .toolbar {
                         ToolbarItem(placement: .topBarLeading) {
                             Button(String(localized: "action_close")) { openFile = nil }
@@ -143,8 +143,8 @@ struct CloudBrowserScreen: View {
     @ViewBuilder
     private func fileRow(_ entry: CloudFileEntry) -> some View {
         HStack(spacing: 14) {
-            if let preview = entry.asset.previewURL(preferredWidth: 128) {
-                RemoteImage(url: preview, contentMode: .fill) {
+            if let preview = entry.asset.preview(preferredWidth: 128) {
+                RemoteImage(fileId: entry.fileID, variant: .preview(width: preview.width), url: preview.url, contentMode: .fill) {
                     Image(systemName: MimeIcon.iconSymbol(forFileName: entry.name))
                         .foregroundStyle(AppColors.onSurfaceVariant)
                 }

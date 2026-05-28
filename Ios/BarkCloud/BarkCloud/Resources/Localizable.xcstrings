@@ -231,6 +231,127 @@
         }
       }
     },
+    "cache_clear_all": {
+      "extractionState": "manual",
+      "localizations": {
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Очистить весь кеш"
+          }
+        }
+      }
+    },
+    "cache_clear_confirm": {
+      "extractionState": "manual",
+      "localizations": {
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Удалить все закешированные файлы? Их придётся загружать заново."
+          }
+        }
+      }
+    },
+    "cache_clear_stale": {
+      "extractionState": "manual",
+      "localizations": {
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Очистить устаревшее"
+          }
+        }
+      }
+    },
+    "cache_entries": {
+      "extractionState": "manual",
+      "localizations": {
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Записей"
+          }
+        }
+      }
+    },
+    "cache_limit": {
+      "extractionState": "manual",
+      "localizations": {
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Лимит кеша"
+          }
+        }
+      }
+    },
+    "cache_limit_1gb": {
+      "extractionState": "manual",
+      "localizations": {
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 ГБ"
+          }
+        }
+      }
+    },
+    "cache_limit_2gb": {
+      "extractionState": "manual",
+      "localizations": {
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "2 ГБ"
+          }
+        }
+      }
+    },
+    "cache_limit_5gb": {
+      "extractionState": "manual",
+      "localizations": {
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "5 ГБ"
+          }
+        }
+      }
+    },
+    "cache_limit_10gb": {
+      "extractionState": "manual",
+      "localizations": {
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "10 ГБ"
+          }
+        }
+      }
+    },
+    "cache_limit_20gb": {
+      "extractionState": "manual",
+      "localizations": {
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "20 ГБ"
+          }
+        }
+      }
+    },
+    "cache_size": {
+      "extractionState": "manual",
+      "localizations": {
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Размер кеша"
+          }
+        }
+      }
+    },
     "cloud_empty_folder": {
       "extractionState": "manual",
       "localizations": {
@@ -1815,6 +1936,17 @@
         }
       }
     },
+    "settings_cache": {
+      "extractionState": "manual",
+      "localizations": {
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Кеш"
+          }
+        }
+      }
+    },
     "settings_devices": {
       "extractionState": "manual",
       "localizations": {
@@ -2108,6 +2240,138 @@
           "stringUnit": {
             "state": "translated",
             "value": "Не удалось загрузить файл"
+          }
+        }
+      }
+    },
+    "backup_title": {
+      "extractionState": "manual",
+      "localizations": {
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Резервная копия"
+          }
+        }
+      }
+    },
+    "backup_autoupload_title": {
+      "extractionState": "manual",
+      "localizations": {
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Автозагрузка"
+          }
+        }
+      }
+    },
+    "backup_autoupload_subtitle": {
+      "extractionState": "manual",
+      "localizations": {
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Автоматически загружать фото и видео в облако"
+          }
+        }
+      }
+    },
+    "backup_scanning": {
+      "extractionState": "manual",
+      "localizations": {
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Сканирую… %lld/%lld"
+          }
+        }
+      }
+    },
+    "backup_uploading_progress": {
+      "extractionState": "manual",
+      "localizations": {
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Загружено %lld · осталось %lld"
+          }
+        }
+      }
+    },
+    "backup_all_uploaded": {
+      "extractionState": "manual",
+      "localizations": {
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Всё загружено"
+          }
+        }
+      }
+    },
+    "backup_free_space": {
+      "extractionState": "manual",
+      "localizations": {
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Освободить место"
+          }
+        }
+      }
+    },
+    "backup_free_space_estimate": {
+      "extractionState": "manual",
+      "localizations": {
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Освободит %@"
+          }
+        }
+      }
+    },
+    "backup_freeing": {
+      "extractionState": "manual",
+      "localizations": {
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Удаляю…"
+          }
+        }
+      }
+    },
+    "backup_nothing_to_free": {
+      "extractionState": "manual",
+      "localizations": {
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Нечего удалять"
+          }
+        }
+      }
+    },
+    "backup_freed_title": {
+      "extractionState": "manual",
+      "localizations": {
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Освобождено %@"
+          }
+        }
+      }
+    },
+    "backup_freed_thanks": {
+      "extractionState": "manual",
+      "localizations": {
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Спасибо, вы молодец!"
           }
         }
       }

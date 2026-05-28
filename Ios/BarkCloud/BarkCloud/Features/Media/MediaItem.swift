@@ -5,19 +5,24 @@ struct MediaItem: Identifiable, Hashable {
     let id: String              // file_id блоба
     /// URL превью. `nil` у плейсхолдеров — ячейка рисует скелетон.
     let thumbnailURL: URL?
+    /// Фактическая ширина выбранного превью — ключ дискового кеша.
+    let previewWidth: Int
     let isVideo: Bool
     let fileName: String
 
-    init(id: String, thumbnailURL: URL?, isVideo: Bool, fileName: String = "") {
+    init(id: String, thumbnailURL: URL?, previewWidth: Int = 512, isVideo: Bool, fileName: String = "") {
         self.id = id
         self.thumbnailURL = thumbnailURL
+        self.previewWidth = previewWidth
         self.isVideo = isVideo
         self.fileName = fileName
     }
 
     init(asset: MediaAsset) {
+        let preview = asset.preview(preferredWidth: 512)
         self.id = asset.id
-        self.thumbnailURL = asset.previewURL(preferredWidth: 512)
+        self.thumbnailURL = preview?.url
+        self.previewWidth = preview?.width ?? 512
         self.isVideo = asset.isVideo
         self.fileName = asset.fileName
     }

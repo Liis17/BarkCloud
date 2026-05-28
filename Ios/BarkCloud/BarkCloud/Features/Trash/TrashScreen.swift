@@ -165,8 +165,8 @@ private struct TrashRow: View {
     @ViewBuilder
     private var thumb: some View {
         let size: CGFloat = 48
-        if let url = item.asset.previewURL(preferredWidth: 128) {
-            RemoteImage(url: url, contentMode: .fill) {
+        if let preview = item.asset.preview(preferredWidth: 128) {
+            RemoteImage(fileId: item.fileID, variant: .preview(width: preview.width), url: preview.url, contentMode: .fill) {
                 AppColors.onSurface.opacity(0.08)
             }
             .frame(width: size, height: size)
