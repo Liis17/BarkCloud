@@ -35,7 +35,7 @@ internal sealed class MountManager : IDisposable
             var instance = new DokanInstanceBuilder(dokan)
                 .ConfigureOptions(options =>
                 {
-                    options.Options = DokanOptions.FixedDrive | DokanOptions.WriteProtection;
+                    options.Options = DokanOptions.FixedDrive;
                     options.MountPoint = mountPoint;
                 })
                 .Build(fs);

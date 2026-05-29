@@ -52,16 +52,30 @@
 
 - **BarkCloud.Drive.Contracts** — IPC-контракт `IDriveEngine` (`LoginAsync`/`MountAsync`/
   `UnmountAsync`/`GetStatusAsync`/`ShutdownAsync`) + DTO `EngineStatus`.
-- **BarkCloud.Drive.Engine** — фоновый процесс: gRPC-клиенты Identity/Cloud/Files,
+- **BarkCloud.Drive.Engine** — **скрытый `WinExe`** (без окна / панели задач / Alt-Tab):
+  gRPC-клиенты Identity (:7020) / Cloud+Files (:7025) двумя каналами как в iOS,
   `TokenManager` (логин `Identity.Auth` + проактивный refresh `CreateToken` по
-  `expiration_date`), `MetadataInterceptor` (device-заголовки base64 + динамический токен),
+  `expiration_date`), `TokenStore` (refresh-токен в **DPAPI**, восстановление сессии на старте),
+  `MetadataInterceptor` (device-заголовки base64 + динамический токен),
   ФС Dokany (из бывшего PoC), `MountManager`, IPC-сервер (named pipe + StreamJsonRpc).
-  Один экземпляр на пользователя (Mutex).
-- **BarkCloud.Drive.App** — WPF UI: логин/пароль/OTP, выбор свободной буквы, монтирование;
-  `EngineLauncher` поднимает процесс движка и коннектится по pipe.
+  Один экземпляр на пользователя (Mutex). Download-URL нормализуется на актуальный Files-эндпоинт.
+- **BarkCloud.Drive.App** — UI на **WPF-UI** (`FluentWindow`) + **трей** (`Wpf.Ui.Tray.NotifyIcon`):
+  логин/пароль/OTP, выбор свободной буквы, монтирование. Трей: Открыть / Примонтировать /
+  Отмонтировать / Закрыть приложение. `EngineLauncher` поднимает движок и коннектится по pipe.
+  Закрытие окна → в трей (диск жив); «Закрыть приложение» → unmount + stop движка + выход.
 
-Логин/пароль идут из UI в движок; **движок сам авторизуется и обновляет токен**. Диск
-живёт в движке — UI можно закрыть. PoC свёрнут в Engine (один путь монтирования).
+Логин/пароль идут из UI в движок; **движок сам авторизуется, хранит refresh в DPAPI и обновляет
+токен**, восстанавливает сессию на старте. Диск живёт в движке — UI можно закрыть. PoC свёрнут в Engine.
+Адреса сервисов — `Engine/appsettings.json` (`Host`/`IdentityPort`/`FilesPort`, как iOS).
+
+**Диск read-write.** Запись: рабочая копия на диске → на `Cleanup` `GetUploadUrl` → multipart
+`POST /upload` (поле `file` + `x-auth-token`, как iOS) → эффективный `fileId` из JSON → `AttachFile`.
+Правка существующего: гидрация копии, на закрытии перезалив + замена записи (если содержимое менялось;
+если `fileId` совпал — no-op). mkdir/delete/rename/move через CloudApi.
+
+**UI:** меню «⋯» сверху (запуск / принудительная остановка движка — `ShutdownAsync` + kill процесса).
+**Single-instance:** движок — Mutex; UI — Mutex + named `EventWaitHandle` (второй экземпляр сигналит
+первому показать окно и выходит).
 
 **Критично для Auth:** сервер требует device-заголовки `x-device-name/os/app/version`
 (иначе `XDeviceNameIsRequired`/`XOsNameIsRequired`/`XAppInfoIsRequied`), все значения —
@@ -74,9 +88,9 @@
 
 1. ~~Core: gRPC-клиенты + refresh-менеджер~~ ← **сделано** (в Engine: TokenManager + авторефреш)
 2. ~~Engine read-only маунт~~ ← **сделано**
-3. Запись: CreateFile/WriteFile/Cleanup-upload (+дедуп-file_id)
-4. Мутации: Move/Delete/CreateDirectory
-5. Бэкенд Range + поблочный кэш содержимого
-6. Бэкенд: копии внутри диска
-7. UI ← **базовый WPF сделан** (логин/буква/монтирование); осталось трей + автозапуск +
-   инсталлятор с бандлом драйвера Dokany
+3. ~~Запись: CreateFile/WriteFile/Cleanup → upload(multipart "file")+AttachFile, эффективный file_id~~ ← **сделано**
+4. ~~Мутации: Move/Delete/CreateDirectory~~ ← **сделано** (rename/move/delete entry+dir, mkdir; правка существующего = перезалив+замена записи)
+5. Бэкенд Range + поблочный кэш содержимого (чтение/правка больших файлов пока целиком)
+6. Бэкенд: копии внутри диска (one-entry-per-file блокирует копию идентичного блоба)
+7. UI ← **WPF-UI + трей + скрытый движок + DPAPI-токен сделаны**; осталось автозапуск
+   (вход в систему) + инсталлятор с бандлом драйвера Dokany + (опц.) тост-уведомления

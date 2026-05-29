@@ -32,10 +32,11 @@ internal sealed class BarkCloudConnection : IDisposable
         Cloud = new CloudApi.CloudApiClient(filesInvoker);
         Files = new FilesApi.FilesApiClient(filesInvoker);
 
-        var downloadHandler = new SocketsHttpHandler();
+        var transferHandler = new SocketsHttpHandler();
         if (acceptAnyCert)
-            downloadHandler.SslOptions.RemoteCertificateValidationCallback = (_, _, _, _) => true;
-        Http = new HttpClient(downloadHandler);
+            transferHandler.SslOptions.RemoteCertificateValidationCallback = (_, _, _, _) => true;
+        // Без таймаута: крупные upload/download не должны обрываться по умолчанию (100 c).
+        Http = new HttpClient(transferHandler) { Timeout = Timeout.InfiniteTimeSpan };
     }
 
     private static GrpcChannel CreateChannel(string address, bool acceptAnyCert)

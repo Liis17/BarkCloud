@@ -4,7 +4,7 @@ namespace BarkCloud.Drive.Engine;
 
 // Логин (Identity.Auth) + хранение токенов + проактивный авторефрешь (CreateToken)
 // за минуту до истечения access-токена. CurrentToken отдаётся интерсептору.
-internal sealed class TokenManager(IdentityApi.IdentityApiClient identity)
+internal sealed class TokenManager(IdentityApi.IdentityApiClient identity, TokenStore store)
 {
     private readonly object _lock = new();
     private string? _accessToken;
@@ -39,7 +39,33 @@ internal sealed class TokenManager(IdentityApi.IdentityApiClient identity)
             _accessExpiresUtc = response.AccessToken.ExpirationDate?.ToDateTime() ?? DateTime.UtcNow.AddMinutes(5);
         }
 
+        store.SaveRefreshToken(response.RefreshToken.Value);
         StartRefreshLoop();
+    }
+
+    // Молчаливое восстановление сессии на старте движка по сохранённому refresh-токену.
+    public async Task TryRestoreAsync()
+    {
+        var refresh = store.LoadRefreshToken();
+        if (string.IsNullOrEmpty(refresh))
+            return;
+
+        try
+        {
+            var response = await identity.CreateTokenAsync(new CreateTokenRequest { RefreshToken = refresh });
+            lock (_lock)
+            {
+                _accessToken = response.AccessToken.Value;
+                _refreshToken = refresh;
+                _accessExpiresUtc = response.AccessToken.ExpirationDate?.ToDateTime() ?? DateTime.UtcNow.AddMinutes(5);
+            }
+
+            StartRefreshLoop();
+        }
+        catch
+        {
+            store.Clear(); // refresh недействителен — потребуется повторный вход
+        }
     }
 
     private void StartRefreshLoop()
@@ -93,6 +119,7 @@ internal sealed class TokenManager(IdentityApi.IdentityApiClient identity)
         {
             // refresh не удался — считаем сессию недействительной
             lock (_lock) _accessToken = null;
+            store.Clear();
         }
     }
 }
