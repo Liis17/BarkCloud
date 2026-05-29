@@ -54,7 +54,7 @@ public class UploadFileCommandHandlerTests
         var act = () => CreateSut().Handle(
             new UploadFileCommand { FileId = id, FileName = "doc.txt", FileStream = MakeStream() }, default);
 
-        await act.Should().ThrowAsync<Exception>();
+        await act.Should().ThrowAsync<BarkCloud.Shared.Exceptions.Files.FileNotFoundException>();
     }
 
     [Fact]

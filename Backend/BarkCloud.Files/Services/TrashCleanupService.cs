@@ -57,8 +57,8 @@ public class TrashCleanupService : BackgroundService
         while (!stoppingToken.IsCancellationRequested)
         {
             using var scope = _scopeFactory.CreateScope();
-            var storage = scope.ServiceProvider.GetRequiredService<CloudHierarchyStorage>();
-            var purge = scope.ServiceProvider.GetRequiredService<TrashPurgeService>();
+            var storage = scope.ServiceProvider.GetRequiredService<ICloudHierarchyStorage>();
+            var purge = scope.ServiceProvider.GetRequiredService<ITrashPurgeService>();
 
             var batch = await storage.GetExpiredTrashedEntries(now, BatchSize, stoppingToken);
             if (batch.Count == 0)
