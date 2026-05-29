@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>WinExe</OutputType>
+        <TargetFramework>net10.0-windows</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <UseWPF>true</UseWPF>
+        <RootNamespace>BarkCloud.Drive.App</RootNamespace>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="StreamJsonRpc" Version="2.24.92" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\BarkCloud.Drive.Contracts\BarkCloud.Drive.Contracts.csproj" />
+    </ItemGroup>
+
+</Project>
