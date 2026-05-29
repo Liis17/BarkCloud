@@ -14,13 +14,13 @@ namespace BarkCloud.Files.Features.Cloud.EmptyTrash;
 public class EmptyTrashCommandHandler : IRequestHandler<EmptyTrashCommand, CloudEmpty>
 {
     private readonly ICloudHierarchyStorage _storage;
-    private readonly TrashPurgeService _purge;
+    private readonly ITrashPurgeService _purge;
     private readonly UserContext _userContext;
     private readonly ILogger<EmptyTrashCommandHandler> _logger;
 
     public EmptyTrashCommandHandler(
         ICloudHierarchyStorage storage,
-        TrashPurgeService purge,
+        ITrashPurgeService purge,
         UserContext userContext,
         ILogger<EmptyTrashCommandHandler> logger)
     {
