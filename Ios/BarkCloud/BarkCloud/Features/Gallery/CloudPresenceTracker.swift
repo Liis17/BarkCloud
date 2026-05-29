@@ -46,7 +46,7 @@ final class CloudPresenceTracker {
         guard !hashingInFlight.contains(id) else { return }
         hashingInFlight.insert(id)
         Task { [weak self] in
-            let hash = await DeviceAssetResource.streamingSHA256(for: asset)
+            let hash = await DeviceAssetResource.cachedSHA256(for: asset)
             guard let self else { return }
             self.hashingInFlight.remove(id)
             guard let hash else { return }

@@ -11,8 +11,15 @@ struct GalleryScreen: View {
     @State private var vm: GalleryViewModel?
     @State private var viewer: ViewerItem?
     @State private var showBackup = false
+    @State private var propertiesTarget: FilePropertiesTarget?
+    @State private var albumPickerAsset: PickerAsset?
 
     private struct ViewerItem: Identifiable {
+        let id: String
+        let asset: PHAsset
+    }
+
+    private struct PickerAsset: Identifiable {
         let id: String
         let asset: PHAsset
     }
@@ -32,13 +39,21 @@ struct GalleryScreen: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { toolbarContent }
         .task {
-            if vm == nil { vm = GalleryViewModel(cloud: env.cloudRepository) }
+            if vm == nil { vm = GalleryViewModel(cloud: env.cloudRepository, albums: env.albumRepository) }
             await vm?.loadIfNeeded()
         }
         .fullScreenCover(item: $viewer) { item in viewerScreen(item.asset) }
         .fullScreenCover(isPresented: $showBackup) {
             BackupSheet(onClose: { showBackup = false })
                 .presentationBackground(.clear)
+        }
+        .sheet(item: $propertiesTarget) { FilePropertiesSheet(target: $0) }
+        .sheet(item: $albumPickerAsset) { picker in
+            AlbumPickerSheet(
+                albums: env.albumRepository,
+                onPickExisting: { albumID in Task { await vm?.addToAlbum(asset: picker.asset, albumID: albumID) } },
+                onCreateNew: { Task { await vm?.createAlbumAndAdd(asset: picker.asset) } }
+            )
         }
         .overlay { if vm?.isUploading == true { uploadingOverlay(vm!) } }
     }
@@ -76,6 +91,7 @@ struct GalleryScreen: View {
                             viewer = ViewerItem(id: asset.localIdentifier, asset: asset)
                         }
                     }
+                    .shakeContextMenu(isActive: !vm.isSelecting) { itemMenu(vm, asset) }
                     .onAppear { vm.observeCloudPresence(for: asset) }
                 }
             }
@@ -104,6 +120,26 @@ struct GalleryScreen: View {
             .padding(.horizontal, 16)
             .padding(.bottom, 8)
             .background(.regularMaterial)
+        }
+    }
+
+    /// Пункты контекстного меню одного ассета устройства (по удержанию ячейки).
+    @ViewBuilder
+    private func itemMenu(_ vm: GalleryViewModel, _ asset: PHAsset) -> some View {
+        Button(String(localized: "ctx_properties")) {
+            propertiesTarget = .device(asset)
+        }
+        Button(String(localized: "ctx_copy_link")) {
+            Task { await vm.copyLink(asset: asset) }
+        }
+        Button(String(localized: "ctx_make_public")) {
+            Task { await vm.makePublic(asset: asset) }
+        }
+        Button(String(localized: "ctx_add_to_album")) {
+            albumPickerAsset = PickerAsset(id: asset.localIdentifier, asset: asset)
+        }
+        Button(String(localized: "ctx_delete_device"), role: .destructive) {
+            Task { await vm.deleteFromDevice(asset: asset) }
         }
     }
 

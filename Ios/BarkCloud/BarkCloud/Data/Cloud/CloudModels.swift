@@ -39,6 +39,10 @@ struct MediaAsset: Identifiable, Hashable, Sendable {
     let kind: CloudMediaKind
     let previews: [MediaPreview]
     let createdAt: Date
+    let imageWidth: Int
+    let imageHeight: Int
+    let uploadedAt: Date?
+    let etag: String
 
     init(_ info: Barkcloud_Files_UploadFileInfo) {
         self.id = info.id
@@ -46,6 +50,10 @@ struct MediaAsset: Identifiable, Hashable, Sendable {
         self.fileSize = info.fileSize
         self.kind = CloudMediaKind(info.mediaKind)
         self.createdAt = info.hasCreatedAt ? info.createdAt.date : Date(timeIntervalSince1970: 0)
+        self.imageWidth = Int(info.imageWidth)
+        self.imageHeight = Int(info.imageHeight)
+        self.uploadedAt = info.hasUploadedAt ? info.uploadedAt.date : nil
+        self.etag = info.etag
         self.previews = info.previews.compactMap { p in
             guard !p.previewURL.isEmpty, let url = URL(string: p.previewURL) else { return nil }
             return MediaPreview(url: url, width: Int(p.targetWidth))
@@ -66,6 +74,24 @@ struct MediaAsset: Identifiable, Hashable, Sendable {
     /// Превью ближайшее к нужной ширине (или максимальное доступное).
     func previewURL(preferredWidth: Int) -> URL? {
         preview(preferredWidth: preferredWidth)?.url
+    }
+}
+
+/// Публичная share-ссылка на файл (зеркалит `ShareInfo`). `url` собирается на
+/// клиенте: `{webHost}/s/{token}` (бэкенд готовый URL не отдаёт).
+struct ShareLink: Identifiable, Hashable, Sendable {
+    let id: String
+    let token: String
+    let name: String
+    let url: URL?
+    let clickCount: Int
+
+    init(_ info: Barkcloud_Files_ShareInfo) {
+        self.id = info.id
+        self.token = info.token
+        self.name = info.name
+        self.url = GrpcEndpoint.publicShareURL(token: info.token)
+        self.clickCount = Int(info.clickCount)
     }
 }
 

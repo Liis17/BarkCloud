@@ -1521,6 +1521,45 @@ internal enum Barkcloud_Files_CloudApi: Sendable {
                 type: .unary
             )
         }
+        /// Namespace for "CreateShare" metadata.
+        internal enum CreateShare: Sendable {
+            /// Request type for "CreateShare".
+            internal typealias Input = Barkcloud_Files_CreateShareRequest
+            /// Response type for "CreateShare".
+            internal typealias Output = Barkcloud_Files_ShareInfo
+            /// Descriptor for "CreateShare".
+            internal static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.CloudApi"),
+                method: "CreateShare",
+                type: .unary
+            )
+        }
+        /// Namespace for "ListMyShares" metadata.
+        internal enum ListMyShares: Sendable {
+            /// Request type for "ListMyShares".
+            internal typealias Input = Barkcloud_Files_ListMySharesRequest
+            /// Response type for "ListMyShares".
+            internal typealias Output = Barkcloud_Files_ListMySharesResponse
+            /// Descriptor for "ListMyShares".
+            internal static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.CloudApi"),
+                method: "ListMyShares",
+                type: .unary
+            )
+        }
+        /// Namespace for "RevokeShare" metadata.
+        internal enum RevokeShare: Sendable {
+            /// Request type for "RevokeShare".
+            internal typealias Input = Barkcloud_Files_RevokeShareRequest
+            /// Response type for "RevokeShare".
+            internal typealias Output = Barkcloud_Files_CloudEmpty
+            /// Descriptor for "RevokeShare".
+            internal static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.CloudApi"),
+                method: "RevokeShare",
+                type: .unary
+            )
+        }
         /// Descriptors for all methods in the "barkcloud.files.CloudApi" service.
         internal static let descriptors: [GRPCCore.MethodDescriptor] = [
             CreateDirectory.descriptor,
@@ -1544,7 +1583,10 @@ internal enum Barkcloud_Files_CloudApi: Sendable {
             EmptyTrash.descriptor,
             AddFavorite.descriptor,
             RemoveFavorite.descriptor,
-            ListFavorites.descriptor
+            ListFavorites.descriptor,
+            CreateShare.descriptor,
+            ListMyShares.descriptor,
+            RevokeShare.descriptor
         ]
     }
 }
@@ -1965,6 +2007,60 @@ extension Barkcloud_Files_CloudApi {
             request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ListFavoritesRequest>,
             context: GRPCCore.ServerContext
         ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_ListFavoritesResponse>
+
+        /// Handle the "CreateShare" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > ───────── Публичные ссылки ─────────
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Files_CreateShareRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Files_ShareInfo` messages.
+        func createShare(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Files_CreateShareRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_ShareInfo>
+
+        /// Handle the "ListMyShares" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Мои публичные ссылки (от новых к старым, cursor pagination)
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Files_ListMySharesRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Files_ListMySharesResponse` messages.
+        func listMyShares(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ListMySharesRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_ListMySharesResponse>
+
+        /// Handle the "RevokeShare" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Отозвать публичную ссылку
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Files_RevokeShareRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Files_CloudEmpty` messages.
+        func revokeShare(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Files_RevokeShareRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty>
     }
 
     /// Service protocol for the "barkcloud.files.CloudApi" service.
@@ -2370,6 +2466,60 @@ extension Barkcloud_Files_CloudApi {
             request: GRPCCore.ServerRequest<Barkcloud_Files_ListFavoritesRequest>,
             context: GRPCCore.ServerContext
         ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_ListFavoritesResponse>
+
+        /// Handle the "CreateShare" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > ───────── Публичные ссылки ─────────
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_CreateShareRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Files_ShareInfo` message.
+        func createShare(
+            request: GRPCCore.ServerRequest<Barkcloud_Files_CreateShareRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_ShareInfo>
+
+        /// Handle the "ListMyShares" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Мои публичные ссылки (от новых к старым, cursor pagination)
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_ListMySharesRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Files_ListMySharesResponse` message.
+        func listMyShares(
+            request: GRPCCore.ServerRequest<Barkcloud_Files_ListMySharesRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_ListMySharesResponse>
+
+        /// Handle the "RevokeShare" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Отозвать публичную ссылку
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_RevokeShareRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Files_CloudEmpty` message.
+        func revokeShare(
+            request: GRPCCore.ServerRequest<Barkcloud_Files_RevokeShareRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty>
     }
 
     /// Simple service protocol for the "barkcloud.files.CloudApi" service.
@@ -2773,6 +2923,60 @@ extension Barkcloud_Files_CloudApi {
             request: Barkcloud_Files_ListFavoritesRequest,
             context: GRPCCore.ServerContext
         ) async throws -> Barkcloud_Files_ListFavoritesResponse
+
+        /// Handle the "CreateShare" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > ───────── Публичные ссылки ─────────
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Files_CreateShareRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Files_ShareInfo` to respond with.
+        func createShare(
+            request: Barkcloud_Files_CreateShareRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Files_ShareInfo
+
+        /// Handle the "ListMyShares" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Мои публичные ссылки (от новых к старым, cursor pagination)
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Files_ListMySharesRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Files_ListMySharesResponse` to respond with.
+        func listMyShares(
+            request: Barkcloud_Files_ListMySharesRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Files_ListMySharesResponse
+
+        /// Handle the "RevokeShare" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Отозвать публичную ссылку
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Files_RevokeShareRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Files_CloudEmpty` to respond with.
+        func revokeShare(
+            request: Barkcloud_Files_RevokeShareRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Files_CloudEmpty
     }
 }
 
@@ -3022,6 +3226,39 @@ extension Barkcloud_Files_CloudApi.StreamingServiceProtocol {
                 )
             }
         )
+        router.registerHandler(
+            forMethod: Barkcloud_Files_CloudApi.Method.CreateShare.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_CreateShareRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_ShareInfo>(),
+            handler: { request, context in
+                try await self.createShare(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
+            forMethod: Barkcloud_Files_CloudApi.Method.ListMyShares.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_ListMySharesRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_ListMySharesResponse>(),
+            handler: { request, context in
+                try await self.listMyShares(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
+            forMethod: Barkcloud_Files_CloudApi.Method.RevokeShare.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_RevokeShareRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_CloudEmpty>(),
+            handler: { request, context in
+                try await self.revokeShare(
+                    request: request,
+                    context: context
+                )
+            }
+        )
     }
 }
 
@@ -3264,6 +3501,39 @@ extension Barkcloud_Files_CloudApi.ServiceProtocol {
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_ListFavoritesResponse> {
         let response = try await self.listFavorites(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    internal func createShare(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Files_CreateShareRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_ShareInfo> {
+        let response = try await self.createShare(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    internal func listMyShares(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ListMySharesRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_ListMySharesResponse> {
+        let response = try await self.listMyShares(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    internal func revokeShare(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Files_RevokeShareRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty> {
+        let response = try await self.revokeShare(
             request: GRPCCore.ServerRequest(stream: request),
             context: context
         )
@@ -3553,6 +3823,45 @@ extension Barkcloud_Files_CloudApi.SimpleServiceProtocol {
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_ListFavoritesResponse> {
         return GRPCCore.ServerResponse<Barkcloud_Files_ListFavoritesResponse>(
             message: try await self.listFavorites(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    internal func createShare(
+        request: GRPCCore.ServerRequest<Barkcloud_Files_CreateShareRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_ShareInfo> {
+        return GRPCCore.ServerResponse<Barkcloud_Files_ShareInfo>(
+            message: try await self.createShare(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    internal func listMyShares(
+        request: GRPCCore.ServerRequest<Barkcloud_Files_ListMySharesRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_ListMySharesResponse> {
+        return GRPCCore.ServerResponse<Barkcloud_Files_ListMySharesResponse>(
+            message: try await self.listMyShares(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    internal func revokeShare(
+        request: GRPCCore.ServerRequest<Barkcloud_Files_RevokeShareRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty> {
+        return GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty>(
+            message: try await self.revokeShare(
                 request: request.message,
                 context: context
             ),
@@ -4074,6 +4383,75 @@ extension Barkcloud_Files_CloudApi {
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_ListFavoritesResponse>,
             options: GRPCCore.CallOptions,
             onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListFavoritesResponse>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "CreateShare" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > ───────── Публичные ссылки ─────────
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_CreateShareRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_CreateShareRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_ShareInfo` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func createShare<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_CreateShareRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_CreateShareRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_ShareInfo>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ShareInfo>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "ListMyShares" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Мои публичные ссылки (от новых к старым, cursor pagination)
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_ListMySharesRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_ListMySharesRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_ListMySharesResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func listMyShares<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_ListMySharesRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_ListMySharesRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_ListMySharesResponse>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListMySharesResponse>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "RevokeShare" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Отозвать публичную ссылку
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_RevokeShareRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_RevokeShareRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_CloudEmpty` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func revokeShare<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_RevokeShareRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_RevokeShareRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CloudEmpty>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result
         ) async throws -> Result where Result: Sendable
     }
 
@@ -4840,6 +5218,108 @@ extension Barkcloud_Files_CloudApi {
                 onResponse: handleResponse
             )
         }
+
+        /// Call the "CreateShare" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > ───────── Публичные ссылки ─────────
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_CreateShareRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_CreateShareRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_ShareInfo` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        internal func createShare<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_CreateShareRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_CreateShareRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_ShareInfo>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ShareInfo>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Files_CloudApi.Method.CreateShare.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "ListMyShares" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Мои публичные ссылки (от новых к старым, cursor pagination)
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_ListMySharesRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_ListMySharesRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_ListMySharesResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        internal func listMyShares<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_ListMySharesRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_ListMySharesRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_ListMySharesResponse>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListMySharesResponse>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Files_CloudApi.Method.ListMyShares.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "RevokeShare" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Отозвать публичную ссылку
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_RevokeShareRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_RevokeShareRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_CloudEmpty` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        internal func revokeShare<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_RevokeShareRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_RevokeShareRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CloudEmpty>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Files_CloudApi.Method.RevokeShare.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
     }
 }
 
@@ -5479,6 +5959,93 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
             request: request,
             serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_ListFavoritesRequest>(),
             deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_ListFavoritesResponse>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "CreateShare" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > ───────── Публичные ссылки ─────────
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Files_CreateShareRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    internal func createShare<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Files_CreateShareRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ShareInfo>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.createShare(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_CreateShareRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_ShareInfo>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "ListMyShares" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Мои публичные ссылки (от новых к старым, cursor pagination)
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Files_ListMySharesRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    internal func listMyShares<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Files_ListMySharesRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListMySharesResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.listMyShares(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_ListMySharesRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_ListMySharesResponse>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "RevokeShare" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Отозвать публичную ссылку
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Files_RevokeShareRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    internal func revokeShare<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Files_RevokeShareRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.revokeShare(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_RevokeShareRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_CloudEmpty>(),
             options: options,
             onResponse: handleResponse
         )
@@ -6213,6 +6780,105 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
             onResponse: handleResponse
         )
     }
+
+    /// Call the "CreateShare" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > ───────── Публичные ссылки ─────────
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    internal func createShare<Result>(
+        _ message: Barkcloud_Files_CreateShareRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ShareInfo>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Files_CreateShareRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.createShare(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "ListMyShares" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Мои публичные ссылки (от новых к старым, cursor pagination)
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    internal func listMyShares<Result>(
+        _ message: Barkcloud_Files_ListMySharesRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListMySharesResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Files_ListMySharesRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.listMyShares(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "RevokeShare" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Отозвать публичную ссылку
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    internal func revokeShare<Result>(
+        _ message: Barkcloud_Files_RevokeShareRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Files_RevokeShareRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.revokeShare(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
 }
 
 // MARK: - barkcloud.files.FilesServerApi
@@ -6276,12 +6942,26 @@ internal enum Barkcloud_Files_FilesServerApi: Sendable {
                 type: .unary
             )
         }
+        /// Namespace for "ResolveShare" metadata.
+        internal enum ResolveShare: Sendable {
+            /// Request type for "ResolveShare".
+            internal typealias Input = Barkcloud_Files_ResolveShareRequest
+            /// Response type for "ResolveShare".
+            internal typealias Output = Barkcloud_Files_ResolveShareResponse
+            /// Descriptor for "ResolveShare".
+            internal static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.FilesServerApi"),
+                method: "ResolveShare",
+                type: .unary
+            )
+        }
         /// Descriptors for all methods in the "barkcloud.files.FilesServerApi" service.
         internal static let descriptors: [GRPCCore.MethodDescriptor] = [
             GetFileData.descriptor,
             GetFilesData.descriptor,
             GetUserStorageInfoServer.descriptor,
-            UploadAvatarServer.descriptor
+            UploadAvatarServer.descriptor,
+            ResolveShare.descriptor
         ]
     }
 }
@@ -6378,6 +7058,24 @@ extension Barkcloud_Files_FilesServerApi {
             request: GRPCCore.StreamingServerRequest<Barkcloud_Files_UploadAvatarServerRequest>,
             context: GRPCCore.ServerContext
         ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_UploadAvatarServerResponse>
+
+        /// Handle the "ResolveShare" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Резолв публичного токена → файл + публичный URL скачивания
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Files_ResolveShareRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Files_ResolveShareResponse` messages.
+        func resolveShare(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ResolveShareRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_ResolveShareResponse>
     }
 
     /// Service protocol for the "barkcloud.files.FilesServerApi" service.
@@ -6459,6 +7157,24 @@ extension Barkcloud_Files_FilesServerApi {
             request: GRPCCore.ServerRequest<Barkcloud_Files_UploadAvatarServerRequest>,
             context: GRPCCore.ServerContext
         ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_UploadAvatarServerResponse>
+
+        /// Handle the "ResolveShare" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Резолв публичного токена → файл + публичный URL скачивания
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_ResolveShareRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Files_ResolveShareResponse` message.
+        func resolveShare(
+            request: GRPCCore.ServerRequest<Barkcloud_Files_ResolveShareRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_ResolveShareResponse>
     }
 
     /// Simple service protocol for the "barkcloud.files.FilesServerApi" service.
@@ -6538,6 +7254,24 @@ extension Barkcloud_Files_FilesServerApi {
             request: Barkcloud_Files_UploadAvatarServerRequest,
             context: GRPCCore.ServerContext
         ) async throws -> Barkcloud_Files_UploadAvatarServerResponse
+
+        /// Handle the "ResolveShare" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Резолв публичного токена → файл + публичный URL скачивания
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Files_ResolveShareRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Files_ResolveShareResponse` to respond with.
+        func resolveShare(
+            request: Barkcloud_Files_ResolveShareRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Files_ResolveShareResponse
     }
 }
 
@@ -6589,6 +7323,17 @@ extension Barkcloud_Files_FilesServerApi.StreamingServiceProtocol {
                 )
             }
         )
+        router.registerHandler(
+            forMethod: Barkcloud_Files_FilesServerApi.Method.ResolveShare.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_ResolveShareRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_ResolveShareResponse>(),
+            handler: { request, context in
+                try await self.resolveShare(
+                    request: request,
+                    context: context
+                )
+            }
+        )
     }
 }
 
@@ -6633,6 +7378,17 @@ extension Barkcloud_Files_FilesServerApi.ServiceProtocol {
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_UploadAvatarServerResponse> {
         let response = try await self.uploadAvatarServer(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    internal func resolveShare(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ResolveShareRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_ResolveShareResponse> {
+        let response = try await self.resolveShare(
             request: GRPCCore.ServerRequest(stream: request),
             context: context
         )
@@ -6688,6 +7444,19 @@ extension Barkcloud_Files_FilesServerApi.SimpleServiceProtocol {
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_UploadAvatarServerResponse> {
         return GRPCCore.ServerResponse<Barkcloud_Files_UploadAvatarServerResponse>(
             message: try await self.uploadAvatarServer(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    internal func resolveShare(
+        request: GRPCCore.ServerRequest<Barkcloud_Files_ResolveShareRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_ResolveShareResponse> {
+        return GRPCCore.ServerResponse<Barkcloud_Files_ResolveShareResponse>(
+            message: try await self.resolveShare(
                 request: request.message,
                 context: context
             ),
@@ -6795,6 +7564,29 @@ extension Barkcloud_Files_FilesServerApi {
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_UploadAvatarServerResponse>,
             options: GRPCCore.CallOptions,
             onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_UploadAvatarServerResponse>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "ResolveShare" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Резолв публичного токена → файл + публичный URL скачивания
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_ResolveShareRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_ResolveShareRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_ResolveShareResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func resolveShare<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_ResolveShareRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_ResolveShareRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_ResolveShareResponse>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ResolveShareResponse>) async throws -> Result
         ) async throws -> Result where Result: Sendable
     }
 
@@ -6949,6 +7741,40 @@ extension Barkcloud_Files_FilesServerApi {
                 onResponse: handleResponse
             )
         }
+
+        /// Call the "ResolveShare" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Резолв публичного токена → файл + публичный URL скачивания
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_ResolveShareRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_ResolveShareRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_ResolveShareResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        internal func resolveShare<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_ResolveShareRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_ResolveShareRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_ResolveShareResponse>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ResolveShareResponse>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Files_FilesServerApi.Method.ResolveShare.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
     }
 }
 
@@ -7066,6 +7892,35 @@ extension Barkcloud_Files_FilesServerApi.ClientProtocol {
             request: request,
             serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_UploadAvatarServerRequest>(),
             deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_UploadAvatarServerResponse>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "ResolveShare" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Резолв публичного токена → файл + публичный URL скачивания
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Files_ResolveShareRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    internal func resolveShare<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Files_ResolveShareRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ResolveShareResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.resolveShare(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_ResolveShareRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_ResolveShareResponse>(),
             options: options,
             onResponse: handleResponse
         )
@@ -7201,6 +8056,39 @@ extension Barkcloud_Files_FilesServerApi.ClientProtocol {
             metadata: metadata
         )
         return try await self.uploadAvatarServer(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "ResolveShare" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Резолв публичного токена → файл + публичный URL скачивания
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    internal func resolveShare<Result>(
+        _ message: Barkcloud_Files_ResolveShareRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ResolveShareResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Files_ResolveShareRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.resolveShare(
             request: request,
             options: options,
             onResponse: handleResponse

@@ -115,7 +115,7 @@ final class BackupManager {
         var batch: [(asset: PHAsset, hash: String)] = []
         for asset in all {
             if Task.isCancelled { return }
-            let hash = await DeviceAssetResource.streamingSHA256(for: asset)
+            let hash = await DeviceAssetResource.cachedSHA256(for: asset)
             scannedCount += 1
             guard let hash else { continue }
             batch.append((asset, hash))

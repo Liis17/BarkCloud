@@ -1,6 +1,7 @@
 import Foundation
 import Observation
 import Photos
+import UIKit
 
 /// Состояние вкладки «Галерея»: медиатека устройства (фото+видео через PhotoKit),
 /// режим выбора и загрузка выбранных ассетов в облако. Индикация «уже в облаке» и
@@ -23,10 +24,12 @@ final class GalleryViewModel {
     let presence: CloudPresenceTracker
 
     private let cloud: CloudRepository
+    private let albums: AlbumRepository
     private var didLoad = false
 
-    init(cloud: CloudRepository) {
+    init(cloud: CloudRepository, albums: AlbumRepository) {
         self.cloud = cloud
+        self.albums = albums
         self.presence = CloudPresenceTracker(cloud: cloud)
     }
 
@@ -126,6 +129,93 @@ final class GalleryViewModel {
         snackbar = anyFailed
             ? String(localized: "gallery_upload_failed")
             : String(localized: "gallery_upload_done")
+    }
+
+    // MARK: - Одиночные действия (контекстное меню по удержанию)
+
+    /// `file_id` ассета устройства в облаке. Сначала резолвим по SHA256-хешу
+    /// (`CheckFileHash`); если файла нет — заливаем оригинал (дедуп по хешу) и
+    /// привязываем к авто-папке «Недавно загруженные». Помечаем как в облаке.
+    func ensureCloudFileID(for asset: PHAsset) async throws -> String {
+        if let hash = await DeviceAssetResource.cachedSHA256(for: asset),
+           let existing = try await cloud.checkFileHash(hash) {
+            presence.markPresent(asset.localIdentifier)
+            return existing
+        }
+        let (data, name) = try await DeviceAssetResource.originalData(for: asset)
+        let folderID = try? await cloud.ensureRecentUploadsFolder()
+        let id = try await cloud.uploadFile(data: data, fileName: name, toDirectory: folderID)
+        presence.markPresent(asset.localIdentifier)
+        return id
+    }
+
+    /// Обёртка: резолвим `file_id` (с индикатором), затем выполняем действие.
+    private func resolveAndRun(_ asset: PHAsset, _ action: (String) async throws -> Void) async {
+        guard !isUploading else { return }
+        isUploading = true
+        uploadTotal = 1
+        uploadDone = 0
+        do {
+            let fileID = try await ensureCloudFileID(for: asset)
+            try await action(fileID)
+        } catch {
+            snackbar = domainErrorMessage(error)
+        }
+        isUploading = false
+        uploadTotal = 0
+    }
+
+    func copyLink(asset: PHAsset) async {
+        await resolveAndRun(asset) { fileID in
+            let urls = try await cloud.transfer.tempDownloadURLs(fileIDs: [fileID])
+            guard let url = urls[fileID] else { throw CloudActionError.noLink }
+            UIPasteboard.general.url = url
+            snackbar = String(localized: "snack_link_copied")
+        }
+    }
+
+    func makePublic(asset: PHAsset) async {
+        await resolveAndRun(asset) { fileID in
+            let name = PHAssetResource.assetResources(for: asset).first?.originalFilename ?? "file"
+            let link = try await cloud.createShare(fileID: fileID, name: name)
+            guard let url = link.url else { throw CloudActionError.noLink }
+            UIPasteboard.general.url = url
+            snackbar = String(localized: "snack_public_copied")
+        }
+    }
+
+    func addToAlbum(asset: PHAsset, albumID: String) async {
+        await resolveAndRun(asset) { fileID in
+            try await albums.addItems(albumID: albumID, fileIDs: [fileID])
+            snackbar = String(localized: "media_added_to_album")
+        }
+    }
+
+    func createAlbumAndAdd(asset: PHAsset) async {
+        await resolveAndRun(asset) { fileID in
+            let name = "\(String(localized: "albums_create_title")) \(Self.randomSuffix())"
+            let album = try await albums.createAlbum(name: name)
+            try await albums.addItems(albumID: album.id, fileIDs: [fileID])
+            snackbar = String(localized: "media_added_to_album")
+        }
+    }
+
+    /// Удалить ассет с устройства. iOS сам показывает системное подтверждение;
+    /// отмена → throw, тогда оставляем как есть.
+    func deleteFromDevice(asset: PHAsset) async {
+        do {
+            try await PHPhotoLibrary.shared().performChanges {
+                PHAssetChangeRequest.deleteAssets([asset] as NSArray)
+            }
+            assets.removeAll { $0.localIdentifier == asset.localIdentifier }
+        } catch {
+            // Пользователь отменил удаление — не ошибка.
+        }
+    }
+
+    private static func randomSuffix(_ length: Int = 5) -> String {
+        let alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+        return String((0..<length).compactMap { _ in alphabet.randomElement() })
     }
 
     func snackbarShown() { snackbar = nil }
