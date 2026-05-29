@@ -65,7 +65,7 @@ public class Program
         builder.Services.AddSingleton<VideoThumbnailExtractor>();
         builder.Services.AddScoped<PreviewPersistenceService>();
         builder.Services.AddScoped<AlbumViewBuilder>();
-        builder.Services.AddScoped<TrashPurgeService>();
+        builder.Services.AddScoped<ITrashPurgeService, TrashPurgeService>();
         builder.Services.AddHostedService<TempFileCleanupService>();
         builder.Services.AddHostedService<TrashCleanupService>();
 

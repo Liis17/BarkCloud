@@ -12,7 +12,7 @@ namespace BarkCloud.Files.Services;
 /// фоновым воркером (<see cref="TrashCleanupService"/>), и ручными RPC «Удалить навсегда» /
 /// «Очистить корзину».
 /// </summary>
-public class TrashPurgeService
+public class TrashPurgeService : ITrashPurgeService
 {
     /// <summary>Срок хранения файла в корзине до окончательного удаления.</summary>
     public static readonly TimeSpan Retention = TimeSpan.FromDays(14);

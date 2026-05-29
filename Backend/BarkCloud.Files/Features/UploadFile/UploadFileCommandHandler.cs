@@ -67,7 +67,7 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
         if (file is null)
         {
             _logger.LogError("Файл с ID {FileId} не найден", request.FileId);
-            throw new Exception("File not found");
+            throw new BarkCloud.Shared.Exceptions.Files.FileNotFoundException();
         }
 
         // Проверяем, не был ли файл уже загружен
