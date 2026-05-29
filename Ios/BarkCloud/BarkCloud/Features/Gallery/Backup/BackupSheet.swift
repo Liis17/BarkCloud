@@ -67,13 +67,14 @@ struct BackupSheet: View {
         let used = manager.usedStorage
         let limit = manager.storageLimit
         let fraction = limit > 0 ? min(1.0, Double(used) / Double(limit)) : 0
-        return VStack(alignment: .leading, spacing: 8) {
-            Text("settings_storage")
+        return VStack(alignment: .leading, spacing: 10) {
+            Label("settings_storage", systemImage: "icloud.fill")
                 .font(AppTypography.titleSmall)
                 .foregroundStyle(AppColors.onSurfaceVariant)
                 .textCase(.uppercase)
             ProgressView(value: fraction)
                 .tint(AppColors.accent)
+                .scaleEffect(x: 1, y: 1.4, anchor: .center)
             Text(verbatim: "\(FormatUtils.formatSize(used)) / \(FormatUtils.formatSize(limit))")
                 .font(AppTypography.bodySmall)
                 .foregroundStyle(AppColors.onSurfaceVariant)
@@ -91,13 +92,19 @@ struct BackupSheet: View {
                 get: { manager.autoUploadEnabled },
                 set: { manager.setAutoUpload($0) }
             )) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("backup_autoupload_title")
-                        .font(AppTypography.titleMedium)
-                        .foregroundStyle(AppColors.onSurface)
-                    Text("backup_autoupload_subtitle")
-                        .font(AppTypography.bodySmall)
-                        .foregroundStyle(AppColors.onSurfaceVariant)
+                HStack(spacing: 12) {
+                    Image(systemName: "icloud.and.arrow.up.fill")
+                        .font(.system(size: 22))
+                        .foregroundStyle(AppColors.accent)
+                        .frame(width: 28)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("backup_autoupload_title")
+                            .font(AppTypography.titleMedium)
+                            .foregroundStyle(AppColors.onSurface)
+                        Text("backup_autoupload_subtitle")
+                            .font(AppTypography.bodySmall)
+                            .foregroundStyle(AppColors.onSurfaceVariant)
+                    }
                 }
             }
             .tint(AppColors.accent)
@@ -159,26 +166,26 @@ struct BackupSheet: View {
 
     private var freeSpaceSection: some View {
         let hasReclaimable = !manager.reclaimable.isEmpty
-        return VStack(spacing: 8) {
+        return VStack(spacing: 10) {
             Button {
                 Task { await manager.freeSpace() }
             } label: {
                 HStack(spacing: 8) {
                     if manager.isFreeing {
-                        ProgressView().tint(.white)
+                        ProgressView().controlSize(.small)
                     } else {
                         Image(systemName: "trash")
                     }
                     Text(manager.isFreeing ? "backup_freeing" : "backup_free_space")
                 }
                 .font(AppTypography.titleMedium)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
-                .background(hasReclaimable ? AppColors.accent : AppColors.onSurface.opacity(0.15))
-                .foregroundStyle(.white)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
             }
+            .buttonStyle(.bordered)
+            .buttonBorderShape(.capsule)
+            .controlSize(.large)
+            .tint(AppColors.accent)
             .disabled(!hasReclaimable || manager.isFreeing)
+            .frame(maxWidth: .infinity)
 
             if manager.reclaimableBytes > 0 {
                 Text(verbatim: String(

@@ -97,5 +97,6 @@ final class AppEnvironment {
         RemoteImageCache.shared.clear()
         InsecureHTTP.clearCaches()
         await fileCache.clearAll()
+        await AssetHashStore.shared.clearAll()
     }
 }

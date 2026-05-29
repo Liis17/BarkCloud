@@ -60,6 +60,29 @@ final class CloudRepository: Sendable {
         return map
     }
 
+    /// Резолв `file_id` по одиночному SHA256-хешу. Возвращает `nil`, если файла
+    /// нет в облаке. Используется галереей устройства, чтобы получить `file_id`
+    /// ассета без полной перезаливки (а если его нет — заливаем отдельно).
+    func checkFileHash(_ hash: String) async throws -> String? {
+        let stub = try await grpc.filesStub()
+        var req = Barkcloud_Files_CheckFileHashRequest()
+        req.fileHash = hash
+        let resp = try await stub.checkFileHash(req)
+        return resp.fileID.isEmpty ? nil : resp.fileID
+    }
+
+    // MARK: - Публичные ссылки
+
+    /// Создать постоянную публичную share-ссылку на свой файл. URL собирается на
+    /// клиенте из `token` (см. `GrpcEndpoint.publicShareURL`).
+    func createShare(fileID: String, name: String) async throws -> ShareLink {
+        let stub = try await grpc.cloudStub()
+        var req = Barkcloud_Files_CreateShareRequest()
+        req.fileID = fileID
+        req.name = name
+        return ShareLink(try await stub.createShare(req))
+    }
+
     // MARK: - Каталоги
 
     /// Содержимое папки с полной информацией о файлах (превью/размеры). `""` = корень.

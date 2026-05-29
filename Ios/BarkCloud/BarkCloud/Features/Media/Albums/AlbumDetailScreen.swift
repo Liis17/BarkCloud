@@ -1,5 +1,6 @@
 import SwiftUI
 import Photos
+import UIKit
 
 @MainActor
 @Observable
@@ -117,6 +118,70 @@ final class AlbumDetailViewModel {
         }
     }
 
+    /// Скопировать временную ссылку на скачивание файла в буфер обмена.
+    func copyLink(_ item: MediaItem) async {
+        do {
+            let urls = try await cloud.transfer.tempDownloadURLs(fileIDs: [item.id])
+            guard let url = urls[item.id] else {
+                state.snackbar = domainErrorMessage(CloudActionError.noLink); return
+            }
+            UIPasteboard.general.url = url
+            state.snackbar = String(localized: "snack_link_copied")
+        } catch {
+            state.snackbar = domainErrorMessage(error)
+        }
+    }
+
+    /// Создать постоянную публичную ссылку и скопировать её в буфер.
+    func makePublic(_ item: MediaItem) async {
+        do {
+            let link = try await cloud.createShare(fileID: item.id, name: item.fileName)
+            guard let url = link.url else {
+                state.snackbar = domainErrorMessage(CloudActionError.noLink); return
+            }
+            UIPasteboard.general.url = url
+            state.snackbar = String(localized: "snack_public_copied")
+        } catch {
+            state.snackbar = domainErrorMessage(error)
+        }
+    }
+
+    /// Удалить файл из облака (в корзину) — не путать с «Убрать из альбома».
+    func deleteFromCloud(fileID: String) async {
+        do {
+            try await cloud.deleteUserMedia(fileID: fileID)
+            await reload()
+        } catch {
+            state.snackbar = domainErrorMessage(error)
+        }
+    }
+
+    /// Добавить файл в другой существующий альбом.
+    func addToAlbum(fileID: String, albumID: String) async {
+        do {
+            try await albums.addItems(albumID: albumID, fileIDs: [fileID])
+            state.snackbar = String(localized: "media_added_to_album")
+        } catch {
+            state.snackbar = domainErrorMessage(error)
+        }
+    }
+
+    func createAlbumAndAdd(fileID: String) async {
+        do {
+            let name = "\(String(localized: "albums_create_title")) \(Self.randomSuffix())"
+            let album = try await albums.createAlbum(name: name)
+            try await albums.addItems(albumID: album.id, fileIDs: [fileID])
+            state.snackbar = String(localized: "media_added_to_album")
+        } catch {
+            state.snackbar = domainErrorMessage(error)
+        }
+    }
+
+    private static func randomSuffix(_ length: Int = 5) -> String {
+        let alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+        return String((0..<length).compactMap { _ in alphabet.randomElement() })
+    }
+
     func rename(name: String) async {
         let trimmed = name.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return }
@@ -153,6 +218,8 @@ struct AlbumDetailScreen: View {
     @State private var showRename = false
     @State private var renameText = ""
     @State private var showDelete = false
+    @State private var propertiesTarget: FilePropertiesTarget?
+    @State private var albumPickerItem: MediaItem?
 
     private static let columns = Array(repeating: GridItem(.flexible(), spacing: 2), count: 3)
 
@@ -196,6 +263,60 @@ struct AlbumDetailScreen: View {
             }
             Button(String(localized: "action_cancel"), role: .cancel) {}
         }
+        .sheet(item: $propertiesTarget) { FilePropertiesSheet(target: $0) }
+        .sheet(item: $albumPickerItem) { item in
+            AlbumPickerSheet(
+                albums: env.albumRepository,
+                onPickExisting: { albumID in Task { await vm?.addToAlbum(fileID: item.id, albumID: albumID) } },
+                onCreateNew: { Task { await vm?.createAlbumAndAdd(fileID: item.id) } }
+            )
+        }
+        .overlay(alignment: .bottom) { if let vm { snackbar(vm) } }
+    }
+
+    /// Пункты контекстного меню одного файла альбома (по удержанию ячейки).
+    @ViewBuilder
+    private func itemMenu(_ vm: AlbumDetailViewModel, _ item: MediaItem) -> some View {
+        Button(String(localized: "ctx_properties")) {
+            if let asset = item.asset { propertiesTarget = .cloud(asset) }
+        }
+        Button(String(localized: "ctx_copy_link")) {
+            Task { await vm.copyLink(item) }
+        }
+        Button(String(localized: "ctx_make_public")) {
+            Task { await vm.makePublic(item) }
+        }
+        Button(String(localized: "ctx_add_to_album")) {
+            albumPickerItem = item
+        }
+        Button(String(localized: "albums_set_cover")) {
+            Task { await vm.setCover(fileID: item.id) }
+        }
+        Button(String(localized: "albums_remove_item")) {
+            Task { await vm.removeItem(fileID: item.id) }
+        }
+        Button(String(localized: "ctx_delete"), role: .destructive) {
+            Task { await vm.deleteFromCloud(fileID: item.id) }
+        }
+    }
+
+    @ViewBuilder
+    private func snackbar(_ vm: AlbumDetailViewModel) -> some View {
+        if let text = vm.state.snackbar {
+            Text(verbatim: text)
+                .font(AppTypography.bodySmall)
+                .foregroundStyle(AppColors.onSurface)
+                .padding(12)
+                .background(.regularMaterial)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .padding(.bottom, 16)
+                .onAppear {
+                    Task { @MainActor in
+                        try? await Task.sleep(nanoseconds: 2_000_000_000)
+                        vm.snackbarShown()
+                    }
+                }
+        }
     }
 
     @ViewBuilder
@@ -219,18 +340,7 @@ struct AlbumDetailScreen: View {
                         MediaThumb(fileId: item.id, previewWidth: item.previewWidth, thumbnailURL: item.thumbnailURL, isVideo: item.isVideo)
                             .onTapGesture { selected = item }
                             .onAppear { Task { await vm.loadMoreIfNeeded(current: item) } }
-                            .contextMenu {
-                                Button {
-                                    Task { await vm.setCover(fileID: item.id) }
-                                } label: {
-                                    Label(String(localized: "albums_set_cover"), systemImage: "star")
-                                }
-                                Button(role: .destructive) {
-                                    Task { await vm.removeItem(fileID: item.id) }
-                                } label: {
-                                    Label(String(localized: "albums_remove_item"), systemImage: "minus.circle")
-                                }
-                            }
+                            .shakeContextMenu { itemMenu(vm, item) }
                     }
                 }
                 if vm.state.isLoadingMore { ProgressView().padding() }

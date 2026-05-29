@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// «Сценка» в зазоре pull-to-refresh: пиксельная оранжевая лиса над тонкой
-/// линией-землёй. Видимость и масштаб ведёт от `pullProgress` (0…1+) при
+/// Индикатор pull-to-refresh: одна пиксельная оранжевая лиса в зазоре, без фона
+/// и без линий. Видимость и масштаб ведёт от `pullProgress` (0…1+) при
 /// оттягивании, а виляние хвостом идёт непрерывно — и при вытягивании, и при
 /// активном обновлении.
 struct BarkRefreshHeader: View {
@@ -20,26 +20,11 @@ struct BarkRefreshHeader: View {
             let scale = isRefreshing ? 1 : min(progress * 1.15, 1)
             let alpha = isRefreshing ? 1 : min(progress * 1.2, 1)
 
-            VStack(spacing: 2) {
-                ZStack {
-                    // Локальный «коврик» цвета фона маскирует системный спиннер
-                    // .refreshable, который рисуется в той же точке.
-                    RoundedRectangle(cornerRadius: 14)
-                        .fill(Color(.systemBackground))
-                        .frame(width: stageWidth, height: stageHeight)
-
-                    BarkMascot(
-                        time: ctx.date.timeIntervalSinceReferenceDate,
-                        scale: scale
-                    )
-                    .frame(width: stageWidth, height: stageHeight)
-                }
-
-                // Тонкая «земля» под лапами.
-                Rectangle()
-                    .fill(Color.secondary.opacity(0.25))
-                    .frame(width: stageWidth - 24, height: 1)
-            }
+            BarkMascot(
+                time: ctx.date.timeIntervalSinceReferenceDate,
+                scale: scale
+            )
+            .frame(width: stageWidth, height: stageHeight)
             .padding(.top, 8)
             .frame(maxWidth: .infinity, alignment: .top)
             .opacity(alpha)

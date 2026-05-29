@@ -9,6 +9,8 @@ struct MediaItem: Identifiable, Hashable {
     let previewWidth: Int
     let isVideo: Bool
     let fileName: String
+    /// Полные метаданные файла для экрана свойств. `nil` у плейсхолдеров.
+    let asset: MediaAsset?
 
     init(id: String, thumbnailURL: URL?, previewWidth: Int = 512, isVideo: Bool, fileName: String = "") {
         self.id = id
@@ -16,6 +18,7 @@ struct MediaItem: Identifiable, Hashable {
         self.previewWidth = previewWidth
         self.isVideo = isVideo
         self.fileName = fileName
+        self.asset = nil
     }
 
     init(asset: MediaAsset) {
@@ -25,6 +28,7 @@ struct MediaItem: Identifiable, Hashable {
         self.previewWidth = preview?.width ?? 512
         self.isVideo = asset.isVideo
         self.fileName = asset.fileName
+        self.asset = asset
     }
 
     /// Плейсхолдеры для скелетон-режима, пока идёт первая загрузка с сервера.

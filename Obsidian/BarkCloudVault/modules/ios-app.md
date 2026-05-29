@@ -194,9 +194,14 @@ BarkCloud/
   `AppEnvironment`, а не во вью — Task'и (`scanTask`/`uploadTask`) хранятся внутри менеджера, чтобы
   ре-рендер/закрытие модалки их не отменял; тот же урок, что в pull-to-refresh). Скан медиатеки —
   **прогрессивный**, последовательно (конкурентность 1, чтобы видео не раздували память): для каждого
-  ассета `DeviceAssetResource.streamingSHA256` → пачками по 100 в `CloudRepository.checkFileHashes`;
+  ассета `DeviceAssetResource.cachedSHA256` → пачками по 100 в `CloudRepository.checkFileHashes`;
   «уже в облаке» → в `reclaimable` (+`DeviceAssetResource.originalByteSize`, новый KVC-хелпер по
-  приватному `fileSize`), иначе → в очередь `pendingUpload`. **Автозагрузка** — только на переднем
+  приватному `fileSize`), иначе → в очередь `pendingUpload`. **Кеш хешей** (`Data/Cache/AssetHashStore.swift`):
+  отдельная SwiftData-БД `BarkCloudAssetHashes.sqlite` (singleton `AssetHashStore.shared`, in-memory fallback)
+  хранит `localIdentifier → SHA256` оригинала с инвалидацией по `modificationDate`. `cachedSHA256` сначала
+  смотрит в неё и считает тяжёлый потоковый хеш лишь раз — переиспользуется и `BackupManager` (скан не
+  пере-хеширует всю медиатеку при каждом холодном старте), и `CloudPresenceTracker` (бейджи «уже в облаке»
+  мгновенны после перезапуска). Очищается в `AppEnvironment.resetLocalState()` при выходе. **Автозагрузка** — только на переднем
   плане (без BGTaskScheduler/фоновой URLSession): `uploadLoop` берёт следующий ассет → `originalData`
   → `CloudRepository.uploadFile(toDirectory: ensureRecentUploadsFolder())`; тогл персистится в
   **`AutoUploadSettings`** (обёртка над `UserDefaults`, ключ `BarkCloud.autoUpload.enabled`), при старте
@@ -204,7 +209,10 @@ BarkCloud/
   **«Освободить место»** — `PHPhotoLibrary.shared().performChanges { PHAssetChangeRequest.deleteAssets }`
   (iOS сам показывает системное подтверждение; отмена → throw, без эффекта); при успехе показывается
   `SpaceFreedView` — оверлей с пиксель-лисой `BarkMascot` + искрами (`Canvas`/`TimelineView`) и count-up
-  освобождённых байт, авто-скрытие.
+  освобождённых байт, авто-скрытие. **Стиль** (лёгкий полиш под Google Photos + iOS): ведущие SF-иконки
+  в секциях (`icloud.fill` у хранилища, `icloud.and.arrow.up.fill` у автозагрузки), capsule-прогресс,
+  «Освободить место» — bordered-pill (`.buttonStyle(.bordered)` + `.buttonBorderShape(.capsule)`), управление
+  автозагрузкой — нативный iOS-тогл.
 - **Альбомы** (`Features/Media/`, таб №3, по умолчанию) — `CloudMediaScreen` с переключателем
   **Фото / Видео / Альбомы**. Фото/Видео: `CloudApi.ListUserMedia(kind)` с cursor-пагинацией и догрузкой,
   превью через `RemoteImage`, тап → полноэкранный QuickLook (`GetTempDownloadUrl` → download),
@@ -247,6 +255,26 @@ BarkCloud/
   `isLoading` при потягивании, чтобы не свернуть `List` (с жестом и лисой) в полноэкранный `ProgressView`; программные обновления
   после CRUD зовут `reload()` со спиннером (и на пустой папке через `ScrollView`))
   и «Общие файлы» → `ComingSoonScreen` (на бэкенде нет API расшаривания — заглушка «скоро»).
+- **Контекстное меню по удержанию на сетках** (`Features/Shared/ShakeContextMenu.swift`) — кастомный
+  `ViewModifier` `.shakeContextMenu(isActive:menu:)` вместо нативного `.contextMenu`: по
+  `.onLongPressGesture(minimumDuration:0.4)` ячейка увеличивается (`scaleEffect 1.09`), «трясётся»
+  (`rotationEffect ±1.5°`, `repeatForever` через `.animation(_:value:)`) и даёт слабую тактильную
+  отдачу (`Haptics.light()` = `UIImpactFeedbackGenerator(.soft)`; заметна только на устройстве), затем
+  открывается `.confirmationDialog` с действиями над файлом. `isActive=false` (режим мультивыбора)
+  отключает жест. Применён на трёх сетках: Фото/Видео (`MediaGridScreen`), содержимое альбома
+  (`AlbumDetailScreen` — заменил прежний `.contextMenu` со «Сделать обложкой»/«Убрать из альбома»,
+  оба сохранены), Галерея устройства (`GalleryScreen`). Пункты: **Свойства**, **Копировать ссылку**
+  (`FileTransferService.tempDownloadURLs` → `UIPasteboard.general.url`), **Сделать публичной**
+  (`CloudApi.CreateShare` → клиент сам собирает `{GrpcEndpoint.webHost}/s/{token}` через
+  `publicShareURL(token:)`, см. [[share-links-client-guide]] — URL ведёт на веб-UI :443, бэкенд готовый
+  URL не отдаёт; см. ограничение revoke в гайде), **Добавить в альбом** (`AlbumPickerSheet` на один файл),
+  **Удалить** (галерея/альбом → `DeleteUserMedia` в корзину; устройство → «Удалить с устройства»
+  `PHAssetChangeRequest.deleteAssets`). **Экран свойств** (`Features/Shared/FilePropertiesSheet.swift`,
+  enum-вход `.cloud(MediaAsset)`/`.device(PHAsset)`) — имя/тип/размер/разрешение/даты/ID (как веб-модалка,
+  где есть данные); `MediaAsset` расширен полями `imageWidth/imageHeight/uploadedAt/etag` из `UploadFileInfo`.
+  На Галерее устройства у `PHAsset` нет `file_id` — `GalleryViewModel.ensureCloudFileID(for:)` резолвит его
+  по SHA256 (`cachedSHA256` → `CloudApi.CheckFileHash`, одиночный), а при отсутствии заливает оригинал
+  (дедуп по хешу) в авто-папку «Недавно загруженные»; на время резолва — оверлей `isUploading`.
 
 **Важно для превью/скачивания**: файловый сервис на `:7025` с self-signed TLS — превью и оригиналы
 грузятся через `InsecureHTTP.session` (`AsyncImage` их бы отверг), поэтому в сетках используется

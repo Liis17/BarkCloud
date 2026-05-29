@@ -15,6 +15,8 @@ struct MediaGridScreen: View {
     @State private var showAlbumPicker = false
     @State private var showDeleteConfirm = false
     @State private var selected: MediaItem?
+    @State private var propertiesTarget: FilePropertiesTarget?
+    @State private var albumPickerItem: MediaItem?
 
     private static let columnCount = 3
     private static let spacing: CGFloat = 2
@@ -64,6 +66,34 @@ struct MediaGridScreen: View {
                 onCreateNew: { Task { await vm?.createAlbumAndAddSelected() } }
             )
         }
+        .sheet(item: $propertiesTarget) { FilePropertiesSheet(target: $0) }
+        .sheet(item: $albumPickerItem) { item in
+            AlbumPickerSheet(
+                albums: env.albumRepository,
+                onPickExisting: { albumID in Task { await vm?.addToAlbum(fileID: item.id, albumID: albumID) } },
+                onCreateNew: { Task { await vm?.createAlbumAndAdd(fileID: item.id) } }
+            )
+        }
+    }
+
+    /// Пункты контекстного меню одного файла (по удержанию ячейки).
+    @ViewBuilder
+    private func itemMenu(_ vm: MediaGridViewModel, _ item: MediaItem) -> some View {
+        Button(String(localized: "ctx_properties")) {
+            if let asset = item.asset { propertiesTarget = .cloud(asset) }
+        }
+        Button(String(localized: "ctx_copy_link")) {
+            Task { await vm.copyLink(item) }
+        }
+        Button(String(localized: "ctx_make_public")) {
+            Task { await vm.makePublic(item) }
+        }
+        Button(String(localized: "ctx_add_to_album")) {
+            albumPickerItem = item
+        }
+        Button(String(localized: "ctx_delete"), role: .destructive) {
+            Task { await vm.deleteSingle(item) }
+        }
     }
 
     @ViewBuilder
@@ -89,6 +119,9 @@ struct MediaGridScreen: View {
                             } else if !vm.state.isPlaceholder {
                                 selected = item
                             }
+                        }
+                        .shakeContextMenu(isActive: !vm.state.isSelecting && !vm.state.isPlaceholder) {
+                            itemMenu(vm, item)
                         }
                         .onAppear {
                             Task { await vm.loadMoreIfNeeded(current: item) }

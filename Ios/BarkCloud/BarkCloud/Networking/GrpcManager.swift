@@ -16,6 +16,16 @@ enum GrpcEndpoint {
     /// База HTTP-раздачи файлов через nginx (`/web/download/{id}`, `/web/upload/{id}`).
     static var filesWebBase: String { "https://\(host):\(filesPort)/web" }
 
+    /// Адрес веб-UI (порт 443) — туда ведут публичные share-ссылки `/s/{token}`.
+    /// Маршрут `/s/...` обслуживает только веб-сервер, не gRPC Files.
+    static var webHost: String { "https://\(host)" }
+
+    /// Публичный URL share-ссылки. `token` — base64url (URL-safe), экранировать не нужно.
+    static func publicShareURL(token: String) -> URL? {
+        guard !token.isEmpty else { return nil }
+        return URL(string: "\(webHost)/s/\(token)")
+    }
+
     /// Перестраивает ссылку скачивания файла на актуальный эндпоинт Files.
     /// Часть ссылок (например, URL аватара) хранится в БД и была сгенерирована
     /// при прежней конфигурации `ExternalEndpoint:Host` — она может указывать на

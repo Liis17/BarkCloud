@@ -1,6 +1,7 @@
 import Foundation
 import Observation
 import Photos
+import UIKit
 
 struct MediaGridUiState {
     var items: [MediaItem] = []
@@ -220,4 +221,67 @@ final class MediaGridViewModel {
     }
 
     func snackbarShown() { state.snackbar = nil }
+
+    // MARK: - Одиночные действия (контекстное меню по удержанию)
+
+    /// Скопировать временную ссылку на скачивание файла в буфер обмена.
+    func copyLink(_ item: MediaItem) async {
+        do {
+            let urls = try await cloud.transfer.tempDownloadURLs(fileIDs: [item.id])
+            guard let url = urls[item.id] else {
+                state.snackbar = domainErrorMessage(CloudActionError.noLink); return
+            }
+            UIPasteboard.general.url = url
+            state.snackbar = String(localized: "snack_link_copied")
+        } catch {
+            state.snackbar = domainErrorMessage(error)
+        }
+    }
+
+    /// Создать постоянную публичную ссылку и скопировать её в буфер.
+    func makePublic(_ item: MediaItem) async {
+        do {
+            let link = try await cloud.createShare(fileID: item.id, name: item.fileName)
+            guard let url = link.url else {
+                state.snackbar = domainErrorMessage(CloudActionError.noLink); return
+            }
+            UIPasteboard.general.url = url
+            state.snackbar = String(localized: "snack_public_copied")
+        } catch {
+            state.snackbar = domainErrorMessage(error)
+        }
+    }
+
+    /// Удалить один файл из галереи (в корзину) и обновить список.
+    func deleteSingle(_ item: MediaItem) async {
+        do {
+            try await cloud.deleteUserMedia(fileID: item.id)
+        } catch {
+            state.snackbar = domainErrorMessage(error)
+        }
+        await reload()
+    }
+
+    func addToAlbum(fileID: String, albumID: String) async {
+        do {
+            try await albums.addItems(albumID: albumID, fileIDs: [fileID])
+            state.snackbar = String(localized: "media_added_to_album")
+        } catch {
+            state.snackbar = domainErrorMessage(error)
+        }
+    }
+
+    func createAlbumAndAdd(fileID: String) async {
+        do {
+            let name = "\(String(localized: "albums_create_title")) \(Self.randomSuffix())"
+            let album = try await albums.createAlbum(name: name)
+            try await albums.addItems(albumID: album.id, fileIDs: [fileID])
+            state.snackbar = String(localized: "media_added_to_album")
+        } catch {
+            state.snackbar = domainErrorMessage(error)
+        }
+    }
 }
+
+/// Локальные ошибки одиночных действий контекстного меню.
+enum CloudActionError: Error { case noLink }

@@ -68,6 +68,21 @@ enum DeviceAssetResource {
         }
     }
 
+    /// SHA256 оригинала с персистентным кешем (`AssetHashStore`): сначала пробуем
+    /// взять готовый хеш по `localIdentifier`, иначе считаем потоково и сохраняем.
+    /// Тяжёлое чтение каждого байта (особенно для видео) выполняется один раз, а
+    /// при последующих сканах/перезапусках берётся из локальной БД.
+    static func cachedSHA256(for asset: PHAsset) async -> String? {
+        let id = asset.localIdentifier
+        let mod = asset.modificationDate
+        if let cached = await AssetHashStore.shared.hash(forLocalId: id, modificationDate: mod) {
+            return cached
+        }
+        guard let hash = await streamingSHA256(for: asset) else { return nil }
+        await AssetHashStore.shared.store(localId: id, modificationDate: mod, sha256: hash)
+        return hash
+    }
+
     /// SHA256 оригинала ассета в hex (lowercase) — считается потоково, без
     /// удержания всего файла в памяти. Должен совпадать с хешем, который бэкенд
     /// вычисляет при загрузке (тот же приоритет ресурсов, что и в `originalData`).

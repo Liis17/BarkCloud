@@ -3,6 +3,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\..\Backend\BarkCloud.Web\BarkCloud.Web.csproj" />
     <ProjectReference Include="..\..\BarkCloud.TestKit\BarkCloud.TestKit.csproj" />
+    <ProjectReference Include="..\..\..\Shared\BarkCloud.Shared.Exceptions\BarkCloud.Shared.Exceptions.csproj" />
   </ItemGroup>
 
 </Project>
