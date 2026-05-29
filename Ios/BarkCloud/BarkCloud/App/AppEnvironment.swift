@@ -15,6 +15,8 @@ final class AppEnvironment {
     let albumRepository: AlbumRepository
     let fileCache: FileCacheService
     let fileCacheSettings: FileCacheSettings
+    let autoUploadSettings: AutoUploadSettings
+    let backupManager: BackupManager
 
     init() {
         let session = SessionStore()
@@ -39,7 +41,13 @@ final class AppEnvironment {
         self.fileCacheSettings = cacheSettings
         self.fileCache = cache
 
+        let autoUpload = AutoUploadSettings()
+        self.autoUploadSettings = autoUpload
+        self.backupManager = BackupManager(cloud: self.cloudRepository, settings: autoUpload)
+
         Task { await cache.runStartupSweepIfNeeded() }
+        // Если автозагрузка включена — продолжить скан/докачку на переднем плане.
+        backupManager.resumeIfEnabled()
     }
 
     /// Контейнер SwiftData для метаданных кеша (`BarkCloudCache.sqlite` в Application

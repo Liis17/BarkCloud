@@ -10,6 +10,7 @@ struct GalleryScreen: View {
 
     @State private var vm: GalleryViewModel?
     @State private var viewer: ViewerItem?
+    @State private var showBackup = false
 
     private struct ViewerItem: Identifiable {
         let id: String
@@ -35,6 +36,10 @@ struct GalleryScreen: View {
             await vm?.loadIfNeeded()
         }
         .fullScreenCover(item: $viewer) { item in viewerScreen(item.asset) }
+        .fullScreenCover(isPresented: $showBackup) {
+            BackupSheet(onClose: { showBackup = false })
+                .presentationBackground(.clear)
+        }
         .overlay { if vm?.isUploading == true { uploadingOverlay(vm!) } }
     }
 
@@ -165,6 +170,16 @@ struct GalleryScreen: View {
                 ) {
                     vm.toggleSelecting()
                 }
+            }
+        }
+        ToolbarItem(placement: .topBarTrailing) {
+            if let vm, vm.access == .authorized || vm.access == .limited {
+                Button {
+                    showBackup = true
+                } label: {
+                    Image(systemName: "icloud")
+                }
+                .accessibilityLabel(String(localized: "backup_title"))
             }
         }
     }
