@@ -43,7 +43,7 @@ struct MediaGridScreen: View {
         .overlay(alignment: .bottom) { if let vm { snackbar(vm) } }
         .task {
             if vm == nil {
-                vm = MediaGridViewModel(kind: kind, cloud: env.cloudRepository, albums: env.albumRepository)
+                vm = MediaGridViewModel(kind: kind, cloud: env.cloudRepository, albums: env.albumRepository, vault: env.vault)
             }
             await vm?.loadIfNeeded()
         }
@@ -196,6 +196,19 @@ struct MediaGridScreen: View {
             .buttonStyle(.borderedProminent)
             .tint(AppColors.accent)
         }
+        .controlSize(.large)
+        .disabled(!vm.hasSelection)
+        .transition(.opacity)
+
+        // Переместить выбранное в локальный сейф (скрыть из галереи под Face ID).
+        Button {
+            vm.moveSelectedToVault()
+        } label: {
+            Label("vault_move_here", systemImage: "lock.fill")
+                .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.bordered)
+        .tint(AppColors.accent)
         .controlSize(.large)
         .disabled(!vm.hasSelection)
         .transition(.opacity)
