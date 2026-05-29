@@ -7,7 +7,9 @@ using BarkCloud.Files.Features.Cloud.DeleteFromTrash;
 using BarkCloud.Files.Features.Cloud.DeleteUserMedia;
 using BarkCloud.Files.Features.Cloud.EmptyTrash;
 using BarkCloud.Files.Features.Cloud.GetPath;
+using BarkCloud.Files.Features.Cloud.CreateShare;
 using BarkCloud.Files.Features.Cloud.ListFavorites;
+using BarkCloud.Files.Features.Cloud.ListMyShares;
 using BarkCloud.Files.Features.Cloud.ListTrash;
 using BarkCloud.Files.Features.Cloud.ListDirectory;
 using BarkCloud.Files.Features.Cloud.ListDirectoryDetailed;
@@ -19,6 +21,7 @@ using BarkCloud.Files.Features.Cloud.RenameDirectory;
 using BarkCloud.Files.Features.Cloud.RemoveFavorite;
 using BarkCloud.Files.Features.Cloud.RenameFileEntry;
 using BarkCloud.Files.Features.Cloud.RestoreFromTrash;
+using BarkCloud.Files.Features.Cloud.RevokeShare;
 using BarkCloud.Files.Features.Cloud.SetVideoThumbnail;
 using BarkCloud.Proto.Files;
 using BarkCloud.Shared.Identity;
@@ -289,6 +292,42 @@ public class CloudApiService : CloudApi.CloudApiBase
         };
 
         return _mediator.Send(command);
+    }
+
+    public override Task<ShareInfo> CreateShare(CreateShareRequest request, ServerCallContext context)
+    {
+        var command = new CreateShareCommand
+        {
+            FileId = Guid.Parse(request.FileId),
+            Name = request.Name
+        };
+
+        return _mediator.Send(command);
+    }
+
+    public override Task<ListMySharesResponse> ListMyShares(ListMySharesRequest request, ServerCallContext context)
+    {
+        DateTime? cursorCreatedAt = null;
+        Guid? cursorShareId = null;
+        if (request.CursorCreatedAt is not null && !string.IsNullOrWhiteSpace(request.CursorShareId))
+        {
+            cursorCreatedAt = request.CursorCreatedAt.ToDateTime();
+            cursorShareId = Guid.Parse(request.CursorShareId);
+        }
+
+        var command = new ListMySharesCommand
+        {
+            Limit = request.Limit,
+            CursorCreatedAt = cursorCreatedAt,
+            CursorShareId = cursorShareId
+        };
+
+        return _mediator.Send(command);
+    }
+
+    public override Task<CloudEmpty> RevokeShare(RevokeShareRequest request, ServerCallContext context)
+    {
+        return _mediator.Send(new RevokeShareCommand { ShareId = Guid.Parse(request.ShareId) });
     }
 
     public override Task<PathResponse> GetPath(GetPathRequest request, ServerCallContext context)

@@ -60,6 +60,7 @@ public class Program
         builder.Services.AddScoped<CloudHierarchyStorage>();
         builder.Services.AddScoped<AlbumStorage>();
         builder.Services.AddScoped<FavoriteFilesStorage>();
+        builder.Services.AddScoped<ShareStorage>();
         builder.Services.AddSingleton<ImageCompressor>();
         builder.Services.AddSingleton<VideoThumbnailExtractor>();
         builder.Services.AddScoped<PreviewPersistenceService>();

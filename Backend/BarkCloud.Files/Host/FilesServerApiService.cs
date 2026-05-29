@@ -1,3 +1,4 @@
+using BarkCloud.Files.Features.Cloud.ResolveShare;
 using BarkCloud.Files.Features.GetFileData;
 using BarkCloud.Files.Features.GetFilesData;
 using BarkCloud.Files.Features.GetUserStorageInfoServer;
@@ -63,5 +64,10 @@ public class FilesServerApiService : FilesServerApi.FilesServerApiBase
         };
 
         return _mediator.Send(command);
+    }
+
+    public override Task<ResolveShareResponse> ResolveShare(ResolveShareRequest request, ServerCallContext context)
+    {
+        return _mediator.Send(new ResolveShareCommand { Token = request.Token });
     }
 }

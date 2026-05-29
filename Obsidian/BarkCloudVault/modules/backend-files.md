@@ -27,6 +27,7 @@ Parent: [[index]] · See also: [[api/files-api]] · [[modules/backend-files-clou
 - `Album.cs` — альбом (универсальная коллекция фото/видео): `Name`, `Description`, `CoverFileId`
 - `AlbumItem.cs` — привязка файла к альбому (many-to-many)
 - `FavoriteFile.cs` — отметка «избранное» на уровне пользователя (`OwnerId`+`FileId`, уникальна). Привязка к блобу, а не к записи иерархии → покрывает и фото/видео из галереи, и файлы/документы из папок
+- `ShareLink.cs` — постоянная публичная ссылка на блоб (`OwnerId`, `FileId`, уникальный `Token`, `Name`, `CreatedAt`, `ClickCount`). Названа `ShareLink` (не `FileShare`) во избежание коллизии с `System.IO.FileShare`
 
 ### Host
 - `FilesApiService.cs` — клиентский gRPC `FilesApi`
@@ -53,13 +54,14 @@ Parent: [[index]] · See also: [[api/files-api]] · [[modules/backend-files-clou
 - `BucketS3Options.cs` — настройки S3-бакета
 
 ### Persistence
-- `FilesContext.cs`, `FilesContextFactory.cs` — EF Core DbContext (содержит `UploadedFiles`, `FileHashes`, `TempFiles`, `CloudDirectories`, `CloudFileEntries`, `FilePreviews`, `Albums`, `AlbumItems`, `FavoriteFiles`)
+- `FilesContext.cs`, `FilesContextFactory.cs` — EF Core DbContext (содержит `UploadedFiles`, `FileHashes`, `TempFiles`, `CloudDirectories`, `CloudFileEntries`, `FilePreviews`, `Albums`, `AlbumItems`, `FavoriteFiles`, `ShareLinks`)
 - `UploadedFilesStorage.cs`
 - `FileHashesStorage.cs`
 - `TempFilesStorage.cs`
 - `CloudHierarchyStorage.cs` — см. [[modules/backend-files-cloud]]; метод `FileEntryExistsForFile` для инварианта одной директории
 - `AlbumStorage.cs` — CRUD альбомов и их элементов, cursor-пагинация
 - `FavoriteFilesStorage.cs` — избранное: `Exists`/`Add`/`Remove`/`ListPage` (cursor-пагинация), по образцу item-методов `AlbumStorage`
+- `ShareStorage.cs` — публичные ссылки: `Add`/`GetByToken`/`Remove` (scoped по владельцу, идемпотентно)/`IncrementClicks`/`ListPage` (cursor-пагинация), по образцу `FavoriteFilesStorage`
 - `Migrations/`:
   - `20260518172338_InitialCreate.cs`
   - `20260518174041_AddCloudDirectories.cs` — добавляет таблицы Cloud
@@ -68,6 +70,7 @@ Parent: [[index]] · See also: [[api/files-api]] · [[modules/backend-files-clou
   - `20260525213058_AddTrashToCloudFileEntries.cs` — корзина: колонки `IsDeleted`/`DeletedAt`/`PurgeAt` в `CloudFileEntries`, частичные уникальные индексы (`WHERE IsDeleted = false`), индекс по `PurgeAt` (`WHERE IsDeleted = true`)
   - `20260525223410_AddFavoriteFiles.cs` — таблица `FavoriteFiles` (уник. индекс `(OwnerId, FileId)`, индекс `(OwnerId, CreatedAt)`)
   - `20260528041219_AddUploadDeviceName.cs` — nullable-колонка `UploadDeviceName` в `UploadedFiles` (имя устройства загрузки)
+  - `20260528215548_AddShareLinks.cs` — таблица `ShareLinks` (уник. индекс `Token`, индекс `(OwnerId, CreatedAt)`)
 
 ### Exceptions (локальные)
 - `FileAlreadyUploadedException.cs`
@@ -102,7 +105,9 @@ Parent: [[index]] · See also: [[api/files-api]] · [[modules/backend-files-clou
 
 ### Облачная иерархия + галерея (вложенно в `Features/Cloud/`)
 
-`CreateDirectory`, `RenameDirectory`, `MoveDirectory`, `DeleteDirectory`, `ListDirectory`, `ListDirectoryDetailed`, `AttachFile`, `RenameFileEntry`, `MoveFileEntry`, `DeleteFileEntry`, `GetPath`, `ListUserImages` (deprecated), `ListUserMedia` (фото/видео по `MediaKind`), `SetVideoThumbnail`. **Корзина**: `ListTrash`, `RestoreFromTrash`, `DeleteFromTrash`, `EmptyTrash` (`DeleteFileEntry`/`DeleteDirectory` теперь soft-delete). **Избранное**: `AddFavorite`/`RemoveFavorite` (по `file_id`, идемпотентны), `ListFavorites` (cursor-пагинация, исключает корзину и осиротевшие ссылки). `CopyFileEntry` **удалён** (инвариант одной директории). Подробнее — [[modules/backend-files-cloud]].
+`CreateDirectory`, `RenameDirectory`, `MoveDirectory`, `DeleteDirectory`, `ListDirectory`, `ListDirectoryDetailed`, `AttachFile`, `RenameFileEntry`, `MoveFileEntry`, `DeleteFileEntry`, `GetPath`, `ListUserImages` (deprecated), `ListUserMedia` (фото/видео по `MediaKind`), `SetVideoThumbnail`. **Корзина**: `ListTrash`, `RestoreFromTrash`, `DeleteFromTrash`, `EmptyTrash` (`DeleteFileEntry`/`DeleteDirectory` теперь soft-delete). **Избранное**: `AddFavorite`/`RemoveFavorite` (по `file_id`, идемпотентны), `ListFavorites` (cursor-пагинация, исключает корзину и осиротевшие ссылки). **Публичные ссылки**: `CreateShare` (проверка владения, токен base64url), `ListMyShares` (cursor-пагинация), `RevokeShare` (идемпотентно). `CopyFileEntry` **удалён** (инвариант одной директории). Подробнее — [[modules/backend-files-cloud]].
+
+`ResolveShare` (публичный резолв токена) — в служебном `FilesServerApi` (`Features/Cloud/ResolveShare/`, без `UserContext`): по токену отдаёт `download_url` через `FileUrlHelper` и инкрементит `ClickCount`. Зовётся из Web-роута `/s/{token}`.
 
 ### Альбомы (вложенно в `Features/Album/`)
 

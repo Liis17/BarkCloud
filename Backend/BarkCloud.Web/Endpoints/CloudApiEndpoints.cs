@@ -272,6 +272,42 @@ public static class CloudApiEndpoints
                 return Results.Json(new { ok = true }, Json);
             }));
 
+        // ───────────────────────── Публичные ссылки ─────────────────────────
+
+        api.MapGet("/shares", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud,
+            int? limit, string? cursorAt, string? cursorId) =>
+            await Guarded(http, auth, async token =>
+            {
+                var req = new ListMySharesRequest { Limit = limit is > 0 and <= 200 ? limit.Value : 60 };
+                if (DateTimeOffset.TryParse(cursorAt, out var dt))
+                    req.CursorCreatedAt = Timestamp.FromDateTimeOffset(dt.ToUniversalTime());
+                if (!string.IsNullOrEmpty(cursorId))
+                    req.CursorShareId = cursorId;
+
+                var resp = await cloud.ListMySharesAsync(req, token);
+                return Results.Json(new
+                {
+                    items = resp.Shares.Select(s => ShareJson(http, s)).ToArray(),
+                    nextCursorAt = resp.NextCursorCreatedAt?.ToDateTimeOffset(),
+                    nextCursorId = resp.NextCursorShareId
+                }, Json);
+            }));
+
+        api.MapPost("/shares", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud, ShareCreateReq body) =>
+            await Guarded(http, auth, async token =>
+            {
+                var info = await cloud.CreateShareAsync(
+                    new CreateShareRequest { FileId = body.FileId, Name = body.Name ?? "" }, token);
+                return Results.Json(ShareJson(http, info), Json);
+            }));
+
+        api.MapPost("/shares/revoke", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud, ShareIdReq body) =>
+            await Guarded(http, auth, async token =>
+            {
+                await cloud.RevokeShareAsync(new RevokeShareRequest { ShareId = body.ShareId }, token);
+                return Results.Json(new { ok = true }, Json);
+            }));
+
         // ───────────────────────── Альбомы ─────────────────────────
 
         api.MapGet("/albums", async (HttpContext http, AuthGateway auth, AlbumApi.AlbumApiClient albums,
@@ -490,6 +526,21 @@ public static class CloudApiEndpoints
 
     // ───────────────────────── Инфраструктура ─────────────────────────
 
+    /// <summary>
+    /// JSON-представление публичной ссылки. Дружелюбный URL собирается из хоста текущего
+    /// запроса (Web — владелец публичного роута /s/{token}), а не приходит из Files.
+    /// </summary>
+    private static object ShareJson(HttpContext http, ShareInfo s) => new
+    {
+        id = s.Id,
+        token = s.Token,
+        url = $"{http.Request.Scheme}://{http.Request.Host}/s/{s.Token}",
+        fileId = s.FileId,
+        name = s.Name,
+        createdAt = s.CreatedAt?.ToDateTimeOffset(),
+        clickCount = s.ClickCount
+    };
+
     /// <summary>Авторизация по cookie + единая обработка gRPC-ошибок.</summary>
     private static async Task<IResult> Guarded(HttpContext http, AuthGateway auth, Func<Metadata, Task<IResult>> action)
     {
@@ -534,4 +585,6 @@ public static class CloudApiEndpoints
     private sealed record AlbumItems(string Album, string[]? FileIds);
     private sealed record HashReq(string? Hash);
     private sealed record VideoThumbReq(string VideoFileId, string ImageFileId);
+    private sealed record ShareCreateReq(string FileId, string? Name);
+    private sealed record ShareIdReq(string ShareId);
 }
