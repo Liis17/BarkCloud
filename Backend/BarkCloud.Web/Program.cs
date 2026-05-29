@@ -10,6 +10,7 @@ using BarkCloud.Web.Endpoints;
 using BarkCloud.Web.Infrastructure;
 using BarkCloud.Web.Rendering;
 
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Http.Features;
 
 // gRPC к микросервисам идёт по docker-сети без TLS (h2c) — разрешаем HTTP/2 поверх http://
@@ -85,6 +86,18 @@ builder.Services.AddScoped<PasswordResetGateway>();
 builder.Services.AddScoped<PageDataBuilder>();
 
 var app = builder.Build();
+
+// За nginx TLS терминируется снаружи, поэтому Kestrel видит scheme=http.
+// Доверяем X-Forwarded-Proto/Host от reverse-proxy, чтобы Request.Scheme был корректным
+// (используется при сборке публичного URL ссылок /s/{token}).
+var fhOptions = new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost
+};
+// nginx в docker-сети — не loopback; доверяем proxy из любой сети (веб не открыт наружу напрямую).
+fhOptions.KnownNetworks.Clear();
+fhOptions.KnownProxies.Clear();
+app.UseForwardedHeaders(fhOptions);
 
 // Бандл React-SPA из wwwroot (собирается Vite из ClientApp). Отдаём статику до эндпоинтов.
 app.UseStaticFiles();

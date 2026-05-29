@@ -98,7 +98,7 @@ Package: `barkcloud.files`
 | `GetFilesData(GetFilesDataRequest) → GetFilesDataResponse` | Информация о нескольких файлах |
 | `GetUserStorageInfoServer(GetUserStorageInfoServerRequest) → GetUserStorageInfoResponse` | Storage info (админка) |
 | `UploadAvatarServer(UploadAvatarServerRequest) → UploadAvatarServerResponse` | Загрузка аватарки пользователя (служебно) |
-| `ResolveShare(ResolveShareRequest) → ResolveShareResponse` | Резолв публичного токена (без `UserContext`): `found` + `file_id`/`name`/`download_url`; инкрементит `click_count`. Зовётся из Web-роута `/s/{token}` сервисным токеном |
+| `ResolveShare(ResolveShareRequest) → ResolveShareResponse` | Резолв публичного токена (без `UserContext`): `found` + `file_id`/`name`/`download_url`. Внутри создаёт `TempFile` для оригинала (прямой `/download/{fileId}` для `CloudFile` запрещён в `DownloadFileCommandHandler`) и инкрементит `click_count`. Зовётся из Web-роута `/s/{token}` сервисным токеном |
 
 Messages: `ResolveShareRequest { token; }` → `ResolveShareResponse { found; file_id; name; download_url; }`.
 
