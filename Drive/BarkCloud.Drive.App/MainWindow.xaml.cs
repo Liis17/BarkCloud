@@ -1,20 +1,36 @@
+using System.ComponentModel;
+using System.Diagnostics;
 using System.IO;
 using System.Windows;
+using System.Windows.Interop;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 
 using BarkCloud.Drive.Contracts;
 
+using Wpf.Ui.Controls;
+
 namespace BarkCloud.Drive.App;
 
-public partial class MainWindow : Window
+public partial class MainWindow : FluentWindow
 {
     private IDriveEngine? _engine;
     private readonly DispatcherTimer _statusTimer;
+    private bool _reallyExit;
 
     public MainWindow()
     {
         InitializeComponent();
+
+        // Иконка трея из системной (без бинарного ассета).
+        TrayIcon.Icon = Imaging.CreateBitmapSourceFromHIcon(
+            System.Drawing.SystemIcons.Application.Handle,
+            Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
+
         PopulateDriveLetters();
+
+        // Подстраховка: гарантированно регистрируем иконку трея после первого рендера.
+        ContentRendered += OnContentRendered;
 
         _statusTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
         _statusTimer.Tick += async (_, _) => await PollStatusAsync();
@@ -97,16 +113,103 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void ShutdownClick(object sender, RoutedEventArgs e)
+    private async void ExitClick(object sender, RoutedEventArgs e)
     {
-        if (_engine == null)
+        _reallyExit = true;
+
+        if (_engine != null)
+        {
+            try { await _engine.ShutdownAsync(); }
+            catch { /* движок завершается */ }
+            _engine = null;
+        }
+
+        TrayIcon.Unregister();
+        Application.Current.Shutdown();
+    }
+
+    // Закрытие окна (крестик) → сворачивание в трей; диск и движок продолжают работать.
+    protected override void OnClosing(CancelEventArgs e)
+    {
+        if (!_reallyExit)
+        {
+            e.Cancel = true;
+            Hide();
+        }
+
+        base.OnClosing(e);
+    }
+
+    private void OnContentRendered(object? sender, EventArgs e)
+    {
+        if (!TrayIcon.IsRegistered)
+            TrayIcon.Register();
+    }
+
+    private void ShowClick(object sender, RoutedEventArgs e) => ShowFromTray();
+
+    // Меню «три точки» — открыть по клику.
+    private void MoreClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement fe && fe.ContextMenu is { } menu)
+        {
+            menu.PlacementTarget = fe;
+            menu.IsOpen = true;
+        }
+    }
+
+    // Запустить движок (если не запущен) и подключиться.
+    private async void StartEngineClick(object sender, RoutedEventArgs e)
+    {
+        var engine = await EnsureEngineAsync();
+        if (engine == null)
             return;
 
-        try { await _engine.ShutdownAsync(); }
-        catch { /* движок завершается */ }
+        try
+        {
+            var status = await engine.GetStatusAsync();
+            status.Message ??= "Движок запущен";
+            Apply(status);
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = $"Ошибка: {ex.Message}";
+        }
+    }
 
-        _engine = null;
+    // Принудительно остановить движок: сначала корректно (unmount + выход), затем убить процесс.
+    private async void StopEngineClick(object sender, RoutedEventArgs e)
+    {
+        if (_engine != null)
+        {
+            try { await _engine.ShutdownAsync(); }
+            catch { /* возможно завис — добьём процесс ниже */ }
+            _engine = null;
+        }
+
+        KillEngineProcesses();
         StatusText.Text = "Движок остановлен.";
+    }
+
+    private static void KillEngineProcesses()
+    {
+        foreach (var process in Process.GetProcessesByName("BarkCloud.Drive.Engine"))
+        {
+            try
+            {
+                process.Kill();
+                process.WaitForExit(2000);
+            }
+            catch { /* уже завершился / нет доступа */ }
+            finally { process.Dispose(); }
+        }
+    }
+
+    private void ShowFromTray()
+    {
+        Show();
+        WindowState = WindowState.Normal;
+        Activate();
     }
 
     private async Task PollStatusAsync()

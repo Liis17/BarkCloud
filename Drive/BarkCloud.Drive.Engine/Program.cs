@@ -24,9 +24,13 @@ var filesAddress = $"https://{config.Host}:{config.FilesPort}";
 TokenManager? tokens = null;
 using var connection = new BarkCloudConnection(
     identityAddress, filesAddress, config.DangerousAcceptAnyServerCert, device, () => tokens?.CurrentToken);
-tokens = new TokenManager(connection.Identity);
+tokens = new TokenManager(connection.Identity, new TokenStore());
 
-var gateway = new CloudGateway(connection.Cloud, connection.Files, connection.Http, $"{filesAddress}/web");
+// Молча восстановить сессию из сохранённого refresh-токена (если есть).
+await tokens.TryRestoreAsync();
+
+var gateway = new CloudGateway(connection.Cloud, connection.Files, connection.Http, $"{filesAddress}/web",
+    () => tokens?.CurrentToken);
 var fs = new BarkCloudFileSystem(gateway);
 using var mount = new MountManager();
 using var lifetime = new CancellationTokenSource();
