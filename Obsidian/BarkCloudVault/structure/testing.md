@@ -55,15 +55,23 @@ Tests/
 
 ## Покрытие (текущее состояние)
 
-| Проект | Покрытые компоненты |
-|--------|---------------------|
-| `BarkCloud.Shared.SecurityUtilities.Tests` | `SecurityUtilities.EvaluatePasswordStrength`, `GetPasswordStrengthMessage` |
-| `BarkCloud.Shared.Auth.Tests` | Все 6 client-interceptor'ов (`JwtClientInterceptor`, `XAppClientInterceptor`, `XOsClientInterceptor`, `XDeviceClientInterceptor`, `XDeviceIdInterceptor`, `XIpClientInterceptor`) |
-| `BarkCloud.Shared.Exceptions.Tests` | `ExceptionClientInterceptor` (маппинг error code → доменное исключение) |
-| `BarkCloud.Identity.Tests` | `Services/`: `JwtService`, `PasswordHasher`, `CodeGenerator`, `RefreshTokenGenerator` |
-| `BarkCloud.GrpcServer.Tests` | `TokenRevocationCache`, `MetricsCollector`, `ServerExceptionInterceptor` |
+Фаза A (мокаемые backend-пробелы — без рефактора) завершена; все `PlaceholderTests` заменены, кроме `Shared.Identity`/`Shared.Queue` (константы/DTO — тестировать нечего).
 
-См. [[../../../refactored-munching-floyd|план]] (этапы P0–P3) для полного перечня запланированных тестов.
+| Проект | Тестов | Покрытые компоненты |
+|--------|-------:|---------------------|
+| `BarkCloud.Identity.Tests` | 119 | 20/20 хендлеров (client + 6 `*Server` admin-вариантов), `Services/` (`JwtService`, `PasswordHasher`, `CodeGenerator`, `RefreshTokenGenerator`), консьюмеры |
+| `BarkCloud.Users.Tests` | 69 | Все хендлеры (Devices×7, Privacy×2, Search/ListByIds/Contacts, ProfilePicture×2, ProfileServer, StorageLimit и пр.) + `SessionRevokedConsumer` |
+| `BarkCloud.Web.Tests` | 49 | Rendering (`Format`, `FileKind`, `CloudJson`), `AuthGateway` (маппинг x-error-code → `LoginOutcome`) |
+| `BarkCloud.Files.Tests` | 34 | Хендлеры за `I*Storage` (`UploadFile` и др.), `ImageCompressor`, `SessionRevokedConsumer`. Album/Cloud-хендлеры + `GetFileData`/`GetFilesData` ждут рефактора (фаза B) |
+| `BarkCloud.Shared.SecurityUtilities.Tests` | 23 | `SecurityUtilities.EvaluatePasswordStrength`, `GetPasswordStrengthMessage` |
+| `BarkCloud.GrpcServer.Tests` | 17 | `TokenRevocationCache`, `MetricsCollector`, `ServerExceptionInterceptor` |
+| `BarkCloud.Notification.Tests` | 9 | `EmailMasker`, `HtmlEmailTemplateParser`, `EmailQueueConsumer` |
+| `BarkCloud.Shared.Auth.Tests` | 8 | Все 6 client-interceptor'ов (`JwtClientInterceptor`, `XAppClientInterceptor`, `XOsClientInterceptor`, `XDeviceClientInterceptor`, `XDeviceIdInterceptor`, `XIpClientInterceptor`) |
+| `BarkCloud.Shared.Exceptions.Tests` | 4 | `ExceptionClientInterceptor` (маппинг error code → доменное исключение) |
+| `BarkCloud.Configuration.Tests` | placeholder | ждёт рефактора `ConfigurationStorage`→`IConfigurationStorage` (фаза B) |
+| `BarkCloud.Shared.Identity.Tests` / `BarkCloud.Shared.Queue.Tests` | placeholder | константы/DTO-records — тестировать нечего |
+
+Дальше: **фаза B** — рефактор `I*Storage` (Album/Share/Favorite/CloudHierarchy + Configuration) и тесты Files/Configuration-хендлеров; **фаза C** — клиенты (iOS pure-logic + iOS CI-джоба, Android ViewModels/репозитории).
 
 ## Команды запуска
 

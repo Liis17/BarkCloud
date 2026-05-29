@@ -51,6 +51,16 @@
 		5EA0000000000000000000F6 /* ShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		5EA0000000000000000000FE /* Exceptions for "ShareExtension" folder in "ShareExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 5EA0000000000000000000F1 /* ShareExtension */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		23AF708E2FBBAEED006005AF /* BarkCloud */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
@@ -64,6 +74,9 @@
 		};
 		5EA0000000000000000000F5 /* ShareExtension */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				5EA0000000000000000000FE /* Exceptions for "ShareExtension" folder in "ShareExtension" target */,
+			);
 			path = ShareExtension;
 			sourceTree = "<group>";
 		};

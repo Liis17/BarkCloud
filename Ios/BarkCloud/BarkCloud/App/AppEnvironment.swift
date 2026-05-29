@@ -15,7 +15,7 @@ final class AppEnvironment {
     let albumRepository: AlbumRepository
     let fileCache: FileCacheService
     let fileCacheSettings: FileCacheSettings
-    let autoUploadSettings: AutoUploadSettings
+    let autoUploadSettings: AutoUploadSettings
     let backupManager: BackupManager
     let vault: VaultStore
     let biometric: BiometricGate
