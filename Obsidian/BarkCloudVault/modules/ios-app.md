@@ -184,13 +184,27 @@ BarkCloud/
   `FilesApi.CheckFileHashes` — если файл с таким хешем уже в облаке, рисуется `checkmark.icloud.fill`.
   Хеш считается тем же ресурсом, что и при загрузке, поэтому совпадает с серверным. Эта логика
   инкапсулирована в `CloudPresenceTracker` и переиспользуется кастомным пикером загрузки.
-  **Резервная копия** (`Features/Gallery/Backup/`) — кнопка-облако (`icloud`) в тулбаре правее
-  «Выбрать» открывает модалку `BackupSheet` (плавающая карточка с отступами: `fullScreenCover` +
-  `.presentationBackground(.clear)` + затемнение + `.padding(20)` + `.regularMaterial`). Внутри:
-  карточка квоты (`FileTransferService.storageInfo()` → used/limit, стиль из `SettingsScreen.storageCard`);
-  тогл автозагрузки фото/видео; при включении — статус скана, прогресс-бар загружено/осталось и ряд
-  превью очереди (текущий + 2 следующих, как в Google Photos); кнопка «Освободить место» с оценкой
-  размера и благодарственной анимацией. Ядро — **`BackupManager`** (`@MainActor @Observable`, живёт в
+  **Резервная копия / BarkCloud** (`Features/Gallery/Backup/`) — кнопка-облако (`icloud`) в тулбаре
+  правее «Выбрать» открывает модалку `BackupSheet` (плавающая карточка с отступами: `fullScreenCover` +
+  `.presentationBackground(.clear)` + затемнение + `.padding(20)` + `.regularMaterial`; заголовок
+  модалки = строка `backup_title` = "BarkCloud", раньше "Резервная копия"). На самой кнопке тулбара —
+  **кольцевой прогресс** общей автозагрузки: показывается, пока `autoUploadEnabled` и `remainingCount > 0`
+  (когда очередь опустела — кольцо убирается, чтобы 100%-дуга не «висела» до следующего открытия);
+  вокруг `Image("icloud")` в `ZStack` рисуется `Circle().stroke` (фон, `accent.opacity(0.25)`)
+  + `Circle().trim(0,progress).stroke(accent, .round)` с `rotationEffect(-90°)`, диаметр 28pt,
+  `.animation(.easeOut(0.4), value: progress)`; `progress = uploadDone / (uploadDone + uploadFailed + remainingCount)`;
+  пока кольцо показано, сама иконка облака уменьшается (`.font(.system(size:15))`), чтобы дуга на неё не налезала.
+  Внутри модалки: **hero-донат хранилища** (`StorageDonut`, 104pt — `Circle().stroke` фоном + `Circle().trim(0,fraction)` дугой,
+  по центру крупный `%`) на фоне `accent.opacity(0.10)` + текстовый блок сбоку (используется `FileTransferService.storageInfo()`);
+  тогл автозагрузки фото/видео в карточке с фоном `onSurface.opacity(0.05)` и круглой иконкой `icloud.and.arrow.up.fill`
+  в `accent.opacity(0.18)` кружке; при включении — статус скана, прогресс-бар загружено/осталось, статус «Всё загружено»
+  с зелёной галкой и ряд превью очереди (текущий + 3 следующих = 4 в ряду; `HStack` flexible aspect-ratio квадратами
+  с `padding(.horizontal, 8)`, чтобы крайние не клипились карточкой; перестройка анимируется через
+  `.animation(.interpolatingSpring, value: queuePreview.map(\.localIdentifier))` +
+  `.transition(.asymmetric(insertion:.move(.trailing), removal:.move(.leading)))` — текущий уезжает
+  влево «по курве», следующие сдвигаются на его место, новый въезжает справа, как конвейер);
+  отдельная карточка освобождения места — оранжевая иконка `trash.fill`, оценка освобождаемого размера и **filled-capsule** кнопка-CTA
+  (`accent` фон, белый текст, дизейблится без кандидатов; `sparkles` иконка слева). Ядро — **`BackupManager`** (`@MainActor @Observable`, живёт в
   `AppEnvironment`, а не во вью — Task'и (`scanTask`/`uploadTask`) хранятся внутри менеджера, чтобы
   ре-рендер/закрытие модалки их не отменял; тот же урок, что в pull-to-refresh). Скан медиатеки —
   **прогрессивный**, последовательно (конкурентность 1, чтобы видео не раздували память): для каждого
@@ -198,7 +212,8 @@ BarkCloud/
   «уже в облаке» → в `reclaimable` (+`DeviceAssetResource.originalByteSize`, новый KVC-хелпер по
   приватному `fileSize`), иначе → в очередь `pendingUpload`. **Кеш хешей** (`Data/Cache/AssetHashStore.swift`):
   отдельная SwiftData-БД `BarkCloudAssetHashes.sqlite` (singleton `AssetHashStore.shared`, in-memory fallback)
-  хранит `localIdentifier → SHA256` оригинала с инвалидацией по `modificationDate`. `cachedSHA256` сначала
+  хранит `localIdentifier → SHA256` оригинала с инвалидацией по `modificationDate` (есть и точечный
+  `remove(localIds:)` — зовётся после освобождения места). `cachedSHA256` сначала
   смотрит в неё и считает тяжёлый потоковый хеш лишь раз — переиспользуется и `BackupManager` (скан не
   пере-хеширует всю медиатеку при каждом холодном старте), и `CloudPresenceTracker` (бейджи «уже в облаке»
   мгновенны после перезапуска). Очищается в `AppEnvironment.resetLocalState()` при выходе. **Автозагрузка** — только на переднем
@@ -208,11 +223,18 @@ BarkCloud/
   приложения `BackupManager.resumeIfEnabled()` (из `AppEnvironment.init`) докачивает остаток.
   **«Освободить место»** — `PHPhotoLibrary.shared().performChanges { PHAssetChangeRequest.deleteAssets }`
   (iOS сам показывает системное подтверждение; отмена → throw, без эффекта); при успехе показывается
-  `SpaceFreedView` — оверлей с пиксель-лисой `BarkMascot` + искрами (`Canvas`/`TimelineView`) и count-up
-  освобождённых байт, авто-скрытие. **Стиль** (лёгкий полиш под Google Photos + iOS): ведущие SF-иконки
-  в секциях (`icloud.fill` у хранилища, `icloud.and.arrow.up.fill` у автозагрузки), capsule-прогресс,
-  «Освободить место» — bordered-pill (`.buttonStyle(.bordered)` + `.buttonBorderShape(.capsule)`), управление
-  автозагрузкой — нативный iOS-тогл.
+  `SpaceFreedView` — оверлей с пиксель-лисой `BarkMascot` + радиальный «glow» под ним (оранжевый
+  `RadialGradient` 180pt) + искры (`Canvas`/`TimelineView`) и count-up освобождённых байт; subtitle
+  деловой, без наигранного «спасибо» (`backup_freed_thanks` = «Не забывайте освобождать место»);
+  тонкая `onSurface.opacity(0.06)` обводка по rounded-corner; авто-скрытие через 2.4 с (или тап). После удаления: чистим `AssetHashStore.remove(localIds:)` (иначе кеш
+  держал бы мёртвые `localIdentifier`), а сетка в табе Галерея обновляется сама через
+  `PHPhotoLibraryChangeObserver` в `GalleryViewModel` (`registerLibraryObserverIfNeeded` →
+  `handleLibraryChange` пересобирает `assets` из `changeDetails.fetchResultAfterChanges`,
+  чистит `selection`) — без него удалённые фото оставались бы превью-«призраками», падающими при открытии. **Стиль** (более «дорогой» полиш): hero-донат с акцентным фоном, секции на нейтральных карточках с
+  `RoundedRectangle(cornerRadius: 20)`, ведущие SF-иконки в круглых акцентных «шайбах»
+  (`icloud.and.arrow.up.fill` для автозагрузки в accent-кружке, `trash.fill` для очистки в оранжевом),
+  CTA освобождения — filled-capsule (accent → белый), управление автозагрузкой — нативный iOS-тогл,
+  заголовок шапки — `icloud.fill` в accent-шайбе + крупный `BarkCloud`, крестик — кружок-кнопка.
 - **Альбомы** (`Features/Media/`, таб №3, по умолчанию) — `CloudMediaScreen` с переключателем
   **Фото / Видео / Альбомы**. Фото/Видео: `CloudApi.ListUserMedia(kind)` с cursor-пагинацией и догрузкой,
   превью через `RemoteImage`, тап → полноэкранный QuickLook (`GetTempDownloadUrl` → download),

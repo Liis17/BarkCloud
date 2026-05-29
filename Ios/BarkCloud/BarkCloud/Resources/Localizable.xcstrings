@@ -2437,7 +2437,7 @@
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Резервная копия"
+            "value": "BarkCloud"
           }
         }
       }
@@ -2558,7 +2558,7 @@
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Спасибо, вы молодец!"
+            "value": "Не забывайте освобождать место"
           }
         }
       }
