@@ -10,7 +10,16 @@ final class CacheSettingsViewModel {
         var sizeBytes: Int64 = 0
         var entryCount: Int = 0
         var limitBytes: Int64 = FileCacheSettings.defaultMaxBytes
+        /// Порог автоочистки по возрасту; `nil` — «Никогда».
+        var staleMaxAge: TimeInterval? = FileCacheSettings.defaultStaleMaxAge
+        var deviceFreeBytes: Int64 = 0
+        var deviceTotalBytes: Int64 = 0
         var isWorking = false
+
+        /// Занято на устройстве «другими» данными (без нашего кеша).
+        var deviceOtherBytes: Int64 {
+            max(0, deviceTotalBytes - deviceFreeBytes - sizeBytes)
+        }
     }
 
     var state = UiState()
@@ -25,9 +34,32 @@ final class CacheSettingsViewModel {
 
     func load() async {
         state.limitBytes = settings.maxCacheBytes
+        state.staleMaxAge = settings.staleMaxAge
+        let device = Self.deviceStorage()
+        state.deviceFreeBytes = device.free
+        state.deviceTotalBytes = device.total
         state.isWorking = true
         await refreshStats()
         state.isWorking = false
+    }
+
+    func setStaleMaxAge(_ value: TimeInterval?) {
+        settings.staleMaxAge = value
+        state.staleMaxAge = value
+    }
+
+    /// Свободная/полная ёмкость тома устройства (для прогресс-бара хранилища).
+    private static func deviceStorage() -> (free: Int64, total: Int64) {
+        let keys: Set<URLResourceKey> = [
+            .volumeAvailableCapacityForImportantUsageKey,
+            .volumeTotalCapacityKey
+        ]
+        guard let values = try? URL.homeDirectory.resourceValues(forKeys: keys),
+              let total = values.volumeTotalCapacity,
+              let free = values.volumeAvailableCapacityForImportantUsage else {
+            return (0, 0)
+        }
+        return (free, Int64(total))
     }
 
     func setLimit(_ bytes: Int64) async {

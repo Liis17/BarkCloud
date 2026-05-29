@@ -143,13 +143,16 @@ actor FileCacheService {
         try? FileManager.default.createDirectory(at: rootURL, withIntermediateDirectories: true)
     }
 
-    /// Раз в неделю при старте: вычистить устаревшее и уложиться в лимит.
+    /// Не чаще раза в сутки при старте: вычистить устаревшее (по настраиваемому
+    /// порогу `staleMaxAge`; `nil` — пропустить возрастную очистку) и уложиться в лимит.
     func runStartupSweepIfNeeded() {
-        let interval: TimeInterval = 7 * 24 * 3600
-        if let last = settings.lastSweepAt, Date.now.timeIntervalSince(last) < interval {
+        let sweepInterval: TimeInterval = 24 * 3600
+        if let last = settings.lastSweepAt, Date.now.timeIntervalSince(last) < sweepInterval {
             return
         }
-        evictStale()
+        if let maxAge = settings.staleMaxAge {
+            evictStale(olderThan: maxAge)
+        }
         enforceSizeLimit()
         settings.lastSweepAt = .now
     }

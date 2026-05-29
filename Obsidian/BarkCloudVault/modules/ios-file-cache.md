@@ -20,7 +20,7 @@ Parent: [[ios-app]]
 | `CacheVariant.swift` | `enum CacheVariant { original, preview(width:), previewCover, avatar, avatarPreview }` + `storageKey` (например, `"preview-512"`) — часть ключа БД и базовое имя файла. |
 | `CachedFileEntry.swift` | SwiftData `@Model`: `key` (`.unique`), `fileId`, `variant`, `sourceURL?`, `relativePath`, `sizeBytes: Int64`, `lastAccessAt`, `createdAt`. Хелпер `key(fileId:variant:)`. |
 | `FileCacheService.swift` | `actor FileCacheService` — единая точка доступа. |
-| `FileCacheSettings.swift` | Обёртка над `UserDefaults`: `maxCacheBytes` (дефолт 5 ГБ) и `lastSweepAt`. |
+| `FileCacheSettings.swift` | Обёртка над `UserDefaults`: `maxCacheBytes` (дефолт 5 ГБ), `staleMaxAge` (порог автоочистки по возрасту, дефолт 7 дней, `nil`/`0` = «Никогда») и `lastSweepAt`. |
 
 > Примечание: в этой же папке `AutoUploadSettings.swift` относится к отдельной
 > фиче авто-загрузки/бэкапа (`[[ios-app]]` → BackupManager), не к кешу.
@@ -64,9 +64,11 @@ func runStartupSweepIfNeeded() // раз в неделю при старте
 ## Политика eviction
 
 Два механизма работают совместно:
-- **Возраст**: `runStartupSweepIfNeeded` при старте, если прошло ≥ 7 дней с
-  `lastSweepAt`, зовёт `evictStale()` (удаляет записи с `lastAccessAt` старше 7 дней)
-  + `enforceSizeLimit()`, затем обновляет `lastSweepAt`.
+- **Возраст**: `runStartupSweepIfNeeded` при старте, но не чаще раза в сутки
+  (`lastSweepAt`), зовёт `evictStale(olderThan: staleMaxAge)` + `enforceSizeLimit()`,
+  затем обновляет `lastSweepAt`. Порог `staleMaxAge` настраивается в UI (1/7/30 дней
+  или «Никогда»); при «Никогда» (`nil`) возрастная очистка пропускается, но лимит по
+  размеру всё равно применяется.
 - **Размер**: после каждого успешного сохранения и в стартовом sweep —
   `enforceSizeLimit()` LRU по `lastAccessAt`, пока не уложимся в `maxCacheBytes`.
 
@@ -83,8 +85,10 @@ func runStartupSweepIfNeeded() // раз в неделю при старте
   `AlbumsGridScreen` (`.previewCover`), `CloudBrowserScreen` / `TrashScreen`
   (`.preview` ширины 128), `SettingsScreen` (аватар, `ProfileViewModel.profilePictureFileID`).
 - `Features/Settings/CacheSettingsScreen.swift` + `CacheSettingsViewModel.swift` —
-  раздел «Кеш»: текущий размер и число записей, селектор лимита (1/2/5/10/20 ГБ),
-  кнопки «Очистить устаревшее» / «Очистить весь кеш» (confirmationDialog).
+  раздел «Кеш»: сегментированный бар хранилища устройства (другое/кеш/свободно — ёмкость
+  тома через `volumeAvailableCapacityForImportantUsage`/`volumeTotalCapacity`), размер
+  и число записей, селектор лимита (1/2/5/10/20 ГБ), период автоочистки (1/7/30 дней
+  или «Никогда» → `staleMaxAge`), кнопки «Очистить устаревшее» / «Очистить весь кеш».
 - `App/AppEnvironment.swift` — `fileCache`/`fileCacheSettings`, стартовый sweep в
   `init()`, `fileCache.clearAll()` в `resetLocalState()` (кеш строго пользовательский).
 

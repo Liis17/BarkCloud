@@ -6,10 +6,13 @@ import Foundation
 final class FileCacheSettings: @unchecked Sendable {
     /// Дефолтный лимит — 5 ГБ.
     static let defaultMaxBytes: Int64 = 5 * 1024 * 1024 * 1024
+    /// Дефолтный порог автоочистки по возрасту — 7 дней.
+    static let defaultStaleMaxAge: TimeInterval = 7 * 24 * 3600
 
     private let defaults: UserDefaults
     private let maxBytesKey = "BarkCloudCache.maxCacheBytes"
     private let lastSweepKey = "BarkCloudCache.lastSweepAt"
+    private let staleMaxAgeKey = "BarkCloudCache.staleMaxAge"
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -21,6 +24,18 @@ final class FileCacheSettings: @unchecked Sendable {
             return Int64(defaults.integer(forKey: maxBytesKey))
         }
         set { defaults.set(Int(newValue), forKey: maxBytesKey) }
+    }
+
+    /// Порог автоочистки по возрасту: записи, к которым не обращались дольше этого
+    /// времени, удаляются стартовым sweep'ом. `nil` — автоочистка по возрасту
+    /// отключена (на диске хранится `0`); лимит по размеру при этом всё равно работает.
+    var staleMaxAge: TimeInterval? {
+        get {
+            guard defaults.object(forKey: staleMaxAgeKey) != nil else { return Self.defaultStaleMaxAge }
+            let value = defaults.double(forKey: staleMaxAgeKey)
+            return value > 0 ? value : nil
+        }
+        set { defaults.set(newValue ?? 0, forKey: staleMaxAgeKey) }
     }
 
     var lastSweepAt: Date? {
