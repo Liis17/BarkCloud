@@ -68,6 +68,7 @@ public class Program
         builder.Services.AddScoped<TrashPurgeService>();
         builder.Services.AddHostedService<TempFileCleanupService>();
         builder.Services.AddHostedService<TrashCleanupService>();
+        builder.Services.AddHostedService<OrphanBlobCleanupService>();
 
         // Путь к бинарям ffmpeg/ffprobe в образе (см. Dockerfile). По умолчанию — /usr/local/bin.
         FFMpegCore.GlobalFFOptions.Configure(o =>

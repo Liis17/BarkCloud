@@ -16,7 +16,8 @@ namespace BarkCloud.Files.Consumers;
 /// <remarks>
 /// Физическое удаление осиротевших блобов из S3 здесь не выполняется — это соответствует
 /// поведению ручного удаления (DeleteFileEntry/DeleteDirectory), которое тоже только
-/// декрементит Uploaders. Очистка orphan-блобов — отдельная фоновая задача.
+/// декрементит Uploaders. Очистку orphan-блобов делает фоновый
+/// <see cref="Services.OrphanBlobCleanupService"/>.
 /// </remarks>
 public class UserDeletedConsumer(
     FilesContext context,
@@ -54,11 +55,12 @@ public class UserDeletedConsumer(
         var albumItems = await context.AlbumItems.Where(x => x.OwnerId == userId).ExecuteDeleteAsync();
         var albums = await context.Albums.Where(x => x.OwnerId == userId).ExecuteDeleteAsync();
         var favorites = await context.FavoriteFiles.Where(x => x.OwnerId == userId).ExecuteDeleteAsync();
+        var shares = await context.ShareLinks.Where(x => x.OwnerId == userId).ExecuteDeleteAsync();
 
         metrics.Increment("accounts_cleaned_files");
 
         logger.LogInformation(
-            "Данные Files для пользователя {UserId} очищены: блобов откреплено {Files}, записей {Entries}, папок {Dirs}, альбомов {Albums} (элементов {AlbumItems}), избранного {Favorites}",
-            userId, files.Count, entries, dirs, albums, albumItems, favorites);
+            "Данные Files для пользователя {UserId} очищены: блобов откреплено {Files}, записей {Entries}, папок {Dirs}, альбомов {Albums} (элементов {AlbumItems}), избранного {Favorites}, ссылок {Shares}",
+            userId, files.Count, entries, dirs, albums, albumItems, favorites, shares);
     }
 }
