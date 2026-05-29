@@ -228,6 +228,16 @@ public sealed class DockerService
                 // внутри compose (./.env, ./nginx и т.п.) разрешались корректно на хосте
                 compose = await GetMountSourceAsync(WebContainer, ComposeFileInContainer);
                 env = await GetMountSourceAsync(WebContainer, EnvFileInContainer);
+
+                // На Windows Docker Desktop хостовый путь — это `C:\…`, что невалидно как destination
+                // Linux-контейнера и не резолвится `docker compose -f`. Трюк работает только под Linux/WSL
+                // (путь `/home/…` или `/mnt/…`). Не запускаем обречённый helper — даём ручную инструкцию.
+                if (IsWindowsPath(compose))
+                    return new ServiceActionResult(false,
+                        "Самообновление веб-клиента недоступно на Windows Docker Desktop. " +
+                        "Разверните стек под Linux/WSL или обновите образ на хосте вручную: " +
+                        "docker compose pull web && docker compose up -d web");
+
                 args.AddRange(["-v", $"{compose}:{compose}:ro", "-v", $"{env}:{env}:ro"]);
             }
 
@@ -251,6 +261,10 @@ public sealed class DockerService
         await RunDockerComposeCommandAsync("-p", project, "--env-file", EnvFileInContainer, "-f", ComposeFileInContainer, "pull", service);
         await RunDockerComposeCommandAsync("-p", project, "--env-file", EnvFileInContainer, "-f", ComposeFileInContainer, "up", "--force-recreate", "-d", service);
     }
+
+    /// <summary>Похоже ли на Windows-путь (`C:\…` / `C:/…`) — такой нельзя смонтировать в Linux-helper.</summary>
+    private static bool IsWindowsPath(string path) =>
+        path.Length >= 3 && char.IsLetter(path[0]) && path[1] == ':' && (path[2] == '\\' || path[2] == '/');
 
     private static bool IsManaged(string service) => Managed.Any(m => m.Service == service);
     private static string ContainerOf(string service) => Managed.First(m => m.Service == service).Container;
