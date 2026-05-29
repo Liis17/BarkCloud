@@ -46,7 +46,7 @@ Tests/
 
 ## Стратегия мокирования
 
-- **Storage классы Backend** (`*Storage.cs` в `Persistence/Services/`) — будут переведены на интерфейсы `I*Storage` отдельным коммитом перед написанием Handler-тестов. До этого тестируются только классы без Storage-зависимостей.
+- **Storage классы Backend** (`*Storage.cs` в `Persistence/Services/`) — переведены на интерфейсы `I*Storage` (Files: `IAlbumStorage`/`IShareStorage`/`IFavoriteFilesStorage`/`ICloudHierarchyStorage`/`IUploadedFilesStorage`/`IFileHashesStorage`; `IConfigurationStorage`), хендлеры инжектят интерфейс и мокаются Moq.
 - **gRPC клиенты** (`*ServerApiClient`) — наследуют `ClientBase<T>`, методы виртуальные, мокаются Moq напрямую.
 - **MediatR** — `Mock<IMediator>`.
 - **ILogger** — `NullLogger<T>.Instance` либо `Mock<ILogger<T>>`.
@@ -55,23 +55,23 @@ Tests/
 
 ## Покрытие (текущее состояние)
 
-Фаза A (мокаемые backend-пробелы — без рефактора) завершена; все `PlaceholderTests` заменены, кроме `Shared.Identity`/`Shared.Queue` (константы/DTO — тестировать нечего).
+Фазы A и B завершены. Фаза A — мокаемые backend-пробелы без рефактора; фаза B — рефактор `I*Storage` (Files: Album/Share/Favorite/CloudHierarchy; Configuration) и тесты всех EF-зависимых хендлеров. Все `PlaceholderTests` заменены, кроме `Shared.Identity`/`Shared.Queue` (константы/DTO — тестировать нечего).
 
 | Проект | Тестов | Покрытые компоненты |
 |--------|-------:|---------------------|
 | `BarkCloud.Identity.Tests` | 119 | 20/20 хендлеров (client + 6 `*Server` admin-вариантов), `Services/` (`JwtService`, `PasswordHasher`, `CodeGenerator`, `RefreshTokenGenerator`), консьюмеры |
 | `BarkCloud.Users.Tests` | 69 | Все хендлеры (Devices×7, Privacy×2, Search/ListByIds/Contacts, ProfilePicture×2, ProfileServer, StorageLimit и пр.) + `SessionRevokedConsumer` |
 | `BarkCloud.Web.Tests` | 49 | Rendering (`Format`, `FileKind`, `CloudJson`), `AuthGateway` (маппинг x-error-code → `LoginOutcome`) |
-| `BarkCloud.Files.Tests` | 34 | Хендлеры за `I*Storage` (`UploadFile` и др.), `ImageCompressor`, `SessionRevokedConsumer`. Album/Cloud-хендлеры + `GetFileData`/`GetFilesData` ждут рефактора (фаза B) |
+| `BarkCloud.Files.Tests` | 164 | 43/44 хендлеров (Album×7, Cloud×26 — директории/корзина/шеринг/избранное/медиа, `GetFileData`/`GetFilesData`, `UploadFile` и др.), сервисы `ImageCompressor`/`AlbumViewBuilder`, `SessionRevokedConsumer`. Пропущены: `UploadAvatarServer` (линейный S3/image-IO, `ImageCompressor` не `virtual`), `UserDeletedConsumer` (прямые `ExecuteDeleteAsync` по `FilesContext`), `VideoThumbnailExtractor`/`PreviewPersistenceService`/`*CleanupService` (IO/таймеры) |
 | `BarkCloud.Shared.SecurityUtilities.Tests` | 23 | `SecurityUtilities.EvaluatePasswordStrength`, `GetPasswordStrengthMessage` |
 | `BarkCloud.GrpcServer.Tests` | 17 | `TokenRevocationCache`, `MetricsCollector`, `ServerExceptionInterceptor` |
 | `BarkCloud.Notification.Tests` | 9 | `EmailMasker`, `HtmlEmailTemplateParser`, `EmailQueueConsumer` |
 | `BarkCloud.Shared.Auth.Tests` | 8 | Все 6 client-interceptor'ов (`JwtClientInterceptor`, `XAppClientInterceptor`, `XOsClientInterceptor`, `XDeviceClientInterceptor`, `XDeviceIdInterceptor`, `XIpClientInterceptor`) |
 | `BarkCloud.Shared.Exceptions.Tests` | 4 | `ExceptionClientInterceptor` (маппинг error code → доменное исключение) |
-| `BarkCloud.Configuration.Tests` | placeholder | ждёт рефактора `ConfigurationStorage`→`IConfigurationStorage` (фаза B) |
+| `BarkCloud.Configuration.Tests` | 13 | Все 6 хендлеров за `IConfigurationStorage` (AddReservedName, DeleteReservedName, GetConfiguration, GetReservedNames, UpdateConfiguration, UpdateReservedName) |
 | `BarkCloud.Shared.Identity.Tests` / `BarkCloud.Shared.Queue.Tests` | placeholder | константы/DTO-records — тестировать нечего |
 
-Дальше: **фаза B** — рефактор `I*Storage` (Album/Share/Favorite/CloudHierarchy + Configuration) и тесты Files/Configuration-хендлеров; **фаза C** — клиенты (iOS pure-logic + iOS CI-джоба, Android ViewModels/репозитории).
+Дальше: **фаза C** — клиенты (iOS pure-logic `AssetHashStore`/`CloudPresenceTracker`/`BarkRefreshable` + iOS CI-джоба, Android ViewModels/репозитории через mockk+turbine).
 
 ## Команды запуска
 
