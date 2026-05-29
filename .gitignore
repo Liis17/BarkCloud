@@ -288,6 +288,8 @@ Generated_Code/
 # because we have git ;-)
 _UpgradeReport_Files/
 Backup*/
+# Не игнорировать модуль резервного копирования iOS (имя совпало с VS-паттерном).
+!Ios/BarkCloud/BarkCloud/Features/Gallery/Backup/
 UpgradeLog*.XML
 UpgradeLog*.htm
 ServiceFabricBackup/

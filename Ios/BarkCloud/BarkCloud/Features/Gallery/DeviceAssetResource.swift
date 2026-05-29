@@ -27,6 +27,14 @@ enum DeviceAssetResource {
         var value: Data { lock.lock(); defer { lock.unlock() }; return data }
     }
 
+    /// Размер оригинала ассета в байтах (для оценки «сколько освободится»). Берётся
+    /// из приватного `fileSize` того же ресурса, что идёт в загрузку — широко
+    /// используемый KVC-приём PhotoKit. `0`, если размер недоступен.
+    static func originalByteSize(for asset: PHAsset) -> Int64 {
+        guard let resource = bestResource(for: asset) else { return 0 }
+        return (resource.value(forKey: "fileSize") as? Int64) ?? 0
+    }
+
     /// Оригинальные байты ассета и его имя файла (для загрузки в облако).
     static func originalData(for asset: PHAsset) async throws -> (Data, String) {
         guard let resource = bestResource(for: asset) else { throw DeviceAssetError.noResource }
