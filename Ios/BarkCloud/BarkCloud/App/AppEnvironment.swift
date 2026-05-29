@@ -15,8 +15,11 @@ final class AppEnvironment {
     let albumRepository: AlbumRepository
     let fileCache: FileCacheService
     let fileCacheSettings: FileCacheSettings
-    let autoUploadSettings: AutoUploadSettings
+    let autoUploadSettings: AutoUploadSettings
     let backupManager: BackupManager
+    let vault: VaultStore
+    let biometric: BiometricGate
+    let shareInboxUploader: ShareInboxUploader
 
     init() {
         let session = SessionStore()
@@ -48,6 +51,13 @@ final class AppEnvironment {
         Task { await cache.runStartupSweepIfNeeded() }
         // Если автозагрузка включена — продолжить скан/докачку на переднем плане.
         backupManager.resumeIfEnabled()
+        self.vault = VaultStore()
+        self.biometric = BiometricGate()
+        self.shareInboxUploader = ShareInboxUploader(cloud: self.cloudRepository, session: session)
+
+        Task { await cache.runStartupSweepIfNeeded() }
+        // Догрузить то, что Share Extension сложил в общий контейнер.
+        shareInboxUploader.uploadPendingIfNeeded()
     }
 
     /// Контейнер SwiftData для метаданных кеша (`BarkCloudCache.sqlite` в Application

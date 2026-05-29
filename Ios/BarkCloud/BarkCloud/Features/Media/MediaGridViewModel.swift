@@ -33,12 +33,14 @@ final class MediaGridViewModel {
     private let kind: MediaKind
     private let cloud: CloudRepository
     private let albums: AlbumRepository
+    private let vault: VaultStore
     private var didLoad = false
 
-    init(kind: MediaKind, cloud: CloudRepository, albums: AlbumRepository) {
+    init(kind: MediaKind, cloud: CloudRepository, albums: AlbumRepository, vault: VaultStore) {
         self.kind = kind
         self.cloud = cloud
         self.albums = albums
+        self.vault = vault
         self.state = MediaGridUiState(
             items: MediaItem.placeholders(count: 12, isVideo: kind.isVideo),
             isPlaceholder: true
@@ -56,7 +58,8 @@ final class MediaGridViewModel {
     func reload() async {
         do {
             let page = try await cloud.listUserMedia(kind: apiKind, limit: 60)
-            state.items = page.items.map(MediaItem.init(asset:))
+            let hidden = vault.protectedIDs
+            state.items = page.items.map(MediaItem.init(asset:)).filter { !hidden.contains($0.id) }
             state.cursorCreatedAt = page.nextCursorCreatedAt
             state.cursorFileID = page.nextCursorFileID
             state.canLoadMore = page.hasMore
@@ -79,7 +82,8 @@ final class MediaGridViewModel {
                 kind: apiKind, limit: 60,
                 cursorCreatedAt: state.cursorCreatedAt, cursorFileID: state.cursorFileID
             )
-            state.items.append(contentsOf: page.items.map(MediaItem.init(asset:)))
+            let hidden = vault.protectedIDs
+            state.items.append(contentsOf: page.items.map(MediaItem.init(asset:)).filter { !hidden.contains($0.id) })
             state.cursorCreatedAt = page.nextCursorCreatedAt
             state.cursorFileID = page.nextCursorFileID
             state.canLoadMore = page.hasMore
@@ -161,6 +165,20 @@ final class MediaGridViewModel {
         exitSelection()
         if anyFailed { state.snackbar = String(localized: "media_delete_failed") }
         await reload()
+    }
+
+    /// Переместить выбранные медиа в локальный сейф: сохраняем снимок (с превью)
+    /// и сразу убираем из сетки. Сервер о защите не знает.
+    func moveSelectedToVault() {
+        let chosen = selectedItems()
+        guard !chosen.isEmpty else { return }
+        vault.add(chosen.map {
+            VaultItem(id: $0.id, thumbnailURL: $0.thumbnailURL, previewWidth: $0.previewWidth, isVideo: $0.isVideo, fileName: $0.fileName)
+        })
+        let ids = Set(chosen.map(\.id))
+        state.items.removeAll { ids.contains($0.id) }
+        exitSelection()
+        state.snackbar = String(localized: "vault_added")
     }
 
     /// Добавить выбранные медиа в существующий альбом.
