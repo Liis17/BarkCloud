@@ -231,6 +231,61 @@
         }
       }
     },
+    "cache_auto_clean": {
+      "extractionState": "manual",
+      "localizations": {
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Автоочистка"
+          }
+        }
+      }
+    },
+    "cache_auto_clean_1d": {
+      "extractionState": "manual",
+      "localizations": {
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 день"
+          }
+        }
+      }
+    },
+    "cache_auto_clean_30d": {
+      "extractionState": "manual",
+      "localizations": {
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "30 дней"
+          }
+        }
+      }
+    },
+    "cache_auto_clean_7d": {
+      "extractionState": "manual",
+      "localizations": {
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "7 дней"
+          }
+        }
+      }
+    },
+    "cache_auto_clean_never": {
+      "extractionState": "manual",
+      "localizations": {
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Никогда"
+          }
+        }
+      }
+    },
     "cache_clear_all": {
       "extractionState": "manual",
       "localizations": {
@@ -264,6 +319,17 @@
         }
       }
     },
+    "cache_device_storage": {
+      "extractionState": "manual",
+      "localizations": {
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Хранилище устройства"
+          }
+        }
+      }
+    },
     "cache_entries": {
       "extractionState": "manual",
       "localizations": {
@@ -271,6 +337,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Записей"
+          }
+        }
+      }
+    },
+    "cache_free": {
+      "extractionState": "manual",
+      "localizations": {
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Свободно"
           }
         }
       }

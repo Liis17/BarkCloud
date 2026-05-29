@@ -78,7 +78,7 @@ final class FileCacheServiceTests: XCTestCase {
         try insert(container, key: "stale", size: 10, lastAccess: now.addingTimeInterval(-10 * 24 * 3600))
 
         let settings = makeSettings()
-        settings.lastSweepAt = now.addingTimeInterval(-24 * 3600)  // 1 день назад → не пора
+        settings.lastSweepAt = now.addingTimeInterval(-3600)  // 1 час назад → не пора (порог — сутки)
         let cache = FileCacheService(modelContainer: container, settings: settings, http: .shared)
 
         await cache.runStartupSweepIfNeeded()
@@ -86,10 +86,25 @@ final class FileCacheServiceTests: XCTestCase {
         XCTAssertEqual(try keys(container), ["stale"], "при недавнем sweep устаревшее не трогаем")
         XCTAssertEqual(
             settings.lastSweepAt!.timeIntervalSince1970,
-            now.addingTimeInterval(-24 * 3600).timeIntervalSince1970,
+            now.addingTimeInterval(-3600).timeIntervalSince1970,
             accuracy: 1,
             "lastSweepAt не должен обновляться, если sweep пропущен"
         )
+    }
+
+    func testStartupSweepNeverModeKeepsStaleButUpdatesSweep() async throws {
+        let container = try makeContainer()
+        let now = Date()
+        try insert(container, key: "stale", size: 10, lastAccess: now.addingTimeInterval(-100 * 24 * 3600))
+
+        let settings = makeSettings()
+        settings.staleMaxAge = nil  // «Никогда» — возрастная очистка отключена
+        let cache = FileCacheService(modelContainer: container, settings: settings, http: .shared)
+
+        await cache.runStartupSweepIfNeeded()
+
+        XCTAssertEqual(try keys(container), ["stale"], "в режиме «Никогда» старое по возрасту не удаляется")
+        XCTAssertNotNil(settings.lastSweepAt, "sweep всё равно отметился (lastSweepAt проставлен)")
     }
 
     func testStartupSweepRunsWhenDue() async throws {
