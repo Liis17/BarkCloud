@@ -120,9 +120,11 @@ UI: в сетке — превью (`MediaThumb`: `<img srcset sizes>` пове�
 
 Создаются ссылки из контекстного меню любого файла («Файлы», «Фото», «Видео») — `lib/share.createShare(fileId, name, toast)` шлёт `POST /api/shares` и кладёт постоянный `/s/{token}` в буфер.
 
-**Сквозная цепочка:** Web `/api/shares*` → `CloudApi.{Create,ListMy,Revoke}Share` (user-токен); публичный `/s/{token}` (анонимный) → `FilesServerApi.ResolveShare` (сервисный токен) → 302 на `download_url`. Записи ссылок живут в БД Files (сущность `ShareLink`, storage `ShareStorage`), см. [[api/files-api]] и [[modules/backend-files-cloud]].
+**Сквозная цепочка:** Web `/api/shares*` → `CloudApi.{Create,ListMy,Revoke}Share` (user-токен); публичный `/s/{token}` (анонимный) → `FilesServerApi.ResolveShare` (сервисный токен). `ResolveShare` создаёт `TempFile` для оригинала (т.к. прямой `/download/{fileId}` для `UploadFileType.CloudFile` запрещён в `DownloadFileCommandHandler` — допустимы только аватарки и превью-блобы) и возвращает temp-URL; Web делает 302 на него. Записи ссылок живут в БД Files (сущность `ShareLink`, storage `ShareStorage`), см. [[api/files-api]] и [[modules/backend-files-cloud]].
 
-> **Известное ограничение (не баг этой фичи):** блобы уже **публично доступны по GUID** через `/download/{fileId}` (так грузятся превью в `<img>` без токена). Поэтому «Отозвать» ломает дружелюбную ссылку `/s/{token}` (резолв вернёт 404), но прямой GUID-URL, если кто-то его сохранил, продолжит работать. Настоящее гейтирование доступа к блобу — отдельная большая задача.
+`Program.cs` веба включает `UseForwardedHeaders(XForwardedProto | XForwardedHost)` с очищенными `KnownNetworks`/`KnownProxies` — за nginx Kestrel должен видеть исходный `scheme=https`, иначе `ShareJson` соберёт ссылку с `http://`. nginx vhost должен прокидывать соответствующие заголовки.
+
+> **Семантика отзыва:** `RevokeShare` удаляет запись `ShareLink` — `ResolveShare` сразу начинает отдавать 404, и новые редиректы/temp-ссылки не создаются. Уже выданная temp-ссылка остаётся живой до истечения `TempFiles:ExpiresAt` (минуты) — это узкое окно, а не постоянная утечка.
 
 ## Настройки (рабочие параметры)
 
@@ -161,7 +163,7 @@ UI: в сетке — превью (`MediaThumb`: `<img srcset sizes>` пове�
 
 ## Ограничения / TODO
 
-- Отзыв публичной ссылки (`/s/{token}`) делает 404 дружелюбный токен, но прямой `/download/{fileId}` по GUID остаётся открытым — блобы публичны по GUID (так грузятся превью). Настоящее гейтирование доступа к блобу не реализовано. См. раздел «Общий доступ».
+- Отзыв публичной ссылки (`/s/{token}`) даёт 404 сразу и новые редиректы не создаются, но уже выданная temp-ссылка живёт до истечения `TempFiles:ExpiresAt`. См. раздел «Общий доступ».
 - Длительность видео не приходит из Files API — в карточках видео показываются только разрешение (по `image_width/height`) и размер.
 - Превью/оригиналы грузит **браузер** по абсолютным URL `{ExternalEndpoint:Host}/web/download/{id}` — ключ Files `ExternalEndpoint:Host` обязан быть `https://cloud.barkfluff.com:7025` (со схемой **https**), иначе на https-странице превью — mixed-content и блокируются браузером. Загрузка байтов от этого ключа уже **не** зависит (идёт на внутренний `cloud-files:7026`).
 - Аплоад большого файла: nginx-vhost фронта веб-клиента (`cloud.barkfluff.com:443` → cloud-web) должен иметь `client_max_body_size 512m;` (по умолчанию 1 МБ → `413`). Этот vhost — вне репозитория (`nginx/cloud.barkfluff.conf` покрывает только gRPC-порты 7020/7021/7025). На стороне .NET лимиты уже сняты в `Program.cs` (Kestrel `MaxRequestBodySize` + `FormOptions.MultipartBodyLengthLimit` = 512 МБ).
