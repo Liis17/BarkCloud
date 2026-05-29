@@ -46,6 +46,9 @@ Package: `barkcloud.files`
 | `AddFavorite(AddFavoriteRequest) → CloudEmpty` | Добавить файл в избранное (по `file_id`; идемпотентно; только файл владельца) |
 | `RemoveFavorite(RemoveFavoriteRequest) → CloudEmpty` | Убрать файл из избранного (идемпотентно) |
 | `ListFavorites(ListFavoritesRequest) → ListFavoritesResponse` | Все избранные файлы владельца от новых к старым; cursor `(cursor_favorited_at + cursor_file_id)`; исключает корзину и осиротевшие ссылки |
+| `CreateShare(CreateShareRequest) → ShareInfo` | Создать постоянную публичную ссылку на файл владельца (проверка владения по `Uploaders`; токен — base64url из 16 случайных байт) |
+| `ListMyShares(ListMySharesRequest) → ListMySharesResponse` | Публичные ссылки владельца от новых к старым; cursor `(cursor_created_at + cursor_share_id)` |
+| `RevokeShare(RevokeShareRequest) → CloudEmpty` | Отозвать ссылку (идемпотентно, scoped по владельцу) |
 
 > **Корзина**: `DeleteFileEntry`/`DeleteDirectory` теперь не удаляют сразу, а помечают записи как удалённые (`IsDeleted`, `DeletedAt`, `PurgeAt = DeletedAt + 14 дней`). Файлы в корзине скрыты из иерархии, галереи и альбомов, но сохраняют квоту. Окончательная зачистка — по `DeleteFromTrash`/`EmptyTrash` или фоновым `TrashCleanupService` (раз в 6 ч). Подробнее — [[modules/backend-files-cloud]].
 
@@ -69,6 +72,10 @@ Package: `barkcloud.files`
 - `AddFavoriteRequest` / `RemoveFavoriteRequest { file_id; }`
 - `ListFavoritesRequest { limit; cursor_favorited_at; cursor_file_id; }` → `ListFavoritesResponse { repeated FavoriteEntry items; next_cursor_favorited_at; next_cursor_file_id; }`
 - `FavoriteEntry { UploadFileInfo file; favorited_at; }` — карточка по `UploadFile` (как в галерее) + дата добавления в избранное
+- `ShareInfo { id; token; file_id; name; created_at; click_count; }` — публичная ссылка; `token` — часть дружелюбного URL `/s/{token}`
+- `CreateShareRequest { file_id; name; }`
+- `ListMySharesRequest { limit; cursor_created_at; cursor_share_id; }` → `ListMySharesResponse { repeated ShareInfo shares; next_cursor_created_at; next_cursor_share_id; }`
+- `RevokeShareRequest { share_id; }`
 - Запросы: `Create/Rename/Move/Delete/ListDirectoryRequest`, `Attach/Rename/Move/DeleteFileEntryRequest`, `GetPathRequest`, `ListUserImagesRequest`, `ListUserMediaRequest`
 - `ListDirectoryRequest.directory_id` — `optional string`, пустая/неуказанная = корень
 - `PathResponse` — путь до объекта
@@ -91,6 +98,9 @@ Package: `barkcloud.files`
 | `GetFilesData(GetFilesDataRequest) → GetFilesDataResponse` | Информация о нескольких файлах |
 | `GetUserStorageInfoServer(GetUserStorageInfoServerRequest) → GetUserStorageInfoResponse` | Storage info (админка) |
 | `UploadAvatarServer(UploadAvatarServerRequest) → UploadAvatarServerResponse` | Загрузка аватарки пользователя (служебно) |
+| `ResolveShare(ResolveShareRequest) → ResolveShareResponse` | Резолв публичного токена (без `UserContext`): `found` + `file_id`/`name`/`download_url`; инкрементит `click_count`. Зовётся из Web-роута `/s/{token}` сервисным токеном |
+
+Messages: `ResolveShareRequest { token; }` → `ResolveShareResponse { found; file_id; name; download_url; }`.
 
 ## Сервис: `AlbumApi` (клиентский, альбомы фото/видео)
 

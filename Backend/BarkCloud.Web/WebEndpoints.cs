@@ -1,6 +1,9 @@
+using BarkCloud.Proto.Files;
 using BarkCloud.Web.Auth;
 using BarkCloud.Web.Infrastructure;
 using BarkCloud.Web.Rendering;
+
+using Grpc.Core;
 
 namespace BarkCloud.Web;
 
@@ -161,6 +164,24 @@ public static class WebEndpoints
             var html = await pages.RenderAsync(LoginPage,
                 ForgotConfirmVars(http, config, resetId, login, result.Message ?? "Не удалось подтвердить код."));
             return Results.Content(html, "text/html; charset=utf-8");
+        });
+
+        // ───────── Публичная ссылка на файл ─────────
+        // Анонимный резолв дружелюбного токена → 302 на публичный URL скачивания.
+        // Резолв идёт через FilesServerApi (сервисный токен), т.к. пользователь не авторизован.
+        app.MapGet("/s/{token}", async (string token, FilesServerApi.FilesServerApiClient filesServer) =>
+        {
+            try
+            {
+                var resp = await filesServer.ResolveShareAsync(new ResolveShareRequest { Token = token });
+                return resp.Found
+                    ? Results.Redirect(resp.DownloadUrl)
+                    : Results.NotFound("Ссылка не найдена или была отозвана.");
+            }
+            catch (RpcException)
+            {
+                return Results.NotFound("Ссылка не найдена или была отозвана.");
+            }
         });
 
         // ───────── Защищённые страницы ─────────

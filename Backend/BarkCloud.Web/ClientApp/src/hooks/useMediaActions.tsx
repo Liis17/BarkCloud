@@ -6,6 +6,7 @@ import { ConfirmModal } from '../components/ui/ConfirmModal';
 import { PropertiesModal } from '../components/ui/PropertiesModal';
 import { useAlbumMembership } from './useAlbumMembership';
 import { apiGet, apiPost, pickFiles, uploadFile } from '../lib/api';
+import { createShare } from '../lib/share';
 import type { Album, MediaItem } from '../lib/types';
 import type { ToastPush } from './useToast';
 
@@ -139,6 +140,7 @@ export function useMediaActions({ albums, toast, onRenamed, onRemoved, onItemPat
     const present = (albums || []).filter((a) => inAlbums.has(a.id));
     const out: ContextItem[] = [
       { label: 'Копировать ссылку', icon: 'link', onClick: () => copyLink(m) },
+      { label: 'Создать публичную ссылку', icon: 'share', onClick: () => createShare(m.id, m.name, toast) },
       { label: 'Переименовать', icon: 'pencil', disabled: !hasEntry, onClick: () => setRename(m) },
       { label: 'Показать в папке', icon: 'folder', disabled: !hasEntry, onClick: () => revealInFolder(m) },
     ];

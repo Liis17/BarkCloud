@@ -85,6 +85,17 @@ export interface FileInfo extends CardFile {
   uploadDeviceName?: string;
 }
 
+/** Публичная ссылка на файл (GET/POST /api/shares). */
+export interface ShareLink {
+  id: string;
+  token: string;
+  url: string;
+  fileId: string;
+  name: string;
+  createdAt: string | null;
+  clickCount: number;
+}
+
 /** Ответ курсор-пагинации. */
 export interface Page<T> {
   items: T[];

@@ -49,6 +49,11 @@ service CloudApi {
   rpc AddFavorite          (AddFavoriteRequest)          returns (CloudEmpty);               // Добавить файл в избранное
   rpc RemoveFavorite       (RemoveFavoriteRequest)       returns (CloudEmpty);               // Убрать файл из избранного
   rpc ListFavorites        (ListFavoritesRequest)        returns (ListFavoritesResponse);    // Все избранные файлы (от новых к старым)
+
+  // ───────── Публичные ссылки ─────────
+  rpc CreateShare          (CreateShareRequest)          returns (ShareInfo);                // Создать постоянную публичную ссылку на файл
+  rpc ListMyShares         (ListMySharesRequest)         returns (ListMySharesResponse);     // Мои публичные ссылки (от новых к старым, cursor pagination)
+  rpc RevokeShare          (RevokeShareRequest)          returns (CloudEmpty);               // Отозвать публичную ссылку
 }
 
 service FilesServerApi {
@@ -59,6 +64,8 @@ service FilesServerApi {
   rpc GetUserStorageInfoServer(GetUserStorageInfoServerRequest) returns(GetUserStorageInfoResponse); // Получить информацию о хранилище пользователя (для админ-панели)
 
   rpc UploadAvatarServer(UploadAvatarServerRequest) returns(UploadAvatarServerResponse); // Загрузить аватарку пользователя (для админ-панели)
+
+  rpc ResolveShare(ResolveShareRequest) returns(ResolveShareResponse); // Резолв публичного токена → файл + публичный URL скачивания
 }
 
 service AlbumApi {
@@ -473,4 +480,47 @@ message ListAlbumItemsResponse {
   repeated AlbumItemEntry items = 1;
   google.protobuf.Timestamp next_cursor_added_at = 2; // пусто = больше нет страниц
   string next_cursor_file_id = 3;
+}
+
+// ============ Публичные ссылки ============
+
+message ShareInfo {
+  string id = 1;                            // Идентификатор ссылки
+  string token = 2;                         // URL-safe токен ссылки
+  string file_id = 3;                       // Идентификатор файла
+  string name = 4;                          // Имя файла на момент создания ссылки
+  google.protobuf.Timestamp created_at = 5; // Когда создана ссылка
+  int64 click_count = 6;                    // Сколько раз по ссылке переходили
+}
+
+message CreateShareRequest {
+  string file_id = 1; // Идентификатор файла, на который создаётся ссылка
+  string name = 2;    // Имя файла (для отображения в списке)
+}
+
+message ListMySharesRequest {
+  int32 limit = 1;                                  // 1..200, default 50
+  google.protobuf.Timestamp cursor_created_at = 2;  // exclusive; пусто = с самых свежих
+  string cursor_share_id = 3;                       // tie-breaker для стабильной cursor-пагинации
+}
+
+message ListMySharesResponse {
+  repeated ShareInfo shares = 1;
+  google.protobuf.Timestamp next_cursor_created_at = 2; // пусто = больше нет страниц
+  string next_cursor_share_id = 3;
+}
+
+message RevokeShareRequest {
+  string share_id = 1;
+}
+
+message ResolveShareRequest {
+  string token = 1;
+}
+
+message ResolveShareResponse {
+  bool found = 1;          // false = ссылка не найдена / отозвана
+  string file_id = 2;      // Идентификатор файла
+  string name = 3;         // Имя файла
+  string download_url = 4; // Публичный URL скачивания
 }

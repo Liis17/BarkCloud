@@ -27,6 +27,8 @@ public class FilesContext : DbContext
 
     public DbSet<FavoriteFile> FavoriteFiles { get; set; }
 
+    public DbSet<ShareLink> ShareLinks { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<TempFile>()
@@ -94,6 +96,14 @@ public class FilesContext : DbContext
             // Один файл — максимум один раз в избранном пользователя (идемпотентность + защита от дублей).
             b.HasIndex(x => new { x.OwnerId, x.FileId }).IsUnique();
             // Cursor-пагинация списка избранного по дате добавления.
+            b.HasIndex(x => new { x.OwnerId, x.CreatedAt });
+        });
+
+        modelBuilder.Entity<ShareLink>(b =>
+        {
+            // Резолв публичной ссылки по токену — токен уникален.
+            b.HasIndex(x => x.Token).IsUnique();
+            // Cursor-пагинация списка ссылок владельца по дате создания.
             b.HasIndex(x => new { x.OwnerId, x.CreatedAt });
         });
     }

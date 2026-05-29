@@ -15,6 +15,7 @@ import { useFileDrop } from '../hooks/useFileDrop';
 import { useSelection } from '../hooks/useSelection';
 import { usePageHeader } from '../hooks/usePageHeader';
 import { apiGet, apiPost, pickFiles, uploadFile } from '../lib/api';
+import { createShare } from '../lib/share';
 import type { Album, CardFile, DirInfo, Entry, Listing } from '../lib/types';
 
 const ruDate = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -355,6 +356,7 @@ export function FilesPage() {
     const present = albums.filter((a) => inAlbums.has(a.id));
     const out: ContextItem[] = [
       { label: 'Копировать ссылку', icon: 'link', onClick: () => copyLink(entry.fileId) },
+      { label: 'Создать публичную ссылку', icon: 'share', onClick: () => createShare(entry.fileId, entry.name, toast) },
       { label: 'Переименовать', icon: 'pencil', onClick: () => startRename(entry, false) },
     ];
     if (isMedia) {

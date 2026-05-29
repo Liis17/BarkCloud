@@ -1,8 +1,11 @@
 import React from 'react';
 import { Icon } from '../components/Icon';
 import { EmptyState, Loading } from '../components/ui/EmptyState';
+import { ConfirmModal } from '../components/ui/ConfirmModal';
+import { SelectionBar } from '../components/ui/SelectionBar';
 import { useToast } from '../hooks/useToast';
 import { usePageHeader } from '../hooks/usePageHeader';
+import { useSelection } from '../hooks/useSelection';
 import { apiGet, apiPost } from '../lib/api';
 import { plural } from '../lib/format';
 import type { Page, TrashItem } from '../lib/types';
@@ -26,10 +29,19 @@ function purgeLeft(iso: string | null): string {
   return `через ${hours} ${plural(hours, 'час', 'часа', 'часов')}`;
 }
 
-function TrashRow({ item, onRestore, onPurge }: { item: TrashItem; onRestore: (i: TrashItem) => void; onPurge: (i: TrashItem) => void }) {
+function TrashRow({ item, bulkChecked, onBulkToggle, onRestore, onPurge }: {
+  item: TrashItem;
+  bulkChecked: boolean;
+  onBulkToggle: (i: TrashItem) => void;
+  onRestore: (i: TrashItem) => void;
+  onPurge: (i: TrashItem) => void;
+}) {
   const m = item.media || ({} as NonNullable<TrashItem['media']>);
   return (
-    <tr>
+    <tr className={bulkChecked ? 'checked' : ''}>
+      <td className="selcell">
+        <input type="checkbox" checked={bulkChecked} onChange={() => onBulkToggle(item)} />
+      </td>
       <td className="name">
         <div className={'file-icon ' + (m.iconKind || 'doc')}>{m.ext || 'FILE'}</div>
         <div className="file-name-col">
@@ -59,17 +71,20 @@ function TrashRow({ item, onRestore, onPurge }: { item: TrashItem; onRestore: (i
 
 export function TrashPage() {
   const [items, setItems] = React.useState<TrashItem[] | null>(null);
+  const [bulkPurgeConfirm, setBulkPurgeConfirm] = React.useState(false);
   const [toastNode, toast] = useToast();
+  const fsel = useSelection();
 
   const load = React.useCallback(() => {
     setItems(null);
+    fsel.clear();
     apiGet<Page<TrashItem>>('/api/cloud/trash')
       .then((d) => setItems(d.items || []))
       .catch((e) => {
         toast((e as Error).message, 'err');
         setItems([]);
       });
-  }, [toast]);
+  }, [toast, fsel.clear]);
   React.useEffect(load, [load]);
 
   async function restore(item: TrashItem) {
@@ -91,6 +106,41 @@ export function TrashPage() {
       toast((e as Error).message, 'err');
     }
   }
+  async function bulkRestore() {
+    const chosen = (items || []).filter((i) => fsel.has(i.entryId));
+    let ok = 0;
+    for (const it of chosen) {
+      try {
+        await apiPost('/api/cloud/trash/restore', { entryId: it.entryId });
+        ok++;
+      } catch (e) {
+        toast(`«${it.name}»: ${(e as Error).message}`, 'err');
+      }
+    }
+    fsel.clear();
+    if (ok) {
+      toast(`Восстановлено: ${ok}`);
+      load();
+    }
+  }
+  async function bulkPurge() {
+    const chosen = (items || []).filter((i) => fsel.has(i.entryId));
+    let ok = 0;
+    for (const it of chosen) {
+      try {
+        await apiPost('/api/cloud/trash/purge', { entryId: it.entryId });
+        ok++;
+      } catch (e) {
+        toast(`«${it.name}»: ${(e as Error).message}`, 'err');
+      }
+    }
+    setBulkPurgeConfirm(false);
+    fsel.clear();
+    if (ok) {
+      toast(`Удалено навсегда: ${ok}`);
+      load();
+    }
+  }
   async function empty() {
     if (!items || !items.length) return;
     if (!window.confirm('Очистить корзину? Все файлы будут удалены навсегда.')) return;
@@ -104,6 +154,7 @@ export function TrashPage() {
   }
 
   const isEmpty = items && !items.length;
+  const allChecked = !!items && items.length > 0 && items.every((i) => fsel.has(i.entryId));
 
   usePageHeader(
     () => ({
@@ -128,6 +179,14 @@ export function TrashPage() {
   return (
     <>
       {toastNode}
+      <SelectionBar
+        count={fsel.count}
+        onClear={fsel.clear}
+        actions={[
+          { label: 'Восстановить', icon: 'refresh', onClick: bulkRestore },
+          { label: 'Удалить навсегда', icon: 'trash', danger: true, onClick: () => setBulkPurgeConfirm(true) },
+        ]}
+      />
       <div className="trash-shell">
         <div className="trash-main">
           <div className="trash-bar">
@@ -142,6 +201,13 @@ export function TrashPage() {
               <table className="ftable">
                 <thead>
                   <tr>
+                    <th style={{ width: 40 }} className="selcell">
+                      <input
+                        type="checkbox"
+                        checked={allChecked}
+                        onChange={(e) => fsel.setAll(items!.map((i) => i.entryId), e.target.checked)}
+                      />
+                    </th>
                     <th>Имя</th>
                     <th style={{ width: 120 }}>Размер</th>
                     <th style={{ width: 150 }}>Удалён</th>
@@ -149,12 +215,33 @@ export function TrashPage() {
                     <th style={{ width: 110 }}></th>
                   </tr>
                 </thead>
-                <tbody>{items!.map((it) => <TrashRow key={it.entryId} item={it} onRestore={restore} onPurge={purge} />)}</tbody>
+                <tbody>
+                  {items!.map((it) => (
+                    <TrashRow
+                      key={it.entryId}
+                      item={it}
+                      bulkChecked={fsel.has(it.entryId)}
+                      onBulkToggle={(t) => fsel.toggle(t.entryId)}
+                      onRestore={restore}
+                      onPurge={purge}
+                    />
+                  ))}
+                </tbody>
               </table>
             )}
           </div>
         </div>
       </div>
+      {bulkPurgeConfirm && (
+        <ConfirmModal
+          title="Удалить навсегда?"
+          danger
+          confirmLabel="Удалить навсегда"
+          message={`Выбранные файлы (${fsel.count}) будут удалены без возможности восстановления.`}
+          onClose={() => setBulkPurgeConfirm(false)}
+          onConfirm={bulkPurge}
+        />
+      )}
     </>
   );
 }
