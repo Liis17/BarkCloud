@@ -335,11 +335,11 @@ function SystemSection({ admin, system }: { admin: SettingsState['admin']; syste
         <div className="sys-section-label">Веб-клиент</div>
         {web && <div className="svc-list">{renderRow(web, () => <span style={{ fontSize: 12, color: 'var(--md-on-surface-variant)' }}>ниже ↓</span>)}</div>}
         <div className="sys-note">
-          Перезапуск веб-клиента работает: страница ненадолго станет недоступна и перезагрузится сама. Обновление веб-клиента из панели <b>временно недоступно</b> на
-          Windows-хосте — обновите образ на хосте вручную (<code>docker compose pull web</code>, затем <code>up -d web</code>).
+          Обновление и перезапуск веб-клиента: страница ненадолго станет недоступна и перезагрузится сама. Работает при развёртывании под Linux/WSL. На Windows Docker
+          Desktop обновление недоступно — обновите образ на хосте вручную (<code>docker compose pull web</code>, затем <code>up -d web</code>).
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-          <button className="btn primary" disabled title="Временно недоступно на Windows-хосте">
+          <button className="btn primary" onClick={() => webSelf('update')}>
             <Icon.download size={16} /> Обновить веб-клиент
           </button>
           <button className="btn" onClick={() => webSelf('restart')}>
