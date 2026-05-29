@@ -8,12 +8,12 @@ namespace BarkCloud.Files.Features.Cloud.RevokeShare;
 
 public class RevokeShareCommandHandler : IRequestHandler<RevokeShareCommand, CloudEmpty>
 {
-    private readonly ShareStorage _storage;
+    private readonly IShareStorage _storage;
     private readonly UserContext _userContext;
     private readonly ILogger<RevokeShareCommandHandler> _logger;
 
     public RevokeShareCommandHandler(
-        ShareStorage storage,
+        IShareStorage storage,
         UserContext userContext,
         ILogger<RevokeShareCommandHandler> logger)
     {

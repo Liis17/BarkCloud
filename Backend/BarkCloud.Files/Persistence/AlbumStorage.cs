@@ -7,7 +7,7 @@ namespace BarkCloud.Files.Persistence;
 /// <summary>
 /// Хранилище альбомов пользователя и их элементов.
 /// </summary>
-public class AlbumStorage
+public class AlbumStorage : IAlbumStorage
 {
     private readonly FilesContext _context;
 

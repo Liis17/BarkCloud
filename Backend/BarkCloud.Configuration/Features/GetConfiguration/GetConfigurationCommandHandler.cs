@@ -9,10 +9,10 @@ namespace BarkCloud.Configuration.Features.GetConfiguration;
 
 public class GetConfigurationCommandHandler : IRequestHandler<GetConfigurationCommand, GetConfigurationResponse>
 {
-    private readonly ConfigurationStorage _configurationStorage;
+    private readonly IConfigurationStorage _configurationStorage;
     private readonly ILogger<GetConfigurationCommandHandler> _logger;
 
-    public GetConfigurationCommandHandler(ConfigurationStorage configurationStorage, ILogger<GetConfigurationCommandHandler> logger)
+    public GetConfigurationCommandHandler(IConfigurationStorage configurationStorage, ILogger<GetConfigurationCommandHandler> logger)
     {
         _configurationStorage = configurationStorage;
         _logger = logger;

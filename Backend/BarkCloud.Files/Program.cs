@@ -57,10 +57,10 @@ public class Program
         builder.Services.AddScoped<IUploadedFilesStorage, UploadedFilesStorage>();
         builder.Services.AddScoped<ITempFilesStorage, TempFilesStorage>();
         builder.Services.AddScoped<IFileHashesStorage, FileHashesStorage>();
-        builder.Services.AddScoped<CloudHierarchyStorage>();
-        builder.Services.AddScoped<AlbumStorage>();
-        builder.Services.AddScoped<FavoriteFilesStorage>();
-        builder.Services.AddScoped<ShareStorage>();
+        builder.Services.AddScoped<ICloudHierarchyStorage, CloudHierarchyStorage>();
+        builder.Services.AddScoped<IAlbumStorage, AlbumStorage>();
+        builder.Services.AddScoped<IFavoriteFilesStorage, FavoriteFilesStorage>();
+        builder.Services.AddScoped<IShareStorage, ShareStorage>();
         builder.Services.AddSingleton<ImageCompressor>();
         builder.Services.AddSingleton<VideoThumbnailExtractor>();
         builder.Services.AddScoped<PreviewPersistenceService>();

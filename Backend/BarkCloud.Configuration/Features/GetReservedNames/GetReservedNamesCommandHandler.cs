@@ -7,10 +7,10 @@ namespace BarkCloud.Configuration.Features.GetReservedNames;
 
 public class GetReservedNamesCommandHandler : IRequestHandler<GetReservedNamesCommand, GetReservedNamesResponse>
 {
-    private readonly ConfigurationStorage _configurationStorage;
+    private readonly IConfigurationStorage _configurationStorage;
     private readonly ILogger<GetReservedNamesCommandHandler> _logger;
 
-    public GetReservedNamesCommandHandler(ConfigurationStorage configurationStorage, ILogger<GetReservedNamesCommandHandler> logger)
+    public GetReservedNamesCommandHandler(IConfigurationStorage configurationStorage, ILogger<GetReservedNamesCommandHandler> logger)
     {
         _configurationStorage = configurationStorage;
         _logger = logger;

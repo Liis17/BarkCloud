@@ -9,8 +9,6 @@ using Google.Protobuf.WellKnownTypes;
 
 using MediatR;
 
-using Microsoft.EntityFrameworkCore;
-
 using DomainMediaKind = BarkCloud.Files.Domain.MediaKind;
 
 namespace BarkCloud.Files.Features.Cloud.ListUserMedia;
@@ -26,23 +24,23 @@ public class ListUserMediaCommandHandler : IRequestHandler<ListUserMediaCommand,
     private const int MaxLimit = 200;
     private const int MaxEntryNames = 5;
 
-    private readonly FilesContext _context;
     private readonly IUploadedFilesStorage _uploadedFiles;
+    private readonly ICloudHierarchyStorage _cloudHierarchy;
     private readonly UserContext _userContext;
     private readonly RunSettings _runSettings;
     private readonly IConfiguration _configuration;
     private readonly ILogger<ListUserMediaCommandHandler> _logger;
 
     public ListUserMediaCommandHandler(
-        FilesContext context,
         IUploadedFilesStorage uploadedFiles,
+        ICloudHierarchyStorage cloudHierarchy,
         UserContext userContext,
         RunSettings runSettings,
         IConfiguration configuration,
         ILogger<ListUserMediaCommandHandler> logger)
     {
-        _context = context;
         _uploadedFiles = uploadedFiles;
+        _cloudHierarchy = cloudHierarchy;
         _userContext = userContext;
         _runSettings = runSettings;
         _configuration = configuration;
@@ -55,32 +53,8 @@ public class ListUserMediaCommandHandler : IRequestHandler<ListUserMediaCommand,
         var limit = request.Limit <= 0 ? DefaultLimit : Math.Min(request.Limit, MaxLimit);
         var kind = request.Kind;
 
-        // Файлы владельца нужного медиа-типа, исключая превью-блобы и «эффективно удалённые»
-        // (все записи владельца на файл — в корзине; файлы без записи или с живой записью остаются).
-        var query = _context.UploadedFiles
-            .AsNoTracking()
-            .Where(f => f.Uploaders.Contains(ownerId)
-                        && f.Type == Domain.UploadFileType.CloudFile
-                        && f.MediaKind == kind
-                        && !_context.FilePreviews.Any(p => p.PreviewFileId == f.Id)
-                        && !(_context.CloudFileEntries.Any(e => e.OwnerId == ownerId && e.FileId == f.Id && e.IsDeleted)
-                             && !_context.CloudFileEntries.Any(e => e.OwnerId == ownerId && e.FileId == f.Id && !e.IsDeleted)));
-
-        if (request.CursorCreatedAt.HasValue && request.CursorFileId.HasValue)
-        {
-            var cursorCreatedAt = DateTime.SpecifyKind(request.CursorCreatedAt.Value, DateTimeKind.Utc);
-            var cursorFileId = request.CursorFileId.Value;
-
-            query = query.Where(f =>
-                f.CreatedAt < cursorCreatedAt
-                || (f.CreatedAt == cursorCreatedAt && f.Id.ToString().CompareTo(cursorFileId.ToString()) < 0));
-        }
-
-        var page = await query
-            .OrderByDescending(f => f.CreatedAt)
-            .ThenByDescending(f => f.Id)
-            .Take(limit + 1)
-            .ToListAsync(cancellationToken);
+        var page = await _uploadedFiles.ListUserMediaPage(
+            ownerId, kind, request.CursorCreatedAt, request.CursorFileId, limit, cancellationToken);
 
         var hasMore = page.Count > limit;
         if (hasMore)
@@ -95,11 +69,7 @@ public class ListUserMediaCommandHandler : IRequestHandler<ListUserMediaCommand,
         var previewsByOriginal = await _uploadedFiles.GetPreviewsForFiles(pageFileIds, cancellationToken);
         var baseUrl = FileUrlHelper.GetPublicBaseUrl(_configuration, _runSettings);
 
-        var entries = await _context.CloudFileEntries
-            .AsNoTracking()
-            .Where(e => e.OwnerId == ownerId && pageFileIds.Contains(e.FileId) && !e.IsDeleted)
-            .Select(e => new { e.Id, e.FileId, e.Name, e.CreatedAt })
-            .ToListAsync(cancellationToken);
+        var entries = await _cloudHierarchy.GetLiveEntriesForFiles(ownerId, pageFileIds, cancellationToken);
 
         var entriesByFileId = entries
             .GroupBy(e => e.FileId)

@@ -14,12 +14,12 @@ public class ListMySharesCommandHandler : IRequestHandler<ListMySharesCommand, L
     private const int DefaultLimit = 50;
     private const int MaxLimit = 200;
 
-    private readonly ShareStorage _storage;
+    private readonly IShareStorage _storage;
     private readonly UserContext _userContext;
     private readonly ILogger<ListMySharesCommandHandler> _logger;
 
     public ListMySharesCommandHandler(
-        ShareStorage storage,
+        IShareStorage storage,
         UserContext userContext,
         ILogger<ListMySharesCommandHandler> logger)
     {

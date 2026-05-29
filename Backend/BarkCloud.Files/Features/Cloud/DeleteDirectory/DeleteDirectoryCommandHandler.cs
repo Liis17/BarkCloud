@@ -17,12 +17,12 @@ namespace BarkCloud.Files.Features.Cloud.DeleteDirectory;
 /// </summary>
 public class DeleteDirectoryCommandHandler : IRequestHandler<DeleteDirectoryCommand, CloudEmpty>
 {
-    private readonly CloudHierarchyStorage _storage;
+    private readonly ICloudHierarchyStorage _storage;
     private readonly UserContext _userContext;
     private readonly ILogger<DeleteDirectoryCommandHandler> _logger;
 
     public DeleteDirectoryCommandHandler(
-        CloudHierarchyStorage storage,
+        ICloudHierarchyStorage storage,
         UserContext userContext,
         ILogger<DeleteDirectoryCommandHandler> logger)
     {

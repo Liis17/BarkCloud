@@ -8,8 +8,6 @@ using BarkCloud.Shared.Exceptions.Files;
 
 using MediatR;
 
-using Microsoft.EntityFrameworkCore;
-
 using FileNotFoundException = BarkCloud.Shared.Exceptions.Files.FileNotFoundException;
 using MediaKind = BarkCloud.Files.Domain.MediaKind;
 
@@ -28,7 +26,6 @@ public class SetVideoThumbnailCommandHandler : IRequestHandler<SetVideoThumbnail
     private readonly PreviewPersistenceService _previewPersistence;
     private readonly S3Uploader _s3Uploader;
     private readonly S3BucketRegistry _bucketRegistry;
-    private readonly FilesContext _context;
     private readonly UserContext _userContext;
     private readonly ILogger<SetVideoThumbnailCommandHandler> _logger;
 
@@ -38,7 +35,6 @@ public class SetVideoThumbnailCommandHandler : IRequestHandler<SetVideoThumbnail
         PreviewPersistenceService previewPersistence,
         S3Uploader s3Uploader,
         S3BucketRegistry bucketRegistry,
-        FilesContext context,
         UserContext userContext,
         ILogger<SetVideoThumbnailCommandHandler> logger)
     {
@@ -47,7 +43,6 @@ public class SetVideoThumbnailCommandHandler : IRequestHandler<SetVideoThumbnail
         _previewPersistence = previewPersistence;
         _s3Uploader = s3Uploader;
         _bucketRegistry = bucketRegistry;
-        _context = context;
         _userContext = userContext;
         _logger = logger;
     }
@@ -82,23 +77,7 @@ public class SetVideoThumbnailCommandHandler : IRequestHandler<SetVideoThumbnail
         }
 
         // 2) Снимаем старые превью видео: убираем владельца из их Uploaders и удаляем связки.
-        var oldPreviews = await _context.FilePreviews
-            .Where(p => p.OriginalFileId == video.Id)
-            .ToListAsync(cancellationToken);
-
-        if (oldPreviews.Count > 0)
-        {
-            var oldPreviewFileIds = oldPreviews.Select(p => p.PreviewFileId).ToList();
-            var oldPreviewFiles = await _context.UploadedFiles
-                .Where(f => oldPreviewFileIds.Contains(f.Id))
-                .ToListAsync(cancellationToken);
-
-            foreach (var pf in oldPreviewFiles)
-                pf.Uploaders.Remove(ownerId);
-
-            _context.FilePreviews.RemoveRange(oldPreviews);
-            await _context.SaveChangesAsync(cancellationToken);
-        }
+        await _filesStorage.RemovePreviewsForOriginal(video.Id, ownerId, cancellationToken);
 
         // 3) Сохраняем новые превью (дедуп + S3 + связки) той же логикой, что при загрузке.
         await _previewPersistence.PersistPreviewsAsync(video, previews, bucketName, cancellationToken);

@@ -17,4 +17,7 @@ public interface IUploadedFilesStorage
     Task<long> GetUserStorageUsed(long userId);
     Task<Dictionary<UploadFileType, long>> GetUserStorageByType(long userId);
     Task<bool> IsPreviewFile(Guid fileId, CancellationToken cancellationToken = default);
+    Task<List<UploadFile>> ListUserMediaPage(long ownerId, MediaKind kind, DateTime? cursorCreatedAt, Guid? cursorFileId, int limit, CancellationToken cancellationToken = default);
+    Task<List<UploadFile>> ListUserImagesPage(long ownerId, DateTime? cursorCreatedAt, Guid? cursorFileId, int limit, CancellationToken cancellationToken = default);
+    Task RemovePreviewsForOriginal(Guid originalFileId, long ownerId, CancellationToken cancellationToken = default);
 }

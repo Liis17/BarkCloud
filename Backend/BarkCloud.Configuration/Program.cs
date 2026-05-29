@@ -70,7 +70,7 @@ public class Program
 
         builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssemblyContaining<Program>());
 
-        builder.Services.AddScoped<ConfigurationStorage>();
+        builder.Services.AddScoped<IConfigurationStorage, ConfigurationStorage>();
 
         var app = builder.Build();
 

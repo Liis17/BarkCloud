@@ -10,7 +10,7 @@ namespace BarkCloud.Files.Persistence;
 /// в запросах, но для CloudFileEntry мы используем выделенный синтетический Guid.Empty
 /// в качестве идентификатора корневой папки на уровне хранения.
 /// </summary>
-public class CloudHierarchyStorage
+public class CloudHierarchyStorage : ICloudHierarchyStorage
 {
     /// <summary>
     /// Синтетический идентификатор корневой директории владельца.
@@ -180,6 +180,45 @@ public class CloudHierarchyStorage
 
         return await _context.CloudFileEntries
             .Where(x => x.OwnerId == ownerId && directoryIds.Contains(x.DirectoryId) && !x.IsDeleted)
+            .ToListAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Живые (не в корзине) записи владельца для одного файла. Отслеживаемые —
+    /// используются для мягкого удаления (мутация IsDeleted/DeletedAt/PurgeAt).
+    /// </summary>
+    public async Task<List<CloudFileEntry>> GetLiveEntriesForFile(long ownerId, Guid fileId, CancellationToken cancellationToken = default)
+    {
+        return await _context.CloudFileEntries
+            .Where(e => e.OwnerId == ownerId && e.FileId == fileId && !e.IsDeleted)
+            .ToListAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Живые (не в корзине) записи владельца для набора файлов — для подсчёта копий в галерее.
+    /// </summary>
+    public async Task<List<CloudFileEntry>> GetLiveEntriesForFiles(long ownerId, IReadOnlyCollection<Guid> fileIds, CancellationToken cancellationToken = default)
+    {
+        if (fileIds.Count == 0)
+            return new List<CloudFileEntry>();
+
+        return await _context.CloudFileEntries
+            .AsNoTracking()
+            .Where(e => e.OwnerId == ownerId && fileIds.Contains(e.FileId) && !e.IsDeleted)
+            .ToListAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Все записи владельца (включая корзину) для набора файлов — для устаревшего листинга изображений.
+    /// </summary>
+    public async Task<List<CloudFileEntry>> GetEntriesForFiles(long ownerId, IReadOnlyCollection<Guid> fileIds, CancellationToken cancellationToken = default)
+    {
+        if (fileIds.Count == 0)
+            return new List<CloudFileEntry>();
+
+        return await _context.CloudFileEntries
+            .AsNoTracking()
+            .Where(e => e.OwnerId == ownerId && fileIds.Contains(e.FileId))
             .ToListAsync(cancellationToken);
     }
 

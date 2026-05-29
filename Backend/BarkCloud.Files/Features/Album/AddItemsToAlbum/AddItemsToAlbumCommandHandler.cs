@@ -12,13 +12,13 @@ namespace BarkCloud.Files.Features.Album.AddItemsToAlbum;
 
 public class AddItemsToAlbumCommandHandler : IRequestHandler<AddItemsToAlbumCommand, CloudEmpty>
 {
-    private readonly AlbumStorage _storage;
+    private readonly IAlbumStorage _storage;
     private readonly IUploadedFilesStorage _filesStorage;
     private readonly UserContext _userContext;
     private readonly ILogger<AddItemsToAlbumCommandHandler> _logger;
 
     public AddItemsToAlbumCommandHandler(
-        AlbumStorage storage,
+        IAlbumStorage storage,
         IUploadedFilesStorage filesStorage,
         UserContext userContext,
         ILogger<AddItemsToAlbumCommandHandler> logger)

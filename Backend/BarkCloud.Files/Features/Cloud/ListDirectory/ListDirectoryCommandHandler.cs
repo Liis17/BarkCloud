@@ -14,12 +14,12 @@ namespace BarkCloud.Files.Features.Cloud.ListDirectory;
 
 public class ListDirectoryCommandHandler : IRequestHandler<ListDirectoryCommand, DirectoryListing>
 {
-    private readonly CloudHierarchyStorage _storage;
+    private readonly ICloudHierarchyStorage _storage;
     private readonly UserContext _userContext;
     private readonly ILogger<ListDirectoryCommandHandler> _logger;
 
     public ListDirectoryCommandHandler(
-        CloudHierarchyStorage storage,
+        ICloudHierarchyStorage storage,
         UserContext userContext,
         ILogger<ListDirectoryCommandHandler> logger)
     {

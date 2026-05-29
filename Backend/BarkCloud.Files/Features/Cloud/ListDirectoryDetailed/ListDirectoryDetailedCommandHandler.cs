@@ -17,7 +17,7 @@ namespace BarkCloud.Files.Features.Cloud.ListDirectoryDetailed;
 
 public class ListDirectoryDetailedCommandHandler : IRequestHandler<ListDirectoryDetailedCommand, DirectoryListingDetailed>
 {
-    private readonly CloudHierarchyStorage _storage;
+    private readonly ICloudHierarchyStorage _storage;
     private readonly IUploadedFilesStorage _uploadedFiles;
     private readonly UserContext _userContext;
     private readonly RunSettings _runSettings;
@@ -25,7 +25,7 @@ public class ListDirectoryDetailedCommandHandler : IRequestHandler<ListDirectory
     private readonly ILogger<ListDirectoryDetailedCommandHandler> _logger;
 
     public ListDirectoryDetailedCommandHandler(
-        CloudHierarchyStorage storage,
+        ICloudHierarchyStorage storage,
         IUploadedFilesStorage uploadedFiles,
         UserContext userContext,
         RunSettings runSettings,

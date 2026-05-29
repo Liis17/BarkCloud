@@ -15,13 +15,13 @@ namespace BarkCloud.Files.Features.Cloud.CreateShare;
 
 public class CreateShareCommandHandler : IRequestHandler<CreateShareCommand, ShareInfo>
 {
-    private readonly ShareStorage _storage;
+    private readonly IShareStorage _storage;
     private readonly IUploadedFilesStorage _filesStorage;
     private readonly UserContext _userContext;
     private readonly ILogger<CreateShareCommandHandler> _logger;
 
     public CreateShareCommandHandler(
-        ShareStorage storage,
+        IShareStorage storage,
         IUploadedFilesStorage filesStorage,
         UserContext userContext,
         ILogger<CreateShareCommandHandler> logger)

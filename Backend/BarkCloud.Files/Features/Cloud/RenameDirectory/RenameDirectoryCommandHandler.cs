@@ -11,12 +11,12 @@ namespace BarkCloud.Files.Features.Cloud.RenameDirectory;
 
 public class RenameDirectoryCommandHandler : IRequestHandler<RenameDirectoryCommand, CloudEmpty>
 {
-    private readonly CloudHierarchyStorage _storage;
+    private readonly ICloudHierarchyStorage _storage;
     private readonly UserContext _userContext;
     private readonly ILogger<RenameDirectoryCommandHandler> _logger;
 
     public RenameDirectoryCommandHandler(
-        CloudHierarchyStorage storage,
+        ICloudHierarchyStorage storage,
         UserContext userContext,
         ILogger<RenameDirectoryCommandHandler> logger)
     {

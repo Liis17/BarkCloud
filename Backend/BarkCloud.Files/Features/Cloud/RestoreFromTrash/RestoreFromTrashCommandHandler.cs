@@ -15,12 +15,12 @@ namespace BarkCloud.Files.Features.Cloud.RestoreFromTrash;
 /// </summary>
 public class RestoreFromTrashCommandHandler : IRequestHandler<RestoreFromTrashCommand, CloudEmpty>
 {
-    private readonly CloudHierarchyStorage _storage;
+    private readonly ICloudHierarchyStorage _storage;
     private readonly UserContext _userContext;
     private readonly ILogger<RestoreFromTrashCommandHandler> _logger;
 
     public RestoreFromTrashCommandHandler(
-        CloudHierarchyStorage storage,
+        ICloudHierarchyStorage storage,
         UserContext userContext,
         ILogger<RestoreFromTrashCommandHandler> logger)
     {

@@ -9,12 +9,12 @@ namespace BarkCloud.Files.Features.Cloud.RenameFileEntry;
 
 public class RenameFileEntryCommandHandler : IRequestHandler<RenameFileEntryCommand, CloudEmpty>
 {
-    private readonly CloudHierarchyStorage _storage;
+    private readonly ICloudHierarchyStorage _storage;
     private readonly UserContext _userContext;
     private readonly ILogger<RenameFileEntryCommandHandler> _logger;
 
     public RenameFileEntryCommandHandler(
-        CloudHierarchyStorage storage,
+        ICloudHierarchyStorage storage,
         UserContext userContext,
         ILogger<RenameFileEntryCommandHandler> logger)
     {
