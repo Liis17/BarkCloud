@@ -9,12 +9,12 @@ namespace BarkCloud.Files.Features.Album.DeleteAlbum;
 
 public class DeleteAlbumCommandHandler : IRequestHandler<DeleteAlbumCommand, CloudEmpty>
 {
-    private readonly AlbumStorage _storage;
+    private readonly IAlbumStorage _storage;
     private readonly UserContext _userContext;
     private readonly ILogger<DeleteAlbumCommandHandler> _logger;
 
     public DeleteAlbumCommandHandler(
-        AlbumStorage storage,
+        IAlbumStorage storage,
         UserContext userContext,
         ILogger<DeleteAlbumCommandHandler> logger)
     {

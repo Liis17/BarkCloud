@@ -14,12 +14,12 @@ namespace BarkCloud.Files.Features.Cloud.CreateDirectory;
 
 public class CreateDirectoryCommandHandler : IRequestHandler<CreateDirectoryCommand, DirectoryInfo>
 {
-    private readonly CloudHierarchyStorage _storage;
+    private readonly ICloudHierarchyStorage _storage;
     private readonly UserContext _userContext;
     private readonly ILogger<CreateDirectoryCommandHandler> _logger;
 
     public CreateDirectoryCommandHandler(
-        CloudHierarchyStorage storage,
+        ICloudHierarchyStorage storage,
         UserContext userContext,
         ILogger<CreateDirectoryCommandHandler> logger)
     {

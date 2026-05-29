@@ -7,10 +7,10 @@ namespace BarkCloud.Configuration.Features.DeleteReservedName;
 
 public class DeleteReservedNameCommandHandler : IRequestHandler<DeleteReservedNameCommand, DeleteReservedNameResponse>
 {
-    private readonly ConfigurationStorage _configurationStorage;
+    private readonly IConfigurationStorage _configurationStorage;
     private readonly ILogger<DeleteReservedNameCommandHandler> _logger;
 
-    public DeleteReservedNameCommandHandler(ConfigurationStorage configurationStorage, ILogger<DeleteReservedNameCommandHandler> logger)
+    public DeleteReservedNameCommandHandler(IConfigurationStorage configurationStorage, ILogger<DeleteReservedNameCommandHandler> logger)
     {
         _configurationStorage = configurationStorage;
         _logger = logger;

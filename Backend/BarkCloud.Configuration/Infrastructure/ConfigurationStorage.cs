@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace BarkCloud.Configuration.Infrastructure;
 
-public class ConfigurationStorage
+public class ConfigurationStorage : IConfigurationStorage
 {
     private readonly ConfigurationContext _context;
     private readonly MetricsCollector _metrics;

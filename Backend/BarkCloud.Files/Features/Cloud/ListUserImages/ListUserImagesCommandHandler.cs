@@ -1,4 +1,3 @@
-using BarkCloud.Files.Domain;
 using BarkCloud.Files.Helpers;
 using BarkCloud.Files.Mapping;
 using BarkCloud.Files.Persistence;
@@ -10,10 +9,6 @@ using Google.Protobuf.WellKnownTypes;
 
 using MediatR;
 
-using Microsoft.EntityFrameworkCore;
-
-using DomainUploadFileType = BarkCloud.Files.Domain.UploadFileType;
-
 namespace BarkCloud.Files.Features.Cloud.ListUserImages;
 
 public class ListUserImagesCommandHandler : IRequestHandler<ListUserImagesCommand, ListUserImagesResponse>
@@ -22,23 +17,23 @@ public class ListUserImagesCommandHandler : IRequestHandler<ListUserImagesComman
     private const int MaxLimit = 200;
     private const int MaxEntryNames = 5;
 
-    private readonly FilesContext _context;
     private readonly IUploadedFilesStorage _uploadedFiles;
+    private readonly ICloudHierarchyStorage _cloudHierarchy;
     private readonly UserContext _userContext;
     private readonly RunSettings _runSettings;
     private readonly IConfiguration _configuration;
     private readonly ILogger<ListUserImagesCommandHandler> _logger;
 
     public ListUserImagesCommandHandler(
-        FilesContext context,
         IUploadedFilesStorage uploadedFiles,
+        ICloudHierarchyStorage cloudHierarchy,
         UserContext userContext,
         RunSettings runSettings,
         IConfiguration configuration,
         ILogger<ListUserImagesCommandHandler> logger)
     {
-        _context = context;
         _uploadedFiles = uploadedFiles;
+        _cloudHierarchy = cloudHierarchy;
         _userContext = userContext;
         _runSettings = runSettings;
         _configuration = configuration;
@@ -50,48 +45,8 @@ public class ListUserImagesCommandHandler : IRequestHandler<ListUserImagesComman
         var ownerId = _userContext.UserId;
         var limit = request.Limit <= 0 ? DefaultLimit : Math.Min(request.Limit, MaxLimit);
 
-        // Базовый предикат: файлы пользователя в облаке, прошедшие фильтр «изображение».
-        // Фильтр изображения — ImageWidth>0 ИЛИ имя оканчивается на одно из известных расширений
-        // (через LOWER + EndsWith, чтобы работало кросс-провайдерно).
-        var query = _context.UploadedFiles
-            .AsNoTracking()
-            .Where(f => f.Uploaders.Contains(ownerId)
-                        && f.Type == DomainUploadFileType.CloudFile
-                        // Превью-блобы (PreviewFileId из FilePreviews) не должны протекать в галерею.
-                        && !_context.FilePreviews.Any(p => p.PreviewFileId == f.Id)
-                        // «Эффективно удалённые» (все записи владельца в корзине) скрываем.
-                        && !(_context.CloudFileEntries.Any(e => e.OwnerId == ownerId && e.FileId == f.Id && e.IsDeleted)
-                             && !_context.CloudFileEntries.Any(e => e.OwnerId == ownerId && e.FileId == f.Id && !e.IsDeleted))
-                        && (
-                            (f.ImageWidth != null && f.ImageWidth > 0)
-                            || (f.Filename != null && (
-                                    f.Filename.ToLower().EndsWith(".jpg")
-                                 || f.Filename.ToLower().EndsWith(".jpeg")
-                                 || f.Filename.ToLower().EndsWith(".png")
-                                 || f.Filename.ToLower().EndsWith(".gif")
-                                 || f.Filename.ToLower().EndsWith(".webp")
-                                 || f.Filename.ToLower().EndsWith(".heic")
-                                 || f.Filename.ToLower().EndsWith(".heif")
-                                 || f.Filename.ToLower().EndsWith(".bmp")
-                                 || f.Filename.ToLower().EndsWith(".tiff")
-                                 || f.Filename.ToLower().EndsWith(".tif")))
-                        ));
-
-        if (request.CursorCreatedAt.HasValue && request.CursorFileId.HasValue)
-        {
-            var cursorCreatedAt = DateTime.SpecifyKind(request.CursorCreatedAt.Value, DateTimeKind.Utc);
-            var cursorFileId = request.CursorFileId.Value;
-
-            query = query.Where(f =>
-                f.CreatedAt < cursorCreatedAt
-                || (f.CreatedAt == cursorCreatedAt && f.Id.ToString().CompareTo(cursorFileId.ToString()) < 0));
-        }
-
-        var page = await query
-            .OrderByDescending(f => f.CreatedAt)
-            .ThenByDescending(f => f.Id)
-            .Take(limit + 1)
-            .ToListAsync(cancellationToken);
+        var page = await _uploadedFiles.ListUserImagesPage(
+            ownerId, request.CursorCreatedAt, request.CursorFileId, limit, cancellationToken);
 
         var hasMore = page.Count > limit;
         if (hasMore)
@@ -110,11 +65,7 @@ public class ListUserImagesCommandHandler : IRequestHandler<ListUserImagesComman
         // Считаем количество и имена FileEntry для каждого FileId пачкой.
         // Делаем в памяти после быстрого выбора всех записей — это надёжнее, чем GroupBy+Take на стороне БД,
         // и стоимость низкая: список ограничен limit (≤200) копий каждого файла на одного владельца, что на практике небольшие десятки.
-        var entries = await _context.CloudFileEntries
-            .AsNoTracking()
-            .Where(e => e.OwnerId == ownerId && pageFileIds.Contains(e.FileId))
-            .Select(e => new { e.FileId, e.Name, e.CreatedAt })
-            .ToListAsync(cancellationToken);
+        var entries = await _cloudHierarchy.GetEntriesForFiles(ownerId, pageFileIds, cancellationToken);
 
         var entriesByFileId = entries
             .GroupBy(e => e.FileId)

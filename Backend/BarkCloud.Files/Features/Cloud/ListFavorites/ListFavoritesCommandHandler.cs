@@ -16,18 +16,18 @@ public class ListFavoritesCommandHandler : IRequestHandler<ListFavoritesCommand,
     private const int DefaultLimit = 50;
     private const int MaxLimit = 200;
 
-    private readonly FavoriteFilesStorage _storage;
+    private readonly IFavoriteFilesStorage _storage;
     private readonly IUploadedFilesStorage _filesStorage;
-    private readonly CloudHierarchyStorage _hierarchyStorage;
+    private readonly ICloudHierarchyStorage _hierarchyStorage;
     private readonly UserContext _userContext;
     private readonly RunSettings _runSettings;
     private readonly IConfiguration _configuration;
     private readonly ILogger<ListFavoritesCommandHandler> _logger;
 
     public ListFavoritesCommandHandler(
-        FavoriteFilesStorage storage,
+        IFavoriteFilesStorage storage,
         IUploadedFilesStorage filesStorage,
-        CloudHierarchyStorage hierarchyStorage,
+        ICloudHierarchyStorage hierarchyStorage,
         UserContext userContext,
         RunSettings runSettings,
         IConfiguration configuration,

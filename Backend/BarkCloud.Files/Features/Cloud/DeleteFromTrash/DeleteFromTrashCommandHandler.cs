@@ -14,13 +14,13 @@ namespace BarkCloud.Files.Features.Cloud.DeleteFromTrash;
 /// </summary>
 public class DeleteFromTrashCommandHandler : IRequestHandler<DeleteFromTrashCommand, CloudEmpty>
 {
-    private readonly CloudHierarchyStorage _storage;
+    private readonly ICloudHierarchyStorage _storage;
     private readonly TrashPurgeService _purge;
     private readonly UserContext _userContext;
     private readonly ILogger<DeleteFromTrashCommandHandler> _logger;
 
     public DeleteFromTrashCommandHandler(
-        CloudHierarchyStorage storage,
+        ICloudHierarchyStorage storage,
         TrashPurgeService purge,
         UserContext userContext,
         ILogger<DeleteFromTrashCommandHandler> logger)

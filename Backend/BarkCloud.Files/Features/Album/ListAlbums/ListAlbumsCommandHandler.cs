@@ -14,13 +14,13 @@ public class ListAlbumsCommandHandler : IRequestHandler<ListAlbumsCommand, ListA
     private const int DefaultLimit = 50;
     private const int MaxLimit = 200;
 
-    private readonly AlbumStorage _storage;
+    private readonly IAlbumStorage _storage;
     private readonly AlbumViewBuilder _viewBuilder;
     private readonly UserContext _userContext;
     private readonly ILogger<ListAlbumsCommandHandler> _logger;
 
     public ListAlbumsCommandHandler(
-        AlbumStorage storage,
+        IAlbumStorage storage,
         AlbumViewBuilder viewBuilder,
         UserContext userContext,
         ILogger<ListAlbumsCommandHandler> logger)

@@ -5,8 +5,6 @@ using BarkCloud.Proto.Files;
 
 using MediatR;
 
-using Microsoft.EntityFrameworkCore;
-
 namespace BarkCloud.Files.Features.Cloud.DeleteUserMedia;
 
 /// <summary>
@@ -24,18 +22,18 @@ namespace BarkCloud.Files.Features.Cloud.DeleteUserMedia;
 /// </summary>
 public class DeleteUserMediaCommandHandler : IRequestHandler<DeleteUserMediaCommand, CloudEmpty>
 {
-    private readonly FilesContext _context;
+    private readonly ICloudHierarchyStorage _cloudHierarchy;
     private readonly IUploadedFilesStorage _uploadedFiles;
     private readonly UserContext _userContext;
     private readonly ILogger<DeleteUserMediaCommandHandler> _logger;
 
     public DeleteUserMediaCommandHandler(
-        FilesContext context,
+        ICloudHierarchyStorage cloudHierarchy,
         IUploadedFilesStorage uploadedFiles,
         UserContext userContext,
         ILogger<DeleteUserMediaCommandHandler> logger)
     {
-        _context = context;
+        _cloudHierarchy = cloudHierarchy;
         _uploadedFiles = uploadedFiles;
         _userContext = userContext;
         _logger = logger;
@@ -45,9 +43,7 @@ public class DeleteUserMediaCommandHandler : IRequestHandler<DeleteUserMediaComm
     {
         var ownerId = _userContext.UserId;
 
-        var liveEntries = await _context.CloudFileEntries
-            .Where(e => e.OwnerId == ownerId && e.FileId == request.FileId && !e.IsDeleted)
-            .ToListAsync(cancellationToken);
+        var liveEntries = await _cloudHierarchy.GetLiveEntriesForFile(ownerId, request.FileId, cancellationToken);
 
         if (liveEntries.Count > 0)
         {
@@ -59,7 +55,7 @@ public class DeleteUserMediaCommandHandler : IRequestHandler<DeleteUserMediaComm
                 entry.PurgeAt = now + TrashPurgeService.Retention;
             }
 
-            await _context.SaveChangesAsync(cancellationToken);
+            await _cloudHierarchy.SaveChangesAsync(cancellationToken);
 
             _logger.LogInformation(
                 "DeleteUserMedia: {Count} записей файла {FileId} (Owner: {OwnerId}) перемещены в корзину",

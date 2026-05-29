@@ -8,12 +8,12 @@ namespace BarkCloud.Files.Features.Cloud.RemoveFavorite;
 
 public class RemoveFavoriteCommandHandler : IRequestHandler<RemoveFavoriteCommand, CloudEmpty>
 {
-    private readonly FavoriteFilesStorage _storage;
+    private readonly IFavoriteFilesStorage _storage;
     private readonly UserContext _userContext;
     private readonly ILogger<RemoveFavoriteCommandHandler> _logger;
 
     public RemoveFavoriteCommandHandler(
-        FavoriteFilesStorage storage,
+        IFavoriteFilesStorage storage,
         UserContext userContext,
         ILogger<RemoveFavoriteCommandHandler> logger)
     {

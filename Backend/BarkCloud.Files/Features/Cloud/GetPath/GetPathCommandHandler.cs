@@ -11,12 +11,12 @@ namespace BarkCloud.Files.Features.Cloud.GetPath;
 
 public class GetPathCommandHandler : IRequestHandler<GetPathCommand, PathResponse>
 {
-    private readonly CloudHierarchyStorage _storage;
+    private readonly ICloudHierarchyStorage _storage;
     private readonly UserContext _userContext;
     private readonly ILogger<GetPathCommandHandler> _logger;
 
     public GetPathCommandHandler(
-        CloudHierarchyStorage storage,
+        ICloudHierarchyStorage storage,
         UserContext userContext,
         ILogger<GetPathCommandHandler> logger)
     {

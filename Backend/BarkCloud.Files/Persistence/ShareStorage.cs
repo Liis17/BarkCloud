@@ -8,7 +8,7 @@ namespace BarkCloud.Files.Persistence;
 /// Хранилище публичных ссылок (<see cref="ShareLink"/>). Резолв по токену анонимный,
 /// листинг и отзыв — в рамках владельца.
 /// </summary>
-public class ShareStorage
+public class ShareStorage : IShareStorage
 {
     private readonly FilesContext _context;
 

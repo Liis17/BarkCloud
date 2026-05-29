@@ -165,4 +165,106 @@ public class UploadedFilesStorage : IUploadedFilesStorage
             .AsNoTracking()
             .AnyAsync(p => p.PreviewFileId == fileId, cancellationToken);
     }
+
+    /// <summary>
+    /// Страница медиа владельца указанного <paramref name="kind"/> с cursor-пагинацией.
+    /// Исключает превью-блобы и «эффективно удалённые» файлы (все записи владельца — в корзине).
+    /// Возвращает limit+1 элемент для определения наличия следующей страницы.
+    /// </summary>
+    public async Task<List<UploadFile>> ListUserMediaPage(long ownerId, MediaKind kind, DateTime? cursorCreatedAt, Guid? cursorFileId, int limit, CancellationToken cancellationToken = default)
+    {
+        var query = _context.UploadedFiles
+            .AsNoTracking()
+            .Where(f => f.Uploaders.Contains(ownerId)
+                        && f.Type == UploadFileType.CloudFile
+                        && f.MediaKind == kind
+                        && !_context.FilePreviews.Any(p => p.PreviewFileId == f.Id)
+                        && !(_context.CloudFileEntries.Any(e => e.OwnerId == ownerId && e.FileId == f.Id && e.IsDeleted)
+                             && !_context.CloudFileEntries.Any(e => e.OwnerId == ownerId && e.FileId == f.Id && !e.IsDeleted)));
+
+        if (cursorCreatedAt.HasValue && cursorFileId.HasValue)
+        {
+            var cursorAt = DateTime.SpecifyKind(cursorCreatedAt.Value, DateTimeKind.Utc);
+            var cursorId = cursorFileId.Value;
+            query = query.Where(f =>
+                f.CreatedAt < cursorAt
+                || (f.CreatedAt == cursorAt && f.Id.ToString().CompareTo(cursorId.ToString()) < 0));
+        }
+
+        return await query
+            .OrderByDescending(f => f.CreatedAt)
+            .ThenByDescending(f => f.Id)
+            .Take(limit + 1)
+            .ToListAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Страница «изображений» владельца с cursor-пагинацией (устаревший фильтр по расширению/ImageWidth,
+    /// без явного MediaKind). Исключает превью-блобы и «эффективно удалённые» файлы.
+    /// Возвращает limit+1 элемент для определения наличия следующей страницы.
+    /// </summary>
+    public async Task<List<UploadFile>> ListUserImagesPage(long ownerId, DateTime? cursorCreatedAt, Guid? cursorFileId, int limit, CancellationToken cancellationToken = default)
+    {
+        var query = _context.UploadedFiles
+            .AsNoTracking()
+            .Where(f => f.Uploaders.Contains(ownerId)
+                        && f.Type == UploadFileType.CloudFile
+                        && !_context.FilePreviews.Any(p => p.PreviewFileId == f.Id)
+                        && !(_context.CloudFileEntries.Any(e => e.OwnerId == ownerId && e.FileId == f.Id && e.IsDeleted)
+                             && !_context.CloudFileEntries.Any(e => e.OwnerId == ownerId && e.FileId == f.Id && !e.IsDeleted))
+                        && (
+                            (f.ImageWidth != null && f.ImageWidth > 0)
+                            || (f.Filename != null && (
+                                    f.Filename.ToLower().EndsWith(".jpg")
+                                 || f.Filename.ToLower().EndsWith(".jpeg")
+                                 || f.Filename.ToLower().EndsWith(".png")
+                                 || f.Filename.ToLower().EndsWith(".gif")
+                                 || f.Filename.ToLower().EndsWith(".webp")
+                                 || f.Filename.ToLower().EndsWith(".heic")
+                                 || f.Filename.ToLower().EndsWith(".heif")
+                                 || f.Filename.ToLower().EndsWith(".bmp")
+                                 || f.Filename.ToLower().EndsWith(".tiff")
+                                 || f.Filename.ToLower().EndsWith(".tif")))
+                        ));
+
+        if (cursorCreatedAt.HasValue && cursorFileId.HasValue)
+        {
+            var cursorAt = DateTime.SpecifyKind(cursorCreatedAt.Value, DateTimeKind.Utc);
+            var cursorId = cursorFileId.Value;
+            query = query.Where(f =>
+                f.CreatedAt < cursorAt
+                || (f.CreatedAt == cursorAt && f.Id.ToString().CompareTo(cursorId.ToString()) < 0));
+        }
+
+        return await query
+            .OrderByDescending(f => f.CreatedAt)
+            .ThenByDescending(f => f.Id)
+            .Take(limit + 1)
+            .ToListAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Снимает все превью оригинала: убирает владельца из Uploaders превью-блобов и удаляет
+    /// записи FilePreview. Используется при ручной смене превью видео.
+    /// </summary>
+    public async Task RemovePreviewsForOriginal(Guid originalFileId, long ownerId, CancellationToken cancellationToken = default)
+    {
+        var oldPreviews = await _context.FilePreviews
+            .Where(p => p.OriginalFileId == originalFileId)
+            .ToListAsync(cancellationToken);
+
+        if (oldPreviews.Count == 0)
+            return;
+
+        var oldPreviewFileIds = oldPreviews.Select(p => p.PreviewFileId).ToList();
+        var oldPreviewFiles = await _context.UploadedFiles
+            .Where(f => oldPreviewFileIds.Contains(f.Id))
+            .ToListAsync(cancellationToken);
+
+        foreach (var pf in oldPreviewFiles)
+            pf.Uploaders.Remove(ownerId);
+
+        _context.FilePreviews.RemoveRange(oldPreviews);
+        await _context.SaveChangesAsync(cancellationToken);
+    }
 }

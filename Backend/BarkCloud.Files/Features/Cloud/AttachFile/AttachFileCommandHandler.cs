@@ -13,13 +13,13 @@ namespace BarkCloud.Files.Features.Cloud.AttachFile;
 
 public class AttachFileCommandHandler : IRequestHandler<AttachFileCommand, CloudEmpty>
 {
-    private readonly CloudHierarchyStorage _storage;
+    private readonly ICloudHierarchyStorage _storage;
     private readonly IUploadedFilesStorage _filesStorage;
     private readonly UserContext _userContext;
     private readonly ILogger<AttachFileCommandHandler> _logger;
 
     public AttachFileCommandHandler(
-        CloudHierarchyStorage storage,
+        ICloudHierarchyStorage storage,
         IUploadedFilesStorage filesStorage,
         UserContext userContext,
         ILogger<AttachFileCommandHandler> logger)

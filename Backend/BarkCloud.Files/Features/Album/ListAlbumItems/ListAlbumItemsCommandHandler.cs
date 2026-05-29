@@ -17,18 +17,18 @@ public class ListAlbumItemsCommandHandler : IRequestHandler<ListAlbumItemsComman
     private const int DefaultLimit = 50;
     private const int MaxLimit = 200;
 
-    private readonly AlbumStorage _storage;
+    private readonly IAlbumStorage _storage;
     private readonly IUploadedFilesStorage _filesStorage;
-    private readonly CloudHierarchyStorage _hierarchyStorage;
+    private readonly ICloudHierarchyStorage _hierarchyStorage;
     private readonly UserContext _userContext;
     private readonly RunSettings _runSettings;
     private readonly IConfiguration _configuration;
     private readonly ILogger<ListAlbumItemsCommandHandler> _logger;
 
     public ListAlbumItemsCommandHandler(
-        AlbumStorage storage,
+        IAlbumStorage storage,
         IUploadedFilesStorage filesStorage,
-        CloudHierarchyStorage hierarchyStorage,
+        ICloudHierarchyStorage hierarchyStorage,
         UserContext userContext,
         RunSettings runSettings,
         IConfiguration configuration,

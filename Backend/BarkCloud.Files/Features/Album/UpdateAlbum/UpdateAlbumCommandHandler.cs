@@ -10,14 +10,14 @@ namespace BarkCloud.Files.Features.Album.UpdateAlbum;
 
 public class UpdateAlbumCommandHandler : IRequestHandler<UpdateAlbumCommand, AlbumInfo>
 {
-    private readonly AlbumStorage _storage;
+    private readonly IAlbumStorage _storage;
     private readonly IUploadedFilesStorage _filesStorage;
     private readonly AlbumViewBuilder _viewBuilder;
     private readonly UserContext _userContext;
     private readonly ILogger<UpdateAlbumCommandHandler> _logger;
 
     public UpdateAlbumCommandHandler(
-        AlbumStorage storage,
+        IAlbumStorage storage,
         IUploadedFilesStorage filesStorage,
         AlbumViewBuilder viewBuilder,
         UserContext userContext,

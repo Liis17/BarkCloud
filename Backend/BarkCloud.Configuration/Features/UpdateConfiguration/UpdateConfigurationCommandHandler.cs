@@ -8,10 +8,10 @@ namespace BarkCloud.Configuration.Features.UpdateConfiguration;
 
 public class UpdateConfigurationCommandHandler : IRequestHandler<UpdateConfigurationCommand, UpdateConfigurationResponse>
 {
-    private readonly ConfigurationStorage _configurationStorage;
+    private readonly IConfigurationStorage _configurationStorage;
     private readonly ILogger<UpdateConfigurationCommandHandler> _logger;
 
-    public UpdateConfigurationCommandHandler(ConfigurationStorage configurationStorage, ILogger<UpdateConfigurationCommandHandler> logger)
+    public UpdateConfigurationCommandHandler(IConfigurationStorage configurationStorage, ILogger<UpdateConfigurationCommandHandler> logger)
     {
         _configurationStorage = configurationStorage;
         _logger = logger;

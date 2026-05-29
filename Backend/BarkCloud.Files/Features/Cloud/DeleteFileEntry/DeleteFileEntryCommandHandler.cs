@@ -16,12 +16,12 @@ namespace BarkCloud.Files.Features.Cloud.DeleteFileEntry;
 /// </summary>
 public class DeleteFileEntryCommandHandler : IRequestHandler<DeleteFileEntryCommand, CloudEmpty>
 {
-    private readonly CloudHierarchyStorage _storage;
+    private readonly ICloudHierarchyStorage _storage;
     private readonly UserContext _userContext;
     private readonly ILogger<DeleteFileEntryCommandHandler> _logger;
 
     public DeleteFileEntryCommandHandler(
-        CloudHierarchyStorage storage,
+        ICloudHierarchyStorage storage,
         UserContext userContext,
         ILogger<DeleteFileEntryCommandHandler> logger)
     {

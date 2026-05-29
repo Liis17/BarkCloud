@@ -7,10 +7,10 @@ namespace BarkCloud.Configuration.Features.UpdateReservedName;
 
 public class UpdateReservedNameCommandHandler : IRequestHandler<UpdateReservedNameCommand, UpdateReservedNameResponse>
 {
-    private readonly ConfigurationStorage _configurationStorage;
+    private readonly IConfigurationStorage _configurationStorage;
     private readonly ILogger<UpdateReservedNameCommandHandler> _logger;
 
-    public UpdateReservedNameCommandHandler(ConfigurationStorage configurationStorage, ILogger<UpdateReservedNameCommandHandler> logger)
+    public UpdateReservedNameCommandHandler(IConfigurationStorage configurationStorage, ILogger<UpdateReservedNameCommandHandler> logger)
     {
         _configurationStorage = configurationStorage;
         _logger = logger;

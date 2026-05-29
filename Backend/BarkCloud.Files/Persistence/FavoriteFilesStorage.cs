@@ -8,7 +8,7 @@ namespace BarkCloud.Files.Persistence;
 /// Хранилище избранных файлов пользователя. Структурно повторяет item-методы
 /// <see cref="AlbumStorage"/>, но без привязки к альбому.
 /// </summary>
-public class FavoriteFilesStorage
+public class FavoriteFilesStorage : IFavoriteFilesStorage
 {
     private readonly FilesContext _context;
 

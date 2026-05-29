@@ -11,12 +11,12 @@ namespace BarkCloud.Files.Features.Cloud.MoveFileEntry;
 
 public class MoveFileEntryCommandHandler : IRequestHandler<MoveFileEntryCommand, CloudEmpty>
 {
-    private readonly CloudHierarchyStorage _storage;
+    private readonly ICloudHierarchyStorage _storage;
     private readonly UserContext _userContext;
     private readonly ILogger<MoveFileEntryCommandHandler> _logger;
 
     public MoveFileEntryCommandHandler(
-        CloudHierarchyStorage storage,
+        ICloudHierarchyStorage storage,
         UserContext userContext,
         ILogger<MoveFileEntryCommandHandler> logger)
     {

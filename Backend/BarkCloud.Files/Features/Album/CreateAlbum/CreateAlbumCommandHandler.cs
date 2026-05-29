@@ -12,12 +12,12 @@ namespace BarkCloud.Files.Features.Album.CreateAlbum;
 
 public class CreateAlbumCommandHandler : IRequestHandler<CreateAlbumCommand, AlbumInfo>
 {
-    private readonly AlbumStorage _storage;
+    private readonly IAlbumStorage _storage;
     private readonly UserContext _userContext;
     private readonly ILogger<CreateAlbumCommandHandler> _logger;
 
     public CreateAlbumCommandHandler(
-        AlbumStorage storage,
+        IAlbumStorage storage,
         UserContext userContext,
         ILogger<CreateAlbumCommandHandler> logger)
     {
