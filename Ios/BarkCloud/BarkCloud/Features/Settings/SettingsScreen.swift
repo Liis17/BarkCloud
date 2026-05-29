@@ -78,6 +78,13 @@ struct SettingsScreen: View {
                         settingsRow(icon: "internaldrive", titleKey: "settings_cache")
                     }
                     .buttonStyle(.plain)
+
+                    NavigationLink {
+                        VaultScreen()
+                    } label: {
+                        settingsRow(icon: "lock.shield.fill", titleKey: "settings_vault")
+                    }
+                    .buttonStyle(.plain)
                 }
 
                 storageCard(vm)

@@ -11,6 +11,7 @@
 		32BDE9A921AD34C08CED5B7E /* SwiftProtobuf in Frameworks */ = {isa = PBXBuildFile; productRef = 4B8BC114DB34C1463871A262 /* SwiftProtobuf */; };
 		478C228E2417FC9B7E777D5C /* GRPCCore in Frameworks */ = {isa = PBXBuildFile; productRef = CE6AA630EBC1B681204291DB /* GRPCCore */; };
 		47EF6BDC60833D3F2ADF3D8F /* GRPCNIOTransportHTTP2 in Frameworks */ = {isa = PBXBuildFile; productRef = B516B9C7010DED413CF2FD27 /* GRPCNIOTransportHTTP2 */; };
+		5EA0000000000000000000FD /* ShareExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 5EA0000000000000000000F6 /* ShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -21,11 +22,33 @@
 			remoteGlobalIDString = 23AF708B2FBBAEED006005AF;
 			remoteInfo = BarkCloud;
 		};
+		5EA0000000000000000000FA /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 23AF70842FBBAEED006005AF /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 5EA0000000000000000000F1;
+			remoteInfo = ShareExtension;
+		};
 /* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		5EA0000000000000000000FC /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				5EA0000000000000000000FD /* ShareExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		23AF708C2FBBAEED006005AF /* BarkCloud.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BarkCloud.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		CA11000000000000000000A2 /* BarkCloudTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BarkCloudTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		5EA0000000000000000000F6 /* ShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -37,6 +60,11 @@
 		CA11000000000000000000A7 /* BarkCloudTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = BarkCloudTests;
+			sourceTree = "<group>";
+		};
+		5EA0000000000000000000F5 /* ShareExtension */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = ShareExtension;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -60,6 +88,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		5EA0000000000000000000F8 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -68,6 +103,7 @@
 			children = (
 				23AF708E2FBBAEED006005AF /* BarkCloud */,
 				CA11000000000000000000A7 /* BarkCloudTests */,
+				5EA0000000000000000000F5 /* ShareExtension */,
 				23AF708D2FBBAEED006005AF /* Products */,
 			);
 			sourceTree = "<group>";
@@ -77,6 +113,7 @@
 			children = (
 				23AF708C2FBBAEED006005AF /* BarkCloud.app */,
 				CA11000000000000000000A2 /* BarkCloudTests.xctest */,
+				5EA0000000000000000000F6 /* ShareExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -92,10 +129,12 @@
 				23AF70882FBBAEED006005AF /* Sources */,
 				23AF70892FBBAEED006005AF /* Frameworks */,
 				23AF708A2FBBAEED006005AF /* Resources */,
+				5EA0000000000000000000FC /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				5EA0000000000000000000FB /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				23AF708E2FBBAEED006005AF /* BarkCloud */,
@@ -133,6 +172,28 @@
 			productReference = CA11000000000000000000A2 /* BarkCloudTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		5EA0000000000000000000F1 /* ShareExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5EA0000000000000000000F2 /* Build configuration list for PBXNativeTarget "ShareExtension" */;
+			buildPhases = (
+				5EA0000000000000000000F7 /* Sources */,
+				5EA0000000000000000000F8 /* Frameworks */,
+				5EA0000000000000000000F9 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				5EA0000000000000000000F5 /* ShareExtension */,
+			);
+			name = ShareExtension;
+			packageProductDependencies = (
+			);
+			productName = ShareExtension;
+			productReference = 5EA0000000000000000000F6 /* ShareExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -149,6 +210,9 @@
 					CA11000000000000000000A1 = {
 						CreatedOnToolsVersion = 26.4.1;
 						TestTargetID = 23AF708B2FBBAEED006005AF;
+					};
+					5EA0000000000000000000F1 = {
+						CreatedOnToolsVersion = 26.4.1;
 					};
 				};
 			};
@@ -175,12 +239,20 @@
 			targets = (
 				23AF708B2FBBAEED006005AF /* BarkCloud */,
 				CA11000000000000000000A1 /* BarkCloudTests */,
+				5EA0000000000000000000F1 /* ShareExtension */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		23AF708A2FBBAEED006005AF /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5EA0000000000000000000F9 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -226,6 +298,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		5EA0000000000000000000F7 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -233,6 +312,11 @@
 			isa = PBXTargetDependency;
 			target = 23AF708B2FBBAEED006005AF /* BarkCloud */;
 			targetProxy = CA11000000000000000000A9 /* PBXContainerItemProxy */;
+		};
+		5EA0000000000000000000FB /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 5EA0000000000000000000F1 /* ShareExtension */;
+			targetProxy = 5EA0000000000000000000FA /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -358,6 +442,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = BarkCloud/BarkCloud.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 9Y935NYUP9;
@@ -367,6 +452,7 @@
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSFaceIDUsageDescription = "Face ID используется для разблокировки сейфа с защищёнными фото.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Доступ к медиатеке нужен, чтобы показывать ваши фото и видео и загружать выбранные в облако.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
@@ -400,6 +486,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = BarkCloud/BarkCloud.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 9Y935NYUP9;
@@ -409,6 +496,7 @@
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSFaceIDUsageDescription = "Face ID используется для разблокировки сейфа с защищёнными фото.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Доступ к медиатеке нужен, чтобы показывать ваши фото и видео и загружать выбранные в облако.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
@@ -479,6 +567,62 @@
 			};
 			name = Release;
 		};
+		5EA0000000000000000000F3 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = ShareExtension/ShareExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 9Y935NYUP9;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = ShareExtension/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.barkfluff.BarkCloud.ShareExtension;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		5EA0000000000000000000F4 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = ShareExtension/ShareExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 9Y935NYUP9;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = ShareExtension/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.barkfluff.BarkCloud.ShareExtension;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -505,6 +649,15 @@
 			buildConfigurations = (
 				CA11000000000000000000A5 /* Debug */,
 				CA11000000000000000000A6 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		5EA0000000000000000000F2 /* Build configuration list for PBXNativeTarget "ShareExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5EA0000000000000000000F3 /* Debug */,
+				5EA0000000000000000000F4 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
