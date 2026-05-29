@@ -1,11 +1,9 @@
 import SwiftUI
 
 /// Кастомное контекстное меню по удержанию: пока палец прижат, ячейка
-/// начинает плавно «тряситься» — амплитуда, частота тряски и сила слабой
-/// вибрации растут по нарастающей кривой. В момент срабатывания длинного
-/// нажатия — резкий тяжёлый удар вибрации, тряска останавливается, ячейка
-/// слегка приподнята, появляется меню. В режиме мультивыбора
-/// (`isActive == false`) жест отключён.
+/// «трясётся» с нарастающей амплитудой и слабой вибрацией, в момент
+/// срабатывания длинного нажатия — тяжёлый удар и появляется меню.
+/// В режиме мультивыбора (`isActive == false`) жест отключён.
 private struct ShakeContextMenuModifier<MenuContent: View>: ViewModifier {
     let isActive: Bool
     @ViewBuilder let menu: () -> MenuContent
@@ -22,9 +20,7 @@ private struct ShakeContextMenuModifier<MenuContent: View>: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .scaleEffect(raised ? 1.09 : 1.0)
             .rotationEffect(.degrees(shakeAngle))
-            .animation(.spring(response: 0.28, dampingFraction: 0.7), value: raised)
             .sensoryFeedback(.impact(weight: .light, intensity: hapticIntensity), trigger: lightTick)
             .sensoryFeedback(.impact(weight: .heavy, intensity: 1.0), trigger: menuTick)
             .onLongPressGesture(minimumDuration: 0.4) {
@@ -62,7 +58,7 @@ private struct ShakeContextMenuModifier<MenuContent: View>: ViewModifier {
                 let elapsed = Date().timeIntervalSince(started)
                 let progress = min(elapsed / total, 1.0)
                 let curve = progress * progress
-                let amp = 0.8 + 2.2 * curve
+                let amp = 0.4 + 0.8 * curve
                 let sign: Double = (step % 2 == 0) ? 1.0 : -1.0
                 withAnimation(.easeInOut(duration: 0.045)) {
                     shakeAngle = sign * amp
