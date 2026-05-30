@@ -72,7 +72,11 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
                     info.IsDirectory = true;
                     return DokanResult.Success;
                 }
-                catch { return DokanResult.Error; }
+                catch (Exception ex)
+                {
+                    EngineLog.Error($"CreateDirectory(\"{fileName}\")", ex);
+                    return DokanResult.Error;
+                }
             }
 
             return DokanResult.PathNotFound;
@@ -102,7 +106,11 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
                 info.Context = OpenExistingForWrite(node, truncate: mode is FileMode.Create or FileMode.Truncate);
                 return DokanResult.Success;
             }
-            catch { return DokanResult.Error; }
+            catch (Exception ex)
+            {
+                EngineLog.Error($"OpenForWrite(\"{fileName}\")", ex);
+                return DokanResult.Error;
+            }
         }
 
         // ───────── новый файл ─────────
@@ -116,7 +124,11 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
                 info.Context = OpenNew(parent.Value.DirectoryId, parent.Value.Name);
                 return DokanResult.Success;
             }
-            catch { return DokanResult.Error; }
+            catch (Exception ex)
+            {
+                EngineLog.Error($"CreateFile(\"{fileName}\")", ex);
+                return DokanResult.Error;
+            }
         }
 
         return DokanResult.FileNotFound;
@@ -131,9 +143,10 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
             else if (info.Context is WriteSession { Persisted: false } ws && (ws.IsNew || ws.Modified))
                 PersistSession(ws);
         }
-        catch
+        catch (Exception ex)
         {
-            // не удалось сохранить/удалить — проглатываем (диск не должен падать)
+            // диск не должен падать, но причину фиксируем
+            EngineLog.Error($"Cleanup(\"{fileName}\")", ex);
         }
     }
 
@@ -169,7 +182,11 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
             bytesRead = _gateway.Read(node.FileId, buffer, offset);
             return DokanResult.Success;
         }
-        catch { return DokanResult.Error; }
+        catch (Exception ex)
+        {
+            EngineLog.Error($"ReadFile(\"{fileName}\")", ex);
+            return DokanResult.Error;
+        }
     }
 
     public NtStatus WriteFile(string fileName, byte[] buffer, out int bytesWritten, long offset, IDokanFileInfo info)
@@ -231,7 +248,11 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
 
         DirectoryListingDetailed listing;
         try { listing = _gateway.ListDirectory(node.DirectoryId); }
-        catch { return DokanResult.Error; }
+        catch (Exception ex)
+        {
+            EngineLog.Error($"FindFiles(\"{fileName}\")", ex);
+            return DokanResult.Error;
+        }
 
         foreach (var d in listing.Subdirs)
             files.Add(new FileInformation
@@ -316,7 +337,11 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
             _gateway.InvalidateListing(to.Value.DirectoryId);
             return DokanResult.Success;
         }
-        catch { return DokanResult.Error; }
+        catch (Exception ex)
+        {
+            EngineLog.Error($"MoveFile(\"{oldName}\" → \"{newName}\")", ex);
+            return DokanResult.Error;
+        }
     }
 
     public NtStatus DeleteFile(string fileName, IDokanFileInfo info) => DokanResult.Success;
@@ -400,7 +425,8 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
     private WriteSession OpenNew(string directoryId, string name)
     {
         var temp = Path.Combine(_writeDir, Guid.NewGuid().ToString("N"));
-        var stream = new FileStream(temp, FileMode.Create, System.IO.FileAccess.ReadWrite, FileShare.None);
+        // FileShare.Read: на Cleanup аплоад открывает второй (read) хэндл к этому же файлу.
+        var stream = new FileStream(temp, FileMode.Create, System.IO.FileAccess.ReadWrite, FileShare.Read);
         return new WriteSession { Name = name, DirectoryId = directoryId, TempPath = temp, Stream = stream };
     }
 
@@ -410,7 +436,7 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
         if (!truncate)
             _gateway.DownloadToAsync(node.FileId, temp).GetAwaiter().GetResult(); // гидрация для частичных правок
 
-        var stream = new FileStream(temp, FileMode.OpenOrCreate, System.IO.FileAccess.ReadWrite, FileShare.None);
+        var stream = new FileStream(temp, FileMode.OpenOrCreate, System.IO.FileAccess.ReadWrite, FileShare.Read);
         return new WriteSession
         {
             Name = node.Name,
@@ -444,6 +470,7 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
 
         _gateway.InvalidateListing(ws.DirectoryId);
         ws.Persisted = true;
+        EngineLog.Info($"Сохранён файл «{ws.Name}» (fileId={fileId})");
     }
 
     private void DeleteNode(string fileName)

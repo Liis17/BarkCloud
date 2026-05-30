@@ -20,6 +20,7 @@ public class UploadFileCommandHandlerTests
     private readonly Mock<S3Uploader> _s3;
     private readonly Mock<ImageCompressor> _imageCompressor;
     private readonly Mock<VideoThumbnailExtractor> _videoExtractor;
+    private readonly Mock<HeicImageConverter> _heicConverter;
     private readonly Mock<PreviewPersistenceService> _previewPersistence;
 
     public UploadFileCommandHandlerTests()
@@ -33,6 +34,7 @@ public class UploadFileCommandHandlerTests
 
         _imageCompressor = new Mock<ImageCompressor>();
         _videoExtractor = new Mock<VideoThumbnailExtractor>(NullLogger<VideoThumbnailExtractor>.Instance);
+        _heicConverter = new Mock<HeicImageConverter>(NullLogger<HeicImageConverter>.Instance);
         _previewPersistence = new Mock<PreviewPersistenceService>(
             _files.Object, _hashes.Object, _s3.Object, /* FilesContext */ null!,
             NullLogger<PreviewPersistenceService>.Instance);
@@ -40,8 +42,8 @@ public class UploadFileCommandHandlerTests
 
     private UploadFileCommandHandler CreateSut() => new(
         _files.Object, _hashes.Object, _s3.Object, _bucketRegistry.Object,
-        _imageCompressor.Object, _videoExtractor.Object, _previewPersistence.Object,
-        NullLogger<UploadFileCommandHandler>.Instance);
+        _imageCompressor.Object, _videoExtractor.Object, _heicConverter.Object,
+        _previewPersistence.Object, NullLogger<UploadFileCommandHandler>.Instance);
 
     private static Stream MakeStream(string content = "hello") => new MemoryStream(System.Text.Encoding.UTF8.GetBytes(content));
 
@@ -110,6 +112,31 @@ public class UploadFileCommandHandlerTests
             Times.Once);
         _files.Verify(s => s.UpdateFile(It.Is<UploadFileEntity>(f => f.Etag == "etag-123" && f.Filename == "doc.txt")), Times.Once);
         _hashes.Verify(s => s.AddHash(It.Is<FileHash>(h => h.FileId == id)), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_HeicFile_ConvertsToJpegBeforeUpload()
+    {
+        var id = Guid.NewGuid();
+        _files.Setup(s => s.GetFile(id))
+            .ReturnsAsync(new UploadFileEntity { Id = id, Type = UploadFileType.CloudFile, Uploaders = new() { 42 } });
+        _hashes.Setup(s => s.GetFileIdByHash(It.IsAny<string>())).ReturnsAsync((Guid?)null);
+
+        var jpegBytes = System.Text.Encoding.UTF8.GetBytes("jpeg-bytes");
+        _heicConverter
+            .Setup(c => c.ConvertToJpegAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(jpegBytes);
+
+        var response = await CreateSut().Handle(
+            new UploadFileCommand { FileId = id, FileName = "photo.heic", FileStream = MakeStream() }, default);
+
+        response.Should().Be(id.ToString());
+        _heicConverter.Verify(c => c.ConvertToJpegAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
+        // Оригинал заливается уже как JPEG, имя меняется на .jpg.
+        _s3.Verify(
+            s => s.UploadAsync("test-bucket", id.ToString(), It.IsAny<Stream>(), "image/jpeg"),
+            Times.Once);
+        _files.Verify(s => s.UpdateFile(It.Is<UploadFileEntity>(f => f.Filename == "photo.jpg")), Times.Once);
     }
 
     [Fact]

@@ -26,6 +26,11 @@ public sealed class DriveEngine : IDriveEngine
 
     public async Task<EngineStatus> LoginAsync(string login, string password, string? otpCode)
     {
+        // Пустой логин → сервер кинул бы FailedPrecondition «Не передан ни логин ни email».
+        // Отсекаем здесь: при восстановленной из refresh.bin сессии вход вообще не нужен.
+        if (string.IsNullOrWhiteSpace(login) || string.IsNullOrWhiteSpace(password))
+            return ErrorMessage("Введите логин и пароль");
+
         try
         {
             await _tokens.LoginAsync(login, password, otpCode);
@@ -119,6 +124,7 @@ public sealed class DriveEngine : IDriveEngine
 
     private EngineStatus Error(Exception ex)
     {
+        EngineLog.Error("DriveEngine", ex);
         var status = Status(null);
         status.Error = ex is RpcException rpc ? rpc.Status.Detail : ex.Message;
         return status;
