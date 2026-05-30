@@ -39,8 +39,8 @@ BarkCloud/
 ├── Data/Users/
 │   └── UserRepository.swift        UsersApi: профиль, имя/юзернейм/bio, приватность, устройства, удаление аккаунта, аватар (через FileTransferService)
 ├── Data/Cloud/
-│   ├── CloudModels.swift           доменные модели UI: MediaAsset, MediaPage, CloudDirectory, CloudFileEntry, AlbumCard, PathCrumb (+ Timestamp.date)
-│   ├── CloudRepository.swift       CloudApi: ListUserMedia, ListDirectoryDetailed, GetPath, CRUD папок/записей, uploadFile
+│   ├── CloudModels.swift           доменные модели UI: MediaAsset, MediaPage, CloudDirectory, CloudFileEntry, AlbumCard, PathCrumb, **CloudFileMetadata** (плоская копия `FileMetadataInfo` с optional-полями) (+ Timestamp.date)
+│   ├── CloudRepository.swift       CloudApi: ListUserMedia, ListDirectoryDetailed, GetPath, CRUD папок/записей, uploadFile, **getFileMetadata(fileID:)** (nil при `has_metadata=false`)
 │   └── AlbumRepository.swift       AlbumApi: список/содержимое альбомов, create/update/delete, add/remove items
 ├── Data/Cache/                     **постоянный дисковый кеш файлов** ([[ios-file-cache]]): CacheVariant, CachedFileEntry (SwiftData @Model), FileCacheService (actor), FileCacheSettings
 ├── Features/
@@ -302,6 +302,14 @@ BarkCloud/
   `PHAssetChangeRequest.deleteAssets`). **Экран свойств** (`Features/Shared/FilePropertiesSheet.swift`,
   enum-вход `.cloud(MediaAsset)`/`.device(PHAsset)`) — имя/тип/размер/разрешение/даты/ID (как веб-модалка,
   где есть данные); `MediaAsset` расширен полями `imageWidth/imageHeight/uploadedAt/etag` из `UploadFileInfo`.
+  Для `.cloud` дополнительно через `.task` асинхронно подгружает расширенные метаданные блоба
+  (`CloudRepository.getFileMetadata(fileID:)` → `CloudApi.GetFileMetadata`) и отрисовывает их секциями
+  `List` поверх базовых полей: **Общее** (taken_at, creator_tool), **Камера** (make+model одной строкой,
+  lens), **Параметры съёмки** (focal_length мм, f/N, выдержка `1/N с`/`X.X с`, ISO, вспышка Да/Нет),
+  **Видео** (длительность mm:ss/h:mm:ss, video/audio codec uppercase, битрейт Мбит/с или кбит/с, fps),
+  **Геолокация** (координаты с 6 знаками после точки, высота в м) и **Документ** (title, author, subject,
+  pages). При `has_metadata=false` (легаси-блобы без бэкафилла, либо файл без EXIF/ffprobe-полей) — секции
+  не показываются, базовые поля остаются.
   На Галерее устройства у `PHAsset` нет `file_id` — `GalleryViewModel.ensureCloudFileID(for:)` резолвит его
   по SHA256 (`cachedSHA256` → `CloudApi.CheckFileHash`, одиночный), а при отсутствии заливает оригинал
   (дедуп по хешу) в авто-папку «Недавно загруженные»; на время резолва — оверлей `isUploading`.

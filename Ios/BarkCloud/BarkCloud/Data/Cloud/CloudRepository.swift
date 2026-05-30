@@ -71,6 +71,17 @@ final class CloudRepository: Sendable {
         return resp.fileID.isEmpty ? nil : resp.fileID
     }
 
+    /// Расширенные метаданные блоба (EXIF / ffprobe / PDF / Office). `nil`, если
+    /// сервер ещё не извлёк (или нечего извлекать) — экран свойств в этом случае
+    /// показывает только базовые поля.
+    func getFileMetadata(fileID: String) async throws -> CloudFileMetadata? {
+        let stub = try await grpc.filesStub()
+        var req = Barkcloud_Files_GetFileMetadataRequest()
+        req.fileID = fileID
+        let resp = try await stub.getFileMetadata(req)
+        return resp.hasMetadata ? CloudFileMetadata(resp.metadata) : nil
+    }
+
     // MARK: - Публичные ссылки
 
     /// Создать постоянную публичную share-ссылку на свой файл. URL собирается на

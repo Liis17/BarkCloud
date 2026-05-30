@@ -77,6 +77,73 @@ struct MediaAsset: Identifiable, Hashable, Sendable {
     }
 }
 
+/// Расширенные метаданные файла (зеркалит `FileMetadataInfo`). Все поля
+/// опциональны — отображаются только те, что заполнены сервером.
+struct CloudFileMetadata: Sendable {
+    // Общие
+    let takenAt: Date?
+    let creatorTool: String?
+
+    // GPS
+    let latitude: Double?
+    let longitude: Double?
+    let altitude: Double?
+
+    // Камера
+    let cameraMake: String?
+    let cameraModel: String?
+    let lensModel: String?
+
+    // Параметры съёмки
+    let focalLengthMm: Double?
+    let fNumber: Double?
+    let exposureTimeSeconds: Double?
+    let iso: Int?
+    let orientation: Int?
+    let flash: Bool?
+
+    // Видео
+    let durationSeconds: Double?
+    let videoCodec: String?
+    let audioCodec: String?
+    let bitrate: Int64?
+    let frameRate: Double?
+
+    // Документ
+    let documentAuthor: String?
+    let documentTitle: String?
+    let documentSubject: String?
+    let documentPageCount: Int?
+
+    init(_ m: Barkcloud_Files_FileMetadataInfo) {
+        takenAt = m.hasTakenAt ? m.takenAt.date : nil
+        creatorTool = m.hasCreatorTool ? m.creatorTool : nil
+        latitude = m.hasLatitude ? m.latitude : nil
+        longitude = m.hasLongitude ? m.longitude : nil
+        altitude = m.hasAltitude ? m.altitude : nil
+        cameraMake = m.hasCameraMake ? m.cameraMake : nil
+        cameraModel = m.hasCameraModel ? m.cameraModel : nil
+        lensModel = m.hasLensModel ? m.lensModel : nil
+        focalLengthMm = m.hasFocalLengthMm ? m.focalLengthMm : nil
+        fNumber = m.hasFNumber ? m.fNumber : nil
+        exposureTimeSeconds = m.hasExposureTimeSeconds ? m.exposureTimeSeconds : nil
+        iso = m.hasIso ? Int(m.iso) : nil
+        orientation = m.hasOrientation ? Int(m.orientation) : nil
+        flash = m.hasFlash ? m.flash : nil
+        durationSeconds = m.hasDurationSeconds ? m.durationSeconds : nil
+        videoCodec = m.hasVideoCodec ? m.videoCodec : nil
+        audioCodec = m.hasAudioCodec ? m.audioCodec : nil
+        bitrate = m.hasBitrate ? m.bitrate : nil
+        frameRate = m.hasFrameRate ? m.frameRate : nil
+        documentAuthor = m.hasDocumentAuthor ? m.documentAuthor : nil
+        documentTitle = m.hasDocumentTitle ? m.documentTitle : nil
+        documentSubject = m.hasDocumentSubject ? m.documentSubject : nil
+        documentPageCount = m.hasDocumentPageCount ? Int(m.documentPageCount) : nil
+    }
+
+    var hasCoordinates: Bool { latitude != nil && longitude != nil }
+}
+
 /// Публичная share-ссылка на файл (зеркалит `ShareInfo`). `url` собирается на
 /// клиенте: `{webHost}/s/{token}` (бэкенд готовый URL не отдаёт).
 struct ShareLink: Identifiable, Hashable, Sendable {

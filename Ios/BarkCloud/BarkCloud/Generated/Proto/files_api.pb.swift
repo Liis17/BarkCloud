@@ -352,6 +352,273 @@ struct Barkcloud_Files_FilePreviewInfo: Sendable {
   init() {}
 }
 
+struct Barkcloud_Files_GetFileMetadataRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var fileID: String = String()
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+}
+
+struct Barkcloud_Files_GetFileMetadataResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  /// false — для файла не извлечено ни одного поля (или ещё не успели)
+  var hasMetadata_p: Bool = false
+
+  /// заполнено только при has_metadata=true
+  var metadata: Barkcloud_Files_FileMetadataInfo {
+    get {_metadata ?? Barkcloud_Files_FileMetadataInfo()}
+    set {_metadata = newValue}
+  }
+  /// Returns true if `metadata` has been explicitly set.
+  var hasMetadata: Bool {self._metadata != nil}
+  /// Clears the value of `metadata`. Subsequent reads from it will return its default value.
+  mutating func clearMetadata() {self._metadata = nil}
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+
+  fileprivate var _metadata: Barkcloud_Files_FileMetadataInfo? = nil
+}
+
+/// Все поля опциональны (через optional) — клиент должен показывать только заданные.
+struct Barkcloud_Files_FileMetadataInfo: @unchecked Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  /// Общие
+  var takenAt: SwiftProtobuf.Google_Protobuf_Timestamp {
+    get {_storage._takenAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_uniqueStorage()._takenAt = newValue}
+  }
+  /// Returns true if `takenAt` has been explicitly set.
+  var hasTakenAt: Bool {_storage._takenAt != nil}
+  /// Clears the value of `takenAt`. Subsequent reads from it will return its default value.
+  mutating func clearTakenAt() {_uniqueStorage()._takenAt = nil}
+
+  /// Программа создания/редактирования
+  var creatorTool: String {
+    get {_storage._creatorTool ?? String()}
+    set {_uniqueStorage()._creatorTool = newValue}
+  }
+  /// Returns true if `creatorTool` has been explicitly set.
+  var hasCreatorTool: Bool {_storage._creatorTool != nil}
+  /// Clears the value of `creatorTool`. Subsequent reads from it will return its default value.
+  mutating func clearCreatorTool() {_uniqueStorage()._creatorTool = nil}
+
+  /// GPS
+  var latitude: Double {
+    get {_storage._latitude ?? 0}
+    set {_uniqueStorage()._latitude = newValue}
+  }
+  /// Returns true if `latitude` has been explicitly set.
+  var hasLatitude: Bool {_storage._latitude != nil}
+  /// Clears the value of `latitude`. Subsequent reads from it will return its default value.
+  mutating func clearLatitude() {_uniqueStorage()._latitude = nil}
+
+  var longitude: Double {
+    get {_storage._longitude ?? 0}
+    set {_uniqueStorage()._longitude = newValue}
+  }
+  /// Returns true if `longitude` has been explicitly set.
+  var hasLongitude: Bool {_storage._longitude != nil}
+  /// Clears the value of `longitude`. Subsequent reads from it will return its default value.
+  mutating func clearLongitude() {_uniqueStorage()._longitude = nil}
+
+  /// Метры; отрицательно — ниже уровня моря
+  var altitude: Double {
+    get {_storage._altitude ?? 0}
+    set {_uniqueStorage()._altitude = newValue}
+  }
+  /// Returns true if `altitude` has been explicitly set.
+  var hasAltitude: Bool {_storage._altitude != nil}
+  /// Clears the value of `altitude`. Subsequent reads from it will return its default value.
+  mutating func clearAltitude() {_uniqueStorage()._altitude = nil}
+
+  /// Камера
+  var cameraMake: String {
+    get {_storage._cameraMake ?? String()}
+    set {_uniqueStorage()._cameraMake = newValue}
+  }
+  /// Returns true if `cameraMake` has been explicitly set.
+  var hasCameraMake: Bool {_storage._cameraMake != nil}
+  /// Clears the value of `cameraMake`. Subsequent reads from it will return its default value.
+  mutating func clearCameraMake() {_uniqueStorage()._cameraMake = nil}
+
+  var cameraModel: String {
+    get {_storage._cameraModel ?? String()}
+    set {_uniqueStorage()._cameraModel = newValue}
+  }
+  /// Returns true if `cameraModel` has been explicitly set.
+  var hasCameraModel: Bool {_storage._cameraModel != nil}
+  /// Clears the value of `cameraModel`. Subsequent reads from it will return its default value.
+  mutating func clearCameraModel() {_uniqueStorage()._cameraModel = nil}
+
+  var lensModel: String {
+    get {_storage._lensModel ?? String()}
+    set {_uniqueStorage()._lensModel = newValue}
+  }
+  /// Returns true if `lensModel` has been explicitly set.
+  var hasLensModel: Bool {_storage._lensModel != nil}
+  /// Clears the value of `lensModel`. Subsequent reads from it will return its default value.
+  mutating func clearLensModel() {_uniqueStorage()._lensModel = nil}
+
+  /// Параметры съёмки
+  var focalLengthMm: Double {
+    get {_storage._focalLengthMm ?? 0}
+    set {_uniqueStorage()._focalLengthMm = newValue}
+  }
+  /// Returns true if `focalLengthMm` has been explicitly set.
+  var hasFocalLengthMm: Bool {_storage._focalLengthMm != nil}
+  /// Clears the value of `focalLengthMm`. Subsequent reads from it will return its default value.
+  mutating func clearFocalLengthMm() {_uniqueStorage()._focalLengthMm = nil}
+
+  var fNumber: Double {
+    get {_storage._fNumber ?? 0}
+    set {_uniqueStorage()._fNumber = newValue}
+  }
+  /// Returns true if `fNumber` has been explicitly set.
+  var hasFNumber: Bool {_storage._fNumber != nil}
+  /// Clears the value of `fNumber`. Subsequent reads from it will return its default value.
+  mutating func clearFNumber() {_uniqueStorage()._fNumber = nil}
+
+  var exposureTimeSeconds: Double {
+    get {_storage._exposureTimeSeconds ?? 0}
+    set {_uniqueStorage()._exposureTimeSeconds = newValue}
+  }
+  /// Returns true if `exposureTimeSeconds` has been explicitly set.
+  var hasExposureTimeSeconds: Bool {_storage._exposureTimeSeconds != nil}
+  /// Clears the value of `exposureTimeSeconds`. Subsequent reads from it will return its default value.
+  mutating func clearExposureTimeSeconds() {_uniqueStorage()._exposureTimeSeconds = nil}
+
+  var iso: Int32 {
+    get {_storage._iso ?? 0}
+    set {_uniqueStorage()._iso = newValue}
+  }
+  /// Returns true if `iso` has been explicitly set.
+  var hasIso: Bool {_storage._iso != nil}
+  /// Clears the value of `iso`. Subsequent reads from it will return its default value.
+  mutating func clearIso() {_uniqueStorage()._iso = nil}
+
+  /// EXIF Orientation 1..8
+  var orientation: Int32 {
+    get {_storage._orientation ?? 0}
+    set {_uniqueStorage()._orientation = newValue}
+  }
+  /// Returns true if `orientation` has been explicitly set.
+  var hasOrientation: Bool {_storage._orientation != nil}
+  /// Clears the value of `orientation`. Subsequent reads from it will return its default value.
+  mutating func clearOrientation() {_uniqueStorage()._orientation = nil}
+
+  var flash: Bool {
+    get {_storage._flash ?? false}
+    set {_uniqueStorage()._flash = newValue}
+  }
+  /// Returns true if `flash` has been explicitly set.
+  var hasFlash: Bool {_storage._flash != nil}
+  /// Clears the value of `flash`. Subsequent reads from it will return its default value.
+  mutating func clearFlash() {_uniqueStorage()._flash = nil}
+
+  /// Видео
+  var durationSeconds: Double {
+    get {_storage._durationSeconds ?? 0}
+    set {_uniqueStorage()._durationSeconds = newValue}
+  }
+  /// Returns true if `durationSeconds` has been explicitly set.
+  var hasDurationSeconds: Bool {_storage._durationSeconds != nil}
+  /// Clears the value of `durationSeconds`. Subsequent reads from it will return its default value.
+  mutating func clearDurationSeconds() {_uniqueStorage()._durationSeconds = nil}
+
+  var videoCodec: String {
+    get {_storage._videoCodec ?? String()}
+    set {_uniqueStorage()._videoCodec = newValue}
+  }
+  /// Returns true if `videoCodec` has been explicitly set.
+  var hasVideoCodec: Bool {_storage._videoCodec != nil}
+  /// Clears the value of `videoCodec`. Subsequent reads from it will return its default value.
+  mutating func clearVideoCodec() {_uniqueStorage()._videoCodec = nil}
+
+  var audioCodec: String {
+    get {_storage._audioCodec ?? String()}
+    set {_uniqueStorage()._audioCodec = newValue}
+  }
+  /// Returns true if `audioCodec` has been explicitly set.
+  var hasAudioCodec: Bool {_storage._audioCodec != nil}
+  /// Clears the value of `audioCodec`. Subsequent reads from it will return its default value.
+  mutating func clearAudioCodec() {_uniqueStorage()._audioCodec = nil}
+
+  /// бит/с
+  var bitrate: Int64 {
+    get {_storage._bitrate ?? 0}
+    set {_uniqueStorage()._bitrate = newValue}
+  }
+  /// Returns true if `bitrate` has been explicitly set.
+  var hasBitrate: Bool {_storage._bitrate != nil}
+  /// Clears the value of `bitrate`. Subsequent reads from it will return its default value.
+  mutating func clearBitrate() {_uniqueStorage()._bitrate = nil}
+
+  var frameRate: Double {
+    get {_storage._frameRate ?? 0}
+    set {_uniqueStorage()._frameRate = newValue}
+  }
+  /// Returns true if `frameRate` has been explicitly set.
+  var hasFrameRate: Bool {_storage._frameRate != nil}
+  /// Clears the value of `frameRate`. Subsequent reads from it will return its default value.
+  mutating func clearFrameRate() {_uniqueStorage()._frameRate = nil}
+
+  /// Документ
+  var documentAuthor: String {
+    get {_storage._documentAuthor ?? String()}
+    set {_uniqueStorage()._documentAuthor = newValue}
+  }
+  /// Returns true if `documentAuthor` has been explicitly set.
+  var hasDocumentAuthor: Bool {_storage._documentAuthor != nil}
+  /// Clears the value of `documentAuthor`. Subsequent reads from it will return its default value.
+  mutating func clearDocumentAuthor() {_uniqueStorage()._documentAuthor = nil}
+
+  var documentTitle: String {
+    get {_storage._documentTitle ?? String()}
+    set {_uniqueStorage()._documentTitle = newValue}
+  }
+  /// Returns true if `documentTitle` has been explicitly set.
+  var hasDocumentTitle: Bool {_storage._documentTitle != nil}
+  /// Clears the value of `documentTitle`. Subsequent reads from it will return its default value.
+  mutating func clearDocumentTitle() {_uniqueStorage()._documentTitle = nil}
+
+  var documentSubject: String {
+    get {_storage._documentSubject ?? String()}
+    set {_uniqueStorage()._documentSubject = newValue}
+  }
+  /// Returns true if `documentSubject` has been explicitly set.
+  var hasDocumentSubject: Bool {_storage._documentSubject != nil}
+  /// Clears the value of `documentSubject`. Subsequent reads from it will return its default value.
+  mutating func clearDocumentSubject() {_uniqueStorage()._documentSubject = nil}
+
+  var documentPageCount: Int32 {
+    get {_storage._documentPageCount ?? 0}
+    set {_uniqueStorage()._documentPageCount = newValue}
+  }
+  /// Returns true if `documentPageCount` has been explicitly set.
+  var hasDocumentPageCount: Bool {_storage._documentPageCount != nil}
+  /// Clears the value of `documentPageCount`. Subsequent reads from it will return its default value.
+  mutating func clearDocumentPageCount() {_uniqueStorage()._documentPageCount = nil}
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+
+  fileprivate var _storage = _StorageClass.defaultInstance
+}
+
 struct Barkcloud_Files_GetUploadUrlRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -2219,6 +2486,299 @@ extension Barkcloud_Files_FilePreviewInfo: SwiftProtobuf.Message, SwiftProtobuf.
     if lhs.actualWidth != rhs.actualWidth {return false}
     if lhs.actualHeight != rhs.actualHeight {return false}
     if lhs.previewURL != rhs.previewURL {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Barkcloud_Files_GetFileMetadataRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".GetFileMetadataRequest"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}file_id\0")
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.fileID) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.fileID.isEmpty {
+      try visitor.visitSingularStringField(value: self.fileID, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: Barkcloud_Files_GetFileMetadataRequest, rhs: Barkcloud_Files_GetFileMetadataRequest) -> Bool {
+    if lhs.fileID != rhs.fileID {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Barkcloud_Files_GetFileMetadataResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".GetFileMetadataResponse"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}has_metadata\0\u{1}metadata\0")
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularBoolField(value: &self.hasMetadata_p) }()
+      case 2: try { try decoder.decodeSingularMessageField(value: &self._metadata) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if self.hasMetadata_p != false {
+      try visitor.visitSingularBoolField(value: self.hasMetadata_p, fieldNumber: 1)
+    }
+    try { if let v = self._metadata {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: Barkcloud_Files_GetFileMetadataResponse, rhs: Barkcloud_Files_GetFileMetadataResponse) -> Bool {
+    if lhs.hasMetadata_p != rhs.hasMetadata_p {return false}
+    if lhs._metadata != rhs._metadata {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Barkcloud_Files_FileMetadataInfo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".FileMetadataInfo"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}taken_at\0\u{3}creator_tool\0\u{1}latitude\0\u{1}longitude\0\u{1}altitude\0\u{3}camera_make\0\u{3}camera_model\0\u{3}lens_model\0\u{3}focal_length_mm\0\u{3}f_number\0\u{3}exposure_time_seconds\0\u{1}iso\0\u{1}orientation\0\u{1}flash\0\u{3}duration_seconds\0\u{3}video_codec\0\u{3}audio_codec\0\u{1}bitrate\0\u{3}frame_rate\0\u{3}document_author\0\u{3}document_title\0\u{3}document_subject\0\u{3}document_page_count\0")
+
+  fileprivate class _StorageClass {
+    var _takenAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+    var _creatorTool: String? = nil
+    var _latitude: Double? = nil
+    var _longitude: Double? = nil
+    var _altitude: Double? = nil
+    var _cameraMake: String? = nil
+    var _cameraModel: String? = nil
+    var _lensModel: String? = nil
+    var _focalLengthMm: Double? = nil
+    var _fNumber: Double? = nil
+    var _exposureTimeSeconds: Double? = nil
+    var _iso: Int32? = nil
+    var _orientation: Int32? = nil
+    var _flash: Bool? = nil
+    var _durationSeconds: Double? = nil
+    var _videoCodec: String? = nil
+    var _audioCodec: String? = nil
+    var _bitrate: Int64? = nil
+    var _frameRate: Double? = nil
+    var _documentAuthor: String? = nil
+    var _documentTitle: String? = nil
+    var _documentSubject: String? = nil
+    var _documentPageCount: Int32? = nil
+
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+
+    private init() {}
+
+    init(copying source: _StorageClass) {
+      _takenAt = source._takenAt
+      _creatorTool = source._creatorTool
+      _latitude = source._latitude
+      _longitude = source._longitude
+      _altitude = source._altitude
+      _cameraMake = source._cameraMake
+      _cameraModel = source._cameraModel
+      _lensModel = source._lensModel
+      _focalLengthMm = source._focalLengthMm
+      _fNumber = source._fNumber
+      _exposureTimeSeconds = source._exposureTimeSeconds
+      _iso = source._iso
+      _orientation = source._orientation
+      _flash = source._flash
+      _durationSeconds = source._durationSeconds
+      _videoCodec = source._videoCodec
+      _audioCodec = source._audioCodec
+      _bitrate = source._bitrate
+      _frameRate = source._frameRate
+      _documentAuthor = source._documentAuthor
+      _documentTitle = source._documentTitle
+      _documentSubject = source._documentSubject
+      _documentPageCount = source._documentPageCount
+    }
+  }
+
+  fileprivate mutating func _uniqueStorage() -> _StorageClass {
+    if !isKnownUniquelyReferenced(&_storage) {
+      _storage = _StorageClass(copying: _storage)
+    }
+    return _storage
+  }
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    _ = _uniqueStorage()
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      while let fieldNumber = try decoder.nextFieldNumber() {
+        // The use of inline closures is to circumvent an issue where the compiler
+        // allocates stack space for every case branch when no optimizations are
+        // enabled. https://github.com/apple/swift-protobuf/issues/1034
+        switch fieldNumber {
+        case 1: try { try decoder.decodeSingularMessageField(value: &_storage._takenAt) }()
+        case 2: try { try decoder.decodeSingularStringField(value: &_storage._creatorTool) }()
+        case 3: try { try decoder.decodeSingularDoubleField(value: &_storage._latitude) }()
+        case 4: try { try decoder.decodeSingularDoubleField(value: &_storage._longitude) }()
+        case 5: try { try decoder.decodeSingularDoubleField(value: &_storage._altitude) }()
+        case 6: try { try decoder.decodeSingularStringField(value: &_storage._cameraMake) }()
+        case 7: try { try decoder.decodeSingularStringField(value: &_storage._cameraModel) }()
+        case 8: try { try decoder.decodeSingularStringField(value: &_storage._lensModel) }()
+        case 9: try { try decoder.decodeSingularDoubleField(value: &_storage._focalLengthMm) }()
+        case 10: try { try decoder.decodeSingularDoubleField(value: &_storage._fNumber) }()
+        case 11: try { try decoder.decodeSingularDoubleField(value: &_storage._exposureTimeSeconds) }()
+        case 12: try { try decoder.decodeSingularInt32Field(value: &_storage._iso) }()
+        case 13: try { try decoder.decodeSingularInt32Field(value: &_storage._orientation) }()
+        case 14: try { try decoder.decodeSingularBoolField(value: &_storage._flash) }()
+        case 15: try { try decoder.decodeSingularDoubleField(value: &_storage._durationSeconds) }()
+        case 16: try { try decoder.decodeSingularStringField(value: &_storage._videoCodec) }()
+        case 17: try { try decoder.decodeSingularStringField(value: &_storage._audioCodec) }()
+        case 18: try { try decoder.decodeSingularInt64Field(value: &_storage._bitrate) }()
+        case 19: try { try decoder.decodeSingularDoubleField(value: &_storage._frameRate) }()
+        case 20: try { try decoder.decodeSingularStringField(value: &_storage._documentAuthor) }()
+        case 21: try { try decoder.decodeSingularStringField(value: &_storage._documentTitle) }()
+        case 22: try { try decoder.decodeSingularStringField(value: &_storage._documentSubject) }()
+        case 23: try { try decoder.decodeSingularInt32Field(value: &_storage._documentPageCount) }()
+        default: break
+        }
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every if/case branch local when no optimizations
+      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+      // https://github.com/apple/swift-protobuf/issues/1182
+      try { if let v = _storage._takenAt {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+      } }()
+      try { if let v = _storage._creatorTool {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 2)
+      } }()
+      try { if let v = _storage._latitude {
+        try visitor.visitSingularDoubleField(value: v, fieldNumber: 3)
+      } }()
+      try { if let v = _storage._longitude {
+        try visitor.visitSingularDoubleField(value: v, fieldNumber: 4)
+      } }()
+      try { if let v = _storage._altitude {
+        try visitor.visitSingularDoubleField(value: v, fieldNumber: 5)
+      } }()
+      try { if let v = _storage._cameraMake {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 6)
+      } }()
+      try { if let v = _storage._cameraModel {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 7)
+      } }()
+      try { if let v = _storage._lensModel {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 8)
+      } }()
+      try { if let v = _storage._focalLengthMm {
+        try visitor.visitSingularDoubleField(value: v, fieldNumber: 9)
+      } }()
+      try { if let v = _storage._fNumber {
+        try visitor.visitSingularDoubleField(value: v, fieldNumber: 10)
+      } }()
+      try { if let v = _storage._exposureTimeSeconds {
+        try visitor.visitSingularDoubleField(value: v, fieldNumber: 11)
+      } }()
+      try { if let v = _storage._iso {
+        try visitor.visitSingularInt32Field(value: v, fieldNumber: 12)
+      } }()
+      try { if let v = _storage._orientation {
+        try visitor.visitSingularInt32Field(value: v, fieldNumber: 13)
+      } }()
+      try { if let v = _storage._flash {
+        try visitor.visitSingularBoolField(value: v, fieldNumber: 14)
+      } }()
+      try { if let v = _storage._durationSeconds {
+        try visitor.visitSingularDoubleField(value: v, fieldNumber: 15)
+      } }()
+      try { if let v = _storage._videoCodec {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 16)
+      } }()
+      try { if let v = _storage._audioCodec {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 17)
+      } }()
+      try { if let v = _storage._bitrate {
+        try visitor.visitSingularInt64Field(value: v, fieldNumber: 18)
+      } }()
+      try { if let v = _storage._frameRate {
+        try visitor.visitSingularDoubleField(value: v, fieldNumber: 19)
+      } }()
+      try { if let v = _storage._documentAuthor {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 20)
+      } }()
+      try { if let v = _storage._documentTitle {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 21)
+      } }()
+      try { if let v = _storage._documentSubject {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 22)
+      } }()
+      try { if let v = _storage._documentPageCount {
+        try visitor.visitSingularInt32Field(value: v, fieldNumber: 23)
+      } }()
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: Barkcloud_Files_FileMetadataInfo, rhs: Barkcloud_Files_FileMetadataInfo) -> Bool {
+    if lhs._storage !== rhs._storage {
+      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
+        let _storage = _args.0
+        let rhs_storage = _args.1
+        if _storage._takenAt != rhs_storage._takenAt {return false}
+        if _storage._creatorTool != rhs_storage._creatorTool {return false}
+        if _storage._latitude != rhs_storage._latitude {return false}
+        if _storage._longitude != rhs_storage._longitude {return false}
+        if _storage._altitude != rhs_storage._altitude {return false}
+        if _storage._cameraMake != rhs_storage._cameraMake {return false}
+        if _storage._cameraModel != rhs_storage._cameraModel {return false}
+        if _storage._lensModel != rhs_storage._lensModel {return false}
+        if _storage._focalLengthMm != rhs_storage._focalLengthMm {return false}
+        if _storage._fNumber != rhs_storage._fNumber {return false}
+        if _storage._exposureTimeSeconds != rhs_storage._exposureTimeSeconds {return false}
+        if _storage._iso != rhs_storage._iso {return false}
+        if _storage._orientation != rhs_storage._orientation {return false}
+        if _storage._flash != rhs_storage._flash {return false}
+        if _storage._durationSeconds != rhs_storage._durationSeconds {return false}
+        if _storage._videoCodec != rhs_storage._videoCodec {return false}
+        if _storage._audioCodec != rhs_storage._audioCodec {return false}
+        if _storage._bitrate != rhs_storage._bitrate {return false}
+        if _storage._frameRate != rhs_storage._frameRate {return false}
+        if _storage._documentAuthor != rhs_storage._documentAuthor {return false}
+        if _storage._documentTitle != rhs_storage._documentTitle {return false}
+        if _storage._documentSubject != rhs_storage._documentSubject {return false}
+        if _storage._documentPageCount != rhs_storage._documentPageCount {return false}
+        return true
+      }
+      if !storagesAreEqual {return false}
+    }
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
