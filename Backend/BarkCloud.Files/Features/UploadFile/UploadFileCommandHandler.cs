@@ -21,6 +21,7 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
     private readonly S3BucketRegistry _bucketRegistry;
     private readonly ImageCompressor _imageCompressor;
     private readonly VideoThumbnailExtractor _videoThumbnailExtractor;
+    private readonly HeicImageConverter _heicConverter;
     private readonly PreviewPersistenceService _previewPersistence;
     private readonly ILogger<UploadFileCommandHandler> _logger;
 
@@ -45,6 +46,7 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
         S3BucketRegistry bucketRegistry,
         ImageCompressor imageCompressor,
         VideoThumbnailExtractor videoThumbnailExtractor,
+        HeicImageConverter heicConverter,
         PreviewPersistenceService previewPersistence,
         ILogger<UploadFileCommandHandler> logger)
     {
@@ -54,6 +56,7 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
         _bucketRegistry = bucketRegistry;
         _imageCompressor = imageCompressor;
         _videoThumbnailExtractor = videoThumbnailExtractor;
+        _heicConverter = heicConverter;
         _previewPersistence = previewPersistence;
         _logger = logger;
     }
@@ -95,14 +98,16 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
 
         var isImageType = file.Type == UploadFileType.UserAvatar;
         var isVideoContent = contentType.StartsWith("video/");
+        // HEIC/HEIF ImageSharp не декодирует — перекодируем в JPEG через ffmpeg (по файлу на диске).
+        var isHeic = contentType == "image/heic";
 
         Stream originalStream;
-        // Путь к временному файлу на диске. Нужен для видео (FFmpeg читает файл по пути),
+        // Путь к временному файлу на диске. Нужен для видео и HEIC (FFmpeg читает файл по пути),
         // а также используется для буферизации больших не-картинок. null = буфер в памяти.
         string? tempFilePath = null;
 
-        // Видео всегда кладём на диск (FFmpeg работает с файлом), как и большие не-картинки.
-        if (isVideoContent || (!isImageType && fileSize > 100 * 1024 * 1024))
+        // Видео и HEIC всегда кладём на диск (FFmpeg работает с файлом), как и большие не-картинки.
+        if (isVideoContent || isHeic || (!isImageType && fileSize > 100 * 1024 * 1024))
         {
             tempFilePath = Path.GetTempFileName();
             _logger.LogInformation("Файл {FileId} ({Size} МБ) буферизуется через диск", request.FileId, fileSize / 1024 / 1024);
@@ -134,6 +139,35 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "Не удалось удалить временный файл {TempPath}", tempFilePath);
+            }
+        }
+
+        // HEIC → JPEG: перекодируем оригинал до хеширования, чтобы дедуп, превью и веб-отдача
+        // работали с JPEG (браузеры HEIC не отображают, ImageSharp его не декодирует).
+        if (isHeic && tempFilePath is not null)
+        {
+            try
+            {
+                var jpegBytes = await _heicConverter.ConvertToJpegAsync(tempFilePath, cancellationToken);
+
+                await originalStream.DisposeAsync();
+                CleanupTempFile();
+                tempFilePath = null;
+
+                originalStream = new MemoryStream(jpegBytes);
+
+                // С этого момента файл — JPEG: имя, content-type и размер обновляем соответственно.
+                file.Filename = Path.ChangeExtension(file.Filename, ".jpg");
+                contentType = "image/jpeg";
+                fileSize = jpegBytes.Length;
+
+                _logger.LogInformation("HEIC {FileId} сконвертирован в JPEG ({Size} байт)", file.Id, jpegBytes.Length);
+            }
+            catch (Exception ex)
+            {
+                // Фолбэк: если ffmpeg не справился — грузим оригинальный HEIC как есть (как было раньше).
+                _logger.LogError(ex, "Не удалось сконвертировать HEIC {FileId} в JPEG, загружаю оригинал", file.Id);
+                originalStream.Position = 0;
             }
         }
 
