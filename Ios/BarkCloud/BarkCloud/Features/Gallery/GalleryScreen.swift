@@ -213,11 +213,46 @@ struct GalleryScreen: View {
                 Button {
                     showBackup = true
                 } label: {
-                    Image(systemName: "icloud")
+                    backupToolbarIcon
                 }
                 .accessibilityLabel(String(localized: "backup_title"))
             }
         }
+    }
+
+    /// Иконка облака в тулбаре. Кольцевой прогресс рисуется только пока есть что
+    /// загружать (`remainingCount > 0`). Когда очередь опустела — кольцо убирается,
+    /// чтобы 100%-дуга не «висела» вокруг иконки до следующего открытия модалки.
+    private var backupToolbarIcon: some View {
+        let manager = env.backupManager
+        let done = manager.uploadDone
+        let failed = manager.uploadFailed
+        let remaining = manager.remainingCount
+        let total = done + failed + remaining
+        let progress: Double = total > 0 ? min(1.0, Double(done) / Double(total)) : 0
+        let showRing = manager.autoUploadEnabled && remaining > 0
+        let ringSize: CGFloat = 28
+
+        return ZStack {
+            if showRing {
+                Circle()
+                    .stroke(AppColors.accent.opacity(0.25), lineWidth: 2)
+                    .frame(width: ringSize, height: ringSize)
+                Circle()
+                    .trim(from: 0, to: progress)
+                    .stroke(
+                        AppColors.accent,
+                        style: StrokeStyle(lineWidth: 2, lineCap: .round)
+                    )
+                    .rotationEffect(.degrees(-90))
+                    .frame(width: ringSize, height: ringSize)
+                    .animation(.easeOut(duration: 0.4), value: progress)
+            }
+            // Когда показано кольцо — иконку чуть уменьшаем, чтобы дуга на неё не налезала.
+            Image(systemName: "icloud")
+                .font(showRing ? .system(size: 15) : nil)
+        }
+        .frame(width: ringSize, height: ringSize)
     }
 
     private func uploadingOverlay(_ vm: GalleryViewModel) -> some View {

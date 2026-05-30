@@ -27,6 +27,11 @@ final class GalleryViewModel {
     private let albums: AlbumRepository
     private var didLoad = false
 
+    /// Текущая выборка ассетов из PhotoKit — нужна, чтобы наблюдатель медиатеки
+    /// (`PhotoLibraryObserver`) умел посчитать дельту изменений.
+    private var fetchResult: PHFetchResult<PHAsset>?
+    private var libraryObserver: PhotoLibraryObserver?
+
     init(cloud: CloudRepository, albums: AlbumRepository) {
         self.cloud = cloud
         self.albums = albums
@@ -74,10 +79,37 @@ final class GalleryViewModel {
             PHAssetMediaType.image.rawValue, PHAssetMediaType.video.rawValue
         )
         let result = PHAsset.fetchAssets(with: options)
+        fetchResult = result
         var list: [PHAsset] = []
         list.reserveCapacity(result.count)
         result.enumerateObjects { asset, _, _ in list.append(asset) }
         assets = list
+        registerLibraryObserverIfNeeded()
+    }
+
+    // MARK: - Наблюдение за медиатекой
+
+    /// Регистрируем наблюдателя один раз. При любом изменении медиатеки (например,
+    /// после удаления фото/видео в «Освободить место») PhotoKit пришлёт уведомление,
+    /// и мы пересоберём список — иначе в сетке остаются мёртвые превью, открытие
+    /// которых падает с ошибкой.
+    private func registerLibraryObserverIfNeeded() {
+        guard libraryObserver == nil else { return }
+        libraryObserver = PhotoLibraryObserver { [weak self] change in
+            Task { @MainActor in self?.handleLibraryChange(change) }
+        }
+    }
+
+    private func handleLibraryChange(_ change: PHChange) {
+        guard let fetchResult,
+              let details = change.changeDetails(for: fetchResult) else { return }
+        let after = details.fetchResultAfterChanges
+        self.fetchResult = after
+        var list: [PHAsset] = []
+        list.reserveCapacity(after.count)
+        after.enumerateObjects { asset, _, _ in list.append(asset) }
+        assets = list
+        selection = selection.filter { id in list.contains { $0.localIdentifier == id } }
     }
 
     // MARK: - Режим выбора
@@ -219,4 +251,26 @@ final class GalleryViewModel {
     }
 
     func snackbarShown() { snackbar = nil }
+}
+
+/// Мост к PhotoKit: `PHPhotoLibraryChangeObserver` требует `NSObject`, поэтому держим
+/// его отдельным классом. Регистрируется при создании и снимается в `deinit` (когда
+/// `GalleryViewModel` освобождает ссылку). Колбэк прилетает с фонового потока — вызов
+/// на MainActor обеспечивает уже сам потребитель.
+private final class PhotoLibraryObserver: NSObject, PHPhotoLibraryChangeObserver {
+    private let onChange: (PHChange) -> Void
+
+    init(onChange: @escaping (PHChange) -> Void) {
+        self.onChange = onChange
+        super.init()
+        PHPhotoLibrary.shared().register(self)
+    }
+
+    deinit {
+        PHPhotoLibrary.shared().unregisterChangeObserver(self)
+    }
+
+    func photoLibraryDidChange(_ changeInstance: PHChange) {
+        onChange(changeInstance)
+    }
 }

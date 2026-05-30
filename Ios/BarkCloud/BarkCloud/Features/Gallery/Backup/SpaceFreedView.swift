@@ -1,8 +1,8 @@
 import SwiftUI
 
-/// Благодарственная анимация после освобождения места: пиксельная лиса-маскот с
-/// вилянием хвоста, искры вокруг и счётчик освобождённых байт, который «накручивается»
-/// от нуля. Появляется пружиной, авто-скрывается через пару секунд (или по тапу).
+/// Сообщение после освобождения места: счётчик высвобождённых байт «накручивается»
+/// от нуля, за маскотом-лисой светится мягкий ореол, по краю поблёскивают искры.
+/// Появляется пружиной, авто-скрывается через пару секунд (или по тапу).
 struct SpaceFreedView: View {
     let bytes: Int64
     let onDismiss: () -> Void
@@ -16,38 +16,59 @@ struct SpaceFreedView: View {
                 .ignoresSafeArea()
                 .onTapGesture { onDismiss() }
 
-            VStack(spacing: 14) {
+            VStack(spacing: 18) {
                 TimelineView(.animation(minimumInterval: 1.0 / 60.0)) { ctx in
                     let t = ctx.date.timeIntervalSinceReferenceDate
                     ZStack {
+                        Circle()
+                            .fill(
+                                RadialGradient(
+                                    colors: [
+                                        Color(red: 0.93, green: 0.49, blue: 0.15).opacity(0.35),
+                                        Color(red: 0.93, green: 0.49, blue: 0.15).opacity(0.0)
+                                    ],
+                                    center: .center,
+                                    startRadius: 4,
+                                    endRadius: 90
+                                )
+                            )
+                            .frame(width: 180, height: 180)
                         Sparkles(time: t)
                         BarkMascot(time: t, scale: 1)
-                            .frame(width: 120, height: 60)
+                            .frame(width: 130, height: 65)
                     }
                 }
-                .frame(width: 170, height: 120)
+                .frame(width: 190, height: 150)
 
-                Text(verbatim: String(
-                    format: NSLocalizedString("backup_freed_title", comment: ""),
-                    FormatUtils.formatSize(displayBytes)
-                ))
-                .font(AppTypography.titleLarge)
-                .foregroundStyle(AppColors.onSurface)
+                VStack(spacing: 6) {
+                    Text(verbatim: String(
+                        format: NSLocalizedString("backup_freed_title", comment: ""),
+                        FormatUtils.formatSize(displayBytes)
+                    ))
+                    .font(.system(size: 28, weight: .semibold))
+                    .foregroundStyle(AppColors.onSurface)
 
-                Text("backup_freed_thanks")
-                    .font(AppTypography.bodyMedium)
-                    .foregroundStyle(AppColors.onSurfaceVariant)
+                    Text("backup_freed_thanks")
+                        .font(AppTypography.bodyMedium)
+                        .foregroundStyle(AppColors.onSurfaceVariant)
+                        .multilineTextAlignment(.center)
+                }
             }
-            .padding(28)
+            .padding(.horizontal, 36)
+            .padding(.vertical, 30)
             .background(.regularMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: 24))
+            .clipShape(RoundedRectangle(cornerRadius: 28))
+            .overlay(
+                RoundedRectangle(cornerRadius: 28)
+                    .stroke(AppColors.onSurface.opacity(0.06), lineWidth: 1)
+            )
             .scaleEffect(appear ? 1 : 0.6)
             .opacity(appear ? 1 : 0)
         }
         .task {
             withAnimation(.spring(response: 0.45, dampingFraction: 0.6)) { appear = true }
             await countUp()
-            try? await Task.sleep(nanoseconds: 2_200_000_000)
+            try? await Task.sleep(nanoseconds: 2_400_000_000)
             onDismiss()
         }
     }
@@ -69,7 +90,7 @@ private struct Sparkles: View {
 
     var body: some View {
         Canvas { ctx, size in
-            let count = 7
+            let count = 8
             let orange = Color(red: 0.93, green: 0.49, blue: 0.15)
             let radius = min(size.width, size.height) * 0.46
             for i in 0..<count {
