@@ -212,6 +212,89 @@ namespace BarkCloud.Files.Persistence.Migrations
                     b.ToTable("FileHashes");
                 });
 
+            modelBuilder.Entity("BarkCloud.Files.Domain.FileMetadata", b =>
+                {
+                    b.Property<Guid>("FileId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<double?>("Altitude")
+                        .HasColumnType("double precision");
+
+                    b.Property<string>("AudioCodec")
+                        .HasColumnType("text");
+
+                    b.Property<long?>("Bitrate")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("CameraMake")
+                        .HasColumnType("text");
+
+                    b.Property<string>("CameraModel")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatorTool")
+                        .HasColumnType("text");
+
+                    b.Property<string>("DocumentAuthor")
+                        .HasColumnType("text");
+
+                    b.Property<int?>("DocumentPageCount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("DocumentSubject")
+                        .HasColumnType("text");
+
+                    b.Property<string>("DocumentTitle")
+                        .HasColumnType("text");
+
+                    b.Property<double?>("DurationSeconds")
+                        .HasColumnType("double precision");
+
+                    b.Property<double?>("ExposureTimeSeconds")
+                        .HasColumnType("double precision");
+
+                    b.Property<double?>("FNumber")
+                        .HasColumnType("double precision");
+
+                    b.Property<bool?>("Flash")
+                        .HasColumnType("boolean");
+
+                    b.Property<double?>("FocalLengthMm")
+                        .HasColumnType("double precision");
+
+                    b.Property<double?>("FrameRate")
+                        .HasColumnType("double precision");
+
+                    b.Property<int?>("Iso")
+                        .HasColumnType("integer");
+
+                    b.Property<double?>("Latitude")
+                        .HasColumnType("double precision");
+
+                    b.Property<string>("LensModel")
+                        .HasColumnType("text");
+
+                    b.Property<double?>("Longitude")
+                        .HasColumnType("double precision");
+
+                    b.Property<int?>("Orientation")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("TakenAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("VideoCodec")
+                        .HasColumnType("text");
+
+                    b.HasKey("FileId");
+
+                    b.ToTable("FileMetadata");
+                });
+
             modelBuilder.Entity("BarkCloud.Files.Domain.FilePreview", b =>
                 {
                     b.Property<Guid>("Id")

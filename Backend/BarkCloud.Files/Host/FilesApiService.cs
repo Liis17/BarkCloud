@@ -2,6 +2,7 @@ using BarkCloud.Files.Features.CheckFileHash;
 using BarkCloud.Files.Features.CheckFileHashes;
 using BarkCloud.Files.Features.GetTempDownloadUrl;
 using BarkCloud.Files.Features.GetUploadUrl;
+using BarkCloud.Files.Features.GetFileMetadata;
 using BarkCloud.Files.Features.GetUserStorageInfo;
 using BarkCloud.GrpcServer.Metrics;
 using BarkCloud.Proto.Files;
@@ -76,6 +77,16 @@ public class FilesApiService : FilesApi.FilesApiBase
     public override async Task<GetUserStorageInfoResponse> GetUserStorageInfo(GetUserStorageInfoRequest request, ServerCallContext context)
     {
         var command = new GetUserStorageInfoCommand();
+
+        return await _mediator.Send(command);
+    }
+
+    public override async Task<GetFileMetadataResponse> GetFileMetadata(GetFileMetadataRequest request, ServerCallContext context)
+    {
+        var command = new GetFileMetadataCommand
+        {
+            FileId = Guid.Parse(request.FileId)
+        };
 
         return await _mediator.Send(command);
     }

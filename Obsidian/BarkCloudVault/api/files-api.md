@@ -18,6 +18,7 @@ Package: `barkcloud.files`
 | `GetTempDownloadUrl(GetTempDownloadUrlRequest) → GetTempDownloadUrlResponse` | Ссылки на скачивание + превью (`file_id`, `url`, `preview_url`) |
 | `CheckFileHash(CheckFileHashRequest) → CheckFileHashResponse` | Проверить дедупликацию по хешу |
 | `GetUserStorageInfo(GetUserStorageInfoRequest) → GetUserStorageInfoResponse` | Инфо о квоте/использовании |
+| `GetFileMetadata(GetFileMetadataRequest) → GetFileMetadataResponse` | Метаданные файла (EXIF/ffprobe/PDF/Office) для диалога «Свойства». Только для собственных файлов (по `Uploaders`). Поля nullable (`optional`), клиент показывает только заданные. `has_metadata=false` если для блоба не извлечено ни одного поля |
 
 ## Сервис: `CloudApi` (клиентский, облачная иерархия)
 
