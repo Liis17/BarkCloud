@@ -5,7 +5,7 @@ Parent: [[index]] · See also: [[api/files-api]] · [[modules/backend-files-clou
 ## Назначение
 
 Сервис файлов. Основные ответственности:
-1. **Загрузка/скачивание**: presigned URL в MinIO, дедупликация по хешу, квоты, временные файлы, сжатие изображений, превью видео (FFmpeg)
+1. **Загрузка/скачивание**: presigned URL в MinIO, дедупликация по хешу, квоты, временные файлы, сжатие изображений, превью видео (FFmpeg), перекодирование HEIC→JPEG (FFmpeg) при загрузке + разовый бэкафилл превью для легаси-файлов при старте
 2. **Облачная иерархия** (NextCloud-подобная): папки + записи о файлах — см. дочернюю заметку [[modules/backend-files-cloud]]
 3. **Галерея и альбомы**: классификация медиа (`MediaKind`), раздельные списки фото/видео (`ListUserMedia`), универсальные альбомы фото/видео (`AlbumApi`)
 
@@ -37,9 +37,11 @@ Parent: [[index]] · See also: [[api/files-api]] · [[modules/backend-files-clou
 - `FilesController.cs` — HTTP-контроллер (прямые upload/download)
 
 ### Services
-- `ImageCompressor.cs` — сжатие изображений
+- `ImageCompressor.cs` — сжатие изображений (на **SixLabors.ImageSharp**; HEIC/HEIF **не декодирует** — для них см. `HeicImageConverter`)
 - `VideoThumbnailExtractor.cs` — извлечение кадра-обложки и размеров видео через FFMpegCore (кадр на 5-й секунде)
+- `HeicImageConverter.cs` — перекодирование HEIC/HEIF → JPEG через ffmpeg (FFMpegCore, `-frames:v 1 -q:v 2`). Нужен потому, что ImageSharp HEIC не читает, а браузеры HEIC не отображают. Используется в `UploadFile` (конвертация оригинала до хеширования) и в `LegacyPreviewBackfillService`
 - `PreviewPersistenceService.cs` — сохранение превью (дедуп по SHA256 + S3 + `FilePreview`); общий для загрузки и `SetVideoThumbnail`
+- `LegacyPreviewBackfillService.cs` — фоновый разовый бэкафилл при старте контейнера (BackgroundService): находит фото-оригиналы (`MediaKind.Photo`) без превью, перекодирует HEIC→JPEG (замена блоба в S3 под тем же ключом + обновление имени/размера/хеша) и генерирует превью 1024/512/128. Курсор по `Id` по возрастанию; дёшев на повторных стартах (файлы с превью выпадают из выборки). Видео не покрывает
 - `AlbumViewBuilder.cs` — сборка `AlbumInfo` (счётчик элементов + URL превью обложки) батчем
 - `TempFileCleanupService.cs` — фоновая очистка временных файлов (BackgroundService)
 - `TrashPurgeService.cs` — окончательная зачистка корзины: снятие `Uploaders`, удаление из альбомов (`AlbumItems`), избранного (`FavoriteFiles`) и публичных ссылок (`ShareLinks`) владельца, удаление записей. Физическое удаление осиротевших блобов вынесено в публичный `PurgeOrphanBlobsAsync` (S3 + хеш + связки `FilePreview` + строка `UploadedFiles`); **строка БД удаляется только при успешном удалении объекта из S3** — иначе блоб остаётся осиротевшим и его добивает воркер (объект не «протекает» в S3). Общий для ручных RPC и воркеров. Константа `Retention = 14 дней`
