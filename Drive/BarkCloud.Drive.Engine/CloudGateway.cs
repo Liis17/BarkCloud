@@ -38,6 +38,8 @@ internal sealed class CloudGateway : IDisposable
     private readonly Func<string?> _tokenProvider;
 
     private readonly ConcurrentDictionary<string, (DateTime At, DirectoryListingDetailed Listing)> _listCache = new();
+    private readonly ConcurrentDictionary<string, int> _listGen = new(); // «поколение» инвалидации на папку — защита от записи устаревшего ответа
+    private readonly object _listLock = new(); // делает (проверка поколения + запись кэша) и (инвалидация + бамп) атомарными друг к другу
     private readonly ConcurrentDictionary<string, Lazy<Task<string>>> _downloads = new();
     private readonly object _storageLock = new();
     private (DateTime At, GetUserStorageInfoResponse Info)? _storage;
@@ -54,10 +56,14 @@ internal sealed class CloudGateway : IDisposable
     // и уходят одним DeleteFileEntries — ускоряет массовое удаление. Буферизованные записи
     // сразу прячутся из листингов «тумбстонами», чтобы файлы не мелькали в Проводнике до отправки.
     private const int DeleteBatchMax = 100;
+    private const int DeleteMaxAttempts = 3; // ретраи пачки при транзиентной ошибке отправки
     private static readonly TimeSpan DeleteWindow = TimeSpan.FromSeconds(1);
-    private readonly object _delLock = new();
+    private static readonly TimeSpan DeleteDeadline = TimeSpan.FromSeconds(5); // gRPC-дедлайн, чтобы выход не висел при недоступном сервере
+    private readonly object _delLock = new();   // защищает _delPending и перепланирование _delTimer
+    private readonly object _sendLock = new();  // сериализует отправку: фоновую (таймер/порог) и блокирующую (выход)
     private readonly List<(string EntryId, string DirId)> _delPending = new();
     private readonly ConcurrentDictionary<string, byte> _delTombstones = new();
+    private readonly ConcurrentDictionary<string, int> _delAttempts = new();
     private readonly Timer _delTimer;
 
     public CloudGateway(CloudApi.CloudApiClient cloud, FilesApi.FilesApiClient files, HttpClient http,
@@ -70,7 +76,7 @@ internal sealed class CloudGateway : IDisposable
         _tokenProvider = tokenProvider;
         _cacheDir = cacheDir;
         Directory.CreateDirectory(_cacheDir);
-        _delTimer = new Timer(_ => FlushDeletes(), null, Timeout.Infinite, Timeout.Infinite);
+        _delTimer = new Timer(_ => DrainTimer(), null, Timeout.Infinite, Timeout.Infinite);
     }
 
     // Сменить папку кэша на лету: новые чтения пойдут в неё. Уже скачанные файлы
@@ -100,8 +106,20 @@ internal sealed class CloudGateway : IDisposable
         if (_listCache.TryGetValue(dirId, out var c) && DateTime.UtcNow - c.At < ListTtl)
             return HidePending(c.Listing);
 
+        _listGen.TryGetValue(dirId, out var gen);
         var listing = _cloud.ListDirectoryDetailed(new ListDirectoryRequest { DirectoryId = dirId });
-        _listCache[dirId] = (DateTime.UtcNow, listing);
+
+        // Кэшируем только если за время RPC папку не инвалидировали: иначе ответ устарел
+        // (например, запись удалена и тумбстон уже снят) и не должен затирать инвалидацию,
+        // удерживая исчезнувший файл в кэше на ListTtl. Проверка поколения и запись кэша —
+        // под _listLock (тем же, что инвалидация), иначе попавшая между ними InvalidateListing терялась бы.
+        lock (_listLock)
+        {
+            _listGen.TryGetValue(dirId, out var genAfter);
+            if (gen == genAfter)
+                _listCache[dirId] = (DateTime.UtcNow, listing);
+        }
+
         return HidePending(listing);
     }
 
@@ -117,7 +135,14 @@ internal sealed class CloudGateway : IDisposable
         return copy;
     }
 
-    public void InvalidateListing(string dirId) => _listCache.TryRemove(dirId, out _);
+    public void InvalidateListing(string dirId)
+    {
+        lock (_listLock)
+        {
+            _listCache.TryRemove(dirId, out _);
+            _listGen.AddOrUpdate(dirId, 1, (_, g) => g + 1); // бампаем поколение — текущие in-flight листинги этой папки не закэшируются
+        }
+    }
 
     public ResolvedNode? Resolve(string path)
     {
@@ -427,31 +452,49 @@ internal sealed class CloudGateway : IDisposable
         _delTombstones[entryId] = 0;     // скрыть из листингов немедленно
         InvalidateListing(parentDirId);  // следующее перечисление пересоберётся уже без записи
 
-        List<(string EntryId, string DirId)>? ready = null;
+        bool atThreshold;
         lock (_delLock)
         {
             _delPending.Add((entryId, parentDirId));
-            if (_delPending.Count >= DeleteBatchMax)
-                ready = TakePendingLocked();
-            else
+            atThreshold = _delPending.Count >= DeleteBatchMax;
+            if (!atThreshold)
                 _delTimer.Change(DeleteWindow, Timeout.InfiniteTimeSpan); // (пере)запуск окна тишины
         }
 
-        if (ready != null)
-            SendDeletes(ready);
+        if (atThreshold)
+            SendNow(allowRetry: true); // _delLock уже отпущен — SendNow возьмёт batch уже под _sendLock
     }
 
-    private void FlushDeletes()
-    {
-        List<(string EntryId, string DirId)> batch;
-        lock (_delLock)
-        {
-            if (_delPending.Count == 0)
-                return;
-            batch = TakePendingLocked();
-        }
+    // Колбэк таймера: фоновый дренаж по окну тишины. Неудачные пачки переотправляются (ретрай по таймеру).
+    private void DrainTimer() => SendNow(allowRetry: true);
 
-        SendDeletes(batch);
+    // Синхронный дренаж до конца — для путей выхода (Unmount/Logout/Shutdown) и Dispose.
+    // best-effort, без перевзвода таймера (на выходе ему уже некому сработать); drainAll
+    // докручивает буфер до пустого, добирая всё, что фоновая попытка успела вернуть.
+    public void FlushPending() => SendNow(allowRetry: false, drainAll: true);
+
+    // Единая точка отправки. _sendLock берётся ПЕРЕД снятием batch из _delPending — это делает
+    // «взять+отправить» атомарным: фоновый дренаж и блокирующий выход не накладываются и не
+    // образуют окна, где batch уже снят, а _sendLock ещё свободен (иначе FlushPending мог бы
+    // проскочить, не дождавшись in-flight отправки, и удаление потерялось бы).
+    private void SendNow(bool allowRetry, bool drainAll = false)
+    {
+        lock (_sendLock)
+        {
+            do
+            {
+                List<(string EntryId, string DirId)> batch;
+                lock (_delLock)
+                {
+                    if (_delPending.Count == 0)
+                        return;
+                    batch = TakePendingLocked();
+                }
+
+                SendChunks(batch, allowRetry);
+            }
+            while (drainAll); // выход дренажит до пустого; фон — один проход (ретрай отложит таймер)
+        }
     }
 
     // Забрать накопленное и остановить таймер — вызывается под _delLock.
@@ -463,10 +506,10 @@ internal sealed class CloudGateway : IDisposable
         return copy;
     }
 
-    // Отправляет накопленные удаления пачками по 100. После каждой пачки снимает тумбстоны и
-    // инвалидирует затронутые листинги: при успехе сервер уже убрал записи, при ошибке файлы
-    // снова станут видны (удаление честно не состоялось).
-    private void SendDeletes(List<(string EntryId, string DirId)> batch)
+    // Отправляет batch пачками по 100 с gRPC-дедлайном. Вызывается только под _sendLock.
+    // При успехе снимает тумбстоны и инвалидирует листинги. При ошибке: allowRetry → переотправка
+    // (батчинг увеличивает радиус поражения транзиентного сбоя), иначе (выход) — сдаёмся сразу.
+    private void SendChunks(List<(string EntryId, string DirId)> batch, bool allowRetry)
     {
         for (var i = 0; i < batch.Count; i += DeleteBatchMax)
         {
@@ -476,23 +519,66 @@ internal sealed class CloudGateway : IDisposable
 
             try
             {
-                _cloud.DeleteFileEntries(request);
+                _cloud.DeleteFileEntries(request, deadline: DateTime.UtcNow.Add(DeleteDeadline));
             }
             catch (Exception ex)
             {
                 EngineLog.Error($"Массовое удаление {chunk.Count} записей", ex);
+                if (allowRetry)
+                    RequeueFailed(chunk);
+                else
+                    DropFailed(chunk); // на выходе ретраить некому — возвращаем файлы в листинг
+                continue;
             }
-            finally
+
+            foreach (var (entryId, dirId) in chunk)
             {
-                foreach (var (entryId, dirId) in chunk)
-                {
-                    // Порядок важен: сначала сбрасываем кэш листинга, потом снимаем тумбстон —
-                    // иначе осталось бы микроокно, где запись из устаревшего кэша снова видна.
-                    InvalidateListing(dirId);
-                    _delTombstones.TryRemove(entryId, out _);
-                }
+                // Порядок важен: сначала сбрасываем кэш листинга, потом снимаем тумбстон —
+                // иначе осталось бы микроокно, где запись из устаревшего кэша снова видна.
+                InvalidateListing(dirId);
+                _delTombstones.TryRemove(entryId, out _);
+                _delAttempts.TryRemove(entryId, out _);
             }
         }
+    }
+
+    // Возвращает неотправленную пачку в очередь на повтор (тумбстоны держим — файлы остаются
+    // скрытыми) и перевзводит таймер. Исчерпавшие лимит попыток сдаём через DropOne.
+    private void RequeueFailed(List<(string EntryId, string DirId)> chunk)
+    {
+        var retry = new List<(string EntryId, string DirId)>();
+        foreach (var item in chunk)
+        {
+            var attempts = _delAttempts.AddOrUpdate(item.EntryId, 1, (_, a) => a + 1);
+            if (attempts < DeleteMaxAttempts)
+                retry.Add(item);
+            else
+                DropOne(item, attempts);
+        }
+
+        if (retry.Count == 0)
+            return;
+
+        lock (_delLock)
+        {
+            _delPending.AddRange(retry);
+            _delTimer.Change(DeleteWindow, Timeout.InfiniteTimeSpan);
+        }
+    }
+
+    // Удаление не состоялось (путь выхода) — возвращаем файлы в листинг, снимая тумбстоны.
+    private void DropFailed(List<(string EntryId, string DirId)> chunk)
+    {
+        foreach (var item in chunk)
+            DropOne(item, _delAttempts.TryGetValue(item.EntryId, out var a) ? a + 1 : 1);
+    }
+
+    private void DropOne((string EntryId, string DirId) item, int attempts)
+    {
+        EngineLog.Info($"Удаление записи {item.EntryId} не выполнено (попыток: {attempts}) — файл возвращён в листинг");
+        InvalidateListing(item.DirId);
+        _delTombstones.TryRemove(item.EntryId, out _);
+        _delAttempts.TryRemove(item.EntryId, out _);
     }
 
     public void RenameDirectory(string directoryId, string newName)
@@ -503,7 +589,7 @@ internal sealed class CloudGateway : IDisposable
 
     public void DeleteDirectory(string directoryId)
     {
-        FlushDeletes(); // порядок: сначала отправляем отложенные удаления файлов, потом рекурсивное удаление папки
+        FlushPending(); // порядок: сначала отправляем отложенные удаления файлов, потом рекурсивное удаление папки
         _cloud.DeleteDirectory(new DeleteDirectoryRequest { DirectoryId = directoryId });
     }
 
@@ -526,7 +612,7 @@ internal sealed class CloudGateway : IDisposable
 
     public void Dispose()
     {
-        FlushDeletes(); // не теряем буферизованные удаления при размонтировании/выходе
+        FlushPending(); // не теряем буферизованные удаления при размонтировании/выходе
         _delTimer.Dispose();
         _http.Dispose();
     }
