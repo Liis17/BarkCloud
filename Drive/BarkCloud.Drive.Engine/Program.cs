@@ -15,28 +15,30 @@ if (!isNew)
 var config = LoadConfig();
 var device = new DeviceIdentity();
 
-// Адреса по сервисам, как в iOS (nginx-порты): Identity :7020, Files :7025.
+// Адреса по сервисам, как в iOS (nginx-порты): Identity :7020, Files :7025, Users :7021.
 var identityAddress = $"https://{config.Host}:{config.IdentityPort}";
 var filesAddress = $"https://{config.Host}:{config.FilesPort}";
+var usersAddress = $"https://{config.Host}:{config.UsersPort}";
 
 // tokenProvider читает текущий токен из TokenManager, который создаётся ниже —
 // замыкание по ссылке разрывает циклическую зависимость канал↔токен-менеджер.
 TokenManager? tokens = null;
 using var connection = new BarkCloudConnection(
-    identityAddress, filesAddress, config.DangerousAcceptAnyServerCert, device, () => tokens?.CurrentToken);
+    identityAddress, filesAddress, usersAddress, config.DangerousAcceptAnyServerCert, device, () => tokens?.CurrentToken);
 tokens = new TokenManager(connection.Identity, new TokenStore());
 
 // Молча восстановить сессию из сохранённого refresh-токена (если есть).
 await tokens.TryRestoreAsync();
 
 var settings = new EngineSettingsStore();
+var profile = new UserProfile(connection.Users);
 var gateway = new CloudGateway(connection.Cloud, connection.Files, connection.Http, $"{filesAddress}/web",
     () => tokens?.CurrentToken, settings.GetCacheDir());
 var fs = new BarkCloudFileSystem(gateway);
 using var mount = new MountManager();
 using var lifetime = new CancellationTokenSource();
 
-var engine = new DriveEngine(tokens, gateway, mount, fs, lifetime, settings);
+var engine = new DriveEngine(tokens, gateway, mount, fs, lifetime, settings, profile, config.Host);
 
 Console.WriteLine("BarkCloud.Drive.Engine запущен. Ожидание подключения UI...");
 
@@ -84,5 +86,6 @@ internal sealed class EngineConfig
     public string Host { get; set; } = "cloud.barkfluff.com";
     public int IdentityPort { get; set; } = 7020; // nginx → Identity
     public int FilesPort { get; set; } = 7025;     // nginx → Files (Cloud/Files/Album + /web)
+    public int UsersPort { get; set; } = 7021;     // nginx → Users
     public bool DangerousAcceptAnyServerCert { get; set; } = true;
 }

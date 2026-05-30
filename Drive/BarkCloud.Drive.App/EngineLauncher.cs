@@ -48,6 +48,21 @@ internal static class EngineLauncher
         }
     }
 
+    // Принудительно завершить все процессы движка (для перезапуска).
+    public static void KillEngine()
+    {
+        foreach (var process in Process.GetProcessesByName("BarkCloud.Drive.Engine"))
+        {
+            try
+            {
+                process.Kill();
+                process.WaitForExit(2000);
+            }
+            catch { /* уже завершился / нет доступа */ }
+            finally { process.Dispose(); }
+        }
+    }
+
     private static void StartEngine()
     {
         var exe = ResolveEnginePath();

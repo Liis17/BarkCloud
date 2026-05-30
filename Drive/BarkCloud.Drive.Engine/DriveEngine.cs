@@ -14,9 +14,12 @@ public sealed class DriveEngine : IDriveEngine
     private readonly BarkCloudFileSystem _fs;
     private readonly CancellationTokenSource _lifetime;
     private readonly EngineSettingsStore _settings;
+    private readonly UserProfile _profile;
+    private readonly string _serverHost;
 
     internal DriveEngine(TokenManager tokens, CloudGateway gateway, MountManager mount,
-        BarkCloudFileSystem fs, CancellationTokenSource lifetime, EngineSettingsStore settings)
+        BarkCloudFileSystem fs, CancellationTokenSource lifetime, EngineSettingsStore settings,
+        UserProfile profile, string serverHost)
     {
         _tokens = tokens;
         _gateway = gateway;
@@ -24,6 +27,8 @@ public sealed class DriveEngine : IDriveEngine
         _fs = fs;
         _lifetime = lifetime;
         _settings = settings;
+        _profile = profile;
+        _serverHost = serverHost;
     }
 
     public async Task<EngineStatus> LoginAsync(string login, string password, string? otpCode)
@@ -36,6 +41,7 @@ public sealed class DriveEngine : IDriveEngine
         try
         {
             await _tokens.LoginAsync(login, password, otpCode);
+            await _profile.EnsureLoadedAsync();
             return Status("Авторизация успешна");
         }
         catch (Exception ex)
@@ -44,12 +50,30 @@ public sealed class DriveEngine : IDriveEngine
         }
     }
 
-    public Task<EngineStatus> MountAsync(string driveLetter)
+    public Task<EngineStatus> LogoutAsync()
+    {
+        try
+        {
+            _mount.Unmount();
+            _tokens.Logout();
+            _profile.Clear();
+            return Task.FromResult(Status("Выполнен выход"));
+        }
+        catch (Exception ex)
+        {
+            return Task.FromResult(Error(ex));
+        }
+    }
+
+    public Task<EngineStatus> MountAsync(string driveLetter, string? volumeLabel)
     {
         try
         {
             if (!_tokens.IsAuthenticated)
                 return Task.FromResult(ErrorMessage("Сначала выполните вход"));
+
+            if (!string.IsNullOrWhiteSpace(volumeLabel))
+                _fs.VolumeLabel = volumeLabel.Trim();
 
             _mount.Mount(driveLetter, _fs);
             return Task.FromResult(Status($"Примонтировано {driveLetter}:"));
@@ -59,6 +83,38 @@ public sealed class DriveEngine : IDriveEngine
             return Task.FromResult(ErrorMessage(
                 "Не найден драйвер Dokany (dokan2.dll). Установите Dokany 2.x — " +
                 "github.com/dokan-dev/dokany/releases (DokanSetup.exe) — и перезапустите."));
+        }
+        catch (Exception ex)
+        {
+            return Task.FromResult(Error(ex));
+        }
+    }
+
+    // Перемонтирование с новой буквой/меткой (null = текущее). Используется для
+    // переименования диска и смены буквы — Dokany читает их только при маунте.
+    public Task<EngineStatus> RemountAsync(string? driveLetter, string? volumeLabel)
+    {
+        try
+        {
+            if (!_tokens.IsAuthenticated)
+                return Task.FromResult(ErrorMessage("Сначала выполните вход"));
+
+            var letter = (string.IsNullOrWhiteSpace(driveLetter) ? _mount.DriveLetter : driveLetter.Trim())
+                ?? throw new InvalidOperationException("Не задана буква диска");
+
+            if (!string.IsNullOrWhiteSpace(volumeLabel))
+                _fs.VolumeLabel = volumeLabel.Trim();
+
+            if (_mount.IsMounted)
+                _mount.Unmount();
+
+            _mount.Mount(letter, _fs);
+            return Task.FromResult(Status($"Перемонтировано {letter}: ({_fs.VolumeLabel})"));
+        }
+        catch (Exception ex) when (IsDokanMissing(ex))
+        {
+            return Task.FromResult(ErrorMessage(
+                "Не найден драйвер Dokany (dokan2.dll). Установите Dokany 2.x и перезапустите."));
         }
         catch (Exception ex)
         {
@@ -88,7 +144,12 @@ public sealed class DriveEngine : IDriveEngine
         }
     }
 
-    public Task<EngineStatus> GetStatusAsync() => Task.FromResult(Status(null));
+    public async Task<EngineStatus> GetStatusAsync()
+    {
+        if (_tokens.IsAuthenticated)
+            await _profile.EnsureLoadedAsync();
+        return Status(null);
+    }
 
     public Task<EngineSettings> GetSettingsAsync()
         => Task.FromResult(new EngineSettings { CacheDir = _settings.GetCacheDir() });
@@ -119,6 +180,9 @@ public sealed class DriveEngine : IDriveEngine
             Mounted = _mount.IsMounted,
             DriveLetter = _mount.DriveLetter,
             Message = message,
+            Username = _profile.Username,
+            ServerHost = _serverHost,
+            VolumeLabel = _fs.VolumeLabel,
         };
 
         if (_tokens.IsAuthenticated)
