@@ -54,6 +54,7 @@ public sealed class DriveEngine : IDriveEngine
     {
         try
         {
+            _gateway.FlushPending(); // дослать буферизованные удаления, пока токен ещё валиден
             _mount.Unmount();
             _tokens.Logout();
             _profile.Clear();
@@ -140,6 +141,7 @@ public sealed class DriveEngine : IDriveEngine
     {
         try
         {
+            _gateway.FlushPending(); // дослать буферизованные удаления до размонтирования
             _mount.Unmount();
             return Task.FromResult(Status("Отмонтировано"));
         }
@@ -179,6 +181,7 @@ public sealed class DriveEngine : IDriveEngine
 
     public Task ShutdownAsync()
     {
+        _gateway.FlushPending(); // дослать буферизованные удаления до завершения процесса
         _mount.Unmount();
         _lifetime.Cancel();
         return Task.CompletedTask;
