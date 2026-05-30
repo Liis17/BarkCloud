@@ -155,6 +155,9 @@ BarkCloud/
   + `InsecureHTTP.clearCaches()` (URL-кэш/куки) → `onSignOut()` → Login. Удаление аккаунта
   использует `resetLocalState()` без серверного `Logout` (аккаунт уже удалён). На время операции —
   блокирующий оверлей (`isProcessing`), защищающий от повторных нажатий.
+  **Пункт «Приложение»** (`AppSettingsScreen`) — переключатель «Блокировка входа» (Face ID + PIN),
+  см. [[#App Lock]]: включение требует подтверждения биометрией и задания PIN через [[SetPinSheet]],
+  выключение — биометрии.
 - **Галерея** (`Features/Gallery/`) — таб №1, локальная медиатека устройства через **PhotoKit**
   (`PHAsset`, разрешение `NSPhotoLibraryUsageDescription` в build-settings pbxproj). Сетка фото+видео
   (`PHCachingImageManager`), тап → полноэкранный просмотр. **Фото** показываются через
@@ -334,6 +337,36 @@ store с одной активной записью `Pending { id, label, action
 (`arrow.uturn.backward`/`trash`), `CloudBrowserScreen` (`trash`/`folder`/`pencil`),
 `DevicesScreen` (`trash`/`pencil`); вместо `Label(..., systemImage:)` — голый `Image(systemName:)`
 + `.accessibilityLabel(...)` для VoiceOver.
+
+### App Lock
+
+Защита запуска приложения биометрией с резервным PIN. Включается из Настройки → Приложение
+(`AppSettingsScreen`). Хранение и логика — три файла:
+
+- `Data/Cache/AppLockSettings.swift` — `@MainActor @Observable` модель. Флаг `isEnabled` и счётчик
+  `failedAttempts` живут в `UserDefaults` (переживают kill процесса). Соль (16 байт случайных,
+  `SecRandomCopyBytes`) и хеш PIN — в **Keychain** (`service = com.barkfluff.BarkCloud.appLock`,
+  `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`). Хеширование — **PBKDF2-HMAC-SHA256, 100 000
+  итераций**, 32-байтовый derived key (`CommonCrypto.CCKeyDerivationPBKDF`); сравнение
+  constant-time. На 3-й неверной попытке `registerFailure()` возвращает `true` (wipe).
+- `Features/AppLock/AppLockManager.swift` — координатор. Держит `isUnlocked` (state на сессию)
+  и `backgroundedAt`; в `handleScenePhase(_:)` запоминает время ухода в фон и при возврате в
+  `.active` снова закрывает экран, если прошло **>30 секунд** (grace для шеринга/файлпикеров).
+  `unlockWithBiometric(reason:)` дёргает [[BiometricGate]] (`deviceOwnerAuthentication` =
+  Face ID/Touch ID + код-пароль устройства как fallback). `verifyPin(_:)` → `.success`,
+  `.wrong(remaining)`, `.wiped`. Wipe делегирует обратно в `AppEnvironment` через колбэк
+  `onWipe`: `resetLocalState()` (Keychain-токены, кеши, gRPC) + `VaultStore.removeAll()` +
+  сам `settings.disable()`. После wipe `RootView` сам уходит на Login, т.к. токенов больше нет.
+- UI (`Features/AppLock/`): `AppLockScreen` (полноэкранный — между Login и Main),
+  `PinKeypad`/`PinDots`/`PinEntryView` (кастомная цифровая клавиатура 3×4 — без системной IME,
+  6 точек-индикаторов), `SetPinSheet` (двухшаговый мастер: ввести → подтвердить, при
+  несовпадении — сбрасывается на шаг 1 с ошибкой).
+
+Интеграция в каркас приложения: `AppEnvironment` создаёт `AppLockSettings` + `AppLockManager`
+и подключает `onWipe`. `RootView` между ветками `MainScreen`/`LoginScreen` вставляет
+`AppLockScreen`, когда `env.appLock.shouldShowLock` (`isEnabled && !isUnlocked`). `BarkCloudApp`
+в `onChange(of: scenePhase)` зовёт `appLock.handleScenePhase(phase)` — этим и реализована
+30-секундная задержка между сворачиваниями.
 
 **Важно для превью/скачивания**: файловый сервис на `:7025` с self-signed TLS — превью и оригиналы
 грузятся через `InsecureHTTP.session` (`AsyncImage` их бы отверг), поэтому в сетках используется
