@@ -50,14 +50,16 @@
             </ui:Button>
 
             <StackPanel Grid.Row="1" Margin="0,4,0,0">
-                <TextBlock Text="Вход" FontWeight="Bold" FontSize="14" Margin="0,0,0,6"/>
-                <ui:TextBox x:Name="UsernameBox" PlaceholderText="Логин или email" Margin="0,2,0,8"/>
-                <ui:PasswordBox x:Name="PasswordBox" PlaceholderText="Пароль" Margin="0,2,0,8"/>
-                <ui:TextBox x:Name="OtpBox" PlaceholderText="OTP-код (если включён 2FA)" Margin="0,2,0,8"/>
-                <ui:Button x:Name="LoginButton" Content="Войти" Click="LoginClick"
-                           Appearance="Primary" HorizontalAlignment="Stretch"/>
+                <StackPanel x:Name="LoginPanel">
+                    <TextBlock Text="Вход" FontWeight="Bold" FontSize="14" Margin="0,0,0,6"/>
+                    <ui:TextBox x:Name="UsernameBox" PlaceholderText="Логин или email" Margin="0,2,0,8"/>
+                    <ui:PasswordBox x:Name="PasswordBox" PlaceholderText="Пароль" Margin="0,2,0,8"/>
+                    <ui:TextBox x:Name="OtpBox" PlaceholderText="OTP-код (если включён 2FA)" Margin="0,2,0,8"/>
+                    <ui:Button x:Name="LoginButton" Content="Войти" Click="LoginClick"
+                               Appearance="Primary" HorizontalAlignment="Stretch"/>
 
-                <Separator Margin="0,12"/>
+                    <Separator Margin="0,12"/>
+                </StackPanel>
 
                 <TextBlock Text="Монтирование" FontWeight="Bold" FontSize="14" Margin="0,0,0,6"/>
                 <ComboBox x:Name="LetterCombo" Margin="0,2,0,8" HorizontalAlignment="Stretch"/>
