@@ -16,6 +16,7 @@ public partial class MainWindow : FluentWindow
 {
     private IDriveEngine? _engine;
     private readonly DispatcherTimer _statusTimer;
+    private readonly AppSettings _settings = AppSettings.Load();
     private bool _reallyExit;
 
     public MainWindow()
@@ -44,7 +45,9 @@ public partial class MainWindow : FluentWindow
             if (!used.Contains(c))
                 LetterCombo.Items.Add(c.ToString());
 
-        if (LetterCombo.Items.Count > 0)
+        if (_settings.DriveLetter is { } saved && LetterCombo.Items.Contains(saved))
+            LetterCombo.SelectedItem = saved;
+        else if (LetterCombo.Items.Count > 0)
             LetterCombo.SelectedIndex = 0;
     }
 
@@ -67,14 +70,24 @@ public partial class MainWindow : FluentWindow
 
     private async void LoginClick(object sender, RoutedEventArgs e)
     {
+        var login = UsernameBox.Text.Trim();
+        if (string.IsNullOrEmpty(login) || string.IsNullOrEmpty(PasswordBox.Password))
+        {
+            StatusText.Text = "Введите логин и пароль.";
+            return;
+        }
+
         var engine = await EnsureEngineAsync();
         if (engine == null)
             return;
 
         try
         {
-            var status = await engine.LoginAsync(UsernameBox.Text.Trim(), PasswordBox.Password, NullIfEmpty(OtpBox.Text));
+            var status = await engine.LoginAsync(login, PasswordBox.Password, NullIfEmpty(OtpBox.Text));
             Apply(status);
+
+            if (status.Authenticated && !status.Mounted)
+                await AutoMountAsync(engine);
         }
         catch (Exception ex)
         {
@@ -90,7 +103,10 @@ public partial class MainWindow : FluentWindow
 
         try
         {
-            Apply(await engine.MountAsync(letter));
+            var status = await engine.MountAsync(letter);
+            if (status.Mounted)
+                RememberLetter(letter);
+            Apply(status);
         }
         catch (Exception ex)
         {
@@ -140,10 +156,75 @@ public partial class MainWindow : FluentWindow
         base.OnClosing(e);
     }
 
-    private void OnContentRendered(object? sender, EventArgs e)
+    private async void OnContentRendered(object? sender, EventArgs e)
     {
         if (!TrayIcon.IsRegistered)
             TrayIcon.Register();
+
+        await InitializeAsync();
+    }
+
+    // Старт UI: поднять/подключить движок, узнать статус. Если сессия уже восстановлена
+    // движком из refresh.bin — форма входа не нужна, сразу монтируем диск.
+    private async Task InitializeAsync()
+    {
+        var engine = await EnsureEngineAsync();
+        if (engine == null)
+            return;
+
+        EngineStatus status;
+        try
+        {
+            status = await engine.GetStatusAsync();
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = $"Движок недоступен: {ex.Message}";
+            return;
+        }
+
+        Apply(status);
+
+        if (status.Authenticated && !status.Mounted)
+            await AutoMountAsync(engine);
+    }
+
+    // Монтирование без участия пользователя: берём предпочтительную (запомненную) букву.
+    private async Task AutoMountAsync(IDriveEngine engine)
+    {
+        var letter = PreferredLetter();
+        if (letter == null)
+        {
+            StatusText.Text = "Нет свободной буквы диска для монтирования.";
+            return;
+        }
+
+        try
+        {
+            var status = await engine.MountAsync(letter);
+            if (status.Mounted)
+                RememberLetter(letter);
+            Apply(status);
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = $"Ошибка автомонтирования: {ex.Message}";
+        }
+    }
+
+    // Запомненная буква (если ещё свободна), иначе выбранная/первая свободная.
+    private string? PreferredLetter()
+    {
+        if (_settings.DriveLetter is { } saved && LetterCombo.Items.Contains(saved))
+            return saved;
+
+        return LetterCombo.SelectedItem as string ?? LetterCombo.Items.Cast<string>().FirstOrDefault();
+    }
+
+    private void RememberLetter(string letter)
+    {
+        _settings.DriveLetter = letter;
+        _settings.Save();
     }
 
     private void ShowClick(object sender, RoutedEventArgs e) => ShowFromTray();
@@ -229,6 +310,9 @@ public partial class MainWindow : FluentWindow
 
     private void Apply(EngineStatus s)
     {
+        // Сессия восстановлена/выполнен вход → форма входа не нужна.
+        LoginPanel.Visibility = s.Authenticated ? Visibility.Collapsed : Visibility.Visible;
+
         var lines = new List<string>
         {
             $"Авторизация: {(s.Authenticated ? "да" : "нет")}",

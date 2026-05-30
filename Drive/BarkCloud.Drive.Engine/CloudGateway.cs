@@ -206,7 +206,8 @@ internal sealed class CloudGateway : IDisposable
     public async Task<string> UploadAsync(string uploadUrl, string fileName, string localPath)
     {
         using var content = new MultipartFormDataContent();
-        await using var fileStream = File.OpenRead(localPath);
+        // FileShare.ReadWrite: рабочая копия ещё открыта на запись хэндлом сессии.
+        await using var fileStream = new FileStream(localPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
         using var fileContent = new StreamContent(fileStream);
         fileContent.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
         content.Add(fileContent, "file", fileName);
