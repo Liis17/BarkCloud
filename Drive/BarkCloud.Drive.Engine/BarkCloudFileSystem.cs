@@ -491,7 +491,7 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
         }
         else
         {
-            _gateway.DeleteFileEntry(node.EntryId);
+            _gateway.QueueDeleteFileEntry(node.EntryId, node.DirectoryId);
         }
 
         if (parent != null)
