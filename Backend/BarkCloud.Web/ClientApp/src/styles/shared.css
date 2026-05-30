@@ -860,6 +860,18 @@ img.avatar { object-fit: cover; }
 }
 .prop-grid .pk { color: var(--md-on-surface-variant); }
 .prop-grid .pv { color: var(--md-on-surface); word-break: break-word; }
+.prop-grid .pv a { color: var(--md-primary); text-decoration: none; }
+.prop-grid .pv a:hover { text-decoration: underline; }
+.prop-section {
+  margin: 14px 0 6px;
+  padding-top: 10px;
+  border-top: 1px solid var(--md-outline-variant);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--md-on-surface-variant);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
 
 /* Сентинел бесконечной прокрутки */
 .infinite-sentinel { min-height: 1px; padding: 8px 0 28px; display: flex; justify-content: center; }

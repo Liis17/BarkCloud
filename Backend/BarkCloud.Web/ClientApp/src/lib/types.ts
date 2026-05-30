@@ -83,6 +83,48 @@ export interface FileInfo extends CardFile {
   etag?: string;
   previewCount?: number;
   uploadDeviceName?: string;
+  metadata?: FileMetadata | null;
+}
+
+/**
+ * Метаданные блоба (EXIF / ffprobe / PDF / Office). Все поля опциональны —
+ * сервер отдаёт только заданные, остальные приходят как undefined.
+ */
+export interface FileMetadata {
+  // Общие
+  takenAt?: string;
+  creatorTool?: string;
+
+  // GPS
+  latitude?: number;
+  longitude?: number;
+  altitude?: number;
+
+  // Камера
+  cameraMake?: string;
+  cameraModel?: string;
+  lensModel?: string;
+
+  // Параметры съёмки
+  focalLengthMm?: number;
+  fNumber?: number;
+  exposureTimeSeconds?: number;
+  iso?: number;
+  orientation?: number;
+  flash?: boolean;
+
+  // Видео
+  durationSeconds?: number;
+  videoCodec?: string;
+  audioCodec?: string;
+  bitrate?: number;
+  frameRate?: number;
+
+  // Документ
+  documentAuthor?: string;
+  documentTitle?: string;
+  documentSubject?: string;
+  documentPageCount?: number;
 }
 
 /** Публичная ссылка на файл (GET/POST /api/shares). */
