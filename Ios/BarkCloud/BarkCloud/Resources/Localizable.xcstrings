@@ -165,6 +165,259 @@
         }
       }
     },
+    "settings_app": {
+      "extractionState": "manual",
+      "localizations": {
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Приложение"
+          }
+        }
+      }
+    },
+    "app_lock_settings_title": {
+      "extractionState": "manual",
+      "localizations": {
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Блокировка входа"
+          }
+        }
+      }
+    },
+    "app_lock_settings_on": {
+      "extractionState": "manual",
+      "localizations": {
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Включена · Face ID и PIN-код"
+          }
+        }
+      }
+    },
+    "app_lock_settings_off": {
+      "extractionState": "manual",
+      "localizations": {
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Выключена"
+          }
+        }
+      }
+    },
+    "app_lock_footer": {
+      "extractionState": "manual",
+      "localizations": {
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "При запуске и возврате после 30 секунд в фоне будет запрошен Face ID. После трёх неверных попыток PIN все локальные данные будут стёрты."
+          }
+        }
+      }
+    },
+    "app_lock_unavailable": {
+      "extractionState": "manual",
+      "localizations": {
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Биометрия и код-пароль недоступны на этом устройстве."
+          }
+        }
+      }
+    },
+    "app_lock_enable_reason": {
+      "extractionState": "manual",
+      "localizations": {
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Подтвердите, чтобы включить блокировку"
+          }
+        }
+      }
+    },
+    "app_lock_disable_reason": {
+      "extractionState": "manual",
+      "localizations": {
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Подтвердите, чтобы выключить блокировку"
+          }
+        }
+      }
+    },
+    "app_lock_biometric_failed": {
+      "extractionState": "manual",
+      "localizations": {
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Не удалось подтвердить личность"
+          }
+        }
+      }
+    },
+    "app_lock_enabled": {
+      "extractionState": "manual",
+      "localizations": {
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Блокировка включена"
+          }
+        }
+      }
+    },
+    "app_lock_disabled": {
+      "extractionState": "manual",
+      "localizations": {
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Блокировка выключена"
+          }
+        }
+      }
+    },
+    "app_lock_set_pin_title": {
+      "extractionState": "manual",
+      "localizations": {
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Новый PIN-код"
+          }
+        }
+      }
+    },
+    "app_lock_set_pin": {
+      "extractionState": "manual",
+      "localizations": {
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Задайте PIN-код"
+          }
+        }
+      }
+    },
+    "app_lock_set_pin_subtitle": {
+      "extractionState": "manual",
+      "localizations": {
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "6 цифр — понадобится при отказе Face ID"
+          }
+        }
+      }
+    },
+    "app_lock_confirm_pin": {
+      "extractionState": "manual",
+      "localizations": {
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Повторите PIN-код"
+          }
+        }
+      }
+    },
+    "app_lock_pin_mismatch": {
+      "extractionState": "manual",
+      "localizations": {
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PIN-коды не совпадают. Попробуйте снова."
+          }
+        }
+      }
+    },
+    "app_lock_screen_title": {
+      "extractionState": "manual",
+      "localizations": {
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "BarkCloud заблокирован"
+          }
+        }
+      }
+    },
+    "app_lock_unlock": {
+      "extractionState": "manual",
+      "localizations": {
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Разблокировать"
+          }
+        }
+      }
+    },
+    "app_lock_use_pin": {
+      "extractionState": "manual",
+      "localizations": {
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ввести PIN-код"
+          }
+        }
+      }
+    },
+    "app_lock_enter_pin": {
+      "extractionState": "manual",
+      "localizations": {
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Введите PIN-код"
+          }
+        }
+      }
+    },
+    "app_lock_wrong_pin": {
+      "extractionState": "manual",
+      "localizations": {
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Неверный PIN. Попыток осталось: %lld"
+          }
+        }
+      }
+    },
+    "app_lock_reason": {
+      "extractionState": "manual",
+      "localizations": {
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Разблокируйте BarkCloud"
+          }
+        }
+      }
+    },
+    "app_lock_backspace": {
+      "extractionState": "manual",
+      "localizations": {
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Стереть"
+          }
+        }
+      }
+    },
     "action_close": {
       "extractionState": "manual",
       "localizations": {

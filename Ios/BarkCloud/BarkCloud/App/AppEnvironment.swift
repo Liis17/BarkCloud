@@ -19,6 +19,8 @@ final class AppEnvironment {
     let backupManager: BackupManager
     let vault: VaultStore
     let biometric: BiometricGate
+    let appLockSettings: AppLockSettings
+    let appLock: AppLockManager
     let shareInboxUploader: ShareInboxUploader
 
     init() {
@@ -53,7 +55,17 @@ final class AppEnvironment {
         backupManager.resumeIfEnabled()
         self.vault = VaultStore()
         self.biometric = BiometricGate()
+        let lockSettings = AppLockSettings()
+        let lock = AppLockManager(settings: lockSettings, biometric: self.biometric)
+        self.appLockSettings = lockSettings
+        self.appLock = lock
         self.shareInboxUploader = ShareInboxUploader(cloud: self.cloudRepository, session: session)
+        // Полная очистка при исчерпании попыток PIN.
+        lock.onWipe = { [weak self] in
+            guard let self else { return }
+            await self.resetLocalState()
+            self.vault.removeAll()
+        }
 
         Task { await cache.runStartupSweepIfNeeded() }
         // Догрузить то, что Share Extension сложил в общий контейнер.
