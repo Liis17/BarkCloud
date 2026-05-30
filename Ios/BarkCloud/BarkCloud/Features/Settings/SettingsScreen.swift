@@ -80,6 +80,13 @@ struct SettingsScreen: View {
                     .buttonStyle(.plain)
 
                     NavigationLink {
+                        AppSettingsScreen()
+                    } label: {
+                        settingsRow(icon: "iphone.gen3", titleKey: "settings_app")
+                    }
+                    .buttonStyle(.plain)
+
+                    NavigationLink {
                         VaultScreen()
                     } label: {
                         settingsRow(icon: "lock.shield.fill", titleKey: "settings_vault")

@@ -59,6 +59,14 @@ final class VaultStore {
         persist()
     }
 
+    /// Полная очистка локального сейфа. Используется при wipe-сценарии
+    /// блокировки приложения (3 неверных PIN).
+    func removeAll() {
+        guard !items.isEmpty else { return }
+        items.removeAll()
+        persist()
+    }
+
     private func persist() {
         if let data = try? JSONEncoder().encode(items) {
             defaults.set(data, forKey: key)
