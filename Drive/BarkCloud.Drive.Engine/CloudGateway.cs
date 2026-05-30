@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Net;
 using System.Net.Http.Headers;
 using System.Text.Json;
 
@@ -31,7 +32,7 @@ internal sealed class CloudGateway : IDisposable
     private readonly CloudApi.CloudApiClient _cloud;
     private readonly FilesApi.FilesApiClient _files;
     private readonly HttpClient _http;
-    private readonly string _cacheDir;
+    private string _cacheDir;
     private readonly string _filesWebBase;
     private readonly Func<string?> _tokenProvider;
 
@@ -40,16 +41,33 @@ internal sealed class CloudGateway : IDisposable
     private readonly object _storageLock = new();
     private (DateTime At, GetUserStorageInfoResponse Info)? _storage;
 
+    // Поблочное чтение (фаза 5): кэш temp-URL на файл (живёт 60 мин — обновляем заранее),
+    // дедуп параллельных скачиваний блоков, и файлы, для которых сервер не дал Range (целиком).
+    private const int BlockSize = 1 << 20; // 1 МиБ
+    private static readonly TimeSpan UrlTtl = TimeSpan.FromMinutes(50);
+    private readonly ConcurrentDictionary<string, (DateTime At, string Url)> _tempUrls = new();
+    private readonly ConcurrentDictionary<string, Lazy<Task>> _blockFetches = new();
+    private readonly ConcurrentDictionary<string, bool> _wholeMode = new();
+
     public CloudGateway(CloudApi.CloudApiClient cloud, FilesApi.FilesApiClient files, HttpClient http,
-        string filesWebBase, Func<string?> tokenProvider)
+        string filesWebBase, Func<string?> tokenProvider, string cacheDir)
     {
         _cloud = cloud;
         _files = files;
         _http = http;
         _filesWebBase = filesWebBase.TrimEnd('/');
         _tokenProvider = tokenProvider;
-        _cacheDir = Path.Combine(Path.GetTempPath(), "BarkCloudDrive");
+        _cacheDir = cacheDir;
         Directory.CreateDirectory(_cacheDir);
+    }
+
+    // Сменить папку кэша на лету: новые чтения пойдут в неё. Уже скачанные файлы
+    // остаются в прежней папке (не переносятся) — повторное чтение их перекачает.
+    public void SetCacheDir(string path)
+    {
+        Directory.CreateDirectory(path);
+        _cacheDir = path;
+        _downloads.Clear();
     }
 
     public GetUserStorageInfoResponse GetStorage()
@@ -152,9 +170,126 @@ internal sealed class CloudGateway : IDisposable
         return (parent.DirectoryId, name);
     }
 
-    // ───────── чтение содержимого (гидрация целиком; Range — фаза 5) ─────────
+    // ───────── чтение содержимого (поблочно по HTTP Range; фаза 5) ─────────
 
-    public int Read(string fileId, byte[] buffer, long offset)
+    // Читает [offset, offset+len) файла, подкачивая недостающие блоки по 1 МиБ Range-запросами.
+    // fileLength берётся из листинга (CloudFile.FileSize). Если сервер не поддерживает Range —
+    // откатываемся на скачивание файла целиком (whole-режим).
+    public int Read(string fileId, long fileLength, byte[] buffer, long offset)
+    {
+        if (_wholeMode.ContainsKey(fileId))
+            return ReadWhole(fileId, buffer, offset);
+
+        if (fileLength <= 0 || offset >= fileLength)
+            return 0;
+
+        try
+        {
+            return ReadBlocks(fileId, fileLength, buffer, offset);
+        }
+        catch (RangeNotSupportedException)
+        {
+            _wholeMode[fileId] = true;
+            EngineLog.Info($"Сервер не отдал Range для {fileId} — переключаюсь на скачивание целиком");
+            return ReadWhole(fileId, buffer, offset);
+        }
+    }
+
+    private int ReadBlocks(string fileId, long fileLength, byte[] buffer, long offset)
+    {
+        var toRead = (int)Math.Min(buffer.Length, fileLength - offset);
+        if (toRead <= 0)
+            return 0;
+
+        var endInclusive = offset + toRead - 1;
+        var firstBlock = offset / BlockSize;
+        var lastBlock = endInclusive / BlockSize;
+
+        for (var b = firstBlock; b <= lastBlock; b++)
+            EnsureBlock(fileId, fileLength, b);
+
+        for (var b = firstBlock; b <= lastBlock; b++)
+        {
+            var blockStart = b * BlockSize;
+            var blockEnd = Math.Min(blockStart + BlockSize, fileLength) - 1;
+            var copyFrom = Math.Max(offset, blockStart);
+            var copyTo = Math.Min(endInclusive, blockEnd);
+            if (copyTo < copyFrom)
+                continue;
+
+            var len = (int)(copyTo - copyFrom + 1);
+            var bufPos = (int)(copyFrom - offset);
+            var inBlockPos = copyFrom - blockStart;
+
+            using var handle = File.OpenHandle(BlockPath(fileId, b), FileMode.Open, FileAccess.Read, FileShare.Read);
+            RandomAccess.Read(handle, buffer.AsSpan(bufPos, len), inBlockPos);
+        }
+
+        return toRead;
+    }
+
+    private void EnsureBlock(string fileId, long fileLength, long blockIndex)
+    {
+        var blockStart = blockIndex * BlockSize;
+        var expectedLen = Math.Min(BlockSize, fileLength - blockStart);
+        var path = BlockPath(fileId, blockIndex);
+        if (File.Exists(path) && new FileInfo(path).Length == expectedLen)
+            return;
+
+        var key = $"{fileId}:{blockIndex}";
+        var lazy = _blockFetches.GetOrAdd(key, _ => new Lazy<Task>(() => FetchBlockAsync(fileId, fileLength, blockIndex)));
+        try
+        {
+            lazy.Value.GetAwaiter().GetResult();
+        }
+        finally
+        {
+            _blockFetches.TryRemove(key, out _);
+        }
+    }
+
+    private async Task FetchBlockAsync(string fileId, long fileLength, long blockIndex)
+    {
+        var start = blockIndex * BlockSize;
+        var end = Math.Min(start + BlockSize, fileLength) - 1; // включительно
+
+        var url = await GetTempUrlAsync(fileId);
+        using var request = new HttpRequestMessage(HttpMethod.Get, url);
+        request.Headers.Range = new RangeHeaderValue(start, end);
+
+        using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+        if (response.StatusCode != HttpStatusCode.PartialContent)
+            throw new RangeNotSupportedException(); // старый бэкенд без Range → откат на целиком
+
+        Directory.CreateDirectory(BlockDir(fileId));
+        var path = BlockPath(fileId, blockIndex);
+        var tmp = path + ".part";
+
+        await using (var net = await response.Content.ReadAsStreamAsync())
+        await using (var file = File.Create(tmp))
+            await net.CopyToAsync(file);
+
+        File.Move(tmp, path, overwrite: true);
+    }
+
+    private async Task<string> GetTempUrlAsync(string fileId)
+    {
+        if (_tempUrls.TryGetValue(fileId, out var c) && DateTime.UtcNow - c.At < UrlTtl)
+            return c.Url;
+
+        var resp = await _files.GetTempDownloadUrlAsync(new GetTempDownloadUrlRequest { FileIds = { fileId } });
+        var raw = resp.FileUrls.FirstOrDefault()?.Url
+                  ?? throw new InvalidOperationException($"Сервер не вернул download URL для {fileId}");
+        var url = NormalizeDownloadUrl(raw);
+        _tempUrls[fileId] = (DateTime.UtcNow, url);
+        return url;
+    }
+
+    private string BlockDir(string fileId) => Path.Combine(_cacheDir, fileId + ".blocks");
+    private string BlockPath(string fileId, long blockIndex) => Path.Combine(BlockDir(fileId), blockIndex + ".blk");
+
+    // Скачивание файла целиком (whole-режим: сервер без Range, и для гидрации копии при записи).
+    private int ReadWhole(string fileId, byte[] buffer, long offset)
     {
         var local = _downloads
             .GetOrAdd(fileId, id => new Lazy<Task<string>>(() => DownloadAsync(id)))
@@ -168,6 +303,8 @@ internal sealed class CloudGateway : IDisposable
         var toRead = (int)Math.Min(buffer.Length, length - offset);
         return RandomAccess.Read(handle, buffer.AsSpan(0, toRead), offset);
     }
+
+    private sealed class RangeNotSupportedException : Exception;
 
     private async Task<string> DownloadAsync(string fileId)
     {

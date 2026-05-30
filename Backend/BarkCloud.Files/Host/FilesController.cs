@@ -5,6 +5,7 @@ using BarkCloud.GrpcServer.Metrics;
 
 using MediatR;
 
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace BarkCloud.Files.Host;
@@ -52,8 +53,9 @@ public class FilesController : Controller
     }
 
     [HttpGet("download/{fileId}")]
-    public async Task<IActionResult> DownloadFile([FromRoute] Guid fileId)
+    public async Task<IActionResult> DownloadFile([FromRoute] Guid fileId, CancellationToken cancellationToken)
     {
+        DownloadFileResult result;
         try
         {
             var command = new DownloadFileCommand()
@@ -61,9 +63,20 @@ public class FilesController : Controller
                 FileId = fileId
             };
 
-            var result = await _mediator.Send(command);
+            // Один диапазон вида bytes=from-[to]. Multi-range и suffix (bytes=-N) не поддерживаем —
+            // отдаём файл целиком (наш клиент шлёт только явные from-to).
+            var range = Request.GetTypedHeaders().Range;
+            if (range?.Ranges.Count == 1)
+            {
+                var item = range.Ranges.First();
+                if (item.From.HasValue)
+                {
+                    command.RangeStart = item.From.Value;
+                    command.RangeEnd = item.To;
+                }
+            }
 
-            return File(result.FileStream, result.ContentType, result.FileName);
+            result = await _mediator.Send(command);
         }
         catch (FileNotUploadedException ex)
         {
@@ -73,5 +86,23 @@ public class FilesController : Controller
         {
             return NotFound($"Ошибка при скачивании файла: {ex.Message}");
         }
+
+        Response.Headers.AcceptRanges = "bytes";
+        Response.ContentType = result.ContentType;
+        Response.Headers.ContentDisposition = $"attachment; filename=\"{result.FileName}\"";
+
+        if (result.IsPartial)
+        {
+            Response.StatusCode = StatusCodes.Status206PartialContent;
+            Response.Headers.ContentRange = $"bytes {result.RangeStart}-{result.RangeEnd}/{result.TotalSize}";
+            Response.ContentLength = result.ContentLength;
+        }
+
+        await using (result.FileStream)
+        {
+            await result.FileStream.CopyToAsync(Response.Body, cancellationToken);
+        }
+
+        return new EmptyResult();
     }
 }

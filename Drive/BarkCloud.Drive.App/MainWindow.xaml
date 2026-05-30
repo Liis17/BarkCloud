@@ -70,6 +70,18 @@
 
                 <Separator Margin="0,12"/>
 
+                <TextBlock Text="Папка кэша" FontWeight="Bold" FontSize="14" Margin="0,0,0,6"/>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <ui:TextBox x:Name="CacheDirBox" Grid.Column="0" IsReadOnly="True" Margin="0,0,8,0"/>
+                    <ui:Button x:Name="BrowseCacheButton" Grid.Column="1" Content="Обзор…" Click="BrowseCacheClick"/>
+                </Grid>
+
+                <Separator Margin="0,12"/>
+
                 <ui:Card>
                     <TextBlock x:Name="StatusText" TextWrapping="Wrap" Text="Не подключено."/>
                 </ui:Card>

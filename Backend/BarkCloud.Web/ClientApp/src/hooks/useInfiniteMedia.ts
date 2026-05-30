@@ -11,7 +11,7 @@ export function useInfiniteMedia(kind: 'photo' | 'video', toast?: ToastPush) {
   const cursorRef = React.useRef<{ at: string; id: string } | null>(null);
   const busyRef = React.useRef(false);
   const doneRef = React.useRef(false);
-  const sentinelRef = React.useRef<HTMLDivElement | null>(null);
+  const observerRef = React.useRef<IntersectionObserver | null>(null);
 
   const loadMore = React.useCallback(async () => {
     if (busyRef.current || doneRef.current) return;
@@ -51,18 +51,24 @@ export function useInfiniteMedia(kind: 'photo' | 'video', toast?: ToastPush) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kind]);
 
-  React.useEffect(() => {
-    const el = sentinelRef.current;
-    if (!el) return;
+  // loadMore стабилен, но держим в ref, чтобы callback-ref не пересоздавал observer.
+  const loadMoreRef = React.useRef(loadMore);
+  loadMoreRef.current = loadMore;
+
+  // Callback-ref: подключаем IntersectionObserver, как только сентинель появляется в DOM,
+  // и переподключаем при его повторном монтировании (например, после переключения вкладок).
+  const sentinelRef = React.useCallback((node: HTMLDivElement | null) => {
+    observerRef.current?.disconnect();
+    if (!node) return;
     const io = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting) loadMore();
+        if (entries[0].isIntersecting) loadMoreRef.current();
       },
       { rootMargin: '600px' },
     );
-    io.observe(el);
-    return () => io.disconnect();
-  }, [loadMore]);
+    io.observe(node);
+    observerRef.current = io;
+  }, []);
 
   const removeItem = React.useCallback((id: string) => setItems((prev) => prev.filter((x) => x.id !== id)), []);
   const updateItem = React.useCallback(

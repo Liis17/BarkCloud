@@ -179,7 +179,7 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
 
         try
         {
-            bytesRead = _gateway.Read(node.FileId, buffer, offset);
+            bytesRead = _gateway.Read(node.FileId, node.Length, buffer, offset);
             return DokanResult.Success;
         }
         catch (Exception ex)

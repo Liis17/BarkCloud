@@ -29,13 +29,14 @@ tokens = new TokenManager(connection.Identity, new TokenStore());
 // Молча восстановить сессию из сохранённого refresh-токена (если есть).
 await tokens.TryRestoreAsync();
 
+var settings = new EngineSettingsStore();
 var gateway = new CloudGateway(connection.Cloud, connection.Files, connection.Http, $"{filesAddress}/web",
-    () => tokens?.CurrentToken);
+    () => tokens?.CurrentToken, settings.GetCacheDir());
 var fs = new BarkCloudFileSystem(gateway);
 using var mount = new MountManager();
 using var lifetime = new CancellationTokenSource();
 
-var engine = new DriveEngine(tokens, gateway, mount, fs, lifetime);
+var engine = new DriveEngine(tokens, gateway, mount, fs, lifetime, settings);
 
 Console.WriteLine("BarkCloud.Drive.Engine запущен. Ожидание подключения UI...");
 

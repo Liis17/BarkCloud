@@ -90,6 +90,43 @@ public class DownloadFileCommandHandler : IRequestHandler<DownloadFileCommand, D
             file.Size
         );
 
+        var fileName = $"{file.Id}{extension}";
+        var totalSize = file.Size;
+
+        // Частичный запрос (HTTP Range): тянем из S3 только нужный диапазон.
+        if (request.RangeStart.HasValue && totalSize > 0)
+        {
+            var start = Math.Max(0, request.RangeStart.Value);
+            var end = request.RangeEnd ?? totalSize - 1;
+            if (end > totalSize - 1)
+                end = totalSize - 1;
+
+            if (start <= end)
+            {
+                var rangeStream = await _s3Uploader.DownloadRangeAsync(bucketName, $"{file.Id}", start, end);
+
+                // Длина диапазона — из ответа S3 (ContentLength), а не из метаданных БД:
+                // это исключает рассинхрон Content-Length с реально отдаваемыми байтами.
+                var rangeLength = rangeStream.Length;
+
+                _logger.LogDebug(
+                    "Частичная отдача файла {FileId}: байты {Start}-{End} ({Length} б) из {Total}",
+                    file.Id, start, start + rangeLength - 1, rangeLength, totalSize);
+
+                return new DownloadFileResult
+                {
+                    FileStream = rangeStream,
+                    FileName = fileName,
+                    ContentType = contentType,
+                    TotalSize = totalSize,
+                    ContentLength = rangeLength,
+                    IsPartial = true,
+                    RangeStart = start,
+                    RangeEnd = start + rangeLength - 1
+                };
+            }
+        }
+
         var fileStream = await _s3Uploader.DownloadAsync(
             bucketName,
             $"{file.Id}"
@@ -106,8 +143,13 @@ public class DownloadFileCommandHandler : IRequestHandler<DownloadFileCommand, D
         return new DownloadFileResult
         {
             FileStream = fileStream,
-            FileName = $"{file.Id}{extension}",
-            ContentType = contentType
+            FileName = fileName,
+            ContentType = contentType,
+            TotalSize = totalSize,
+            ContentLength = totalSize,
+            IsPartial = false,
+            RangeStart = 0,
+            RangeEnd = totalSize > 0 ? totalSize - 1 : 0
         };
     }
 }
