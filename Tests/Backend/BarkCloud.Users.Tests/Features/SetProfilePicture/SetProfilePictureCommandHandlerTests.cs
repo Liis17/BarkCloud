@@ -80,4 +80,19 @@ public class SetProfilePictureCommandHandlerTests
         await act.Should().ThrowAsync<ProfilePictureHasNotValidType>();
         _users.Verify(s => s.UpdateProfilePicture(It.IsAny<long>(), It.IsAny<string>(), It.IsAny<string>()), Times.Never);
     }
+
+    [Fact]
+    public async Task Handle_FilesServiceFails_PropagatesAndDoesNotUpdate()
+    {
+        _filesClient.Setup(c => c.GetFileDataAsync(
+                It.IsAny<GetFileDataRequest>(), It.IsAny<Grpc.Core.Metadata>(),
+                It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
+            .Throws(new Grpc.Core.RpcException(new Grpc.Core.Status(Grpc.Core.StatusCode.Internal, "files down")));
+
+        var act = () => CreateSut().Handle(new SetProfilePictureCommand { FileId = Guid.NewGuid() }, default);
+
+        await act.Should().ThrowAsync<Grpc.Core.RpcException>();
+        _users.Verify(s => s.UpdateProfilePicture(It.IsAny<long>(), It.IsAny<string>(), It.IsAny<string>()), Times.Never);
+        _queue.Verify(s => s.UserChangedAvatarEvent(It.IsAny<long>(), It.IsAny<string>(), It.IsAny<string>()), Times.Never);
+    }
 }

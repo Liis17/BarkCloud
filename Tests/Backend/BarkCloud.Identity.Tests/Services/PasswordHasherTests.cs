@@ -65,4 +65,21 @@ public class PasswordHasherTests
 
         PasswordHasher.VerifyPassword("bar", legacyHash).Should().BeFalse();
     }
+
+    [Fact]
+    public void VerifyPassword_LongPassword_RoundTrips()
+    {
+        var password = new string('a', 100);
+        var hash = PasswordHasher.HashPassword(password);
+
+        PasswordHasher.VerifyPassword(password, hash).Should().BeTrue();
+    }
+
+    [Fact]
+    public void VerifyPassword_MalformedNonBCryptHash_ReturnsFalseWithoutThrowing()
+    {
+        // Не-BCrypt строка идёт по legacy-ветке и сравнивается побайтово как есть —
+        // мусор в storedHash должен давать false, а не исключение.
+        PasswordHasher.VerifyPassword("any", "not-a-real-hash").Should().BeFalse();
+    }
 }

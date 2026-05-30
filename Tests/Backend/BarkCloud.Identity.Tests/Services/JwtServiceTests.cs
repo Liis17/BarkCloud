@@ -114,4 +114,35 @@ public class JwtServiceTests
         var jwt = Read(token);
         jwt.ValidTo.Year.Should().Be(9999);
     }
+
+    [Fact]
+    public void GenerateServerToken_DoesNotContainUserOrDeviceClaims()
+    {
+        var sut = new JwtService(BuildSettings());
+
+        var token = sut.GenerateServerToken(ServiceId.Files);
+
+        var jwt = Read(token);
+        jwt.Claims.Should().NotContain(c => c.Type == IdentityClaims.UserId);
+        jwt.Claims.Should().NotContain(c => c.Type == IdentityClaims.DeviceId);
+    }
+
+    [Fact]
+    public void GenerateUserToken_ValidationWithWrongKey_IsRejected()
+    {
+        var sut = new JwtService(BuildSettings());
+        var token = sut.GenerateUserToken(1, "d");
+
+        var handler = new JwtSecurityTokenHandler();
+        var act = () => handler.ValidateToken(token.Value, new TokenValidationParameters
+        {
+            ValidateIssuer = false,
+            ValidateAudience = false,
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("a_completely_different_secret_key_32bytes!!")),
+            ValidateLifetime = false
+        }, out _);
+
+        act.Should().Throw<SecurityTokenException>();
+    }
 }

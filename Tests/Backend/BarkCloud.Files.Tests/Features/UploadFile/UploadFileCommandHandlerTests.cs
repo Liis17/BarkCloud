@@ -16,11 +16,13 @@ public class UploadFileCommandHandlerTests
 {
     private readonly Mock<IUploadedFilesStorage> _files = new();
     private readonly Mock<IFileHashesStorage> _hashes = new();
+    private readonly Mock<IFileMetadataStorage> _metadata = new();
     private readonly Mock<S3BucketRegistry> _bucketRegistry;
     private readonly Mock<S3Uploader> _s3;
     private readonly Mock<ImageCompressor> _imageCompressor;
     private readonly Mock<VideoThumbnailExtractor> _videoExtractor;
     private readonly Mock<HeicImageConverter> _heicConverter;
+    private readonly Mock<FileMetadataExtractor> _metadataExtractor;
     private readonly Mock<PreviewPersistenceService> _previewPersistence;
 
     public UploadFileCommandHandlerTests()
@@ -35,15 +37,16 @@ public class UploadFileCommandHandlerTests
         _imageCompressor = new Mock<ImageCompressor>();
         _videoExtractor = new Mock<VideoThumbnailExtractor>(NullLogger<VideoThumbnailExtractor>.Instance);
         _heicConverter = new Mock<HeicImageConverter>(NullLogger<HeicImageConverter>.Instance);
+        _metadataExtractor = new Mock<FileMetadataExtractor>(NullLogger<FileMetadataExtractor>.Instance);
         _previewPersistence = new Mock<PreviewPersistenceService>(
             _files.Object, _hashes.Object, _s3.Object, /* FilesContext */ null!,
             NullLogger<PreviewPersistenceService>.Instance);
     }
 
     private UploadFileCommandHandler CreateSut() => new(
-        _files.Object, _hashes.Object, _s3.Object, _bucketRegistry.Object,
+        _files.Object, _hashes.Object, _metadata.Object, _s3.Object, _bucketRegistry.Object,
         _imageCompressor.Object, _videoExtractor.Object, _heicConverter.Object,
-        _previewPersistence.Object, NullLogger<UploadFileCommandHandler>.Instance);
+        _metadataExtractor.Object, _previewPersistence.Object, NullLogger<UploadFileCommandHandler>.Instance);
 
     private static Stream MakeStream(string content = "hello") => new MemoryStream(System.Text.Encoding.UTF8.GetBytes(content));
 
