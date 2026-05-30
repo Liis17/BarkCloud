@@ -18,9 +18,38 @@
         <ui:TitleBar Grid.Row="0" Title="Настройка BarkCloud Drive" ShowMaximize="False" ShowMinimize="False"/>
 
         <Grid Grid.Row="1" Margin="24,8,24,8">
-            <!-- Шаг 1: вход -->
-            <StackPanel x:Name="StepLogin">
-                <TextBlock Text="Шаг 1 из 4 · Вход" FontWeight="Bold" FontSize="15" Margin="0,0,0,12"/>
+            <!-- Шаг 1: адрес сервера -->
+            <StackPanel x:Name="StepServer">
+                <TextBlock Text="Шаг 1 из 5 · Адрес сервера" FontWeight="Bold" FontSize="15" Margin="0,0,0,12"/>
+                <TextBlock Text="Адрес вашего сервера BarkCloud:" TextWrapping="Wrap" Margin="0,0,0,8"/>
+                <TextBlock Text="Сервер (хост или IP)" Margin="0,0,0,4"/>
+                <ui:TextBox x:Name="HostBox" PlaceholderText="cloud.example.com" Margin="0,0,0,12"/>
+                <TextBlock Text="Порты сервисов" Margin="0,0,0,4"/>
+                <Grid Margin="0,0,0,12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" Margin="0,0,4,0">
+                        <TextBlock Text="Identity" Opacity="0.7" Margin="0,0,0,2"/>
+                        <ui:TextBox x:Name="IdentityPortBox"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Margin="4,0,4,0">
+                        <TextBlock Text="Files" Opacity="0.7" Margin="0,0,0,2"/>
+                        <ui:TextBox x:Name="FilesPortBox"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" Margin="4,0,0,0">
+                        <TextBlock Text="Users" Opacity="0.7" Margin="0,0,0,2"/>
+                        <ui:TextBox x:Name="UsersPortBox"/>
+                    </StackPanel>
+                </Grid>
+                <CheckBox x:Name="AcceptCertCheck" Content="Доверять самоподписанному сертификату" IsChecked="True"/>
+            </StackPanel>
+
+            <!-- Шаг 2: вход -->
+            <StackPanel x:Name="StepLogin" Visibility="Collapsed">
+                <TextBlock Text="Шаг 2 из 5 · Вход" FontWeight="Bold" FontSize="15" Margin="0,0,0,12"/>
                 <StackPanel x:Name="LoginFields">
                     <ui:TextBox x:Name="UsernameBox" PlaceholderText="Логин или email" Margin="0,2,0,8"/>
                     <ui:PasswordBox x:Name="PasswordBox" PlaceholderText="Пароль" Margin="0,2,0,8"/>
@@ -29,18 +58,18 @@
                 <TextBlock x:Name="AlreadyLoggedIn" Visibility="Collapsed" TextWrapping="Wrap"/>
             </StackPanel>
 
-            <!-- Шаг 2: имя и буква -->
+            <!-- Шаг 3: имя и буква -->
             <StackPanel x:Name="StepDrive" Visibility="Collapsed">
-                <TextBlock Text="Шаг 2 из 4 · Диск" FontWeight="Bold" FontSize="15" Margin="0,0,0,12"/>
+                <TextBlock Text="Шаг 3 из 5 · Диск" FontWeight="Bold" FontSize="15" Margin="0,0,0,12"/>
                 <TextBlock Text="Имя диска" Margin="0,0,0,4"/>
                 <ui:TextBox x:Name="VolumeLabelBox" Text="BarkCloud" Margin="0,0,0,12"/>
                 <TextBlock Text="Буква диска" Margin="0,0,0,4"/>
                 <ComboBox x:Name="LetterCombo" HorizontalAlignment="Stretch"/>
             </StackPanel>
 
-            <!-- Шаг 3: папка кэша -->
+            <!-- Шаг 4: папка кэша -->
             <StackPanel x:Name="StepCache" Visibility="Collapsed">
-                <TextBlock Text="Шаг 3 из 4 · Папка кэша" FontWeight="Bold" FontSize="15" Margin="0,0,0,12"/>
+                <TextBlock Text="Шаг 4 из 5 · Папка кэша" FontWeight="Bold" FontSize="15" Margin="0,0,0,12"/>
                 <TextBlock Text="Куда складывать скачанное содержимое файлов:" TextWrapping="Wrap" Margin="0,0,0,8"/>
                 <Grid>
                     <Grid.ColumnDefinitions>
@@ -52,9 +81,9 @@
                 </Grid>
             </StackPanel>
 
-            <!-- Шаг 4: автозагрузка -->
+            <!-- Шаг 5: автозагрузка -->
             <StackPanel x:Name="StepAutostart" Visibility="Collapsed">
-                <TextBlock Text="Шаг 4 из 4 · Автозагрузка" FontWeight="Bold" FontSize="15" Margin="0,0,0,12"/>
+                <TextBlock Text="Шаг 5 из 5 · Автозагрузка" FontWeight="Bold" FontSize="15" Margin="0,0,0,12"/>
                 <TextBlock Text="Запускать при входе в Windows:" TextWrapping="Wrap" Margin="0,0,0,10"/>
                 <CheckBox x:Name="AutostartAppCheck" Content="Приложение (значок в трее)" IsChecked="True" Margin="0,0,0,8"/>
                 <CheckBox x:Name="AutostartEngineCheck" Content="Движок (монтировать диск при входе)" IsChecked="True"/>

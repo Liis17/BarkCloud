@@ -33,6 +33,14 @@ public partial class SettingsWindow : FluentWindow
         AutostartAppCheck.IsChecked = Autostart.IsAppEnabled();
         AutostartEngineCheck.IsChecked = Autostart.IsEngineEnabled();
 
+        // Адрес сервера читается из файла, не зависит от движка.
+        var server = ServerConfig.Load() ?? new ServerConfig();
+        HostBox.Text = server.Host;
+        IdentityPortBox.Text = server.IdentityPort.ToString();
+        FilesPortBox.Text = server.FilesPort.ToString();
+        UsersPortBox.Text = server.UsersPort.ToString();
+        AcceptCertCheck.IsChecked = server.AcceptAnyCert;
+
         var engine = Engine;
         if (engine == null)
         {
@@ -90,6 +98,64 @@ public partial class SettingsWindow : FluentWindow
         catch (Exception ex)
         {
             Status($"Ошибка выхода: {ex.Message}");
+        }
+    }
+
+    private async void ApplyServerClick(object sender, RoutedEventArgs e)
+    {
+        var host = ServerInput.StripScheme(HostBox.Text);
+        if (string.IsNullOrEmpty(host)) { Status("Введите адрес сервера."); return; }
+        if (!ServerInput.TryPort(IdentityPortBox.Text, out var ip)) { Status("Неверный порт Identity (1–65535)."); return; }
+        if (!ServerInput.TryPort(FilesPortBox.Text, out var fp)) { Status("Неверный порт Files (1–65535)."); return; }
+        if (!ServerInput.TryPort(UsersPortBox.Text, out var up)) { Status("Неверный порт Users (1–65535)."); return; }
+
+        var cfg = new ServerConfig
+        {
+            Host = host,
+            IdentityPort = ip,
+            FilesPort = fp,
+            UsersPort = up,
+            AcceptAnyCert = AcceptCertCheck.IsChecked == true,
+        };
+
+        try
+        {
+            cfg.Save();
+        }
+        catch (Exception ex)
+        {
+            Status($"Не удалось сохранить адрес: {ex.Message}");
+            return;
+        }
+
+        Status("Применение адреса, перезапуск движка…");
+        var engine = await _owner.RestartEngineAsync();
+        if (engine == null)
+        {
+            Status("Движок недоступен после смены адреса.");
+            return;
+        }
+
+        try
+        {
+            var s = await engine.GetStatusAsync();
+            if (!s.Authenticated)
+            {
+                // Новый сервер — сессия не восстановилась. Возврат к мастеру (там есть вход).
+                _settings.Configured = false;
+                _settings.Save();
+                Status("Адрес сохранён. Требуется вход — откроется мастер.");
+                Close();
+                return;
+            }
+
+            UsernameText.Text = UserText(s);
+            UpdateMountButtons(s.Mounted);
+            Status("Адрес сервера обновлён.");
+        }
+        catch (Exception ex)
+        {
+            Status($"Ошибка: {ex.Message}");
         }
     }
 

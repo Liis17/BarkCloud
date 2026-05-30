@@ -1,6 +1,7 @@
 using System.IO.Pipes;
 using System.Text.Json;
 
+using BarkCloud.Drive.Contracts;
 using BarkCloud.Drive.Engine;
 
 using StreamJsonRpc;
@@ -96,10 +97,28 @@ return 0;
 static EngineConfig LoadConfig()
 {
     var path = Path.Combine(AppContext.BaseDirectory, "appsettings.json");
-    return JsonSerializer.Deserialize<EngineConfig>(
-               File.ReadAllText(path),
-               new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
-           ?? new EngineConfig();
+    var config = JsonSerializer.Deserialize<EngineConfig>(
+                     File.ReadAllText(path),
+                     new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
+                 ?? new EngineConfig();
+
+    // Адреса self-hosted сервера, заданные пользователем в UI, перекрывают дефолты.
+    var server = ServerConfig.Load();
+    if (server != null)
+    {
+        config.Host = server.Host;
+        config.IdentityPort = server.IdentityPort;
+        config.FilesPort = server.FilesPort;
+        config.UsersPort = server.UsersPort;
+        config.DangerousAcceptAnyServerCert = server.AcceptAnyCert;
+    }
+
+    // Самодиагностика для self-hosted: какой адрес реально применён (частая причина проблем).
+    EngineLog.Info(server != null
+        ? $"Адреса из server.json: {config.Host} (Identity {config.IdentityPort}/Files {config.FilesPort}/Users {config.UsersPort})"
+        : $"server.json не задан — дефолты: {config.Host} (Identity {config.IdentityPort}/Files {config.FilesPort}/Users {config.UsersPort})");
+
+    return config;
 }
 
 internal sealed class EngineConfig
