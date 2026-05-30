@@ -9,20 +9,24 @@ using Wpf.Ui.Controls;
 
 namespace BarkCloud.Drive.App;
 
-// Мастер первичной настройки: вход → имя/буква диска → папка кэша → создание диска.
+// Мастер первичной настройки: адрес сервера → вход → имя/буква диска → папка кэша → автозагрузка.
 public partial class FirstRunWizard : FluentWindow
 {
     private static readonly char[] InvalidLabelChars = "\\/:*?\"<>|".ToCharArray();
 
-    private readonly IDriveEngine _engine;
+    private IDriveEngine _engine;
     private readonly AppSettings _settings;
+    private readonly Func<Task<IDriveEngine?>> _restartEngine;
+    private ServerConfig _appliedServer = new(); // адрес, с которым сейчас работает движок
+    private bool _serverFileSaved; // server.json уже записан → движок точно стартовал с него
     private int _step;
     private bool _authenticated;
 
-    internal FirstRunWizard(IDriveEngine engine, AppSettings settings)
+    internal FirstRunWizard(IDriveEngine engine, AppSettings settings, Func<Task<IDriveEngine?>> restartEngine)
     {
         _engine = engine;
         _settings = settings;
+        _restartEngine = restartEngine;
         InitializeComponent();
 
         foreach (var letter in DriveLetters.Free())
@@ -36,6 +40,18 @@ public partial class FirstRunWizard : FluentWindow
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
     {
+        // Адрес сервера (defaults или ранее сохранённый server.json) — это то,
+        // с чем движок стартовал, поэтому одновременно фиксируем как «применённый».
+        var server = ServerConfig.Load();
+        _serverFileSaved = server != null; // нет файла → движок на дефолтах appsettings.json
+        server ??= new ServerConfig();
+        _appliedServer = server;
+        HostBox.Text = server.Host;
+        IdentityPortBox.Text = server.IdentityPort.ToString();
+        FilesPortBox.Text = server.FilesPort.ToString();
+        UsersPortBox.Text = server.UsersPort.ToString();
+        AcceptCertCheck.IsChecked = server.AcceptAnyCert;
+
         try
         {
             var settings = await _engine.GetSettingsAsync();
@@ -61,13 +77,14 @@ public partial class FirstRunWizard : FluentWindow
 
     private void ShowStep()
     {
-        StepLogin.Visibility = _step == 0 ? Visibility.Visible : Visibility.Collapsed;
-        StepDrive.Visibility = _step == 1 ? Visibility.Visible : Visibility.Collapsed;
-        StepCache.Visibility = _step == 2 ? Visibility.Visible : Visibility.Collapsed;
-        StepAutostart.Visibility = _step == 3 ? Visibility.Visible : Visibility.Collapsed;
+        StepServer.Visibility = _step == 0 ? Visibility.Visible : Visibility.Collapsed;
+        StepLogin.Visibility = _step == 1 ? Visibility.Visible : Visibility.Collapsed;
+        StepDrive.Visibility = _step == 2 ? Visibility.Visible : Visibility.Collapsed;
+        StepCache.Visibility = _step == 3 ? Visibility.Visible : Visibility.Collapsed;
+        StepAutostart.Visibility = _step == 4 ? Visibility.Visible : Visibility.Collapsed;
 
         BackButton.IsEnabled = _step > 0;
-        NextButton.Content = _step == 3 ? "Готово" : "Далее";
+        NextButton.Content = _step == 4 ? "Готово" : "Далее";
         WizardStatus.Visibility = Visibility.Collapsed;
     }
 
@@ -89,7 +106,7 @@ public partial class FirstRunWizard : FluentWindow
         NextButton.IsEnabled = false;
         try
         {
-            if (_step == 3)
+            if (_step == 4)
             {
                 await FinishAsync();
                 return;
@@ -112,6 +129,9 @@ public partial class FirstRunWizard : FluentWindow
         switch (_step)
         {
             case 0:
+                return await ApplyServerAsync();
+
+            case 1:
                 if (_authenticated)
                     return true;
 
@@ -124,9 +144,11 @@ public partial class FirstRunWizard : FluentWindow
                     return Fail(string.IsNullOrEmpty(status.Error) ? "Не удалось войти." : status.Error!);
 
                 _authenticated = true;
+                PasswordBox.Password = string.Empty; // не держим пароль/одноразовый OTP в полях
+                OtpBox.Text = string.Empty;
                 return true;
 
-            case 1:
+            case 2:
                 var label = VolumeLabelBox.Text.Trim();
                 if (string.IsNullOrEmpty(label))
                     return Fail("Введите имя диска.");
@@ -136,7 +158,7 @@ public partial class FirstRunWizard : FluentWindow
                     return Fail("Выберите букву диска.");
                 return true;
 
-            case 2:
+            case 3:
                 var dir = CacheDirBox.Text.Trim();
                 if (string.IsNullOrEmpty(dir))
                     return Fail("Выберите папку кэша.");
@@ -155,6 +177,83 @@ public partial class FirstRunWizard : FluentWindow
                 return true;
         }
     }
+
+    // Шаг адреса: проверить, сохранить и (если изменился) перезапустить движок,
+    // чтобы он подхватил новые адреса — каналы строятся только на старте.
+    private async Task<bool> ApplyServerAsync()
+    {
+        var host = ServerInput.StripScheme(HostBox.Text);
+        if (string.IsNullOrEmpty(host))
+            return Fail("Введите адрес сервера.");
+        if (!ServerInput.TryPort(IdentityPortBox.Text, out var ip))
+            return Fail("Неверный порт Identity (1–65535).");
+        if (!ServerInput.TryPort(FilesPortBox.Text, out var fp))
+            return Fail("Неверный порт Files (1–65535).");
+        if (!ServerInput.TryPort(UsersPortBox.Text, out var up))
+            return Fail("Неверный порт Users (1–65535).");
+
+        var cfg = new ServerConfig
+        {
+            Host = host,
+            IdentityPort = ip,
+            FilesPort = fp,
+            UsersPort = up,
+            AcceptAnyCert = AcceptCertCheck.IsChecked == true,
+        };
+
+        // Если server.json уже записан и адрес не менялся (например, вернулись назад) —
+        // движок точно работает с ним, перезапуск не нужен. На первом запуске (файла нет)
+        // всё равно сохраняем и перезапускаем, чтобы движок гарантированно ушёл с дефолтов.
+        if (_serverFileSaved && SameServer(cfg, _appliedServer))
+            return true;
+
+        try
+        {
+            cfg.Save();
+        }
+        catch (Exception ex)
+        {
+            return Fail($"Не удалось сохранить адрес: {ex.Message}");
+        }
+
+        var engine = await _restartEngine();
+        if (engine == null)
+            return Fail("Движок недоступен после смены адреса сервера.");
+
+        _engine = engine;
+        _appliedServer = cfg;
+        _serverFileSaved = true;
+
+        // Против нового сервера сессия могла восстановиться из refresh-токена.
+        try
+        {
+            var st = await _engine.GetStatusAsync();
+            _authenticated = st.Authenticated;
+            if (st.Authenticated)
+            {
+                LoginFields.Visibility = Visibility.Collapsed;
+                AlreadyLoggedIn.Visibility = Visibility.Visible;
+                AlreadyLoggedIn.Text = string.IsNullOrEmpty(st.Username)
+                    ? "Вы уже вошли. Нажмите «Далее»."
+                    : $"Вы вошли как {st.Username}. Нажмите «Далее».";
+            }
+            else
+            {
+                LoginFields.Visibility = Visibility.Visible;
+                AlreadyLoggedIn.Visibility = Visibility.Collapsed;
+            }
+        }
+        catch
+        {
+            // статус не критичен — шаг входа проверит сам
+        }
+
+        return true;
+    }
+
+    private static bool SameServer(ServerConfig a, ServerConfig b)
+        => a.Host == b.Host && a.IdentityPort == b.IdentityPort && a.FilesPort == b.FilesPort
+           && a.UsersPort == b.UsersPort && a.AcceptAnyCert == b.AcceptAnyCert;
 
     private void BrowseClick(object sender, RoutedEventArgs e)
     {

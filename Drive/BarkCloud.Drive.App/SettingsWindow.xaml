@@ -27,6 +27,42 @@
                     </StackPanel>
                 </ui:Card>
 
+                <!-- Сервер -->
+                <ui:Card Margin="0,12,0,0">
+                    <StackPanel>
+                        <TextBlock Text="Сервер" FontWeight="SemiBold" Margin="0,0,0,8"/>
+
+                        <TextBlock Text="Сервер (хост или IP)" Margin="0,0,0,4"/>
+                        <ui:TextBox x:Name="HostBox" Margin="0,0,0,10"/>
+
+                        <TextBlock Text="Порты сервисов" Margin="0,0,0,4"/>
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Margin="0,0,4,0">
+                                <TextBlock Text="Identity" Opacity="0.7" Margin="0,0,0,2"/>
+                                <ui:TextBox x:Name="IdentityPortBox"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Margin="4,0,4,0">
+                                <TextBlock Text="Files" Opacity="0.7" Margin="0,0,0,2"/>
+                                <ui:TextBox x:Name="FilesPortBox"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="2" Margin="4,0,0,0">
+                                <TextBlock Text="Users" Opacity="0.7" Margin="0,0,0,2"/>
+                                <ui:TextBox x:Name="UsersPortBox"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <CheckBox x:Name="AcceptCertCheck" Content="Доверять самоподписанному сертификату" Margin="0,0,0,10"/>
+                        <ui:Button Content="Применить адрес" Click="ApplyServerClick"/>
+                        <TextBlock Text="Движок перезапустится; при смене сервера может потребоваться повторный вход."
+                                   Opacity="0.7" TextWrapping="Wrap" Margin="0,8,0,0"/>
+                    </StackPanel>
+                </ui:Card>
+
                 <!-- Диск -->
                 <ui:Card Margin="0,12,0,0">
                     <StackPanel>

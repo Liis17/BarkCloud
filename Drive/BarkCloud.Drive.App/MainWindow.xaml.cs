@@ -76,6 +76,15 @@ public partial class MainWindow : FluentWindow
                 ExitApp(); // первичная настройка отменена — без неё пользоваться нечем
                 return;
             }
+
+            // В мастере могли сменить адрес сервера → движок перезапущен, прокси обновлён.
+            if (_engine == null)
+            {
+                UpdateEngineBanner();
+                return;
+            }
+
+            engine = _engine;
         }
 
         try
@@ -130,7 +139,7 @@ public partial class MainWindow : FluentWindow
 
     private bool RunWizard(IDriveEngine engine)
     {
-        var wizard = new FirstRunWizard(engine, _settings) { Owner = this };
+        var wizard = new FirstRunWizard(engine, _settings, RestartEngineAsync) { Owner = this };
         return wizard.ShowDialog() == true;
     }
 
