@@ -4,8 +4,10 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 
+using System.IdentityModel.Tokens.Jwt;
 using System.Text;
 
 namespace BarkCloud.GrpcServer.XAuth;
@@ -59,7 +61,13 @@ public static class XAuthExtensions
                                 var cache = context.HttpContext.RequestServices
                                     .GetRequiredService<TokenRevocationCache>();
 
-                                if (cache.IsRevoked(userId, deviceId))
+                                // iat валидированного токена. Если не прочитать —
+                                // MinValue (≤ любого отзыва), т.е. fail-safe «отозван».
+                                var issuedAt = (context.SecurityToken as JsonWebToken)?.IssuedAt
+                                    ?? (context.SecurityToken as JwtSecurityToken)?.IssuedAt
+                                    ?? DateTime.MinValue;
+
+                                if (cache.IsRevoked(userId, deviceId, issuedAt))
                                 {
                                     context.Fail("Session has been revoked");
                                 }
