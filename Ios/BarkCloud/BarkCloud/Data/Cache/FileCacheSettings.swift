@@ -42,4 +42,11 @@ final class FileCacheSettings: @unchecked Sendable {
         get { defaults.object(forKey: lastSweepKey) as? Date }
         set { defaults.set(newValue, forKey: lastSweepKey) }
     }
+
+    /// Сброс к дефолтам — при полном сбросе устройства.
+    func reset() {
+        defaults.removeObject(forKey: maxBytesKey)
+        defaults.removeObject(forKey: staleMaxAgeKey)
+        defaults.removeObject(forKey: lastSweepKey)
+    }
 }

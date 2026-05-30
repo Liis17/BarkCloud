@@ -39,6 +39,7 @@
 
 ### 📱 Модули — iOS
 - [[modules/ios-app]] — Нативный iOS-клиент (SwiftUI, Swift 5, iOS 18+), полный паритет с Android — реализован
+  - [[modules/ios-background-upload]] — Фоновая загрузка через `URLSession.background` + Live Activity (Lock Screen + Dynamic Island), Share Extension сам грузит, BGTask retry
 
 ### 💻 Модули — Windows (Desktop)
 - [[modules/windows-drive]] — Виртуальный диск `X:` поверх облака (Dokany, .NET). Текущее: read-only PoC фазы 2

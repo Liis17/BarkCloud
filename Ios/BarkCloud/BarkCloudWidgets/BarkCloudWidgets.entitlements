@@ -6,9 +6,5 @@
 	<array>
 		<string>group.com.barkfluff.BarkCloud</string>
 	</array>
-	<key>keychain-access-groups</key>
-	<array>
-		<string>$(AppIdentifierPrefix)com.barkfluff.BarkCloud</string>
-	</array>
 </dict>
 </plist>

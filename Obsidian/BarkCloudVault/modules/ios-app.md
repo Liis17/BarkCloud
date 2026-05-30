@@ -19,16 +19,17 @@ Parent: [[index]]
 BarkCloud/
 ├── App/
 │   ├── BarkCloudApp.swift          @main, инжектит AppEnvironment в RootView
-│   ├── AppEnvironment.swift        @Observable service locator (sessionStore, grpcManager, authRepository, localFileRepository, fileTransfer, userRepository, cloudRepository, albumRepository)
-│   └── RootView.swift              gate: !sessionExpired && (hasValidRefreshToken || isAuthenticated) ? Main : Login
+│   ├── AppEnvironment.swift        @Observable service locator (serverConfig, sessionStore, grpcManager, authRepository, localFileRepository, fileTransfer, userRepository, cloudRepository, albumRepository)
+│   ├── ServerConfigStore.swift     @Observable обёртка над ServerConfig (App Group UserDefaults): config + isConfigured + save(_:) — гейт первого запуска (см. [[#Server Setup]])
+│   └── RootView.swift              gate: !serverConfig.isConfigured ? ServerSetup : (!sessionExpired && (hasValidRefreshToken || isAuthenticated) ? Main : Login)
 ├── Session/
 │   └── SessionStore.swift          Keychain (kSecClassGenericPassword, service "com.barkfluff.BarkCloud.tokens"); snapshot()/saveRefreshedAccessToken()/invalidate(), наблюдаемый флаг sessionExpired
 ├── Networking/                     gRPC: GrpcManager (actor) + интерсепторы
-│   ├── GrpcManager.swift           multi-endpoint: Identity :7020 / Users :7021 / Files(Cloud/Album) :7025, TLS allowSelfSigned, кэш GRPCClient по порту, стабы identity/users/files/cloud/album; **проактивное авто-обновление access-токена** (Identity.CreateToken, сериализовано через refreshTask)
+│   ├── GrpcManager.swift           multi-endpoint поверх **ServerConfig** (self-hosted адреса из App Group UserDefaults, см. [[#Server Setup]]): per-service host+port Identity/Users/Files(Cloud/Album), TLS allowSelfSigned, кэш GRPCClient по ключу `host:port`, стабы identity/users/files/cloud/album; **проактивное авто-обновление access-токена** (Identity.CreateToken, сериализовано через refreshTask). `GrpcEndpoint` — статические computed-аксессоры над `ServerConfig.current` (хосты/порты/scheme/filesWebBase/webHost); до настройки — `ServerConfig.production` дефолты
 │   ├── InsecureURLSession.swift    URLSession, доверяющий self-signed TLS (для HTTP upload/download и превью)
 │   ├── FileTransferService.swift   FilesApi (GetUploadUrl/GetTempDownloadUrl/StorageInfo) + HTTP multipart upload (поле `file`) / download оригинала
 │   ├── CloudErrorCodes.swift       GUID-коды доменных ошибок Files/Users + domainErrorMessage(_:)
-│   ├── AuthInterceptor.swift       x-auth-token — токен берёт у GrpcManager по имени метода (с проактивным refresh; CreateToken → nil, без рекурсии)
+│   ├── AuthInterceptor.swift       x-auth-token — токен берёт у GrpcManager по имени метода (с проактивным refresh; публичные Auth/CreateToken → nil, чтобы стейл-токен не ловил 401 от auth-middleware)
 │   ├── XAppInterceptor / XDeviceInterceptor / XIpInterceptor / XOsInterceptor — device-метаданные
 │   ├── Base64Header.swift          base64-кодирование значений заголовков
 │   ├── AuthErrorCodes.swift        GUID-коды OTP_REQUIRED / INVALID_CREDENTIALS
@@ -44,7 +45,8 @@ BarkCloud/
 │   └── AlbumRepository.swift       AlbumApi: список/содержимое альбомов, create/update/delete, add/remove items
 ├── Data/Cache/                     **постоянный дисковый кеш файлов** ([[ios-file-cache]]): CacheVariant, CachedFileEntry (SwiftData @Model), FileCacheService (actor), FileCacheSettings
 ├── Features/
-│   ├── Login/                      LoginScreen + LoginUiState + LoginViewModel (логин/пароль + OTP)
+│   ├── ServerSetup/                ServerSetupScreen — ввод адресов self-hosted сервера на первом запуске (см. [[#Server Setup]])
+│   ├── Login/                      LoginScreen + LoginUiState + LoginViewModel (логин/пароль + OTP; внизу ссылка «Настройки сервера» → лист ServerSetupScreen)
 │   ├── Main/                       MainScreen (TabView, 5 табов: Галерея/Файлы/Альбомы(default)/Корзина/Настройки), MainDestination
 │   ├── Gallery/                    GalleryScreen+VM (медиатека устройства PhotoKit: сетка фото+видео, выбор, загрузка в облако), DeviceMediaViews (PHImageManager-загрузчик + ячейка + полноэкранный просмотр фото/видео), DeviceAssetResource (общее чтение оригинала+SHA256), CloudPresenceTracker (индикация «уже в облаке»), DeviceAssetPickerScreen (кастомный пикер загрузки — замена PhotosPicker)
 │   ├── Shared/                     RemoteImage (self-signed AsyncImage-замена + NSCache; cache-aware вариант `RemoteImage(fileId:variant:url:)` и `FallbackRemoteImage(fileId:urls:)` тянут байты через дисковый кеш [[ios-file-cache]]), FilePreviewController/RemoteFilePreviewScreen (QuickLook; оригинал через FileCacheService.loadFile(.original)), MediaThumb (fileId + previewWidth) + SquareThumbClip (квадратная обрезка fill-картинки с корректным хит-тестом), ComingSoonScreen (универсальная заглушка «скоро»), BarkMascot/BarkRefreshHeader/BarkRefreshable (фирменный pull-to-refresh — **полностью свой, без системного `.refreshable`**, поэтому в зазоре нет ни системного спиннера, ни подложки: видна только пиксель-арт оранжевая лиса в Canvas — сидит ровно анфас, пушистый хвост справа виляет вверх-вниз непрерывным сдвигом по синусу; виляние идёт и при вытягивании, и при обновлении — TimelineView `.animation` с paused: `!(isRefreshing || progress > 0.001)`, масштаб появления ведётся от `pullProgress`. Жест: `onScrollGeometryChange` → `pullProgress`, `onScrollPhaseChange` → при отпускании (`.idle`/`.decelerating`) и `pullProgress >= 1` запускает обновление; во время обновления контент опускается на `refreshGap` через `.contentMargins(.top,…,for:.scrollContent)`, чтобы лиса была в чистом зазоре; **критично #1:** `pullProgress` считается как `max(0, -(contentOffset.y + contentInsets.top))/threshold` — именно `+ contentInsets.top`, потому что в покое `List` (TrashScreen) репортит `contentOffset.y == -contentInsets.top` (инсет навбара), и без поправки лиса висела бы постоянно; `ScrollView` (остальные экраны) покоится около 0, поэтому там баг не проявлялся; **критично #2:** прогресс/флаг обновления и сама задача (`Task`) хранятся в `@Observable BarkRefreshState`, а НЕ в `@State` модификатора — `body(content:)` читает только `isRefreshing` (редкий тогл для `contentMargins`), но НЕ `pullProgress`, поэтому прокрутка не пересобирает модификатор; задача обновления живёт в state-объекте и перерисовками view не отменяется (иначе рвался бы gRPC-запрос → «the transport threw an unexpected error»))
@@ -120,7 +122,7 @@ BarkCloud/
 | `Material3 Theme` | SwiftUI `.tint` + asset-catalog accent |
 | `androidx.navigation.compose NavHost` | SwiftUI `NavigationStack` (на таб) + `TabView` (5 табов: Галерея/Файлы/Альбомы/Корзина/Настройки, default = Альбомы) |
 | `FileProvider + ACTION_SEND` | `UIActivityViewController` через `UIViewControllerRepresentable` (PR 5) |
-| `BuildConfig.IDENTITY_API_ADDRESS = https://cloud.barkfluff.com:7020` | `GrpcEndpoint` в `GrpcManager`: `cloud.barkfluff.com:7020`, `useTLS = true`, `allowSelfSigned = true` (TLS терминируется на nginx) |
+| `BuildConfig.IDENTITY_API_ADDRESS = https://cloud.barkfluff.com:7020` | `ServerConfig` (App Group UserDefaults) → `GrpcEndpoint`: per-service host+port, useTLS, allowSelfSigned — задаёт пользователь на первом запуске (см. [[#Server Setup]]); дефолт `ServerConfig.production` = боевые адреса |
 
 ## Серверная интеграция (реализовано)
 
@@ -133,8 +135,11 @@ BarkCloud/
   осталось < 60 c (или токена нет): читает снимок `SessionStore.snapshot()`, при необходимости вызывает
   `Identity.CreateToken(refresh_token)` и сохраняет новый access-токен (`saveRefreshedAccessToken`).
   Обновление **сериализовано** полем `refreshTask` (актор-изоляция `GrpcManager`): при пачке параллельных
-  запросов `CreateToken` вызывается один раз, остальные ждут результат. Рекурсия исключена — для метода
-  `CreateToken` интерсептор не прикрепляет токен и не запускает refresh. Тот же путь (`grpc.validAccessToken()`)
+  запросов `CreateToken` вызывается один раз, остальные ждут результат. **Публичным (без авторизации) RPC
+  Identity — `Auth` (логин) и `CreateToken` (refresh) — токен НЕ прикрепляется** (`unauthenticatedMethods`):
+  иначе просроченный/чужой токен из Keychain ловит auth-middleware сервера и отвечает HTTP 401 ещё до метода
+  (логин падает «non-200 HTTP Status Code (401)»); для `CreateToken` это заодно исключает рекурсию refresh.
+  Тот же путь (`grpc.validAccessToken()`)
   использует HTTP-аплоад в `FileTransferService`. Если refresh-токен истёк локально или сервер ответил
   `UNAUTHENTICATED` — `SessionStore.invalidate()` чистит токены и поднимает наблюдаемый `sessionExpired`,
   и `RootView` уводит на экран логина. Успешная авторизация сбрасывает флаг (`AuthRepository.persist`).
@@ -150,10 +155,16 @@ BarkCloud/
   хранилище (`GetUserStorageInfo`), выход и удаление аккаунта (`DeleteAccount`).
   Sign-out проброшен `RootView → MainScreen → SettingsScreen` через `onSignOut`.
   **Выход** централизован в `AppEnvironment.signOut()`: серверный отзыв сессии `Identity.Logout`
-  (best-effort, до очистки токенов) → `resetLocalState()` = `SessionStore.clearSession()` (Keychain)
-  + `GrpcManager.shutdown()` (сброс кэшированных соединений) + `RemoteImageCache.clear()`
-  + `InsecureHTTP.clearCaches()` (URL-кэш/куки) → `onSignOut()` → Login. Удаление аккаунта
-  использует `resetLocalState()` без серверного `Logout` (аккаунт уже удалён). На время операции —
+  (best-effort, до очистки токенов) → `resetLocalState()`. **`resetLocalState()` — полный сброс до
+  «свежей установки»** (объём выбран как «полный сброс устройства»): `SessionStore.clearSession()`
+  (Keychain-токены) + `GrpcManager.shutdown()` (соединения) + `BackgroundUploadCoordinator.cancelAll()`
+  (отмена live-задач фоновой сессии) + `UploadQueueStore.deleteAll()` (очередь загрузок) +
+  `BackupManager.setAutoUpload(false)` + `RemoteImageCache.clear()` + `InsecureHTTP.clearCaches()`
+  (URL-кэш/куки) + `FileCacheService.clearAll()` + `AssetHashStore.clearAll()` + `FileCacheSettings.reset()`
+  + `AppLockSettings.disable()` (стирает PIN/соль из Keychain) + `VaultStore.removeAll()` (локальный «сейф»)
+  + `ServerConfigStore.reset()` (`ServerConfig.clear()` → `isConfigured=false`). После сброса `RootView`
+  уходит **на `ServerSetupScreen`** (адреса сервера стёрты), а не на Login. Удаление аккаунта
+  использует тот же `resetLocalState()` без серверного `Logout` (аккаунт уже удалён). На время операции —
   блокирующий оверлей (`isProcessing`), защищающий от повторных нажатий.
   **Пункт «Приложение»** (`AppSettingsScreen`) — переключатель «Блокировка входа» (Face ID + PIN),
   см. [[#App Lock]]: включение требует подтверждения биометрией и задания PIN через [[SetPinSheet]],
@@ -300,8 +311,8 @@ BarkCloud/
   **Удалить** (галерея/альбом → `DeleteUserMedia` в корзину **оптимистично через [[#PendingDelete]]** —
   файл сразу пропадает из сетки, внизу snackbar 5 с с «Отменить»; устройство → «Удалить с устройства»
   `PHAssetChangeRequest.deleteAssets`). **Экран свойств** (`Features/Shared/FilePropertiesSheet.swift`,
-  enum-вход `.cloud(MediaAsset)`/`.device(PHAsset)`) — имя/тип/размер/разрешение/даты/ID (как веб-модалка,
-  где есть данные); `MediaAsset` расширен полями `imageWidth/imageHeight/uploadedAt/etag` из `UploadFileInfo`.
+  enum-вход `.cloud(MediaAsset)`/`.device(PHAsset)`) — имя/тип/размер/разрешение/даты/ID/устройство загрузки
+  (как веб-модалка, где есть данные); `MediaAsset` расширен полями `imageWidth/imageHeight/uploadedAt/etag/uploadDeviceName` из `UploadFileInfo`.
   Для `.cloud` дополнительно через `.task` асинхронно подгружает расширенные метаданные блоба
   (`CloudRepository.getFileMetadata(fileID:)` → `CloudApi.GetFileMetadata`) и отрисовывает их секциями
   `List` поверх базовых полей: **Общее** (taken_at, creator_tool), **Камера** (make+model одной строкой,
@@ -346,6 +357,33 @@ store с одной активной записью `Pending { id, label, action
 `DevicesScreen` (`trash`/`pencil`); вместо `Label(..., systemImage:)` — голый `Image(systemName:)`
 + `.accessibilityLabel(...)` для VoiceOver.
 
+### Server Setup
+
+BarkCloud — self-hosted, поэтому адреса микросервисов вводит пользователь, а не хардкод.
+
+- **Модель** `ServerConfig` (`Networking/GrpcManager.swift`, `Sendable`): per-service `host`+`port`
+  (Identity/Users/Files), `useTLS`, `allowSelfSigned`. Хранится в **App Group UserDefaults**
+  (`UploadConstants.appGroupID` = `group.com.barkfluff.BarkCloud`) — чтобы конфиг видел и Share
+  Extension (отдельный процесс, тоже создаёт `GrpcManager`). Ключи `BarkCloud.server.*` + флаг
+  `configured`. `ServerConfig.current` отдаёт сохранённое или `production`-дефолты (боевые адреса);
+  `ServerConfig.isConfigured` — был ли первый ввод; `persist()` пишет ключи и поднимает `configured`.
+- **`GrpcEndpoint`** теперь статические computed-аксессоры над `ServerConfig.current`
+  (`identityHost/identityPort/...`, `useTLS`, `allowSelfSigned`, `scheme`, `filesWebBase`, `webHost`).
+  `GrpcManager.client(host:port:)` кэширует `GRPCClient` по ключу `"host:port"` (раньше — по порту,
+  один общий хост). `webHost`/`filesWebBase` выводятся из **хоста Files** (в этой архитектуре веб-UI
+  и файловая раздача на одном хосте). TLS-делегаты `InsecureURLSession`/`BackgroundUploadCoordinator`
+  доверяют self-signed только при `allowSelfSigned` и `host == GrpcEndpoint.filesHost`.
+- **`ServerConfigStore`** (`App/ServerConfigStore.swift`, `@MainActor @Observable`) — UI-обёртка:
+  `config`, `isConfigured`, `save(_:)`. Живёт в `AppEnvironment`. `RootView` показывает
+  `ServerSetupScreen`, пока `!serverConfig.isConfigured` (перед веткой Login/Main).
+- **`ServerSetupScreen`** (`Features/ServerSetup/`) — форма в стиле `LoginScreen` (крупный заголовок
+  `displaySmall`, секции по сервисам с host+port, тумблеры TLS/самоподписанный, prominent-кнопка
+  «Продолжить»). Поля предзаполнены текущей конфигурацией (на первом запуске — `production`-дефолты).
+  Валидация: host непустой (схема/слеши срезаются), port 1…65535. Сохранение → `serverConfig.save` +
+  `grpcManager.shutdown()` (сброс кэшированных соединений к старому адресу). Параметры `onCancel`
+  (ненил → показывает «Закрыть», режим листа) и `onComplete`. Доступен повторно с экрана логина
+  (ссылка «Настройки сервера» → лист) — чтобы можно было исправить неверный адрес, не «закирпичив» вход.
+
 ### App Lock
 
 Защита запуска приложения биометрией с резервным PIN. Включается из Настройки → Приложение
@@ -363,8 +401,8 @@ store с одной активной записью `Pending { id, label, action
   `unlockWithBiometric(reason:)` дёргает [[BiometricGate]] (`deviceOwnerAuthentication` =
   Face ID/Touch ID + код-пароль устройства как fallback). `verifyPin(_:)` → `.success`,
   `.wrong(remaining)`, `.wiped`. Wipe делегирует обратно в `AppEnvironment` через колбэк
-  `onWipe`: `resetLocalState()` (Keychain-токены, кеши, gRPC) + `VaultStore.removeAll()` +
-  сам `settings.disable()`. После wipe `RootView` сам уходит на Login, т.к. токенов больше нет.
+  `onWipe`: `resetLocalState()` (полный сброс — токены, кеши, очередь загрузок, «сейф», PIN, адреса
+  сервера; см. выше) + сам `settings.disable()`. После wipe `RootView` уходит на `ServerSetupScreen`.
 - UI (`Features/AppLock/`): `AppLockScreen` (полноэкранный — между Login и Main),
   `PinKeypad`/`PinDots`/`PinEntryView` (кастомная цифровая клавиатура 3×4 — без системной IME,
   6 точек-индикаторов), `SetPinSheet` (двухшаговый мастер: ввести → подтвердить, при
@@ -424,3 +462,67 @@ xcodebuild test -project BarkCloud.xcodeproj -scheme BarkCloud \
 - **PR 7** ✅ — Серверная интеграция: multi-endpoint gRPC (Users :7021, Files :7025), `FileTransferService`/`InsecureURLSession`/`RemoteImage`, репозитории `UserRepository`/`CloudRepository`/`AlbumRepository`; экраны Настройки/профиль/приватность/устройства, аватар, медиа-галерея с пагинацией и просмотром, альбомы, облачный файловый менеджер, загрузки фото/видео/документов.
 
 Серверные точки интеграции закрыты — медиа, облако, альбомы и профиль работают с боевым бэкендом.
+
+## Background Upload + Live Activity
+
+См. [[ios-background-upload]] — детальное описание.
+
+Все загрузки (Share / Backup / Manual из Cloud Browser) идут через одну
+**background `URLSession`** с identifier `com.barkfluff.BarkCloud.upload` и
+`sharedContainerIdentifier = group.com.barkfluff.BarkCloud`. Фактическую передачу
+байт ведёт iOS-демон — загрузка переживает сворачивание, kill main app и
+перезапуск устройства.
+
+**Ключевые компоненты:**
+- `Networking/BackgroundUploadCoordinator.swift` — singleton, держит
+  `URLSession.background(...)`, выступает её делегатом (TLS self-signed
+  zеркалит `SelfSignedTrustDelegate`, прогресс/завершение → UploadJob).
+- `Data/Cache/UploadJob.swift` + `UploadQueueStore.swift` — SwiftData-модель и
+  actor поверх неё в App Group container (`UploadQueue.sqlite`). Persist
+  переживает kill и доступен Share Extension.
+- `Networking/MultipartBodyBuilder.swift` — собирает multipart body как
+  файл стримом (background URLSession принимает только `fromFile:`).
+- `Networking/UploadLiveActivityController.swift` (`@MainActor`) — управляет
+  одной агрегированной Live Activity «Загружаю в BarkCloud» (Lock Screen +
+  Dynamic Island), пересчитывает прогресс по всем jobs за последний час.
+- `Shared/UploadActivityAttributes.swift` — `ActivityAttributes`, membership:
+  main app + BarkCloudWidgets + ShareExtension.
+- `BarkCloudWidgets/UploadLiveActivity.swift` — SwiftUI рендеринг Live Activity
+  (compact/expanded/minimal).
+- `App/AppDelegate.swift` (через `@UIApplicationDelegateAdaptor`) — принимает
+  `handleEventsForBackgroundURLSession` и регистрирует BGTask-хендлер
+  `com.barkfluff.BarkCloud.upload.retry`.
+
+**Share Extension** теперь сам инициирует upload: читает токен из shared
+Keychain (access group `$(AppIdentifierPrefix)com.barkfluff.BarkCloud`),
+`FilesApi.GetUploadUrl` через gRPC, готовит multipart body в App Group,
+ставит UploadJob, submit'ит в координатор и стартует Live Activity — затем
+закрывается. Демон iOS продолжает загрузку.
+
+**BackupManager** уходит от `cloud.uploadFile(data:)` к
+`enqueueAssetForBackup(_:folderID:)` — оригинал ассета пишется потоком в App
+Group через `DeviceAssetResource.writeOriginal(asset:to:)` (без RAM),
+UploadJob ставится в очередь с лимитом 5 одновременных задач.
+
+**Retry**: при `failed` job координатор зовёт `onPersistentFailure` →
+`scheduleRetryBGTaskIfNeeded()` (BGProcessingTaskRequest, требует Wi-Fi,
+earliestBeginDate +5 мин). При просыпании BGTask resubmit'ит failed jobs
+с `retries < 3`.
+
+**Capabilities**:
+- `BarkCloud.entitlements` и `ShareExtension.entitlements`: + `keychain-access-groups`.
+- `BarkCloudWidgets.entitlements`: `application-groups`.
+- Main app build settings: `INFOPLIST_KEY_NSSupportsLiveActivities = YES`,
+  `INFOPLIST_KEY_UIBackgroundModes = processing`,
+  `INFOPLIST_KEY_BGTaskSchedulerPermittedIdentifiers = com.barkfluff.BarkCloud.upload.retry`.
+- `SessionStore` Keychain queries содержат `kSecAttrAccessGroup` (только не на симуляторе).
+
+**Скрипты pbxproj**: `setup_widgets_target.rb` (создаёт widget target +
+Shared/), `setup_share_extension_sources.rb` (добавляет references на
+gRPC/Networking/Generated файлы в Share Extension target + линкует SwiftPM
+зависимости), `setup_bgtasks_info.rb` (BGTaskScheduler INFOPLIST_KEY).
+Скрипты идемпотентны.
+
+`ShareInboxUploader` остался как одноразовая миграция legacy очереди
+(`ShareInbox/<uuid>/<file>`) — переоформляет файлы в UploadJob через
+`cloud.enqueueBackgroundUpload(sourceFile:)` при старте app.

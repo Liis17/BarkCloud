@@ -9,7 +9,8 @@ private final class SelfSignedTrustDelegate: NSObject, URLSessionDelegate, @unch
         completionHandler: @escaping @Sendable (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
     ) {
         guard challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
-              challenge.protectionSpace.host == GrpcEndpoint.host,
+              GrpcEndpoint.allowSelfSigned,
+              challenge.protectionSpace.host == GrpcEndpoint.filesHost,
               let trust = challenge.protectionSpace.serverTrust else {
             completionHandler(.performDefaultHandling, nil)
             return

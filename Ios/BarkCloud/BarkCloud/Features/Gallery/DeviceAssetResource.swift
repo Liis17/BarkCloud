@@ -35,6 +35,61 @@ enum DeviceAssetResource {
         return (resource.value(forKey: "fileSize") as? Int64) ?? 0
     }
 
+    /// Записать оригинал ассета в файл (поток с диска медиатеки → файл), без
+    /// загрузки в RAM. Используется для постановки в `BackgroundUploadCoordinator`:
+    /// background URLSession принимает только `fromFile:`, и держать всё видео в
+    /// памяти — гарантированный crash при больших файлах. Возвращает имя файла.
+    @discardableResult
+    static func writeOriginal(asset: PHAsset, to destination: URL) async throws -> String {
+        guard let resource = bestResource(for: asset) else { throw DeviceAssetError.noResource }
+        let fm = FileManager.default
+        try fm.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try? fm.removeItem(at: destination)
+        guard fm.createFile(atPath: destination.path, contents: nil) else {
+            throw DeviceAssetError.noResource
+        }
+        let handle = try FileHandle(forWritingTo: destination)
+        let options = PHAssetResourceRequestOptions()
+        options.isNetworkAccessAllowed = true
+
+        // Делегатное чтение чанков с фонового потока — пишем в FileHandle под
+        // защитой NSLock (writeData может оказаться вызванным с разных потоков).
+        let writer = ChunkFileWriter(handle: handle)
+        do {
+            try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
+                PHAssetResourceManager.default().requestData(
+                    for: resource,
+                    options: options,
+                    dataReceivedHandler: { chunk in writer.write(chunk) },
+                    completionHandler: { error in
+                        if let error { cont.resume(throwing: error) } else { cont.resume() }
+                    }
+                )
+            }
+        } catch {
+            writer.close()
+            try? fm.removeItem(at: destination)
+            throw error
+        }
+        writer.close()
+        return resource.originalFilename
+    }
+
+    /// Потокобезопасный writer чанков в FileHandle.
+    private final class ChunkFileWriter: @unchecked Sendable {
+        private let handle: FileHandle
+        private let lock = NSLock()
+        init(handle: FileHandle) { self.handle = handle }
+        func write(_ chunk: Data) {
+            lock.lock(); defer { lock.unlock() }
+            try? handle.write(contentsOf: chunk)
+        }
+        func close() {
+            lock.lock(); defer { lock.unlock() }
+            try? handle.close()
+        }
+    }
+
     /// Оригинальные байты ассета и его имя файла (для загрузки в облако).
     static func originalData(for asset: PHAsset) async throws -> (Data, String) {
         guard let resource = bestResource(for: asset) else { throw DeviceAssetError.noResource }

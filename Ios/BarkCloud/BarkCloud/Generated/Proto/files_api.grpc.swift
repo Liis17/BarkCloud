@@ -1587,6 +1587,19 @@ internal enum Barkcloud_Files_CloudApi: Sendable {
                 type: .unary
             )
         }
+        /// Namespace for "DeleteFileEntries" metadata.
+        internal enum DeleteFileEntries: Sendable {
+            /// Request type for "DeleteFileEntries".
+            internal typealias Input = Barkcloud_Files_DeleteFileEntriesRequest
+            /// Response type for "DeleteFileEntries".
+            internal typealias Output = Barkcloud_Files_DeleteFileEntriesResponse
+            /// Descriptor for "DeleteFileEntries".
+            internal static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.CloudApi"),
+                method: "DeleteFileEntries",
+                type: .unary
+            )
+        }
         /// Namespace for "ListUserImages" metadata.
         internal enum ListUserImages: Sendable {
             /// Request type for "ListUserImages".
@@ -1794,6 +1807,7 @@ internal enum Barkcloud_Files_CloudApi: Sendable {
             RenameFileEntry.descriptor,
             MoveFileEntry.descriptor,
             DeleteFileEntry.descriptor,
+            DeleteFileEntries.descriptor,
             ListUserImages.descriptor,
             ListUserMedia.descriptor,
             DeleteUserMedia.descriptor,
@@ -2013,6 +2027,24 @@ extension Barkcloud_Files_CloudApi {
             request: GRPCCore.StreamingServerRequest<Barkcloud_Files_DeleteFileEntryRequest>,
             context: GRPCCore.ServerContext
         ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty>
+
+        /// Handle the "DeleteFileEntries" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Массовое удаление записей в корзину (до 100 за запрос)
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Files_DeleteFileEntriesRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Files_DeleteFileEntriesResponse` messages.
+        func deleteFileEntries(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Files_DeleteFileEntriesRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_DeleteFileEntriesResponse>
 
         /// Handle the "ListUserImages" method.
         ///
@@ -2473,6 +2505,24 @@ extension Barkcloud_Files_CloudApi {
             context: GRPCCore.ServerContext
         ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty>
 
+        /// Handle the "DeleteFileEntries" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Массовое удаление записей в корзину (до 100 за запрос)
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_DeleteFileEntriesRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Files_DeleteFileEntriesResponse` message.
+        func deleteFileEntries(
+            request: GRPCCore.ServerRequest<Barkcloud_Files_DeleteFileEntriesRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_DeleteFileEntriesResponse>
+
         /// Handle the "ListUserImages" method.
         ///
         /// > Source IDL Documentation:
@@ -2930,6 +2980,24 @@ extension Barkcloud_Files_CloudApi {
             context: GRPCCore.ServerContext
         ) async throws -> Barkcloud_Files_CloudEmpty
 
+        /// Handle the "DeleteFileEntries" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Массовое удаление записей в корзину (до 100 за запрос)
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Files_DeleteFileEntriesRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Files_DeleteFileEntriesResponse` to respond with.
+        func deleteFileEntries(
+            request: Barkcloud_Files_DeleteFileEntriesRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Files_DeleteFileEntriesResponse
+
         /// Handle the "ListUserImages" method.
         ///
         /// > Source IDL Documentation:
@@ -3317,6 +3385,17 @@ extension Barkcloud_Files_CloudApi.StreamingServiceProtocol {
             }
         )
         router.registerHandler(
+            forMethod: Barkcloud_Files_CloudApi.Method.DeleteFileEntries.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_DeleteFileEntriesRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_DeleteFileEntriesResponse>(),
+            handler: { request, context in
+                try await self.deleteFileEntries(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
             forMethod: Barkcloud_Files_CloudApi.Method.ListUserImages.descriptor,
             deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_ListUserImagesRequest>(),
             serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_ListUserImagesResponse>(),
@@ -3591,6 +3670,17 @@ extension Barkcloud_Files_CloudApi.ServiceProtocol {
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty> {
         let response = try await self.deleteFileEntry(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    internal func deleteFileEntries(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Files_DeleteFileEntriesRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_DeleteFileEntriesResponse> {
+        let response = try await self.deleteFileEntries(
             request: GRPCCore.ServerRequest(stream: request),
             context: context
         )
@@ -3889,6 +3979,19 @@ extension Barkcloud_Files_CloudApi.SimpleServiceProtocol {
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty> {
         return GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty>(
             message: try await self.deleteFileEntry(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    internal func deleteFileEntries(
+        request: GRPCCore.ServerRequest<Barkcloud_Files_DeleteFileEntriesRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_DeleteFileEntriesResponse> {
+        return GRPCCore.ServerResponse<Barkcloud_Files_DeleteFileEntriesResponse>(
+            message: try await self.deleteFileEntries(
                 request: request.message,
                 context: context
             ),
@@ -4329,6 +4432,29 @@ extension Barkcloud_Files_CloudApi {
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CloudEmpty>,
             options: GRPCCore.CallOptions,
             onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "DeleteFileEntries" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Массовое удаление записей в корзину (до 100 за запрос)
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_DeleteFileEntriesRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_DeleteFileEntriesRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_DeleteFileEntriesResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func deleteFileEntries<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_DeleteFileEntriesRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_DeleteFileEntriesRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_DeleteFileEntriesResponse>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_DeleteFileEntriesResponse>) async throws -> Result
         ) async throws -> Result where Result: Sendable
 
         /// Call the "ListUserImages" method.
@@ -5026,6 +5152,40 @@ extension Barkcloud_Files_CloudApi {
             try await self.client.unary(
                 request: request,
                 descriptor: Barkcloud_Files_CloudApi.Method.DeleteFileEntry.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "DeleteFileEntries" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Массовое удаление записей в корзину (до 100 за запрос)
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_DeleteFileEntriesRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_DeleteFileEntriesRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_DeleteFileEntriesResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        internal func deleteFileEntries<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_DeleteFileEntriesRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_DeleteFileEntriesRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_DeleteFileEntriesResponse>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_DeleteFileEntriesResponse>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Files_CloudApi.Method.DeleteFileEntries.descriptor,
                 serializer: serializer,
                 deserializer: deserializer,
                 options: options,
@@ -5838,6 +5998,35 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
         )
     }
 
+    /// Call the "DeleteFileEntries" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Массовое удаление записей в корзину (до 100 за запрос)
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Files_DeleteFileEntriesRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    internal func deleteFileEntries<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Files_DeleteFileEntriesRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_DeleteFileEntriesResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.deleteFileEntries(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_DeleteFileEntriesRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_DeleteFileEntriesResponse>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
     /// Call the "ListUserImages" method.
     ///
     /// > Source IDL Documentation:
@@ -6601,6 +6790,39 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
             metadata: metadata
         )
         return try await self.deleteFileEntry(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "DeleteFileEntries" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Массовое удаление записей в корзину (до 100 за запрос)
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    internal func deleteFileEntries<Result>(
+        _ message: Barkcloud_Files_DeleteFileEntriesRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_DeleteFileEntriesResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Files_DeleteFileEntriesRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.deleteFileEntries(
             request: request,
             options: options,
             onResponse: handleResponse

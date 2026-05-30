@@ -140,21 +140,25 @@ final class CloudBrowserViewModel {
         catch { state.snackbar = domainErrorMessage(error) }
     }
 
-    /// Загрузить файлы в текущую папку (фото/видео/документы).
+    /// Поставить файлы в фоновую очередь (`BackgroundUploadCoordinator`). UI не
+    /// ждёт завершения — загрузка переживёт сворачивание/kill приложения. По
+    /// событию `onJobCompleted` в `AppEnvironment` файл будет привязан к папке.
     func upload(_ files: [(data: Data, fileName: String)]) async {
         guard !files.isEmpty else { return }
-        state.isUploading = true
         var anyFailed = false
         for file in files {
             do {
-                _ = try await cloud.uploadFile(data: file.data, fileName: file.fileName, toDirectory: state.directoryID)
+                _ = try await cloud.enqueueBackgroundUpload(
+                    data: file.data,
+                    fileName: file.fileName,
+                    toDirectory: state.directoryID,
+                    source: .manual
+                )
             } catch {
                 anyFailed = true
             }
         }
-        state.isUploading = false
         if anyFailed { state.snackbar = String(localized: "upload_failed") }
-        await reload()
     }
 
     func snackbarShown() { state.snackbar = nil }

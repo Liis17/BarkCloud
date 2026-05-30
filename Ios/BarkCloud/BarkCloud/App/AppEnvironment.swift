@@ -5,6 +5,7 @@ import SwiftData
 @MainActor
 @Observable
 final class AppEnvironment {
+    let serverConfig: ServerConfigStore
     let sessionStore: SessionStore
     let grpcManager: GrpcManager
     let authRepository: AuthRepository
@@ -22,8 +23,14 @@ final class AppEnvironment {
     let appLockSettings: AppLockSettings
     let appLock: AppLockManager
     let shareInboxUploader: ShareInboxUploader
+    let backgroundUploads: BackgroundUploadCoordinator
+    /// Источник истины для глобального баннера прогресса над TabBar (см.
+    /// [[GlobalUploadBanner]]). Подписан на координатор через `addObserver`.
+    let uploadProgress: UploadProgressObserver
 
     init() {
+        self.serverConfig = ServerConfigStore()
+
         let session = SessionStore()
         let grpc = GrpcManager(session: session)
         let transfer = FileTransferService(grpc: grpc)
@@ -60,16 +67,53 @@ final class AppEnvironment {
         self.appLockSettings = lockSettings
         self.appLock = lock
         self.shareInboxUploader = ShareInboxUploader(cloud: self.cloudRepository, session: session)
+
+        // Координатор фоновой загрузки. Singleton — той же URLSession касается и
+        // Share Extension (через тот же `identifier`). Здесь конфигурируем хуки.
+        let uploads = BackgroundUploadCoordinator.shared
+        self.backgroundUploads = uploads
+        let transferRef = self.fileTransfer
+        let cloudRef = self.cloudRepository
+        uploads.tokenProvider = { [weak transferRef] in
+            await transferRef?.validAccessToken()
+        }
+        uploads.onPersistentFailure = {
+            scheduleRetryBGTaskIfNeeded()
+        }
+        // Системный observer: при completed — привязать файл к папке. Через
+        // addObserver, чтобы UI-наблюдатели (UploadProgressObserver) могли
+        // подписаться независимо, не перетирая друг друга.
+        uploads.addObserver(completion: { snapshot in
+            Task { [weak cloudRef] in
+                guard let cloudRef,
+                      let directoryID = snapshot.directoryID,
+                      !directoryID.isEmpty,
+                      !snapshot.preparedFileID.isEmpty else { return }
+                try? await cloudRef.attachFile(
+                    fileID: snapshot.preparedFileID,
+                    directoryID: directoryID,
+                    name: snapshot.fileName
+                )
+            }
+        })
+
+        // Глобальный баннер прогресса над TabBar.
+        let progress = UploadProgressObserver(queueStore: .shared)
+        self.uploadProgress = progress
+        progress.attach(to: uploads)
+
         // Полная очистка при исчерпании попыток PIN.
         lock.onWipe = { [weak self] in
             guard let self else { return }
             await self.resetLocalState()
-            self.vault.removeAll()
         }
 
         Task { await cache.runStartupSweepIfNeeded() }
         // Догрузить то, что Share Extension сложил в общий контейнер.
         shareInboxUploader.uploadPendingIfNeeded()
+        // Прицепиться к существующей background-сессии: подобрать недозавершённые
+        // jobs (running без живой task) — это случается после kill main app.
+        Task { await uploads.attachAndResubmitOrphans() }
     }
 
     /// Контейнер SwiftData для метаданных кеша (`BarkCloudCache.sqlite` в Application
@@ -100,15 +144,26 @@ final class AppEnvironment {
         await resetLocalState()
     }
 
-    /// Очистить все локальные данные приложения: токены в Keychain, кэшированные
-    /// gRPC-соединения, кэш изображений и URL-кэш. Используется при выходе и при
-    /// удалении аккаунта (когда серверный отзыв сессии не нужен).
+    /// Полный сброс локального состояния до «свежей установки»: токены в Keychain,
+    /// кэшированные gRPC-соединения, очередь и live-задачи фоновой загрузки, кеши
+    /// (файлы, изображения, URL, хеши ассетов), настройки автозагрузки и кеша,
+    /// блокировка приложения (PIN/Face ID), локальный «сейф» и адреса сервера.
+    /// После сброса `RootView` показывает экран ввода адресов сервера. Используется
+    /// при выходе, удалении аккаунта и принудительном wipe по неверному PIN.
     func resetLocalState() async {
         sessionStore.clearSession()
         await grpcManager.shutdown()
+        await backgroundUploads.cancelAll()
+        await UploadQueueStore.shared.deleteAll()
+        UploadConstants.purgeStaging()
+        backupManager.setAutoUpload(false)
         RemoteImageCache.shared.clear()
         InsecureHTTP.clearCaches()
         await fileCache.clearAll()
         await AssetHashStore.shared.clearAll()
+        fileCacheSettings.reset()
+        appLockSettings.disable()
+        vault.removeAll()
+        serverConfig.reset()
     }
 }

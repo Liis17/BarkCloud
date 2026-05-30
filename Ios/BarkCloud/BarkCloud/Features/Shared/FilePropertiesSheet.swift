@@ -63,6 +63,9 @@ struct FilePropertiesSheet: View {
         if let uploadedAt = asset.uploadedAt {
             row("props_uploaded", dateTime(uploadedAt))
         }
+        if let device = asset.uploadDeviceName {
+            row("props_uploaded_device", device)
+        }
         row("props_id", asset.id)
     }
 

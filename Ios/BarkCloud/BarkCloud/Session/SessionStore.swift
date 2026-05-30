@@ -83,7 +83,13 @@ final class SessionStore {
     }
 
     private func baseQuery(_ key: Key) -> [String: Any] {
-        [
+        // `kSecAttrAccessGroup` намеренно не указываем: Keychain при наличии
+        // `keychain-access-groups` entitlement автоматически кладёт запись в
+        // первую группу из массива (общую с Share Extension) и при чтении ищет
+        // во всех группах, доступных приложению. Это работает идентично на
+        // симуляторе и устройстве и не требует подстановки `$(AppIdentifierPrefix)`,
+        // который в Swift не раскрывается.
+        return [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: key.rawValue

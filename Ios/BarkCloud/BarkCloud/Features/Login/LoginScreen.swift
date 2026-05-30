@@ -3,6 +3,7 @@ import SwiftUI
 struct LoginScreen: View {
     @Environment(AppEnvironment.self) private var env
     @State private var viewModel: LoginViewModel?
+    @State private var showServerSetup = false
     @FocusState private var focusedField: Field?
 
     let onAuthenticated: () -> Void
@@ -47,6 +48,13 @@ struct LoginScreen: View {
                             }
                         }
                         .font(AppTypography.labelLarge)
+
+                        Button { showServerSetup = true } label: {
+                            Label("server_setup_login_link", systemImage: "server.rack")
+                                .font(AppTypography.labelLarge)
+                                .foregroundStyle(AppColors.onSurfaceVariant)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .center)
                     }
                 }
                 .padding(.horizontal, 24)
@@ -65,6 +73,12 @@ struct LoginScreen: View {
             }
         }
         .animation(.easeInOut(duration: 0.25), value: state.snackbarMessage != nil)
+        .sheet(isPresented: $showServerSetup) {
+            ServerSetupScreen(
+                onCancel: { showServerSetup = false },
+                onComplete: { showServerSetup = false }
+            )
+        }
         .onAppear {
             if viewModel == nil {
                 viewModel = LoginViewModel(auth: env.authRepository)

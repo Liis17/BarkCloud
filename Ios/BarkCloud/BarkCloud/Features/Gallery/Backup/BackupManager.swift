@@ -44,6 +44,11 @@ final class BackupManager {
     private var scanTask: Task<Void, Never>?
     private var uploadTask: Task<Void, Never>?
     private var didStartScan = false
+    /// localIdentifier ассетов, которые уже прошли классификацию (либо в
+    /// pendingUpload, либо в reclaimable). При повторном сканировании (когда
+    /// пользователь возвращается на вкладку Галереи) пропускаем — это и SHA256
+    /// не считаем второй раз, и в `pendingUpload` дубликаты не плодим.
+    private var processedAssetIDs: Set<String> = []
 
     init(cloud: CloudRepository, settings: AutoUploadSettings) {
         self.cloud = cloud
@@ -78,6 +83,22 @@ final class BackupManager {
         startUploadLoop()
     }
 
+    /// Вызывать при возврате на таб «Галерея»: пересканировать медиатеку на
+    /// предмет новых ассетов (которые могли появиться, пока приложение было
+    /// открыто на другой вкладке). Если предыдущий скан ещё не закончился —
+    /// ничего не делаем (он сам подхватит новые в текущем проходе). Если
+    /// закончился — запускаем повторный, который пропустит уже виденные ассеты
+    /// (`processedAssetIDs`). Автозагрузка стартует автоматически в `classify`.
+    func refreshScanForNewAssets() async {
+        guard scanTask == nil else { return }
+        isScanning = true
+        scanTask = Task(priority: .utility) { [weak self] in
+            await self?.scan()
+            self?.isScanning = false
+            self?.scanTask = nil
+        }
+    }
+
     func loadStorageInfo() async {
         if let info = try? await cloud.transfer.storageInfo() {
             usedStorage = info.used
@@ -108,16 +129,23 @@ final class BackupManager {
         var all: [PHAsset] = []
         all.reserveCapacity(fetch.count)
         fetch.enumerateObjects { asset, _, _ in all.append(asset) }
+        // Фильтруем уже виденные ассеты — на повторном сканировании (при возврате
+        // на таб Галереи) это избавит от пересчёта SHA256 у тысяч уже известных.
+        let fresh = all.filter { !processedAssetIDs.contains($0.localIdentifier) }
         totalAssets = all.count
+        scannedCount = all.count - fresh.count
 
         // Последовательно (конкурентность 1): хеш видео читает каждый байт — не
         // плодим параллельные чтения, чтобы не раздувать память.
         var batch: [(asset: PHAsset, hash: String)] = []
-        for asset in all {
+        for asset in fresh {
             if Task.isCancelled { return }
             let hash = await DeviceAssetResource.cachedSHA256(for: asset)
             scannedCount += 1
-            guard let hash else { continue }
+            guard let hash else {
+                processedAssetIDs.insert(asset.localIdentifier)
+                continue
+            }
             batch.append((asset, hash))
             if batch.count >= 100 {
                 await classify(batch)
@@ -132,6 +160,7 @@ final class BackupManager {
     private func classify(_ batch: [(asset: PHAsset, hash: String)]) async {
         let results = (try? await cloud.checkFileHashes(batch.map { $0.hash })) ?? [:]
         for item in batch {
+            processedAssetIDs.insert(item.asset.localIdentifier)
             if results[item.hash] == true {
                 reclaimable.append(item.asset)
                 reclaimableBytes += DeviceAssetResource.originalByteSize(for: item.asset)
@@ -164,27 +193,34 @@ final class BackupManager {
         }
     }
 
+    /// Максимум одновременных background-задач, которые мы держим в очереди — чтобы
+    /// диск не забивался multipart-копиями. Демон iOS сам решает, сколько грузить
+    /// параллельно (обычно 2–4); мы лишь регулируем поток постановки.
+    private let inFlightLimit = 5
+
     private func uploadLoop() async {
         let folderID = try? await cloud.ensureRecentUploadsFolder()
         while autoUploadEnabled, !Task.isCancelled {
             guard !pendingUpload.isEmpty else {
-                // Очередь пуста: если скан ещё идёт — подождём и проверим снова.
                 if isScanning {
                     try? await Task.sleep(nanoseconds: 500_000_000)
                     continue
                 }
                 break
             }
+            // Не подавать новые job'ы, пока их слишком много в run-state.
+            let active = await UploadQueueStore.shared.activeJobs().filter { $0.source == .backup }.count
+            if active >= inFlightLimit {
+                try? await Task.sleep(nanoseconds: 500_000_000)
+                continue
+            }
             let asset = pendingUpload.removeFirst()
             currentAsset = asset
             do {
-                let (data, name) = try await DeviceAssetResource.originalData(for: asset)
-                _ = try await cloud.uploadFile(data: data, fileName: name, toDirectory: folderID)
+                try await enqueueAssetForBackup(asset, folderID: folderID)
                 uploadDone += 1
                 reclaimable.append(asset)
                 reclaimableBytes += DeviceAssetResource.originalByteSize(for: asset)
-                // Файл загружен — обновляем занятый объём, чтобы прогресс-бар
-                // хранилища в открытой модалке двигался по ходу автозагрузки.
                 await loadStorageInfo()
             } catch {
                 uploadFailed += 1
@@ -192,6 +228,27 @@ final class BackupManager {
         }
         currentAsset = nil
         await loadStorageInfo()
+    }
+
+    /// Подготовить файл оригинала ассета в App Group container стримом (без RAM),
+    /// получить uploadURL и поставить UploadJob в координатор. Фактическая
+    /// передача идёт в фоне — переживает сворачивание и kill main app.
+    private func enqueueAssetForBackup(_ asset: PHAsset, folderID: String?) async throws {
+        guard let stagingDir = UploadConstants.stagingDirectory else {
+            throw DeviceAssetError.noResource
+        }
+        let originalPath = stagingDir.appendingPathComponent("\(UUID().uuidString)")
+        let fileName = try await DeviceAssetResource.writeOriginal(asset: asset, to: originalPath)
+        let renamed = originalPath.deletingLastPathComponent().appendingPathComponent("\(UUID().uuidString)-\(fileName)")
+        try? FileManager.default.moveItem(at: originalPath, to: renamed)
+        let sourcePath = FileManager.default.fileExists(atPath: renamed.path) ? renamed : originalPath
+        _ = try await cloud.enqueueBackgroundUpload(
+            sourceFile: sourcePath,
+            fileName: fileName,
+            mimeType: nil,
+            toDirectory: folderID,
+            source: .backup
+        )
     }
 
     // MARK: - Освобождение места
