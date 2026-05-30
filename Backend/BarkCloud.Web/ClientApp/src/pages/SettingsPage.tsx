@@ -335,8 +335,8 @@ function SystemSection({ admin, system }: { admin: SettingsState['admin']; syste
         <div className="sys-section-label">Веб-клиент</div>
         {web && <div className="svc-list">{renderRow(web, () => <span style={{ fontSize: 12, color: 'var(--md-on-surface-variant)' }}>ниже ↓</span>)}</div>}
         <div className="sys-note">
-          Обновление и перезапуск веб-клиента: страница ненадолго станет недоступна и перезагрузится сама. Работает при развёртывании под Linux/WSL. На Windows Docker
-          Desktop обновление недоступно — обновите образ на хосте вручную (<code>docker compose pull web</code>, затем <code>up -d web</code>).
+          Обновление и перезапуск веб-клиента: страница ненадолго станет недоступна и перезагрузится сама. Веб пересоздаётся отдельным helper-контейнером, поэтому работает
+          и под Linux/WSL, и на Windows Docker Desktop. При неудачном обновлении автоматически откатывается на прежний контейнер.
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           <button className="btn primary" onClick={() => webSelf('update')}>

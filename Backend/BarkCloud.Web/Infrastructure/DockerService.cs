@@ -178,72 +178,195 @@ public sealed class DockerService
 
     // ───────────────────────── Self-update веба ─────────────────────────
 
-    /// <summary>Обновить образ и пересоздать сам веб через detached helper-контейнер.</summary>
-    public Task<ServiceActionResult> UpdateWebSelfAsync()
-        => RunWebHelperAsync(
-            "cloud-web-updater",
-            withComposeMounts: true,
-            innerCommand: (project, compose, env) =>
-                $"sleep 2 && docker compose -p {project} --env-file {env} -f {compose} pull {WebService}" +
-                $" && docker compose -p {project} --env-file {env} -f {compose} up --force-recreate -d {WebService}" +
-                " && docker image prune -f",
-            startedMessage: "Обновление веб-клиента запущено");
+    /// <summary>
+    /// Обновить сам веб: detached helper тянет новый образ и пересоздаёт контейнер web
+    /// «клонированием» его текущей конфигурации (mounts/env/ports/network/labels) из
+    /// <c>docker inspect</c>. Compose здесь не используется намеренно — он требует разрешения
+    /// относительных путей web (<c>./docker-compose.yml</c>) в реальные хостовые, что невозможно
+    /// из Linux-helper'а на Windows-путях (<c>C:\…</c>). Клон же переиспользует те же источники
+    /// mount'ов, что демон уже применяет, поэтому работает и на Windows Docker Desktop, и под
+    /// Linux/WSL. При сбое пересоздания helper откатывается на прежний контейнер.
+    /// </summary>
+    public async Task<ServiceActionResult> UpdateWebSelfAsync()
+    {
+        try
+        {
+            var spec = await BuildWebRecreateSpecAsync();
+            return await RunWebHelperAsync("cloud-web-updater", BuildSelfUpdateScript(spec), "Обновление веб-клиента запущено");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Ошибка подготовки самообновления веб-клиента");
+            return new ServiceActionResult(false, "Не удалось подготовить обновление веб-клиента", ex.Message);
+        }
+    }
 
     /// <summary>Перезапустить сам веб через detached helper-контейнер.</summary>
     public Task<ServiceActionResult> RestartWebSelfAsync()
-        => RunWebHelperAsync(
-            "cloud-web-restarter",
-            withComposeMounts: false,
-            innerCommand: (_, _, _) => $"sleep 2 && docker restart {WebContainer}",
-            startedMessage: "Перезапуск веб-клиента запущен");
+        => RunWebHelperAsync("cloud-web-restarter", $"sleep 2 && docker restart {WebContainer}", "Перезапуск веб-клиента запущен");
 
-    private async Task<ServiceActionResult> RunWebHelperAsync(
-        string helperName, bool withComposeMounts, Func<string, string, string, string> innerCommand, string startedMessage)
+    /// <summary>Образ + аргументы `docker run` для пересоздания web и команды подключения доп. сетей.</summary>
+    private sealed record WebRecreateSpec(string Image, List<string> RunArgs, List<string> ExtraNetworkConnects);
+
+    /// <summary>Собрать спецификацию пересоздания web из его текущего <c>docker inspect</c>.</summary>
+    private async Task<WebRecreateSpec> BuildWebRecreateSpecAsync()
+    {
+        var json = await RunDockerCommandAsync("inspect", WebContainer);
+        using var doc = JsonDocument.Parse(json);
+        var c = doc.RootElement[0];
+        var config = c.GetProperty("Config");
+        var host = c.GetProperty("HostConfig");
+
+        var image = config.GetProperty("Image").GetString()!;
+        var id = c.TryGetProperty("Id", out var idp) ? idp.GetString() ?? "" : "";
+        var shortId = id.Length >= 12 ? id[..12] : id;
+
+        // без ведущего "run" — его добавляет шаблон скрипта (`docker run {args}`)
+        var args = new List<string> { "-d", "--name", WebContainer };
+
+        // restart policy
+        if (host.TryGetProperty("RestartPolicy", out var rp) &&
+            rp.TryGetProperty("Name", out var rpn) && rpn.GetString() is { Length: > 0 } policy && policy != "no")
+        {
+            var max = rp.TryGetProperty("MaximumRetryCount", out var mr) ? mr.GetInt32() : 0;
+            args.Add("--restart");
+            args.Add(policy == "on-failure" && max > 0 ? $"{policy}:{max}" : policy);
+        }
+
+        // user
+        if (config.TryGetProperty("User", out var u) && u.GetString() is { Length: > 0 } user)
+        {
+            args.Add("--user");
+            args.Add(user);
+        }
+
+        // env — полный набор (image-defaults + всё, что подставил compose из .env/environment)
+        if (config.TryGetProperty("Env", out var env) && env.ValueKind == JsonValueKind.Array)
+            foreach (var e in env.EnumerateArray())
+                if (e.GetString() is { } ev) { args.Add("-e"); args.Add(ev); }
+
+        // labels — включая com.docker.compose.*, иначе сломается определение проекта при апдейте остальных
+        if (config.TryGetProperty("Labels", out var labels) && labels.ValueKind == JsonValueKind.Object)
+            foreach (var l in labels.EnumerateObject())
+            {
+                args.Add("--label");
+                args.Add($"{l.Name}={l.Value.GetString()}");
+            }
+
+        // публикуемые порты
+        if (host.TryGetProperty("PortBindings", out var pb) && pb.ValueKind == JsonValueKind.Object)
+            foreach (var p in pb.EnumerateObject())
+            {
+                if (p.Value.ValueKind != JsonValueKind.Array) continue;
+                foreach (var b in p.Value.EnumerateArray())
+                {
+                    var hPort = b.TryGetProperty("HostPort", out var hp) ? hp.GetString() : null;
+                    if (string.IsNullOrEmpty(hPort)) continue;
+                    var hIp = b.TryGetProperty("HostIp", out var hi) ? hi.GetString() : null;
+                    args.Add("-p");
+                    args.Add(string.IsNullOrEmpty(hIp) ? $"{hPort}:{p.Name}" : $"{hIp}:{hPort}:{p.Name}");
+                }
+            }
+
+        // mounts (bind + volume) — переиспользуем источники, которые демон уже знает (включая Windows-пути)
+        if (c.TryGetProperty("Mounts", out var mounts) && mounts.ValueKind == JsonValueKind.Array)
+            foreach (var m in mounts.EnumerateArray())
+            {
+                var type = m.TryGetProperty("Type", out var tp) ? tp.GetString() : null;
+                var dest = m.TryGetProperty("Destination", out var dp) ? dp.GetString() : null;
+                var src = type == "volume"
+                    ? (m.TryGetProperty("Name", out var nm) ? nm.GetString() : null)
+                    : (m.TryGetProperty("Source", out var sp) ? sp.GetString() : null);
+                if (string.IsNullOrEmpty(type) || string.IsNullOrEmpty(src) || string.IsNullOrEmpty(dest)) continue;
+                var spec = $"type={type},source={src},destination={dest}";
+                if (!(m.TryGetProperty("RW", out var rwp) && rwp.GetBoolean())) spec += ",readonly";
+                args.Add("--mount");
+                args.Add(spec);
+            }
+
+        // сети: первую — на `docker run`, остальные — отдельным `docker network connect` после запуска
+        var connects = new List<string>();
+        if (c.TryGetProperty("NetworkSettings", out var ns) &&
+            ns.TryGetProperty("Networks", out var nw) && nw.ValueKind == JsonValueKind.Object)
+        {
+            var first = true;
+            foreach (var n in nw.EnumerateObject())
+            {
+                var aliases = new List<string>();
+                if (n.Value.TryGetProperty("Aliases", out var al) && al.ValueKind == JsonValueKind.Array)
+                    foreach (var a in al.EnumerateArray())
+                        if (a.GetString() is { Length: > 0 } av && av != shortId) aliases.Add(av);
+
+                if (first)
+                {
+                    args.Add("--network");
+                    args.Add(n.Name);
+                    foreach (var a in aliases) { args.Add("--network-alias"); args.Add(a); }
+                    first = false;
+                }
+                else
+                {
+                    var parts = new List<string> { "docker", "network", "connect" };
+                    foreach (var a in aliases) { parts.Add("--alias"); parts.Add(a); }
+                    parts.Add(n.Name);
+                    parts.Add(WebContainer);
+                    connects.Add(string.Join(" ", parts.Select(ShQuote)));
+                }
+            }
+        }
+
+        args.Add(image); // образ — последним аргументом
+        return new WebRecreateSpec(image, args, connects);
+    }
+
+    /// <summary>
+    /// Скрипт для helper'а: тянет образ, под именем <c>-bak</c> гасит текущий web и поднимает новый;
+    /// при сбое пересоздания — откат на прежний контейнер, чтобы веб не остался недоступным.
+    /// </summary>
+    private static string BuildSelfUpdateScript(WebRecreateSpec spec)
+    {
+        var run = string.Join(" ", spec.RunArgs.Select(ShQuote));
+        var connects = string.Concat(spec.ExtraNetworkConnects.Select(cmd => $"\n  {cmd} >/dev/null 2>&1"));
+        return
+$@"sleep 2
+docker pull {ShQuote(spec.Image)} || exit 1
+docker rename {WebContainer} {WebContainer}-bak >/dev/null 2>&1 || exit 1
+docker stop -t 10 {WebContainer}-bak >/dev/null 2>&1
+if docker run {run}; then{connects}
+  docker rm -f {WebContainer}-bak >/dev/null 2>&1
+  docker image prune -f >/dev/null 2>&1
+else
+  docker rm -f {WebContainer} >/dev/null 2>&1
+  docker rename {WebContainer}-bak {WebContainer} >/dev/null 2>&1
+  docker start {WebContainer} >/dev/null 2>&1
+fi";
+    }
+
+    /// <summary>Безопасное single-quote экранирование аргумента для <c>sh -c</c>.</summary>
+    private static string ShQuote(string s) => "'" + s.Replace("'", "'\\''") + "'";
+
+    /// <summary>Запустить detached helper-контейнер из образа web с готовым sh-скриптом.</summary>
+    private async Task<ServiceActionResult> RunWebHelperAsync(string helperName, string innerScript, string startedMessage)
     {
         try
         {
             var image = (await RunDockerCommandAsync("inspect", "--format", "{{.Config.Image}}", WebContainer)).Trim();
             var dockerSock = await GetMountSourceAsync(WebContainer, "/var/run/docker.sock");
-            var project = await GetComposeProjectAsync();
 
             await TryRemoveContainerAsync(helperName);
 
-            var args = new List<string>
-            {
+            // Registry публичный на pull → креды не нужны; пустой DOCKER_CONFIG, чтобы CLI не звал
+            // отсутствующий в alpine docker-credential-desktop из config.json хоста.
+            string[] args =
+            [
                 "run", "-d", "--rm", "--name", helperName, "--user", "root",
                 "-e", "DOCKER_HOST=unix:///var/run/docker.sock",
-                "-e", "DOCKER_CONFIG=/root/.docker",
+                "-e", "DOCKER_CONFIG=/tmp/barkcloud-docker",
                 "-v", $"{dockerSock}:/var/run/docker.sock",
-            };
+                "--entrypoint", "sh", image, "-c", innerScript,
+            ];
 
-            // helper тянет образ из приватного registry — пробросим креды docker, если они смонтированы в web
-            var dockerConfig = await GetMountSourceAsync(WebContainer, "/root/.docker/config.json");
-            if (!string.IsNullOrEmpty(dockerConfig))
-                args.AddRange(["-v", $"{dockerConfig}:/root/.docker/config.json:ro"]);
-
-            string compose = ComposeFileInContainer, env = EnvFileInContainer;
-            if (withComposeMounts)
-            {
-                // монтируем compose и env по их РЕАЛЬНЫМ хостовым путям, чтобы относительные пути
-                // внутри compose (./.env, ./nginx и т.п.) разрешались корректно на хосте
-                compose = await GetMountSourceAsync(WebContainer, ComposeFileInContainer);
-                env = await GetMountSourceAsync(WebContainer, EnvFileInContainer);
-
-                // На Windows Docker Desktop хостовый путь — это `C:\…`, что невалидно как destination
-                // Linux-контейнера и не резолвится `docker compose -f`. Трюк работает только под Linux/WSL
-                // (путь `/home/…` или `/mnt/…`). Не запускаем обречённый helper — даём ручную инструкцию.
-                if (IsWindowsPath(compose))
-                    return new ServiceActionResult(false,
-                        "Самообновление веб-клиента недоступно на Windows Docker Desktop. " +
-                        "Разверните стек под Linux/WSL или обновите образ на хосте вручную: " +
-                        "docker compose pull web && docker compose up -d web");
-
-                args.AddRange(["-v", $"{compose}:{compose}:ro", "-v", $"{env}:{env}:ro"]);
-            }
-
-            args.AddRange(["--entrypoint", "sh", image, "-c", innerCommand(project, compose, env)]);
-
-            await RunDockerCommandAsync([.. args]);
+            await RunDockerCommandAsync(args);
             return new ServiceActionResult(true, startedMessage);
         }
         catch (Exception ex)
@@ -261,10 +384,6 @@ public sealed class DockerService
         await RunDockerComposeCommandAsync("-p", project, "--env-file", EnvFileInContainer, "-f", ComposeFileInContainer, "pull", service);
         await RunDockerComposeCommandAsync("-p", project, "--env-file", EnvFileInContainer, "-f", ComposeFileInContainer, "up", "--force-recreate", "-d", service);
     }
-
-    /// <summary>Похоже ли на Windows-путь (`C:\…` / `C:/…`) — такой нельзя смонтировать в Linux-helper.</summary>
-    private static bool IsWindowsPath(string path) =>
-        path.Length >= 3 && char.IsLetter(path[0]) && path[1] == ':' && (path[2] == '\\' || path[2] == '/');
 
     private static bool IsManaged(string service) => Managed.Any(m => m.Service == service);
     private static string ContainerOf(string service) => Managed.First(m => m.Service == service).Container;
