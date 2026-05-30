@@ -16,6 +16,13 @@ public interface IDriveEngine
     // Текущее состояние (для опроса из UI).
     Task<EngineStatus> GetStatusAsync();
 
+    // Текущие настройки движка (папка кэша и т.п.).
+    Task<EngineSettings> GetSettingsAsync();
+
+    // Сменить папку кэша. Применяется к новым скачиваниям; уже скачанное остаётся
+    // в прежней папке. Возвращает применённые настройки.
+    Task<EngineSettings> SetCacheDirAsync(string path);
+
     // Отмонтировать и завершить процесс движка.
     Task ShutdownAsync();
 }

@@ -28,7 +28,7 @@
 | `FindFiles` | `CloudApi.ListDirectoryDetailed` (через резолв пути→GUID) |
 | `GetFileInformation` | из кэша листинга |
 | `CreateFile` (open) | резолв `entryId`/`fileId`, без скачивания |
-| `ReadFile(offset)` | `GetTempDownloadUrl` → HTTP GET (Range — фаза 5; пока целиком) |
+| `ReadFile(offset)` | поблочно (1 МиБ) по HTTP **Range** к temp-URL; fallback на целиком |
 | `Cleanup` (запись) | `GetUploadUrl` → `POST /upload` → `AttachFile` (фаза 3) |
 | `Cleanup` (`DeletePending`) | `DeleteFileEntry` / `DeleteDirectory` |
 | `MoveFile` | `Rename*`/`Move*` Directory/FileEntry |
@@ -51,7 +51,8 @@
 Решение **`Drive/BarkCloud.Drive.slnx`** — два процесса (read-only), собирается чисто:
 
 - **BarkCloud.Drive.Contracts** — IPC-контракт `IDriveEngine` (`LoginAsync`/`MountAsync`/
-  `UnmountAsync`/`GetStatusAsync`/`ShutdownAsync`) + DTO `EngineStatus`.
+  `UnmountAsync`/`GetStatusAsync`/`GetSettingsAsync`/`SetCacheDirAsync`/`ShutdownAsync`) +
+  DTO `EngineStatus`, `EngineSettings` (папка кэша).
 - **BarkCloud.Drive.Engine** — **скрытый `WinExe`** (без окна / панели задач / Alt-Tab):
   gRPC-клиенты Identity (:7020) / Cloud+Files (:7025) двумя каналами как в iOS,
   `TokenManager` (логин `Identity.Auth` + проактивный refresh `CreateToken` по
@@ -64,6 +65,12 @@
   Отмонтировать / Закрыть приложение. `EngineLauncher` поднимает движок и коннектится по pipe.
   Закрытие окна → в трей (диск жив); «Закрыть приложение» → unmount + stop движка + выход.
   `AppSettings` хранит последнюю букву диска (`%LOCALAPPDATA%\BarkCloud.Drive\app.json`).
+  Секция «Папка кэша» (`OpenFolderDialog` → `SetCacheDirAsync`): выбор каталога кэша диска.
+
+**Папка кэша** — забота движка (он владеет кэшем). `EngineSettingsStore` хранит путь в
+`%LOCALAPPDATA%\BarkCloud.Drive\settings.json` (по умолчанию `%TEMP%\BarkCloudDrive`), читается на
+старте в `CloudGateway`. Смена на лету (`CloudGateway.SetCacheDir`): новые чтения идут в новую папку,
+ранее скачанное остаётся в прежней (не переносится). UI выбирает папку, путь идёт в движок по IPC.
 
 Логин/пароль идут из UI в движок; **движок сам авторизуется, хранит refresh в DPAPI и обновляет
 токен**, восстанавливает сессию на старте. Диск живёт в движке — UI можно закрыть. PoC свёрнут в Engine.
@@ -82,6 +89,18 @@
 Правка существующего: гидрация копии, на закрытии перезалив + замена записи (если содержимое менялось;
 если `fileId` совпал — no-op). mkdir/delete/rename/move через CloudApi.
 
+**Поблочное чтение (Range, фаза 5).** Чтение больше НЕ гидрирует файл целиком.
+- *Бэкенд (сервис Files):* `S3Uploader.DownloadRangeAsync` (`GetObjectRequest.ByteRange` → MinIO/S3 нативно);
+  `DownloadFileCommand`/`Result` несут диапазон и `IsPartial`/`TotalSize`/`ContentLength` (длина куска — из
+  ответа S3, не из БД, чтобы не разъехался `Content-Length`); `FilesController.DownloadFile` парсит заголовок
+  `Range`, отдаёт **206** с `Content-Range`/`Content-Length`/`Accept-Ranges` (один диапазон `bytes=from-[to]`;
+  multi/suffix — целиком). temp-URL живёт 60 мин и не одноразовый → по ней можно слать много Range-запросов.
+- *Клиент (`CloudGateway.Read(fileId, fileLength, …)`):* режет запрос на блоки по **1 МиБ**, недостающие тянет
+  `Range`-GET'ом по кэшированной temp-URL (TTL 50 мин), кладёт блоки файлами `{fileId}.blocks/{N}.blk`
+  (`.part`→rename), собирает ответ из блоков. Если сервер вернул не 206 — `RangeNotSupportedException` →
+  откат на скачивание целиком (`ReadWhole`, прежний путь; он же — для гидрации копии при записи).
+  `fileLength` берётся из листинга (`CloudFile.FileSize`).
+
 **UI:** меню «⋯» сверху (запуск / принудительная остановка движка — `ShutdownAsync` + kill процесса).
 **Single-instance:** движок — Mutex; UI — Mutex + named `EventWaitHandle` (второй экземпляр сигналит
 первому показать окно и выходит).
@@ -99,7 +118,7 @@
 2. ~~Engine read-only маунт~~ ← **сделано**
 3. ~~Запись: CreateFile/WriteFile/Cleanup → upload(multipart "file")+AttachFile, эффективный file_id~~ ← **сделано**
 4. ~~Мутации: Move/Delete/CreateDirectory~~ ← **сделано** (rename/move/delete entry+dir, mkdir; правка существующего = перезалив+замена записи)
-5. Бэкенд Range + поблочный кэш содержимого (чтение/правка больших файлов пока целиком)
+5. ~~Бэкенд Range + поблочный кэш чтения~~ ← **сделано** (см. ниже «Поблочное чтение»)
 6. Бэкенд: копии внутри диска (one-entry-per-file блокирует копию идентичного блоба)
 7. UI ← **WPF-UI + трей + скрытый движок + DPAPI-токен + автовосстановление сессии и
    автомонтирование на старте UI сделаны**; осталось автозапуск (вход в систему) +

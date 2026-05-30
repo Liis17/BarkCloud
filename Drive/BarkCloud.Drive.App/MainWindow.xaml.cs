@@ -6,6 +6,8 @@ using System.Windows.Interop;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 
+using Microsoft.Win32;
+
 using BarkCloud.Drive.Contracts;
 
 using Wpf.Ui.Controls;
@@ -185,6 +187,16 @@ public partial class MainWindow : FluentWindow
 
         Apply(status);
 
+        try
+        {
+            var settings = await engine.GetSettingsAsync();
+            CacheDirBox.Text = settings.CacheDir;
+        }
+        catch
+        {
+            // настройки недоступны — не критично
+        }
+
         if (status.Authenticated && !status.Mounted)
             await AutoMountAsync(engine);
     }
@@ -225,6 +237,32 @@ public partial class MainWindow : FluentWindow
     {
         _settings.DriveLetter = letter;
         _settings.Save();
+    }
+
+    // Выбор папки кэша: диалог → передаём путь движку (он владеет кэшем).
+    private async void BrowseCacheClick(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFolderDialog { Title = "Выберите папку для кэша диска", Multiselect = false };
+        if (!string.IsNullOrEmpty(CacheDirBox.Text))
+            dialog.InitialDirectory = CacheDirBox.Text;
+
+        if (dialog.ShowDialog() != true)
+            return;
+
+        var engine = await EnsureEngineAsync();
+        if (engine == null)
+            return;
+
+        try
+        {
+            var settings = await engine.SetCacheDirAsync(dialog.FolderName);
+            CacheDirBox.Text = settings.CacheDir;
+            StatusText.Text = "Папка кэша обновлена. Ранее скачанные файлы остаются в прежней папке.";
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = $"Не удалось сменить папку кэша: {ex.Message}";
+        }
     }
 
     private void ShowClick(object sender, RoutedEventArgs e) => ShowFromTray();

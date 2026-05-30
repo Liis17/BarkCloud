@@ -87,9 +87,13 @@ dotnet test Tests/Backend/BarkCloud.Identity.Tests/BarkCloud.Identity.Tests.cspr
 
 ## CI
 
-Workflow `.github/workflows/tests.yml`:
-- **`dotnet-tests`** — `runs-on: self-hosted`, прогоняет `dotnet test` на всём solution с coverage и публикацией TRX-отчёта.
-- **`android-tests`** — `runs-on: ubuntu-latest`, прогоняет `./gradlew :app:testDebugUnitTest`.
+Workflow `.github/workflows/tests.yml` — гранулярный запуск по изменённым путям через `dorny/paths-filter@v4`:
+- **`changes`** — джоба-диспетчер: определяет изменённые части (per-микросервис, `shared`, `android`) и выдаёт outputs. Изменения в `Shared/**` или `Tests/BarkCloud.TestKit/**` триггерят все backend-тесты (микросервисы зависят от Shared/Proto).
+- **`test-<сервис>`** (configuration/files/grpcserver/identity/notification/users/web) — `runs-on: [self-hosted, linux]`, каждая гоняет только свой `.Tests`-проект; `if`: изменена своя папка **или** `shared`.
+- **`test-shared`** — все `Shared.*.Tests` одним прогоном при изменении `Shared/**`.
+- **`android-tests`** — `runs-on: ubuntu-latest`, `./gradlew :app:testDebugUnitTest`, только при изменениях в `Android/**`.
 - **`ios-tests`** — будет добавлен в этапе P3 (требует macOS-раннера).
+
+Drive (`Drive/*`, WPF/Windows, тестов нет) в CI не собирается — только локально. Backend-воркфлоу `build-backend-*.yml` привязаны к `[self-hosted, linux]`, чтобы не уехать на Windows self-hosted runner (общий label `self-hosted`).
 
 Триггеры: push в `dev`/`master`/`claude/**`, pull_request в `dev`/`master`, workflow_dispatch.

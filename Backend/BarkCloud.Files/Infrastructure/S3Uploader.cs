@@ -66,6 +66,27 @@ public class S3Uploader
     }
 
     /// <summary>
+    /// Скачивает диапазон байтов [start..end] (включительно) объекта из S3 через
+    /// <see cref="GetObjectRequest.ByteRange"/>. <see cref="GetObjectResponse.ContentLength"/>
+    /// (и, соответственно, <c>Length</c> возвращаемого потока) равны длине диапазона.
+    /// </summary>
+    public virtual async Task<Stream> DownloadRangeAsync(string bucket, string key, long start, long end)
+    {
+        var client = _registry.GetClientForBucket(bucket);
+
+        var request = new GetObjectRequest
+        {
+            BucketName = bucket,
+            Key = key,
+            ByteRange = new ByteRange(start, end)
+        };
+
+        var response = await client.GetObjectAsync(request);
+
+        return new S3ObjectStream(response);
+    }
+
+    /// <summary>
     /// Обёртка над <see cref="GetObjectResponse.ResponseStream"/>, которая при освобождении
     /// дополнительно диспозит сам ответ AWS SDK. Это нужно потому, что
     /// <see cref="GetObjectResponse"/> владеет HTTP-соединением и метаданными, и закрытие

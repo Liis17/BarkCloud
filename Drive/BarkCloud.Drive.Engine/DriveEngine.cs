@@ -13,15 +13,17 @@ public sealed class DriveEngine : IDriveEngine
     private readonly MountManager _mount;
     private readonly BarkCloudFileSystem _fs;
     private readonly CancellationTokenSource _lifetime;
+    private readonly EngineSettingsStore _settings;
 
     internal DriveEngine(TokenManager tokens, CloudGateway gateway, MountManager mount,
-        BarkCloudFileSystem fs, CancellationTokenSource lifetime)
+        BarkCloudFileSystem fs, CancellationTokenSource lifetime, EngineSettingsStore settings)
     {
         _tokens = tokens;
         _gateway = gateway;
         _mount = mount;
         _fs = fs;
         _lifetime = lifetime;
+        _settings = settings;
     }
 
     public async Task<EngineStatus> LoginAsync(string login, string password, string? otpCode)
@@ -87,6 +89,20 @@ public sealed class DriveEngine : IDriveEngine
     }
 
     public Task<EngineStatus> GetStatusAsync() => Task.FromResult(Status(null));
+
+    public Task<EngineSettings> GetSettingsAsync()
+        => Task.FromResult(new EngineSettings { CacheDir = _settings.GetCacheDir() });
+
+    public Task<EngineSettings> SetCacheDirAsync(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+            throw new ArgumentException("Пустой путь к папке кэша");
+
+        _settings.SetCacheDir(path);
+        _gateway.SetCacheDir(path);
+        EngineLog.Info($"Папка кэша изменена: {path}");
+        return Task.FromResult(new EngineSettings { CacheDir = path });
+    }
 
     public Task ShutdownAsync()
     {
