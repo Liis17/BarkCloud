@@ -85,13 +85,27 @@ internal enum Barkcloud_Files_FilesApi: Sendable {
                 type: .unary
             )
         }
+        /// Namespace for "GetFileMetadata" metadata.
+        internal enum GetFileMetadata: Sendable {
+            /// Request type for "GetFileMetadata".
+            internal typealias Input = Barkcloud_Files_GetFileMetadataRequest
+            /// Response type for "GetFileMetadata".
+            internal typealias Output = Barkcloud_Files_GetFileMetadataResponse
+            /// Descriptor for "GetFileMetadata".
+            internal static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.FilesApi"),
+                method: "GetFileMetadata",
+                type: .unary
+            )
+        }
         /// Descriptors for all methods in the "barkcloud.files.FilesApi" service.
         internal static let descriptors: [GRPCCore.MethodDescriptor] = [
             GetUploadUrl.descriptor,
             GetTempDownloadUrl.descriptor,
             CheckFileHash.descriptor,
             CheckFileHashes.descriptor,
-            GetUserStorageInfo.descriptor
+            GetUserStorageInfo.descriptor,
+            GetFileMetadata.descriptor
         ]
     }
 }
@@ -206,6 +220,24 @@ extension Barkcloud_Files_FilesApi {
             request: GRPCCore.StreamingServerRequest<Barkcloud_Files_GetUserStorageInfoRequest>,
             context: GRPCCore.ServerContext
         ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_GetUserStorageInfoResponse>
+
+        /// Handle the "GetFileMetadata" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Метаданные файла (EXIF/ffprobe/Office) для диалога «Свойства»
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Files_GetFileMetadataRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Files_GetFileMetadataResponse` messages.
+        func getFileMetadata(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Files_GetFileMetadataRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_GetFileMetadataResponse>
     }
 
     /// Service protocol for the "barkcloud.files.FilesApi" service.
@@ -305,6 +337,24 @@ extension Barkcloud_Files_FilesApi {
             request: GRPCCore.ServerRequest<Barkcloud_Files_GetUserStorageInfoRequest>,
             context: GRPCCore.ServerContext
         ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_GetUserStorageInfoResponse>
+
+        /// Handle the "GetFileMetadata" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Метаданные файла (EXIF/ffprobe/Office) для диалога «Свойства»
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_GetFileMetadataRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Files_GetFileMetadataResponse` message.
+        func getFileMetadata(
+            request: GRPCCore.ServerRequest<Barkcloud_Files_GetFileMetadataRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_GetFileMetadataResponse>
     }
 
     /// Simple service protocol for the "barkcloud.files.FilesApi" service.
@@ -402,6 +452,24 @@ extension Barkcloud_Files_FilesApi {
             request: Barkcloud_Files_GetUserStorageInfoRequest,
             context: GRPCCore.ServerContext
         ) async throws -> Barkcloud_Files_GetUserStorageInfoResponse
+
+        /// Handle the "GetFileMetadata" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Метаданные файла (EXIF/ffprobe/Office) для диалога «Свойства»
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Files_GetFileMetadataRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Files_GetFileMetadataResponse` to respond with.
+        func getFileMetadata(
+            request: Barkcloud_Files_GetFileMetadataRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Files_GetFileMetadataResponse
     }
 }
 
@@ -464,6 +532,17 @@ extension Barkcloud_Files_FilesApi.StreamingServiceProtocol {
                 )
             }
         )
+        router.registerHandler(
+            forMethod: Barkcloud_Files_FilesApi.Method.GetFileMetadata.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_GetFileMetadataRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_GetFileMetadataResponse>(),
+            handler: { request, context in
+                try await self.getFileMetadata(
+                    request: request,
+                    context: context
+                )
+            }
+        )
     }
 }
 
@@ -519,6 +598,17 @@ extension Barkcloud_Files_FilesApi.ServiceProtocol {
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_GetUserStorageInfoResponse> {
         let response = try await self.getUserStorageInfo(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    internal func getFileMetadata(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Files_GetFileMetadataRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_GetFileMetadataResponse> {
+        let response = try await self.getFileMetadata(
             request: GRPCCore.ServerRequest(stream: request),
             context: context
         )
@@ -587,6 +677,19 @@ extension Barkcloud_Files_FilesApi.SimpleServiceProtocol {
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_GetUserStorageInfoResponse> {
         return GRPCCore.ServerResponse<Barkcloud_Files_GetUserStorageInfoResponse>(
             message: try await self.getUserStorageInfo(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    internal func getFileMetadata(
+        request: GRPCCore.ServerRequest<Barkcloud_Files_GetFileMetadataRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_GetFileMetadataResponse> {
+        return GRPCCore.ServerResponse<Barkcloud_Files_GetFileMetadataResponse>(
+            message: try await self.getFileMetadata(
                 request: request.message,
                 context: context
             ),
@@ -717,6 +820,29 @@ extension Barkcloud_Files_FilesApi {
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_GetUserStorageInfoResponse>,
             options: GRPCCore.CallOptions,
             onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_GetUserStorageInfoResponse>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "GetFileMetadata" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Метаданные файла (EXIF/ffprobe/Office) для диалога «Свойства»
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_GetFileMetadataRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_GetFileMetadataRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_GetFileMetadataResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func getFileMetadata<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_GetFileMetadataRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_GetFileMetadataRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_GetFileMetadataResponse>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_GetFileMetadataResponse>) async throws -> Result
         ) async throws -> Result where Result: Sendable
     }
 
@@ -905,6 +1031,40 @@ extension Barkcloud_Files_FilesApi {
                 onResponse: handleResponse
             )
         }
+
+        /// Call the "GetFileMetadata" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Метаданные файла (EXIF/ffprobe/Office) для диалога «Свойства»
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_GetFileMetadataRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_GetFileMetadataRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_GetFileMetadataResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        internal func getFileMetadata<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_GetFileMetadataRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_GetFileMetadataRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_GetFileMetadataResponse>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_GetFileMetadataResponse>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Files_FilesApi.Method.GetFileMetadata.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
     }
 }
 
@@ -1051,6 +1211,35 @@ extension Barkcloud_Files_FilesApi.ClientProtocol {
             request: request,
             serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_GetUserStorageInfoRequest>(),
             deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_GetUserStorageInfoResponse>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "GetFileMetadata" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Метаданные файла (EXIF/ffprobe/Office) для диалога «Свойства»
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Files_GetFileMetadataRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    internal func getFileMetadata<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Files_GetFileMetadataRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_GetFileMetadataResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.getFileMetadata(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_GetFileMetadataRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_GetFileMetadataResponse>(),
             options: options,
             onResponse: handleResponse
         )
@@ -1219,6 +1408,39 @@ extension Barkcloud_Files_FilesApi.ClientProtocol {
             metadata: metadata
         )
         return try await self.getUserStorageInfo(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "GetFileMetadata" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Метаданные файла (EXIF/ffprobe/Office) для диалога «Свойства»
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    internal func getFileMetadata<Result>(
+        _ message: Barkcloud_Files_GetFileMetadataRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_GetFileMetadataResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Files_GetFileMetadataRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.getFileMetadata(
             request: request,
             options: options,
             onResponse: handleResponse
