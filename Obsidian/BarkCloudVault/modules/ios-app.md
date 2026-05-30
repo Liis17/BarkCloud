@@ -263,7 +263,9 @@ BarkCloud/
   программный `reload()` после `create()` идёт со спиннером. Сетки Фото/Видео (`MediaGridViewModel`)
   этим не страдают — там нет ветки переключения вида по `isLoading`.
 - **Корзина** (`Features/Trash/`, таб №4) — `CloudApi.ListTrash` с cursor-пагинацией, превью/иконка
-  по типу, дата удаления и срок очистки; свайп — `RestoreFromTrash` / `DeleteFromTrash`; в тулбаре —
+  по типу, дата удаления и срок очистки; свайп — `RestoreFromTrash` / `DeleteFromTrash` (**только
+  иконки**, без подписей; «удалить навсегда» оптимистично через [[#PendingDelete]] — элемент сразу
+  убирается, внизу snackbar с обратным отсчётом 5 с и кнопкой «Отменить»); в тулбаре —
   `EmptyTrash` с подтверждением и блокирующим оверлеем. Pull-to-refresh (`.barkRefreshable` → `reload()`),
   работает и на пустом состоянии (пустой экран обёрнут в `ScrollView`). **Важно:** `reload()` НЕ поднимает
   `isLoading` — иначе при потягивании экран свернул бы `List` (носитель жеста pull-to-refresh и overlay-лисы)
@@ -273,7 +275,9 @@ BarkCloud/
   «Облачное хранилище» (карточка-вход в `CloudBrowserScreen`: навигация по папкам
   `ListDirectoryDetailed`, хлебные крошки `GetPath`, CRUD папок/записей, перемещение через
   `CloudMovePicker`, загрузка фото/видео (PhotosPicker) и документов (`.fileImporter`), открытие/скачивание
-  в QuickLook, pull-to-refresh `.barkRefreshable` → `reload(showSpinner: false)` — флаг отключает подъём
+  в QuickLook, **swipe-actions только иконками** (`trash`/`folder`/`pencil`, без подписей), удаление
+  файла/папки — оптимистичное через [[#PendingDelete]] (внизу snackbar 5 с с «Отменить»),
+  pull-to-refresh `.barkRefreshable` → `reload(showSpinner: false)` — флаг отключает подъём
   `isLoading` при потягивании, чтобы не свернуть `List` (с жестом и лисой) в полноэкранный `ProgressView`; программные обновления
   после CRUD зовут `reload()` со спиннером (и на пустой папке через `ScrollView`))
   и «Общие файлы» → `ComingSoonScreen` (на бэкенде нет API расшаривания — заглушка «скоро»).
@@ -290,13 +294,46 @@ BarkCloud/
   (`CloudApi.CreateShare` → клиент сам собирает `{GrpcEndpoint.webHost}/s/{token}` через
   `publicShareURL(token:)`, см. [[share-links-client-guide]] — URL ведёт на веб-UI :443, бэкенд готовый
   URL не отдаёт; см. ограничение revoke в гайде), **Добавить в альбом** (`AlbumPickerSheet` на один файл),
-  **Удалить** (галерея/альбом → `DeleteUserMedia` в корзину; устройство → «Удалить с устройства»
+  **Удалить** (галерея/альбом → `DeleteUserMedia` в корзину **оптимистично через [[#PendingDelete]]** —
+  файл сразу пропадает из сетки, внизу snackbar 5 с с «Отменить»; устройство → «Удалить с устройства»
   `PHAssetChangeRequest.deleteAssets`). **Экран свойств** (`Features/Shared/FilePropertiesSheet.swift`,
   enum-вход `.cloud(MediaAsset)`/`.device(PHAsset)`) — имя/тип/размер/разрешение/даты/ID (как веб-модалка,
   где есть данные); `MediaAsset` расширен полями `imageWidth/imageHeight/uploadedAt/etag` из `UploadFileInfo`.
   На Галерее устройства у `PHAsset` нет `file_id` — `GalleryViewModel.ensureCloudFileID(for:)` резолвит его
   по SHA256 (`cachedSHA256` → `CloudApi.CheckFileHash`, одиночный), а при отсутствии заливает оригинал
   (дедуп по хешу) в авто-папку «Недавно загруженные»; на время резолва — оверлей `isUploading`.
+
+### PendingDelete
+
+Общий компонент отложенного удаления для всех экранов (`Features/Shared/PendingDelete.swift` +
+`PendingDeleteSnackbar.swift`) — паттерн «undo-snackbar» как в Gmail. `@MainActor @Observable`
+store с одной активной записью `Pending { id, label, action, onUndo }` и `remainingSeconds`.
+**Логика:**
+1. View-модель сразу убирает элемент из своей коллекции (оптимистично).
+2. Зовёт `pendingDelete.schedule(label:action:onUndo:)`; внизу появляется snackbar с именем файла,
+   отсчётом `Удалится через N с.` и кнопкой «Отменить» (capsule на accent-фоне).
+3. Через 5 секунд срабатывает таймер — выполняется `action` (реальный gRPC-запрос на сервер).
+4. Если до этого пользователь ставит **другое** удаление через `schedule()` — предыдущее
+   немедленно исполняется в фоне (его `action` уходит), snackbar обновляется на новый элемент
+   со своим 5-секундным отсчётом. Тот же эффект даёт `await pendingDelete.flushIfAny()`,
+   который во всех VM вызывается **в начале `reload()`**, чтобы pull-to-refresh не вернул
+   только что удалённый элемент с сервера.
+5. Кнопка «Отменить» зовёт `cancel()` — таймер останавливается, `onUndo()` восстанавливает
+   элемент в коллекции по запомненному индексу (`min(index, count)` на случай вставок).
+6. При ошибке от сервера в action — VM показывает обычный текстовый snackbar и зовёт
+   `reload()` (элемент возвращается с сервера, состояние синхронизируется).
+
+Применён: `CloudBrowserViewModel.deleteFile/deleteDirectory`, `TrashViewModel.deleteForever`,
+`MediaGridViewModel.deleteSingle`, `AlbumDetailViewModel.deleteFromCloud` — то есть везде, где
+пользователь удаляет один файл (через swipe в списке или контекстное меню на сетке). Batch-удаление
+(`MediaGridViewModel.deleteSelected`) пока без undo — там свой прогресс-индикатор. Удаление
+устройства (`DevicesScreen`) и удаление альбома/аккаунта — через confirmation-диалог,
+тоже без undo.
+
+**Swipe-actions: только иконки** (без подписей) на всех экранах со свайпом: `TrashScreen`
+(`arrow.uturn.backward`/`trash`), `CloudBrowserScreen` (`trash`/`folder`/`pencil`),
+`DevicesScreen` (`trash`/`pencil`); вместо `Label(..., systemImage:)` — голый `Image(systemName:)`
++ `.accessibilityLabel(...)` для VoiceOver.
 
 **Важно для превью/скачивания**: файловый сервис на `:7025` с self-signed TLS — превью и оригиналы
 грузятся через `InsecureHTTP.session` (`AsyncImage` их бы отверг), поэтому в сетках используется

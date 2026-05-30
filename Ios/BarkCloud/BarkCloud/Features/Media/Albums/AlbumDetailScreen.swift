@@ -20,6 +20,10 @@ final class AlbumDetailViewModel {
 
     var state: UiState
 
+    /// Отложенное удаление файла из облака (контекстное меню) — snackbar внизу
+    /// с отсчётом и кнопкой «Отменить».
+    let pendingDelete = PendingDelete()
+
     private let albums: AlbumRepository
     private let cloud: CloudRepository
     private let kind: MediaKind?
@@ -45,6 +49,8 @@ final class AlbumDetailViewModel {
     }
 
     func reload() async {
+        // Досдаём отложенное удаление, иначе сервер вернёт нам убранный файл.
+        await pendingDelete.flushIfAny()
         state.isLoading = true
         do {
             let page = try await albums.listItems(albumID: state.album.id, kindFilter: apiKind, limit: 60)
@@ -146,14 +152,27 @@ final class AlbumDetailViewModel {
         }
     }
 
-    /// Удалить файл из облака (в корзину) — не путать с «Убрать из альбома».
-    func deleteFromCloud(fileID: String) async {
-        do {
-            try await cloud.deleteUserMedia(fileID: fileID)
-            await reload()
-        } catch {
-            state.snackbar = domainErrorMessage(error)
-        }
+    /// Оптимистичное удаление файла из облака (в корзину) — не путать с «Убрать
+    /// из альбома». Сразу убираем из сетки и кладём в очередь; реальный запрос
+    /// уйдёт, когда snackbar отсчитает 5 секунд.
+    func deleteFromCloud(item: MediaItem) {
+        guard let index = state.items.firstIndex(where: { $0.id == item.id }) else { return }
+        state.items.remove(at: index)
+        pendingDelete.schedule(
+            label: item.fileName,
+            action: { [weak self, cloud] in
+                do { try await cloud.deleteUserMedia(fileID: item.id) }
+                catch {
+                    self?.state.snackbar = domainErrorMessage(error)
+                    await self?.reload()
+                }
+            },
+            onUndo: { [weak self] in
+                guard let self else { return }
+                let position = min(index, state.items.count)
+                state.items.insert(item, at: position)
+            }
+        )
     }
 
     /// Добавить файл в другой существующий альбом.
@@ -271,6 +290,9 @@ struct AlbumDetailScreen: View {
                 onCreateNew: { Task { await vm?.createAlbumAndAdd(fileID: item.id) } }
             )
         }
+        .overlay(alignment: .bottom) {
+            if let vm { PendingDeleteSnackbar(store: vm.pendingDelete) }
+        }
         .overlay(alignment: .bottom) { if let vm { snackbar(vm) } }
     }
 
@@ -296,7 +318,7 @@ struct AlbumDetailScreen: View {
             Task { await vm.removeItem(fileID: item.id) }
         }
         Button(String(localized: "ctx_delete"), role: .destructive) {
-            Task { await vm.deleteFromCloud(fileID: item.id) }
+            vm.deleteFromCloud(item: item)
         }
     }
 

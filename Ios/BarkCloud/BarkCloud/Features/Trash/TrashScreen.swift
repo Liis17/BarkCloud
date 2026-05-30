@@ -60,16 +60,18 @@ struct TrashScreen: View {
                         Button {
                             Task { await vm.restore(item) }
                         } label: {
-                            Label(String(localized: "trash_restore"), systemImage: "arrow.uturn.backward")
+                            Image(systemName: "arrow.uturn.backward")
                         }
                         .tint(.green)
+                        .accessibilityLabel(String(localized: "trash_restore"))
                     }
                     .swipeActions(edge: .trailing) {
                         Button(role: .destructive) {
-                            Task { await vm.deleteForever(item) }
+                            vm.deleteForever(item)
                         } label: {
-                            Label(String(localized: "trash_delete_forever"), systemImage: "trash")
+                            Image(systemName: "trash")
                         }
+                        .accessibilityLabel(String(localized: "trash_delete_forever"))
                     }
             }
             if vm.state.isLoadingMore {
@@ -79,6 +81,7 @@ struct TrashScreen: View {
         .listStyle(.plain)
         // Потянуть вниз — перезагрузить корзину.
         .barkRefreshable { await vm.reload() }
+        .overlay(alignment: .bottom) { PendingDeleteSnackbar(store: vm.pendingDelete) }
         .overlay(alignment: .bottom) { snackbar(vm) }
     }
 

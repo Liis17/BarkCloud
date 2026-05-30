@@ -143,6 +143,28 @@
         }
       }
     },
+    "action_undo": {
+      "extractionState": "manual",
+      "localizations": {
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Отменить"
+          }
+        }
+      }
+    },
+    "pending_delete_countdown": {
+      "extractionState": "manual",
+      "localizations": {
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Удалится через %lld с."
+          }
+        }
+      }
+    },
     "action_close": {
       "extractionState": "manual",
       "localizations": {

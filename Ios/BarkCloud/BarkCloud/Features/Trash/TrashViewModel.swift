@@ -21,6 +21,10 @@ final class TrashViewModel {
 
     var state = UiState()
 
+    /// Отложенное «удалить навсегда» — внизу появляется snackbar с отсчётом и
+    /// кнопкой «Отменить». До истечения таймера запрос на сервер не уходит.
+    let pendingDelete = PendingDelete()
+
     private let cloud: CloudRepository
     private var didLoad = false
 
@@ -39,6 +43,9 @@ final class TrashViewModel {
     /// Спиннер первого показа обеспечивает дефолт `isLoading = true`, спиннер
     /// потягивания рисует сам `.refreshable`.
     func reload() async {
+        // Если есть отложенное удаление навсегда — досдаём его, иначе сервер
+        // вернёт нам обратно элемент, который пользователь уже визуально убрал.
+        await pendingDelete.flushIfAny()
         do {
             let page = try await cloud.listTrash(limit: 50)
             state.items = page.items
@@ -80,14 +87,28 @@ final class TrashViewModel {
         }
     }
 
-    func deleteForever(_ item: TrashItem) async {
-        do {
-            try await cloud.deleteFromTrash(entryID: item.id)
-            state.items.removeAll { $0.id == item.id }
-            state.snackbar = String(localized: "trash_deleted")
-        } catch {
-            state.snackbar = domainErrorMessage(error)
-        }
+    /// Оптимистичное «удалить навсегда»: сразу убираем элемент из списка и кладём
+    /// удаление в очередь — реальный запрос уйдёт, когда snackbar отсчитает
+    /// 5 секунд (или пользователь поставит другое удаление в очередь).
+    func deleteForever(_ item: TrashItem) {
+        guard let index = state.items.firstIndex(where: { $0.id == item.id }) else { return }
+        state.items.remove(at: index)
+        pendingDelete.schedule(
+            label: item.name,
+            action: { [weak self, cloud] in
+                do { try await cloud.deleteFromTrash(entryID: item.id) }
+                catch {
+                    // Сервер не дал — возвращаем элемент через reload и сообщаем.
+                    self?.state.snackbar = domainErrorMessage(error)
+                    await self?.reload()
+                }
+            },
+            onUndo: { [weak self] in
+                guard let self else { return }
+                let position = min(index, state.items.count)
+                state.items.insert(item, at: position)
+            }
+        )
     }
 
     func emptyAll() async {

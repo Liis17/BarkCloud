@@ -83,16 +83,18 @@ struct DevicesScreen: View {
                             Button(role: .destructive) {
                                 deleteTarget = device
                             } label: {
-                                Label(String(localized: "action_delete"), systemImage: "trash")
+                                Image(systemName: "trash")
                             }
+                            .accessibilityLabel(String(localized: "action_delete"))
                         }
                         Button {
                             renameText = device.customName.isEmpty ? device.originalName : device.customName
                             renameTarget = device
                         } label: {
-                            Label(String(localized: "action_rename"), systemImage: "pencil")
+                            Image(systemName: "pencil")
                         }
                         .tint(AppColors.accent)
+                        .accessibilityLabel(String(localized: "action_rename"))
                     }
             }
         }

@@ -19,6 +19,10 @@ struct CloudBrowserUiState {
 final class CloudBrowserViewModel {
     var state: CloudBrowserUiState
 
+    /// Очередь отложенного удаления — внизу экрана показывается snackbar с
+    /// отсчётом, до выполнения запрос на сервер не уходит.
+    let pendingDelete = PendingDelete()
+
     private let cloud: CloudRepository
     private var didLoad = false
 
@@ -42,6 +46,10 @@ final class CloudBrowserViewModel {
     /// бы задачу обновления и gRPC-запрос упал бы с «the transport threw an
     /// unexpected error». Спиннер потягивания рисует сам `.refreshable`.
     func reload(showSpinner: Bool = true) async {
+        // Если в очереди есть отложенное удаление — выполняем его до перезагрузки,
+        // иначе сервер вернёт нам обратно файл, который пользователь только что
+        // визуально убрал.
+        await pendingDelete.flushIfAny()
         if showSpinner { state.isLoading = true }
         do {
             let listing = try await cloud.listDirectory(state.directoryID)
@@ -77,14 +85,49 @@ final class CloudBrowserViewModel {
         catch { state.snackbar = domainErrorMessage(error) }
     }
 
-    func deleteDirectory(_ dir: CloudDirectory) async {
-        do { try await cloud.deleteDirectory(dir.id); await reload() }
-        catch { state.snackbar = domainErrorMessage(error) }
+    /// Оптимистичное удаление папки: сразу убираем из сетки и кладём в очередь
+    /// отложенного удаления — реальный gRPC-запрос уйдёт, когда snackbar отсчитает
+    /// свои 5 секунд (или пользователь поставит другое удаление в очередь).
+    func deleteDirectory(_ dir: CloudDirectory) {
+        guard let index = state.subdirs.firstIndex(where: { $0.id == dir.id }) else { return }
+        state.subdirs.remove(at: index)
+        pendingDelete.schedule(
+            label: dir.name,
+            action: { [weak self, cloud] in
+                do { try await cloud.deleteDirectory(dir.id) }
+                catch {
+                    // Сервер не дал удалить — возвращаем папку на место и сообщаем.
+                    self?.state.snackbar = domainErrorMessage(error)
+                    await self?.reload(showSpinner: false)
+                }
+            },
+            onUndo: { [weak self] in
+                guard let self else { return }
+                let position = min(index, state.subdirs.count)
+                state.subdirs.insert(dir, at: position)
+            }
+        )
     }
 
-    func deleteFile(_ entry: CloudFileEntry) async {
-        do { try await cloud.deleteFileEntry(entry.id); await reload() }
-        catch { state.snackbar = domainErrorMessage(error) }
+    /// Оптимистичное удаление файла (см. `deleteDirectory`).
+    func deleteFile(_ entry: CloudFileEntry) {
+        guard let index = state.files.firstIndex(where: { $0.id == entry.id }) else { return }
+        state.files.remove(at: index)
+        pendingDelete.schedule(
+            label: entry.name,
+            action: { [weak self, cloud] in
+                do { try await cloud.deleteFileEntry(entry.id) }
+                catch {
+                    self?.state.snackbar = domainErrorMessage(error)
+                    await self?.reload(showSpinner: false)
+                }
+            },
+            onUndo: { [weak self] in
+                guard let self else { return }
+                let position = min(index, state.files.count)
+                state.files.insert(entry, at: position)
+            }
+        )
     }
 
     func moveDirectory(_ dir: CloudDirectory, toDirectory targetID: String) async {
