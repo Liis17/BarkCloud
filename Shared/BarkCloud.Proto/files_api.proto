@@ -16,6 +16,8 @@ service FilesApi {
   rpc CheckFileHashes(CheckFileHashesRequest) returns(CheckFileHashesResponse); // Пакетная проверка наличия файлов по списку SHA256-хешей (без побочных эффектов)
 
   rpc GetUserStorageInfo(GetUserStorageInfoRequest) returns(GetUserStorageInfoResponse); // Получить информацию о хранилище пользователя
+
+  rpc GetFileMetadata(GetFileMetadataRequest) returns(GetFileMetadataResponse); // Метаданные файла (EXIF/ffprobe/Office) для диалога «Свойства»
 }
 
 service CloudApi {
@@ -142,6 +144,55 @@ message FilePreviewInfo {
   int32 actual_width = 3;     // Фактическая ширина после ресайза
   int32 actual_height = 4;    // Фактическая высота после ресайза
   string preview_url = 5;     // Публичная ссылка на скачивание превью
+}
+
+// ───────── Метаданные блоба (EXIF / ffprobe / PDF / Office) ─────────
+
+message GetFileMetadataRequest {
+  string file_id = 1;
+}
+
+message GetFileMetadataResponse {
+  bool has_metadata = 1;                 // false — для файла не извлечено ни одного поля (или ещё не успели)
+  FileMetadataInfo metadata = 2;         // заполнено только при has_metadata=true
+}
+
+// Все поля опциональны (через optional) — клиент должен показывать только заданные.
+message FileMetadataInfo {
+  // Общие
+  optional google.protobuf.Timestamp taken_at = 1; // Дата/время съёмки/создания контента (UTC)
+  optional string creator_tool = 2;                // Программа создания/редактирования
+
+  // GPS
+  optional double latitude = 3;
+  optional double longitude = 4;
+  optional double altitude = 5;                    // Метры; отрицательно — ниже уровня моря
+
+  // Камера
+  optional string camera_make = 6;
+  optional string camera_model = 7;
+  optional string lens_model = 8;
+
+  // Параметры съёмки
+  optional double focal_length_mm = 9;
+  optional double f_number = 10;
+  optional double exposure_time_seconds = 11;
+  optional int32 iso = 12;
+  optional int32 orientation = 13;                 // EXIF Orientation 1..8
+  optional bool flash = 14;
+
+  // Видео
+  optional double duration_seconds = 15;
+  optional string video_codec = 16;
+  optional string audio_codec = 17;
+  optional int64 bitrate = 18;                     // бит/с
+  optional double frame_rate = 19;
+
+  // Документ
+  optional string document_author = 20;
+  optional string document_title = 21;
+  optional string document_subject = 22;
+  optional int32 document_page_count = 23;
 }
 
 message GetUploadUrlRequest {

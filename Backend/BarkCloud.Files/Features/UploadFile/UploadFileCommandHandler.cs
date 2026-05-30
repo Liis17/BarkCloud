@@ -17,11 +17,13 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
 {
     private readonly IUploadedFilesStorage _filesStorage;
     private readonly IFileHashesStorage _hashesStorage;
+    private readonly IFileMetadataStorage _metadataStorage;
     private readonly S3Uploader _s3Uploader;
     private readonly S3BucketRegistry _bucketRegistry;
     private readonly ImageCompressor _imageCompressor;
     private readonly VideoThumbnailExtractor _videoThumbnailExtractor;
     private readonly HeicImageConverter _heicConverter;
+    private readonly FileMetadataExtractor _metadataExtractor;
     private readonly PreviewPersistenceService _previewPersistence;
     private readonly ILogger<UploadFileCommandHandler> _logger;
 
@@ -42,21 +44,25 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
     public UploadFileCommandHandler(
         IUploadedFilesStorage filesStorage,
         IFileHashesStorage hashesStorage,
+        IFileMetadataStorage metadataStorage,
         S3Uploader s3Uploader,
         S3BucketRegistry bucketRegistry,
         ImageCompressor imageCompressor,
         VideoThumbnailExtractor videoThumbnailExtractor,
         HeicImageConverter heicConverter,
+        FileMetadataExtractor metadataExtractor,
         PreviewPersistenceService previewPersistence,
         ILogger<UploadFileCommandHandler> logger)
     {
         _filesStorage = filesStorage;
         _hashesStorage = hashesStorage;
+        _metadataStorage = metadataStorage;
         _s3Uploader = s3Uploader;
         _bucketRegistry = bucketRegistry;
         _imageCompressor = imageCompressor;
         _videoThumbnailExtractor = videoThumbnailExtractor;
         _heicConverter = heicConverter;
+        _metadataExtractor = metadataExtractor;
         _previewPersistence = previewPersistence;
         _logger = logger;
     }
@@ -139,6 +145,30 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "Не удалось удалить временный файл {TempPath}", tempFilePath);
+            }
+        }
+
+        // Метаданные (EXIF/QuickTime/PDF/Office) — извлекаются по ходу пайплайна
+        // в подходящие моменты (HEIC — до конвертации, JPEG/PNG — перед превью, видео —
+        // вместе с ffprobe, документы — отдельным блоком), и сохраняются в конце.
+        FileMetadata? extractedMetadata = null;
+
+        // HEIC EXIF: извлекаем оригинальные теги ДО конвертации в JPEG —
+        // ffmpeg `-frames:v 1` теряет EXIF, поэтому после конвертации брать неоткуда.
+        if (isHeic && tempFilePath is not null)
+        {
+            try
+            {
+                originalStream.Position = 0;
+                extractedMetadata = _metadataExtractor.ExtractFromImage(originalStream);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Не удалось извлечь EXIF из HEIC {FileId}", file.Id);
+            }
+            finally
+            {
+                originalStream.Position = 0;
             }
         }
 
@@ -283,18 +313,40 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
                 }
             }
 
+            // 2a) EXIF для НЕ-HEIC изображений — после probing размеров, до S3-аплоада.
+            // HEIC обработан выше отдельно (до конвертации), здесь не дублируем.
+            if (isImageContent && !isHeic && extractedMetadata is null)
+            {
+                try
+                {
+                    originalStream.Position = 0;
+                    extractedMetadata = _metadataExtractor.ExtractFromImage(originalStream);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Не удалось извлечь EXIF из изображения {FileId}", file.Id);
+                }
+                finally
+                {
+                    originalStream.Position = 0;
+                }
+            }
+
             // 2b) Видео: размеры + кадр-обложка на 5-й секунде → тот же multi-preview pipeline.
             var needsVideoPreview = file.Type == UploadFileType.CloudFile && isVideoContent && tempFilePath is not null;
             if (needsVideoPreview)
             {
                 try
                 {
-                    var (vw, vh, _) = await _videoThumbnailExtractor.ProbeAsync(tempFilePath!, cancellationToken);
+                    var probe = await _videoThumbnailExtractor.ProbeFullAsync(tempFilePath!, cancellationToken);
+                    var (vw, vh) = (probe.Width, probe.Height);
                     if (vw > 0 && vh > 0)
                     {
                         file.ImageWidth = vw;
                         file.ImageHeight = vh;
                     }
+
+                    extractedMetadata ??= _metadataExtractor.ExtractFromVideo(probe);
 
                     var frameBytes = await _videoThumbnailExtractor.ExtractFrameJpegAsync(
                         tempFilePath!, VideoThumbnailExtractor.DefaultFramePosition, cancellationToken);
@@ -310,6 +362,31 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
                 catch (Exception ex)
                 {
                     _logger.LogWarning(ex, "Не удалось сгенерировать превью видео {FileId}", file.Id);
+                }
+                finally
+                {
+                    originalStream.Position = 0;
+                }
+            }
+
+            // 2c) PDF / Office — отдельные парсеры; извлекаем перед загрузкой в S3.
+            if (extractedMetadata is null && file.Type == UploadFileType.CloudFile)
+            {
+                try
+                {
+                    originalStream.Position = 0;
+                    if (contentType == "application/pdf")
+                    {
+                        extractedMetadata = _metadataExtractor.ExtractFromPdf(originalStream);
+                    }
+                    else if (contentType.StartsWith("application/vnd.openxmlformats-officedocument."))
+                    {
+                        extractedMetadata = _metadataExtractor.ExtractFromOffice(originalStream, contentType);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Не удалось извлечь метаданные документа {FileId}", file.Id);
                 }
                 finally
                 {
@@ -353,6 +430,21 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
         if (generatedPreviews is { Count: > 0 })
         {
             await _previewPersistence.PersistPreviewsAsync(file, generatedPreviews, bucketName, cancellationToken);
+        }
+
+        // 5) Метаданные блоба. Сохраняем только для CloudFile (для аватаров не имеет смысла).
+        if (extractedMetadata is not null && file.Type == UploadFileType.CloudFile)
+        {
+            extractedMetadata.FileId = file.Id;
+            extractedMetadata.CreatedAt = DateTime.UtcNow;
+            try
+            {
+                await _metadataStorage.AddIfMissing(extractedMetadata, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Не удалось сохранить FileMetadata для {FileId}", file.Id);
+            }
         }
 
         _logger.LogInformation("Обработка файла {FileId} успешно завершена", file.Id);

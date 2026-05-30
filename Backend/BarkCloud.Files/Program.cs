@@ -61,9 +61,11 @@ public class Program
         builder.Services.AddScoped<IAlbumStorage, AlbumStorage>();
         builder.Services.AddScoped<IFavoriteFilesStorage, FavoriteFilesStorage>();
         builder.Services.AddScoped<IShareStorage, ShareStorage>();
+        builder.Services.AddScoped<IFileMetadataStorage, FileMetadataStorage>();
         builder.Services.AddSingleton<ImageCompressor>();
         builder.Services.AddSingleton<VideoThumbnailExtractor>();
         builder.Services.AddSingleton<HeicImageConverter>();
+        builder.Services.AddSingleton<FileMetadataExtractor>();
         builder.Services.AddScoped<PreviewPersistenceService>();
         builder.Services.AddScoped<AlbumViewBuilder>();
         builder.Services.AddScoped<ITrashPurgeService, TrashPurgeService>();
@@ -71,6 +73,7 @@ public class Program
         builder.Services.AddHostedService<TrashCleanupService>();
         builder.Services.AddHostedService<OrphanBlobCleanupService>();
         builder.Services.AddHostedService<LegacyPreviewBackfillService>();
+        builder.Services.AddHostedService<LegacyMetadataBackfillService>();
 
         // Путь к бинарям ffmpeg/ffprobe в образе (см. Dockerfile). По умолчанию — /usr/local/bin.
         FFMpegCore.GlobalFFOptions.Configure(o =>

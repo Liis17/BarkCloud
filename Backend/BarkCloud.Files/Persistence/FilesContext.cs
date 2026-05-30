@@ -29,6 +29,8 @@ public class FilesContext : DbContext
 
     public DbSet<ShareLink> ShareLinks { get; set; }
 
+    public DbSet<FileMetadata> FileMetadata { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<TempFile>()

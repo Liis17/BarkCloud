@@ -3,6 +3,20 @@ using FFMpegCore;
 namespace BarkCloud.Files.Services;
 
 /// <summary>
+/// Технические метаданные видеоконтейнера, собранные через ffprobe.
+/// Любое поле может быть «пустым» (0 / null), если ffprobe не смог его определить.
+/// </summary>
+public record VideoProbe(
+    int Width,
+    int Height,
+    TimeSpan Duration,
+    string? VideoCodec,
+    string? AudioCodec,
+    long BitRate,
+    double FrameRate,
+    IReadOnlyDictionary<string, string>? FormatTags);
+
+/// <summary>
 /// Извлекает кадр-обложку и метаданные из видео через FFmpeg (FFMpegCore).
 /// Бинарь ffmpeg/ffprobe берётся из каталога, заданного через GlobalFFOptions в Program.cs.
 /// </summary>
@@ -28,6 +42,30 @@ public class VideoThumbnailExtractor
         var info = await FFProbe.AnalyseAsync(filePath, cancellationToken: cancellationToken);
         var video = info.PrimaryVideoStream;
         return (video?.Width ?? 0, video?.Height ?? 0, info.Duration);
+    }
+
+    /// <summary>
+    /// Полные технические метаданные контейнера: размеры, длительность, кодеки, битрейт, fps
+    /// плюс теги контейнера (для GPS/устройства из QuickTime/MP4).
+    /// Используется для заполнения <see cref="Domain.FileMetadata"/>.
+    /// </summary>
+    public virtual async Task<VideoProbe> ProbeFullAsync(string filePath, CancellationToken cancellationToken = default)
+    {
+        var info = await FFProbe.AnalyseAsync(filePath, cancellationToken: cancellationToken);
+        var video = info.PrimaryVideoStream;
+        var audio = info.PrimaryAudioStream;
+
+        var bitRate = info.Format?.BitRate > 0 ? (long)info.Format.BitRate : 0L;
+
+        return new VideoProbe(
+            Width: video?.Width ?? 0,
+            Height: video?.Height ?? 0,
+            Duration: info.Duration,
+            VideoCodec: video?.CodecName,
+            AudioCodec: audio?.CodecName,
+            BitRate: bitRate,
+            FrameRate: video?.FrameRate ?? 0,
+            FormatTags: info.Format?.Tags);
     }
 
     /// <summary>
