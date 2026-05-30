@@ -81,6 +81,19 @@ actor AssetHashStore {
         try? context.save()
     }
 
+    /// Удалить записи для перечисленных ассетов — вызывается после того, как фото/видео
+    /// удалены с устройства (освобождение места), чтобы кеш не держал мёртвые `localIdentifier`.
+    func remove(localIds ids: [String]) {
+        guard !ids.isEmpty else { return }
+        let context = ModelContext(container)
+        let descriptor = FetchDescriptor<AssetHashEntry>(
+            predicate: #Predicate { ids.contains($0.localIdentifier) }
+        )
+        guard let entries = try? context.fetch(descriptor), !entries.isEmpty else { return }
+        for entry in entries { context.delete(entry) }
+        try? context.save()
+    }
+
     /// Полная очистка — вызывается при выходе из аккаунта (`resetLocalState`).
     func clearAll() {
         let context = ModelContext(container)

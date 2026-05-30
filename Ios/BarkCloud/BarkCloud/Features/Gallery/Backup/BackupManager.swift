@@ -51,11 +51,11 @@ final class BackupManager {
         self.autoUploadEnabled = settings.autoUploadEnabled
     }
 
-    /// Текущий загружаемый + следующие 2 в очереди (как в Google Photos).
+    /// Текущий загружаемый + следующие 3 в очереди (как в Google Photos).
     var queuePreview: [PHAsset] {
         var result: [PHAsset] = []
         if let currentAsset { result.append(currentAsset) }
-        result.append(contentsOf: pendingUpload.prefix(2))
+        result.append(contentsOf: pendingUpload.prefix(3))
         return result
     }
 
@@ -183,6 +183,9 @@ final class BackupManager {
                 uploadDone += 1
                 reclaimable.append(asset)
                 reclaimableBytes += DeviceAssetResource.originalByteSize(for: asset)
+                // Файл загружен — обновляем занятый объём, чтобы прогресс-бар
+                // хранилища в открытой модалке двигался по ходу автозагрузки.
+                await loadStorageInfo()
             } catch {
                 uploadFailed += 1
             }
@@ -206,6 +209,10 @@ final class BackupManager {
             reclaimable.removeAll()
             reclaimableBytes = 0
             lastFreedBytes = bytes
+            // Ассеты удалены с устройства — выкидываем их из кеша хешей, чтобы он
+            // не держал мёртвые localIdentifier. Список в галерее обновится сам через
+            // PHPhotoLibraryChangeObserver (GalleryViewModel).
+            await AssetHashStore.shared.remove(localIds: assets.map(\.localIdentifier))
             await loadStorageInfo()
         } catch {
             // Пользователь отменил или удаление не удалось — оставляем как есть.
