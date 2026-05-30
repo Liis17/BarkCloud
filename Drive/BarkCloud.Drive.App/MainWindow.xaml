@@ -45,10 +45,22 @@
 
             <!-- Профиль -->
             <ui:Card>
-                <StackPanel>
-                    <TextBlock x:Name="UsernameText" FontWeight="Bold" FontSize="16" Text="—"/>
-                    <TextBlock x:Name="ServerText" Opacity="0.7" FontSize="12"/>
-                </StackPanel>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Ellipse x:Name="AvatarEllipse" Grid.Column="0" Width="48" Height="48"
+                             Margin="0,0,12,0" Visibility="Collapsed">
+                        <Ellipse.Fill>
+                            <ImageBrush x:Name="AvatarBrush" Stretch="UniformToFill"/>
+                        </Ellipse.Fill>
+                    </Ellipse>
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                        <TextBlock x:Name="UsernameText" FontWeight="Bold" FontSize="16" Text="—"/>
+                        <TextBlock x:Name="ServerText" Opacity="0.7" FontSize="12"/>
+                    </StackPanel>
+                </Grid>
             </ui:Card>
 
             <!-- Хранилище -->

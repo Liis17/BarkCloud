@@ -77,6 +77,15 @@
                     </StackPanel>
                 </ui:Card>
 
+                <!-- Автозагрузка -->
+                <ui:Card Margin="0,12,0,0">
+                    <StackPanel>
+                        <TextBlock Text="Автозагрузка (при входе в Windows)" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                        <CheckBox x:Name="AutostartAppCheck" Content="Приложение (значок в трее)" Click="AutostartAppClick" Margin="0,0,0,6"/>
+                        <CheckBox x:Name="AutostartEngineCheck" Content="Движок (монтировать диск при входе)" Click="AutostartEngineClick"/>
+                    </StackPanel>
+                </ui:Card>
+
                 <!-- Движок -->
                 <ui:Card Margin="0,12,0,0">
                     <StackPanel>

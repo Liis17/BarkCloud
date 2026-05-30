@@ -72,6 +72,9 @@ internal static class EngineLauncher
         Process.Start(new ProcessStartInfo(exe) { UseShellExecute = false, CreateNoWindow = true });
     }
 
+    // Путь к exe движка (для записи в автозагрузку).
+    public static string EnginePath => ResolveEnginePath();
+
     private static string ResolveEnginePath()
     {
         var baseDir = AppContext.BaseDirectory;

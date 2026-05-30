@@ -36,8 +36,14 @@ public partial class App : Application
         _showEvent = new EventWaitHandle(false, EventResetMode.AutoReset, ShowEventName);
         ThreadPool.RegisterWaitForSingleObject(_showEvent, OnShowSignaled, null, Timeout.Infinite, executeOnlyOnce: false);
 
-        var window = new MainWindow();
+        // --tray (автозагрузка): стартуем сразу в трей, без видимого окна.
+        var startHidden = e.Args.Any(a => string.Equals(a, "--tray", StringComparison.OrdinalIgnoreCase));
+
+        var window = new MainWindow(startHidden);
         MainWindow = window;
+        if (startHidden)
+            window.WindowState = WindowState.Minimized;
+
         window.Show();
     }
 

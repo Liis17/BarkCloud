@@ -363,6 +363,24 @@ internal sealed class CloudGateway : IDisposable
                ?? throw new InvalidOperationException("Ответ загрузки без fileId");
     }
 
+    // Скачать байты аватара по его URL (тип UserAvatar качается напрямую по id, без temp-ссылки).
+    // URL нормализуется на текущий Files-эндпоинт (как и download-ссылки — они могут быть устаревшими).
+    public async Task<byte[]?> DownloadAvatarAsync(string url)
+    {
+        try
+        {
+            using var response = await _http.GetAsync(NormalizeDownloadUrl(url));
+            if (!response.IsSuccessStatusCode)
+                return null;
+            return await response.Content.ReadAsByteArrayAsync();
+        }
+        catch (Exception ex)
+        {
+            EngineLog.Error("DownloadAvatar", ex);
+            return null;
+        }
+    }
+
     public void AttachFile(string directoryId, string fileId, string name)
         => _cloud.AttachFile(new AttachFileRequest { DirectoryId = directoryId, FileId = fileId, Name = name });
 

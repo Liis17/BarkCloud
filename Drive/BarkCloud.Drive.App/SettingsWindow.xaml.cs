@@ -29,6 +29,10 @@ public partial class SettingsWindow : FluentWindow
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
     {
+        // Состояние автозагрузки — из реестра, не зависит от движка.
+        AutostartAppCheck.IsChecked = Autostart.IsAppEnabled();
+        AutostartEngineCheck.IsChecked = Autostart.IsEngineEnabled();
+
         var engine = Engine;
         if (engine == null)
         {
@@ -218,6 +222,18 @@ public partial class SettingsWindow : FluentWindow
         {
             Status($"Ошибка: {ex.Message}");
         }
+    }
+
+    private void AutostartAppClick(object sender, RoutedEventArgs e)
+    {
+        Autostart.SetApp(AutostartAppCheck.IsChecked == true);
+        Status("Автозагрузка обновлена.");
+    }
+
+    private void AutostartEngineClick(object sender, RoutedEventArgs e)
+    {
+        Autostart.SetEngine(AutostartEngineCheck.IsChecked == true);
+        Status("Автозагрузка обновлена.");
     }
 
     private void ApplyResult(EngineStatus s, string okMessage)
