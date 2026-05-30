@@ -11,4 +11,9 @@ public sealed class EngineStatus
     public long LimitBytes { get; set; }
     public string? Message { get; set; }
     public string? Error { get; set; }
+
+    // Профиль/окружение для дашборда.
+    public string? Username { get; set; }
+    public string? ServerHost { get; set; }
+    public string? VolumeLabel { get; set; }
 }

@@ -42,6 +42,9 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
     private readonly CloudGateway _gateway;
     private readonly string _writeDir;
 
+    // Метка тома (имя диска), отдаётся в GetVolumeInformation. Устанавливается перед Mount.
+    public string VolumeLabel { get; set; } = "BarkCloud";
+
     public BarkCloudFileSystem(CloudGateway gateway)
     {
         _gateway = gateway;
@@ -382,7 +385,7 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
     public NtStatus GetVolumeInformation(out string volumeLabel, out FileSystemFeatures features,
         out string fileSystemName, out uint maximumComponentLength, IDokanFileInfo info)
     {
-        volumeLabel = "BarkCloud";
+        volumeLabel = VolumeLabel;
         fileSystemName = "BarkCloudFS";
         maximumComponentLength = 255;
         features = FileSystemFeatures.CasePreservedNames | FileSystemFeatures.UnicodeOnDisk;

@@ -43,6 +43,21 @@ internal sealed class TokenManager(IdentityApi.IdentityApiClient identity, Token
         StartRefreshLoop();
     }
 
+    // Выход: обнулить токены, остановить refresh-loop, стереть сохранённый refresh.
+    public void Logout()
+    {
+        lock (_lock)
+        {
+            _accessToken = null;
+            _refreshToken = null; // RefreshLoopAsync увидит refresh==null → break
+            _accessExpiresUtc = default;
+        }
+
+        _refreshCts?.Cancel();
+        _refreshCts = null;
+        store.Clear();
+    }
+
     // Молчаливое восстановление сессии на старте движка по сохранённому refresh-токену.
     public async Task TryRestoreAsync()
     {

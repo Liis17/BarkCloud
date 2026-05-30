@@ -7,6 +7,8 @@ namespace BarkCloud.Drive.App;
 // при следующем запуске поднимало тот же диск. Файл: %LOCALAPPDATA%\BarkCloud.Drive\app.json
 internal sealed class AppSettings
 {
+    public bool Configured { get; set; }   // первичная настройка (мастер) пройдена
+    public string? DriveName { get; set; }  // метка тома (имя диска)
     public string? DriveLetter { get; set; }
 
     private static string FilePath => Path.Combine(

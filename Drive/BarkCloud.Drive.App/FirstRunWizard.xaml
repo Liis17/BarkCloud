@@ -1,0 +1,65 @@
+<ui:FluentWindow x:Class="BarkCloud.Drive.App.FirstRunWizard"
+                 xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                 xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+                 Title="Настройка BarkCloud Drive" Height="460" Width="440"
+                 ExtendsContentIntoTitleBar="True"
+                 WindowBackdropType="None"
+                 ResizeMode="NoResize"
+                 WindowStartupLocation="CenterScreen">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <ui:TitleBar Grid.Row="0" Title="Настройка BarkCloud Drive" ShowMaximize="False" ShowMinimize="False"/>
+
+        <Grid Grid.Row="1" Margin="24,8,24,8">
+            <!-- Шаг 1: вход -->
+            <StackPanel x:Name="StepLogin">
+                <TextBlock Text="Шаг 1 из 3 · Вход" FontWeight="Bold" FontSize="15" Margin="0,0,0,12"/>
+                <StackPanel x:Name="LoginFields">
+                    <ui:TextBox x:Name="UsernameBox" PlaceholderText="Логин или email" Margin="0,2,0,8"/>
+                    <ui:PasswordBox x:Name="PasswordBox" PlaceholderText="Пароль" Margin="0,2,0,8"/>
+                    <ui:TextBox x:Name="OtpBox" PlaceholderText="OTP-код (если включён 2FA)" Margin="0,2,0,8"/>
+                </StackPanel>
+                <TextBlock x:Name="AlreadyLoggedIn" Visibility="Collapsed" TextWrapping="Wrap"/>
+            </StackPanel>
+
+            <!-- Шаг 2: имя и буква -->
+            <StackPanel x:Name="StepDrive" Visibility="Collapsed">
+                <TextBlock Text="Шаг 2 из 3 · Диск" FontWeight="Bold" FontSize="15" Margin="0,0,0,12"/>
+                <TextBlock Text="Имя диска" Margin="0,0,0,4"/>
+                <ui:TextBox x:Name="VolumeLabelBox" Text="BarkCloud" Margin="0,0,0,12"/>
+                <TextBlock Text="Буква диска" Margin="0,0,0,4"/>
+                <ComboBox x:Name="LetterCombo" HorizontalAlignment="Stretch"/>
+            </StackPanel>
+
+            <!-- Шаг 3: папка кэша -->
+            <StackPanel x:Name="StepCache" Visibility="Collapsed">
+                <TextBlock Text="Шаг 3 из 3 · Папка кэша" FontWeight="Bold" FontSize="15" Margin="0,0,0,12"/>
+                <TextBlock Text="Куда складывать скачанное содержимое файлов:" TextWrapping="Wrap" Margin="0,0,0,8"/>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <ui:TextBox x:Name="CacheDirBox" Grid.Column="0" IsReadOnly="True" Margin="0,0,8,0"/>
+                    <ui:Button x:Name="BrowseButton" Grid.Column="1" Content="Обзор…" Click="BrowseClick"/>
+                </Grid>
+            </StackPanel>
+        </Grid>
+
+        <TextBlock Grid.Row="2" x:Name="WizardStatus" Foreground="#E81123" TextWrapping="Wrap"
+                   Margin="24,0,24,0" Visibility="Collapsed"/>
+
+        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="24,12,24,16">
+            <ui:Button x:Name="BackButton" Content="Назад" Click="BackClick" Margin="0,0,8,0"/>
+            <ui:Button x:Name="NextButton" Content="Далее" Appearance="Primary" Click="NextClick" Margin="0,0,8,0"/>
+            <ui:Button Content="Отмена" Click="CancelClick"/>
+        </StackPanel>
+    </Grid>
+</ui:FluentWindow>

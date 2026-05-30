@@ -1,12 +1,8 @@
 using System.ComponentModel;
-using System.Diagnostics;
-using System.IO;
 using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
-
-using Microsoft.Win32;
 
 using BarkCloud.Drive.Contracts;
 
@@ -30,27 +26,63 @@ public partial class MainWindow : FluentWindow
             System.Drawing.SystemIcons.Application.Handle,
             Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
 
-        PopulateDriveLetters();
-
-        // Подстраховка: гарантированно регистрируем иконку трея после первого рендера.
         ContentRendered += OnContentRendered;
 
-        _statusTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
+        _statusTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
         _statusTimer.Tick += async (_, _) => await PollStatusAsync();
-        _statusTimer.Start();
+
+        // Обновляем использование только когда окно видимо и не свёрнуто.
+        StateChanged += (_, _) => UpdatePolling();          // свернуть/развернуть
+        IsVisibleChanged += (_, _) => UpdatePolling();      // показать/скрыть в трей
     }
 
-    private void PopulateDriveLetters()
-    {
-        var used = DriveInfo.GetDrives().Select(d => char.ToUpperInvariant(d.Name[0])).ToHashSet();
-        for (var c = 'D'; c <= 'Z'; c++)
-            if (!used.Contains(c))
-                LetterCombo.Items.Add(c.ToString());
+    // Текущий прокси движка — для модалки настроек.
+    public IDriveEngine? Engine => _engine;
 
-        if (_settings.DriveLetter is { } saved && LetterCombo.Items.Contains(saved))
-            LetterCombo.SelectedItem = saved;
-        else if (LetterCombo.Items.Count > 0)
-            LetterCombo.SelectedIndex = 0;
+    private async void OnContentRendered(object? sender, EventArgs e)
+    {
+        if (!TrayIcon.IsRegistered)
+            TrayIcon.Register();
+
+        await InitializeAsync();
+    }
+
+    private async Task InitializeAsync()
+    {
+        var engine = await EnsureEngineAsync();
+        if (engine == null)
+            return; // баннер «движок не запущен» показан
+
+        await ProceedAfterEngineAsync(engine);
+    }
+
+    // Общий путь после подключения к движку: первый запуск → мастер; иначе статус + автомонтаж.
+    private async Task ProceedAfterEngineAsync(IDriveEngine engine)
+    {
+        if (!_settings.Configured)
+        {
+            if (!RunWizard(engine))
+            {
+                ExitApp(); // первичная настройка отменена — без неё пользоваться нечем
+                return;
+            }
+        }
+
+        try
+        {
+            var status = await engine.GetStatusAsync();
+            Apply(status);
+
+            if (status.Authenticated && !status.Mounted)
+                await AutoMountAsync(engine);
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = $"Движок недоступен: {ex.Message}";
+        }
+
+        if (!_statusTimer.IsEnabled && IsVisible && WindowState != WindowState.Minimized)
+            _statusTimer.Start();
     }
 
     private async Task<IDriveEngine?> EnsureEngineAsync()
@@ -67,53 +99,171 @@ public partial class MainWindow : FluentWindow
             StatusText.Text = $"Движок недоступен: {ex.Message}";
         }
 
+        UpdateEngineBanner();
         return _engine;
     }
 
-    private async void LoginClick(object sender, RoutedEventArgs e)
+    // Перезапуск движка по запросу из настроек: корректное завершение + добивание процесса + реконнект.
+    public async Task<IDriveEngine?> RestartEngineAsync()
     {
-        var login = UsernameBox.Text.Trim();
-        if (string.IsNullOrEmpty(login) || string.IsNullOrEmpty(PasswordBox.Password))
+        if (_engine != null)
         {
-            StatusText.Text = "Введите логин и пароль.";
-            return;
+            try { await _engine.ShutdownAsync(); } catch { /* возможно завис */ }
+            _engine = null;
         }
 
+        EngineLauncher.KillEngine();
         var engine = await EnsureEngineAsync();
-        if (engine == null)
-            return;
-
-        try
-        {
-            var status = await engine.LoginAsync(login, PasswordBox.Password, NullIfEmpty(OtpBox.Text));
-            Apply(status);
-
-            if (status.Authenticated && !status.Mounted)
-                await AutoMountAsync(engine);
-        }
-        catch (Exception ex)
-        {
-            StatusText.Text = $"Ошибка входа: {ex.Message}";
-        }
+        UpdateEngineBanner();
+        return engine;
     }
 
-    private async void MountClick(object sender, RoutedEventArgs e)
+    private bool RunWizard(IDriveEngine engine)
     {
-        var engine = await EnsureEngineAsync();
-        if (engine == null || LetterCombo.SelectedItem is not string letter)
+        var wizard = new FirstRunWizard(engine, _settings) { Owner = this };
+        return wizard.ShowDialog() == true;
+    }
+
+    private async Task AutoMountAsync(IDriveEngine engine)
+    {
+        var letter = PreferredLetter();
+        if (letter == null)
+        {
+            StatusText.Text = "Нет свободной буквы диска для монтирования.";
             return;
+        }
 
         try
         {
-            var status = await engine.MountAsync(letter);
+            var status = await engine.MountAsync(letter, _settings.DriveName);
             if (status.Mounted)
-                RememberLetter(letter);
+            {
+                _settings.DriveLetter = letter;
+                _settings.Save();
+            }
+
             Apply(status);
         }
         catch (Exception ex)
         {
             StatusText.Text = $"Ошибка монтирования: {ex.Message}";
         }
+    }
+
+    // Запомненная буква (если ещё свободна), иначе первая свободная.
+    private string? PreferredLetter()
+    {
+        var free = DriveLetters.Free();
+        if (_settings.DriveLetter is { } saved && free.Contains(saved))
+            return saved;
+
+        return free.FirstOrDefault();
+    }
+
+    private void Apply(EngineStatus s)
+    {
+        UsernameText.Text = !string.IsNullOrEmpty(s.Username)
+            ? s.Username
+            : (s.Authenticated ? "Вы вошли" : "Вход не выполнен");
+        ServerText.Text = string.IsNullOrEmpty(s.ServerHost) ? string.Empty : $"Сервер: {s.ServerHost}";
+
+        if (s.LimitBytes > 0)
+        {
+            UsageBar.Value = s.UsedBytes * 100.0 / s.LimitBytes;
+            UsageText.Text = $"{Bytes(s.UsedBytes)} из {Bytes(s.LimitBytes)}";
+        }
+        else
+        {
+            UsageBar.Value = 0;
+            UsageText.Text = "—";
+        }
+
+        DriveStateText.Text = s.Mounted
+            ? $"Диск {s.DriveLetter}: примонтирован ({s.VolumeLabel})"
+            : "Диск не примонтирован";
+
+        StatusText.Text = !string.IsNullOrEmpty(s.Error)
+            ? $"Ошибка: {s.Error}"
+            : (s.Message ?? string.Empty);
+    }
+
+    private async Task PollStatusAsync()
+    {
+        if (_engine == null)
+        {
+            UpdateEngineBanner();
+            return;
+        }
+
+        try
+        {
+            Apply(await _engine.GetStatusAsync());
+        }
+        catch
+        {
+            _engine = null; // движок мог завершиться
+            UpdateEngineBanner();
+        }
+    }
+
+    private void UpdatePolling()
+    {
+        if (IsVisible && WindowState != WindowState.Minimized)
+        {
+            if (!_statusTimer.IsEnabled)
+                _statusTimer.Start();
+            if (_engine != null)
+                _ = PollStatusAsync(); // мгновенное обновление при возврате
+        }
+        else
+        {
+            _statusTimer.Stop(); // в трее / свёрнуто — не опрашиваем
+        }
+    }
+
+    private void UpdateEngineBanner()
+        => EngineWarning.Visibility = _engine == null ? Visibility.Visible : Visibility.Collapsed;
+
+    private async void StartEngineClick(object sender, RoutedEventArgs e)
+    {
+        _engine = null;
+        var engine = await EnsureEngineAsync();
+        if (engine != null)
+            await ProceedAfterEngineAsync(engine);
+    }
+
+    private async void OpenSettingsClick(object sender, RoutedEventArgs e)
+    {
+        if (_engine == null)
+        {
+            StatusText.Text = "Движок не запущен.";
+            return;
+        }
+
+        _statusTimer.Stop(); // пауза опроса на время модалки
+        new SettingsWindow(this, _settings) { Owner = this }.ShowDialog();
+
+        // Возможно, в настройках вышли из аккаунта (Configured=false) → мастер заново.
+        if (!_settings.Configured && _engine != null && !RunWizard(_engine))
+        {
+            ExitApp();
+            return;
+        }
+
+        if (IsVisible && WindowState != WindowState.Minimized)
+            _statusTimer.Start();
+        await PollStatusAsync();
+    }
+
+    // ───────── трей ─────────
+
+    private void ShowClick(object sender, RoutedEventArgs e) => ShowFromTray();
+
+    private async void MountClick(object sender, RoutedEventArgs e)
+    {
+        var engine = await EnsureEngineAsync();
+        if (engine != null)
+            await AutoMountAsync(engine);
     }
 
     private async void UnmountClick(object sender, RoutedEventArgs e)
@@ -146,6 +296,13 @@ public partial class MainWindow : FluentWindow
         Application.Current.Shutdown();
     }
 
+    private void ShowFromTray()
+    {
+        Show();
+        WindowState = WindowState.Normal;
+        Activate();
+    }
+
     // Закрытие окна (крестик) → сворачивание в трей; диск и движок продолжают работать.
     protected override void OnClosing(CancelEventArgs e)
     {
@@ -158,216 +315,12 @@ public partial class MainWindow : FluentWindow
         base.OnClosing(e);
     }
 
-    private async void OnContentRendered(object? sender, EventArgs e)
+    private void ExitApp()
     {
-        if (!TrayIcon.IsRegistered)
-            TrayIcon.Register();
-
-        await InitializeAsync();
+        _reallyExit = true;
+        try { TrayIcon.Unregister(); } catch { /* ignore */ }
+        Application.Current.Shutdown();
     }
-
-    // Старт UI: поднять/подключить движок, узнать статус. Если сессия уже восстановлена
-    // движком из refresh.bin — форма входа не нужна, сразу монтируем диск.
-    private async Task InitializeAsync()
-    {
-        var engine = await EnsureEngineAsync();
-        if (engine == null)
-            return;
-
-        EngineStatus status;
-        try
-        {
-            status = await engine.GetStatusAsync();
-        }
-        catch (Exception ex)
-        {
-            StatusText.Text = $"Движок недоступен: {ex.Message}";
-            return;
-        }
-
-        Apply(status);
-
-        try
-        {
-            var settings = await engine.GetSettingsAsync();
-            CacheDirBox.Text = settings.CacheDir;
-        }
-        catch
-        {
-            // настройки недоступны — не критично
-        }
-
-        if (status.Authenticated && !status.Mounted)
-            await AutoMountAsync(engine);
-    }
-
-    // Монтирование без участия пользователя: берём предпочтительную (запомненную) букву.
-    private async Task AutoMountAsync(IDriveEngine engine)
-    {
-        var letter = PreferredLetter();
-        if (letter == null)
-        {
-            StatusText.Text = "Нет свободной буквы диска для монтирования.";
-            return;
-        }
-
-        try
-        {
-            var status = await engine.MountAsync(letter);
-            if (status.Mounted)
-                RememberLetter(letter);
-            Apply(status);
-        }
-        catch (Exception ex)
-        {
-            StatusText.Text = $"Ошибка автомонтирования: {ex.Message}";
-        }
-    }
-
-    // Запомненная буква (если ещё свободна), иначе выбранная/первая свободная.
-    private string? PreferredLetter()
-    {
-        if (_settings.DriveLetter is { } saved && LetterCombo.Items.Contains(saved))
-            return saved;
-
-        return LetterCombo.SelectedItem as string ?? LetterCombo.Items.Cast<string>().FirstOrDefault();
-    }
-
-    private void RememberLetter(string letter)
-    {
-        _settings.DriveLetter = letter;
-        _settings.Save();
-    }
-
-    // Выбор папки кэша: диалог → передаём путь движку (он владеет кэшем).
-    private async void BrowseCacheClick(object sender, RoutedEventArgs e)
-    {
-        var dialog = new OpenFolderDialog { Title = "Выберите папку для кэша диска", Multiselect = false };
-        if (!string.IsNullOrEmpty(CacheDirBox.Text))
-            dialog.InitialDirectory = CacheDirBox.Text;
-
-        if (dialog.ShowDialog() != true)
-            return;
-
-        var engine = await EnsureEngineAsync();
-        if (engine == null)
-            return;
-
-        try
-        {
-            var settings = await engine.SetCacheDirAsync(dialog.FolderName);
-            CacheDirBox.Text = settings.CacheDir;
-            StatusText.Text = "Папка кэша обновлена. Ранее скачанные файлы остаются в прежней папке.";
-        }
-        catch (Exception ex)
-        {
-            StatusText.Text = $"Не удалось сменить папку кэша: {ex.Message}";
-        }
-    }
-
-    private void ShowClick(object sender, RoutedEventArgs e) => ShowFromTray();
-
-    // Меню «три точки» — открыть по клику.
-    private void MoreClick(object sender, RoutedEventArgs e)
-    {
-        if (sender is FrameworkElement fe && fe.ContextMenu is { } menu)
-        {
-            menu.PlacementTarget = fe;
-            menu.IsOpen = true;
-        }
-    }
-
-    // Запустить движок (если не запущен) и подключиться.
-    private async void StartEngineClick(object sender, RoutedEventArgs e)
-    {
-        var engine = await EnsureEngineAsync();
-        if (engine == null)
-            return;
-
-        try
-        {
-            var status = await engine.GetStatusAsync();
-            status.Message ??= "Движок запущен";
-            Apply(status);
-        }
-        catch (Exception ex)
-        {
-            StatusText.Text = $"Ошибка: {ex.Message}";
-        }
-    }
-
-    // Принудительно остановить движок: сначала корректно (unmount + выход), затем убить процесс.
-    private async void StopEngineClick(object sender, RoutedEventArgs e)
-    {
-        if (_engine != null)
-        {
-            try { await _engine.ShutdownAsync(); }
-            catch { /* возможно завис — добьём процесс ниже */ }
-            _engine = null;
-        }
-
-        KillEngineProcesses();
-        StatusText.Text = "Движок остановлен.";
-    }
-
-    private static void KillEngineProcesses()
-    {
-        foreach (var process in Process.GetProcessesByName("BarkCloud.Drive.Engine"))
-        {
-            try
-            {
-                process.Kill();
-                process.WaitForExit(2000);
-            }
-            catch { /* уже завершился / нет доступа */ }
-            finally { process.Dispose(); }
-        }
-    }
-
-    private void ShowFromTray()
-    {
-        Show();
-        WindowState = WindowState.Normal;
-        Activate();
-    }
-
-    private async Task PollStatusAsync()
-    {
-        if (_engine == null)
-            return;
-
-        try
-        {
-            Apply(await _engine.GetStatusAsync());
-        }
-        catch
-        {
-            _engine = null; // движок мог завершиться
-        }
-    }
-
-    private void Apply(EngineStatus s)
-    {
-        // Сессия восстановлена/выполнен вход → форма входа не нужна.
-        LoginPanel.Visibility = s.Authenticated ? Visibility.Collapsed : Visibility.Visible;
-
-        var lines = new List<string>
-        {
-            $"Авторизация: {(s.Authenticated ? "да" : "нет")}",
-            s.Mounted ? $"Диск {s.DriveLetter}: примонтирован" : "Диск: не примонтирован",
-        };
-
-        if (s.LimitBytes > 0)
-            lines.Add($"Хранилище: {Bytes(s.UsedBytes)} / {Bytes(s.LimitBytes)}");
-        if (!string.IsNullOrEmpty(s.Message))
-            lines.Add(s.Message!);
-        if (!string.IsNullOrEmpty(s.Error))
-            lines.Add($"Ошибка: {s.Error}");
-
-        StatusText.Text = string.Join(Environment.NewLine, lines);
-    }
-
-    private static string? NullIfEmpty(string s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
 
     private static string Bytes(long b)
     {

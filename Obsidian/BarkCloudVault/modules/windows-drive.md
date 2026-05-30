@@ -48,24 +48,30 @@
 
 ## Текущее состояние
 
-Решение **`Drive/BarkCloud.Drive.slnx`** — два процесса (read-only), собирается чисто:
+Решение **`Drive/BarkCloud.Drive.slnx`** — два процесса (read-write), собирается чисто:
 
-- **BarkCloud.Drive.Contracts** — IPC-контракт `IDriveEngine` (`LoginAsync`/`MountAsync`/
-  `UnmountAsync`/`GetStatusAsync`/`GetSettingsAsync`/`SetCacheDirAsync`/`ShutdownAsync`) +
-  DTO `EngineStatus`, `EngineSettings` (папка кэша).
+- **BarkCloud.Drive.Contracts** — IPC-контракт `IDriveEngine` (`LoginAsync`/`LogoutAsync`/
+  `MountAsync(letter,label)`/`RemountAsync(letter,label)`/`UnmountAsync`/`GetStatusAsync`/
+  `GetSettingsAsync`/`SetCacheDirAsync`/`ShutdownAsync`) + DTO `EngineStatus` (+`Username`/`ServerHost`/
+  `VolumeLabel`), `EngineSettings` (папка кэша).
 - **BarkCloud.Drive.Engine** — **скрытый `WinExe`** (без окна / панели задач / Alt-Tab):
-  gRPC-клиенты Identity (:7020) / Cloud+Files (:7025) двумя каналами как в iOS,
-  `TokenManager` (логин `Identity.Auth` + проактивный refresh `CreateToken` по
-  `expiration_date`), `TokenStore` (refresh-токен в **DPAPI**, восстановление сессии на старте),
+  gRPC-клиенты Identity (:7020) / Cloud+Files (:7025) / **Users (:7021)** каналами как в iOS,
+  `TokenManager` (логин `Identity.Auth` + проактивный refresh `CreateToken`; `Logout()` чистит токены+refresh.bin),
+  `TokenStore` (refresh-токен в **DPAPI**, восстановление сессии на старте),
+  `UserProfile` (имя пользователя через `UsersApi.GetUser(0)`, кэш до logout; почту клиентский API не отдаёт),
   `MetadataInterceptor` (device-заголовки base64 + динамический токен),
-  ФС Dokany (из бывшего PoC), `MountManager`, IPC-сервер (named pipe + StreamJsonRpc).
+  ФС Dokany (метка тома `VolumeLabel` settable → имя диска), `MountManager`, IPC-сервер (named pipe + StreamJsonRpc).
   Один экземпляр на пользователя (Mutex). Download-URL нормализуется на актуальный Files-эндпоинт.
-- **BarkCloud.Drive.App** — UI на **WPF-UI** (`FluentWindow`) + **трей** (`Wpf.Ui.Tray.NotifyIcon`):
-  логин/пароль/OTP, выбор свободной буквы, монтирование. Трей: Открыть / Примонтировать /
-  Отмонтировать / Закрыть приложение. `EngineLauncher` поднимает движок и коннектится по pipe.
-  Закрытие окна → в трей (диск жив); «Закрыть приложение» → unmount + stop движка + выход.
-  `AppSettings` хранит последнюю букву диска (`%LOCALAPPDATA%\BarkCloud.Drive\app.json`).
-  Секция «Папка кэша» (`OpenFolderDialog` → `SetCacheDirAsync`): выбор каталога кэша диска.
+- **BarkCloud.Drive.App** — UI на **WPF-UI** (`FluentWindow`) + **трей**. Три окна:
+  - **`FirstRunWizard`** — мастер первого запуска (по `AppSettings.Configured`): шаг логин → имя диска+буква
+    → папка кэша → проверка и создание диска (`SetCacheDirAsync`→`MountAsync(letter,label)`).
+  - **`MainWindow`** (дашборд) — имя пользователя + сервер, прогресс хранилища, баннер «движок не запущен»
+    (+ «Запустить движок»), кнопка «Настройки». Опрос статуса **5 c только когда окно видимо** (пауза в трее/свёрнуто,
+    обновление при возврате — `StateChanged`+`IsVisibleChanged`). Трей: Открыть/Примонтировать/Отмонтировать/Закрыть.
+  - **`SettingsWindow`** (модаль) — разлогин, монтаж/размонтаж, переименование и смена буквы (через `RemountAsync`),
+    папка кэша, перезапуск движка (`MainWindow.RestartEngineAsync`).
+  `EngineLauncher` поднимает движок и коннектится по pipe (`KillEngine()` для рестарта). `AppSettings`
+  (`%LOCALAPPDATA%\BarkCloud.Drive\app.json`): `Configured`, `DriveName`, `DriveLetter`. `DriveLetters.Free()` — свободные буквы.
 
 **Папка кэша** — забота движка (он владеет кэшем). `EngineSettingsStore` хранит путь в
 `%LOCALAPPDATA%\BarkCloud.Drive\settings.json` (по умолчанию `%TEMP%\BarkCloudDrive`), читается на
@@ -76,13 +82,13 @@
 токен**, восстанавливает сессию на старте. Диск живёт в движке — UI можно закрыть. PoC свёрнут в Engine.
 Адреса сервисов — `Engine/appsettings.json` (`Host`/`IdentityPort`/`FilesPort`, как iOS).
 
-**Автостарт UI (`MainWindow.InitializeAsync` на `ContentRendered`):** подключиться к движку
-(поднять, если не запущен) → `GetStatusAsync`. Если сессия уже восстановлена из `refresh.bin`
-(`Authenticated`) — **форма входа сворачивается** (`LoginPanel.Visibility`), повторный логин не нужен,
-и диск **автомонтируется** на запомненную букву (иначе первую свободную). Автомонтаж только на старте и
-после ручного логина — НЕ из 3-сек polling (чтобы не перемонтировать после ручного unmount).
-Пустой логин отсекается и в UI, и в `DriveEngine.LoginAsync` → сервер `Auth` больше не бросает
-`NotSetUsernameOrEmailException` («Не передан ни логин ни email») вхолостую.
+**Старт UI (`MainWindow.InitializeAsync` на `ContentRendered`):** подключиться к движку (поднять, если не
+запущен). Если `!AppSettings.Configured` → **мастер** (`FirstRunWizard.ShowDialog`); отмена первичной настройки
+закрывает приложение. Иначе `GetStatusAsync` → дашборд; при `Authenticated && !Mounted` диск **автомонтируется**
+на запомненную букву (`MountAsync(DriveLetter, DriveName)`). Разлогин из настроек ставит `Configured=false` →
+по закрытии модалки `MainWindow` снова показывает мастер. Пустой логин отсекается в `DriveEngine.LoginAsync`
+(сервер `Auth` не бросает `NotSetUsernameOrEmailException` вхолостую). Имя/буква диска = метка тома + точка
+монтирования Dokany, поэтому переименование/смена буквы делаются перемонтированием (`RemountAsync`).
 
 **Диск read-write.** Запись: рабочая копия на диске → на `Cleanup` `GetUploadUrl` → multipart
 `POST /upload` (поле `file` + `x-auth-token`, как iOS) → эффективный `fileId` из JSON → `AttachFile`.
