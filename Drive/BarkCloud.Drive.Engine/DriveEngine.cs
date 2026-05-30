@@ -72,10 +72,14 @@ public sealed class DriveEngine : IDriveEngine
             if (!_tokens.IsAuthenticated)
                 return Task.FromResult(ErrorMessage("Сначала выполните вход"));
 
+            if (_mount.IsMounted)
+                return Task.FromResult(Status("Диск уже примонтирован")); // идемпотентность (гонка авто-монтажа движка и UI)
+
             if (!string.IsNullOrWhiteSpace(volumeLabel))
                 _fs.VolumeLabel = volumeLabel.Trim();
 
             _mount.Mount(driveLetter, _fs);
+            _settings.SetLastMount(driveLetter, _fs.VolumeLabel);
             return Task.FromResult(Status($"Примонтировано {driveLetter}:"));
         }
         catch (Exception ex) when (IsDokanMissing(ex))
@@ -109,6 +113,7 @@ public sealed class DriveEngine : IDriveEngine
                 _mount.Unmount();
 
             _mount.Mount(letter, _fs);
+            _settings.SetLastMount(letter, _fs.VolumeLabel);
             return Task.FromResult(Status($"Перемонтировано {letter}: ({_fs.VolumeLabel})"));
         }
         catch (Exception ex) when (IsDokanMissing(ex))
@@ -149,6 +154,13 @@ public sealed class DriveEngine : IDriveEngine
         if (_tokens.IsAuthenticated)
             await _profile.EnsureLoadedAsync();
         return Status(null);
+    }
+
+    public async Task<byte[]?> GetAvatarAsync()
+    {
+        await _profile.EnsureLoadedAsync();
+        var url = _profile.AvatarUrl;
+        return string.IsNullOrEmpty(url) ? null : await _gateway.DownloadAvatarAsync(url);
     }
 
     public Task<EngineSettings> GetSettingsAsync()

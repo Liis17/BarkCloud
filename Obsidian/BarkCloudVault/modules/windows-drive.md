@@ -52,26 +52,31 @@
 
 - **BarkCloud.Drive.Contracts** — IPC-контракт `IDriveEngine` (`LoginAsync`/`LogoutAsync`/
   `MountAsync(letter,label)`/`RemountAsync(letter,label)`/`UnmountAsync`/`GetStatusAsync`/
-  `GetSettingsAsync`/`SetCacheDirAsync`/`ShutdownAsync`) + DTO `EngineStatus` (+`Username`/`ServerHost`/
-  `VolumeLabel`), `EngineSettings` (папка кэша).
+  `GetAvatarAsync`/`GetSettingsAsync`/`SetCacheDirAsync`/`ShutdownAsync`) + DTO `EngineStatus`
+  (+`Username`/`ServerHost`/`VolumeLabel`), `EngineSettings` (папка кэша).
 - **BarkCloud.Drive.Engine** — **скрытый `WinExe`** (без окна / панели задач / Alt-Tab):
   gRPC-клиенты Identity (:7020) / Cloud+Files (:7025) / **Users (:7021)** каналами как в iOS,
   `TokenManager` (логин `Identity.Auth` + проактивный refresh `CreateToken`; `Logout()` чистит токены+refresh.bin),
   `TokenStore` (refresh-токен в **DPAPI**, восстановление сессии на старте),
-  `UserProfile` (имя пользователя через `UsersApi.GetUser(0)`, кэш до logout; почту клиентский API не отдаёт),
+  `UserProfile` (имя + URL аватара через `UsersApi.GetUser(0)`, кэш до logout; почту клиентский API не отдаёт;
+  аватар — `profile_picture_preview`→full, готовый /download-URL, качается напрямую `CloudGateway.DownloadAvatarAsync`),
   `MetadataInterceptor` (device-заголовки base64 + динамический токен),
   ФС Dokany (метка тома `VolumeLabel` settable → имя диска), `MountManager`, IPC-сервер (named pipe + StreamJsonRpc).
   Один экземпляр на пользователя (Mutex). Download-URL нормализуется на актуальный Files-эндпоинт.
+  `EngineSettingsStore` помнит последний маунт (буква+метка); **Program на старте автомонтирует** его при
+  восстановленной сессии (для автозапуска движка без UI); `MountAsync` идемпотентен (гонка авто-монтажа движка и UI).
 - **BarkCloud.Drive.App** — UI на **WPF-UI** (`FluentWindow`) + **трей**. Три окна:
-  - **`FirstRunWizard`** — мастер первого запуска (по `AppSettings.Configured`): шаг логин → имя диска+буква
-    → папка кэша → проверка и создание диска (`SetCacheDirAsync`→`MountAsync(letter,label)`).
-  - **`MainWindow`** (дашборд) — имя пользователя + сервер, прогресс хранилища, баннер «движок не запущен»
-    (+ «Запустить движок»), кнопка «Настройки». Опрос статуса **5 c только когда окно видимо** (пауза в трее/свёрнуто,
-    обновление при возврате — `StateChanged`+`IsVisibleChanged`). Трей: Открыть/Примонтировать/Отмонтировать/Закрыть.
+  - **`FirstRunWizard`** — мастер первого запуска (по `AppSettings.Configured`): логин → имя диска+буква
+    → папка кэша → **автозагрузка** (чекбоксы UI/движок) → создание диска (`SetCacheDirAsync`→`MountAsync(letter,label)`).
+  - **`MainWindow`** (дашборд) — **аватар** (круглый, `Ellipse`+`ImageBrush`, байты через `GetAvatarAsync`) + имя
+    пользователя + сервер, прогресс хранилища, баннер «движок не запущен» (+ «Запустить движок»), кнопка «Настройки».
+    Опрос статуса **5 c только когда окно видимо** (пауза в трее/свёрнуто, обновление при возврате —
+    `StateChanged`+`IsVisibleChanged`). Трей: Открыть/Примонтировать/Отмонтировать/Закрыть.
   - **`SettingsWindow`** (модаль) — разлогин, монтаж/размонтаж, переименование и смена буквы (через `RemountAsync`),
-    папка кэша, перезапуск движка (`MainWindow.RestartEngineAsync`).
-  `EngineLauncher` поднимает движок и коннектится по pipe (`KillEngine()` для рестарта). `AppSettings`
-  (`%LOCALAPPDATA%\BarkCloud.Drive\app.json`): `Configured`, `DriveName`, `DriveLetter`. `DriveLetters.Free()` — свободные буквы.
+    папка кэша, **автозагрузка** (чекбоксы), перезапуск движка (`MainWindow.RestartEngineAsync`).
+  `EngineLauncher` поднимает движок и коннектится по pipe (`KillEngine()` для рестарта; `EnginePath` для автозагрузки).
+  **Автозагрузка** — `Autostart` (HKCU\…\Run): запись App (`--tray` → старт в трей) и/или Engine.
+  `AppSettings` (`%LOCALAPPDATA%\BarkCloud.Drive\app.json`): `Configured`, `DriveName`, `DriveLetter`. `DriveLetters.Free()` — свободные буквы.
 
 **Папка кэша** — забота движка (он владеет кэшем). `EngineSettingsStore` хранит путь в
 `%LOCALAPPDATA%\BarkCloud.Drive\settings.json` (по умолчанию `%TEMP%\BarkCloudDrive`), читается на

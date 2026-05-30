@@ -24,6 +24,9 @@ public interface IDriveEngine
     // Текущее состояние (для опроса из UI).
     Task<EngineStatus> GetStatusAsync();
 
+    // Байты аватара текущего пользователя (PNG/JPG) или null, если аватара нет.
+    Task<byte[]?> GetAvatarAsync();
+
     // Текущие настройки движка (папка кэша и т.п.).
     Task<EngineSettings> GetSettingsAsync();
 

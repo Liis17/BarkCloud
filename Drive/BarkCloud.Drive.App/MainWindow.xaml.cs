@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.IO;
 using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Media.Imaging;
@@ -15,10 +16,13 @@ public partial class MainWindow : FluentWindow
     private IDriveEngine? _engine;
     private readonly DispatcherTimer _statusTimer;
     private readonly AppSettings _settings = AppSettings.Load();
+    private readonly bool _startHidden;
     private bool _reallyExit;
+    private bool _avatarLoaded;
 
-    public MainWindow()
+    public MainWindow(bool startHidden = false)
     {
+        _startHidden = startHidden;
         InitializeComponent();
 
         // Иконка трея из системной (без бинарного ассета).
@@ -45,6 +49,12 @@ public partial class MainWindow : FluentWindow
             TrayIcon.Register();
 
         await InitializeAsync();
+
+        if (_startHidden)
+        {
+            Hide(); // автозагрузка: ушли в трей, диск уже монтируется
+            WindowState = WindowState.Normal; // следующее открытие из трея — нормальное
+        }
     }
 
     private async Task InitializeAsync()
@@ -167,6 +177,20 @@ public partial class MainWindow : FluentWindow
             : (s.Authenticated ? "Вы вошли" : "Вход не выполнен");
         ServerText.Text = string.IsNullOrEmpty(s.ServerHost) ? string.Empty : $"Сервер: {s.ServerHost}";
 
+        if (s.Authenticated)
+        {
+            if (!_avatarLoaded)
+            {
+                _avatarLoaded = true; // одна попытка загрузки на сессию
+                _ = LoadAvatarAsync();
+            }
+        }
+        else
+        {
+            _avatarLoaded = false;
+            AvatarEllipse.Visibility = Visibility.Collapsed;
+        }
+
         if (s.LimitBytes > 0)
         {
             UsageBar.Value = s.UsedBytes * 100.0 / s.LimitBytes;
@@ -185,6 +209,33 @@ public partial class MainWindow : FluentWindow
         StatusText.Text = !string.IsNullOrEmpty(s.Error)
             ? $"Ошибка: {s.Error}"
             : (s.Message ?? string.Empty);
+    }
+
+    private async Task LoadAvatarAsync()
+    {
+        if (_engine == null)
+            return;
+
+        try
+        {
+            var bytes = await _engine.GetAvatarAsync();
+            if (bytes is not { Length: > 0 })
+                return;
+
+            var bmp = new BitmapImage();
+            bmp.BeginInit();
+            bmp.CacheOption = BitmapCacheOption.OnLoad;
+            bmp.StreamSource = new MemoryStream(bytes);
+            bmp.EndInit();
+            bmp.Freeze();
+
+            AvatarBrush.ImageSource = bmp;
+            AvatarEllipse.Visibility = Visibility.Visible;
+        }
+        catch
+        {
+            // аватар не критичен — оставляем без него
+        }
     }
 
     private async Task PollStatusAsync()

@@ -64,9 +64,10 @@ public partial class FirstRunWizard : FluentWindow
         StepLogin.Visibility = _step == 0 ? Visibility.Visible : Visibility.Collapsed;
         StepDrive.Visibility = _step == 1 ? Visibility.Visible : Visibility.Collapsed;
         StepCache.Visibility = _step == 2 ? Visibility.Visible : Visibility.Collapsed;
+        StepAutostart.Visibility = _step == 3 ? Visibility.Visible : Visibility.Collapsed;
 
         BackButton.IsEnabled = _step > 0;
-        NextButton.Content = _step == 2 ? "Готово" : "Далее";
+        NextButton.Content = _step == 3 ? "Готово" : "Далее";
         WizardStatus.Visibility = Visibility.Collapsed;
     }
 
@@ -88,7 +89,7 @@ public partial class FirstRunWizard : FluentWindow
         NextButton.IsEnabled = false;
         try
         {
-            if (_step == 2)
+            if (_step == 3)
             {
                 await FinishAsync();
                 return;
@@ -133,6 +134,21 @@ public partial class FirstRunWizard : FluentWindow
                     return Fail("Имя диска: до 32 символов, без \\ / : * ? \" < > |");
                 if (LetterCombo.SelectedItem is not string)
                     return Fail("Выберите букву диска.");
+                return true;
+
+            case 2:
+                var dir = CacheDirBox.Text.Trim();
+                if (string.IsNullOrEmpty(dir))
+                    return Fail("Выберите папку кэша.");
+                try
+                {
+                    Directory.CreateDirectory(dir);
+                }
+                catch (Exception ex)
+                {
+                    return Fail($"Папка кэша недоступна: {ex.Message}");
+                }
+
                 return true;
 
             default:
@@ -185,6 +201,9 @@ public partial class FirstRunWizard : FluentWindow
             _settings.DriveName = label;
             _settings.DriveLetter = letter;
             _settings.Save();
+
+            Autostart.SetApp(AutostartAppCheck.IsChecked == true);
+            Autostart.SetEngine(AutostartEngineCheck.IsChecked == true);
 
             DialogResult = true;
             Close();

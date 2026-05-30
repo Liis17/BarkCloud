@@ -40,6 +40,27 @@ using var lifetime = new CancellationTokenSource();
 
 var engine = new DriveEngine(tokens, gateway, mount, fs, lifetime, settings, profile, config.Host);
 
+// Автомонтаж на старте: при автозапуске движка (без UI) поднимаем последний диск,
+// если сессия восстановлена и буква запомнена. UI при своём старте увидит Mounted и не дублирует.
+if (tokens.IsAuthenticated)
+{
+    var (letter, label) = settings.GetLastMount();
+    if (!string.IsNullOrEmpty(letter))
+    {
+        try
+        {
+            if (!string.IsNullOrEmpty(label))
+                fs.VolumeLabel = label;
+            mount.Mount(letter, fs);
+            EngineLog.Info($"Автомонтаж {letter}: ({fs.VolumeLabel}) на старте");
+        }
+        catch (Exception ex)
+        {
+            EngineLog.Error("Автомонтаж на старте", ex);
+        }
+    }
+}
+
 Console.WriteLine("BarkCloud.Drive.Engine запущен. Ожидание подключения UI...");
 
 // IPC: named pipe + StreamJsonRpc. Обслуживаем по одному клиенту за раз,

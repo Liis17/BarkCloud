@@ -8,10 +8,17 @@ internal sealed class UserProfile(UsersApi.UsersApiClient users)
 {
     private readonly object _lock = new();
     private string? _username;
+    private string? _avatarUrl;
 
     public string? Username
     {
         get { lock (_lock) return _username; }
+    }
+
+    // URL аватара (превью или, если его нет, полный). Готовый /download-URL — нормализуется при скачивании.
+    public string? AvatarUrl
+    {
+        get { lock (_lock) return _avatarUrl; }
     }
 
     // Ленивая загрузка имени (первый GetStatus после авторизации). Ошибка не критична.
@@ -22,8 +29,14 @@ internal sealed class UserProfile(UsersApi.UsersApiClient users)
 
         try
         {
-            var resp = await users.GetUserAsync(new GetUserRequest { UserId = 0 });
-            lock (_lock) _username = resp.User.Username;
+            var user = (await users.GetUserAsync(new GetUserRequest { UserId = 0 })).User;
+            lock (_lock)
+            {
+                _username = user.Username;
+                _avatarUrl = !string.IsNullOrEmpty(user.ProfilePicturePreview)
+                    ? user.ProfilePicturePreview
+                    : user.ProfilePicture;
+            }
         }
         catch (Exception ex)
         {
@@ -33,6 +46,10 @@ internal sealed class UserProfile(UsersApi.UsersApiClient users)
 
     public void Clear()
     {
-        lock (_lock) _username = null;
+        lock (_lock)
+        {
+            _username = null;
+            _avatarUrl = null;
+        }
     }
 }
