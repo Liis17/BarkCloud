@@ -122,6 +122,21 @@ public class CloudHierarchyStorage : ICloudHierarchyStorage
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
     }
 
+    /// <summary>
+    /// Живые (не в корзине) записи владельца по набору id записей — отслеживаемые,
+    /// для массового мягкого удаления (мутация IsDeleted/DeletedAt/PurgeAt). Чужие,
+    /// несуществующие и уже удалённые id просто не попадают в выборку.
+    /// </summary>
+    public async Task<List<CloudFileEntry>> GetLiveFileEntriesByIds(long ownerId, IReadOnlyCollection<Guid> entryIds, CancellationToken cancellationToken = default)
+    {
+        if (entryIds.Count == 0)
+            return new List<CloudFileEntry>();
+
+        return await _context.CloudFileEntries
+            .Where(e => e.OwnerId == ownerId && entryIds.Contains(e.Id) && !e.IsDeleted)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<bool> FileEntryNameExists(long ownerId, Guid directoryId, string name, CancellationToken cancellationToken = default)
     {
         return await _context.CloudFileEntries

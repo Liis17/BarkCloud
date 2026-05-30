@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text.Json;
+using System.Threading;
 
 using BarkCloud.Proto.Files;
 
@@ -49,6 +50,16 @@ internal sealed class CloudGateway : IDisposable
     private readonly ConcurrentDictionary<string, Lazy<Task>> _blockFetches = new();
     private readonly ConcurrentDictionary<string, bool> _wholeMode = new();
 
+    // Батчинг удалений: пользовательские удаления файлов копятся до 1 c (или порога в 100)
+    // и уходят одним DeleteFileEntries — ускоряет массовое удаление. Буферизованные записи
+    // сразу прячутся из листингов «тумбстонами», чтобы файлы не мелькали в Проводнике до отправки.
+    private const int DeleteBatchMax = 100;
+    private static readonly TimeSpan DeleteWindow = TimeSpan.FromSeconds(1);
+    private readonly object _delLock = new();
+    private readonly List<(string EntryId, string DirId)> _delPending = new();
+    private readonly ConcurrentDictionary<string, byte> _delTombstones = new();
+    private readonly Timer _delTimer;
+
     public CloudGateway(CloudApi.CloudApiClient cloud, FilesApi.FilesApiClient files, HttpClient http,
         string filesWebBase, Func<string?> tokenProvider, string cacheDir)
     {
@@ -59,6 +70,7 @@ internal sealed class CloudGateway : IDisposable
         _tokenProvider = tokenProvider;
         _cacheDir = cacheDir;
         Directory.CreateDirectory(_cacheDir);
+        _delTimer = new Timer(_ => FlushDeletes(), null, Timeout.Infinite, Timeout.Infinite);
     }
 
     // Сменить папку кэша на лету: новые чтения пойдут в неё. Уже скачанные файлы
@@ -86,11 +98,23 @@ internal sealed class CloudGateway : IDisposable
     public DirectoryListingDetailed ListDirectory(string dirId)
     {
         if (_listCache.TryGetValue(dirId, out var c) && DateTime.UtcNow - c.At < ListTtl)
-            return c.Listing;
+            return HidePending(c.Listing);
 
         var listing = _cloud.ListDirectoryDetailed(new ListDirectoryRequest { DirectoryId = dirId });
         _listCache[dirId] = (DateTime.UtcNow, listing);
-        return listing;
+        return HidePending(listing);
+    }
+
+    // Убирает из листинга записи, удаление которых ещё буферизовано (тумбстоны), не трогая кэш.
+    private DirectoryListingDetailed HidePending(DirectoryListingDetailed listing)
+    {
+        if (_delTombstones.IsEmpty || !listing.Files.Any(f => _delTombstones.ContainsKey(f.Entry.Id)))
+            return listing;
+
+        var copy = new DirectoryListingDetailed();
+        copy.Subdirs.AddRange(listing.Subdirs);
+        copy.Files.AddRange(listing.Files.Where(f => !_delTombstones.ContainsKey(f.Entry.Id)));
+        return copy;
     }
 
     public void InvalidateListing(string dirId) => _listCache.TryRemove(dirId, out _);
@@ -396,6 +420,81 @@ internal sealed class CloudGateway : IDisposable
     public void DeleteFileEntry(string entryId)
         => _cloud.DeleteFileEntry(new DeleteFileEntryRequest { EntryId = entryId });
 
+    // Буферизованное удаление файла: запись прячется из листингов сразу, а на сервер уходит
+    // пачкой через DeleteFileEntries — по таймеру (1 c тишины) либо по достижении порога в 100.
+    public void QueueDeleteFileEntry(string entryId, string parentDirId)
+    {
+        _delTombstones[entryId] = 0;     // скрыть из листингов немедленно
+        InvalidateListing(parentDirId);  // следующее перечисление пересоберётся уже без записи
+
+        List<(string EntryId, string DirId)>? ready = null;
+        lock (_delLock)
+        {
+            _delPending.Add((entryId, parentDirId));
+            if (_delPending.Count >= DeleteBatchMax)
+                ready = TakePendingLocked();
+            else
+                _delTimer.Change(DeleteWindow, Timeout.InfiniteTimeSpan); // (пере)запуск окна тишины
+        }
+
+        if (ready != null)
+            SendDeletes(ready);
+    }
+
+    private void FlushDeletes()
+    {
+        List<(string EntryId, string DirId)> batch;
+        lock (_delLock)
+        {
+            if (_delPending.Count == 0)
+                return;
+            batch = TakePendingLocked();
+        }
+
+        SendDeletes(batch);
+    }
+
+    // Забрать накопленное и остановить таймер — вызывается под _delLock.
+    private List<(string EntryId, string DirId)> TakePendingLocked()
+    {
+        var copy = new List<(string EntryId, string DirId)>(_delPending);
+        _delPending.Clear();
+        _delTimer.Change(Timeout.Infinite, Timeout.Infinite);
+        return copy;
+    }
+
+    // Отправляет накопленные удаления пачками по 100. После каждой пачки снимает тумбстоны и
+    // инвалидирует затронутые листинги: при успехе сервер уже убрал записи, при ошибке файлы
+    // снова станут видны (удаление честно не состоялось).
+    private void SendDeletes(List<(string EntryId, string DirId)> batch)
+    {
+        for (var i = 0; i < batch.Count; i += DeleteBatchMax)
+        {
+            var chunk = batch.GetRange(i, Math.Min(DeleteBatchMax, batch.Count - i));
+            var request = new DeleteFileEntriesRequest();
+            request.EntryIds.AddRange(chunk.Select(x => x.EntryId));
+
+            try
+            {
+                _cloud.DeleteFileEntries(request);
+            }
+            catch (Exception ex)
+            {
+                EngineLog.Error($"Массовое удаление {chunk.Count} записей", ex);
+            }
+            finally
+            {
+                foreach (var (entryId, dirId) in chunk)
+                {
+                    // Порядок важен: сначала сбрасываем кэш листинга, потом снимаем тумбстон —
+                    // иначе осталось бы микроокно, где запись из устаревшего кэша снова видна.
+                    InvalidateListing(dirId);
+                    _delTombstones.TryRemove(entryId, out _);
+                }
+            }
+        }
+    }
+
     public void RenameDirectory(string directoryId, string newName)
         => _cloud.RenameDirectory(new RenameDirectoryRequest { DirectoryId = directoryId, NewName = newName });
 
@@ -403,7 +502,10 @@ internal sealed class CloudGateway : IDisposable
         => _cloud.MoveDirectory(new MoveDirectoryRequest { DirectoryId = directoryId, NewParentId = newParentId });
 
     public void DeleteDirectory(string directoryId)
-        => _cloud.DeleteDirectory(new DeleteDirectoryRequest { DirectoryId = directoryId });
+    {
+        FlushDeletes(); // порядок: сначала отправляем отложенные удаления файлов, потом рекурсивное удаление папки
+        _cloud.DeleteDirectory(new DeleteDirectoryRequest { DirectoryId = directoryId });
+    }
 
     // Пересобирает download-ссылку на актуальный Files-эндпоинт (как iOS normalizedFileDownloadURL).
     private string NormalizeDownloadUrl(string raw)
@@ -422,5 +524,10 @@ internal sealed class CloudGateway : IDisposable
 
     private static DateTime? ToDate(Timestamp? t) => t?.ToDateTime();
 
-    public void Dispose() => _http.Dispose();
+    public void Dispose()
+    {
+        FlushDeletes(); // не теряем буферизованные удаления при размонтировании/выходе
+        _delTimer.Dispose();
+        _http.Dispose();
+    }
 }

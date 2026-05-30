@@ -13,6 +13,7 @@ public interface ICloudHierarchyStorage
     Task<List<CloudDirectory>> GetSubtree(long ownerId, Guid rootDirectoryId, CancellationToken cancellationToken = default);
     void RemoveDirectories(IEnumerable<CloudDirectory> directories);
     Task<CloudFileEntry?> GetFileEntry(Guid id, CancellationToken cancellationToken = default);
+    Task<List<CloudFileEntry>> GetLiveFileEntriesByIds(long ownerId, IReadOnlyCollection<Guid> entryIds, CancellationToken cancellationToken = default);
     Task<bool> FileEntryNameExists(long ownerId, Guid directoryId, string name, CancellationToken cancellationToken = default);
     Task<bool> FileEntryExistsForFile(long ownerId, Guid fileId, CancellationToken cancellationToken = default);
     Task<CloudFileEntry> AddFileEntry(CloudFileEntry entry, CancellationToken cancellationToken = default);
