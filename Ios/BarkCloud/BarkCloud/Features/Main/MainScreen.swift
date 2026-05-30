@@ -2,6 +2,7 @@ import SwiftUI
 
 struct MainScreen: View {
     let onSignOut: () -> Void
+    @Environment(AppEnvironment.self) private var env
     @State private var selection: MainDestination = .default
 
     var body: some View {
@@ -33,6 +34,35 @@ struct MainScreen: View {
             SettingsScreen(onSignOut: onSignOut)
                 .tabItem { tabLabel(.settings) }
                 .tag(MainDestination.settings)
+        }
+        .overlay(alignment: .bottom) { uploadBannerOverlay }
+        .onChange(of: selection) { _, new in
+            // При возврате на вкладку «Галерея» — дать BackupManager пере-сканировать
+            // медиатеку на новые ассеты и (если автозагрузка включена) запустить
+            // upload-loop для них. Дешёво для повторных скансов: уже обработанные
+            // ассеты пропускаются по `processedAssetIDs`.
+            if new == .gallery {
+                Task { await env.backupManager.refreshScanForNewAssets() }
+            }
+        }
+    }
+
+    /// Плавающая плашка прогресса. Видна на любой вкладке пока есть активная
+    /// загрузка (см. [[UploadProgressObserver]]). По тапу — открыть BackupSheet,
+    /// если идёт автозагрузка медиатеки (там детальный прогресс); иначе ничего
+    /// не делать — баннер просто как индикатор.
+    @ViewBuilder
+    private var uploadBannerOverlay: some View {
+        if env.uploadProgress.isActive {
+            GlobalUploadBanner(observer: env.uploadProgress) {
+                if env.uploadProgress.currentSource == .backup {
+                    selection = .gallery
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.bottom, 56)  // приподнять над TabBar
+            .animation(.spring(response: 0.4, dampingFraction: 0.85), value: env.uploadProgress.isActive)
+            .transition(.move(edge: .bottom).combined(with: .opacity))
         }
     }
 

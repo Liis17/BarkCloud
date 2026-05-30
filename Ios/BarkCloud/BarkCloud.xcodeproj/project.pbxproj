@@ -8,10 +8,45 @@
 
 /* Begin PBXBuildFile section */
 		0581DC0D95ED4F136C34C3A1 /* GRPCProtobuf in Frameworks */ = {isa = PBXBuildFile; productRef = C1A46198F3632CDB091ABA2E /* GRPCProtobuf */; };
+		0F643B748954098301807A03 /* users_api.grpc.swift in Sources */ = {isa = PBXBuildFile; fileRef = D187B4FA27A00A0EDB8BB982 /* users_api.grpc.swift */; };
+		1252B67AC1EECA9FAD1D1809 /* XIpInterceptor.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC09EBFBDB249FD15BB99C20 /* XIpInterceptor.swift */; };
+		2043BA461E57F29FB5B83C0C /* shared.grpc.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30C187A7C5ED6ABBBEC1B614 /* shared.grpc.swift */; };
+		265D0060BE6DC2865BB629E3 /* Base64Header.swift in Sources */ = {isa = PBXBuildFile; fileRef = 943E934E922904C8A68F3A42 /* Base64Header.swift */; };
+		27D24A1E2D883904EA913FDC /* SessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAC6CC9467247D19BAB53FE7 /* SessionStore.swift */; };
+		29DB76FA7C0467B9FE8A6D9F /* UploadConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = 555D3F284DAC1CF7AEA62388 /* UploadConstants.swift */; };
+		2BA79926F488AE9AB5AE3FB7 /* XAppInterceptor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0EB208CDAD0F11A35688A32D /* XAppInterceptor.swift */; };
+		2BEB24FB0BF92ED9213DB295 /* identity_api.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D1B062DD1285A0ED4A73FB2 /* identity_api.pb.swift */; };
 		32BDE9A921AD34C08CED5B7E /* SwiftProtobuf in Frameworks */ = {isa = PBXBuildFile; productRef = 4B8BC114DB34C1463871A262 /* SwiftProtobuf */; };
+		36722D0A9E467C0DE0B06549 /* SwiftProtobuf in Frameworks */ = {isa = PBXBuildFile; productRef = DC0A6231AEF4F15474767117 /* SwiftProtobuf */; };
+		36EA5655385856ABE81741B4 /* XDeviceInterceptor.swift in Sources */ = {isa = PBXBuildFile; fileRef = E92ABE0B79C2F25636B45148 /* XDeviceInterceptor.swift */; };
+		3BB2F4B147D345D39CC27676 /* files_api.grpc.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACB71C136C1AA3C96141A84B /* files_api.grpc.swift */; };
+		3DCDCB60098F244AF7DAFBEE /* GRPCProtobuf in Frameworks */ = {isa = PBXBuildFile; productRef = ECCAAB3075E4045E47E3AF85 /* GRPCProtobuf */; };
+		3DD3A6F1B02CE737A8D81754 /* CloudErrorCodes.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0A5D6C5C01BB210CCB03586 /* CloudErrorCodes.swift */; };
+		45F3AFD4AC11FD03FA307430 /* users_api.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0124ACF63449B4778D91FE10 /* users_api.pb.swift */; };
 		478C228E2417FC9B7E777D5C /* GRPCCore in Frameworks */ = {isa = PBXBuildFile; productRef = CE6AA630EBC1B681204291DB /* GRPCCore */; };
 		47EF6BDC60833D3F2ADF3D8F /* GRPCNIOTransportHTTP2 in Frameworks */ = {isa = PBXBuildFile; productRef = B516B9C7010DED413CF2FD27 /* GRPCNIOTransportHTTP2 */; };
+		4BACEDD1DB62D6C12CF78EB5 /* AuthErrorCodes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 459FB06F1D1837B7879E348D /* AuthErrorCodes.swift */; };
+		5A7FCD030AA6F986B51022E2 /* FileTransferService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DF7CFC27DED0803F53812ED /* FileTransferService.swift */; };
+		5A8556A5C42F6F63A4A4FF00 /* UploadActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27A85F89053CD1A2308756B7 /* UploadActivityAttributes.swift */; };
 		5EA0000000000000000000FD /* ShareExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 5EA0000000000000000000F6 /* ShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		64B09CC0B5653F24335F3851 /* InsecureURLSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65CC1716BA9F3344D52873D6 /* InsecureURLSession.swift */; };
+		78D39141D7D0319F44B8B931 /* UploadQueueStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2440111D80EE72A88A3DAA4E /* UploadQueueStore.swift */; };
+		7CCC20E0353FF6B6B839FD88 /* files_api.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = A05397032CED9E16C7E61B00 /* files_api.pb.swift */; };
+		87A95CEB6AFFD5A43FB676ED /* BackgroundUploadCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A61969CD78B8E955562C882 /* BackgroundUploadCoordinator.swift */; };
+		962EB76D8B8330A004808637 /* GrpcManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DD2B7F1CA879A1612A8D729 /* GrpcManager.swift */; };
+		A1E28946FAA6E43C992C972E /* XOsInterceptor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51768E6F5B0F4998857ACF86 /* XOsInterceptor.swift */; };
+		A864E4A36E2C8B371555D225 /* shared.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8AC87F7025E534E89566455D /* shared.pb.swift */; };
+		B78BC2CB5C43E4CB77E4CF57 /* GRPCNIOTransportHTTP2 in Frameworks */ = {isa = PBXBuildFile; productRef = AEF847B678D0D2F29670306C /* GRPCNIOTransportHTTP2 */; };
+		CFF4CDDFED96F2A79E619812 /* identity_api.grpc.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8081AFC23A114879EE4E4885 /* identity_api.grpc.swift */; };
+		D83E4F86FBE18BC129A6A54D /* MultipartBodyBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D6699BDEBB6483432D58DD9 /* MultipartBodyBuilder.swift */; };
+		DA2266D9CE7F1FA26FB03BA4 /* GrpcError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35A4AE97D2A9BD196CAA1FB2 /* GrpcError.swift */; };
+		E8A8BE766449D1887D7FC303 /* UploadActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27A85F89053CD1A2308756B7 /* UploadActivityAttributes.swift */; };
+		EA3B6C441ACE9EAE571B7121 /* UploadJob.swift in Sources */ = {isa = PBXBuildFile; fileRef = 325595313544346519E96798 /* UploadJob.swift */; };
+		EAFCA3958EDF37757D562C90 /* UploadActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27A85F89053CD1A2308756B7 /* UploadActivityAttributes.swift */; };
+		ECCD67357844A0B568216AF0 /* UploadLiveActivityController.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3CC4E880CDD641FFCC83FDE /* UploadLiveActivityController.swift */; };
+		F3DC6E5EA97D897616F8E71C /* AuthInterceptor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D21C276B4E4CD84A63B5AE3 /* AuthInterceptor.swift */; };
+		F854EB05AC33CB24C1AD0846 /* BarkCloudWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 25F2313879CF10ED77037E1E /* BarkCloudWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		FB8CCF1BBD3DA9DD17906187 /* GRPCCore in Frameworks */ = {isa = PBXBuildFile; productRef = 44F4629D0CABB4B0B0F74882 /* GRPCCore */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -21,6 +56,13 @@
 			proxyType = 1;
 			remoteGlobalIDString = 5EA0000000000000000000F1;
 			remoteInfo = ShareExtension;
+		};
+		C60DB4165B49D5AC3E96ED8A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 23AF70842FBBAEED006005AF /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 68167DCF5369C7239E3BFB56;
+			remoteInfo = BarkCloudWidgets;
 		};
 		CA11000000000000000000A9 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -39,6 +81,7 @@
 			dstSubfolderSpec = 13;
 			files = (
 				5EA0000000000000000000FD /* ShareExtension.appex in Embed Foundation Extensions */,
+				F854EB05AC33CB24C1AD0846 /* BarkCloudWidgets.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -46,9 +89,38 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		0124ACF63449B4778D91FE10 /* users_api.pb.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = users_api.pb.swift; path = BarkCloud/Generated/Proto/users_api.pb.swift; sourceTree = SOURCE_ROOT; };
+		0D1B062DD1285A0ED4A73FB2 /* identity_api.pb.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = identity_api.pb.swift; path = BarkCloud/Generated/Proto/identity_api.pb.swift; sourceTree = SOURCE_ROOT; };
+		0EB208CDAD0F11A35688A32D /* XAppInterceptor.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = XAppInterceptor.swift; path = BarkCloud/Networking/XAppInterceptor.swift; sourceTree = SOURCE_ROOT; };
+		1A61969CD78B8E955562C882 /* BackgroundUploadCoordinator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = BackgroundUploadCoordinator.swift; path = BarkCloud/Networking/BackgroundUploadCoordinator.swift; sourceTree = SOURCE_ROOT; };
+		1D6699BDEBB6483432D58DD9 /* MultipartBodyBuilder.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = MultipartBodyBuilder.swift; path = BarkCloud/Networking/MultipartBodyBuilder.swift; sourceTree = SOURCE_ROOT; };
 		23AF708C2FBBAEED006005AF /* BarkCloud.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BarkCloud.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		2440111D80EE72A88A3DAA4E /* UploadQueueStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = UploadQueueStore.swift; path = BarkCloud/Data/Cache/UploadQueueStore.swift; sourceTree = SOURCE_ROOT; };
+		25F2313879CF10ED77037E1E /* BarkCloudWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = BarkCloudWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		27A85F89053CD1A2308756B7 /* UploadActivityAttributes.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = UploadActivityAttributes.swift; sourceTree = "<group>"; };
+		30C187A7C5ED6ABBBEC1B614 /* shared.grpc.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = shared.grpc.swift; path = BarkCloud/Generated/Proto/shared.grpc.swift; sourceTree = SOURCE_ROOT; };
+		325595313544346519E96798 /* UploadJob.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = UploadJob.swift; path = BarkCloud/Data/Cache/UploadJob.swift; sourceTree = SOURCE_ROOT; };
+		35A4AE97D2A9BD196CAA1FB2 /* GrpcError.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = GrpcError.swift; path = BarkCloud/Networking/GrpcError.swift; sourceTree = SOURCE_ROOT; };
+		3D21C276B4E4CD84A63B5AE3 /* AuthInterceptor.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AuthInterceptor.swift; path = BarkCloud/Networking/AuthInterceptor.swift; sourceTree = SOURCE_ROOT; };
+		459FB06F1D1837B7879E348D /* AuthErrorCodes.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AuthErrorCodes.swift; path = BarkCloud/Networking/AuthErrorCodes.swift; sourceTree = SOURCE_ROOT; };
+		4DD2B7F1CA879A1612A8D729 /* GrpcManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = GrpcManager.swift; path = BarkCloud/Networking/GrpcManager.swift; sourceTree = SOURCE_ROOT; };
+		51768E6F5B0F4998857ACF86 /* XOsInterceptor.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = XOsInterceptor.swift; path = BarkCloud/Networking/XOsInterceptor.swift; sourceTree = SOURCE_ROOT; };
+		555D3F284DAC1CF7AEA62388 /* UploadConstants.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = UploadConstants.swift; path = BarkCloud/Networking/UploadConstants.swift; sourceTree = SOURCE_ROOT; };
 		5EA0000000000000000000F6 /* ShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		65CC1716BA9F3344D52873D6 /* InsecureURLSession.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = InsecureURLSession.swift; path = BarkCloud/Networking/InsecureURLSession.swift; sourceTree = SOURCE_ROOT; };
+		8081AFC23A114879EE4E4885 /* identity_api.grpc.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = identity_api.grpc.swift; path = BarkCloud/Generated/Proto/identity_api.grpc.swift; sourceTree = SOURCE_ROOT; };
+		8AC87F7025E534E89566455D /* shared.pb.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = shared.pb.swift; path = BarkCloud/Generated/Proto/shared.pb.swift; sourceTree = SOURCE_ROOT; };
+		8DF7CFC27DED0803F53812ED /* FileTransferService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = FileTransferService.swift; path = BarkCloud/Networking/FileTransferService.swift; sourceTree = SOURCE_ROOT; };
+		943E934E922904C8A68F3A42 /* Base64Header.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = Base64Header.swift; path = BarkCloud/Networking/Base64Header.swift; sourceTree = SOURCE_ROOT; };
+		A05397032CED9E16C7E61B00 /* files_api.pb.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = files_api.pb.swift; path = BarkCloud/Generated/Proto/files_api.pb.swift; sourceTree = SOURCE_ROOT; };
+		ACB71C136C1AA3C96141A84B /* files_api.grpc.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = files_api.grpc.swift; path = BarkCloud/Generated/Proto/files_api.grpc.swift; sourceTree = SOURCE_ROOT; };
+		B0A5D6C5C01BB210CCB03586 /* CloudErrorCodes.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CloudErrorCodes.swift; path = BarkCloud/Networking/CloudErrorCodes.swift; sourceTree = SOURCE_ROOT; };
 		CA11000000000000000000A2 /* BarkCloudTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BarkCloudTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		D187B4FA27A00A0EDB8BB982 /* users_api.grpc.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = users_api.grpc.swift; path = BarkCloud/Generated/Proto/users_api.grpc.swift; sourceTree = SOURCE_ROOT; };
+		E3CC4E880CDD641FFCC83FDE /* UploadLiveActivityController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = UploadLiveActivityController.swift; path = BarkCloud/Networking/UploadLiveActivityController.swift; sourceTree = SOURCE_ROOT; };
+		E92ABE0B79C2F25636B45148 /* XDeviceInterceptor.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = XDeviceInterceptor.swift; path = BarkCloud/Networking/XDeviceInterceptor.swift; sourceTree = SOURCE_ROOT; };
+		EAC6CC9467247D19BAB53FE7 /* SessionStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SessionStore.swift; path = BarkCloud/Session/SessionStore.swift; sourceTree = SOURCE_ROOT; };
+		FC09EBFBDB249FD15BB99C20 /* XIpInterceptor.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = XIpInterceptor.swift; path = BarkCloud/Networking/XIpInterceptor.swift; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -59,12 +131,27 @@
 			);
 			target = 5EA0000000000000000000F1 /* ShareExtension */;
 		};
+		DB06269049401722EB775745 /* Exceptions for "BarkCloudWidgets" folder in "BarkCloudWidgets" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 68167DCF5369C7239E3BFB56 /* BarkCloudWidgets */;
+		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		23AF708E2FBBAEED006005AF /* BarkCloud */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = BarkCloud;
+			sourceTree = "<group>";
+		};
+		4CF4A57742092EC99EA9D6D2 /* BarkCloudWidgets */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				DB06269049401722EB775745 /* Exceptions for "BarkCloudWidgets" folder in "BarkCloudWidgets" target */,
+			);
+			path = BarkCloudWidgets;
 			sourceTree = "<group>";
 		};
 		5EA0000000000000000000F5 /* ShareExtension */ = {
@@ -98,6 +185,17 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				FB8CCF1BBD3DA9DD17906187 /* GRPCCore in Frameworks */,
+				B78BC2CB5C43E4CB77E4CF57 /* GRPCNIOTransportHTTP2 in Frameworks */,
+				3DCDCB60098F244AF7DAFBEE /* GRPCProtobuf in Frameworks */,
+				36722D0A9E467C0DE0B06549 /* SwiftProtobuf in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		65A893ACA3FCA1A24C45FD87 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -111,6 +209,14 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		001791ED6FF760E32F553D89 /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				27A85F89053CD1A2308756B7 /* UploadActivityAttributes.swift */,
+			);
+			path = Shared;
+			sourceTree = "<group>";
+		};
 		23AF70832FBBAEED006005AF = {
 			isa = PBXGroup;
 			children = (
@@ -118,6 +224,9 @@
 				CA11000000000000000000A7 /* BarkCloudTests */,
 				5EA0000000000000000000F5 /* ShareExtension */,
 				23AF708D2FBBAEED006005AF /* Products */,
+				001791ED6FF760E32F553D89 /* Shared */,
+				4CF4A57742092EC99EA9D6D2 /* BarkCloudWidgets */,
+				51A76C574A66100E51989442 /* SharedSources */,
 			);
 			sourceTree = "<group>";
 		};
@@ -127,9 +236,44 @@
 				23AF708C2FBBAEED006005AF /* BarkCloud.app */,
 				CA11000000000000000000A2 /* BarkCloudTests.xctest */,
 				5EA0000000000000000000F6 /* ShareExtension.appex */,
+				25F2313879CF10ED77037E1E /* BarkCloudWidgets.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
+		};
+		51A76C574A66100E51989442 /* SharedSources */ = {
+			isa = PBXGroup;
+			children = (
+				3D21C276B4E4CD84A63B5AE3 /* AuthInterceptor.swift */,
+				459FB06F1D1837B7879E348D /* AuthErrorCodes.swift */,
+				B0A5D6C5C01BB210CCB03586 /* CloudErrorCodes.swift */,
+				943E934E922904C8A68F3A42 /* Base64Header.swift */,
+				35A4AE97D2A9BD196CAA1FB2 /* GrpcError.swift */,
+				4DD2B7F1CA879A1612A8D729 /* GrpcManager.swift */,
+				65CC1716BA9F3344D52873D6 /* InsecureURLSession.swift */,
+				8DF7CFC27DED0803F53812ED /* FileTransferService.swift */,
+				0EB208CDAD0F11A35688A32D /* XAppInterceptor.swift */,
+				E92ABE0B79C2F25636B45148 /* XDeviceInterceptor.swift */,
+				FC09EBFBDB249FD15BB99C20 /* XIpInterceptor.swift */,
+				51768E6F5B0F4998857ACF86 /* XOsInterceptor.swift */,
+				555D3F284DAC1CF7AEA62388 /* UploadConstants.swift */,
+				1D6699BDEBB6483432D58DD9 /* MultipartBodyBuilder.swift */,
+				1A61969CD78B8E955562C882 /* BackgroundUploadCoordinator.swift */,
+				E3CC4E880CDD641FFCC83FDE /* UploadLiveActivityController.swift */,
+				EAC6CC9467247D19BAB53FE7 /* SessionStore.swift */,
+				325595313544346519E96798 /* UploadJob.swift */,
+				2440111D80EE72A88A3DAA4E /* UploadQueueStore.swift */,
+				A05397032CED9E16C7E61B00 /* files_api.pb.swift */,
+				ACB71C136C1AA3C96141A84B /* files_api.grpc.swift */,
+				0D1B062DD1285A0ED4A73FB2 /* identity_api.pb.swift */,
+				8081AFC23A114879EE4E4885 /* identity_api.grpc.swift */,
+				8AC87F7025E534E89566455D /* shared.pb.swift */,
+				0124ACF63449B4778D91FE10 /* users_api.pb.swift */,
+				D187B4FA27A00A0EDB8BB982 /* users_api.grpc.swift */,
+				30C187A7C5ED6ABBBEC1B614 /* shared.grpc.swift */,
+			);
+			name = SharedSources;
+			sourceTree = SOURCE_ROOT;
 		};
 /* End PBXGroup section */
 
@@ -148,6 +292,7 @@
 			);
 			dependencies = (
 				5EA0000000000000000000FB /* PBXTargetDependency */,
+				9131840A61AB80FCE68544A8 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				23AF708E2FBBAEED006005AF /* BarkCloud */,
@@ -180,9 +325,33 @@
 			);
 			name = ShareExtension;
 			packageProductDependencies = (
+				44F4629D0CABB4B0B0F74882 /* GRPCCore */,
+				AEF847B678D0D2F29670306C /* GRPCNIOTransportHTTP2 */,
+				ECCAAB3075E4045E47E3AF85 /* GRPCProtobuf */,
+				DC0A6231AEF4F15474767117 /* SwiftProtobuf */,
 			);
 			productName = ShareExtension;
 			productReference = 5EA0000000000000000000F6 /* ShareExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		68167DCF5369C7239E3BFB56 /* BarkCloudWidgets */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 912F7529EB25381D7EDCE78A /* Build configuration list for PBXNativeTarget "BarkCloudWidgets" */;
+			buildPhases = (
+				F2EEDC4D7534ED2A293D2645 /* Sources */,
+				65A893ACA3FCA1A24C45FD87 /* Frameworks */,
+				94AA21A4A68F189AE313110E /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				4CF4A57742092EC99EA9D6D2 /* BarkCloudWidgets */,
+			);
+			name = BarkCloudWidgets;
+			productName = BarkCloudWidgets;
+			productReference = 25F2313879CF10ED77037E1E /* BarkCloudWidgets.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
 		CA11000000000000000000A1 /* BarkCloudTests */ = {
@@ -201,8 +370,6 @@
 				CA11000000000000000000A7 /* BarkCloudTests */,
 			);
 			name = BarkCloudTests;
-			packageProductDependencies = (
-			);
 			productName = BarkCloudTests;
 			productReference = CA11000000000000000000A2 /* BarkCloudTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
@@ -253,6 +420,7 @@
 				23AF708B2FBBAEED006005AF /* BarkCloud */,
 				CA11000000000000000000A1 /* BarkCloudTests */,
 				5EA0000000000000000000F1 /* ShareExtension */,
+				68167DCF5369C7239E3BFB56 /* BarkCloudWidgets */,
 			);
 		};
 /* End PBXProject section */
@@ -266,6 +434,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		5EA0000000000000000000F9 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		94AA21A4A68F189AE313110E /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -301,6 +476,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E8A8BE766449D1887D7FC303 /* UploadActivityAttributes.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -308,6 +484,34 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				EAFCA3958EDF37757D562C90 /* UploadActivityAttributes.swift in Sources */,
+				F3DC6E5EA97D897616F8E71C /* AuthInterceptor.swift in Sources */,
+				4BACEDD1DB62D6C12CF78EB5 /* AuthErrorCodes.swift in Sources */,
+				3DD3A6F1B02CE737A8D81754 /* CloudErrorCodes.swift in Sources */,
+				265D0060BE6DC2865BB629E3 /* Base64Header.swift in Sources */,
+				DA2266D9CE7F1FA26FB03BA4 /* GrpcError.swift in Sources */,
+				962EB76D8B8330A004808637 /* GrpcManager.swift in Sources */,
+				64B09CC0B5653F24335F3851 /* InsecureURLSession.swift in Sources */,
+				5A7FCD030AA6F986B51022E2 /* FileTransferService.swift in Sources */,
+				2BA79926F488AE9AB5AE3FB7 /* XAppInterceptor.swift in Sources */,
+				36EA5655385856ABE81741B4 /* XDeviceInterceptor.swift in Sources */,
+				1252B67AC1EECA9FAD1D1809 /* XIpInterceptor.swift in Sources */,
+				A1E28946FAA6E43C992C972E /* XOsInterceptor.swift in Sources */,
+				29DB76FA7C0467B9FE8A6D9F /* UploadConstants.swift in Sources */,
+				D83E4F86FBE18BC129A6A54D /* MultipartBodyBuilder.swift in Sources */,
+				87A95CEB6AFFD5A43FB676ED /* BackgroundUploadCoordinator.swift in Sources */,
+				ECCD67357844A0B568216AF0 /* UploadLiveActivityController.swift in Sources */,
+				27D24A1E2D883904EA913FDC /* SessionStore.swift in Sources */,
+				EA3B6C441ACE9EAE571B7121 /* UploadJob.swift in Sources */,
+				78D39141D7D0319F44B8B931 /* UploadQueueStore.swift in Sources */,
+				7CCC20E0353FF6B6B839FD88 /* files_api.pb.swift in Sources */,
+				3BB2F4B147D345D39CC27676 /* files_api.grpc.swift in Sources */,
+				2BEB24FB0BF92ED9213DB295 /* identity_api.pb.swift in Sources */,
+				CFF4CDDFED96F2A79E619812 /* identity_api.grpc.swift in Sources */,
+				A864E4A36E2C8B371555D225 /* shared.pb.swift in Sources */,
+				45F3AFD4AC11FD03FA307430 /* users_api.pb.swift in Sources */,
+				0F643B748954098301807A03 /* users_api.grpc.swift in Sources */,
+				2043BA461E57F29FB5B83C0C /* shared.grpc.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -318,6 +522,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		F2EEDC4D7534ED2A293D2645 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5A8556A5C42F6F63A4A4FF00 /* UploadActivityAttributes.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -325,6 +537,11 @@
 			isa = PBXTargetDependency;
 			target = 5EA0000000000000000000F1 /* ShareExtension */;
 			targetProxy = 5EA0000000000000000000FA /* PBXContainerItemProxy */;
+		};
+		9131840A61AB80FCE68544A8 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 68167DCF5369C7239E3BFB56 /* BarkCloudWidgets */;
+			targetProxy = C60DB4165B49D5AC3E96ED8A /* PBXContainerItemProxy */;
 		};
 		CA11000000000000000000A8 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
@@ -465,12 +682,16 @@
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_BGTaskSchedulerPermittedIdentifiers = com.barkfluff.BarkCloud.upload.retry;
 				INFOPLIST_KEY_NSFaceIDUsageDescription = "Face ID используется для разблокировки сейфа с защищёнными фото.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Доступ к медиатеке нужен, чтобы показывать ваши фото и видео и загружать выбранные в облако.";
+				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
+				INFOPLIST_KEY_NSSupportsLiveActivitiesFrequentUpdates = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphonesimulator*]" = YES;
+				INFOPLIST_KEY_UIBackgroundModes = processing;
 				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphoneos*]" = UIStatusBarStyleDefault;
@@ -509,12 +730,16 @@
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_BGTaskSchedulerPermittedIdentifiers = com.barkfluff.BarkCloud.upload.retry;
 				INFOPLIST_KEY_NSFaceIDUsageDescription = "Face ID используется для разблокировки сейфа с защищёнными фото.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Доступ к медиатеке нужен, чтобы показывать ваши фото и видео и загружать выбранные в облако.";
+				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
+				INFOPLIST_KEY_NSSupportsLiveActivitiesFrequentUpdates = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphonesimulator*]" = YES;
+				INFOPLIST_KEY_UIBackgroundModes = processing;
 				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphoneos*]" = UIStatusBarStyleDefault;
@@ -538,6 +763,34 @@
 			};
 			name = Release;
 		};
+		4BA80102BE4C3F2824BA0A1D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = BarkCloudWidgets/BarkCloudWidgets.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 9Y935NYUP9;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = BarkCloudWidgets/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.barkfluff.BarkCloud.Widgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 		5EA0000000000000000000F3 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -545,6 +798,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 9Y935NYUP9;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = ShareExtension/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
@@ -573,6 +827,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 9Y935NYUP9;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = ShareExtension/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
@@ -636,6 +891,34 @@
 			};
 			name = Release;
 		};
+		E1FBA9093B1B21D2EDFDEA8D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = BarkCloudWidgets/BarkCloudWidgets.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 9Y935NYUP9;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = BarkCloudWidgets/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.barkfluff.BarkCloud.Widgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -662,6 +945,15 @@
 			buildConfigurations = (
 				5EA0000000000000000000F3 /* Debug */,
 				5EA0000000000000000000F4 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		912F7529EB25381D7EDCE78A /* Build configuration list for PBXNativeTarget "BarkCloudWidgets" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E1FBA9093B1B21D2EDFDEA8D /* Debug */,
+				4BA80102BE4C3F2824BA0A1D /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -713,10 +1005,20 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		44F4629D0CABB4B0B0F74882 /* GRPCCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 58D2F8B08B083E0B6FBCC3FB /* XCRemoteSwiftPackageReference "grpc-swift-2" */;
+			productName = GRPCCore;
+		};
 		4B8BC114DB34C1463871A262 /* SwiftProtobuf */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 73F74D6EEDDFD7D6646D02A0 /* XCRemoteSwiftPackageReference "swift-protobuf" */;
 			productName = SwiftProtobuf;
+		};
+		AEF847B678D0D2F29670306C /* GRPCNIOTransportHTTP2 */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 2B40067EABBEA6EEDEABBC3E /* XCRemoteSwiftPackageReference "grpc-swift-nio-transport" */;
+			productName = GRPCNIOTransportHTTP2;
 		};
 		B516B9C7010DED413CF2FD27 /* GRPCNIOTransportHTTP2 */ = {
 			isa = XCSwiftPackageProductDependency;
@@ -732,6 +1034,16 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 58D2F8B08B083E0B6FBCC3FB /* XCRemoteSwiftPackageReference "grpc-swift-2" */;
 			productName = GRPCCore;
+		};
+		DC0A6231AEF4F15474767117 /* SwiftProtobuf */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 73F74D6EEDDFD7D6646D02A0 /* XCRemoteSwiftPackageReference "swift-protobuf" */;
+			productName = SwiftProtobuf;
+		};
+		ECCAAB3075E4045E47E3AF85 /* GRPCProtobuf */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 07369F5ACE620A0BC6078E22 /* XCRemoteSwiftPackageReference "grpc-swift-protobuf" */;
+			productName = GRPCProtobuf;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

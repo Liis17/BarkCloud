@@ -2,6 +2,7 @@ import SwiftUI
 
 @main
 struct BarkCloudApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var env = AppEnvironment()
     @Environment(\.scenePhase) private var scenePhase
 

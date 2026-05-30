@@ -50,6 +50,12 @@ final class FileTransferService: Sendable {
         return (resp.totalUsedStorage, resp.storageLimit)
     }
 
+    /// Свежий access-токен (через проактивный refresh) — для использования в
+    /// `BackgroundUploadCoordinator` при сборке `URLRequest`.
+    func validAccessToken() async -> String? {
+        await grpc.validAccessToken()
+    }
+
     // MARK: - HTTP
 
     /// Залить байты по адресу из `getUploadURL`. Возвращает `fileId` ИЗ ОТВЕТА —

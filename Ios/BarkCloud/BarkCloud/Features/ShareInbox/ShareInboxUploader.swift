@@ -1,10 +1,14 @@
 import Foundation
 import Observation
 
-/// Догружает файлы, накопленные Share Extension в общем контейнере App Group.
-/// Работает на переднем плане (как автозагрузка резервной копии — фоновой
-/// `URLSession` в проекте нет): запускается при старте и при возврате приложения
-/// на передний план, если есть валидная сессия.
+/// Одноразовая миграция legacy `ShareInbox/<uuid>/<file>` (формат старой версии
+/// Share Extension, который только складывал файлы в App Group). Теперь Share
+/// Extension сразу ставит UploadJob в `BackgroundUploadCoordinator`, но если
+/// пользователь обновился со старыми файлами в очереди — переоформляем их в
+/// новый формат, не теряя.
+///
+/// Запускается при старте app и при возврате на передний план. После того как
+/// пользователи проапгрейдятся, этот класс можно удалить.
 @MainActor
 @Observable
 final class ShareInboxUploader {
@@ -22,13 +26,17 @@ final class ShareInboxUploader {
         let items = ShareInbox.pendingItems()
         guard !items.isEmpty else { return }
         isRunning = true
-        Task {
-            // Привязываем к авто-папке «Недавно загруженные» (как остальные загрузки).
+        Task { [cloud] in
+            // Привязываем к авто-папке «Недавно загруженные», как остальные загрузки.
             let folderID = try? await cloud.ensureRecentUploadsFolder()
             for item in items {
                 do {
-                    let data = try Data(contentsOf: item)
-                    _ = try await cloud.uploadFile(data: data, fileName: item.lastPathComponent, toDirectory: folderID)
+                    _ = try await cloud.enqueueBackgroundUpload(
+                        sourceFile: item,
+                        fileName: item.lastPathComponent,
+                        toDirectory: folderID,
+                        source: .share
+                    )
                     ShareInbox.remove(item)
                 } catch {
                     // Оставляем файл в ящике до следующей попытки.

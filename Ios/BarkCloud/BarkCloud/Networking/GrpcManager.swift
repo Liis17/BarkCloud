@@ -3,22 +3,113 @@ import GRPCCore
 import GRPCNIOTransportHTTP2
 import SwiftProtobuf
 
-/// Эндпоинты микросервисов. nginx терминирует TLS и маршрутизирует gRPC по портам
-/// (см. Backend/nginx/cloud.barkfluff.conf): Identity :7020, Users :7021, Files :7025.
+/// Конфигурация адресов сервера. BarkCloud — self-hosted, поэтому адреса
+/// микросервисов задаёт пользователь при первом запуске (см. `ServerSetupScreen`)
+/// и хранятся в App Group UserDefaults — общем хранилище main app и Share Extension
+/// (тот же контейнер `group.com.barkfluff.BarkCloud`, что у фоновой загрузки).
+struct ServerConfig: Sendable, Equatable {
+    var identityHost: String
+    var identityPort: Int
+    var usersHost: String
+    var usersPort: Int
+    var filesHost: String
+    var filesPort: Int
+    var useTLS: Bool
+    var allowSelfSigned: Bool
+
+    /// Значения боевого деплоя — дефолт и предзаполнение формы первого запуска.
+    static let production = ServerConfig(
+        identityHost: "cloud.barkfluff.com", identityPort: 7020,
+        usersHost: "cloud.barkfluff.com", usersPort: 7021,
+        filesHost: "cloud.barkfluff.com", filesPort: 7025,
+        useTLS: true, allowSelfSigned: true
+    )
+
+    private enum Key {
+        static let identityHost = "BarkCloud.server.identityHost"
+        static let identityPort = "BarkCloud.server.identityPort"
+        static let usersHost = "BarkCloud.server.usersHost"
+        static let usersPort = "BarkCloud.server.usersPort"
+        static let filesHost = "BarkCloud.server.filesHost"
+        static let filesPort = "BarkCloud.server.filesPort"
+        static let useTLS = "BarkCloud.server.useTLS"
+        static let allowSelfSigned = "BarkCloud.server.allowSelfSigned"
+        static let configured = "BarkCloud.server.configured"
+    }
+
+    private static var store: UserDefaults {
+        UserDefaults(suiteName: UploadConstants.appGroupID) ?? .standard
+    }
+
+    /// Пользователь хотя бы раз сохранил адреса. До этого `RootView` показывает экран ввода.
+    static var isConfigured: Bool { store.bool(forKey: Key.configured) }
+
+    /// Текущая конфигурация. До первой настройки — `production`-дефолты.
+    static var current: ServerConfig {
+        let d = store
+        guard d.bool(forKey: Key.configured) else { return .production }
+        let p = ServerConfig.production
+        func port(_ key: String, _ fallback: Int) -> Int {
+            let v = d.integer(forKey: key)
+            return v > 0 ? v : fallback
+        }
+        return ServerConfig(
+            identityHost: d.string(forKey: Key.identityHost) ?? p.identityHost,
+            identityPort: port(Key.identityPort, p.identityPort),
+            usersHost: d.string(forKey: Key.usersHost) ?? p.usersHost,
+            usersPort: port(Key.usersPort, p.usersPort),
+            filesHost: d.string(forKey: Key.filesHost) ?? p.filesHost,
+            filesPort: port(Key.filesPort, p.filesPort),
+            useTLS: d.object(forKey: Key.useTLS) as? Bool ?? p.useTLS,
+            allowSelfSigned: d.object(forKey: Key.allowSelfSigned) as? Bool ?? p.allowSelfSigned
+        )
+    }
+
+    /// Сохранить адреса и отметить конфигурацию завершённой.
+    func persist() {
+        let d = Self.store
+        d.set(identityHost, forKey: Key.identityHost)
+        d.set(identityPort, forKey: Key.identityPort)
+        d.set(usersHost, forKey: Key.usersHost)
+        d.set(usersPort, forKey: Key.usersPort)
+        d.set(filesHost, forKey: Key.filesHost)
+        d.set(filesPort, forKey: Key.filesPort)
+        d.set(useTLS, forKey: Key.useTLS)
+        d.set(allowSelfSigned, forKey: Key.allowSelfSigned)
+        d.set(true, forKey: Key.configured)
+    }
+
+    /// Полный сброс адресов сервера — после него `isConfigured == false`, и
+    /// `RootView` снова показывает экран ввода адресов (`ServerSetupScreen`).
+    static func clear() {
+        let d = store
+        [Key.identityHost, Key.identityPort, Key.usersHost, Key.usersPort,
+         Key.filesHost, Key.filesPort, Key.useTLS, Key.allowSelfSigned, Key.configured]
+            .forEach(d.removeObject(forKey:))
+    }
+}
+
+/// Эндпоинты микросервисов поверх `ServerConfig`. nginx терминирует TLS и
+/// маршрутизирует gRPC по портам (см. Backend/nginx/cloud.barkfluff.conf):
+/// Identity :7020, Users :7021, Files :7025 — но хосты/порты задаёт пользователь.
 enum GrpcEndpoint {
-    static let host = "cloud.barkfluff.com"
-    static let identityPort = 7020
-    static let usersPort = 7021
-    static let filesPort = 7025
-    static let useTLS = true
-    static let allowSelfSigned = true
+    static var identityHost: String { ServerConfig.current.identityHost }
+    static var identityPort: Int { ServerConfig.current.identityPort }
+    static var usersHost: String { ServerConfig.current.usersHost }
+    static var usersPort: Int { ServerConfig.current.usersPort }
+    static var filesHost: String { ServerConfig.current.filesHost }
+    static var filesPort: Int { ServerConfig.current.filesPort }
+    static var useTLS: Bool { ServerConfig.current.useTLS }
+    static var allowSelfSigned: Bool { ServerConfig.current.allowSelfSigned }
+
+    private static var scheme: String { useTLS ? "https" : "http" }
 
     /// База HTTP-раздачи файлов через nginx (`/web/download/{id}`, `/web/upload/{id}`).
-    static var filesWebBase: String { "https://\(host):\(filesPort)/web" }
+    static var filesWebBase: String { "\(scheme)://\(filesHost):\(filesPort)/web" }
 
     /// Адрес веб-UI (порт 443) — туда ведут публичные share-ссылки `/s/{token}`.
-    /// Маршрут `/s/...` обслуживает только веб-сервер, не gRPC Files.
-    static var webHost: String { "https://\(host)" }
+    /// Маршрут `/s/...` обслуживает только веб-сервер, не gRPC Files. Берём хост Files.
+    static var webHost: String { "\(scheme)://\(filesHost)" }
 
     /// Публичный URL share-ссылки. `token` — base64url (URL-safe), экранировать не нужно.
     static func publicShareURL(token: String) -> URL? {
@@ -56,8 +147,8 @@ actor GrpcManager {
     typealias AlbumClient = Barkcloud_Files_AlbumApi.Client<Transport>
 
     private let session: SessionStore
-    private var clients: [Int: GRPCClient<Transport>] = [:]
-    private var runTasks: [Int: Task<Void, Error>] = [:]
+    private var clients: [String: GRPCClient<Transport>] = [:]
+    private var runTasks: [String: Task<Void, Error>] = [:]
 
     /// Текущая задача обновления access-токена. Гарантирует, что при множестве
     /// параллельных запросов обновление выполняется ровно один раз (остальные
@@ -72,27 +163,28 @@ actor GrpcManager {
     }
 
     func identityStub() async throws -> IdentityClient {
-        IdentityClient(wrapping: try await client(port: GrpcEndpoint.identityPort))
+        IdentityClient(wrapping: try await client(host: GrpcEndpoint.identityHost, port: GrpcEndpoint.identityPort))
     }
 
     func usersStub() async throws -> UsersClient {
-        UsersClient(wrapping: try await client(port: GrpcEndpoint.usersPort))
+        UsersClient(wrapping: try await client(host: GrpcEndpoint.usersHost, port: GrpcEndpoint.usersPort))
     }
 
     func filesStub() async throws -> FilesClient {
-        FilesClient(wrapping: try await client(port: GrpcEndpoint.filesPort))
+        FilesClient(wrapping: try await client(host: GrpcEndpoint.filesHost, port: GrpcEndpoint.filesPort))
     }
 
     func cloudStub() async throws -> CloudClient {
-        CloudClient(wrapping: try await client(port: GrpcEndpoint.filesPort))
+        CloudClient(wrapping: try await client(host: GrpcEndpoint.filesHost, port: GrpcEndpoint.filesPort))
     }
 
     func albumStub() async throws -> AlbumClient {
-        AlbumClient(wrapping: try await client(port: GrpcEndpoint.filesPort))
+        AlbumClient(wrapping: try await client(host: GrpcEndpoint.filesHost, port: GrpcEndpoint.filesPort))
     }
 
-    private func client(port: Int) async throws -> GRPCClient<Transport> {
-        if let existing = clients[port] { return existing }
+    private func client(host: String, port: Int) async throws -> GRPCClient<Transport> {
+        let key = "\(host):\(port)"
+        if let existing = clients[key] { return existing }
 
         let transportSecurity: Transport.TransportSecurity
         if GrpcEndpoint.useTLS {
@@ -106,7 +198,7 @@ actor GrpcManager {
         }
 
         let transport = try Transport(
-            target: .dns(host: GrpcEndpoint.host, port: port),
+            target: .dns(host: host, port: port),
             transportSecurity: transportSecurity
         )
 
@@ -121,8 +213,8 @@ actor GrpcManager {
         ]
 
         let client = GRPCClient(transport: transport, interceptors: interceptors)
-        clients[port] = client
-        runTasks[port] = Task { [client] in
+        clients[key] = client
+        runTasks[key] = Task { [client] in
             try await client.runConnections()
         }
         return client
@@ -137,11 +229,18 @@ actor GrpcManager {
 
     // MARK: - Авто-обновление access-токена
 
-    /// Токен для запроса конкретного метода. `CreateToken` — публичный RPC
-    /// обновления: не прикрепляем токен и не запускаем refresh (иначе рекурсия
-    /// refresh → CreateToken → refresh). Прочие методы получают валидный токен.
+    /// Публичные (без авторизации) RPC Identity, к которым НЕ прикрепляем
+    /// `x-auth-token`: `Auth` (логин по паролю) и `CreateToken` (обновление по
+    /// refresh). Если повесить на них просроченный/чужой токен из Keychain, его
+    /// ловит auth-middleware сервера и отвечает HTTP 401 ещё до самого метода —
+    /// логин падает с «non-200 HTTP Status Code (401)». `CreateToken` к тому же
+    /// исключает рекурсию refresh → CreateToken → refresh.
+    private static let unauthenticatedMethods: Set<String> = ["Auth", "CreateToken"]
+
+    /// Токен для запроса конкретного метода. Публичным RPC отдаёт `nil`, прочие
+    /// получают валидный (при необходимости проактивно обновлённый) токен.
     func accessToken(forMethod method: String) async -> String? {
-        if method == "CreateToken" { return nil }
+        if Self.unauthenticatedMethods.contains(method) { return nil }
         return await validAccessToken()
     }
 

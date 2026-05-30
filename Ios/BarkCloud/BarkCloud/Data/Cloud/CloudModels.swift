@@ -43,6 +43,9 @@ struct MediaAsset: Identifiable, Hashable, Sendable {
     let imageHeight: Int
     let uploadedAt: Date?
     let etag: String
+    /// Имя устройства, с которого блоб был загружен в первый раз (сохраняется при дедупликации).
+    /// Пусто, если бэкенд не передал значение (легаси-файлы до миграции `AddUploadDeviceName`).
+    let uploadDeviceName: String?
 
     init(_ info: Barkcloud_Files_UploadFileInfo) {
         self.id = info.id
@@ -54,6 +57,7 @@ struct MediaAsset: Identifiable, Hashable, Sendable {
         self.imageHeight = Int(info.imageHeight)
         self.uploadedAt = info.hasUploadedAt ? info.uploadedAt.date : nil
         self.etag = info.etag
+        self.uploadDeviceName = info.uploadDeviceName.isEmpty ? nil : info.uploadDeviceName
         self.previews = info.previews.compactMap { p in
             guard !p.previewURL.isEmpty, let url = URL(string: p.previewURL) else { return nil }
             return MediaPreview(url: url, width: Int(p.targetWidth))
