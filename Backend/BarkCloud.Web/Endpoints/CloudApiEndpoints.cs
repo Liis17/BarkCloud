@@ -470,7 +470,14 @@ public static class CloudApiEndpoints
 
         // Полные свойства файла по file_id (для модалки «Свойства») — через серверный GetFileData.
         // FilesServerApi авторизуется сервисным токеном (интерцептор), поэтому проверяем владение вручную.
-        api.MapGet("/files/info", async (HttpContext http, AuthGateway auth, FilesServerApi.FilesServerApiClient filesServer, string? id) =>
+        // Дополнительно подтягиваем EXIF/ffprobe/PDF/Office-метаданные через клиентский GetFileMetadata
+        // (юзер-токен → авторизация по Uploaders на стороне Files).
+        api.MapGet("/files/info", async (
+            HttpContext http,
+            AuthGateway auth,
+            FilesServerApi.FilesServerApiClient filesServer,
+            FilesApi.FilesApiClient filesUser,
+            string? id) =>
         {
             var user = await auth.AuthenticateAsync(http);
             if (user is null)
@@ -486,6 +493,20 @@ public static class CloudApiEndpoints
                     return Results.Json(new { error = "Файл не найден" }, Json, statusCode: 404);
                 if (!f.Uploaders.Contains(user.UserId))
                     return Results.Json(new { error = "Нет доступа" }, Json, statusCode: 403);
+
+                object? metadataJson = null;
+                try
+                {
+                    var metaResp = await filesUser.GetFileMetadataAsync(
+                        new GetFileMetadataRequest { FileId = id },
+                        BrowserContext.UserToken(user.AccessToken));
+                    if (metaResp.HasMetadata && metaResp.Metadata is not null)
+                        metadataJson = FileMetadataJson(metaResp.Metadata);
+                }
+                catch (RpcException)
+                {
+                    // Метаданных может ещё не быть (бэкафилл не дошёл) — это не ошибка модалки.
+                }
 
                 var (iconKind, ext) = FileKind.Classify(f.FileName);
                 return Results.Json(new
@@ -510,7 +531,8 @@ public static class CloudApiEndpoints
                     previewCount = f.Previews.Count,
                     createdAt = f.CreatedAt?.ToDateTimeOffset(),
                     uploadedAt = f.UploadedAt?.ToDateTimeOffset(),
-                    uploadDeviceName = f.UploadDeviceName
+                    uploadDeviceName = f.UploadDeviceName,
+                    metadata = metadataJson
                 }, Json);
             }
             catch (RpcException ex) when (ex.StatusCode == StatusCode.NotFound)
@@ -540,6 +562,46 @@ public static class CloudApiEndpoints
         createdAt = s.CreatedAt?.ToDateTimeOffset(),
         clickCount = s.ClickCount
     };
+
+    /// <summary>
+    /// gRPC <see cref="FileMetadataInfo"/> → плоский JSON для модалки «Свойства».
+    /// Все поля опциональны — отдаём только те, что заданы (через HasFoo), без «пустых» нулей.
+    /// </summary>
+    private static object FileMetadataJson(FileMetadataInfo m)
+    {
+        var dict = new Dictionary<string, object?>();
+
+        if (m.TakenAt is not null) dict["takenAt"] = m.TakenAt.ToDateTimeOffset();
+        if (m.HasCreatorTool) dict["creatorTool"] = m.CreatorTool;
+
+        if (m.HasLatitude) dict["latitude"] = m.Latitude;
+        if (m.HasLongitude) dict["longitude"] = m.Longitude;
+        if (m.HasAltitude) dict["altitude"] = m.Altitude;
+
+        if (m.HasCameraMake) dict["cameraMake"] = m.CameraMake;
+        if (m.HasCameraModel) dict["cameraModel"] = m.CameraModel;
+        if (m.HasLensModel) dict["lensModel"] = m.LensModel;
+
+        if (m.HasFocalLengthMm) dict["focalLengthMm"] = m.FocalLengthMm;
+        if (m.HasFNumber) dict["fNumber"] = m.FNumber;
+        if (m.HasExposureTimeSeconds) dict["exposureTimeSeconds"] = m.ExposureTimeSeconds;
+        if (m.HasIso) dict["iso"] = m.Iso;
+        if (m.HasOrientation) dict["orientation"] = m.Orientation;
+        if (m.HasFlash) dict["flash"] = m.Flash;
+
+        if (m.HasDurationSeconds) dict["durationSeconds"] = m.DurationSeconds;
+        if (m.HasVideoCodec) dict["videoCodec"] = m.VideoCodec;
+        if (m.HasAudioCodec) dict["audioCodec"] = m.AudioCodec;
+        if (m.HasBitrate) dict["bitrate"] = m.Bitrate;
+        if (m.HasFrameRate) dict["frameRate"] = m.FrameRate;
+
+        if (m.HasDocumentAuthor) dict["documentAuthor"] = m.DocumentAuthor;
+        if (m.HasDocumentTitle) dict["documentTitle"] = m.DocumentTitle;
+        if (m.HasDocumentSubject) dict["documentSubject"] = m.DocumentSubject;
+        if (m.HasDocumentPageCount) dict["documentPageCount"] = m.DocumentPageCount;
+
+        return dict;
+    }
 
     /// <summary>Авторизация по cookie + единая обработка gRPC-ошибок.</summary>
     private static async Task<IResult> Guarded(HttpContext http, AuthGateway auth, Func<Metadata, Task<IResult>> action)
