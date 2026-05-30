@@ -20,45 +20,207 @@ permissions:
   contents: read
 
 jobs:
-  dotnet-tests:
-    name: ".NET unit tests"
-    runs-on: self-hosted
+  # ═══════════════════════════════════════════════════════════════
+  #  Определение изменённых частей репозитория.
+  #  Изменения в Shared/Proto/TestKit запускают все backend-тесты.
+  # ═══════════════════════════════════════════════════════════════
+  changes:
+    name: "Определение изменений"
+    runs-on: [self-hosted, linux]
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      configuration: ${{ steps.filter.outputs.configuration }}
+      files: ${{ steps.filter.outputs.files }}
+      grpcserver: ${{ steps.filter.outputs.grpcserver }}
+      identity: ${{ steps.filter.outputs.identity }}
+      notification: ${{ steps.filter.outputs.notification }}
+      users: ${{ steps.filter.outputs.users }}
+      web: ${{ steps.filter.outputs.web }}
+      shared: ${{ steps.filter.outputs.shared }}
+      android: ${{ steps.filter.outputs.android }}
     steps:
-      - name: "Checkout"
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dorny/paths-filter@v4
+        id: filter
+        with:
+          filters: |
+            shared:
+              - 'Shared/**'
+              - 'Tests/BarkCloud.TestKit/**'
+            configuration:
+              - 'Backend/BarkCloud.Configuration/**'
+              - 'Tests/Backend/BarkCloud.Configuration.Tests/**'
+            files:
+              - 'Backend/BarkCloud.Files/**'
+              - 'Tests/Backend/BarkCloud.Files.Tests/**'
+            grpcserver:
+              - 'Backend/BarkCloud.GrpcServer/**'
+              - 'Tests/Backend/BarkCloud.GrpcServer.Tests/**'
+            identity:
+              - 'Backend/BarkCloud.Identity/**'
+              - 'Tests/Backend/BarkCloud.Identity.Tests/**'
+            notification:
+              - 'Backend/BarkCloud.Notification/**'
+              - 'Tests/Backend/BarkCloud.Notification.Tests/**'
+            users:
+              - 'Backend/BarkCloud.Users/**'
+              - 'Tests/Backend/BarkCloud.Users.Tests/**'
+            web:
+              - 'Backend/BarkCloud.Web/**'
+              - 'Tests/Backend/BarkCloud.Web.Tests/**'
+            android:
+              - 'Android/**'
 
-      - name: "Check .NET 10.0 SDK"
-        id: check
-        run: |
-          if ! dotnet --list-sdks 2>/dev/null | grep -q "^10\."; then
-            echo "missing=true" >> "$GITHUB_OUTPUT"
-            exit 1
-          fi
-          echo "missing=false" >> "$GITHUB_OUTPUT"
-
-      - name: "Restore"
-        run: dotnet restore BarkCloud.slnx
-
-      - name: "Build"
-        run: dotnet build BarkCloud.slnx --no-restore -c Release
-
+  # ═══════════════════════════════════════════════════════════════
+  #  Backend — тесты per-микросервис (свой + изменения в Shared)
+  # ═══════════════════════════════════════════════════════════════
+  test-configuration:
+    name: "Configuration"
+    needs: changes
+    if: ${{ needs.changes.outputs.configuration == 'true' || needs.changes.outputs.shared == 'true' }}
+    runs-on: [self-hosted, linux]
+    steps:
+      - uses: actions/checkout@v4
       - name: "Test"
-        run: |
-          dotnet test BarkCloud.slnx \
-            --no-build -c Release \
-            --collect:"XPlat Code Coverage" \
-            --logger "trx;LogFileName=test-results.trx" \
-            --results-directory TestResults
-
+        run: dotnet test Tests/Backend/BarkCloud.Configuration.Tests/BarkCloud.Configuration.Tests.csproj -c Release --logger "trx;LogFileName=configuration.trx" --results-directory TestResults
       - name: "Upload test results"
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: dotnet-test-results
+          name: test-results-configuration
           path: TestResults/**
 
+  test-files:
+    name: "Files"
+    needs: changes
+    if: ${{ needs.changes.outputs.files == 'true' || needs.changes.outputs.shared == 'true' }}
+    runs-on: [self-hosted, linux]
+    steps:
+      - uses: actions/checkout@v4
+      - name: "Test"
+        run: dotnet test Tests/Backend/BarkCloud.Files.Tests/BarkCloud.Files.Tests.csproj -c Release --logger "trx;LogFileName=files.trx" --results-directory TestResults
+      - name: "Upload test results"
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-files
+          path: TestResults/**
+
+  test-grpcserver:
+    name: "GrpcServer"
+    needs: changes
+    if: ${{ needs.changes.outputs.grpcserver == 'true' || needs.changes.outputs.shared == 'true' }}
+    runs-on: [self-hosted, linux]
+    steps:
+      - uses: actions/checkout@v4
+      - name: "Test"
+        run: dotnet test Tests/Backend/BarkCloud.GrpcServer.Tests/BarkCloud.GrpcServer.Tests.csproj -c Release --logger "trx;LogFileName=grpcserver.trx" --results-directory TestResults
+      - name: "Upload test results"
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-grpcserver
+          path: TestResults/**
+
+  test-identity:
+    name: "Identity"
+    needs: changes
+    if: ${{ needs.changes.outputs.identity == 'true' || needs.changes.outputs.shared == 'true' }}
+    runs-on: [self-hosted, linux]
+    steps:
+      - uses: actions/checkout@v4
+      - name: "Test"
+        run: dotnet test Tests/Backend/BarkCloud.Identity.Tests/BarkCloud.Identity.Tests.csproj -c Release --logger "trx;LogFileName=identity.trx" --results-directory TestResults
+      - name: "Upload test results"
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-identity
+          path: TestResults/**
+
+  test-notification:
+    name: "Notification"
+    needs: changes
+    if: ${{ needs.changes.outputs.notification == 'true' || needs.changes.outputs.shared == 'true' }}
+    runs-on: [self-hosted, linux]
+    steps:
+      - uses: actions/checkout@v4
+      - name: "Test"
+        run: dotnet test Tests/Backend/BarkCloud.Notification.Tests/BarkCloud.Notification.Tests.csproj -c Release --logger "trx;LogFileName=notification.trx" --results-directory TestResults
+      - name: "Upload test results"
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-notification
+          path: TestResults/**
+
+  test-users:
+    name: "Users"
+    needs: changes
+    if: ${{ needs.changes.outputs.users == 'true' || needs.changes.outputs.shared == 'true' }}
+    runs-on: [self-hosted, linux]
+    steps:
+      - uses: actions/checkout@v4
+      - name: "Test"
+        run: dotnet test Tests/Backend/BarkCloud.Users.Tests/BarkCloud.Users.Tests.csproj -c Release --logger "trx;LogFileName=users.trx" --results-directory TestResults
+      - name: "Upload test results"
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-users
+          path: TestResults/**
+
+  test-web:
+    name: "Web"
+    needs: changes
+    if: ${{ needs.changes.outputs.web == 'true' || needs.changes.outputs.shared == 'true' }}
+    runs-on: [self-hosted, linux]
+    steps:
+      - uses: actions/checkout@v4
+      - name: "Test"
+        run: dotnet test Tests/Backend/BarkCloud.Web.Tests/BarkCloud.Web.Tests.csproj -c Release --logger "trx;LogFileName=web.trx" --results-directory TestResults
+      - name: "Upload test results"
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-web
+          path: TestResults/**
+
+  # ═══════════════════════════════════════════════════════════════
+  #  Shared — все Shared.*.Tests одним прогоном
+  # ═══════════════════════════════════════════════════════════════
+  test-shared:
+    name: "Shared"
+    needs: changes
+    if: ${{ needs.changes.outputs.shared == 'true' }}
+    runs-on: [self-hosted, linux]
+    steps:
+      - uses: actions/checkout@v4
+      - name: "Test"
+        run: |
+          for proj in Tests/Shared/*/*.csproj; do
+            dotnet test "$proj" -c Release \
+              --logger "trx;LogFileName=$(basename "$proj" .csproj).trx" \
+              --results-directory TestResults
+          done
+      - name: "Upload test results"
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-shared
+          path: TestResults/**
+
+  # ═══════════════════════════════════════════════════════════════
+  #  Android — только при изменениях в Android/**
+  # ═══════════════════════════════════════════════════════════════
   android-tests:
     name: "Android unit tests"
+    needs: changes
+    if: ${{ needs.changes.outputs.android == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: "Checkout"
