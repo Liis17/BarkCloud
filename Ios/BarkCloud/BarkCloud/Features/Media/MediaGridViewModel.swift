@@ -31,6 +31,10 @@ struct MediaGridUiState {
 final class MediaGridViewModel {
     var state: MediaGridUiState
 
+    /// Отложенное удаление одного файла (через контекстное меню) — внизу
+    /// показывается snackbar с отсчётом и кнопкой «Отменить».
+    let pendingDelete = PendingDelete()
+
     private let kind: MediaKind
     private let cloud: CloudRepository
     private let albums: AlbumRepository
@@ -57,6 +61,9 @@ final class MediaGridViewModel {
     }
 
     func reload() async {
+        // Досдаём отложенное удаление, чтобы сервер не вернул только что
+        // убранный файл обратно в сетку.
+        await pendingDelete.flushIfAny()
         do {
             let page = try await cloud.listUserMedia(kind: apiKind, limit: 60)
             let hidden = vault.protectedIDs
@@ -252,14 +259,29 @@ final class MediaGridViewModel {
         }
     }
 
-    /// Удалить один файл из галереи (в корзину) и обновить список.
-    func deleteSingle(_ item: MediaItem) async {
-        do {
-            try await cloud.deleteUserMedia(fileID: item.id)
-        } catch {
-            state.snackbar = domainErrorMessage(error)
-        }
-        await reload()
+    /// Оптимистичное удаление одного файла из галереи (контекстное меню): сразу
+    /// убираем из сетки и кладём в очередь — реальный `deleteUserMedia` уйдёт,
+    /// когда snackbar отсчитает 5 секунд (или пользователь поставит другое
+    /// удаление в очередь).
+    func deleteSingle(_ item: MediaItem) {
+        guard let index = state.items.firstIndex(where: { $0.id == item.id }) else { return }
+        state.items.remove(at: index)
+        state.selection.remove(item.id)
+        pendingDelete.schedule(
+            label: item.fileName,
+            action: { [weak self, cloud] in
+                do { try await cloud.deleteUserMedia(fileID: item.id) }
+                catch {
+                    self?.state.snackbar = domainErrorMessage(error)
+                    await self?.reload()
+                }
+            },
+            onUndo: { [weak self] in
+                guard let self else { return }
+                let position = min(index, state.items.count)
+                state.items.insert(item, at: position)
+            }
+        )
     }
 
     func addToAlbum(fileID: String, albumID: String) async {

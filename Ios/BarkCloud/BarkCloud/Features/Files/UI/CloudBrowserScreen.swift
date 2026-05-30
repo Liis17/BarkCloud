@@ -99,7 +99,7 @@ struct CloudBrowserScreen: View {
                         folderRow(dir)
                     }
                     .swipeActions(edge: .trailing) {
-                        deleteButton { Task { await vm.deleteDirectory(dir) } }
+                        deleteButton { vm.deleteDirectory(dir) }
                         moveButton { moveSubject = .directory(dir) }
                         renameButton {
                             renameText = dir.name
@@ -112,7 +112,7 @@ struct CloudBrowserScreen: View {
                         .contentShape(Rectangle())
                         .onTapGesture { openFile = entry }
                         .swipeActions(edge: .trailing) {
-                            deleteButton { Task { await vm.deleteFile(entry) } }
+                            deleteButton { vm.deleteFile(entry) }
                             moveButton { moveSubject = .file(entry) }
                             renameButton {
                                 renameText = entry.name
@@ -124,6 +124,7 @@ struct CloudBrowserScreen: View {
             .listStyle(.plain)
             // Потянуть вниз — перезагрузить содержимое папки.
             .barkRefreshable { await vm.reload(showSpinner: false) }
+            .overlay(alignment: .bottom) { PendingDeleteSnackbar(store: vm.pendingDelete) }
         }
     }
 
@@ -198,22 +199,25 @@ struct CloudBrowserScreen: View {
 
     private func deleteButton(_ action: @escaping () -> Void) -> some View {
         Button(role: .destructive, action: action) {
-            Label(String(localized: "action_delete"), systemImage: "trash")
+            Image(systemName: "trash")
         }
+        .accessibilityLabel(String(localized: "action_delete"))
     }
 
     private func moveButton(_ action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Label(String(localized: "action_move"), systemImage: "folder")
+            Image(systemName: "folder")
         }
         .tint(.orange)
+        .accessibilityLabel(String(localized: "action_move"))
     }
 
     private func renameButton(_ action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Label(String(localized: "action_rename"), systemImage: "pencil")
+            Image(systemName: "pencil")
         }
         .tint(AppColors.accent)
+        .accessibilityLabel(String(localized: "action_rename"))
     }
 
     private func performRename() {

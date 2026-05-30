@@ -42,6 +42,9 @@ struct MediaGridScreen: View {
             }
         }
         .animation(.spring(response: 0.35, dampingFraction: 0.85), value: vm?.state.isSelecting ?? false)
+        .overlay(alignment: .bottom) {
+            if let vm { PendingDeleteSnackbar(store: vm.pendingDelete) }
+        }
         .overlay(alignment: .bottom) { if let vm { snackbar(vm) } }
         .task {
             if vm == nil {
@@ -92,7 +95,7 @@ struct MediaGridScreen: View {
             albumPickerItem = item
         }
         Button(String(localized: "ctx_delete"), role: .destructive) {
-            Task { await vm.deleteSingle(item) }
+            vm.deleteSingle(item)
         }
     }
 
