@@ -35,4 +35,7 @@
     <Project Path="Tests/Shared/BarkCloud.Shared.Queue.Tests/BarkCloud.Shared.Queue.Tests.csproj" />
     <Project Path="Tests/Shared/BarkCloud.Shared.SecurityUtilities.Tests/BarkCloud.Shared.SecurityUtilities.Tests.csproj" />
   </Folder>
+  <Project Path="Drive/BarkCloud.Drive.App/BarkCloud.Drive.App.csproj" />
+  <Project Path="Drive/BarkCloud.Drive.Contracts/BarkCloud.Drive.Contracts.csproj" />
+  <Project Path="Drive/BarkCloud.Drive.Engine/BarkCloud.Drive.Engine.csproj" />
 </Solution>
