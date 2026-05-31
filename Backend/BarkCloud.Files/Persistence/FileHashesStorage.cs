@@ -35,6 +35,19 @@ public class FileHashesStorage : IFileHashesStorage
     }
 
     /// <summary>
+    /// Возвращает все FileId с данным хешем. Дедупликация снята, поэтому одинаковый контент
+    /// может относиться к нескольким блобам (индекс по Hash неуникальный).
+    /// </summary>
+    public async Task<List<Guid>> GetFileIdsByHash(string hash, CancellationToken cancellationToken = default)
+    {
+        return await _context.FileHashes
+            .AsNoTracking()
+            .Where(x => x.Hash == hash)
+            .Select(x => x.FileId)
+            .ToListAsync(cancellationToken);
+    }
+
+    /// <summary>
     /// Checks if a hash exists in the storage.
     /// </summary>
     public async Task<bool> HashExists(string hash)
