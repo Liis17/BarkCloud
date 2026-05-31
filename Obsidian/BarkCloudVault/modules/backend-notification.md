@@ -19,7 +19,7 @@ Parent: [[index]] · See also: [[modules/backend-identity]] · [[modules/shared-
 - `EmailQueueConsumer.cs` — `IConsumer<EmailNotification>`, слушает очередь `notifications-email-handler`. Метрики `rabbitmq_events_consumed` / `emails_sent` / `emails_failed`. При ошибке пробрасывает исключение → MassTransit retry (письмо не теряется).
 
 ### Senders
-- `EmailSender.cs` — отправка через `System.Net.Mail.SmtpClient` (EnableSsl, NetworkCredential). Тело письма формирует парсер по типу уведомления.
+- `EmailSender.cs` — отправка через `System.Net.Mail.SmtpClient` (EnableSsl, NetworkCredential). Тело письма формирует парсер по типу уведомления. Перед отправкой ставит `ServicePointManager.ServerCertificateValidationCallback => true` — отключает проверку TLS-сертификата SMTP-сервера (иначе handshake падает в chiseled-образе, где нужный CA отсутствует в trust store; как в родительском BarkFluff). Компромисс: теряется защита от MITM. API помечен obsolete (SYSLIB0014), но `SmtpClient` этот колбэк всё ещё читает.
 
 ### Parsers
 - `HtmlEmailTemplateParser.cs` — маппинг `NotificationType → файл шаблона`, подстановка плейсхолдеров `ꟿꟿꟿключꟿꟿꟿ` из `Payload` с HTML-экранированием, авто-добавление `currentyear`.
