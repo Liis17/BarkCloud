@@ -23,6 +23,12 @@ public class CloudDirectory
 
     public string Name { get; set; } = "";
 
+    /// <summary>
+    /// Тип системной папки (Фото/Видео/Другие документы). None — обычная пользовательская папка.
+    /// Системные папки находятся по этому флагу при авто-распределении загрузок по типу медиа.
+    /// </summary>
+    public CloudDirectorySystemKind SystemKind { get; set; } = CloudDirectorySystemKind.None;
+
     public DateTime CreatedAt { get; set; }
 
     public DateTime UpdatedAt { get; set; }
