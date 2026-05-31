@@ -54,6 +54,12 @@ public class ResolveShareCommandHandler : IRequestHandler<ResolveShareCommand, R
         var baseUrl = FileUrlHelper.GetPublicBaseUrl(_configuration, _runSettings);
         var downloadUrl = FileUrlHelper.GenerateDownloadUrl(baseUrl, tempId);
 
+        // Публичное превью (фото/видео) для страницы просмотра: берём самое крупное доступное.
+        // Превью-блобы отдаются анонимно через /download/{previewFileId}.
+        var previews = await _filesStorage.GetPreviewsForFile(share.FileId, cancellationToken);
+        var bestPreview = previews.Count > 0 ? previews.OrderByDescending(p => p.TargetWidth).First() : null;
+        var previewUrl = bestPreview is null ? string.Empty : FileUrlHelper.GenerateDownloadUrl(baseUrl, bestPreview.PreviewFileId);
+
         _logger.LogInformation("Резолв публичной ссылки {ShareId} → файл {FileId} (temp {TempId})", share.Id, share.FileId, tempId);
 
         return new ResolveShareResponse
@@ -61,7 +67,12 @@ public class ResolveShareCommandHandler : IRequestHandler<ResolveShareCommand, R
             Found = true,
             FileId = share.FileId.ToString(),
             Name = share.Name,
-            DownloadUrl = downloadUrl
+            DownloadUrl = downloadUrl,
+            MediaKind = (BarkCloud.Proto.Files.MediaKind)(int)file.MediaKind,
+            PreviewUrl = previewUrl,
+            ImageWidth = file.ImageWidth ?? 0,
+            ImageHeight = file.ImageHeight ?? 0,
+            FileSize = file.Size
         };
     }
 }
