@@ -64,13 +64,15 @@ NextCloud-подобная иерархия папок и файловых за�
 - `ListDirectoryDetailed` — листинг с обогащёнными `FileEntryDetailed` (полная `UploadFileInfo` с URL/превью)
 
 ### Записи о файлах
-- `AttachFile` — привязать существующий `UploadFile` к папке (создаёт `CloudFileEntry`); отказывает, если файл уже привязан к директории владельца (`FileAlreadyAttachedException`)
+- `AttachFile` — привязать существующий `UploadFile` к папке (создаёт `CloudFileEntry`); отказывает, если файл уже привязан к директории владельца (`FileAlreadyAttachedException`); коллизия имени в папке разрешается суффиксом ` (1)`; при `route_by_media_kind=true` `directory_id` игнорируется и файл кладётся в системную папку по типу медиа
 - `RenameFileEntry` — изменить отображаемое имя записи
 - `MoveFileEntry` — перенести в другую папку
 - `DeleteFileEntry` — **перемещает запись в корзину** (soft-delete: `IsDeleted/DeletedAt/PurgeAt`). `Uploaders`/квота сохраняются, блоб не трогается
 - `DeleteDirectory` — рекурсивно: файлы поддерева → в корзину, сами папки удаляются сразу (restore вернёт файлы в корень)
 
 > `CopyFileEntry` **удалён** в рамках инварианта «одна директория на файл».
+
+> **Системные папки и авто-распределение**: `CloudDirectory.SystemKind` (None/Photos/Videos/OtherDocuments) помечает системные папки «Фото»/«Видео»/«Другие документы» — находятся по флагу (устойчивы к переименованию), создаются лениво (`EnsureSystemDirectory`). При `route_by_media_kind` сервер кладёт фото→«Фото», видео→«Видео», прочее→«Другие документы». Клиентская папка «Недавно загруженные» больше не используется. При явной папке (перетаскивание в открытую папку, Windows-диск) распределение не применяется.
 
 ### Корзина
 - `ListTrash` — список записей в корзине (от свежеудалённых к старым); cursor-пагинация `(DeletedAt + entry_id)`; `TrashEntry` = `FileEntryInfo` + `UploadFileInfo` + `deleted_at`/`purge_at`

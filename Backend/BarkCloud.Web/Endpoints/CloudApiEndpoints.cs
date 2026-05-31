@@ -136,7 +136,7 @@ public static class CloudApiEndpoints
             await Guarded(http, auth, async token =>
             {
                 await cloud.AttachFileAsync(
-                    new AttachFileRequest { DirectoryId = body.Dir ?? "", FileId = body.FileId, Name = body.Name }, token);
+                    new AttachFileRequest { DirectoryId = body.Dir ?? "", FileId = body.FileId, Name = body.Name, RouteByMediaKind = body.RouteByMediaKind }, token);
                 return Results.Json(new { ok = true }, Json);
             }));
 
@@ -400,13 +400,24 @@ public static class CloudApiEndpoints
 
         // ───────────────────────── Файлы: загрузка / оригинал ─────────────────────────
 
-        // Дедупликация: по SHA256-хешу узнаём, есть ли уже такой файл в хранилище.
-        // Клиент считает хеш в браузере и, если fileId непустой, привязывает существующий файл без загрузки байтов.
+        // Проверка наличия по SHA256-хешу (без побочных эффектов): клиент считает хеш в браузере
+        // и, если контент уже есть, показывает модалку «такой файл уже есть» с его именем и папкой.
         api.MapPost("/files/check-hash", async (HttpContext http, AuthGateway auth, FilesApi.FilesApiClient files, HashReq body) =>
             await Guarded(http, auth, async token =>
             {
                 var resp = await files.CheckFileHashAsync(new CheckFileHashRequest { FileHash = body.Hash ?? "" }, token);
-                return Results.Json(new { fileId = resp.FileId }, Json);
+                return Results.Json(new
+                {
+                    fileId = resp.FileId,
+                    exists = resp.Exists,
+                    locations = resp.ExistingLocations.Select(l => new
+                    {
+                        entryId = l.EntryId,
+                        name = l.Name,
+                        directoryId = l.DirectoryId,
+                        directoryName = l.DirectoryName
+                    })
+                }, Json);
             }));
 
         // Прокси-загрузка: получаем upload-URL у Files и стримим туда байты (same-origin, без CORS).
@@ -437,7 +448,7 @@ public static class CloudApiEndpoints
                 if (!resp.IsSuccessStatusCode)
                     return Results.Json(new { error = responseBody }, Json, statusCode: (int)resp.StatusCode);
 
-                // ответ upload: { "fileId": "<guid>" } — берём именно его (мог измениться при дедупликации)
+                // ответ upload: { "fileId": "<guid>" } — теперь всегда равен запрошенному (серверный дедуп снят)
                 string? fileId = null;
                 try
                 {
@@ -636,7 +647,7 @@ public static class CloudApiEndpoints
     private sealed record RenameReq(string Id, string Name);
     private sealed record MoveReq(string Id, string? ParentId);
     private sealed record IdReq(string Id);
-    private sealed record AttachReq(string? Dir, string FileId, string Name);
+    private sealed record AttachReq(string? Dir, string FileId, string Name, bool RouteByMediaKind = false);
     private sealed record EntryRenameReq(string EntryId, string Name);
     private sealed record EntryMoveReq(string EntryId, string? Dir);
     private sealed record EntryIdReq(string EntryId);

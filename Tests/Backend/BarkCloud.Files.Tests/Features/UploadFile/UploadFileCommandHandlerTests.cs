@@ -80,21 +80,18 @@ public class UploadFileCommandHandlerTests
     {
         // Дедупликация отключена: одинаковый контент сохраняется как отдельный независимый блоб.
         var id = Guid.NewGuid();
-        var existingId = Guid.NewGuid();
         _files.Setup(s => s.GetFile(id))
             .ReturnsAsync(new UploadFileEntity { Id = id, Type = UploadFileType.CloudFile, Uploaders = new() { 42 } });
-        // Хеш уже присутствует в хранилище — раньше это приводило к дедупликации.
-        _hashes.Setup(s => s.GetFileIdByHash(It.IsAny<string>())).ReturnsAsync(existingId);
 
         var response = await CreateSut().Handle(
             new UploadFileCommand { FileId = id, FileName = "doc.txt", FileStream = MakeStream() }, default);
 
-        // Возвращается ID нового файла, а не существующего; новый блоб залит, его хеш сохранён.
+        // Загружается новый блоб со своим id, его хеш сохраняется; никакого дедупа.
         response.Should().Be(id.ToString());
         _s3.Verify(s => s.UploadAsync("test-bucket", id.ToString(), It.IsAny<Stream>(), "text/plain"), Times.Once);
         _hashes.Verify(s => s.AddHash(It.Is<FileHash>(h => h.FileId == id)), Times.Once);
-        // Никакой дедупликации: не привязываем новый контент к существующему и не удаляем новую запись.
-        _files.Verify(s => s.AddUploaderToFile(existingId, It.IsAny<long>()), Times.Never);
+        // Не привязываем новый контент к существующему и не удаляем новую запись.
+        _files.Verify(s => s.AddUploaderToFile(It.IsAny<Guid>(), It.IsAny<long>()), Times.Never);
         _files.Verify(s => s.DeleteFile(id), Times.Never);
     }
 
@@ -104,7 +101,6 @@ public class UploadFileCommandHandlerTests
         var id = Guid.NewGuid();
         _files.Setup(s => s.GetFile(id))
             .ReturnsAsync(new UploadFileEntity { Id = id, Type = UploadFileType.CloudFile, Uploaders = new() { 42 } });
-        _hashes.Setup(s => s.GetFileIdByHash(It.IsAny<string>())).ReturnsAsync((Guid?)null);
 
         var response = await CreateSut().Handle(
             new UploadFileCommand { FileId = id, FileName = "doc.txt", FileStream = MakeStream() }, default);
@@ -123,7 +119,6 @@ public class UploadFileCommandHandlerTests
         var id = Guid.NewGuid();
         _files.Setup(s => s.GetFile(id))
             .ReturnsAsync(new UploadFileEntity { Id = id, Type = UploadFileType.CloudFile, Uploaders = new() { 42 } });
-        _hashes.Setup(s => s.GetFileIdByHash(It.IsAny<string>())).ReturnsAsync((Guid?)null);
 
         var jpegBytes = System.Text.Encoding.UTF8.GetBytes("jpeg-bytes");
         _heicConverter
