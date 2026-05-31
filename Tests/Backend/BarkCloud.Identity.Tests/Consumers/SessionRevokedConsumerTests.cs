@@ -30,7 +30,7 @@ public class SessionRevokedConsumerTests
 
         await sut.Consume(ctx.Object);
 
-        cache.IsRevoked(42, "d1").Should().BeTrue();
+        cache.IsRevoked(42, "d1", DateTime.UtcNow.AddMinutes(-1)).Should().BeTrue();
         var snap = metrics.SnapshotAndReset();
         snap["rabbitmq_events_consumed"].Should().Be(1);
         snap["session_revocations_received"].Should().Be(1);
