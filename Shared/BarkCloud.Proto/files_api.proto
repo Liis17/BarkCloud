@@ -235,6 +235,15 @@ message CheckFileHashRequest {
 
 message CheckFileHashResponse {
   string file_id = 1; // Идентификатор файла если найден, пустая строка если не найден
+  bool exists = 2; // true → контент с таким хешем уже есть в облаке
+  repeated ExistingLocation existing_locations = 3; // Существующие копии этого контента у пользователя (имя + папка) для модалки «файл уже есть»
+}
+
+message ExistingLocation {
+  string entry_id = 1;
+  string name = 2;
+  string directory_id = 3; // Пустая строка — корень владельца
+  string directory_name = 4; // Имя папки (пусто для корня)
 }
 
 message CheckFileHashesRequest {
