@@ -26,6 +26,8 @@ using BarkCloud.Files.Features.Cloud.RevokeShare;
 using BarkCloud.Files.Features.Cloud.RevokeUserShare;
 using BarkCloud.Files.Features.Cloud.ShareFileWithUser;
 using BarkCloud.Files.Features.Cloud.ListMyOutgoingShares;
+using BarkCloud.Files.Features.Cloud.ListSharedWithMe;
+using BarkCloud.Files.Features.Cloud.GetSharedFileDownloadUrl;
 using BarkCloud.Files.Features.Cloud.SetVideoThumbnail;
 using BarkCloud.Proto.Files;
 using BarkCloud.Shared.Identity;
@@ -365,6 +367,29 @@ public class CloudApiService : CloudApi.CloudApiBase
     public override Task<ListMyOutgoingSharesResponse> ListMyOutgoingShares(ListMyOutgoingSharesRequest request, ServerCallContext context)
     {
         return _mediator.Send(new ListMyOutgoingSharesCommand { FileId = Guid.Parse(request.FileId) });
+    }
+
+    public override Task<ListSharedWithMeResponse> ListSharedWithMe(ListSharedWithMeRequest request, ServerCallContext context)
+    {
+        DateTime? cursorSharedAt = null;
+        Guid? cursorGrantId = null;
+        if (request.CursorSharedAt is not null && !string.IsNullOrWhiteSpace(request.CursorGrantId))
+        {
+            cursorSharedAt = request.CursorSharedAt.ToDateTime();
+            cursorGrantId = Guid.Parse(request.CursorGrantId);
+        }
+
+        return _mediator.Send(new ListSharedWithMeCommand
+        {
+            Limit = request.Limit,
+            CursorSharedAt = cursorSharedAt,
+            CursorGrantId = cursorGrantId
+        });
+    }
+
+    public override Task<GetSharedFileDownloadUrlResponse> GetSharedFileDownloadUrl(GetSharedFileDownloadUrlRequest request, ServerCallContext context)
+    {
+        return _mediator.Send(new GetSharedFileDownloadUrlCommand { FileId = Guid.Parse(request.FileId) });
     }
 
     public override Task<PathResponse> GetPath(GetPathRequest request, ServerCallContext context)
