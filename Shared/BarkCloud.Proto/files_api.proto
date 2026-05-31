@@ -57,6 +57,13 @@ service CloudApi {
   rpc CreateShare          (CreateShareRequest)          returns (ShareInfo);                // Создать постоянную публичную ссылку на файл
   rpc ListMyShares         (ListMySharesRequest)         returns (ListMySharesResponse);     // Мои публичные ссылки (от новых к старым, cursor pagination)
   rpc RevokeShare          (RevokeShareRequest)          returns (CloudEmpty);               // Отозвать публичную ссылку
+
+  // ───────── Шаринг между пользователями (приватные гранты) ─────────
+  rpc ShareFileWithUser    (ShareFileWithUserRequest)    returns (CloudEmpty);                    // Поделиться файлом с конкретным пользователем
+  rpc RevokeUserShare      (RevokeUserShareRequest)      returns (CloudEmpty);                    // Отозвать грант доступа (владелец)
+  rpc ListMyOutgoingShares (ListMyOutgoingSharesRequest) returns (ListMyOutgoingSharesResponse);  // С кем поделён файл (управление)
+  rpc ListSharedWithMe     (ListSharedWithMeRequest)     returns (ListSharedWithMeResponse);      // Доступные мне файлы (от новых к старым, cursor pagination)
+  rpc GetSharedFileDownloadUrl (GetSharedFileDownloadUrlRequest) returns (GetSharedFileDownloadUrlResponse); // Временная ссылка на скачивание доступного мне файла
 }
 
 service FilesServerApi {
@@ -598,4 +605,56 @@ message ResolveShareResponse {
   int32 image_width = 7;      // размеры оригинала (если известны)
   int32 image_height = 8;
   int64 file_size = 9;        // размер оригинала, байт
+}
+
+// ============ Шаринг между пользователями (приватные гранты) ============
+
+message ShareFileWithUserRequest {
+  string file_id = 1;
+  int64 recipient_user_id = 2;
+}
+
+message RevokeUserShareRequest {
+  string grant_id = 1;
+}
+
+message ListMyOutgoingSharesRequest {
+  string file_id = 1;
+}
+
+message OutgoingShareEntry {
+  string grant_id = 1;
+  int64 recipient_user_id = 2;
+  google.protobuf.Timestamp shared_at = 3;
+}
+
+message ListMyOutgoingSharesResponse {
+  repeated OutgoingShareEntry items = 1;
+}
+
+message ListSharedWithMeRequest {
+  int32 limit = 1;                                 // 1..200, default 50
+  google.protobuf.Timestamp cursor_shared_at = 2;  // exclusive; пусто = с самых свежих
+  string cursor_grant_id = 3;                      // tie-breaker
+}
+
+message SharedWithMeEntry {
+  string grant_id = 1;
+  UploadFileInfo file = 2;     // полная инфо файла (имя, превью, размеры); превью публичны
+  int64 owner_user_id = 3;     // от кого (имя резолвит веб-слой через Users)
+  google.protobuf.Timestamp shared_at = 4;
+}
+
+message ListSharedWithMeResponse {
+  repeated SharedWithMeEntry items = 1;
+  google.protobuf.Timestamp next_cursor_shared_at = 2; // пусто = больше нет страниц
+  string next_cursor_grant_id = 3;
+}
+
+message GetSharedFileDownloadUrlRequest {
+  string file_id = 1;
+}
+
+message GetSharedFileDownloadUrlResponse {
+  string download_url = 1;
 }
