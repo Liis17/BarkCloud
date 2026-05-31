@@ -29,6 +29,8 @@ public class FilesContext : DbContext
 
     public DbSet<ShareLink> ShareLinks { get; set; }
 
+    public DbSet<FileGrant> FileGrants { get; set; }
+
     public DbSet<FileMetadata> FileMetadata { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -110,6 +112,16 @@ public class FilesContext : DbContext
             b.HasIndex(x => x.Token).IsUnique();
             // Cursor-пагинация списка ссылок владельца по дате создания.
             b.HasIndex(x => new { x.OwnerId, x.CreatedAt });
+        });
+
+        modelBuilder.Entity<FileGrant>(b =>
+        {
+            // Идемпотентность: один файл — максимум один грант владельца конкретному получателю.
+            b.HasIndex(x => new { x.OwnerId, x.FileId, x.RecipientId }).IsUnique();
+            // Cursor-пагинация раздела «мне доступны» получателя.
+            b.HasIndex(x => new { x.RecipientId, x.CreatedAt });
+            // Обратный поиск/чистка по файлу.
+            b.HasIndex(x => x.FileId);
         });
     }
 }
