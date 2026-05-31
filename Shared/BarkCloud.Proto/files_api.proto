@@ -593,4 +593,9 @@ message ResolveShareResponse {
   string file_id = 2;      // Идентификатор файла
   string name = 3;         // Имя файла
   string download_url = 4; // Публичный URL скачивания
+  MediaKind media_kind = 5;   // фото / видео / прочее — для отрисовки публичной страницы
+  string preview_url = 6;     // публичный URL превью (фото/видео), пусто если превью нет
+  int32 image_width = 7;      // размеры оригинала (если известны)
+  int32 image_height = 8;
+  int64 file_size = 9;        // размер оригинала, байт
 }
