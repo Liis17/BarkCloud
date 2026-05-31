@@ -2,6 +2,7 @@ using System.Net.Http.Headers;
 using System.Text.Json;
 
 using BarkCloud.Proto.Files;
+using BarkCloud.Proto.Users;
 using BarkCloud.Web.Auth;
 using BarkCloud.Web.Infrastructure;
 using BarkCloud.Web.Rendering;
@@ -308,6 +309,91 @@ public static class CloudApiEndpoints
                 return Results.Json(new { ok = true }, Json);
             }));
 
+        // ───────────────────────── Шаринг между пользователями ─────────────────────────
+
+        // Поиск получателей (юзернейм/имя, минимум 2 символа).
+        api.MapGet("/shared/users/search", async (HttpContext http, AuthGateway auth, UsersApi.UsersApiClient users, string? q, int? limit) =>
+            await Guarded(http, auth, async token =>
+            {
+                var query = (q ?? "").Trim();
+                if (query.Length < 2)
+                    return Results.Json(new { users = Array.Empty<object>() }, Json);
+
+                var resp = await users.SearchUsersAsync(
+                    new SearchUsersRequest { Query = query, Limit = limit is > 0 and <= 50 ? limit.Value : 20 }, token);
+                return Results.Json(new { users = resp.Users.Select(UserJson).ToArray() }, Json);
+            }));
+
+        // Поделиться файлом с пользователем.
+        api.MapPost("/shared/grant", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud, GrantReq body) =>
+            await Guarded(http, auth, async token =>
+            {
+                await cloud.ShareFileWithUserAsync(
+                    new ShareFileWithUserRequest { FileId = body.FileId, RecipientUserId = body.RecipientUserId }, token);
+                return Results.Json(new { ok = true }, Json);
+            }));
+
+        // Отозвать грант доступа.
+        api.MapPost("/shared/revoke-grant", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud, GrantIdReq body) =>
+            await Guarded(http, auth, async token =>
+            {
+                await cloud.RevokeUserShareAsync(new RevokeUserShareRequest { GrantId = body.GrantId }, token);
+                return Results.Json(new { ok = true }, Json);
+            }));
+
+        // С кем поделён файл (управление).
+        api.MapGet("/shared/outgoing", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud,
+            UsersServerApi.UsersServerApiClient usersServer, string fileId) =>
+            await Guarded(http, auth, async token =>
+            {
+                var resp = await cloud.ListMyOutgoingSharesAsync(new ListMyOutgoingSharesRequest { FileId = fileId }, token);
+                var byId = await ResolveUsers(usersServer, resp.Items.Select(i => i.RecipientUserId));
+                return Results.Json(new
+                {
+                    items = resp.Items.Select(i => new
+                    {
+                        grantId = i.GrantId,
+                        sharedAt = i.SharedAt?.ToDateTimeOffset(),
+                        user = byId.TryGetValue(i.RecipientUserId, out var u) ? UserJson(u) : MinimalUserJson(i.RecipientUserId)
+                    }).ToArray()
+                }, Json);
+            }));
+
+        // Доступные мне файлы (раздел «мне доступны»).
+        api.MapGet("/shared/with-me", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud,
+            UsersServerApi.UsersServerApiClient usersServer, int? limit, string? cursorAt, string? cursorId) =>
+            await Guarded(http, auth, async token =>
+            {
+                var req = new ListSharedWithMeRequest { Limit = limit is > 0 and <= 200 ? limit.Value : 60 };
+                if (DateTimeOffset.TryParse(cursorAt, out var dt))
+                    req.CursorSharedAt = Timestamp.FromDateTimeOffset(dt.ToUniversalTime());
+                if (!string.IsNullOrEmpty(cursorId))
+                    req.CursorGrantId = cursorId;
+
+                var resp = await cloud.ListSharedWithMeAsync(req, token);
+                var byId = await ResolveUsers(usersServer, resp.Items.Select(i => i.OwnerUserId));
+                return Results.Json(new
+                {
+                    items = resp.Items.Select(i => new
+                    {
+                        grantId = i.GrantId,
+                        file = CloudJson.Media(i.File),
+                        sharedAt = i.SharedAt?.ToDateTimeOffset(),
+                        owner = byId.TryGetValue(i.OwnerUserId, out var u) ? UserJson(u) : MinimalUserJson(i.OwnerUserId)
+                    }).ToArray(),
+                    nextCursorAt = resp.NextCursorSharedAt?.ToDateTimeOffset(),
+                    nextCursorId = resp.NextCursorGrantId
+                }, Json);
+            }));
+
+        // Временная ссылка на скачивание доступного мне файла (grant-проверка на сервере).
+        api.MapPost("/shared/download", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud, FileIdReq body) =>
+            await Guarded(http, auth, async token =>
+            {
+                var resp = await cloud.GetSharedFileDownloadUrlAsync(new GetSharedFileDownloadUrlRequest { FileId = body.FileId }, token);
+                return Results.Json(new { downloadUrl = resp.DownloadUrl }, Json);
+            }));
+
         // ───────────────────────── Альбомы ─────────────────────────
 
         api.MapGet("/albums", async (HttpContext http, AuthGateway auth, AlbumApi.AlbumApiClient albums,
@@ -574,6 +660,33 @@ public static class CloudApiEndpoints
         clickCount = s.ClickCount
     };
 
+    private static object UserJson(User u) => new
+    {
+        id = u.Id,
+        username = u.Username,
+        firstName = u.FirstName,
+        lastName = u.LastName,
+        avatar = u.ProfilePicturePreview
+    };
+
+    private static object MinimalUserJson(long id) => new { id, username = "", firstName = "", lastName = "", avatar = "" };
+
+    /// <summary>Резолв id пользователей → User через UsersServerApi (имена «от кого / кому»).</summary>
+    private static async Task<Dictionary<long, User>> ResolveUsers(
+        UsersServerApi.UsersServerApiClient usersServer, IEnumerable<long> ids)
+    {
+        var distinct = ids.Distinct().ToList();
+        if (distinct.Count == 0)
+            return new Dictionary<long, User>();
+
+        var req = new ListByIdsRequest();
+        req.Ids.AddRange(distinct);
+        var resp = await usersServer.ListByIdsAsync(req);
+        return resp.Users
+            .GroupBy(u => u.Id)
+            .ToDictionary(g => g.Key, g => g.First());
+    }
+
     /// <summary>
     /// gRPC <see cref="FileMetadataInfo"/> → плоский JSON для модалки «Свойства».
     /// Все поля опциональны — отдаём только те, что заданы (через HasFoo), без «пустых» нулей.
@@ -652,6 +765,8 @@ public static class CloudApiEndpoints
     private sealed record EntryMoveReq(string EntryId, string? Dir);
     private sealed record EntryIdReq(string EntryId);
     private sealed record FileIdReq(string FileId);
+    private sealed record GrantReq(string FileId, long RecipientUserId);
+    private sealed record GrantIdReq(string GrantId);
     private sealed record AlbumCreate(string Name, string? Description);
     private sealed record AlbumUpdate(string Album, string? Name, string? Description, string? CoverFileId);
     private sealed record AlbumIdReq(string Album);

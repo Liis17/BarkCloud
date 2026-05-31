@@ -57,6 +57,8 @@ Package: `barkcloud.files`
 
 > **Инвариант «одна директория на файл»**: `CopyFileEntry` удалён, `AttachFile` отказывает (`FileAlreadyAttachedException`), если у владельца уже есть `CloudFileEntry` для этого `FileId`. Уникальный индекс `(OwnerId, FileId)`.
 
+> **Шаринг между пользователями**: приватные гранты `FileGrant` (владелец→получатель→файл). RPC `ShareFileWithUser`/`RevokeUserShare`/`ListMyOutgoingShares` (владелец) и `ListSharedWithMe`/`GetSharedFileDownloadUrl` (получатель — доступ строго по гранту через `TempFile`, без обхода `DownloadFileCommandHandler`). Имя «от кого» резолвит веб-слой через Users (`UsersServerApi.ListByIds`). Публичный `ResolveShare` дополнительно отдаёт `media_kind`/`preview_url`/размеры для страницы просмотра. Гранты чистятся в `UserDeleted`/`TrashPurge`.
+
 ### Messages CloudApi
 
 - `CloudEmpty {}` — пустой ответ
