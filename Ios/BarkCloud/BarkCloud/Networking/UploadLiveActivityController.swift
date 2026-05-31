@@ -20,6 +20,13 @@ final class UploadLiveActivityController {
 
     init(queueStore: UploadQueueStore) {
         self.queueStore = queueStore
+        // Подцепиться к Activity, начатой в Share Extension'е (если она ещё жива).
+        // Иначе main app создал бы вторую активность, а старая зомби-висела бы
+        // до staleDate.
+        if let existing = Activity<UploadActivityAttributes>.activities.first {
+            self.currentActivity = existing
+            self.sessionStartedAt = existing.attributes.startedAt
+        }
     }
 
     /// Вызвать после любого изменения очереди — контроллер сам решит, нужно
@@ -33,6 +40,16 @@ final class UploadLiveActivityController {
         guard !jobs.isEmpty else {
             await endIfNeeded()
             return
+        }
+
+        let activeStates: Set<UploadJobState> = [.pending, .preparing, .running]
+        let activeJobs = jobs.filter { activeStates.contains($0.state) }
+
+        // Зафиксировать окно сессии на createdAt самого раннего активного job,
+        // иначе следующий вызов notifyChanged отсечёт свои же jobs.
+        if sessionStartedAt == nil, !activeJobs.isEmpty {
+            let earliest = activeJobs.map(\.createdAt).min() ?? Date()
+            sessionStartedAt = earliest.addingTimeInterval(-1)
         }
 
         let total = jobs.count

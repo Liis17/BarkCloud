@@ -131,6 +131,7 @@ struct UploadJobSnapshot: Sendable, Identifiable, Hashable {
     let sessionTaskIdentifier: Int
     let retries: Int
     let lastError: String?
+    let createdAt: Date
 
     init(_ job: UploadJob) {
         self.id = job.id
@@ -148,6 +149,7 @@ struct UploadJobSnapshot: Sendable, Identifiable, Hashable {
         self.sessionTaskIdentifier = job.sessionTaskIdentifier
         self.retries = job.retries
         self.lastError = job.lastError
+        self.createdAt = job.createdAt
     }
 
     var source: UploadJobSource { UploadJobSource(rawValue: sourceKind) ?? .manual }
