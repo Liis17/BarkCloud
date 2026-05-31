@@ -60,7 +60,8 @@ final class UploadProgressObserver {
     private func recompute() async {
         // Окно «недавно»: если сессии ещё не было — берём 1 час, чтобы зацепить
         // только что созданный job. После первого появления активного job окно
-        // фиксируется этим моментом — старые завершённые отсекаются.
+        // фиксируется минимальным createdAt активных — иначе свои же jobs из
+        // прошлого (созданные Share Extension'ом до старта main app) отсекутся.
         let since = sessionStartedAt ?? Date().addingTimeInterval(-3600)
         let jobs = await queueStore.recentJobs(since: since)
         if jobs.isEmpty {
@@ -69,12 +70,14 @@ final class UploadProgressObserver {
         }
 
         let activeStates: Set<UploadJobState> = [.pending, .preparing, .running]
-        let hasActive = jobs.contains { activeStates.contains($0.state) }
+        let activeJobs = jobs.filter { activeStates.contains($0.state) }
+        let hasActive = !activeJobs.isEmpty
 
         if sessionStartedAt == nil, hasActive {
-            // Фиксируем окно сессии: чуть назад во времени, чтобы первый job
-            // гарантированно попадал в фильтр `recentJobs(since:)`.
-            sessionStartedAt = Date().addingTimeInterval(-1)
+            // Фиксируем окно сессии на момент самого старого активного job
+            // (минус 1с буфер), чтобы он гарантированно попадал в фильтр.
+            let earliest = activeJobs.map(\.createdAt).min() ?? Date()
+            sessionStartedAt = earliest.addingTimeInterval(-1)
         }
 
         let total = jobs.count

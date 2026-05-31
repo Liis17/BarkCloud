@@ -147,6 +147,11 @@ final class BackgroundUploadCoordinator: NSObject, @unchecked Sendable {
             await queueStore.resetForRetry(id: snapshot.id)
             await submit(jobID: snapshot.id)
         }
+        // Обновить Live Activity и UI: если main app открылся после того как
+        // Share Extension стартовал Activity и ушёл — controller подцепился к
+        // существующей активности в init, но её state нужно освежить актуальным
+        // snapshot'ом из SwiftData. Иначе Dynamic Island виснет на initial state.
+        await UploadLiveActivityController.shared.notifyChanged()
     }
 
     private func currentTaskIdentifiers() async -> Set<Int> {

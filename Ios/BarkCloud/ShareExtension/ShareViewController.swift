@@ -112,9 +112,9 @@ final class ShareViewController: UIViewController {
         NSLayoutConstraint.activate([
             containerView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             containerView.centerYAnchor.constraint(equalTo: view.centerYAnchor),
-            containerView.leadingAnchor.constraint(greaterThanOrEqualTo: view.leadingAnchor, constant: 24),
-            containerView.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -24),
-            containerView.widthAnchor.constraint(lessThanOrEqualToConstant: 360),
+            containerView.leadingAnchor.constraint(greaterThanOrEqualTo: view.leadingAnchor, constant: 16),
+            containerView.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -16),
+            containerView.widthAnchor.constraint(lessThanOrEqualToConstant: 480),
 
             stack.topAnchor.constraint(equalTo: containerView.topAnchor, constant: 24),
             stack.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 20),
@@ -140,7 +140,7 @@ final class ShareViewController: UIViewController {
         folderButton.layer.borderWidth = 1
         folderButton.layer.borderColor = UIColor.separator.cgColor
         folderButton.backgroundColor = .systemBackground
-        folderButton.showsMenuAsPrimaryAction = true
+        folderButton.addTarget(self, action: #selector(folderTapped), for: .touchUpInside)
     }
 
     private func configureActionButtons() {
@@ -188,8 +188,10 @@ final class ShareViewController: UIViewController {
         updateFolderButtonTitle()
     }
 
-    /// Чип-кнопка папки: подписать названием текущей выбранной и собрать UIMenu
-    /// из загруженных папок корня + опция «Корень» (без папки).
+    /// Чип-кнопка папки: подписать названием текущей выбранной. Сам список папок
+    /// показывается в `folderTapped()` через `UIAlertController.actionSheet` —
+    /// он раскрывается на всю ширину экрана, в отличие от `UIMenu`, который
+    /// подстраивается под ширину кнопки.
     private func updateFolderButtonTitle() {
         let name = selectedFolder?.name ?? "Без папки"
         var config = UIButton.Configuration.bordered()
@@ -202,28 +204,39 @@ final class ShareViewController: UIViewController {
         title.font = .preferredFont(forTextStyle: .body)
         config.attributedTitle = title
         folderButton.configuration = config
+    }
 
-        var actions: [UIAction] = []
-        // «Без папки» — файл в облаке без записи каталога (только медиа-роли).
-        actions.append(UIAction(
-            title: "Без папки",
-            image: UIImage(systemName: "tray.full"),
-            state: selectedFolder == nil ? .on : .off
-        ) { [weak self] _ in
+    @objc private func folderTapped() {
+        let sheet = UIAlertController(
+            title: "Выберите папку",
+            message: "Куда сохранить файл в BarkCloud",
+            preferredStyle: .actionSheet
+        )
+        let none = UIAlertAction(title: "Без папки", style: .default) { [weak self] _ in
             self?.selectedFolder = nil
             self?.updateFolderButtonTitle()
-        })
+        }
+        if selectedFolder == nil {
+            none.setValue(true, forKey: "checked")
+        }
+        sheet.addAction(none)
         for folder in availableFolders {
-            actions.append(UIAction(
-                title: folder.name,
-                image: UIImage(systemName: "folder.fill"),
-                state: folder.id == selectedFolder?.id ? .on : .off
-            ) { [weak self] _ in
+            let action = UIAlertAction(title: folder.name, style: .default) { [weak self] _ in
                 self?.selectedFolder = folder
                 self?.updateFolderButtonTitle()
-            })
+            }
+            if folder.id == selectedFolder?.id {
+                action.setValue(true, forKey: "checked")
+            }
+            sheet.addAction(action)
         }
-        folderButton.menu = UIMenu(children: actions)
+        sheet.addAction(UIAlertAction(title: "Отмена", style: .cancel))
+        // На iPad action sheet требует sourceView для popover.
+        if let popover = sheet.popoverPresentationController {
+            popover.sourceView = folderButton
+            popover.sourceRect = folderButton.bounds
+        }
+        present(sheet, animated: true)
     }
 
     /// Список папок корня + создание/поиск «Недавно загруженные». При ошибке
