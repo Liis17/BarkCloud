@@ -29,7 +29,7 @@ public class SessionRevokedConsumerTests
 
         await sut.Consume(ctx.Object);
 
-        cache.IsRevoked(42, "d1").Should().BeTrue();
+        cache.IsRevoked(42, "d1", DateTime.UtcNow.AddMinutes(-1)).Should().BeTrue();
         var snap = metrics.SnapshotAndReset();
         snap["session_revoked_received"].Should().Be(1);
         snap.Should().ContainKey("last_session_revoked_unix");

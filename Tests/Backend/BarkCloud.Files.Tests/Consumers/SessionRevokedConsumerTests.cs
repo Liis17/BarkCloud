@@ -27,6 +27,6 @@ public class SessionRevokedConsumerTests
 
         await sut.Consume(ctx.Object);
 
-        cache.IsRevoked(42, "d1").Should().BeTrue();
+        cache.IsRevoked(42, "d1", DateTime.UtcNow.AddMinutes(-1)).Should().BeTrue();
     }
 }
