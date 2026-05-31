@@ -76,26 +76,26 @@ public class UploadFileCommandHandlerTests
     }
 
     [Fact]
-    public async Task Handle_DeduplicatesWhenSameHashExists()
+    public async Task Handle_SameHashExists_StillUploadsAsIndependentCopy()
     {
+        // Дедупликация отключена: одинаковый контент сохраняется как отдельный независимый блоб.
         var id = Guid.NewGuid();
         var existingId = Guid.NewGuid();
         _files.Setup(s => s.GetFile(id))
             .ReturnsAsync(new UploadFileEntity { Id = id, Type = UploadFileType.CloudFile, Uploaders = new() { 42 } });
+        // Хеш уже присутствует в хранилище — раньше это приводило к дедупликации.
         _hashes.Setup(s => s.GetFileIdByHash(It.IsAny<string>())).ReturnsAsync(existingId);
-        _files.Setup(s => s.GetFile(existingId))
-            .ReturnsAsync(new UploadFileEntity { Id = existingId, Type = UploadFileType.CloudFile, Etag = "existing-etag" });
-        _files.Setup(s => s.GetPreviewsForFile(existingId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<FilePreview>());
 
         var response = await CreateSut().Handle(
             new UploadFileCommand { FileId = id, FileName = "doc.txt", FileStream = MakeStream() }, default);
 
-        response.Should().Be(existingId.ToString());
-        _files.Verify(s => s.AddUploaderToFile(existingId, 42), Times.Once);
-        _files.Verify(s => s.DeleteFile(id), Times.Once);
-        _hashes.Verify(s => s.DeleteHashByFileId(id, It.IsAny<CancellationToken>()), Times.Once);
-        _s3.Verify(s => s.UploadAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<Stream>(), It.IsAny<string>()), Times.Never);
+        // Возвращается ID нового файла, а не существующего; новый блоб залит, его хеш сохранён.
+        response.Should().Be(id.ToString());
+        _s3.Verify(s => s.UploadAsync("test-bucket", id.ToString(), It.IsAny<Stream>(), "text/plain"), Times.Once);
+        _hashes.Verify(s => s.AddHash(It.Is<FileHash>(h => h.FileId == id)), Times.Once);
+        // Никакой дедупликации: не привязываем новый контент к существующему и не удаляем новую запись.
+        _files.Verify(s => s.AddUploaderToFile(existingId, It.IsAny<long>()), Times.Never);
+        _files.Verify(s => s.DeleteFile(id), Times.Never);
     }
 
     [Fact]
@@ -140,25 +140,5 @@ public class UploadFileCommandHandlerTests
             s => s.UploadAsync("test-bucket", id.ToString(), It.IsAny<Stream>(), "image/jpeg"),
             Times.Once);
         _files.Verify(s => s.UpdateFile(It.Is<UploadFileEntity>(f => f.Filename == "photo.jpg")), Times.Once);
-    }
-
-    [Fact]
-    public async Task Handle_DeduplicationSkippedWhenTypeMismatch_FallsBackToUpload()
-    {
-        var id = Guid.NewGuid();
-        var existingId = Guid.NewGuid();
-        _files.Setup(s => s.GetFile(id))
-            .ReturnsAsync(new UploadFileEntity { Id = id, Type = UploadFileType.CloudFile, Uploaders = new() { 42 } });
-        _hashes.Setup(s => s.GetFileIdByHash(It.IsAny<string>())).ReturnsAsync(existingId);
-        _files.Setup(s => s.GetFile(existingId))
-            .ReturnsAsync(new UploadFileEntity { Id = existingId, Type = UploadFileType.UserAvatar, Etag = "e" });
-
-        var response = await CreateSut().Handle(
-            new UploadFileCommand { FileId = id, FileName = "doc.txt", FileStream = MakeStream() }, default);
-
-        response.Should().Be(id.ToString());
-        _s3.Verify(
-            s => s.UploadAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<Stream>(), It.IsAny<string>()),
-            Times.Once);
     }
 }
