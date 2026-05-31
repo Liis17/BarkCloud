@@ -76,16 +76,19 @@ public class AttachFileCommandHandlerTests
     }
 
     [Fact]
-    public async Task Handle_NameConflict_Throws()
+    public async Task Handle_NameConflict_AutoRenamesWithSuffix()
     {
         var fileId = Guid.NewGuid();
         _files.Setup(s => s.GetFile(fileId)).ReturnsAsync(new UploadFileEntity { Id = fileId, Uploaders = new() { OwnerId } });
         _storage.Setup(s => s.FileEntryExistsForFile(OwnerId, fileId, It.IsAny<CancellationToken>())).ReturnsAsync(false);
+        // Имя "f" занято; "f (1)" свободно (по умолчанию false) → авто-переименование вместо ошибки.
         _storage.Setup(s => s.FileEntryNameExists(OwnerId, CloudHierarchyStorage.RootDirectoryId, "f", It.IsAny<CancellationToken>())).ReturnsAsync(true);
 
-        var act = () => CreateSut().Handle(new AttachFileCommand { FileId = fileId, Name = "f" }, default);
+        await CreateSut().Handle(new AttachFileCommand { FileId = fileId, Name = "f" }, default);
 
-        await act.Should().ThrowAsync<DirectoryNameConflictException>();
+        _storage.Verify(s => s.AddFileEntry(
+            It.Is<CloudFileEntry>(e => e.FileId == fileId && e.Name == "f (1)"),
+            It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]

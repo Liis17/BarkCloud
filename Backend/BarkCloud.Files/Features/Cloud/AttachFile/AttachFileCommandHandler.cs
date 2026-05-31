@@ -1,4 +1,5 @@
 using BarkCloud.Files.Domain;
+using BarkCloud.Files.Helpers;
 using BarkCloud.Files.Persistence;
 using BarkCloud.GrpcServer.XAuth;
 using BarkCloud.Proto.Files;
@@ -67,9 +68,12 @@ public class AttachFileCommandHandler : IRequestHandler<AttachFileCommand, Cloud
         if (await _storage.FileEntryExistsForFile(ownerId, file.Id, cancellationToken))
             throw new FileAlreadyAttachedException();
 
-        // Проверяем уникальность имени в директории
-        if (await _storage.FileEntryNameExists(ownerId, storageDirectoryId, name, cancellationToken))
-            throw new DirectoryNameConflictException();
+        // Коллизия имени в директории разрешается авто-переименованием: новый файл
+        // получает суффикс " (1)", " (2)"… вместо отклонения ошибкой.
+        name = await UniqueNameResolver.ResolveAsync(
+            name,
+            (candidate, ct) => _storage.FileEntryNameExists(ownerId, storageDirectoryId, candidate, ct),
+            cancellationToken);
 
         var entry = new CloudFileEntry
         {
