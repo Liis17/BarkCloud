@@ -302,9 +302,10 @@ message DirectoryListing {
 }
 
 message AttachFileRequest {
-  string directory_id = 1; // Пустая строка означает корень владельца
+  string directory_id = 1; // Пустая строка означает корень владельца (игнорируется при route_by_media_kind)
   string file_id = 2;
   string name = 3;
+  bool route_by_media_kind = 4; // true → сервер кладёт файл в системную папку Фото/Видео/Другие документы по типу медиа
 }
 
 message RenameFileEntryRequest {

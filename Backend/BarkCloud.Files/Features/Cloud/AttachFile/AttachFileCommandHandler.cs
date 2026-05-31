@@ -9,6 +9,7 @@ using MediatR;
 
 using DirectoryNotFoundException = BarkCloud.Shared.Exceptions.Files.DirectoryNotFoundException;
 using FileNotFoundException = BarkCloud.Shared.Exceptions.Files.FileNotFoundException;
+using MediaKind = BarkCloud.Files.Domain.MediaKind;
 
 namespace BarkCloud.Files.Features.Cloud.AttachFile;
 
@@ -38,9 +39,10 @@ public class AttachFileCommandHandler : IRequestHandler<AttachFileCommand, Cloud
         if (string.IsNullOrWhiteSpace(name))
             throw new DirectoryNameConflictException();
 
-        // Валидируем директорию (если указана)
-        Guid storageDirectoryId;
-        if (request.DirectoryId.HasValue)
+        // Валидируем директорию (если указана). При route_by_media_kind папка определяется
+        // ниже по типу медиа, поэтому присланный directory_id игнорируется.
+        Guid storageDirectoryId = CloudHierarchyStorage.RootDirectoryId;
+        if (!request.RouteByMediaKind && request.DirectoryId.HasValue)
         {
             var dir = await _storage.GetDirectoryAsNoTracking(request.DirectoryId.Value, cancellationToken);
             if (dir is null)
@@ -48,10 +50,6 @@ public class AttachFileCommandHandler : IRequestHandler<AttachFileCommand, Cloud
             if (dir.OwnerId != ownerId)
                 throw new CloudAccessDeniedException();
             storageDirectoryId = dir.Id;
-        }
-        else
-        {
-            storageDirectoryId = CloudHierarchyStorage.RootDirectoryId;
         }
 
         // Проверяем существование UploadFile
@@ -63,6 +61,14 @@ public class AttachFileCommandHandler : IRequestHandler<AttachFileCommand, Cloud
         // Иначе кто угодно мог бы «приватизировать» чужой файл по знанию его ID.
         if (!file.Uploaders.Contains(ownerId))
             throw new CloudAccessDeniedException();
+
+        // Авто-распределение по типу медиа в системные папки Фото/Видео/Другие документы
+        // (применяется, когда клиент грузит без явной папки — вкладки Фото/Видео, общий аплоад).
+        if (request.RouteByMediaKind)
+        {
+            var (systemKind, folderName) = MapMediaKindToSystemFolder(file.MediaKind);
+            storageDirectoryId = await _storage.EnsureSystemDirectory(ownerId, systemKind, folderName, cancellationToken);
+        }
 
         // Инвариант «одна директория на файл»: блоб владельца может быть привязан только к одной директории.
         if (await _storage.FileEntryExistsForFile(ownerId, file.Id, cancellationToken))
@@ -93,4 +99,11 @@ public class AttachFileCommandHandler : IRequestHandler<AttachFileCommand, Cloud
 
         return new CloudEmpty();
     }
+
+    private static (CloudDirectorySystemKind kind, string name) MapMediaKindToSystemFolder(MediaKind mediaKind) => mediaKind switch
+    {
+        MediaKind.Photo => (CloudDirectorySystemKind.Photos, "Фото"),
+        MediaKind.Video => (CloudDirectorySystemKind.Videos, "Видео"),
+        _ => (CloudDirectorySystemKind.OtherDocuments, "Другие документы"),
+    };
 }

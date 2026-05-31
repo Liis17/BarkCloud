@@ -105,4 +105,30 @@ public class AttachFileCommandHandlerTests
             It.Is<CloudFileEntry>(e => e.OwnerId == OwnerId && e.FileId == fileId && e.Name == "photo.jpg" && e.DirectoryId == CloudHierarchyStorage.RootDirectoryId),
             It.IsAny<CancellationToken>()), Times.Once);
     }
+
+    [Theory]
+    [InlineData(MediaKind.Photo, CloudDirectorySystemKind.Photos, "Фото")]
+    [InlineData(MediaKind.Video, CloudDirectorySystemKind.Videos, "Видео")]
+    [InlineData(MediaKind.Document, CloudDirectorySystemKind.OtherDocuments, "Другие документы")]
+    [InlineData(MediaKind.Audio, CloudDirectorySystemKind.OtherDocuments, "Другие документы")]
+    [InlineData(MediaKind.Other, CloudDirectorySystemKind.OtherDocuments, "Другие документы")]
+    public async Task Handle_RouteByMediaKind_RoutesToSystemFolderByType(
+        MediaKind kind, CloudDirectorySystemKind expectedSystemKind, string expectedName)
+    {
+        var fileId = Guid.NewGuid();
+        var systemDir = Guid.NewGuid();
+        _files.Setup(s => s.GetFile(fileId)).ReturnsAsync(new UploadFileEntity { Id = fileId, Uploaders = new() { OwnerId }, MediaKind = kind });
+        _storage.Setup(s => s.FileEntryExistsForFile(OwnerId, fileId, It.IsAny<CancellationToken>())).ReturnsAsync(false);
+        _storage.Setup(s => s.EnsureSystemDirectory(OwnerId, expectedSystemKind, expectedName, It.IsAny<CancellationToken>())).ReturnsAsync(systemDir);
+
+        // directory_id присылается, но при route_by_media_kind игнорируется.
+        await CreateSut().Handle(
+            new AttachFileCommand { FileId = fileId, Name = "f", DirectoryId = Guid.NewGuid(), RouteByMediaKind = true }, default);
+
+        _storage.Verify(s => s.AddFileEntry(
+            It.Is<CloudFileEntry>(e => e.FileId == fileId && e.DirectoryId == systemDir),
+            It.IsAny<CancellationToken>()), Times.Once);
+        // Явный directory_id не валидируется при авто-распределении.
+        _storage.Verify(s => s.GetDirectoryAsNoTracking(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
 }

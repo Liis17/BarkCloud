@@ -120,7 +120,8 @@ public class CloudApiService : CloudApi.CloudApiBase
         {
             DirectoryId = ParseOptionalGuid(request.DirectoryId),
             FileId = Guid.Parse(request.FileId),
-            Name = request.Name
+            Name = request.Name,
+            RouteByMediaKind = request.RouteByMediaKind
         };
 
         return _mediator.Send(command);

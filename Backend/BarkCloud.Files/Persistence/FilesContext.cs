@@ -46,6 +46,9 @@ public class FilesContext : DbContext
             b.HasIndex(x => new { x.OwnerId, x.ParentId, x.Name }).IsUnique();
             // Быстрый листинг детей конкретной директории владельца
             b.HasIndex(x => new { x.OwnerId, x.ParentId });
+            // Быстрый поиск системной папки владельца по типу (авто-распределение загрузок).
+            b.HasIndex(x => new { x.OwnerId, x.SystemKind })
+                .HasFilter("\"SystemKind\" <> 0");
         });
 
         modelBuilder.Entity<CloudFileEntry>(b =>
