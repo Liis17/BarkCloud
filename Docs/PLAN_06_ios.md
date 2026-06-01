@@ -21,9 +21,20 @@
 
 **Проверка:** анализ кода (сборка недоступна). Логика: дубликаты теперь выбираемы; модалка спрашивает перед повторной загрузкой; «Только новые» грузит лишь не-дубликаты.
 
-## Отложено (требует macOS) — маршрутизация папок iOS
+## Задача 6.2 — Маршрутизация папок iOS (передние загрузки) — ВЫПОЛНЕНО
 
-Дефолтные папки (`route_by_media_kind`, замена «Недавно загруженные») для iOS **отложены**: поле `route_by_media_kind` отсутствует в checked-in генерённом `Generated/Proto/files_api.pb.swift` — нужна **регенерация proto** (protoc + grpc-swift) на macOS и сборка/прогон на устройстве, что недоступно на текущем хосте. Бэкенд готов принять флаг. После регенерации: в `uploadSelected`/`uploadAssets` заменить `ensureRecentUploadsFolder()` на `attachFile(..., routeByMediaKind: true)` и убрать `recentUploadsFolderName`/`ensureRecentUploadsFolder`.
+Поле `route_by_media_kind` **уже присутствует** в checked-in `Generated/Proto/files_api.pb.swift` (`Barkcloud_Files_AttachFileRequest.routeByMediaKind`, регенерировано при позднем мердже) — отдельная регенерация proto не нужна.
+
+**Сделано:**
+- `CloudRepository.attachFile` += `routeByMediaKind: Bool = false` → пробрасывает в `AttachFileRequest.route_by_media_kind`.
+- `CloudRepository.uploadFile` += `routeByMediaKind: Bool = false` → при `true` привязывает без папки с флагом (сервер раскладывает по «Фото»/«Видео»/«Другие документы»).
+- Передние загрузки переведены на `routeByMediaKind: true`: `GalleryViewModel.uploadSelected`, `GalleryViewModel.ensureCloudFileID`, `MediaGridViewModel.uploadAssets` (убран `ensureRecentUploadsFolder()` в этих местах).
+
+**Сборка не делалась** (хост Windows/Linux, нет macOS) — изменения верифицированы анализом кода.
+
+### Остаётся (фоновые загрузки)
+
+`ensureRecentUploadsFolder`/`recentUploadsFolderName` **НЕ удалены**: их ещё используют фоновые пути — `BackupManager` (автозагрузка) и `ShareInboxUploader`/Share Extension. Там привязка отложена через персистентный `UploadJob` (SwiftData `@Model`, общий с отдельным таргетом Share Extension), и проброс `route_by_media_kind` потребовал бы миграции схемы `UploadJob` + правки второго таргета + отложенного attach в `AppEnvironment.onJobCompleted` — это вне безопасного/верифицируемого скоупа без сборки на macOS. После их перевода хелпер можно убрать.
 
 ## Финал
 
