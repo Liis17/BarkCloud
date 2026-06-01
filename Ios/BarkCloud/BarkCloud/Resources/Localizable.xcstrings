@@ -3446,6 +3446,138 @@
         }
       }
     },
+    "shared_with_user_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Поделиться «%@»"
+          }
+        }
+      }
+    },
+    "shared_search_placeholder" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Поиск по имени или юзернейму"
+          }
+        }
+      }
+    },
+    "shared_search_min_chars" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Введите минимум 2 символа."
+          }
+        }
+      }
+    },
+    "shared_search_loading" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Поиск…"
+          }
+        }
+      }
+    },
+    "shared_search_no_results" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Никого не найдено."
+          }
+        }
+      }
+    },
+    "shared_search_failed" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не удалось выполнить поиск"
+          }
+        }
+      }
+    },
+    "shared_share_action" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Поделиться"
+          }
+        }
+      }
+    },
+    "shared_granted" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Выдан"
+          }
+        }
+      }
+    },
+    "shared_grant_success" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Доступ выдан: %@"
+          }
+        }
+      }
+    },
+    "shared_grant_failed" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не удалось выдать доступ"
+          }
+        }
+      }
+    },
+    "shared_done" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Готово"
+          }
+        }
+      }
+    },
+    "shared_with_user_action" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Поделиться с пользователем"
+          }
+        }
+      }
+    },
     "snack_public_copied" : {
       "extractionState" : "manual",
       "localizations" : {

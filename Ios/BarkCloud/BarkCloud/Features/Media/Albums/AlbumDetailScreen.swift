@@ -239,6 +239,7 @@ struct AlbumDetailScreen: View {
     @State private var showDelete = false
     @State private var propertiesTarget: FilePropertiesTarget?
     @State private var albumPickerItem: MediaItem?
+    @State private var shareWithUserContext: ShareWithUserContext?
 
     private static let columns = Array(repeating: GridItem(.flexible(), spacing: 2), count: 3)
 
@@ -283,6 +284,9 @@ struct AlbumDetailScreen: View {
             Button(String(localized: "action_cancel"), role: .cancel) {}
         }
         .sheet(item: $propertiesTarget) { FilePropertiesSheet(target: $0) }
+        .sheet(item: $shareWithUserContext) { context in
+            ShareWithUserSheet(context: context) { shareWithUserContext = nil }
+        }
         .sheet(item: $albumPickerItem) { item in
             AlbumPickerSheet(
                 albums: env.albumRepository,
@@ -307,6 +311,9 @@ struct AlbumDetailScreen: View {
         }
         Button(String(localized: "ctx_make_public")) {
             Task { await vm.makePublic(item) }
+        }
+        Button(String(localized: "shared_with_user_action")) {
+            shareWithUserContext = ShareWithUserContext(fileID: item.id, fileName: item.fileName)
         }
         Button(String(localized: "ctx_add_to_album")) {
             albumPickerItem = item

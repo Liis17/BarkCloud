@@ -52,6 +52,23 @@ final class UserRepository: Sendable {
         _ = try await stub.changeBio(req)
     }
 
+    // MARK: - Поиск
+
+    /// Поиск пользователей по юзернейму/имени. Сервер требует минимум 2 символа,
+    /// поэтому короткие запросы заворачиваем тут же без сетевого вызова.
+    /// `limit` 1..50 (default 20). Возвращает только тех, у кого
+    /// `PrivacySettings.searchableByUsername == true`.
+    func searchUsers(query: String, limit: Int = 20) async throws -> [CloudUser] {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count >= 2 else { return [] }
+        let stub = try await grpc.usersStub()
+        var req = Barkcloud_Users_SearchUsersRequest()
+        req.query = trimmed
+        req.limit = Int32(max(1, min(50, limit)))
+        let resp = try await stub.searchUsers(req)
+        return resp.users.map(CloudUser.init)
+    }
+
     // MARK: - Приватность
 
     func getPrivacySettings() async throws -> Barkcloud_Users_PrivacySettings {

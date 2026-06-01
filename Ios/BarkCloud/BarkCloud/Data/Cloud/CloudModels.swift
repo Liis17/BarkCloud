@@ -179,6 +179,33 @@ struct ShareLinksPage: Sendable {
     var hasMore: Bool { nextCursorCreatedAt != nil }
 }
 
+/// Получатель шара / результат поиска пользователей. Зеркалит
+/// `Barkcloud_Users_User` в минимальном объёме, нужном для UI выбора (поиск,
+/// карточка получателя, отображение «от кого» в Мне доступны).
+struct CloudUser: Identifiable, Hashable, Sendable {
+    let id: Int64
+    let username: String
+    let firstName: String
+    let lastName: String
+    let avatarURL: URL?
+
+    init(_ u: Barkcloud_Users_User) {
+        self.id = u.id
+        self.username = u.username
+        self.firstName = u.firstName
+        self.lastName = u.lastName
+        self.avatarURL = URL(string: u.profilePicturePreview.isEmpty ? u.profilePicture : u.profilePicturePreview)
+    }
+
+    /// «Имя Фамилия» если есть, иначе `@username`, иначе `id N`.
+    var displayName: String {
+        let full = [firstName, lastName].filter { !$0.isEmpty }.joined(separator: " ")
+        if !full.isEmpty { return full }
+        if !username.isEmpty { return "@\(username)" }
+        return "id \(id)"
+    }
+}
+
 /// Страница медиа-галереи с курсором пагинации.
 struct MediaPage: Sendable {
     let items: [MediaAsset]

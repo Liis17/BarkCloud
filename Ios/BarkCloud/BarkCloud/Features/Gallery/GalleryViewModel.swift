@@ -19,6 +19,10 @@ final class GalleryViewModel {
     var uploadDone = 0
     var uploadTotal = 0
     var snackbar: String?
+    /// Открыть sheet «Поделиться с пользователем» когда непусто. Резолв
+    /// fileID идёт в `prepareShareWithUser(asset:)` (как `copyLink`/`makePublic`),
+    /// чтобы загрузить device-ассет в облако если он там ещё не лежит.
+    var pendingShareWithUser: ShareWithUserContext?
 
     /// Трекер наличия файлов в облаке (по SHA256-хешу) — общий с пикером загрузки.
     let presence: CloudPresenceTracker
@@ -213,6 +217,17 @@ final class GalleryViewModel {
             guard let url = link.url else { throw CloudActionError.noLink }
             UIPasteboard.general.url = url
             snackbar = String(localized: "snack_public_copied")
+        }
+    }
+
+    /// Подготовить контекст для sheet «Поделиться с пользователем». Если ассет
+    /// ещё не в облаке — `resolveAndRun` загрузит его (как `makePublic`),
+    /// после чего выставит `pendingShareWithUser` → screen откроет sheet через
+    /// `.sheet(item:)`.
+    func prepareShareWithUser(asset: PHAsset) async {
+        await resolveAndRun(asset) { fileID in
+            let name = PHAssetResource.assetResources(for: asset).first?.originalFilename ?? "file"
+            pendingShareWithUser = ShareWithUserContext(fileID: fileID, fileName: name)
         }
     }
 

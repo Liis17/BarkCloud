@@ -48,6 +48,12 @@ struct GalleryScreen: View {
                 .presentationBackground(.clear)
         }
         .sheet(item: $propertiesTarget) { FilePropertiesSheet(target: $0) }
+        .sheet(item: Binding(
+            get: { vm?.pendingShareWithUser },
+            set: { vm?.pendingShareWithUser = $0 }
+        )) { context in
+            ShareWithUserSheet(context: context) { vm?.pendingShareWithUser = nil }
+        }
         .sheet(item: $albumPickerAsset) { picker in
             AlbumPickerSheet(
                 albums: env.albumRepository,
@@ -134,6 +140,9 @@ struct GalleryScreen: View {
         }
         Button(String(localized: "ctx_make_public")) {
             Task { await vm.makePublic(asset: asset) }
+        }
+        Button(String(localized: "shared_with_user_action")) {
+            Task { await vm.prepareShareWithUser(asset: asset) }
         }
         Button(String(localized: "ctx_add_to_album")) {
             albumPickerAsset = PickerAsset(id: asset.localIdentifier, asset: asset)
