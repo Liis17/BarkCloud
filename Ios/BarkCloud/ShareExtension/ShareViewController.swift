@@ -54,6 +54,11 @@ final class ShareViewController: UIViewController {
     private var selectedFolder: FolderItem?
     private var isPreparing = true
     private var isUploading = false
+    /// Поставленные в очередь job-id, по которым отслеживаем завершение.
+    /// Пока в этом множестве есть незавершённые id — UI Share Extension'а
+    /// остаётся открытым.
+    private var trackedJobIDs: Set<String> = []
+    private var didFinishUploads = false
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -112,16 +117,21 @@ final class ShareViewController: UIViewController {
         NSLayoutConstraint.activate([
             containerView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             containerView.centerYAnchor.constraint(equalTo: view.centerYAnchor),
-            containerView.leadingAnchor.constraint(greaterThanOrEqualTo: view.leadingAnchor, constant: 16),
-            containerView.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -16),
-            containerView.widthAnchor.constraint(lessThanOrEqualToConstant: 480),
+            // Раньше containerView был ограничен 480pt и подтягивался по
+            // ширине только если экран меньше — на iPhone название папки
+            // переносилось в две строки. Теперь контейнер заполняет всё
+            // доступное пространство (минус 12pt по краям), и folderButton
+            // тоже становится шире — длинные названия помещаются в одну
+            // строку с truncating tail.
+            containerView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 12),
+            containerView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -12),
 
             stack.topAnchor.constraint(equalTo: containerView.topAnchor, constant: 24),
-            stack.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 20),
-            stack.trailingAnchor.constraint(equalTo: containerView.trailingAnchor, constant: -20),
+            stack.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 16),
+            stack.trailingAnchor.constraint(equalTo: containerView.trailingAnchor, constant: -16),
             stack.bottomAnchor.constraint(equalTo: containerView.bottomAnchor, constant: -20),
 
-            folderButton.heightAnchor.constraint(equalToConstant: 44),
+            folderButton.heightAnchor.constraint(equalToConstant: 52),
             uploadButton.heightAnchor.constraint(equalToConstant: 48),
             cancelButton.heightAnchor.constraint(equalToConstant: 36)
         ])
@@ -199,11 +209,21 @@ final class ShareViewController: UIViewController {
         config.baseBackgroundColor = .systemBackground
         config.image = UIImage(systemName: "folder.fill")
         config.imagePlacement = .leading
-        config.imagePadding = 8
+        config.imagePadding = 10
+        // По умолчанию Configuration переносит длинный title на вторую строку
+        // (.byWordWrapping). На iPhone с узким контейнером «Папка: Недавно
+        // загруженные» как раз ломалось пополам. Принудительно одну строку
+        // с трункейтом в середине, чтобы и начало («Папка:») и хвост
+        // (название) оставались видимыми.
+        config.titleLineBreakMode = .byTruncatingMiddle
         var title = AttributedString("Папка: \(name)")
         title.font = .preferredFont(forTextStyle: .body)
         config.attributedTitle = title
         folderButton.configuration = config
+        folderButton.titleLabel?.numberOfLines = 1
+        folderButton.titleLabel?.lineBreakMode = .byTruncatingMiddle
+        folderButton.titleLabel?.adjustsFontSizeToFitWidth = true
+        folderButton.titleLabel?.minimumScaleFactor = 0.85
     }
 
     @objc private func folderTapped() {
@@ -294,6 +314,13 @@ final class ShareViewController: UIViewController {
     }
 
     @objc private func cancelTapped() {
+        if isUploading {
+            // После нажатия «Загрузить» это уже «Закрыть в фоне»: загрузка
+            // уже идёт через background URLSession, демон iOS продолжит её
+            // (включая main app при следующей активации).
+            extensionContext?.completeRequest(returningItems: nil)
+            return
+        }
         // Удаляем зашаженные originals — они уже скопированы в App Group.
         for prepared in preparedAttachments {
             try? FileManager.default.removeItem(at: prepared.stagedURL)
@@ -301,18 +328,86 @@ final class ShareViewController: UIViewController {
         extensionContext?.completeRequest(returningItems: nil)
     }
 
+    /// Подать все attachments в фоновую очередь и ожидать их завершения
+    /// (Share Extension остаётся открытым). Когда все trackedJobIDs дошли
+    /// до completed/failed — показываем терминальный экран и закрываемся.
     private func runEnqueueAndFinish() async {
-        var enqueued = 0
+        // Подписываемся до старта enqueue, чтобы не пропустить ранние события
+        // у моментально загружающихся маленьких файлов.
+        subscribeToCoordinatorEvents()
+
+        var ids: [String] = []
         for prepared in preparedAttachments {
-            if await enqueue(prepared) {
-                enqueued += 1
+            if let id = await enqueue(prepared) {
+                ids.append(id)
+                trackedJobIDs.insert(id)
             }
         }
-        if enqueued > 0 {
-            await showTerminal("Загружаю в BarkCloud…", autoClose: 0.8)
-        } else {
+        if ids.isEmpty {
             await showTerminal("Не удалось подготовить загрузку.", autoClose: 1.2)
+            return
         }
+        showUploadingUI(total: ids.count)
+        // Догнать события, которые могли отстреляться между submit и
+        // вставкой в trackedJobIDs (для крошечных файлов).
+        await recomputeProgress()
+    }
+
+    private func subscribeToCoordinatorEvents() {
+        BackgroundUploadCoordinator.shared.addObserver(
+            completion: { [weak self] snapshot in
+                guard let self else { return }
+                Task { @MainActor in self.handleJobFinished(snapshot) }
+            },
+            failure: { [weak self] snapshot in
+                guard let self else { return }
+                Task { @MainActor in self.handleJobFinished(snapshot) }
+            }
+        )
+    }
+
+    private func showUploadingUI(total: Int) {
+        titleLabel.text = "Загружаю в BarkCloud…"
+        subtitleLabel.text = "0 из \(total)"
+        spinner.isHidden = false
+        spinner.startAnimating()
+        folderButton.isHidden = true
+        uploadButton.isHidden = true
+        cancelButton.setTitle("Закрыть в фоне", for: .normal)
+        cancelButton.isEnabled = true
+        cancelButton.isHidden = false
+    }
+
+    private func handleJobFinished(_ snapshot: UploadJobSnapshot) {
+        guard trackedJobIDs.contains(snapshot.id), !didFinishUploads else { return }
+        Task { await self.recomputeProgress() }
+    }
+
+    /// Источник истины — состояние jobs в БД (а не накопление через callbacks).
+    /// Безопасно от двойных событий и от состояний «job завершился раньше, чем
+    /// мы успели вставить его id в trackedJobIDs».
+    private func recomputeProgress() async {
+        guard !didFinishUploads, !trackedJobIDs.isEmpty else { return }
+        var done = 0
+        var failed = 0
+        for id in trackedJobIDs {
+            if let snap = await UploadQueueStore.shared.fetch(id: id) {
+                switch snap.state {
+                case .completed: done += 1
+                case .failed:    failed += 1
+                default:         break
+                }
+            }
+        }
+        let total = trackedJobIDs.count
+        subtitleLabel.text = "\(done + failed) из \(total)"
+        guard done + failed >= total else { return }
+        didFinishUploads = true
+        let title: String
+        if failed == 0      { title = "Загружено!" }
+        else if done == 0   { title = "Не удалось загрузить" }
+        else                { title = "Загружено: \(done) из \(total)" }
+        await showTerminal(title, autoClose: 1.2)
     }
 
     private func showTerminal(_ text: String, autoClose: TimeInterval) async {
@@ -394,15 +489,15 @@ final class ShareViewController: UIViewController {
 
     // MARK: - Постановка в фоновую очередь
 
-    private func enqueue(_ prepared: PreparedAttachment) async -> Bool {
-        guard let stagingDir = UploadConstants.stagingDirectory else { return false }
+    private func enqueue(_ prepared: PreparedAttachment) async -> String? {
+        guard let stagingDir = UploadConstants.stagingDirectory else { return nil }
 
         // 1. Получить uploadURL через gRPC.
         let upload: (url: String, fileID: String)
         do {
             upload = try await transfer.getUploadURL(type: .cloudFile)
         } catch {
-            return false
+            return nil
         }
 
         // 2. Подготовить multipart body файл в App Group.
@@ -417,7 +512,7 @@ final class ShareViewController: UIViewController {
                 destination: multipartURL
             )
         } catch {
-            return false
+            return nil
         }
 
         // 3. Создать UploadJob и submit. directoryID нужен — координатор сам
@@ -435,7 +530,7 @@ final class ShareViewController: UIViewController {
             totalBytes: totalBytes
         )
         await BackgroundUploadCoordinator.shared.submit(jobID: snapshot.id)
-        return true
+        return snapshot.id
     }
 
     private func inferMime(for fileName: String) -> String {

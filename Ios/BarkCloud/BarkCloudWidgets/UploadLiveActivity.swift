@@ -30,58 +30,91 @@ struct UploadLiveActivity: Widget {
                         Image(systemName: iconName(for: context.state))
                             .font(.system(size: 17, weight: .semibold))
                             .foregroundStyle(AccentOrange)
-                            .symbolEffect(.pulse, options: .repeating, isActive: !context.state.isFinished)
+                            .symbolEffect(.pulse, options: .repeating, isActive: !context.state.isFinished && !needsForeground(context.state))
                     }
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    Text("\(context.state.completedFiles)/\(context.state.totalFiles)")
-                        .font(.system(size: 16, weight: .semibold))
-                        .monospacedDigit()
-                        .foregroundStyle(.white)
-                        .contentTransition(.numericText())
-                }
-                DynamicIslandExpandedRegion(.center) {
-                    Text(context.state.currentFileName.isEmpty
-                         ? "BarkCloud"
-                         : context.state.currentFileName)
-                        .font(.system(size: 14, weight: .medium))
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                        .foregroundStyle(.white.opacity(0.85))
-                }
-                DynamicIslandExpandedRegion(.bottom) {
-                    ShimmerProgressBar(
-                        progress: context.state.overallProgress,
-                        animating: !context.state.isFinished
-                    )
-                    .frame(height: 6)
-                    .padding(.top, 2)
-                }
-            } compactLeading: {
-                Image(systemName: iconName(for: context.state))
-                    .foregroundStyle(AccentOrange)
-                    .symbolEffect(.pulse, options: .repeating, isActive: !context.state.isFinished)
-            } compactTrailing: {
-                CompactRing(progress: context.state.overallProgress)
-                    .frame(width: 18, height: 18)
-                    .overlay {
-                        Text("\(context.state.completedFiles)")
-                            .font(.system(size: 9, weight: .semibold))
+                    if needsForeground(context.state) {
+                        Image(systemName: "hand.tap.fill")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(AccentOrange)
+                    } else {
+                        Text("\(context.state.completedFiles)/\(context.state.totalFiles)")
+                            .font(.system(size: 16, weight: .semibold))
                             .monospacedDigit()
                             .foregroundStyle(.white)
                             .contentTransition(.numericText())
                     }
+                }
+                DynamicIslandExpandedRegion(.center) {
+                    if needsForeground(context.state) {
+                        Text("Откройте BarkCloud, чтобы продолжить")
+                            .font(.system(size: 14, weight: .semibold))
+                            .lineLimit(2)
+                            .multilineTextAlignment(.center)
+                            .foregroundStyle(.white)
+                    } else {
+                        Text(context.state.currentFileName.isEmpty
+                             ? "BarkCloud"
+                             : context.state.currentFileName)
+                            .font(.system(size: 14, weight: .medium))
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                            .foregroundStyle(.white.opacity(0.85))
+                    }
+                }
+                DynamicIslandExpandedRegion(.bottom) {
+                    if !needsForeground(context.state) {
+                        ShimmerProgressBar(
+                            progress: context.state.overallProgress,
+                            animating: !context.state.isFinished
+                        )
+                        .frame(height: 6)
+                        .padding(.top, 2)
+                    }
+                }
+            } compactLeading: {
+                Image(systemName: iconName(for: context.state))
+                    .foregroundStyle(AccentOrange)
+                    .symbolEffect(.pulse, options: .repeating, isActive: !context.state.isFinished && !needsForeground(context.state))
+            } compactTrailing: {
+                if needsForeground(context.state) {
+                    Image(systemName: "hand.tap.fill")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(AccentOrange)
+                } else {
+                    CompactRing(progress: context.state.overallProgress)
+                        .frame(width: 18, height: 18)
+                        .overlay {
+                            Text("\(context.state.completedFiles)")
+                                .font(.system(size: 9, weight: .semibold))
+                                .monospacedDigit()
+                                .foregroundStyle(.white)
+                                .contentTransition(.numericText())
+                        }
+                }
             } minimal: {
-                BreathingRing(progress: context.state.overallProgress, animating: !context.state.isFinished)
+                if needsForeground(context.state) {
+                    Image(systemName: "hand.tap.fill")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(AccentOrange)
+                } else {
+                    BreathingRing(progress: context.state.overallProgress, animating: !context.state.isFinished)
+                }
             }
             .keylineTint(AccentOrange)
         }
     }
 
     private func iconName(for state: UploadActivityAttributes.ContentState) -> String {
+        if needsForeground(state) { return "icloud.slash.fill" }
         if state.isFinished && state.failedFiles == 0 { return "checkmark.icloud.fill" }
         if state.failedFiles > 0 && state.isFinished { return "exclamationmark.icloud.fill" }
         return "icloud.and.arrow.up.fill"
+    }
+
+    private func needsForeground(_ state: UploadActivityAttributes.ContentState) -> Bool {
+        state.requiresForeground == true && !state.isFinished
     }
 }
 
@@ -94,6 +127,10 @@ private let AccentOrange = Color(red: 1.0, green: 0.46, blue: 0.16)
 
 private struct LockScreenView: View {
     let state: UploadActivityAttributes.ContentState
+
+    private var needsForeground: Bool {
+        state.requiresForeground == true && !state.isFinished
+    }
 
     var body: some View {
         VStack(spacing: 12) {
@@ -112,43 +149,54 @@ private struct LockScreenView: View {
                     Image(systemName: iconName)
                         .font(.system(size: 22, weight: .semibold))
                         .foregroundStyle(.white)
-                        .symbolEffect(.pulse, options: .repeating, isActive: !state.isFinished)
+                        .symbolEffect(.pulse, options: .repeating, isActive: !state.isFinished && !needsForeground)
                 }
                 VStack(alignment: .leading, spacing: 2) {
                     Text(titleText)
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(.white)
-                    Text(state.currentFileName.isEmpty ? " " : state.currentFileName)
+                    Text(subtitleText)
                         .font(.system(size: 13))
-                        .lineLimit(1)
+                        .lineLimit(2)
                         .truncationMode(.middle)
                         .foregroundStyle(.white.opacity(0.7))
                 }
                 Spacer(minLength: 8)
-                Text("\(state.completedFiles)/\(state.totalFiles)")
-                    .font(.system(size: 17, weight: .semibold))
-                    .monospacedDigit()
-                    .foregroundStyle(.white)
-                    .contentTransition(.numericText())
+                if !needsForeground {
+                    Text("\(state.completedFiles)/\(state.totalFiles)")
+                        .font(.system(size: 17, weight: .semibold))
+                        .monospacedDigit()
+                        .foregroundStyle(.white)
+                        .contentTransition(.numericText())
+                }
             }
-            ShimmerProgressBar(
-                progress: state.overallProgress,
-                animating: !state.isFinished
-            )
-            .frame(height: 6)
+            if !needsForeground {
+                ShimmerProgressBar(
+                    progress: state.overallProgress,
+                    animating: !state.isFinished
+                )
+                .frame(height: 6)
+            }
         }
     }
 
     private var iconName: String {
+        if needsForeground { return "icloud.slash.fill" }
         if state.isFinished && state.failedFiles == 0 { return "checkmark.icloud.fill" }
         if state.failedFiles > 0 && state.isFinished { return "exclamationmark.icloud.fill" }
         return "icloud.and.arrow.up.fill"
     }
 
     private var titleText: String {
+        if needsForeground { return "Загрузка приостановлена" }
         if state.isFinished && state.failedFiles == 0 { return "Загрузка завершена" }
         if state.failedFiles > 0 && state.isFinished { return "Не все файлы загружены" }
         return "Загружаю в BarkCloud"
+    }
+
+    private var subtitleText: String {
+        if needsForeground { return "Откройте BarkCloud, чтобы продолжить загрузку" }
+        return state.currentFileName.isEmpty ? " " : state.currentFileName
     }
 }
 

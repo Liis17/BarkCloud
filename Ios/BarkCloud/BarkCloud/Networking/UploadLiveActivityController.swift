@@ -17,6 +17,10 @@ final class UploadLiveActivityController {
 
     private var currentActivity: Activity<UploadActivityAttributes>?
     private var sessionStartedAt: Date?
+    /// main app в background. Когда true — Activity показывает «Откройте
+    /// BarkCloud, чтобы продолжить» вместо прогресса. Управляется из
+    /// `BarkCloudApp.scenePhase` через `setForegroundActive(_:)`.
+    private var isInBackground = false
 
     init(queueStore: UploadQueueStore) {
         self.queueStore = queueStore
@@ -27,6 +31,17 @@ final class UploadLiveActivityController {
             self.currentActivity = existing
             self.sessionStartedAt = existing.attributes.startedAt
         }
+    }
+
+    /// Вызывается из `BarkCloudApp` при смене scenePhase. true → main app
+    /// активен (foreground), false → ушёл в background. Когда уходим в фон,
+    /// сразу обновляем Activity на «Откройте BarkCloud…»; при возврате —
+    /// обычный прогресс.
+    func setForegroundActive(_ active: Bool) async {
+        let newValue = !active
+        guard newValue != isInBackground else { return }
+        isInBackground = newValue
+        await notifyChanged()
     }
 
     /// Вызвать после любого изменения очереди — контроллер сам решит, нужно
@@ -82,7 +97,8 @@ final class UploadLiveActivityController {
             currentFileName: currentFileName,
             currentProgress: currentProgress,
             overallProgress: overallProgress,
-            isFinished: isFinished
+            isFinished: isFinished,
+            requiresForeground: isInBackground ? true : nil
         )
 
         if currentActivity == nil, !isFinished {

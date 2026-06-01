@@ -180,8 +180,15 @@ final class BackupManager {
             startScanIfNeeded()
             startUploadLoop()
         } else {
+            // Останавливаем продюсера, очищаем pending-очередь и отменяем
+            // уже подавшие живые background-задачи именно с источником .backup
+            // (manual/share не трогаем). Иначе уже поставленные в URLSession
+            // jobs продолжали бы грузиться независимо от тогла.
             uploadTask?.cancel()
             uploadTask = nil
+            pendingUpload.removeAll()
+            currentAsset = nil
+            Task { await BackgroundUploadCoordinator.shared.cancelActiveJobs(source: .backup) }
         }
     }
 

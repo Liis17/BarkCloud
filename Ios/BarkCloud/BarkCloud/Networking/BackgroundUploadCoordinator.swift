@@ -173,6 +173,32 @@ final class BackgroundUploadCoordinator: NSObject, @unchecked Sendable {
         responseBuffers.removeAll()
         lock.unlock()
     }
+
+    /// Отменить активные задачи определённого источника (`.backup`, `.share`,
+    /// `.manual`). Используется при выключении автозагрузки: останавливаем
+    /// только backup-jobs, ручные/из шаринга продолжают работать. Каждый
+    /// отменённый job помечается `.failed` в БД, чтобы UI и Live Activity
+    /// освежились.
+    func cancelActiveJobs(source: UploadJobSource) async {
+        let active = await queueStore.activeJobs().filter { $0.source == source }
+        guard !active.isEmpty else { return }
+        let taskIDs = Set(active.map { $0.sessionTaskIdentifier })
+        let tasks: [URLSessionTask] = await withCheckedContinuation { continuation in
+            session.getAllTasks { continuation.resume(returning: $0) }
+        }
+        for task in tasks where taskIDs.contains(task.taskIdentifier) {
+            task.cancel()
+        }
+        for snapshot in active {
+            _ = await queueStore.updateState(
+                id: snapshot.id,
+                state: .failed,
+                lastError: "Cancelled by user"
+            )
+            try? FileManager.default.removeItem(atPath: snapshot.multipartBodyPath)
+        }
+        await UploadLiveActivityController.shared.notifyChanged()
+    }
 }
 
 // MARK: - URLSessionDelegate (TLS + background launch finish)

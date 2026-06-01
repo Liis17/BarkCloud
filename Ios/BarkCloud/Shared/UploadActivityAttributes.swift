@@ -17,6 +17,12 @@ public struct UploadActivityAttributes: ActivityAttributes {
         public var currentProgress: Double   // 0…1 для текущего файла
         public var overallProgress: Double   // 0…1 для всей очереди
         public var isFinished: Bool
+        /// true → main app в background. iOS-демон не всегда может продолжать
+        /// background URLSession при сворачивании, поэтому показываем
+        /// «Откройте BarkCloud, чтобы продолжить» вместо прогресса.
+        /// Optional — чтобы новая Live Activity не падала на старом snapshot
+        /// без этого поля.
+        public var requiresForeground: Bool?
 
         public init(
             totalFiles: Int,
@@ -25,7 +31,8 @@ public struct UploadActivityAttributes: ActivityAttributes {
             currentFileName: String,
             currentProgress: Double,
             overallProgress: Double,
-            isFinished: Bool
+            isFinished: Bool,
+            requiresForeground: Bool? = nil
         ) {
             self.totalFiles = totalFiles
             self.completedFiles = completedFiles
@@ -34,6 +41,7 @@ public struct UploadActivityAttributes: ActivityAttributes {
             self.currentProgress = currentProgress
             self.overallProgress = overallProgress
             self.isFinished = isFinished
+            self.requiresForeground = requiresForeground
         }
     }
 
