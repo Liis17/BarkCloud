@@ -217,7 +217,9 @@ public partial class MainWindow : FluentWindow
 
         StatusText.Text = !string.IsNullOrEmpty(s.Error)
             ? $"Ошибка: {s.Error}"
-            : (s.Message ?? string.Empty);
+            : !string.IsNullOrEmpty(s.LastSyncError)
+                ? $"Синхронизация: {s.LastSyncError}"
+                : (s.Message ?? string.Empty);
     }
 
     private async Task LoadAvatarAsync()

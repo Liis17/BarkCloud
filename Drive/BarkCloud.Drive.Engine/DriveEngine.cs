@@ -198,6 +198,7 @@ public sealed class DriveEngine : IDriveEngine
             Username = _profile.Username,
             ServerHost = _serverHost,
             VolumeLabel = _fs.VolumeLabel,
+            LastSyncError = _fs.LastSyncError,
         };
 
         if (_tokens.IsAuthenticated)
