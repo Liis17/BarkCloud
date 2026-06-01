@@ -23,6 +23,9 @@ struct MySharesListView: View {
             }
         }
         .overlay(alignment: .bottom) { snackbar }
+        .sheet(item: $vm.state.pendingShareURL) { item in
+            ActivityViewController(activityItems: [item.url])
+        }
         .confirmationDialog(
             String(localized: "shared_revoke_confirm"),
             isPresented: Binding(
@@ -101,8 +104,7 @@ struct MySharesListView: View {
 
     private func copy(_ link: ShareLink) {
         guard let url = link.url else { return }
-        UIPasteboard.general.url = url
-        vm.state.snackbar = String(localized: "snack_link_copied")
+        vm.state.pendingShareURL = ShareableURL(url: url)
     }
 }
 
@@ -147,13 +149,13 @@ private struct ShareLinkRow: View {
             Spacer(minLength: 8)
             VStack(spacing: 4) {
                 Button(action: onCopy) {
-                    Image(systemName: "doc.on.doc")
+                    Image(systemName: "square.and.arrow.up")
                         .font(.system(size: 16))
                         .foregroundStyle(AppColors.accent)
                         .frame(width: 36, height: 36)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(String(localized: "shared_copy_link"))
+                .accessibilityLabel(String(localized: "shared_share_action"))
                 Button(action: onRevoke) {
                     Image(systemName: "trash")
                         .font(.system(size: 16))

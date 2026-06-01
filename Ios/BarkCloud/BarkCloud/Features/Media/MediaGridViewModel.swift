@@ -22,6 +22,10 @@ struct MediaGridUiState {
     var deleteDone: Int = 0
     var deleteTotal: Int = 0
 
+    /// URL только что созданной публичной ссылки → системный Share Sheet.
+    /// Заменяет старое прямое копирование в `UIPasteboard`.
+    var pendingShareURL: ShareableURL?
+
     fileprivate var cursorCreatedAt: Date?
     fileprivate var cursorFileID: String = ""
 }
@@ -245,15 +249,14 @@ final class MediaGridViewModel {
         }
     }
 
-    /// Создать постоянную публичную ссылку и скопировать её в буфер.
+    /// Создать постоянную публичную ссылку и открыть системный Share Sheet.
     func makePublic(_ item: MediaItem) async {
         do {
             let link = try await cloud.createShare(fileID: item.id, name: item.fileName)
             guard let url = link.url else {
                 state.snackbar = domainErrorMessage(CloudActionError.noLink); return
             }
-            UIPasteboard.general.url = url
-            state.snackbar = String(localized: "snack_public_copied")
+            state.pendingShareURL = ShareableURL(url: url)
         } catch {
             state.snackbar = domainErrorMessage(error)
         }

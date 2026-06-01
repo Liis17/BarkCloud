@@ -13,6 +13,8 @@ final class AlbumDetailViewModel {
         var canLoadMore = false
         var isUploading = false
         var snackbar: String?
+        /// URL созданной публичной ссылки → системный Share Sheet.
+        var pendingShareURL: ShareableURL?
 
         fileprivate var cursorAddedAt: Date?
         fileprivate var cursorFileID: String = ""
@@ -138,15 +140,14 @@ final class AlbumDetailViewModel {
         }
     }
 
-    /// Создать постоянную публичную ссылку и скопировать её в буфер.
+    /// Создать постоянную публичную ссылку и открыть системный Share Sheet.
     func makePublic(_ item: MediaItem) async {
         do {
             let link = try await cloud.createShare(fileID: item.id, name: item.fileName)
             guard let url = link.url else {
                 state.snackbar = domainErrorMessage(CloudActionError.noLink); return
             }
-            UIPasteboard.general.url = url
-            state.snackbar = String(localized: "snack_public_copied")
+            state.pendingShareURL = ShareableURL(url: url)
         } catch {
             state.snackbar = domainErrorMessage(error)
         }
@@ -286,6 +287,12 @@ struct AlbumDetailScreen: View {
         .sheet(item: $propertiesTarget) { FilePropertiesSheet(target: $0) }
         .sheet(item: $shareWithUserContext) { context in
             ShareWithUserSheet(context: context) { shareWithUserContext = nil }
+        }
+        .sheet(item: Binding(
+            get: { vm?.state.pendingShareURL },
+            set: { vm?.state.pendingShareURL = $0 }
+        )) { item in
+            ActivityViewController(activityItems: [item.url])
         }
         .sheet(item: $albumPickerItem) { item in
             AlbumPickerSheet(

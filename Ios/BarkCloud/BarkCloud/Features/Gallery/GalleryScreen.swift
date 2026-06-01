@@ -54,6 +54,12 @@ struct GalleryScreen: View {
         )) { context in
             ShareWithUserSheet(context: context) { vm?.pendingShareWithUser = nil }
         }
+        .sheet(item: Binding(
+            get: { vm?.pendingShareURL },
+            set: { vm?.pendingShareURL = $0 }
+        )) { item in
+            ActivityViewController(activityItems: [item.url])
+        }
         .sheet(item: $albumPickerAsset) { picker in
             AlbumPickerSheet(
                 albums: env.albumRepository,

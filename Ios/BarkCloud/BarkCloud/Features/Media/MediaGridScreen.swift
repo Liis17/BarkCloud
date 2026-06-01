@@ -74,6 +74,12 @@ struct MediaGridScreen: View {
         .sheet(item: $shareWithUserContext) { context in
             ShareWithUserSheet(context: context) { shareWithUserContext = nil }
         }
+        .sheet(item: Binding(
+            get: { vm?.state.pendingShareURL },
+            set: { vm?.state.pendingShareURL = $0 }
+        )) { item in
+            ActivityViewController(activityItems: [item.url])
+        }
         .sheet(item: $albumPickerItem) { item in
             AlbumPickerSheet(
                 albums: env.albumRepository,
