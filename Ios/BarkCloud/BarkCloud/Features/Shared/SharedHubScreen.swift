@@ -8,6 +8,7 @@ struct SharedHubScreen: View {
     @Environment(AppEnvironment.self) private var env
     @State private var tab: SharedHubTab = .myPublic
     @State private var mySharesVM: MySharesViewModel?
+    @State private var sharedWithMeVM: SharedWithMeViewModel?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -28,7 +29,11 @@ struct SharedHubScreen: View {
                     ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             case .sharedWithMe:
-                comingSoonView
+                if let sharedWithMeVM {
+                    SharedWithMeListView(vm: sharedWithMeVM)
+                } else {
+                    ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
             }
         }
         .navigationTitle(String(localized: "shared_hub_title"))
@@ -39,24 +44,19 @@ struct SharedHubScreen: View {
             }
             await mySharesVM?.loadIfNeeded()
         }
-    }
-
-    private var comingSoonView: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "tray.and.arrow.down")
-                .font(.system(size: 56))
-                .foregroundStyle(AppColors.onSurfaceVariant)
-            Text(String(localized: "shared_with_me_empty_title"))
-                .font(AppTypography.titleMedium)
-                .foregroundStyle(AppColors.onSurface)
-                .multilineTextAlignment(.center)
-            Text(String(localized: "shared_with_me_coming_soon"))
-                .font(AppTypography.bodySmall)
-                .foregroundStyle(AppColors.onSurfaceVariant)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 24)
+        .task(id: tab) {
+            // Лениво создаём и грузим «Мне доступны» только при первом переключении
+            // на этот таб — не тратим запрос если пользователь не зайдёт.
+            if tab == .sharedWithMe {
+                if sharedWithMeVM == nil {
+                    sharedWithMeVM = SharedWithMeViewModel(
+                        cloud: env.cloudRepository,
+                        users: env.userRepository
+                    )
+                }
+                await sharedWithMeVM?.loadIfNeeded()
+            }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 

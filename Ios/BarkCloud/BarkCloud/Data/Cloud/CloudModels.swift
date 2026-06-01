@@ -206,6 +206,35 @@ struct CloudUser: Identifiable, Hashable, Sendable {
     }
 }
 
+/// Один входящий шар — файл, которым со мной поделился другой пользователь.
+/// `file.id` — это `fileID`, по которому через `getSharedFileDownloadUrl`
+/// получают временный URL для скачивания. `ownerUserID` потом резолвится в
+/// `CloudUser` через `UserRepository.getUser(userID:)`.
+struct SharedFileEntry: Identifiable, Hashable, Sendable {
+    let grantID: String
+    let file: MediaAsset
+    let ownerUserID: Int64
+    let sharedAt: Date
+
+    init(_ e: Barkcloud_Files_SharedWithMeEntry) {
+        self.grantID = e.grantID
+        self.file = MediaAsset(e.file)
+        self.ownerUserID = e.ownerUserID
+        self.sharedAt = e.hasSharedAt ? e.sharedAt.date : Date(timeIntervalSince1970: 0)
+    }
+
+    /// `grantID` уникален среди активных грантов и нужен в роли `Identifiable`.
+    var id: String { grantID }
+}
+
+/// Страница списка входящих шаров с курсором пагинации.
+struct SharedWithMePage: Sendable {
+    let items: [SharedFileEntry]
+    let nextCursorSharedAt: Date?
+    let nextCursorGrantID: String
+    var hasMore: Bool { nextCursorSharedAt != nil }
+}
+
 /// Страница медиа-галереи с курсором пагинации.
 struct MediaPage: Sendable {
     let items: [MediaAsset]

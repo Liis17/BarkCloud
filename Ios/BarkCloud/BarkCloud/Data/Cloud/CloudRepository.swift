@@ -140,6 +140,41 @@ final class CloudRepository: Sendable {
         _ = try await stub.shareFileWithUser(req)
     }
 
+    /// Файлы, которыми со мной поделились другие пользователи. От свежих к
+    /// старым. Курсорная пагинация: `cursorSharedAt = nil` — первая страница.
+    func listSharedWithMe(
+        limit: Int = 60,
+        cursorSharedAt: Date? = nil,
+        cursorGrantID: String = ""
+    ) async throws -> SharedWithMePage {
+        let stub = try await grpc.cloudStub()
+        var req = Barkcloud_Files_ListSharedWithMeRequest()
+        req.limit = Int32(max(1, min(200, limit)))
+        if let cursorSharedAt {
+            req.cursorSharedAt = Google_Protobuf_Timestamp(date: cursorSharedAt)
+        }
+        if !cursorGrantID.isEmpty {
+            req.cursorGrantID = cursorGrantID
+        }
+        let resp = try await stub.listSharedWithMe(req)
+        return SharedWithMePage(
+            items: resp.items.map(SharedFileEntry.init),
+            nextCursorSharedAt: resp.hasNextCursorSharedAt ? resp.nextCursorSharedAt.date : nil,
+            nextCursorGrantID: resp.nextCursorGrantID
+        )
+    }
+
+    /// Временный публичный URL для скачивания файла, которым со мной поделились
+    /// (grant-проверка идёт на бэкенде). URL живёт `TempFiles:ExpiresAt` минут,
+    /// потом 404 → надо запросить заново.
+    func getSharedFileDownloadUrl(fileID: String) async throws -> URL? {
+        let stub = try await grpc.cloudStub()
+        var req = Barkcloud_Files_GetSharedFileDownloadUrlRequest()
+        req.fileID = fileID
+        let resp = try await stub.getSharedFileDownloadUrl(req)
+        return URL(string: resp.downloadURL)
+    }
+
     // MARK: - Каталоги
 
     /// Содержимое папки с полной информацией о файлах (превью/размеры). `""` = корень.

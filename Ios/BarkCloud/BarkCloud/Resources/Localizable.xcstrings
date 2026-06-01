@@ -3578,6 +3578,61 @@
         }
       }
     },
+    "shared_with_me_empty_title_real" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Пока ничего не расшарено вам"
+          }
+        }
+      }
+    },
+    "shared_with_me_empty_hint" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Файлы, которыми с вами поделились другие пользователи, появятся здесь."
+          }
+        }
+      }
+    },
+    "shared_download" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Скачать"
+          }
+        }
+      }
+    },
+    "shared_download_failed" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не удалось скачать файл"
+          }
+        }
+      }
+    },
+    "shared_owner_fallback" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Пользователь %@"
+          }
+        }
+      }
+    },
     "snack_public_copied" : {
       "extractionState" : "manual",
       "localizations" : {
