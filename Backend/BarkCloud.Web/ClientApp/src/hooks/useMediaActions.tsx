@@ -109,6 +109,14 @@ export function useMediaActions({ albums, toast, onRenamed, onRemoved, onItemPat
       toast((e as Error).message, 'err');
     }
   }
+  async function addToFavorites(m: MediaItem) {
+    try {
+      await apiPost('/api/cloud/favorites/add', { fileId: m.id });
+      toast('Добавлено в избранное');
+    } catch (e) {
+      toast((e as Error).message, 'err');
+    }
+  }
   async function replaceThumb(m: MediaItem) {
     const [img] = await pickFiles({ accept: 'image/*', multiple: false });
     if (!img) return;
@@ -163,6 +171,7 @@ export function useMediaActions({ albums, toast, onRenamed, onRemoved, onItemPat
         });
       }
     }
+    out.push({ label: 'Добавить в избранное', icon: 'star', onClick: () => addToFavorites(m) });
     out.push({ label: 'Свойства', icon: 'info', onClick: () => setProps(m) });
     out.push({ divider: true });
     out.push({ label: 'Удалить', icon: 'trash', danger: true, disabled: !hasEntry, onClick: () => setConfirm(m) });
