@@ -26,11 +26,18 @@ struct ShareWithUserSheet: View {
     @State private var sharedIDs: Set<Int64> = []
     @State private var snackbar: String?
     @State private var searchTask: Task<Void, Never>?
+    /// Кому уже выдан грант на этот файл — сразу подгружаем при открытии,
+    /// чтобы показать счётчик и баннер «Уже расшарено: N → Управление».
+    /// Пустой массив → баннера нет. Заполняется в `task` через
+    /// `cloud.listMyOutgoingShares`.
+    @State private var outgoingCount: Int = 0
+    @State private var showOutgoing = false
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
                 searchField
+                if outgoingCount > 0 { outgoingBanner }
                 content
             }
             .navigationTitle(String(format: String(localized: "shared_with_user_title"), context.fileName))
@@ -41,9 +48,51 @@ struct ShareWithUserSheet: View {
                 }
             }
             .overlay(alignment: .bottom) { snackbarOverlay }
+            .sheet(isPresented: $showOutgoing) {
+                OutgoingSharesSheet(context: context, onClose: {
+                    showOutgoing = false
+                    Task { await refreshOutgoingCount() }
+                })
+            }
         }
         .presentationDetents([.medium, .large])
         .onDisappear { searchTask?.cancel() }
+        .task { await refreshOutgoingCount() }
+    }
+
+    private var outgoingBanner: some View {
+        Button { showOutgoing = true } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "person.2.fill")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(AppColors.accent)
+                Text(String(format: String(localized: "shared_already_count"), outgoingCount))
+                    .font(AppTypography.bodySmall)
+                    .foregroundStyle(AppColors.onSurface)
+                Spacer()
+                Text(String(localized: "shared_manage_grants"))
+                    .font(AppTypography.bodySmall)
+                    .foregroundStyle(AppColors.accent)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(AppColors.accent)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(AppColors.accent.opacity(0.10))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 16)
+        .padding(.top, 8)
+    }
+
+    /// Подтянуть актуальный счётчик активных грантов на файл — для баннера.
+    /// Вызывается при открытии sheet и после закрытия `OutgoingSharesSheet`
+    /// (в нём могли отозвать).
+    private func refreshOutgoingCount() async {
+        let count = (try? await env.cloudRepository.listMyOutgoingShares(fileID: context.fileID).count) ?? 0
+        outgoingCount = count
     }
 
     private var searchField: some View {
@@ -143,12 +192,14 @@ struct ShareWithUserSheet: View {
     }
 
     private func share(_ user: CloudUser) async {
+        let alreadyShared = sharedIDs.contains(user.id)
         do {
             try await env.cloudRepository.shareFileWithUser(
                 fileID: context.fileID,
                 recipientUserID: user.id
             )
             sharedIDs.insert(user.id)
+            if !alreadyShared { outgoingCount += 1 }
             snackbar = String(format: String(localized: "shared_grant_success"), user.displayName)
         } catch {
             snackbar = String(localized: "shared_grant_failed")

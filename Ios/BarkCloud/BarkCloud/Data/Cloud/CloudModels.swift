@@ -235,6 +235,23 @@ struct SharedWithMePage: Sendable {
     var hasMore: Bool { nextCursorSharedAt != nil }
 }
 
+/// Один исходящий грант — кому конкретно расшарен мой файл. `grantID` — id для
+/// `revokeUserShare`. `recipientUserID` резолвится в `CloudUser` через
+/// `UserRepository.getUser(userID:)` для отображения имени/аватара.
+struct OutgoingShare: Identifiable, Hashable, Sendable {
+    let grantID: String
+    let recipientUserID: Int64
+    let sharedAt: Date
+
+    init(_ e: Barkcloud_Files_OutgoingShareEntry) {
+        self.grantID = e.grantID
+        self.recipientUserID = e.recipientUserID
+        self.sharedAt = e.hasSharedAt ? e.sharedAt.date : Date(timeIntervalSince1970: 0)
+    }
+
+    var id: String { grantID }
+}
+
 /// Страница медиа-галереи с курсором пагинации.
 struct MediaPage: Sendable {
     let items: [MediaAsset]

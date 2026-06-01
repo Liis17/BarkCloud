@@ -1,0 +1,204 @@
+import SwiftUI
+import Observation
+
+/// Sheet «Кто видит этот файл»: список получателей, которым уже выдан грант, с
+/// возможностью отозвать каждый. Открывается из `ShareWithUserSheet` (когда
+/// `outgoingCount > 0`) или напрямую при долгом удержании в будущих UI.
+///
+/// Оптимистичный revoke: убираем из списка сразу, при ошибке возвращаем.
+struct OutgoingSharesSheet: View {
+    let context: ShareWithUserContext
+    let onClose: () -> Void
+
+    @Environment(AppEnvironment.self) private var env
+    @State private var items: [OutgoingShare] = []
+    @State private var owners: [Int64: CloudUser] = [:]
+    @State private var isLoading = true
+    @State private var snackbar: String?
+    @State private var pendingRevoke: OutgoingShare?
+
+    var body: some View {
+        NavigationStack {
+            content
+                .navigationTitle(String(format: String(localized: "shared_outgoing_title"), context.fileName))
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button(String(localized: "shared_done")) { onClose() }
+                    }
+                }
+                .overlay(alignment: .bottom) { snackbarOverlay }
+                .confirmationDialog(
+                    String(localized: "shared_revoke_grant_confirm"),
+                    isPresented: Binding(
+                        get: { pendingRevoke != nil },
+                        set: { if !$0 { pendingRevoke = nil } }
+                    ),
+                    titleVisibility: .visible
+                ) {
+                    Button(String(localized: "shared_revoke"), role: .destructive) {
+                        if let share = pendingRevoke {
+                            Task { await revoke(share) }
+                        }
+                        pendingRevoke = nil
+                    }
+                    Button(String(localized: "action_cancel"), role: .cancel) {
+                        pendingRevoke = nil
+                    }
+                }
+        }
+        .presentationDetents([.medium, .large])
+        .task { await load() }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        if isLoading {
+            ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if items.isEmpty {
+            VStack(spacing: 12) {
+                Image(systemName: "person.2.slash")
+                    .font(.system(size: 48))
+                    .foregroundStyle(AppColors.onSurfaceVariant)
+                Text(String(localized: "shared_outgoing_empty_title"))
+                    .font(AppTypography.titleMedium)
+                    .foregroundStyle(AppColors.onSurface)
+                Text(String(localized: "shared_outgoing_empty_hint"))
+                    .font(AppTypography.bodySmall)
+                    .foregroundStyle(AppColors.onSurfaceVariant)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 24)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+            List {
+                ForEach(items) { share in
+                    OutgoingRow(
+                        share: share,
+                        user: owners[share.recipientUserID],
+                        onRevoke: { pendingRevoke = share }
+                    )
+                }
+            }
+            .listStyle(.plain)
+        }
+    }
+
+    @ViewBuilder
+    private var snackbarOverlay: some View {
+        if let text = snackbar {
+            Text(verbatim: text)
+                .font(AppTypography.bodySmall)
+                .foregroundStyle(AppColors.onSurface)
+                .padding(12)
+                .background(.regularMaterial)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .padding(.bottom, 16)
+                .onAppear {
+                    Task { @MainActor in
+                        try? await Task.sleep(nanoseconds: 2_000_000_000)
+                        snackbar = nil
+                    }
+                }
+        }
+    }
+
+    private func load() async {
+        isLoading = true
+        defer { isLoading = false }
+        do {
+            let result = try await env.cloudRepository.listMyOutgoingShares(fileID: context.fileID)
+            items = result
+            await resolveOwners(for: result)
+        } catch {
+            snackbar = String(localized: "shared_load_failed")
+        }
+    }
+
+    private func resolveOwners(for shares: [OutgoingShare]) async {
+        let ids = Set(shares.map(\.recipientUserID)).subtracting(owners.keys)
+        guard !ids.isEmpty else { return }
+        await withTaskGroup(of: (Int64, CloudUser?).self) { group in
+            for id in ids {
+                group.addTask { @MainActor in
+                    let raw = try? await env.userRepository.getUser(userID: id)
+                    return (id, raw.map(CloudUser.init))
+                }
+            }
+            for await (id, user) in group {
+                if let user { owners[id] = user }
+            }
+        }
+    }
+
+    private func revoke(_ share: OutgoingShare) async {
+        guard let idx = items.firstIndex(where: { $0.id == share.id }) else { return }
+        items.remove(at: idx)
+        do {
+            try await env.cloudRepository.revokeUserShare(grantID: share.grantID)
+            snackbar = String(localized: "shared_grant_revoked")
+        } catch {
+            items.insert(share, at: min(idx, items.count))
+            snackbar = String(localized: "shared_revoke_failed")
+        }
+    }
+}
+
+private struct OutgoingRow: View {
+    let share: OutgoingShare
+    let user: CloudUser?
+    let onRevoke: () -> Void
+
+    var body: some View {
+        HStack(spacing: 12) {
+            avatar
+            VStack(alignment: .leading, spacing: 2) {
+                Text(displayName)
+                    .font(AppTypography.bodyMedium)
+                    .foregroundStyle(AppColors.onSurface)
+                if let user, !user.username.isEmpty {
+                    Text("@\(user.username)")
+                        .font(.system(size: 12))
+                        .foregroundStyle(AppColors.onSurfaceVariant)
+                }
+                Text(share.sharedAt, format: .dateTime.day().month().year())
+                    .font(.system(size: 12))
+                    .foregroundStyle(AppColors.onSurfaceVariant)
+            }
+            Spacer(minLength: 8)
+            Button(action: onRevoke) {
+                Image(systemName: "trash")
+                    .font(.system(size: 16))
+                    .foregroundStyle(AppColors.error)
+                    .frame(width: 36, height: 36)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(String(localized: "shared_revoke"))
+        }
+        .padding(.vertical, 4)
+    }
+
+    private var displayName: String {
+        user?.displayName ?? String(format: String(localized: "shared_owner_fallback"), String(share.recipientUserID))
+    }
+
+    @ViewBuilder
+    private var avatar: some View {
+        ZStack {
+            Circle()
+                .fill(AppColors.onSurface.opacity(0.08))
+                .frame(width: 36, height: 36)
+            if let url = user?.avatarURL {
+                RemoteImage(url: url) {
+                    Image(systemName: "person.fill")
+                        .foregroundStyle(AppColors.onSurfaceVariant)
+                }
+                .frame(width: 36, height: 36)
+                .clipShape(Circle())
+            } else {
+                Image(systemName: "person.fill")
+                    .foregroundStyle(AppColors.onSurfaceVariant)
+            }
+        }
+    }
+}

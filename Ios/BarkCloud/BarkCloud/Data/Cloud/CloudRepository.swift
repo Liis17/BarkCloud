@@ -175,6 +175,26 @@ final class CloudRepository: Sendable {
         return URL(string: resp.downloadURL)
     }
 
+    /// Список активных грантов на один файл — кому я сейчас раздал доступ.
+    /// Сортировка: от свежего к старому (как на бэке).
+    func listMyOutgoingShares(fileID: String) async throws -> [OutgoingShare] {
+        let stub = try await grpc.cloudStub()
+        var req = Barkcloud_Files_ListMyOutgoingSharesRequest()
+        req.fileID = fileID
+        let resp = try await stub.listMyOutgoingShares(req)
+        return resp.items.map(OutgoingShare.init)
+    }
+
+    /// Отозвать грант — у получателя файл сразу пропадёт из «Мне доступны»,
+    /// `getSharedFileDownloadUrl` для него начнёт отдавать ошибку. Идемпотентно:
+    /// повторный revoke на уже отозванном проходит без исключения.
+    func revokeUserShare(grantID: String) async throws {
+        let stub = try await grpc.cloudStub()
+        var req = Barkcloud_Files_RevokeUserShareRequest()
+        req.grantID = grantID
+        _ = try await stub.revokeUserShare(req)
+    }
+
     // MARK: - Каталоги
 
     /// Содержимое папки с полной информацией о файлах (превью/размеры). `""` = корень.
