@@ -9,14 +9,13 @@ import { AlbumDetail } from '../components/albums/AlbumDetail';
 import { useToast } from '../hooks/useToast';
 import { useInfiniteMedia } from '../hooks/useInfiniteMedia';
 import { useMediaActions } from '../hooks/useMediaActions';
+import { useDuplicatePrompt } from '../hooks/useDuplicatePrompt';
 import { useFileDrop } from '../hooks/useFileDrop';
 import { useBulkMedia } from '../hooks/useBulkMedia';
 import { usePageHeader } from '../hooks/usePageHeader';
-import { apiGet, apiPost, pickFiles, uploadFile } from '../lib/api';
+import { apiGet, apiPost, pickFiles, uploadFile, checkDuplicate } from '../lib/api';
 import { plural, dateLabel } from '../lib/format';
 import type { Album, MediaItem } from '../lib/types';
-
-const RECENT_FOLDER = 'Недавно загруженные';
 
 function fmtSize(bytes: number): string {
   if (!bytes) return '0 Б';
@@ -87,6 +86,7 @@ export function VideosPage() {
   const [creating, setCreating] = React.useState(false);
   const [upload, setUpload] = React.useState<UploadState | null>(null);
   const [toastNode, toast] = useToast();
+  const dup = useDuplicatePrompt();
 
   const { items: videos, loading, done, sentinelRef, removeItem, updateItem, reload } = useInfiniteMedia('video', toast);
 
@@ -112,42 +112,36 @@ export function VideosPage() {
     reloadAlbums: loadAlbums,
   });
 
-  async function ensureRecentFolder(): Promise<string> {
-    const d = await apiGet<{ dirs?: { id: string; name: string }[] }>('/api/cloud/list?dir=');
-    const found = (d.dirs || []).find((x) => x.name === RECENT_FOLDER);
-    if (found) return found.id;
-    const created = await apiPost<{ id: string }>('/api/cloud/dir', { name: RECENT_FOLDER });
-    return created.id;
-  }
-
   async function doUpload(dropped?: File[]) {
     const files = dropped && dropped.length ? dropped : await pickFiles({ accept: 'video/*' });
     if (!files.length) return;
-    let folderId: string | null = null;
-    try {
-      folderId = await ensureRecentFolder();
-    } catch {
-      /* без папки — видео всё равно попадёт в галерею */
-    }
-    let count = 0;
+    let processed = 0;
+    let uploaded = 0;
     for (const f of files) {
-      setUpload({ current: count + 1, total: files.length, pct: 0 });
+      setUpload({ current: processed + 1, total: files.length, pct: 0 });
       try {
-        const res = await uploadFile(f, (p) => setUpload({ current: count + 1, total: files.length, pct: Math.round(p * 100) }));
-        if (folderId && res && res.fileId) {
+        const d = await checkDuplicate(f);
+        if (d.exists && !(await dup.ask(f.name, d.locations))) {
+          processed++;
+          continue;
+        }
+        const res = await uploadFile(f, (p) => setUpload({ current: processed + 1, total: files.length, pct: Math.round(p * 100) }));
+        if (res?.fileId) {
+          // Загрузка с вкладки «Видео» → авто-распределение по типу в системную папку.
           try {
-            await apiPost('/api/cloud/attach', { dir: folderId, fileId: res.fileId, name: res.name || f.name });
+            await apiPost('/api/cloud/attach', { fileId: res.fileId, name: res.name || f.name, routeByMediaKind: true });
           } catch {
             /* attach best-effort */
           }
         }
+        uploaded++;
       } catch (e) {
         toast(`«${f.name}»: ${(e as Error).message}`, 'err');
       }
-      count++;
+      processed++;
     }
     setUpload(null);
-    toast(`Загружено: ${count} ${plural(count, 'видео', 'видео', 'видео')}`);
+    if (uploaded > 0) toast(`Загружено: ${uploaded} ${plural(uploaded, 'видео', 'видео', 'видео')}`);
     reload();
   }
 
@@ -192,6 +186,7 @@ export function VideosPage() {
     <>
       {toastNode}
       {actionsCtx.overlay}
+      {dup.overlay}
       {bulk.bar}
       {bulk.overlay}
 
