@@ -19,6 +19,7 @@ struct CloudBrowserScreen: View {
     @State private var renameText = ""
     @State private var moveSubject: MoveSubject?
     @State private var openFile: CloudFileEntry?
+    @State private var shareWithUserContext: ShareWithUserContext?
 
     var body: some View {
         Group {
@@ -59,6 +60,10 @@ struct CloudBrowserScreen: View {
                 performMove(subject, to: targetID)
             }
         }
+        .sheet(item: $shareWithUserContext) { context in
+            ShareWithUserSheet(context: context) { shareWithUserContext = nil }
+        }
+        .overlay(alignment: .bottom) { if let vm { snackbarView(vm) } }
         .fullScreenCover(item: $openFile) { entry in
             NavigationStack {
                 RemoteFilePreviewScreen(fileID: entry.fileID, fileName: entry.name, transfer: env.fileTransfer, cache: env.fileCache)
@@ -117,6 +122,34 @@ struct CloudBrowserScreen: View {
                             renameButton {
                                 renameText = entry.name
                                 renameSubject = .file(entry)
+                            }
+                        }
+                        .contextMenu {
+                            Button {
+                                Task { await vm.makePublic(entry) }
+                            } label: {
+                                Label(String(localized: "ctx_make_public"), systemImage: "link")
+                            }
+                            Button {
+                                shareWithUserContext = ShareWithUserContext(fileID: entry.fileID, fileName: entry.name)
+                            } label: {
+                                Label(String(localized: "shared_with_user_action"), systemImage: "person.2")
+                            }
+                            Button {
+                                renameText = entry.name
+                                renameSubject = .file(entry)
+                            } label: {
+                                Label(String(localized: "action_rename"), systemImage: "pencil")
+                            }
+                            Button {
+                                moveSubject = .file(entry)
+                            } label: {
+                                Label(String(localized: "action_move"), systemImage: "folder")
+                            }
+                            Button(role: .destructive) {
+                                vm.deleteFile(entry)
+                            } label: {
+                                Label(String(localized: "action_delete"), systemImage: "trash")
                             }
                         }
                 }
@@ -194,6 +227,25 @@ struct CloudBrowserScreen: View {
                     Image(systemName: "plus")
                 }
             }
+        }
+    }
+
+    @ViewBuilder
+    private func snackbarView(_ vm: CloudBrowserViewModel) -> some View {
+        if let text = vm.state.snackbar {
+            Text(verbatim: text)
+                .font(AppTypography.bodySmall)
+                .foregroundStyle(AppColors.onSurface)
+                .padding(12)
+                .background(.regularMaterial)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .padding(.bottom, 16)
+                .onAppear {
+                    Task { @MainActor in
+                        try? await Task.sleep(nanoseconds: 2_000_000_000)
+                        vm.snackbarShown()
+                    }
+                }
         }
     }
 
