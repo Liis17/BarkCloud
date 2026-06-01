@@ -15,10 +15,13 @@ struct BarkCloudApp: App {
         .onChange(of: scenePhase) { _, phase in
             // Возврат на передний план (в т.ч. после шеринга): догрузить ящик,
             // пересканировать медиатеку на новые фото, вернуть Live Activity
-            // в обычный режим (с прогрессом).
+            // в обычный режим (с прогрессом). Также пере-цепляемся к
+            // background URLSession — иначе orphan-jobs (которые продолжил
+            // iOS-демон пока main app был свернут) не подхватываются.
             if phase == .active {
                 env.shareInboxUploader.uploadPendingIfNeeded()
                 Task {
+                    await env.backgroundUploads.attachAndResubmitOrphans()
                     await env.backupManager.refreshScanForNewAssets()
                     await UploadLiveActivityController.shared.setForegroundActive(true)
                 }

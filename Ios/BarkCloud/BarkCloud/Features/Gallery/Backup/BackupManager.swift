@@ -177,16 +177,21 @@ final class BackupManager {
         autoUploadEnabled = on
         settings.autoUploadEnabled = on
         if on {
+            // Сбрасываем кеш processedAssetIDs — при предыдущем выключении мы
+            // могли потерять pendingUpload (отмена in-flight jobs) и теперь
+            // нужно дать scan'у снова разложить ассеты по бакетам. Иначе
+            // pendingUpload останется пуст и uploadLoop сразу же выйдет.
+            processedAssetIDs.removeAll()
+            didStartScan = false
             startScanIfNeeded()
             startUploadLoop()
         } else {
-            // Останавливаем продюсера, очищаем pending-очередь и отменяем
-            // уже подавшие живые background-задачи именно с источником .backup
-            // (manual/share не трогаем). Иначе уже поставленные в URLSession
-            // jobs продолжали бы грузиться независимо от тогла.
+            // Останавливаем продюсера и отменяем уже поданные в URLSession
+            // backup-jobs (manual/share не трогаем). pendingUpload оставляем —
+            // он переживёт re-toggle, чтобы при повторном включении не ждать
+            // полного re-scan'a.
             uploadTask?.cancel()
             uploadTask = nil
-            pendingUpload.removeAll()
             currentAsset = nil
             Task { await BackgroundUploadCoordinator.shared.cancelActiveJobs(source: .backup) }
         }
