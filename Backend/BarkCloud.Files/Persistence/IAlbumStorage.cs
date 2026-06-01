@@ -14,6 +14,7 @@ public interface IAlbumStorage
     Task<HashSet<Guid>> GetExistingItemFileIds(Guid albumId, IReadOnlyCollection<Guid> fileIds, CancellationToken cancellationToken = default);
     Task AddItems(IEnumerable<AlbumItem> items, CancellationToken cancellationToken = default);
     Task<int> RemoveItems(Guid albumId, IReadOnlyCollection<Guid> fileIds, CancellationToken cancellationToken = default);
+    Task<int> RemoveFileFromAllAlbums(long ownerId, Guid fileId, CancellationToken cancellationToken = default);
     Task<List<AlbumItem>> ListItemsPage(Guid albumId, DateTime? cursorAddedAt, Guid? cursorFileId, int limit, CancellationToken cancellationToken = default);
     Task<AlbumItem?> GetFirstItem(Guid albumId, CancellationToken cancellationToken = default);
 }

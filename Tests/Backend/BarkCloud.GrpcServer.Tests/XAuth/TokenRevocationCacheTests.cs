@@ -9,7 +9,7 @@ public class TokenRevocationCacheTests
     {
         var sut = new TokenRevocationCache();
 
-        sut.IsRevoked(userId: 1, deviceId: "d1").Should().BeFalse();
+        sut.IsRevoked(userId: 1, deviceId: "d1", tokenIssuedAt: DateTime.UtcNow).Should().BeFalse();
     }
 
     [Fact]
@@ -19,7 +19,7 @@ public class TokenRevocationCacheTests
 
         sut.Revoke(userId: 1, deviceId: "d1", accessTokenExpiresAt: DateTime.UtcNow.AddHours(1));
 
-        sut.IsRevoked(1, "d1").Should().BeTrue();
+        sut.IsRevoked(1, "d1", DateTime.UtcNow.AddMinutes(-1)).Should().BeTrue();
     }
 
     [Fact]
@@ -29,8 +29,8 @@ public class TokenRevocationCacheTests
 
         sut.Revoke(1, "d1", DateTime.UtcNow.AddHours(1));
 
-        sut.IsRevoked(1, "d2").Should().BeFalse();
-        sut.IsRevoked(2, "d1").Should().BeFalse();
+        sut.IsRevoked(1, "d2", DateTime.UtcNow).Should().BeFalse();
+        sut.IsRevoked(2, "d1", DateTime.UtcNow).Should().BeFalse();
     }
 
     [Fact]
@@ -42,8 +42,8 @@ public class TokenRevocationCacheTests
 
         sut.Cleanup();
 
-        sut.IsRevoked(1, "expired").Should().BeFalse();
-        sut.IsRevoked(2, "live").Should().BeTrue();
+        sut.IsRevoked(1, "expired", DateTime.UtcNow.AddMinutes(-1)).Should().BeFalse();
+        sut.IsRevoked(2, "live", DateTime.UtcNow.AddMinutes(-1)).Should().BeTrue();
     }
 
     [Fact]
@@ -55,7 +55,7 @@ public class TokenRevocationCacheTests
 
         sut.Cleanup();
 
-        sut.IsRevoked(1, "a").Should().BeTrue();
-        sut.IsRevoked(2, "b").Should().BeTrue();
+        sut.IsRevoked(1, "a", DateTime.UtcNow.AddMinutes(-1)).Should().BeTrue();
+        sut.IsRevoked(2, "b", DateTime.UtcNow.AddMinutes(-1)).Should().BeTrue();
     }
 }

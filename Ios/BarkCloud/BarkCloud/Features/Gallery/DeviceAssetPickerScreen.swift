@@ -34,7 +34,8 @@ final class DeviceAssetPickerViewModel {
 
     /// Трекер наличия в облаке (бейдж «уже загружено»).
     let presence: CloudPresenceTracker
-    /// Блокировать выбор уже загруженных (дубликат бессмысленен) — см. экран.
+    /// Предупреждать о дубликатах: при подтверждении показать модалку, если среди
+    /// выбранных есть уже загруженные (галерея — да; альбом — нет, дубль осмыслен).
     let blockAlreadyUploaded: Bool
 
     private let filter: DeviceAssetPickerFilter
@@ -55,13 +56,14 @@ final class DeviceAssetPickerViewModel {
         if selection.contains(id) { selection.remove(id) } else { selection.insert(id) }
     }
 
-    /// Выбранные ассеты в порядке сетки. В режиме блокировки дубликатов отсекаем
-    /// те, что уже точно в облаке (на случай гонки выбора и определения хеша).
+    /// Выбранные ассеты в порядке сетки.
     func selectedAssets() -> [PHAsset] {
-        assets.filter {
-            selection.contains($0.localIdentifier)
-                && !(blockAlreadyUploaded && presence.isInCloud($0.localIdentifier))
-        }
+        assets.filter { selection.contains($0.localIdentifier) }
+    }
+
+    /// Выбранные ассеты, которые уже есть в облаке (для предупреждения о дубликатах).
+    func selectedDuplicates() -> [PHAsset] {
+        selectedAssets().filter { presence.isInCloud($0.localIdentifier) }
     }
 
     func loadIfNeeded() async {
@@ -102,8 +104,8 @@ struct DeviceAssetPickerScreen: View {
     let filter: DeviceAssetPickerFilter
     /// Подпись кнопки подтверждения («Загрузить» / «Добавить»).
     let confirmTitle: String
-    /// `true` — для вкладок Фото/Видео (повторная загрузка дубликата не нужна);
-    /// `false` — для альбома (файл может быть в облаке, но не в этом альбоме).
+    /// `true` — для вкладок Фото/Видео (предупреждать перед повторной загрузкой дубликата);
+    /// `false` — для альбома (дубль в альбом осмыслен, без предупреждения).
     var blockAlreadyUploaded: Bool = true
     let onConfirm: ([PHAsset]) -> Void
 
@@ -112,6 +114,7 @@ struct DeviceAssetPickerScreen: View {
     @Environment(\.openURL) private var openURL
 
     @State private var vm: DeviceAssetPickerViewModel?
+    @State private var pendingDuplicates: [PHAsset]?
 
     private static let spacing: CGFloat = 2
     private let columns = Array(repeating: GridItem(.flexible(), spacing: spacing), count: 3)
@@ -166,30 +169,58 @@ struct DeviceAssetPickerScreen: View {
             LazyVGrid(columns: columns, spacing: Self.spacing) {
                 ForEach(vm.assets, id: \.localIdentifier) { asset in
                     let inCloud = vm.presence.isInCloud(asset.localIdentifier)
-                    let blocked = vm.blockAlreadyUploaded && inCloud
                     DeviceMediaThumb(
                         asset: asset,
                         isSelecting: true,
                         isSelected: vm.isSelected(asset),
                         isInCloud: inCloud
                     )
-                    .opacity(blocked ? 0.45 : 1)
-                    .onTapGesture {
-                        if !blocked { vm.toggle(asset) }
-                    }
+                    .onTapGesture { vm.toggle(asset) }
                     .onAppear { vm.presence.observe(asset) }
                 }
             }
         }
         .safeAreaInset(edge: .bottom) { confirmBar(vm) }
+        .confirmationDialog(
+            "Некоторые файлы уже загружены",
+            isPresented: Binding(
+                get: { pendingDuplicates != nil },
+                set: { if !$0 { pendingDuplicates = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Загрузить всё") {
+                if let selected = pendingDuplicates {
+                    onConfirm(selected)
+                    dismiss()
+                }
+                pendingDuplicates = nil
+            }
+            Button("Только новые") {
+                if let selected = pendingDuplicates {
+                    let fresh = selected.filter { !vm.presence.isInCloud($0.localIdentifier) }
+                    onConfirm(fresh)
+                    dismiss()
+                }
+                pendingDuplicates = nil
+            }
+            Button("Отмена", role: .cancel) { pendingDuplicates = nil }
+        } message: {
+            Text("Часть выбранных файлов уже есть в облаке. Загрузить их ещё раз?")
+        }
     }
 
     @ViewBuilder
     private func confirmBar(_ vm: DeviceAssetPickerViewModel) -> some View {
         if vm.hasSelection {
             Button {
-                onConfirm(vm.selectedAssets())
-                dismiss()
+                let selected = vm.selectedAssets()
+                if vm.blockAlreadyUploaded && !vm.selectedDuplicates().isEmpty {
+                    pendingDuplicates = selected
+                } else {
+                    onConfirm(selected)
+                    dismiss()
+                }
             } label: {
                 Label("\(confirmTitle) (\(vm.selection.count))", systemImage: "icloud.and.arrow.up")
                     .font(AppTypography.titleMedium)

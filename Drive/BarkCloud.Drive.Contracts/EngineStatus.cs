@@ -12,6 +12,9 @@ public sealed class EngineStatus
     public string? Message { get; set; }
     public string? Error { get; set; }
 
+    // Последняя ошибка синхронизации файла в облако (Cleanup/PersistSession) — чтобы не глушить её молча.
+    public string? LastSyncError { get; set; }
+
     // Профиль/окружение для дашборда.
     public string? Username { get; set; }
     public string? ServerHost { get; set; }

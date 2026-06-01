@@ -56,6 +56,46 @@ public class CloudHierarchyStorage : ICloudHierarchyStorage
         return directory;
     }
 
+    /// <summary>
+    /// Возвращает id системной папки владельца указанного типа, создавая её при отсутствии.
+    /// Поиск идёт по флагу SystemKind (устойчив к переименованию). Если у владельца уже есть
+    /// обычная папка с каноническим именем в корне — она «повышается» до системной.
+    /// </summary>
+    public async Task<Guid> EnsureSystemDirectory(long ownerId, CloudDirectorySystemKind kind, string canonicalName, CancellationToken cancellationToken = default)
+    {
+        var existing = await _context.CloudDirectories
+            .FirstOrDefaultAsync(x => x.OwnerId == ownerId && x.SystemKind == kind, cancellationToken);
+        if (existing is not null)
+            return existing.Id;
+
+        // Есть пользовательская папка с тем же именем в корне — повышаем её до системной,
+        // чтобы не упереться в уникальный индекс (OwnerId, ParentId, Name) и не плодить дубль.
+        var byName = await _context.CloudDirectories
+            .FirstOrDefaultAsync(x => x.OwnerId == ownerId && x.ParentId == null && x.Name == canonicalName, cancellationToken);
+        if (byName is not null)
+        {
+            byName.SystemKind = kind;
+            byName.UpdatedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync(cancellationToken);
+            return byName.Id;
+        }
+
+        var now = DateTime.UtcNow;
+        var directory = new CloudDirectory
+        {
+            Id = Guid.NewGuid(),
+            OwnerId = ownerId,
+            ParentId = null,
+            Name = canonicalName,
+            SystemKind = kind,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+        _context.CloudDirectories.Add(directory);
+        await _context.SaveChangesAsync(cancellationToken);
+        return directory.Id;
+    }
+
     public async Task UpdateDirectory(CloudDirectory directory, CancellationToken cancellationToken = default)
     {
         _context.CloudDirectories.Update(directory);

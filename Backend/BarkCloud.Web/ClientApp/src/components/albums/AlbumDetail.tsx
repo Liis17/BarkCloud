@@ -5,7 +5,11 @@ import { Lightbox } from '../media/Lightbox';
 import { Loading, EmptyState } from '../ui/EmptyState';
 import { AlbumFormModal } from './AlbumFormModal';
 import { PickMediaModal } from './PickMediaModal';
+import { useContextMenu, type ContextItem } from '../ui/ContextMenu';
+import { PropertiesModal } from '../ui/PropertiesModal';
+import { ShareWithUserModal } from '../ui/ShareWithUserModal';
 import { apiGet, apiPost } from '../../lib/api';
+import { createShare } from '../../lib/share';
 import { GRID_SIZES } from '../../lib/format';
 import type { Album, CardFile, Page } from '../../lib/types';
 import type { ToastPush } from '../../hooks/useToast';
@@ -25,6 +29,9 @@ export function AlbumDetail({ album, candidates, gridSizes = GRID_SIZES, onBack,
   const [lightbox, setLightbox] = React.useState<number | null>(null);
   const [editing, setEditing] = React.useState(false);
   const [picking, setPicking] = React.useState(false);
+  const [props, setProps] = React.useState<CardFile | null>(null);
+  const [shareWith, setShareWith] = React.useState<CardFile | null>(null);
+  const { menu, openAt } = useContextMenu();
 
   const load = React.useCallback(() => {
     setItems(null);
@@ -75,6 +82,25 @@ export function AlbumDetail({ album, candidates, gridSizes = GRID_SIZES, onBack,
       toast((e as Error).message, 'err');
     }
   }
+  async function addToFavorites(id: string) {
+    try {
+      await apiPost('/api/cloud/favorites/add', { fileId: id });
+      toast('Добавлено в избранное');
+    } catch (e) {
+      toast((e as Error).message, 'err');
+    }
+  }
+  function itemMenu(m: CardFile): ContextItem[] {
+    return [
+      { label: 'Сделать обложкой', icon: 'photo', onClick: () => setCover(m.id) },
+      { label: 'Добавить в избранное', icon: 'star', onClick: () => addToFavorites(m.id) },
+      { label: 'Создать публичную ссылку', icon: 'share', onClick: () => createShare(m.id, m.name, toast) },
+      { label: 'Поделиться с пользователем', icon: 'user', onClick: () => setShareWith(m) },
+      { label: 'Свойства', icon: 'info', onClick: () => setProps(m) },
+      { divider: true },
+      { label: 'Убрать из альбома', icon: 'x', danger: true, onClick: () => removeItem(m.id) },
+    ];
+  }
 
   return (
     <div>
@@ -117,7 +143,7 @@ export function AlbumDetail({ album, candidates, gridSizes = GRID_SIZES, onBack,
       ) : (
         <div className="photo-grid">
           {items.map((m, idx) => (
-            <div key={m.id} className="photo" onClick={() => setLightbox(idx)}>
+            <div key={m.id} className="photo" onClick={() => setLightbox(idx)} onContextMenu={(e) => openAt(e, itemMenu(m))}>
               <MediaThumb media={m} sizes={gridSizes} />
               {m.kind === 'video' && (
                 <div className="vbadge">
@@ -153,6 +179,11 @@ export function AlbumDetail({ album, candidates, gridSizes = GRID_SIZES, onBack,
         <PickMediaModal candidates={candidates} exclude={excludeIds} onClose={() => setPicking(false)} onAdd={addItems} toast={toast} />
       )}
       {lightbox !== null && items && <Lightbox items={items} index={lightbox} onClose={() => setLightbox(null)} />}
+      {props && <PropertiesModal fileId={props.id} fallback={props} onClose={() => setProps(null)} />}
+      {shareWith && (
+        <ShareWithUserModal fileId={shareWith.id} fileName={shareWith.name} onClose={() => setShareWith(null)} toast={toast} />
+      )}
+      {menu}
     </div>
   );
 }

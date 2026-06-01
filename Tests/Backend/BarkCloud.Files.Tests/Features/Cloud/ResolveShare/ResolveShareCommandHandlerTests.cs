@@ -8,6 +8,9 @@ using Microsoft.Extensions.Logging.Abstractions;
 using DomainShareLink = BarkCloud.Files.Domain.ShareLink;
 using TempFileEntity = BarkCloud.Files.Domain.TempFile;
 using UploadFileEntity = BarkCloud.Files.Domain.UploadFile;
+using DomainMediaKind = BarkCloud.Files.Domain.MediaKind;
+using FilePreviewEntity = BarkCloud.Files.Domain.FilePreview;
+using ProtoMediaKind = BarkCloud.Proto.Files.MediaKind;
 
 namespace BarkCloud.Files.Tests.Features.Cloud.ResolveShare;
 
@@ -47,15 +50,25 @@ public class ResolveShareCommandHandlerTests
     }
 
     [Fact]
-    public async Task Handle_HappyPath_IncrementsClicksAndReturnsUrl()
+    public async Task Handle_HappyPath_IncrementsClicksAndReturnsUrlWithPreview()
     {
         var fileId = Guid.NewGuid();
         var tempId = Guid.NewGuid();
+        var previewLarge = Guid.NewGuid();
         var share = new DomainShareLink { Id = Guid.NewGuid(), FileId = fileId, Token = "t", Name = "Pic" };
         _storage.Setup(s => s.GetByToken("t", It.IsAny<CancellationToken>())).ReturnsAsync(share);
-        _files.Setup(s => s.GetFile(fileId)).ReturnsAsync(new UploadFileEntity { Id = fileId });
+        _files.Setup(s => s.GetFile(fileId)).ReturnsAsync(new UploadFileEntity
+        {
+            Id = fileId, MediaKind = DomainMediaKind.Photo, ImageWidth = 800, ImageHeight = 600, Size = 12345
+        });
         _temp.Setup(s => s.CreateTempFilesBatchAsync(It.IsAny<IEnumerable<Guid>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<TempFileEntity> { new() { Id = tempId, OriginalFileId = fileId } });
+        _files.Setup(s => s.GetPreviewsForFile(fileId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<FilePreviewEntity>
+            {
+                new() { PreviewFileId = Guid.NewGuid(), TargetWidth = 128 },
+                new() { PreviewFileId = previewLarge, TargetWidth = 512 }
+            });
 
         var response = await CreateSut().Handle(new ResolveShareCommand { Token = "t" }, default);
 
@@ -63,6 +76,10 @@ public class ResolveShareCommandHandlerTests
         response.FileId.Should().Be(fileId.ToString());
         response.Name.Should().Be("Pic");
         response.DownloadUrl.Should().Contain(tempId.ToString());
+        response.MediaKind.Should().Be(ProtoMediaKind.Photo);
+        response.PreviewUrl.Should().Contain(previewLarge.ToString()); // берётся самое крупное превью
+        response.ImageWidth.Should().Be(800);
+        response.FileSize.Should().Be(12345);
         _storage.Verify(s => s.IncrementClicks(share.Id, It.IsAny<CancellationToken>()), Times.Once);
     }
 }

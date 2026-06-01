@@ -184,6 +184,33 @@ public static class WebEndpoints
             }
         });
 
+        // Анонимный JSON для публичной страницы просмотра (/v/{token}): метаданные + превью.
+        app.MapGet("/s/{token}/info", async (string token, FilesServerApi.FilesServerApiClient filesServer) =>
+        {
+            try
+            {
+                var resp = await filesServer.ResolveShareAsync(new ResolveShareRequest { Token = token });
+                if (!resp.Found)
+                    return Results.NotFound(new { found = false });
+
+                return Results.Json(new
+                {
+                    found = true,
+                    name = resp.Name,
+                    mediaKind = resp.MediaKind.ToString().ToLowerInvariant(),
+                    previewUrl = resp.PreviewUrl,
+                    imageWidth = resp.ImageWidth,
+                    imageHeight = resp.ImageHeight,
+                    fileSize = resp.FileSize,
+                    downloadPath = "/s/" + token,
+                });
+            }
+            catch (RpcException)
+            {
+                return Results.NotFound(new { found = false });
+            }
+        });
+
         // ───────── Защищённые страницы ─────────
         // Страницы приложения (/photos, /videos, /files, /favorites, /trash, /settings, /shared)
         // отдаёт React-SPA через SPA-fallback в Program.cs (UseStaticFiles + MapFallback).

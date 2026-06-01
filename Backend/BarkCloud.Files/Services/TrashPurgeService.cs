@@ -52,8 +52,8 @@ public class TrashPurgeService : ITrashPurgeService
             .ToList();
         var entryIds = entries.Select(e => e.Id).ToList();
 
-        // 1. Убираем файлы из альбомов, избранного и публичных ссылок владельца, удаляем сами
-        //    записи иерархии.
+        // 1. Убираем файлы из альбомов, избранного, публичных ссылок и грантов доступа владельца,
+        //    удаляем сами записи иерархии.
         foreach (var pair in pairs)
         {
             await _context.AlbumItems
@@ -66,6 +66,10 @@ public class TrashPurgeService : ITrashPurgeService
 
             await _context.ShareLinks
                 .Where(s => s.OwnerId == pair.OwnerId && s.FileId == pair.FileId)
+                .ExecuteDeleteAsync(cancellationToken);
+
+            await _context.FileGrants
+                .Where(g => g.OwnerId == pair.OwnerId && g.FileId == pair.FileId)
                 .ExecuteDeleteAsync(cancellationToken);
         }
 

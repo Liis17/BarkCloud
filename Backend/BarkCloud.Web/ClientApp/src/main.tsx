@@ -13,11 +13,13 @@ import { FavoritesPage } from './pages/FavoritesPage';
 import { TrashPage } from './pages/TrashPage';
 import { SharedPage } from './pages/SharedPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { PublicViewPage } from './pages/PublicViewPage';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <BrowserRouter>
       <Routes>
+        <Route path="v/:token" element={<PublicViewPage />} />
         <Route element={<AppShell />}>
           <Route index element={<Navigate to="/photos" replace />} />
           <Route path="photos" element={<PhotosPage />} />

@@ -5,7 +5,7 @@ Parent: [[index]] · See also: [[api/files-api]] · [[modules/backend-files-clou
 ## Назначение
 
 Сервис файлов. Основные ответственности:
-1. **Загрузка/скачивание**: presigned URL в MinIO, дедупликация по хешу, квоты, временные файлы, сжатие изображений, превью видео (FFmpeg), перекодирование HEIC→JPEG (FFmpeg) при загрузке + разовый бэкафилл превью для легаси-файлов при старте
+1. **Загрузка/скачивание**: presigned URL в MinIO, квоты, временные файлы, сжатие изображений, превью видео (FFmpeg), перекодирование HEIC→JPEG (FFmpeg) при загрузке + разовый бэкафилл превью для легаси-файлов при старте. **Дедупликация контента по хешу снята** — одинаковые файлы сохраняются как отдельные блобы (хеш пишется для проверок наличия; превью по-прежнему дедуплицируются по SHA256)
 2. **Облачная иерархия** (NextCloud-подобная): папки + записи о файлах — см. дочернюю заметку [[modules/backend-files-cloud]]
 3. **Галерея и альбомы**: классификация медиа (`MediaKind`), раздельные списки фото/видео (`ListUserMedia`), универсальные альбомы фото/видео (`AlbumApi`)
 
@@ -25,9 +25,10 @@ Parent: [[index]] · See also: [[api/files-api]] · [[modules/backend-files-clou
 - `CloudDirectory.cs` — папка в облачной иерархии → [[modules/backend-files-cloud]]
 - `CloudFileEntry.cs` — запись о файле в иерархии → [[modules/backend-files-cloud]]
 - `Album.cs` — альбом (универсальная коллекция фото/видео): `Name`, `Description`, `CoverFileId`
-- `AlbumItem.cs` — привязка файла к альбому (many-to-many)
+- `AlbumItem.cs` — привязка файла к альбому (many-to-many). При безвозвратном удалении файла (`DeleteUserMedia` hard-delete, `TrashPurge`, `UserDeleted`) членство чистится явно, обложки переустанавливаются на первый оставшийся элемент
 - `FavoriteFile.cs` — отметка «избранное» на уровне пользователя (`OwnerId`+`FileId`, уникальна). Привязка к блобу, а не к записи иерархии → покрывает и фото/видео из галереи, и файлы/документы из папок
 - `ShareLink.cs` — постоянная публичная ссылка на блоб (`OwnerId`, `FileId`, уникальный `Token`, `Name`, `CreatedAt`, `ClickCount`). Названа `ShareLink` (не `FileShare`) во избежание коллизии с `System.IO.FileShare`
+- `FileGrant.cs` — приватный грант доступа к блобу конкретному пользователю (`OwnerId`→`RecipientId`→`FileId`, уникальная тройка). Получатель видит файл в «мне доступны», смотрит/скачивает (без редактирования/ре-шаринга); чистится при удалении файла/аккаунта
 - `FileMetadata.cs` — метаданные блоба 1:1 к `UploadFile` через `FileId`-PK (24 nullable-поля): GPS (`Latitude`/`Longitude`/`Altitude`), `TakenAt`, `CreatorTool`, камера (`CameraMake`/`CameraModel`/`LensModel`), параметры съёмки (`FocalLengthMm`, `FNumber`, `ExposureTimeSeconds`, `Iso`, `Orientation`, `Flash`), видео (`DurationSeconds`, `VideoCodec`, `AudioCodec`, `Bitrate`, `FrameRate`), документ (`DocumentAuthor`, `DocumentTitle`, `DocumentSubject`, `DocumentPageCount`). Привязка к блобу, а не к пользователю — дедупликация прозрачна
 
 ### Host
@@ -90,7 +91,7 @@ Parent: [[index]] · See also: [[api/files-api]] · [[modules/backend-files-clou
 
 ### Consumers
 - `SessionRevokedConsumer.cs` — слушает `SessionRevokedEvent` из [[modules/shared-queue]]
-- `UserDeletedConsumer.cs` — по `UserDeleted` (из [[modules/backend-users]]) снимает пользователя из `Uploaders` всех его блобов (освобождает квоту) и удаляет его `CloudDirectories`/`CloudFileEntries`/`Albums`/`AlbumItems`/`FavoriteFiles`/`ShareLinks`. Физическое удаление осиротевших S3-блобов делает фоновый `OrphanBlobCleanupService`
+- `UserDeletedConsumer.cs` — по `UserDeleted` (из [[modules/backend-users]]) снимает пользователя из `Uploaders` всех его блобов (освобождает квоту) и удаляет его `CloudDirectories`/`CloudFileEntries`/`Albums`/`AlbumItems`/`FavoriteFiles`/`ShareLinks`/`FileGrants` (как владельца и как получателя). Физическое удаление осиротевших S3-блобов делает фоновый `OrphanBlobCleanupService`
 
 ### Прочее
 - `Extensions/FileExtensions.cs`, `Extensions/ServiceCollectionExtensions.cs`
@@ -109,7 +110,7 @@ Parent: [[index]] · See also: [[api/files-api]] · [[modules/backend-files-clou
 | `UploadFile` | Серверная загрузка файла |
 | `GetTempDownloadUrl` | Временные ссылки на скачивание + превью |
 | `DownloadFile` | Скачивание (через контроллер) |
-| `CheckFileHash` | Проверка дедупликации (одиночный; добавляет юзера в uploaders) |
+| `CheckFileHash` | Проверка наличия по хешу (без побочных эффектов); возвращает `exists` + локации копий пользователя (имя+папка) для модалки «файл уже есть» |
 | `CheckFileHashes` | Пакетная проверка наличия по списку SHA256-хешей (без побочных эффектов; для пассивной индикации «в облаке») |
 | `GetFileData` / `GetFilesData` | Метаданные файла(ов) |
 | `GetFileMetadata` | EXIF/ffprobe/PDF/Office метаданные блоба (для диалога «Свойства»). Только собственные файлы (по `Uploaders`). Возвращает `HasMetadata=false`, если ничего не извлекалось |

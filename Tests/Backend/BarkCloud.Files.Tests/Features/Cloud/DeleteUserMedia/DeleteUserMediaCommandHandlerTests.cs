@@ -13,9 +13,10 @@ public class DeleteUserMediaCommandHandlerTests
     private const long OwnerId = 42;
     private readonly Mock<ICloudHierarchyStorage> _hierarchy = new();
     private readonly Mock<IUploadedFilesStorage> _files = new();
+    private readonly Mock<IAlbumStorage> _albums = new();
 
     private DeleteUserMediaCommandHandler CreateSut() => new(
-        _hierarchy.Object, _files.Object,
+        _hierarchy.Object, _files.Object, _albums.Object,
         UserContextFactory.Create(OwnerId),
         NullLogger<DeleteUserMediaCommandHandler>.Instance);
 
@@ -36,6 +37,8 @@ public class DeleteUserMediaCommandHandlerTests
         entries[0].PurgeAt.Should().NotBeNull();
         _hierarchy.Verify(s => s.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
         _files.Verify(s => s.RemoveUploaderFromFile(It.IsAny<Guid>(), It.IsAny<long>(), It.IsAny<CancellationToken>()), Times.Never);
+        // Мягкое удаление (в корзину) НЕ трогает альбомы: членство сохраняется для восстановления.
+        _albums.Verify(s => s.RemoveFileFromAllAlbums(It.IsAny<long>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -48,5 +51,7 @@ public class DeleteUserMediaCommandHandlerTests
 
         _files.Verify(s => s.RemoveUploaderFromFile(fileId, OwnerId, It.IsAny<CancellationToken>()), Times.Once);
         _hierarchy.Verify(s => s.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+        // Жёсткое удаление обязано вычистить файл из всех альбомов владельца (фикс бага-сироты).
+        _albums.Verify(s => s.RemoveFileFromAllAlbums(OwnerId, fileId, It.IsAny<CancellationToken>()), Times.Once);
     }
 }
