@@ -69,7 +69,13 @@ export function pickFiles({ accept, multiple = true }: { accept?: string; multip
 export interface UploadResult {
   fileId: string;
   name: string;
-  deduped?: boolean;
+}
+
+export interface DuplicateLocation {
+  entryId: string;
+  name: string;
+  directoryId: string;
+  directoryName: string;
 }
 
 /** SHA256 файла в hex. Читает файл целиком в память — допустимо при лимите 512 МБ;
@@ -87,21 +93,22 @@ async function sha256Hex(file: File): Promise<string | null> {
   }
 }
 
-/** Загрузка файла с предварительной дедупликацией по хешу: если файл уже в хранилище —
- *  возвращаем существующий fileId, не передавая байты. Иначе — обычный XHR-аплоад. */
-export async function uploadFile(file: File, onProgress?: (frac: number) => void): Promise<UploadResult> {
+/** Проверка наличия контента по SHA256 (без побочных эффектов): есть ли уже такой файл
+ *  у пользователя и где он лежит. Нет crypto.subtle (http-контекст) → считаем «не дубликат». */
+export async function checkDuplicate(file: File): Promise<{ exists: boolean; locations: DuplicateLocation[] }> {
   const hash = await sha256Hex(file);
-  if (hash) {
-    try {
-      const r = await apiPost<{ fileId: string }>('/api/files/check-hash', { hash });
-      if (r.fileId) {
-        onProgress?.(1);
-        return { fileId: r.fileId, name: file.name, deduped: true };
-      }
-    } catch {
-      /* проверка не критична — грузим обычным путём */
-    }
+  if (!hash) return { exists: false, locations: [] };
+  try {
+    const r = await apiPost<{ exists?: boolean; locations?: DuplicateLocation[] }>('/api/files/check-hash', { hash });
+    return { exists: !!r.exists, locations: r.locations || [] };
+  } catch {
+    return { exists: false, locations: [] };
   }
+}
+
+/** Загрузка файла (новый блоб). Серверный дедуп снят — каждая загрузка создаёт копию;
+ *  предварительную проверку дубликата делает вызывающий код через checkDuplicate. */
+export async function uploadFile(file: File, onProgress?: (frac: number) => void): Promise<UploadResult> {
   return uploadXhr(file, onProgress);
 }
 
