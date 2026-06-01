@@ -7,6 +7,7 @@ import { AlbumFormModal } from './AlbumFormModal';
 import { PickMediaModal } from './PickMediaModal';
 import { useContextMenu, type ContextItem } from '../ui/ContextMenu';
 import { PropertiesModal } from '../ui/PropertiesModal';
+import { ShareWithUserModal } from '../ui/ShareWithUserModal';
 import { apiGet, apiPost } from '../../lib/api';
 import { createShare } from '../../lib/share';
 import { GRID_SIZES } from '../../lib/format';
@@ -29,6 +30,7 @@ export function AlbumDetail({ album, candidates, gridSizes = GRID_SIZES, onBack,
   const [editing, setEditing] = React.useState(false);
   const [picking, setPicking] = React.useState(false);
   const [props, setProps] = React.useState<CardFile | null>(null);
+  const [shareWith, setShareWith] = React.useState<CardFile | null>(null);
   const { menu, openAt } = useContextMenu();
 
   const load = React.useCallback(() => {
@@ -93,6 +95,7 @@ export function AlbumDetail({ album, candidates, gridSizes = GRID_SIZES, onBack,
       { label: 'Сделать обложкой', icon: 'photo', onClick: () => setCover(m.id) },
       { label: 'Добавить в избранное', icon: 'star', onClick: () => addToFavorites(m.id) },
       { label: 'Создать публичную ссылку', icon: 'share', onClick: () => createShare(m.id, m.name, toast) },
+      { label: 'Поделиться с пользователем', icon: 'user', onClick: () => setShareWith(m) },
       { label: 'Свойства', icon: 'info', onClick: () => setProps(m) },
       { divider: true },
       { label: 'Убрать из альбома', icon: 'x', danger: true, onClick: () => removeItem(m.id) },
@@ -177,6 +180,9 @@ export function AlbumDetail({ album, candidates, gridSizes = GRID_SIZES, onBack,
       )}
       {lightbox !== null && items && <Lightbox items={items} index={lightbox} onClose={() => setLightbox(null)} />}
       {props && <PropertiesModal fileId={props.id} fallback={props} onClose={() => setProps(null)} />}
+      {shareWith && (
+        <ShareWithUserModal fileId={shareWith.id} fileName={shareWith.name} onClose={() => setShareWith(null)} toast={toast} />
+      )}
       {menu}
     </div>
   );
