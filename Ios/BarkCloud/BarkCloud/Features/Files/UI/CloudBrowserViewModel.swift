@@ -1,6 +1,5 @@
 import Foundation
 import Observation
-import UIKit
 
 struct CloudBrowserUiState {
     var directoryID: String       // "" = корень
@@ -11,6 +10,8 @@ struct CloudBrowserUiState {
     var isLoading = true
     var isUploading = false
     var snackbar: String?
+    /// URL созданной публичной ссылки → системный Share Sheet.
+    var pendingShareURL: ShareableURL?
 
     var isEmpty: Bool { subdirs.isEmpty && files.isEmpty }
 }
@@ -164,7 +165,7 @@ final class CloudBrowserViewModel {
 
     func snackbarShown() { state.snackbar = nil }
 
-    /// Создать публичную ссылку на файл и положить URL в буфер обмена.
+    /// Создать публичную ссылку на файл и открыть системный Share Sheet.
     /// Зеркалит `GalleryViewModel.makePublic` / `MediaGridViewModel.makePublic`.
     func makePublic(_ entry: CloudFileEntry) async {
         do {
@@ -173,8 +174,7 @@ final class CloudBrowserViewModel {
                 state.snackbar = String(localized: "shared_load_failed")
                 return
             }
-            UIPasteboard.general.url = url
-            state.snackbar = String(localized: "snack_public_copied")
+            state.pendingShareURL = ShareableURL(url: url)
         } catch {
             state.snackbar = domainErrorMessage(error)
         }

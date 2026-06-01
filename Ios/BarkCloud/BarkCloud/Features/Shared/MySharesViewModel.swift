@@ -11,6 +11,8 @@ struct MySharesUiState {
     var isLoadingMore: Bool = false
     var canLoadMore: Bool = false
     var snackbar: String?
+    /// URL для системного Share Sheet (при тапе на «Поделиться» у карточки).
+    var pendingShareURL: ShareableURL?
 
     fileprivate var cursorCreatedAt: Date?
     fileprivate var cursorShareID: String = ""

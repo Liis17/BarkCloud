@@ -23,6 +23,9 @@ final class GalleryViewModel {
     /// fileID идёт в `prepareShareWithUser(asset:)` (как `copyLink`/`makePublic`),
     /// чтобы загрузить device-ассет в облако если он там ещё не лежит.
     var pendingShareWithUser: ShareWithUserContext?
+    /// URL созданной публичной ссылки → системный Share Sheet (Telegram/Mail/
+    /// AirDrop/копировать). Заменяет старое прямое копирование в `UIPasteboard`.
+    var pendingShareURL: ShareableURL?
 
     /// Трекер наличия файлов в облаке (по SHA256-хешу) — общий с пикером загрузки.
     let presence: CloudPresenceTracker
@@ -215,8 +218,7 @@ final class GalleryViewModel {
             let name = PHAssetResource.assetResources(for: asset).first?.originalFilename ?? "file"
             let link = try await cloud.createShare(fileID: fileID, name: name)
             guard let url = link.url else { throw CloudActionError.noLink }
-            UIPasteboard.general.url = url
-            snackbar = String(localized: "snack_public_copied")
+            pendingShareURL = ShareableURL(url: url)
         }
     }
 
