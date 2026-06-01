@@ -3270,6 +3270,182 @@
         }
       }
     },
+    "shared_hub_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Общий доступ"
+          }
+        }
+      }
+    },
+    "shared_tab_public" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Мои публичные"
+          }
+        }
+      }
+    },
+    "shared_tab_with_me" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Мне доступны"
+          }
+        }
+      }
+    },
+    "shared_with_me_empty_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Скоро здесь будет"
+          }
+        }
+      }
+    },
+    "shared_with_me_coming_soon" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Файлы, которыми с вами поделились другие пользователи, появятся в следующем обновлении."
+          }
+        }
+      }
+    },
+    "shared_my_empty_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Пока нет публичных ссылок"
+          }
+        }
+      }
+    },
+    "shared_my_empty_hint" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Создайте ссылку из контекстного меню файла в «Файлах», «Фото» или «Видео» — она появится здесь."
+          }
+        }
+      }
+    },
+    "shared_copy_link" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Скопировать ссылку"
+          }
+        }
+      }
+    },
+    "shared_revoke" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Отозвать"
+          }
+        }
+      }
+    },
+    "shared_revoke_confirm" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Отозвать публичную ссылку?"
+          }
+        }
+      }
+    },
+    "shared_revoke_message" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ссылка на «%@» перестанет работать. Уже выданные временные ссылки могут оставаться действительными до истечения их TTL."
+          }
+        }
+      }
+    },
+    "shared_unnamed" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Без имени"
+          }
+        }
+      }
+    },
+    "shared_link_revoked" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ссылка отозвана"
+          }
+        }
+      }
+    },
+    "shared_revoke_failed" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не удалось отозвать ссылку"
+          }
+        }
+      }
+    },
+    "shared_load_failed" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не удалось загрузить список"
+          }
+        }
+      }
+    },
+    "shared_open" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Общий доступ"
+          }
+        }
+      }
+    },
     "snack_public_copied" : {
       "extractionState" : "manual",
       "localizations" : {

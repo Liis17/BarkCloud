@@ -55,7 +55,7 @@ struct FilesRootScreen: View {
     @ViewBuilder
     private var sharedFiles: some View {
         NavigationLink {
-            ComingSoonScreen(titleKey: "files_shared_title", iconName: "person.2")
+            SharedHubScreen()
         } label: {
             cardRow(
                 iconName: "person.2",
