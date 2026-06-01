@@ -649,16 +649,21 @@ public static class CloudApiEndpoints
     /// JSON-представление публичной ссылки. Дружелюбный URL собирается из хоста текущего
     /// запроса (Web — владелец публичного роута /s/{token}), а не приходит из Files.
     /// </summary>
-    private static object ShareJson(HttpContext http, ShareInfo s) => new
+    private static object ShareJson(HttpContext http, ShareInfo s)
     {
-        id = s.Id,
-        token = s.Token,
-        url = $"{http.Request.Scheme}://{http.Request.Host}/s/{s.Token}",
-        fileId = s.FileId,
-        name = s.Name,
-        createdAt = s.CreatedAt?.ToDateTimeOffset(),
-        clickCount = s.ClickCount
-    };
+        var origin = $"{http.Request.Scheme}://{http.Request.Host}";
+        return new
+        {
+            id = s.Id,
+            token = s.Token,
+            url = $"{origin}/v/{s.Token}",         // публичная страница просмотра (основная ссылка)
+            downloadUrl = $"{origin}/s/{s.Token}", // прямое скачивание (302)
+            fileId = s.FileId,
+            name = s.Name,
+            createdAt = s.CreatedAt?.ToDateTimeOffset(),
+            clickCount = s.ClickCount
+        };
+    }
 
     private static object UserJson(User u) => new
     {
