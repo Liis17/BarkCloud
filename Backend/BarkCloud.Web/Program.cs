@@ -115,7 +115,9 @@ app.MapFallback(async (HttpContext http, AuthGateway auth) =>
     if (http.Request.Path.StartsWithSegments("/api"))
         return Results.NotFound();
 
-    if (await auth.AuthenticateAsync(http) is null)
+    // Публичная страница просмотра по шаринг-ссылке (/v/{token}) — доступна без авторизации.
+    var isPublicView = http.Request.Path.StartsWithSegments("/v");
+    if (!isPublicView && await auth.AuthenticateAsync(http) is null)
         return Results.Redirect("/login");
 
     var index = app.Environment.WebRootFileProvider.GetFileInfo("index.html");
