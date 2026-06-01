@@ -37,12 +37,14 @@ struct MainScreen: View {
         }
         .overlay(alignment: .bottom) { uploadBannerOverlay }
         .onChange(of: selection) { _, new in
-            // При возврате на вкладку «Галерея» — дать BackupManager пере-сканировать
-            // медиатеку на новые ассеты и (если автозагрузка включена) запустить
-            // upload-loop для них. Дешёво для повторных скансов: уже обработанные
-            // ассеты пропускаются по `processedAssetIDs`.
+            // При возврате на вкладку «Галерея»: re-scan медиатеки в BackupManager
+            // (новые ассеты в pendingUpload), reload в GalleryViewModel (пересобрать
+            // assets через PhotoKit — PHPhotoLibraryChangeObserver мог пропустить
+            // изменения если процесс был suspended). Сигнал галерее идёт через
+            // NotificationCenter, чтобы не таскать ref на vm из родительского экрана.
             if new == .gallery {
                 Task { await env.backupManager.refreshScanForNewAssets() }
+                NotificationCenter.default.post(name: .galleryDidFocus, object: nil)
             }
         }
     }

@@ -28,6 +28,10 @@ final class UploadProgressObserver {
     /// Дебаунс recompute: didSendBodyData приходит 50+ раз в секунду на большом
     /// файле, а пересчёт лезет в SwiftData. Достаточно ~10 fps для UI.
     private var pendingRecompute: Task<Void, Never>?
+    /// Отложенное скрытие баннера после завершения всех jobs. Cancellable —
+    /// если в течение 1.5с появится новый активный job, мы отменяем reset,
+    /// иначе баннер исчезал бы даже когда уже шла следующая загрузка.
+    private var resetTask: Task<Void, Never>?
 
     init(queueStore: UploadQueueStore) {
         self.queueStore = queueStore
@@ -105,10 +109,20 @@ final class UploadProgressObserver {
 
         if finished {
             // Дать пользователю секунду посмотреть «100%», потом скрыть.
-            Task { [weak self] in
+            // Cancellable: если в окне отсрочки появится новый активный job
+            // (например, BackupManager только что добавил следующий) — отменим
+            // и вычислим заново. Без cancellation баннер исчезал бы посреди
+            // продолжающейся загрузки.
+            resetTask?.cancel()
+            resetTask = Task { [weak self] in
                 try? await Task.sleep(nanoseconds: 1_500_000_000)
+                guard !Task.isCancelled else { return }
                 self?.reset()
             }
+        } else {
+            // Появились активные job'ы — отменяем запланированное скрытие.
+            resetTask?.cancel()
+            resetTask = nil
         }
     }
 
@@ -120,5 +134,6 @@ final class UploadProgressObserver {
         currentFileName = ""
         overallProgress = 0
         sessionStartedAt = nil
+        resetTask = nil
     }
 }

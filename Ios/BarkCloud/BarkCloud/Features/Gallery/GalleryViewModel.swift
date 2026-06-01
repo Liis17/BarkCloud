@@ -3,6 +3,13 @@ import Observation
 import Photos
 import UIKit
 
+extension Notification.Name {
+    /// MainScreen → GalleryScreen: пользователь только что переключился на
+    /// вкладку Галерея. GalleryScreen ловит и зовёт `vm.reload()`, чтобы
+    /// пересобрать список ассетов из PhotoKit.
+    static let galleryDidFocus = Notification.Name("BarkCloud.galleryDidFocus")
+}
+
 /// Состояние вкладки «Галерея»: медиатека устройства (фото+видео через PhotoKit),
 /// режим выбора и загрузка выбранных ассетов в облако. Индикация «уже в облаке» и
 /// чтение оригиналов вынесены в [[CloudPresenceTracker]] и [[DeviceAssetResource]].
@@ -66,6 +73,15 @@ final class GalleryViewModel {
         if access == .authorized || access == .limited {
             loadAssets()
         }
+    }
+
+    /// Пересобрать список ассетов из PhotoKit без повторного запроса
+    /// разрешений. Зовётся при возврате на таб Галереи — если пока приложение
+    /// было на другой вкладке появились новые фото, PHPhotoLibraryChangeObserver
+    /// мог не дойти (suspended-процесс), и мы вытаскиваем актуальный набор сами.
+    func reload() {
+        guard access == .authorized || access == .limited else { return }
+        loadAssets()
     }
 
     private func apply(_ status: PHAuthorizationStatus) {

@@ -42,6 +42,9 @@ struct GalleryScreen: View {
             if vm == nil { vm = GalleryViewModel(cloud: env.cloudRepository, albums: env.albumRepository) }
             await vm?.loadIfNeeded()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .galleryDidFocus)) { _ in
+            vm?.reload()
+        }
         .fullScreenCover(item: $viewer) { item in viewerScreen(item.asset) }
         .fullScreenCover(isPresented: $showBackup) {
             BackupSheet(onClose: { showBackup = false })

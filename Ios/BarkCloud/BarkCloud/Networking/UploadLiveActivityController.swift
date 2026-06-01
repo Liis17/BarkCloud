@@ -118,18 +118,22 @@ final class UploadLiveActivityController {
 
     private func start(initialState: UploadActivityAttributes.ContentState) async {
         guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
-        let startedAt = Date()
-        sessionStartedAt = startedAt
+        // ВНИМАНИЕ: НЕ перезаписываем sessionStartedAt здесь. notifyChanged уже
+        // зафиксировал его на min(activeJobs.createdAt)-1s раньше; если задать
+        // на Date() сейчас — следующий recentJobs(since:) отсечёт собственные
+        // job (их createdAt < startedAt на 50-100ms), recompute увидит
+        // jobs.isEmpty и сразу же закроет Activity (Dynamic Island мигнёт и
+        // погаснет, что и наблюдалось как «не работает»).
+        let attributeStart = sessionStartedAt ?? Date()
         do {
             currentActivity = try Activity<UploadActivityAttributes>.request(
-                attributes: UploadActivityAttributes(startedAt: startedAt),
+                attributes: UploadActivityAttributes(startedAt: attributeStart),
                 content: ActivityContent(state: initialState, staleDate: nil),
                 pushType: nil
             )
         } catch {
             // Лимит активных Live Activity исчерпан или пользователь отключил —
             // оставим без активности, UI сам покажет прогресс из координатора.
-            sessionStartedAt = nil
         }
     }
 
