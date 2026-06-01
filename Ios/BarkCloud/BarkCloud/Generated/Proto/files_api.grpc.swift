@@ -1795,6 +1795,71 @@ internal enum Barkcloud_Files_CloudApi: Sendable {
                 type: .unary
             )
         }
+        /// Namespace for "ShareFileWithUser" metadata.
+        internal enum ShareFileWithUser: Sendable {
+            /// Request type for "ShareFileWithUser".
+            internal typealias Input = Barkcloud_Files_ShareFileWithUserRequest
+            /// Response type for "ShareFileWithUser".
+            internal typealias Output = Barkcloud_Files_CloudEmpty
+            /// Descriptor for "ShareFileWithUser".
+            internal static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.CloudApi"),
+                method: "ShareFileWithUser",
+                type: .unary
+            )
+        }
+        /// Namespace for "RevokeUserShare" metadata.
+        internal enum RevokeUserShare: Sendable {
+            /// Request type for "RevokeUserShare".
+            internal typealias Input = Barkcloud_Files_RevokeUserShareRequest
+            /// Response type for "RevokeUserShare".
+            internal typealias Output = Barkcloud_Files_CloudEmpty
+            /// Descriptor for "RevokeUserShare".
+            internal static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.CloudApi"),
+                method: "RevokeUserShare",
+                type: .unary
+            )
+        }
+        /// Namespace for "ListMyOutgoingShares" metadata.
+        internal enum ListMyOutgoingShares: Sendable {
+            /// Request type for "ListMyOutgoingShares".
+            internal typealias Input = Barkcloud_Files_ListMyOutgoingSharesRequest
+            /// Response type for "ListMyOutgoingShares".
+            internal typealias Output = Barkcloud_Files_ListMyOutgoingSharesResponse
+            /// Descriptor for "ListMyOutgoingShares".
+            internal static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.CloudApi"),
+                method: "ListMyOutgoingShares",
+                type: .unary
+            )
+        }
+        /// Namespace for "ListSharedWithMe" metadata.
+        internal enum ListSharedWithMe: Sendable {
+            /// Request type for "ListSharedWithMe".
+            internal typealias Input = Barkcloud_Files_ListSharedWithMeRequest
+            /// Response type for "ListSharedWithMe".
+            internal typealias Output = Barkcloud_Files_ListSharedWithMeResponse
+            /// Descriptor for "ListSharedWithMe".
+            internal static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.CloudApi"),
+                method: "ListSharedWithMe",
+                type: .unary
+            )
+        }
+        /// Namespace for "GetSharedFileDownloadUrl" metadata.
+        internal enum GetSharedFileDownloadUrl: Sendable {
+            /// Request type for "GetSharedFileDownloadUrl".
+            internal typealias Input = Barkcloud_Files_GetSharedFileDownloadUrlRequest
+            /// Response type for "GetSharedFileDownloadUrl".
+            internal typealias Output = Barkcloud_Files_GetSharedFileDownloadUrlResponse
+            /// Descriptor for "GetSharedFileDownloadUrl".
+            internal static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.CloudApi"),
+                method: "GetSharedFileDownloadUrl",
+                type: .unary
+            )
+        }
         /// Descriptors for all methods in the "barkcloud.files.CloudApi" service.
         internal static let descriptors: [GRPCCore.MethodDescriptor] = [
             CreateDirectory.descriptor,
@@ -1822,7 +1887,12 @@ internal enum Barkcloud_Files_CloudApi: Sendable {
             ListFavorites.descriptor,
             CreateShare.descriptor,
             ListMyShares.descriptor,
-            RevokeShare.descriptor
+            RevokeShare.descriptor,
+            ShareFileWithUser.descriptor,
+            RevokeUserShare.descriptor,
+            ListMyOutgoingShares.descriptor,
+            ListSharedWithMe.descriptor,
+            GetSharedFileDownloadUrl.descriptor
         ]
     }
 }
@@ -2315,6 +2385,96 @@ extension Barkcloud_Files_CloudApi {
             request: GRPCCore.StreamingServerRequest<Barkcloud_Files_RevokeShareRequest>,
             context: GRPCCore.ServerContext
         ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty>
+
+        /// Handle the "ShareFileWithUser" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > ───────── Шаринг между пользователями (приватные гранты) ─────────
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Files_ShareFileWithUserRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Files_CloudEmpty` messages.
+        func shareFileWithUser(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ShareFileWithUserRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty>
+
+        /// Handle the "RevokeUserShare" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Отозвать грант доступа (владелец)
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Files_RevokeUserShareRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Files_CloudEmpty` messages.
+        func revokeUserShare(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Files_RevokeUserShareRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty>
+
+        /// Handle the "ListMyOutgoingShares" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > С кем поделён файл (управление)
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Files_ListMyOutgoingSharesRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Files_ListMyOutgoingSharesResponse` messages.
+        func listMyOutgoingShares(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ListMyOutgoingSharesRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_ListMyOutgoingSharesResponse>
+
+        /// Handle the "ListSharedWithMe" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Доступные мне файлы (от новых к старым, cursor pagination)
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Files_ListSharedWithMeRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Files_ListSharedWithMeResponse` messages.
+        func listSharedWithMe(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ListSharedWithMeRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_ListSharedWithMeResponse>
+
+        /// Handle the "GetSharedFileDownloadUrl" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Временная ссылка на скачивание доступного мне файла
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Files_GetSharedFileDownloadUrlRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Files_GetSharedFileDownloadUrlResponse` messages.
+        func getSharedFileDownloadUrl(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Files_GetSharedFileDownloadUrlRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_GetSharedFileDownloadUrlResponse>
     }
 
     /// Service protocol for the "barkcloud.files.CloudApi" service.
@@ -2792,6 +2952,96 @@ extension Barkcloud_Files_CloudApi {
             request: GRPCCore.ServerRequest<Barkcloud_Files_RevokeShareRequest>,
             context: GRPCCore.ServerContext
         ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty>
+
+        /// Handle the "ShareFileWithUser" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > ───────── Шаринг между пользователями (приватные гранты) ─────────
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_ShareFileWithUserRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Files_CloudEmpty` message.
+        func shareFileWithUser(
+            request: GRPCCore.ServerRequest<Barkcloud_Files_ShareFileWithUserRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty>
+
+        /// Handle the "RevokeUserShare" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Отозвать грант доступа (владелец)
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_RevokeUserShareRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Files_CloudEmpty` message.
+        func revokeUserShare(
+            request: GRPCCore.ServerRequest<Barkcloud_Files_RevokeUserShareRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty>
+
+        /// Handle the "ListMyOutgoingShares" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > С кем поделён файл (управление)
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_ListMyOutgoingSharesRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Files_ListMyOutgoingSharesResponse` message.
+        func listMyOutgoingShares(
+            request: GRPCCore.ServerRequest<Barkcloud_Files_ListMyOutgoingSharesRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_ListMyOutgoingSharesResponse>
+
+        /// Handle the "ListSharedWithMe" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Доступные мне файлы (от новых к старым, cursor pagination)
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_ListSharedWithMeRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Files_ListSharedWithMeResponse` message.
+        func listSharedWithMe(
+            request: GRPCCore.ServerRequest<Barkcloud_Files_ListSharedWithMeRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_ListSharedWithMeResponse>
+
+        /// Handle the "GetSharedFileDownloadUrl" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Временная ссылка на скачивание доступного мне файла
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_GetSharedFileDownloadUrlRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Files_GetSharedFileDownloadUrlResponse` message.
+        func getSharedFileDownloadUrl(
+            request: GRPCCore.ServerRequest<Barkcloud_Files_GetSharedFileDownloadUrlRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_GetSharedFileDownloadUrlResponse>
     }
 
     /// Simple service protocol for the "barkcloud.files.CloudApi" service.
@@ -3267,6 +3517,96 @@ extension Barkcloud_Files_CloudApi {
             request: Barkcloud_Files_RevokeShareRequest,
             context: GRPCCore.ServerContext
         ) async throws -> Barkcloud_Files_CloudEmpty
+
+        /// Handle the "ShareFileWithUser" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > ───────── Шаринг между пользователями (приватные гранты) ─────────
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Files_ShareFileWithUserRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Files_CloudEmpty` to respond with.
+        func shareFileWithUser(
+            request: Barkcloud_Files_ShareFileWithUserRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Files_CloudEmpty
+
+        /// Handle the "RevokeUserShare" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Отозвать грант доступа (владелец)
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Files_RevokeUserShareRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Files_CloudEmpty` to respond with.
+        func revokeUserShare(
+            request: Barkcloud_Files_RevokeUserShareRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Files_CloudEmpty
+
+        /// Handle the "ListMyOutgoingShares" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > С кем поделён файл (управление)
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Files_ListMyOutgoingSharesRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Files_ListMyOutgoingSharesResponse` to respond with.
+        func listMyOutgoingShares(
+            request: Barkcloud_Files_ListMyOutgoingSharesRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Files_ListMyOutgoingSharesResponse
+
+        /// Handle the "ListSharedWithMe" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Доступные мне файлы (от новых к старым, cursor pagination)
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Files_ListSharedWithMeRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Files_ListSharedWithMeResponse` to respond with.
+        func listSharedWithMe(
+            request: Barkcloud_Files_ListSharedWithMeRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Files_ListSharedWithMeResponse
+
+        /// Handle the "GetSharedFileDownloadUrl" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Временная ссылка на скачивание доступного мне файла
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Files_GetSharedFileDownloadUrlRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Files_GetSharedFileDownloadUrlResponse` to respond with.
+        func getSharedFileDownloadUrl(
+            request: Barkcloud_Files_GetSharedFileDownloadUrlRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Files_GetSharedFileDownloadUrlResponse
     }
 }
 
@@ -3560,6 +3900,61 @@ extension Barkcloud_Files_CloudApi.StreamingServiceProtocol {
                 )
             }
         )
+        router.registerHandler(
+            forMethod: Barkcloud_Files_CloudApi.Method.ShareFileWithUser.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_ShareFileWithUserRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_CloudEmpty>(),
+            handler: { request, context in
+                try await self.shareFileWithUser(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
+            forMethod: Barkcloud_Files_CloudApi.Method.RevokeUserShare.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_RevokeUserShareRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_CloudEmpty>(),
+            handler: { request, context in
+                try await self.revokeUserShare(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
+            forMethod: Barkcloud_Files_CloudApi.Method.ListMyOutgoingShares.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_ListMyOutgoingSharesRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_ListMyOutgoingSharesResponse>(),
+            handler: { request, context in
+                try await self.listMyOutgoingShares(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
+            forMethod: Barkcloud_Files_CloudApi.Method.ListSharedWithMe.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_ListSharedWithMeRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_ListSharedWithMeResponse>(),
+            handler: { request, context in
+                try await self.listSharedWithMe(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
+            forMethod: Barkcloud_Files_CloudApi.Method.GetSharedFileDownloadUrl.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_GetSharedFileDownloadUrlRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_GetSharedFileDownloadUrlResponse>(),
+            handler: { request, context in
+                try await self.getSharedFileDownloadUrl(
+                    request: request,
+                    context: context
+                )
+            }
+        )
     }
 }
 
@@ -3846,6 +4241,61 @@ extension Barkcloud_Files_CloudApi.ServiceProtocol {
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty> {
         let response = try await self.revokeShare(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    internal func shareFileWithUser(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ShareFileWithUserRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty> {
+        let response = try await self.shareFileWithUser(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    internal func revokeUserShare(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Files_RevokeUserShareRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty> {
+        let response = try await self.revokeUserShare(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    internal func listMyOutgoingShares(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ListMyOutgoingSharesRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_ListMyOutgoingSharesResponse> {
+        let response = try await self.listMyOutgoingShares(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    internal func listSharedWithMe(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ListSharedWithMeRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_ListSharedWithMeResponse> {
+        let response = try await self.listSharedWithMe(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    internal func getSharedFileDownloadUrl(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Files_GetSharedFileDownloadUrlRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_GetSharedFileDownloadUrlResponse> {
+        let response = try await self.getSharedFileDownloadUrl(
             request: GRPCCore.ServerRequest(stream: request),
             context: context
         )
@@ -4187,6 +4637,71 @@ extension Barkcloud_Files_CloudApi.SimpleServiceProtocol {
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty> {
         return GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty>(
             message: try await self.revokeShare(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    internal func shareFileWithUser(
+        request: GRPCCore.ServerRequest<Barkcloud_Files_ShareFileWithUserRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty> {
+        return GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty>(
+            message: try await self.shareFileWithUser(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    internal func revokeUserShare(
+        request: GRPCCore.ServerRequest<Barkcloud_Files_RevokeUserShareRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty> {
+        return GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty>(
+            message: try await self.revokeUserShare(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    internal func listMyOutgoingShares(
+        request: GRPCCore.ServerRequest<Barkcloud_Files_ListMyOutgoingSharesRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_ListMyOutgoingSharesResponse> {
+        return GRPCCore.ServerResponse<Barkcloud_Files_ListMyOutgoingSharesResponse>(
+            message: try await self.listMyOutgoingShares(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    internal func listSharedWithMe(
+        request: GRPCCore.ServerRequest<Barkcloud_Files_ListSharedWithMeRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_ListSharedWithMeResponse> {
+        return GRPCCore.ServerResponse<Barkcloud_Files_ListSharedWithMeResponse>(
+            message: try await self.listSharedWithMe(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    internal func getSharedFileDownloadUrl(
+        request: GRPCCore.ServerRequest<Barkcloud_Files_GetSharedFileDownloadUrlRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_GetSharedFileDownloadUrlResponse> {
+        return GRPCCore.ServerResponse<Barkcloud_Files_GetSharedFileDownloadUrlResponse>(
+            message: try await self.getSharedFileDownloadUrl(
                 request: request.message,
                 context: context
             ),
@@ -4800,6 +5315,121 @@ extension Barkcloud_Files_CloudApi {
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CloudEmpty>,
             options: GRPCCore.CallOptions,
             onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "ShareFileWithUser" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > ───────── Шаринг между пользователями (приватные гранты) ─────────
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_ShareFileWithUserRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_ShareFileWithUserRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_CloudEmpty` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func shareFileWithUser<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_ShareFileWithUserRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_ShareFileWithUserRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CloudEmpty>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "RevokeUserShare" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Отозвать грант доступа (владелец)
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_RevokeUserShareRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_RevokeUserShareRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_CloudEmpty` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func revokeUserShare<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_RevokeUserShareRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_RevokeUserShareRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CloudEmpty>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "ListMyOutgoingShares" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > С кем поделён файл (управление)
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_ListMyOutgoingSharesRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_ListMyOutgoingSharesRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_ListMyOutgoingSharesResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func listMyOutgoingShares<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_ListMyOutgoingSharesRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_ListMyOutgoingSharesRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_ListMyOutgoingSharesResponse>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListMyOutgoingSharesResponse>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "ListSharedWithMe" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Доступные мне файлы (от новых к старым, cursor pagination)
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_ListSharedWithMeRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_ListSharedWithMeRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_ListSharedWithMeResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func listSharedWithMe<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_ListSharedWithMeRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_ListSharedWithMeRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_ListSharedWithMeResponse>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListSharedWithMeResponse>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "GetSharedFileDownloadUrl" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Временная ссылка на скачивание доступного мне файла
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_GetSharedFileDownloadUrlRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_GetSharedFileDownloadUrlRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_GetSharedFileDownloadUrlResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func getSharedFileDownloadUrl<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_GetSharedFileDownloadUrlRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_GetSharedFileDownloadUrlRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_GetSharedFileDownloadUrlResponse>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_GetSharedFileDownloadUrlResponse>) async throws -> Result
         ) async throws -> Result where Result: Sendable
     }
 
@@ -5702,6 +6332,176 @@ extension Barkcloud_Files_CloudApi {
                 onResponse: handleResponse
             )
         }
+
+        /// Call the "ShareFileWithUser" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > ───────── Шаринг между пользователями (приватные гранты) ─────────
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_ShareFileWithUserRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_ShareFileWithUserRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_CloudEmpty` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        internal func shareFileWithUser<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_ShareFileWithUserRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_ShareFileWithUserRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CloudEmpty>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Files_CloudApi.Method.ShareFileWithUser.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "RevokeUserShare" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Отозвать грант доступа (владелец)
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_RevokeUserShareRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_RevokeUserShareRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_CloudEmpty` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        internal func revokeUserShare<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_RevokeUserShareRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_RevokeUserShareRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CloudEmpty>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Files_CloudApi.Method.RevokeUserShare.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "ListMyOutgoingShares" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > С кем поделён файл (управление)
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_ListMyOutgoingSharesRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_ListMyOutgoingSharesRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_ListMyOutgoingSharesResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        internal func listMyOutgoingShares<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_ListMyOutgoingSharesRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_ListMyOutgoingSharesRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_ListMyOutgoingSharesResponse>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListMyOutgoingSharesResponse>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Files_CloudApi.Method.ListMyOutgoingShares.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "ListSharedWithMe" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Доступные мне файлы (от новых к старым, cursor pagination)
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_ListSharedWithMeRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_ListSharedWithMeRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_ListSharedWithMeResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        internal func listSharedWithMe<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_ListSharedWithMeRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_ListSharedWithMeRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_ListSharedWithMeResponse>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListSharedWithMeResponse>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Files_CloudApi.Method.ListSharedWithMe.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "GetSharedFileDownloadUrl" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Временная ссылка на скачивание доступного мне файла
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_GetSharedFileDownloadUrlRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_GetSharedFileDownloadUrlRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_GetSharedFileDownloadUrlResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        internal func getSharedFileDownloadUrl<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_GetSharedFileDownloadUrlRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_GetSharedFileDownloadUrlRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_GetSharedFileDownloadUrlResponse>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_GetSharedFileDownloadUrlResponse>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Files_CloudApi.Method.GetSharedFileDownloadUrl.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
     }
 }
 
@@ -6457,6 +7257,151 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
             request: request,
             serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_RevokeShareRequest>(),
             deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_CloudEmpty>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "ShareFileWithUser" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > ───────── Шаринг между пользователями (приватные гранты) ─────────
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Files_ShareFileWithUserRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    internal func shareFileWithUser<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Files_ShareFileWithUserRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.shareFileWithUser(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_ShareFileWithUserRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_CloudEmpty>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "RevokeUserShare" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Отозвать грант доступа (владелец)
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Files_RevokeUserShareRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    internal func revokeUserShare<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Files_RevokeUserShareRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.revokeUserShare(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_RevokeUserShareRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_CloudEmpty>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "ListMyOutgoingShares" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > С кем поделён файл (управление)
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Files_ListMyOutgoingSharesRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    internal func listMyOutgoingShares<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Files_ListMyOutgoingSharesRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListMyOutgoingSharesResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.listMyOutgoingShares(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_ListMyOutgoingSharesRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_ListMyOutgoingSharesResponse>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "ListSharedWithMe" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Доступные мне файлы (от новых к старым, cursor pagination)
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Files_ListSharedWithMeRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    internal func listSharedWithMe<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Files_ListSharedWithMeRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListSharedWithMeResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.listSharedWithMe(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_ListSharedWithMeRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_ListSharedWithMeResponse>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "GetSharedFileDownloadUrl" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Временная ссылка на скачивание доступного мне файла
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Files_GetSharedFileDownloadUrlRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    internal func getSharedFileDownloadUrl<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Files_GetSharedFileDownloadUrlRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_GetSharedFileDownloadUrlResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.getSharedFileDownloadUrl(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_GetSharedFileDownloadUrlRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_GetSharedFileDownloadUrlResponse>(),
             options: options,
             onResponse: handleResponse
         )
@@ -7318,6 +8263,171 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
             metadata: metadata
         )
         return try await self.revokeShare(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "ShareFileWithUser" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > ───────── Шаринг между пользователями (приватные гранты) ─────────
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    internal func shareFileWithUser<Result>(
+        _ message: Barkcloud_Files_ShareFileWithUserRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Files_ShareFileWithUserRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.shareFileWithUser(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "RevokeUserShare" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Отозвать грант доступа (владелец)
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    internal func revokeUserShare<Result>(
+        _ message: Barkcloud_Files_RevokeUserShareRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Files_RevokeUserShareRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.revokeUserShare(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "ListMyOutgoingShares" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > С кем поделён файл (управление)
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    internal func listMyOutgoingShares<Result>(
+        _ message: Barkcloud_Files_ListMyOutgoingSharesRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListMyOutgoingSharesResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Files_ListMyOutgoingSharesRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.listMyOutgoingShares(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "ListSharedWithMe" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Доступные мне файлы (от новых к старым, cursor pagination)
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    internal func listSharedWithMe<Result>(
+        _ message: Barkcloud_Files_ListSharedWithMeRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListSharedWithMeResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Files_ListSharedWithMeRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.listSharedWithMe(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "GetSharedFileDownloadUrl" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Временная ссылка на скачивание доступного мне файла
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    internal func getSharedFileDownloadUrl<Result>(
+        _ message: Barkcloud_Files_GetSharedFileDownloadUrlRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_GetSharedFileDownloadUrlResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Files_GetSharedFileDownloadUrlRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.getSharedFileDownloadUrl(
             request: request,
             options: options,
             onResponse: handleResponse
