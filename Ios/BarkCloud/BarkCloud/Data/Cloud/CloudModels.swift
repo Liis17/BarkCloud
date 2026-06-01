@@ -153,17 +153,30 @@ struct CloudFileMetadata: Sendable {
 struct ShareLink: Identifiable, Hashable, Sendable {
     let id: String
     let token: String
+    let fileID: String
     let name: String
     let url: URL?
     let clickCount: Int
+    let createdAt: Date
 
     init(_ info: Barkcloud_Files_ShareInfo) {
         self.id = info.id
         self.token = info.token
+        self.fileID = info.fileID
         self.name = info.name
         self.url = GrpcEndpoint.publicShareURL(token: info.token)
         self.clickCount = Int(info.clickCount)
+        self.createdAt = info.hasCreatedAt ? info.createdAt.date : Date()
     }
+}
+
+/// Страница списка моих публичных ссылок с курсором пагинации.
+/// `nextCursorCreatedAt == nil` → больше страниц нет.
+struct ShareLinksPage: Sendable {
+    let items: [ShareLink]
+    let nextCursorCreatedAt: Date?
+    let nextCursorShareID: String
+    var hasMore: Bool { nextCursorCreatedAt != nil }
 }
 
 /// Страница медиа-галереи с курсором пагинации.

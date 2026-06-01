@@ -94,6 +94,40 @@ final class CloudRepository: Sendable {
         return ShareLink(try await stub.createShare(req))
     }
 
+    /// Список моих публичных ссылок (от свежих к старым). Курсорная пагинация:
+    /// первый вызов — `cursorCreatedAt = nil`, далее передавать `nextCursor*`
+    /// из ответа. `page.hasMore == false` — конец списка.
+    func listMyShares(
+        limit: Int = 60,
+        cursorCreatedAt: Date? = nil,
+        cursorShareID: String = ""
+    ) async throws -> ShareLinksPage {
+        let stub = try await grpc.cloudStub()
+        var req = Barkcloud_Files_ListMySharesRequest()
+        req.limit = Int32(max(1, min(200, limit)))
+        if let cursorCreatedAt {
+            req.cursorCreatedAt = Google_Protobuf_Timestamp(date: cursorCreatedAt)
+        }
+        if !cursorShareID.isEmpty {
+            req.cursorShareID = cursorShareID
+        }
+        let resp = try await stub.listMyShares(req)
+        return ShareLinksPage(
+            items: resp.shares.map(ShareLink.init),
+            nextCursorCreatedAt: resp.hasNextCursorCreatedAt ? resp.nextCursorCreatedAt.date : nil,
+            nextCursorShareID: resp.nextCursorShareID
+        )
+    }
+
+    /// Отозвать публичную ссылку. Идемпотентно: повторный вызов на уже
+    /// отозванной ссылке проходит без ошибки. После — `/s/{token}` отдаёт 404.
+    func revokeShare(id: String) async throws {
+        let stub = try await grpc.cloudStub()
+        var req = Barkcloud_Files_RevokeShareRequest()
+        req.shareID = id
+        _ = try await stub.revokeShare(req)
+    }
+
     // MARK: - Каталоги
 
     /// Содержимое папки с полной информацией о файлах (превью/размеры). `""` = корень.
