@@ -17,6 +17,7 @@ struct MediaGridScreen: View {
     @State private var selected: MediaItem?
     @State private var propertiesTarget: FilePropertiesTarget?
     @State private var albumPickerItem: MediaItem?
+    @State private var shareWithUserContext: ShareWithUserContext?
 
     private static let columnCount = 3
     private static let spacing: CGFloat = 2
@@ -70,6 +71,9 @@ struct MediaGridScreen: View {
             )
         }
         .sheet(item: $propertiesTarget) { FilePropertiesSheet(target: $0) }
+        .sheet(item: $shareWithUserContext) { context in
+            ShareWithUserSheet(context: context) { shareWithUserContext = nil }
+        }
         .sheet(item: $albumPickerItem) { item in
             AlbumPickerSheet(
                 albums: env.albumRepository,
@@ -90,6 +94,9 @@ struct MediaGridScreen: View {
         }
         Button(String(localized: "ctx_make_public")) {
             Task { await vm.makePublic(item) }
+        }
+        Button(String(localized: "shared_with_user_action")) {
+            shareWithUserContext = ShareWithUserContext(fileID: item.id, fileName: item.fileName)
         }
         Button(String(localized: "ctx_add_to_album")) {
             albumPickerItem = item

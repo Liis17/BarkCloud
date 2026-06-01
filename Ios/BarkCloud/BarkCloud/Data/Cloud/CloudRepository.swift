@@ -128,6 +128,18 @@ final class CloudRepository: Sendable {
         _ = try await stub.revokeShare(req)
     }
 
+    // MARK: - Шаринг с конкретным пользователем
+
+    /// Выдать пользователю доступ к одному файлу. Идемпотентно: повторный
+    /// `ShareFileWithUser` для уже расшаренного файла проходит без ошибки.
+    func shareFileWithUser(fileID: String, recipientUserID: Int64) async throws {
+        let stub = try await grpc.cloudStub()
+        var req = Barkcloud_Files_ShareFileWithUserRequest()
+        req.fileID = fileID
+        req.recipientUserID = recipientUserID
+        _ = try await stub.shareFileWithUser(req)
+    }
+
     // MARK: - Каталоги
 
     /// Содержимое папки с полной информацией о файлах (превью/размеры). `""` = корень.
