@@ -213,46 +213,10 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
 
         _logger.LogInformation("Вычислен хеш файла: {FileHash}", fileHash);
 
-        // Серверная дедупликация: проверяем, существует ли файл с таким хешем
-        var existingFileId = await _hashesStorage.GetFileIdByHash(fileHash);
-        if (existingFileId.HasValue)
-        {
-            _logger.LogInformation(
-                "Файл с хешем {FileHash} уже существует в хранилище (FileId: {ExistingFileId}). Дедупликация.",
-                fileHash, existingFileId.Value);
-
-            var existingFile = await _filesStorage.GetFile(existingFileId.Value);
-
-            var canDeduplicate = existingFile is not null
-                && !string.IsNullOrEmpty(existingFile.Etag)
-                && existingFile.Type == file.Type;
-
-            if (canDeduplicate)
-            {
-                foreach (var uploaderId in file.Uploaders)
-                    await _filesStorage.AddUploaderToFile(existingFileId.Value, uploaderId);
-
-                // Если у дедуплицированного оригинала есть превью — подцепляем владельцев и к ним,
-                // чтобы корректно считать квоту по превью.
-                var existingPreviews = await _filesStorage.GetPreviewsForFile(existingFileId.Value, cancellationToken);
-                foreach (var prev in existingPreviews)
-                {
-                    foreach (var uploaderId in file.Uploaders)
-                        await _filesStorage.AddUploaderToFile(prev.PreviewFileId, uploaderId);
-                }
-
-                await _filesStorage.DeleteFile(file.Id);
-                await _hashesStorage.DeleteHashByFileId(file.Id, cancellationToken);
-                await originalStream.DisposeAsync();
-                CleanupTempFile();
-
-                return existingFileId.Value.ToString();
-            }
-
-            _logger.LogInformation(
-                "Дедупликация пропущена для {FileId}: тип отличается ({ExistingType} vs {NewType}) или файл не загружен.",
-                file.Id, existingFile?.Type, file.Type);
-        }
+        // Дедупликация по хешу намеренно отключена: одинаковый контент сохраняется как
+        // отдельные независимые блобы (каждая загрузка — свой file.Id и своя строка FileHash;
+        // индекс по Hash неуникальный). Хеш по-прежнему пишется в БД для проверок наличия
+        // (CheckFileHash/CheckFileHashes) — например, чтобы автозагрузка iOS пропускала уже залитое.
 
         // Превью генерируем только для облачных файлов с image/* контентом.
         // Аватары идут через UploadAvatarServer (там собственный пайплайн с 64px-thumb),

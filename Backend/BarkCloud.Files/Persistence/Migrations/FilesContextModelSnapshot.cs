@@ -18,7 +18,7 @@ namespace BarkCloud.Files.Persistence.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.1")
+                .HasAnnotation("ProductVersion", "10.0.8")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -107,12 +107,18 @@ namespace BarkCloud.Files.Persistence.Migrations
                     b.Property<Guid?>("ParentId")
                         .HasColumnType("uuid");
 
+                    b.Property<int>("SystemKind")
+                        .HasColumnType("integer");
+
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
 
                     b.HasIndex("OwnerId", "ParentId");
+
+                    b.HasIndex("OwnerId", "SystemKind")
+                        .HasFilter("\"SystemKind\" <> 0");
 
                     b.HasIndex("OwnerId", "ParentId", "Name")
                         .IsUnique();
@@ -192,6 +198,36 @@ namespace BarkCloud.Files.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("FavoriteFiles");
+                });
+
+            modelBuilder.Entity("BarkCloud.Files.Domain.FileGrant", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("FileId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("OwnerId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("RecipientId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FileId");
+
+                    b.HasIndex("RecipientId", "CreatedAt");
+
+                    b.HasIndex("OwnerId", "FileId", "RecipientId")
+                        .IsUnique();
+
+                    b.ToTable("FileGrants");
                 });
 
             modelBuilder.Entity("BarkCloud.Files.Domain.FileHash", b =>

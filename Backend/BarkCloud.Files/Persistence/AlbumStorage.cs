@@ -144,6 +144,41 @@ public class AlbumStorage : IAlbumStorage
     }
 
     /// <summary>
+    /// Убирает файл из ВСЕХ альбомов владельца и переустанавливает обложки тех альбомов,
+    /// где он был обложкой (на первый оставшийся элемент или null). Вызывается при
+    /// безвозвратном удалении файла, чтобы не осталось осиротевших записей альбома.
+    /// </summary>
+    public async Task<int> RemoveFileFromAllAlbums(long ownerId, Guid fileId, CancellationToken cancellationToken = default)
+    {
+        var albumsWithCover = await _context.Albums
+            .Where(a => a.OwnerId == ownerId && a.CoverFileId == fileId)
+            .ToListAsync(cancellationToken);
+
+        var removed = await _context.AlbumItems
+            .Where(x => x.OwnerId == ownerId && x.FileId == fileId)
+            .ExecuteDeleteAsync(cancellationToken);
+
+        if (albumsWithCover.Count > 0)
+        {
+            var now = DateTime.UtcNow;
+            foreach (var album in albumsWithCover)
+            {
+                var first = await _context.AlbumItems
+                    .AsNoTracking()
+                    .Where(x => x.AlbumId == album.Id)
+                    .OrderBy(x => x.AddedAt)
+                    .ThenBy(x => x.FileId)
+                    .FirstOrDefaultAsync(cancellationToken);
+                album.CoverFileId = first?.FileId;
+                album.UpdatedAt = now;
+            }
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+
+        return removed;
+    }
+
+    /// <summary>
     /// Страница элементов альбома, отсортированных по (AddedAt desc, FileId desc), с cursor-пагинацией.
     /// Возвращает limit+1 элемент для определения наличия следующей страницы.
     /// </summary>

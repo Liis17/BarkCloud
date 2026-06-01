@@ -8,6 +8,7 @@ public interface ICloudHierarchyStorage
     Task<CloudDirectory?> GetDirectoryAsNoTracking(Guid id, CancellationToken cancellationToken = default);
     Task<bool> DirectoryNameExists(long ownerId, Guid? parentId, string name, CancellationToken cancellationToken = default);
     Task<CloudDirectory> AddDirectory(CloudDirectory directory, CancellationToken cancellationToken = default);
+    Task<Guid> EnsureSystemDirectory(long ownerId, CloudDirectorySystemKind kind, string canonicalName, CancellationToken cancellationToken = default);
     Task UpdateDirectory(CloudDirectory directory, CancellationToken cancellationToken = default);
     Task<List<CloudDirectory>> ListSubdirectories(long ownerId, Guid? parentId, CancellationToken cancellationToken = default);
     Task<List<CloudDirectory>> GetSubtree(long ownerId, Guid rootDirectoryId, CancellationToken cancellationToken = default);

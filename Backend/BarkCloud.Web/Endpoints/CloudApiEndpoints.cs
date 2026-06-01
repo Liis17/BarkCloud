@@ -2,6 +2,7 @@ using System.Net.Http.Headers;
 using System.Text.Json;
 
 using BarkCloud.Proto.Files;
+using BarkCloud.Proto.Users;
 using BarkCloud.Web.Auth;
 using BarkCloud.Web.Infrastructure;
 using BarkCloud.Web.Rendering;
@@ -136,7 +137,7 @@ public static class CloudApiEndpoints
             await Guarded(http, auth, async token =>
             {
                 await cloud.AttachFileAsync(
-                    new AttachFileRequest { DirectoryId = body.Dir ?? "", FileId = body.FileId, Name = body.Name }, token);
+                    new AttachFileRequest { DirectoryId = body.Dir ?? "", FileId = body.FileId, Name = body.Name, RouteByMediaKind = body.RouteByMediaKind }, token);
                 return Results.Json(new { ok = true }, Json);
             }));
 
@@ -308,6 +309,91 @@ public static class CloudApiEndpoints
                 return Results.Json(new { ok = true }, Json);
             }));
 
+        // ───────────────────────── Шаринг между пользователями ─────────────────────────
+
+        // Поиск получателей (юзернейм/имя, минимум 2 символа).
+        api.MapGet("/shared/users/search", async (HttpContext http, AuthGateway auth, UsersApi.UsersApiClient users, string? q, int? limit) =>
+            await Guarded(http, auth, async token =>
+            {
+                var query = (q ?? "").Trim();
+                if (query.Length < 2)
+                    return Results.Json(new { users = Array.Empty<object>() }, Json);
+
+                var resp = await users.SearchUsersAsync(
+                    new SearchUsersRequest { Query = query, Limit = limit is > 0 and <= 50 ? limit.Value : 20 }, token);
+                return Results.Json(new { users = resp.Users.Select(UserJson).ToArray() }, Json);
+            }));
+
+        // Поделиться файлом с пользователем.
+        api.MapPost("/shared/grant", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud, GrantReq body) =>
+            await Guarded(http, auth, async token =>
+            {
+                await cloud.ShareFileWithUserAsync(
+                    new ShareFileWithUserRequest { FileId = body.FileId, RecipientUserId = body.RecipientUserId }, token);
+                return Results.Json(new { ok = true }, Json);
+            }));
+
+        // Отозвать грант доступа.
+        api.MapPost("/shared/revoke-grant", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud, GrantIdReq body) =>
+            await Guarded(http, auth, async token =>
+            {
+                await cloud.RevokeUserShareAsync(new RevokeUserShareRequest { GrantId = body.GrantId }, token);
+                return Results.Json(new { ok = true }, Json);
+            }));
+
+        // С кем поделён файл (управление).
+        api.MapGet("/shared/outgoing", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud,
+            UsersServerApi.UsersServerApiClient usersServer, string fileId) =>
+            await Guarded(http, auth, async token =>
+            {
+                var resp = await cloud.ListMyOutgoingSharesAsync(new ListMyOutgoingSharesRequest { FileId = fileId }, token);
+                var byId = await ResolveUsers(usersServer, resp.Items.Select(i => i.RecipientUserId));
+                return Results.Json(new
+                {
+                    items = resp.Items.Select(i => new
+                    {
+                        grantId = i.GrantId,
+                        sharedAt = i.SharedAt?.ToDateTimeOffset(),
+                        user = byId.TryGetValue(i.RecipientUserId, out var u) ? UserJson(u) : MinimalUserJson(i.RecipientUserId)
+                    }).ToArray()
+                }, Json);
+            }));
+
+        // Доступные мне файлы (раздел «мне доступны»).
+        api.MapGet("/shared/with-me", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud,
+            UsersServerApi.UsersServerApiClient usersServer, int? limit, string? cursorAt, string? cursorId) =>
+            await Guarded(http, auth, async token =>
+            {
+                var req = new ListSharedWithMeRequest { Limit = limit is > 0 and <= 200 ? limit.Value : 60 };
+                if (DateTimeOffset.TryParse(cursorAt, out var dt))
+                    req.CursorSharedAt = Timestamp.FromDateTimeOffset(dt.ToUniversalTime());
+                if (!string.IsNullOrEmpty(cursorId))
+                    req.CursorGrantId = cursorId;
+
+                var resp = await cloud.ListSharedWithMeAsync(req, token);
+                var byId = await ResolveUsers(usersServer, resp.Items.Select(i => i.OwnerUserId));
+                return Results.Json(new
+                {
+                    items = resp.Items.Select(i => new
+                    {
+                        grantId = i.GrantId,
+                        file = CloudJson.Media(i.File),
+                        sharedAt = i.SharedAt?.ToDateTimeOffset(),
+                        owner = byId.TryGetValue(i.OwnerUserId, out var u) ? UserJson(u) : MinimalUserJson(i.OwnerUserId)
+                    }).ToArray(),
+                    nextCursorAt = resp.NextCursorSharedAt?.ToDateTimeOffset(),
+                    nextCursorId = resp.NextCursorGrantId
+                }, Json);
+            }));
+
+        // Временная ссылка на скачивание доступного мне файла (grant-проверка на сервере).
+        api.MapPost("/shared/download", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud, FileIdReq body) =>
+            await Guarded(http, auth, async token =>
+            {
+                var resp = await cloud.GetSharedFileDownloadUrlAsync(new GetSharedFileDownloadUrlRequest { FileId = body.FileId }, token);
+                return Results.Json(new { downloadUrl = resp.DownloadUrl }, Json);
+            }));
+
         // ───────────────────────── Альбомы ─────────────────────────
 
         api.MapGet("/albums", async (HttpContext http, AuthGateway auth, AlbumApi.AlbumApiClient albums,
@@ -400,13 +486,24 @@ public static class CloudApiEndpoints
 
         // ───────────────────────── Файлы: загрузка / оригинал ─────────────────────────
 
-        // Дедупликация: по SHA256-хешу узнаём, есть ли уже такой файл в хранилище.
-        // Клиент считает хеш в браузере и, если fileId непустой, привязывает существующий файл без загрузки байтов.
+        // Проверка наличия по SHA256-хешу (без побочных эффектов): клиент считает хеш в браузере
+        // и, если контент уже есть, показывает модалку «такой файл уже есть» с его именем и папкой.
         api.MapPost("/files/check-hash", async (HttpContext http, AuthGateway auth, FilesApi.FilesApiClient files, HashReq body) =>
             await Guarded(http, auth, async token =>
             {
                 var resp = await files.CheckFileHashAsync(new CheckFileHashRequest { FileHash = body.Hash ?? "" }, token);
-                return Results.Json(new { fileId = resp.FileId }, Json);
+                return Results.Json(new
+                {
+                    fileId = resp.FileId,
+                    exists = resp.Exists,
+                    locations = resp.ExistingLocations.Select(l => new
+                    {
+                        entryId = l.EntryId,
+                        name = l.Name,
+                        directoryId = l.DirectoryId,
+                        directoryName = l.DirectoryName
+                    })
+                }, Json);
             }));
 
         // Прокси-загрузка: получаем upload-URL у Files и стримим туда байты (same-origin, без CORS).
@@ -437,7 +534,7 @@ public static class CloudApiEndpoints
                 if (!resp.IsSuccessStatusCode)
                     return Results.Json(new { error = responseBody }, Json, statusCode: (int)resp.StatusCode);
 
-                // ответ upload: { "fileId": "<guid>" } — берём именно его (мог измениться при дедупликации)
+                // ответ upload: { "fileId": "<guid>" } — теперь всегда равен запрошенному (серверный дедуп снят)
                 string? fileId = null;
                 try
                 {
@@ -552,16 +649,48 @@ public static class CloudApiEndpoints
     /// JSON-представление публичной ссылки. Дружелюбный URL собирается из хоста текущего
     /// запроса (Web — владелец публичного роута /s/{token}), а не приходит из Files.
     /// </summary>
-    private static object ShareJson(HttpContext http, ShareInfo s) => new
+    private static object ShareJson(HttpContext http, ShareInfo s)
     {
-        id = s.Id,
-        token = s.Token,
-        url = $"{http.Request.Scheme}://{http.Request.Host}/s/{s.Token}",
-        fileId = s.FileId,
-        name = s.Name,
-        createdAt = s.CreatedAt?.ToDateTimeOffset(),
-        clickCount = s.ClickCount
+        var origin = $"{http.Request.Scheme}://{http.Request.Host}";
+        return new
+        {
+            id = s.Id,
+            token = s.Token,
+            url = $"{origin}/v/{s.Token}",         // публичная страница просмотра (основная ссылка)
+            downloadUrl = $"{origin}/s/{s.Token}", // прямое скачивание (302)
+            fileId = s.FileId,
+            name = s.Name,
+            createdAt = s.CreatedAt?.ToDateTimeOffset(),
+            clickCount = s.ClickCount
+        };
+    }
+
+    private static object UserJson(User u) => new
+    {
+        id = u.Id,
+        username = u.Username,
+        firstName = u.FirstName,
+        lastName = u.LastName,
+        avatar = u.ProfilePicturePreview
     };
+
+    private static object MinimalUserJson(long id) => new { id, username = "", firstName = "", lastName = "", avatar = "" };
+
+    /// <summary>Резолв id пользователей → User через UsersServerApi (имена «от кого / кому»).</summary>
+    private static async Task<Dictionary<long, User>> ResolveUsers(
+        UsersServerApi.UsersServerApiClient usersServer, IEnumerable<long> ids)
+    {
+        var distinct = ids.Distinct().ToList();
+        if (distinct.Count == 0)
+            return new Dictionary<long, User>();
+
+        var req = new ListByIdsRequest();
+        req.Ids.AddRange(distinct);
+        var resp = await usersServer.ListByIdsAsync(req);
+        return resp.Users
+            .GroupBy(u => u.Id)
+            .ToDictionary(g => g.Key, g => g.First());
+    }
 
     /// <summary>
     /// gRPC <see cref="FileMetadataInfo"/> → плоский JSON для модалки «Свойства».
@@ -636,11 +765,13 @@ public static class CloudApiEndpoints
     private sealed record RenameReq(string Id, string Name);
     private sealed record MoveReq(string Id, string? ParentId);
     private sealed record IdReq(string Id);
-    private sealed record AttachReq(string? Dir, string FileId, string Name);
+    private sealed record AttachReq(string? Dir, string FileId, string Name, bool RouteByMediaKind = false);
     private sealed record EntryRenameReq(string EntryId, string Name);
     private sealed record EntryMoveReq(string EntryId, string? Dir);
     private sealed record EntryIdReq(string EntryId);
     private sealed record FileIdReq(string FileId);
+    private sealed record GrantReq(string FileId, long RecipientUserId);
+    private sealed record GrantIdReq(string GrantId);
     private sealed record AlbumCreate(string Name, string? Description);
     private sealed record AlbumUpdate(string Album, string? Name, string? Description, string? CoverFileId);
     private sealed record AlbumIdReq(string Album);

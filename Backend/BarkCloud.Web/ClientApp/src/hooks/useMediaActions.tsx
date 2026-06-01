@@ -7,6 +7,7 @@ import { PropertiesModal } from '../components/ui/PropertiesModal';
 import { useAlbumMembership } from './useAlbumMembership';
 import { apiGet, apiPost, pickFiles, uploadFile } from '../lib/api';
 import { createShare } from '../lib/share';
+import { ShareWithUserModal } from '../components/ui/ShareWithUserModal';
 import type { Album, MediaItem } from '../lib/types';
 import type { ToastPush } from './useToast';
 
@@ -36,6 +37,7 @@ export function useMediaActions({ albums, toast, onRenamed, onRemoved, onItemPat
   const [rename, setRename] = React.useState<MediaItem | null>(null);
   const [confirm, setConfirm] = React.useState<MediaItem | null>(null);
   const [props, setProps] = React.useState<MediaItem | null>(null);
+  const [shareWith, setShareWith] = React.useState<MediaItem | null>(null);
   const membership = useAlbumMembership(albums);
 
   const openMenu = React.useCallback(
@@ -109,6 +111,14 @@ export function useMediaActions({ albums, toast, onRenamed, onRemoved, onItemPat
       toast((e as Error).message, 'err');
     }
   }
+  async function addToFavorites(m: MediaItem) {
+    try {
+      await apiPost('/api/cloud/favorites/add', { fileId: m.id });
+      toast('Добавлено в избранное');
+    } catch (e) {
+      toast((e as Error).message, 'err');
+    }
+  }
   async function replaceThumb(m: MediaItem) {
     const [img] = await pickFiles({ accept: 'image/*', multiple: false });
     if (!img) return;
@@ -141,6 +151,7 @@ export function useMediaActions({ albums, toast, onRenamed, onRemoved, onItemPat
     const out: ContextItem[] = [
       { label: 'Копировать ссылку', icon: 'link', onClick: () => copyLink(m) },
       { label: 'Создать публичную ссылку', icon: 'share', onClick: () => createShare(m.id, m.name, toast) },
+      { label: 'Поделиться с пользователем', icon: 'user', onClick: () => setShareWith(m) },
       { label: 'Переименовать', icon: 'pencil', disabled: !hasEntry, onClick: () => setRename(m) },
       { label: 'Показать в папке', icon: 'folder', disabled: !hasEntry, onClick: () => revealInFolder(m) },
     ];
@@ -163,6 +174,7 @@ export function useMediaActions({ albums, toast, onRenamed, onRemoved, onItemPat
         });
       }
     }
+    out.push({ label: 'Добавить в избранное', icon: 'star', onClick: () => addToFavorites(m) });
     out.push({ label: 'Свойства', icon: 'info', onClick: () => setProps(m) });
     out.push({ divider: true });
     out.push({ label: 'Удалить', icon: 'trash', danger: true, disabled: !hasEntry, onClick: () => setConfirm(m) });
@@ -192,6 +204,9 @@ export function useMediaActions({ albums, toast, onRenamed, onRemoved, onItemPat
         />
       )}
       {props && <PropertiesModal fileId={props.id} fallback={props} onClose={() => setProps(null)} />}
+      {shareWith && (
+        <ShareWithUserModal fileId={shareWith.id} fileName={shareWith.name} onClose={() => setShareWith(null)} toast={toast} />
+      )}
     </>
   );
 

@@ -24,17 +24,20 @@ public class DeleteUserMediaCommandHandler : IRequestHandler<DeleteUserMediaComm
 {
     private readonly ICloudHierarchyStorage _cloudHierarchy;
     private readonly IUploadedFilesStorage _uploadedFiles;
+    private readonly IAlbumStorage _albumStorage;
     private readonly UserContext _userContext;
     private readonly ILogger<DeleteUserMediaCommandHandler> _logger;
 
     public DeleteUserMediaCommandHandler(
         ICloudHierarchyStorage cloudHierarchy,
         IUploadedFilesStorage uploadedFiles,
+        IAlbumStorage albumStorage,
         UserContext userContext,
         ILogger<DeleteUserMediaCommandHandler> logger)
     {
         _cloudHierarchy = cloudHierarchy;
         _uploadedFiles = uploadedFiles;
+        _albumStorage = albumStorage;
         _userContext = userContext;
         _logger = logger;
     }
@@ -63,11 +66,15 @@ public class DeleteUserMediaCommandHandler : IRequestHandler<DeleteUserMediaComm
         }
         else
         {
+            // Жёсткое удаление (нет записей каталога): помимо снятия владельца с блоба чистим
+            // членство файла во всех альбомах владельца и переустанавливаем обложки — иначе
+            // остаётся осиротевшая запись AlbumItem (раздувает счётчик, ломает обложку альбома).
+            var removedFromAlbums = await _albumStorage.RemoveFileFromAllAlbums(ownerId, request.FileId, cancellationToken);
             await _uploadedFiles.RemoveUploaderFromFile(request.FileId, ownerId, cancellationToken);
 
             _logger.LogInformation(
-                "DeleteUserMedia: владелец {OwnerId} снят с файла {FileId} (нет записей каталога)",
-                ownerId, request.FileId);
+                "DeleteUserMedia: владелец {OwnerId} снят с файла {FileId} (нет записей каталога); удалён из {AlbumCount} альбом(ов)",
+                ownerId, request.FileId, removedFromAlbums);
         }
 
         return new CloudEmpty();

@@ -45,6 +45,9 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
     // Метка тома (имя диска), отдаётся в GetVolumeInformation. Устанавливается перед Mount.
     public string VolumeLabel { get; set; } = "BarkCloud";
 
+    // Последняя ошибка загрузки/привязки файла в облако (из Cleanup). Не глушим — отдаём в статус.
+    public string? LastSyncError { get; private set; }
+
     public BarkCloudFileSystem(CloudGateway gateway)
     {
         _gateway = gateway;
@@ -148,8 +151,11 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
         }
         catch (Exception ex)
         {
-            // диск не должен падать, но причину фиксируем
+            // диск не должен падать, но причину фиксируем — и не глушим: при сбое синхронизации
+            // записи в облако выставляем ошибку в статус, чтобы App показал её пользователю.
             EngineLog.Error($"Cleanup(\"{fileName}\")", ex);
+            if (info.Context is WriteSession)
+                LastSyncError = $"Не удалось сохранить «{Path.GetFileName(fileName)}» в облако: {ex.Message}";
         }
     }
 
@@ -473,6 +479,7 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
 
         _gateway.InvalidateListing(ws.DirectoryId);
         ws.Persisted = true;
+        LastSyncError = null; // успешная синхронизация — снимаем прежнюю ошибку
         EngineLog.Info($"Сохранён файл «{ws.Name}» (fileId={fileId})");
     }
 

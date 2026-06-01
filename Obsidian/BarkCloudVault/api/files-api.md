@@ -16,7 +16,7 @@ Package: `barkcloud.files`
 |-----|-----------|
 | `GetUploadUrl(GetUploadUrlRequest) → GetUploadUrlResponse` | Получить presigned URL для загрузки |
 | `GetTempDownloadUrl(GetTempDownloadUrlRequest) → GetTempDownloadUrlResponse` | Ссылки на скачивание + превью (`file_id`, `url`, `preview_url`) |
-| `CheckFileHash(CheckFileHashRequest) → CheckFileHashResponse` | Проверить дедупликацию по хешу |
+| `CheckFileHash(CheckFileHashRequest) → CheckFileHashResponse` | Проверка наличия по хешу (без побочных эффектов): `exists` + `existing_locations` (имя+папка) для модалки «файл уже есть» |
 | `GetUserStorageInfo(GetUserStorageInfoRequest) → GetUserStorageInfoResponse` | Инфо о квоте/использовании |
 | `GetFileMetadata(GetFileMetadataRequest) → GetFileMetadataResponse` | Метаданные файла (EXIF/ffprobe/PDF/Office) для диалога «Свойства». Только для собственных файлов (по `Uploaders`). Поля nullable (`optional`), клиент показывает только заданные. `has_metadata=false` если для блоба не извлечено ни одного поля |
 
@@ -32,7 +32,7 @@ Package: `barkcloud.files`
 | `DeleteDirectory(DeleteDirectoryRequest) → CloudEmpty` | Удалить рекурсивно |
 | `ListDirectory(ListDirectoryRequest) → DirectoryListing` | Листинг (`subdirs`, `files`); `directory_id` пуст = корень владельца. Только метаданные |
 | `ListDirectoryDetailed(ListDirectoryRequest) → DirectoryListingDetailed` | Та же выборка, что у `ListDirectory`, но каждый `FileEntryDetailed` содержит полный `UploadFileInfo` (URL, превью 128/512/1024, размеры) |
-| `AttachFile(AttachFileRequest) → CloudEmpty` | Привязать загруженный `UploadFile` к папке (создаёт `CloudFileEntry`) |
+| `AttachFile(AttachFileRequest) → CloudEmpty` | Привязать загруженный `UploadFile` к папке (создаёт `CloudFileEntry`); коллизия имени → суффикс ` (1)`. `route_by_media_kind=true` → `directory_id` игнорируется, файл кладётся по типу в системную папку Фото/Видео/Другие документы |
 | `RenameFileEntry(RenameFileEntryRequest) → CloudEmpty` | Переименовать запись (не меняет `UploadFile.Filename`) |
 | `MoveFileEntry(MoveFileEntryRequest) → CloudEmpty` | Переместить запись (`new_directory_id` пуст = корень) |
 | `DeleteFileEntry(DeleteFileEntryRequest) → CloudEmpty` | Удалить запись (`UploadFile` не трогается, декремент `Uploaders` если это была последняя копия владельца) |
@@ -56,6 +56,8 @@ Package: `barkcloud.files`
 > **Избранное**: отметка на уровне пользователя в таблице `FavoriteFile` (`OwnerId`+`FileId`, уникальна) — привязка к блобу, а не к записи иерархии, поэтому покрывает и фото/видео из галереи (без `CloudFileEntry`), и файлы/документы из папок. `ListFavorites` отдаёт карточки по `UploadFile` (как галерея). Чистится при удалении из корзины навсегда и при удалении аккаунта.
 
 > **Инвариант «одна директория на файл»**: `CopyFileEntry` удалён, `AttachFile` отказывает (`FileAlreadyAttachedException`), если у владельца уже есть `CloudFileEntry` для этого `FileId`. Уникальный индекс `(OwnerId, FileId)`.
+
+> **Шаринг между пользователями**: приватные гранты `FileGrant` (владелец→получатель→файл). RPC `ShareFileWithUser`/`RevokeUserShare`/`ListMyOutgoingShares` (владелец) и `ListSharedWithMe`/`GetSharedFileDownloadUrl` (получатель — доступ строго по гранту через `TempFile`, без обхода `DownloadFileCommandHandler`). Имя «от кого» резолвит веб-слой через Users (`UsersServerApi.ListByIds`). Публичный `ResolveShare` дополнительно отдаёт `media_kind`/`preview_url`/размеры для страницы просмотра. Гранты чистятся в `UserDeleted`/`TrashPurge`.
 
 ### Messages CloudApi
 
@@ -83,7 +85,7 @@ Package: `barkcloud.files`
 
 ### UploadFileInfo · поле upload_device_name
 
-`UploadFileInfo.upload_device_name` (поле 15) — имя устройства, с которого блоб был загружен. Сервер заполняет его в `GetUploadUrl` из gRPC-заголовка `x-device-name` ([[modules/shared-auth]] · `RequestContext.DeviceName`); хранится на блобе (`UploadFile.UploadDeviceName`). При дедупликации по SHA256 сохраняется значение **первой** успешной загрузки этого контента, так как новая запись блоба удаляется в `UploadFileCommandHandler` и в каталоге используется существующий блоб. В веб-клиенте выводится в модалке «Свойства» (`/api/files/info` → `uploadDeviceName`).
+`UploadFileInfo.upload_device_name` (поле 15) — имя устройства, с которого блоб был загружен. Сервер заполняет его в `GetUploadUrl` из gRPC-заголовка `x-device-name` ([[modules/shared-auth]] · `RequestContext.DeviceName`); хранится на блобе (`UploadFile.UploadDeviceName`). Каждая загрузка сохраняется как отдельный блоб (дедупликация контента по хешу снята), поэтому значение принадлежит конкретной загрузке. В веб-клиенте выводится в модалке «Свойства» (`/api/files/info` → `uploadDeviceName`).
 
 ### MediaKind (proto enum)
 

@@ -12,9 +12,10 @@ import { SelectionBar } from '../components/ui/SelectionBar';
 import { useToast } from '../hooks/useToast';
 import { useAlbumMembership } from '../hooks/useAlbumMembership';
 import { useFileDrop } from '../hooks/useFileDrop';
+import { useDuplicatePrompt } from '../hooks/useDuplicatePrompt';
 import { useSelection } from '../hooks/useSelection';
 import { usePageHeader } from '../hooks/usePageHeader';
-import { apiGet, apiPost, pickFiles, uploadFile } from '../lib/api';
+import { apiGet, apiPost, pickFiles, uploadFile, checkDuplicate } from '../lib/api';
 import { createShare } from '../lib/share';
 import type { Album, CardFile, DirInfo, Entry, Listing } from '../lib/types';
 
@@ -215,6 +216,7 @@ export function FilesPage() {
   const [confirmDel, setConfirmDel] = React.useState<RenameTarget | null>(null);
   const [bulkConfirm, setBulkConfirm] = React.useState(false);
   const [toastNode, toast] = useToast();
+  const dup = useDuplicatePrompt();
   const { menu, openAt } = useContextMenu();
   const membership = useAlbumMembership(albums);
   const { over, dropHandlers } = useFileDrop((f) => doUpload(f));
@@ -385,19 +387,27 @@ export function FilesPage() {
   async function doUpload(dropped?: File[]) {
     const files = dropped && dropped.length ? dropped : await pickFiles({});
     if (!files.length) return;
-    let count = 0;
+    let processed = 0;
+    let uploaded = 0;
     for (const f of files) {
-      setUpload({ current: count + 1, total: files.length, pct: 0 });
+      setUpload({ current: processed + 1, total: files.length, pct: 0 });
       try {
-        const res = await uploadFile(f, (p) => setUpload({ current: count + 1, total: files.length, pct: Math.round(p * 100) }));
+        const d = await checkDuplicate(f);
+        if (d.exists && !(await dup.ask(f.name, d.locations))) {
+          processed++;
+          continue;
+        }
+        const res = await uploadFile(f, (p) => setUpload({ current: processed + 1, total: files.length, pct: Math.round(p * 100) }));
+        // Загрузка в открытую папку — кладём именно в неё (без авто-распределения по типу).
         await apiPost('/api/cloud/attach', { dir: currentDir, fileId: res.fileId, name: f.name });
+        uploaded++;
       } catch (e) {
         toast(`«${f.name}»: ${(e as Error).message}`, 'err');
       }
-      count++;
+      processed++;
     }
     setUpload(null);
-    toast(`Загружено: ${count}`);
+    if (uploaded > 0) toast(`Загружено: ${uploaded}`);
     load();
   }
 
@@ -465,6 +475,7 @@ export function FilesPage() {
   return (
     <>
       {toastNode}
+      {dup.overlay}
       <SelectionBar
         count={fsel.count}
         onClear={fsel.clear}

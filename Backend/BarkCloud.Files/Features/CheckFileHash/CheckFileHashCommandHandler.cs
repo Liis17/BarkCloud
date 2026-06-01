@@ -11,7 +11,7 @@ namespace BarkCloud.Files.Features.CheckFileHash;
 public partial class CheckFileHashCommandHandler : IRequestHandler<CheckFileHashCommand, CheckFileHashResponse>
 {
     private readonly IFileHashesStorage _hashesStorage;
-    private readonly IUploadedFilesStorage _filesStorage;
+    private readonly ICloudHierarchyStorage _hierarchyStorage;
     private readonly UserContext _userContext;
     private readonly ILogger<CheckFileHashCommandHandler> _logger;
 
@@ -21,12 +21,12 @@ public partial class CheckFileHashCommandHandler : IRequestHandler<CheckFileHash
 
     public CheckFileHashCommandHandler(
         IFileHashesStorage hashesStorage,
-        IUploadedFilesStorage filesStorage,
+        ICloudHierarchyStorage hierarchyStorage,
         UserContext userContext,
         ILogger<CheckFileHashCommandHandler> logger)
     {
         _hashesStorage = hashesStorage;
-        _filesStorage = filesStorage;
+        _hierarchyStorage = hierarchyStorage;
         _userContext = userContext;
         _logger = logger;
     }
@@ -48,26 +48,43 @@ public partial class CheckFileHashCommandHandler : IRequestHandler<CheckFileHash
         // Normalize hash to lowercase
         var normalizedHash = request.FileHash.ToLowerInvariant();
 
-        var fileId = await _hashesStorage.GetFileIdByHash(normalizedHash);
-
-        if (fileId.HasValue)
+        // Дедуп снят: контент с одним хешем может относиться к нескольким блобам.
+        var fileIds = await _hashesStorage.GetFileIdsByHash(normalizedHash, cancellationToken);
+        if (fileIds.Count == 0)
         {
-            _logger.LogInformation("Файл с хешем {FileHash} найден, FileId: {FileId}", normalizedHash, fileId.Value);
-
-            // Add current user to uploaders list (for deduplication tracking)
-            await _filesStorage.AddUploaderToFile(fileId.Value, _userContext.UserId);
-
-            return new CheckFileHashResponse
-            {
-                FileId = fileId.Value.ToString()
-            };
+            _logger.LogInformation("Файл с хешем {FileHash} не найден", normalizedHash);
+            return new CheckFileHashResponse { FileId = string.Empty, Exists = false };
         }
 
-        _logger.LogInformation("Файл с хешем {FileHash} не найден", normalizedHash);
+        _logger.LogInformation("Файл с хешем {FileHash} найден ({Count} блоб(ов))", normalizedHash, fileIds.Count);
 
-        return new CheckFileHashResponse
+        var response = new CheckFileHashResponse
         {
-            FileId = string.Empty
+            FileId = fileIds[0].ToString(),
+            Exists = true
         };
+
+        // Локации существующих копий пользователя (имя + папка) — для модалки «файл уже есть».
+        // AddUploaderToFile здесь намеренно НЕ вызывается: проверка без побочных эффектов,
+        // решение «грузить копию / открыть существующий» принимает клиент.
+        var ownerId = _userContext.UserId;
+        var entries = await _hierarchyStorage.GetLiveEntriesForFiles(ownerId, fileIds, cancellationToken);
+        foreach (var entry in entries)
+        {
+            var isRoot = entry.DirectoryId == CloudHierarchyStorage.RootDirectoryId;
+            var directoryName = isRoot
+                ? string.Empty
+                : (await _hierarchyStorage.GetDirectoryAsNoTracking(entry.DirectoryId, cancellationToken))?.Name ?? string.Empty;
+
+            response.ExistingLocations.Add(new ExistingLocation
+            {
+                EntryId = entry.Id.ToString(),
+                Name = entry.Name,
+                DirectoryId = isRoot ? string.Empty : entry.DirectoryId.ToString(),
+                DirectoryName = directoryName
+            });
+        }
+
+        return response;
     }
 }
