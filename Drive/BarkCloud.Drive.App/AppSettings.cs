@@ -10,6 +10,7 @@ internal sealed class AppSettings
     public bool Configured { get; set; }   // первичная настройка (мастер) пройдена
     public string? DriveName { get; set; }  // метка тома (имя диска)
     public string? DriveLetter { get; set; }
+    public string? Language { get; set; }   // код языка UI (ru/en/de); null → авто по Windows
 
     private static string FilePath => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),

@@ -1,6 +1,8 @@
 using System.Windows;
+using System.Windows.Controls;
 
 using BarkCloud.Drive.Contracts;
+using BarkCloud.Drive.Contracts.Localization;
 
 using Microsoft.Win32;
 
@@ -16,16 +18,33 @@ public partial class SettingsWindow : FluentWindow
 
     private readonly MainWindow _owner;
     private readonly AppSettings _settings;
+    private bool _langReady; // селектор языка инициализирован (чтобы первичный SelectionChanged не сработал)
 
     internal SettingsWindow(MainWindow owner, AppSettings settings)
     {
         _owner = owner;
         _settings = settings;
         InitializeComponent();
+
+        LanguageCombo.ItemsSource = Languages.All;
+        LanguageCombo.SelectedItem = Languages.All.FirstOrDefault(l => l.Code == Loc.CurrentCode) ?? Languages.All[0];
+        _langReady = true;
+
         Loaded += OnLoaded;
     }
 
     private IDriveEngine? Engine => _owner.Engine;
+
+    private void LanguageChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!_langReady || LanguageCombo.SelectedItem is not Language lang)
+            return;
+
+        Loc.SetCulture(lang.Code);
+        _settings.Language = lang.Code;
+        _settings.Save();
+        _ = Engine?.SetLanguageAsync(lang.Code);
+    }
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
     {
@@ -44,7 +63,7 @@ public partial class SettingsWindow : FluentWindow
         var engine = Engine;
         if (engine == null)
         {
-            Status("Движок не запущен.");
+            Status(Loc.T("Common_EngineNotRunning"));
             return;
         }
 
@@ -61,7 +80,7 @@ public partial class SettingsWindow : FluentWindow
         }
         catch (Exception ex)
         {
-            Status($"Ошибка: {ex.Message}");
+            Status(Loc.T("Common_ErrorFmt", ex.Message));
         }
     }
 
@@ -97,17 +116,17 @@ public partial class SettingsWindow : FluentWindow
         }
         catch (Exception ex)
         {
-            Status($"Ошибка выхода: {ex.Message}");
+            Status(Loc.T("Settings_LogoutErrorFmt", ex.Message));
         }
     }
 
     private async void ApplyServerClick(object sender, RoutedEventArgs e)
     {
         var host = ServerInput.StripScheme(HostBox.Text);
-        if (string.IsNullOrEmpty(host)) { Status("Введите адрес сервера."); return; }
-        if (!ServerInput.TryPort(IdentityPortBox.Text, out var ip)) { Status("Неверный порт Identity (1–65535)."); return; }
-        if (!ServerInput.TryPort(FilesPortBox.Text, out var fp)) { Status("Неверный порт Files (1–65535)."); return; }
-        if (!ServerInput.TryPort(UsersPortBox.Text, out var up)) { Status("Неверный порт Users (1–65535)."); return; }
+        if (string.IsNullOrEmpty(host)) { Status(Loc.T("Common_EnterServer")); return; }
+        if (!ServerInput.TryPort(IdentityPortBox.Text, out var ip)) { Status(Loc.T("Common_BadPortIdentity")); return; }
+        if (!ServerInput.TryPort(FilesPortBox.Text, out var fp)) { Status(Loc.T("Common_BadPortFiles")); return; }
+        if (!ServerInput.TryPort(UsersPortBox.Text, out var up)) { Status(Loc.T("Common_BadPortUsers")); return; }
 
         var cfg = new ServerConfig
         {
@@ -124,15 +143,15 @@ public partial class SettingsWindow : FluentWindow
         }
         catch (Exception ex)
         {
-            Status($"Не удалось сохранить адрес: {ex.Message}");
+            Status(Loc.T("Common_SaveAddressFailedFmt", ex.Message));
             return;
         }
 
-        Status("Применение адреса, перезапуск движка…");
+        Status(Loc.T("Settings_ApplyingAddress"));
         var engine = await _owner.RestartEngineAsync();
         if (engine == null)
         {
-            Status("Движок недоступен после смены адреса.");
+            Status(Loc.T("Settings_EngineUnavailableAfterServer"));
             return;
         }
 
@@ -144,18 +163,18 @@ public partial class SettingsWindow : FluentWindow
                 // Новый сервер — сессия не восстановилась. Возврат к мастеру (там есть вход).
                 _settings.Configured = false;
                 _settings.Save();
-                Status("Адрес сохранён. Требуется вход — откроется мастер.");
+                Status(Loc.T("Settings_AddressSavedWizard"));
                 Close();
                 return;
             }
 
             UsernameText.Text = UserText(s);
             UpdateMountButtons(s.Mounted);
-            Status("Адрес сервера обновлён.");
+            Status(Loc.T("Settings_AddressUpdated"));
         }
         catch (Exception ex)
         {
-            Status($"Ошибка: {ex.Message}");
+            Status(Loc.T("Common_ErrorFmt", ex.Message));
         }
     }
 
@@ -174,11 +193,11 @@ public partial class SettingsWindow : FluentWindow
             var s = await engine.MountAsync(letter, label);
             if (s.Mounted)
                 SaveDrive(letter, label);
-            ApplyResult(s, "Примонтировано");
+            ApplyResult(s, Loc.T("Settings_Mounted"));
         }
         catch (Exception ex)
         {
-            Status($"Ошибка: {ex.Message}");
+            Status(Loc.T("Common_ErrorFmt", ex.Message));
         }
     }
 
@@ -190,11 +209,11 @@ public partial class SettingsWindow : FluentWindow
 
         try
         {
-            ApplyResult(await engine.UnmountAsync(), "Отмонтировано");
+            ApplyResult(await engine.UnmountAsync(), Loc.T("Settings_Unmounted"));
         }
         catch (Exception ex)
         {
-            Status($"Ошибка: {ex.Message}");
+            Status(Loc.T("Common_ErrorFmt", ex.Message));
         }
     }
 
@@ -214,11 +233,11 @@ public partial class SettingsWindow : FluentWindow
             if (s.Mounted)
                 s = await engine.RemountAsync(null, label); // имя применяется только при маунте
             SaveDrive(_settings.DriveLetter, label);
-            ApplyResult(s, s.Mounted ? "Диск переименован" : "Имя сохранено (примонтируйте диск)");
+            ApplyResult(s, Loc.T(s.Mounted ? "Settings_DriveRenamed" : "Settings_NameSaved"));
         }
         catch (Exception ex)
         {
-            Status($"Ошибка: {ex.Message}");
+            Status(Loc.T("Common_ErrorFmt", ex.Message));
         }
     }
 
@@ -235,11 +254,11 @@ public partial class SettingsWindow : FluentWindow
                 s = await engine.RemountAsync(letter, null);
             SaveDrive(letter, _settings.DriveName);
             PopulateLetters(letter);
-            ApplyResult(s, s.Mounted ? $"Буква изменена на {letter}:" : "Буква сохранена (примонтируйте диск)");
+            ApplyResult(s, s.Mounted ? Loc.T("Settings_LetterChangedFmt", letter) : Loc.T("Settings_LetterSaved"));
         }
         catch (Exception ex)
         {
-            Status($"Ошибка: {ex.Message}");
+            Status(Loc.T("Common_ErrorFmt", ex.Message));
         }
     }
 
@@ -249,7 +268,7 @@ public partial class SettingsWindow : FluentWindow
         if (engine == null)
             return;
 
-        var dialog = new OpenFolderDialog { Title = "Выберите папку для кэша диска", Multiselect = false };
+        var dialog = new OpenFolderDialog { Title = Loc.T("Common_SelectCacheFolderTitle"), Multiselect = false };
         if (!string.IsNullOrEmpty(CacheDirBox.Text))
             dialog.InitialDirectory = CacheDirBox.Text;
         if (dialog.ShowDialog() != true)
@@ -259,21 +278,21 @@ public partial class SettingsWindow : FluentWindow
         {
             var settings = await engine.SetCacheDirAsync(dialog.FolderName);
             CacheDirBox.Text = settings.CacheDir;
-            Status("Папка кэша обновлена. Ранее скачанное осталось в прежней папке.");
+            Status(Loc.T("Settings_CacheUpdated"));
         }
         catch (Exception ex)
         {
-            Status($"Не удалось сменить папку кэша: {ex.Message}");
+            Status(Loc.T("Settings_CacheChangeFailedFmt", ex.Message));
         }
     }
 
     private async void RestartClick(object sender, RoutedEventArgs e)
     {
-        Status("Перезапуск движка…");
+        Status(Loc.T("Settings_RestartingEngine"));
         var engine = await _owner.RestartEngineAsync();
         if (engine == null)
         {
-            Status("Движок недоступен после перезапуска.");
+            Status(Loc.T("Settings_EngineUnavailableAfterRestart"));
             return;
         }
 
@@ -282,30 +301,30 @@ public partial class SettingsWindow : FluentWindow
             var s = await engine.GetStatusAsync();
             UsernameText.Text = UserText(s);
             UpdateMountButtons(s.Mounted);
-            Status("Движок перезапущен.");
+            Status(Loc.T("Settings_EngineRestarted"));
         }
         catch (Exception ex)
         {
-            Status($"Ошибка: {ex.Message}");
+            Status(Loc.T("Common_ErrorFmt", ex.Message));
         }
     }
 
     private void AutostartAppClick(object sender, RoutedEventArgs e)
     {
         Autostart.SetApp(AutostartAppCheck.IsChecked == true);
-        Status("Автозагрузка обновлена.");
+        Status(Loc.T("Settings_AutostartUpdated"));
     }
 
     private void AutostartEngineClick(object sender, RoutedEventArgs e)
     {
         Autostart.SetEngine(AutostartEngineCheck.IsChecked == true);
-        Status("Автозагрузка обновлена.");
+        Status(Loc.T("Settings_AutostartUpdated"));
     }
 
     private void ApplyResult(EngineStatus s, string okMessage)
     {
         UpdateMountButtons(s.Mounted);
-        Status(string.IsNullOrEmpty(s.Error) ? okMessage : $"Ошибка: {s.Error}");
+        Status(string.IsNullOrEmpty(s.Error) ? okMessage : Loc.T("Common_ErrorFmt", s.Error));
     }
 
     private void SaveDrive(string? letter, string? name)
@@ -319,7 +338,7 @@ public partial class SettingsWindow : FluentWindow
     {
         if (string.IsNullOrEmpty(label) || label.Length > 32 || label.IndexOfAny(InvalidLabelChars) >= 0)
         {
-            Status("Имя диска: до 32 символов, без \\ / : * ? \" < > |");
+            Status(Loc.T("Common_DriveNameRule"));
             return false;
         }
 
@@ -327,7 +346,7 @@ public partial class SettingsWindow : FluentWindow
     }
 
     private static string UserText(EngineStatus s)
-        => !string.IsNullOrEmpty(s.Username) ? s.Username! : (s.Authenticated ? "Вы вошли" : "Вход не выполнен");
+        => !string.IsNullOrEmpty(s.Username) ? s.Username! : Loc.T(s.Authenticated ? "User_LoggedIn" : "User_NotLoggedIn");
 
     private void Status(string message) => SettingsStatus.Text = message;
 }
