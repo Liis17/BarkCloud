@@ -162,15 +162,13 @@ final class GalleryViewModel {
         isUploading = true
         uploadDone = 0
         uploadTotal = targets.count
-        // Привязываем медиа к авто-папке «Недавно загруженные» (как веб-клиент),
-        // чтобы у него была запись каталога. Best-effort: без папки файл всё равно
-        // попадёт в галерею.
-        let folderID = try? await cloud.ensureRecentUploadsFolder()
         var anyFailed = false
         for asset in targets {
             do {
                 let (data, name) = try await DeviceAssetResource.originalData(for: asset)
-                _ = try await cloud.uploadFile(data: data, fileName: name, toDirectory: folderID)
+                // Без явной папки: сервер раскладывает по системным «Фото»/«Видео»/
+                // «Другие документы» по типу медиа (route_by_media_kind).
+                _ = try await cloud.uploadFile(data: data, fileName: name, routeByMediaKind: true)
                 // Файл теперь в облаке — сразу показываем иконку.
                 presence.markPresent(asset.localIdentifier)
             } catch {
@@ -189,8 +187,8 @@ final class GalleryViewModel {
     // MARK: - Одиночные действия (контекстное меню по удержанию)
 
     /// `file_id` ассета устройства в облаке. Сначала резолвим по SHA256-хешу
-    /// (`CheckFileHash`); если файла нет — заливаем оригинал (дедуп по хешу) и
-    /// привязываем к авто-папке «Недавно загруженные». Помечаем как в облаке.
+    /// (`CheckFileHash`); если файла нет — заливаем оригинал и привязываем по типу
+    /// медиа в системную папку (route_by_media_kind). Помечаем как в облаке.
     func ensureCloudFileID(for asset: PHAsset) async throws -> String {
         if let hash = await DeviceAssetResource.cachedSHA256(for: asset),
            let existing = try await cloud.checkFileHash(hash) {
@@ -198,8 +196,7 @@ final class GalleryViewModel {
             return existing
         }
         let (data, name) = try await DeviceAssetResource.originalData(for: asset)
-        let folderID = try? await cloud.ensureRecentUploadsFolder()
-        let id = try await cloud.uploadFile(data: data, fileName: name, toDirectory: folderID)
+        let id = try await cloud.uploadFile(data: data, fileName: name, routeByMediaKind: true)
         presence.markPresent(asset.localIdentifier)
         return id
     }

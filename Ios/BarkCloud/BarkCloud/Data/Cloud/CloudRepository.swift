@@ -252,12 +252,21 @@ final class CloudRepository: Sendable {
 
     // MARK: - Записи о файлах
 
-    func attachFile(fileID: String, directoryID: String, name: String) async throws {
+    /// Привязать блоб к каталогу. Если `routeByMediaKind == true` — сервер
+    /// игнорирует `directoryID` и кладёт файл в системную папку «Фото»/«Видео»/
+    /// «Другие документы» по типу медиа.
+    func attachFile(
+        fileID: String,
+        directoryID: String,
+        name: String,
+        routeByMediaKind: Bool = false
+    ) async throws {
         let stub = try await grpc.cloudStub()
         var req = Barkcloud_Files_AttachFileRequest()
         req.fileID = fileID
         req.directoryID = directoryID
         req.name = name
+        req.routeByMediaKind = routeByMediaKind
         _ = try await stub.attachFile(req)
     }
 
@@ -343,13 +352,22 @@ final class CloudRepository: Sendable {
         return try await createDirectory(parentID: "", name: Self.recentUploadsFolderName).id
     }
 
-    /// Загрузить файл в облако. Если задан `directoryID` — привязать к папке.
-    /// Возвращает `file_id` блоба (из ответа сервера; учитывает дедупликацию).
+    /// Загрузить файл в облако. Если `routeByMediaKind == true` — сервер сам
+    /// разложит файл по системным папкам «Фото»/«Видео»/«Другие документы» по типу
+    /// медиа (явный `directoryID` игнорируется). Иначе при заданном `directoryID` —
+    /// привязать к этой папке. Возвращает `file_id` блоба.
     @discardableResult
-    func uploadFile(data: Data, fileName: String, toDirectory directoryID: String? = nil) async throws -> String {
+    func uploadFile(
+        data: Data,
+        fileName: String,
+        toDirectory directoryID: String? = nil,
+        routeByMediaKind: Bool = false
+    ) async throws -> String {
         let upload = try await transfer.getUploadURL(type: .cloudFile)
         let fileID = try await transfer.upload(data: data, fileName: fileName, to: upload.url)
-        if let directoryID {
+        if routeByMediaKind {
+            try await attachFile(fileID: fileID, directoryID: "", name: fileName, routeByMediaKind: true)
+        } else if let directoryID {
             try await attachFile(fileID: fileID, directoryID: directoryID, name: fileName)
         }
         return fileID
