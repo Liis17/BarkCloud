@@ -1,0 +1,383 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="Common_Settings" xml:space="preserve">
+    <value>Настройки</value>
+  </data>
+  <data name="Common_Back" xml:space="preserve">
+    <value>Назад</value>
+  </data>
+  <data name="Common_Next" xml:space="preserve">
+    <value>Далее</value>
+  </data>
+  <data name="Common_Cancel" xml:space="preserve">
+    <value>Отмена</value>
+  </data>
+  <data name="Common_Finish" xml:space="preserve">
+    <value>Готово</value>
+  </data>
+  <data name="Common_Browse" xml:space="preserve">
+    <value>Обзор…</value>
+  </data>
+  <data name="Common_Language" xml:space="preserve">
+    <value>Язык</value>
+  </data>
+  <data name="Common_ServerHost" xml:space="preserve">
+    <value>Сервер (хост или IP)</value>
+  </data>
+  <data name="Common_Ports" xml:space="preserve">
+    <value>Порты сервисов</value>
+  </data>
+  <data name="Common_AcceptCert" xml:space="preserve">
+    <value>Доверять самоподписанному сертификату</value>
+  </data>
+  <data name="Common_DriveName" xml:space="preserve">
+    <value>Имя диска</value>
+  </data>
+  <data name="Common_DriveLetter" xml:space="preserve">
+    <value>Буква диска</value>
+  </data>
+  <data name="Common_AutostartApp" xml:space="preserve">
+    <value>Приложение (значок в трее)</value>
+  </data>
+  <data name="Common_AutostartEngine" xml:space="preserve">
+    <value>Движок (монтировать диск при входе)</value>
+  </data>
+  <data name="Common_ErrorFmt" xml:space="preserve">
+    <value>Ошибка: {0}</value>
+  </data>
+  <data name="Common_EngineNotRunning" xml:space="preserve">
+    <value>Движок не запущен.</value>
+  </data>
+  <data name="Common_EnterServer" xml:space="preserve">
+    <value>Введите адрес сервера.</value>
+  </data>
+  <data name="Common_BadPortIdentity" xml:space="preserve">
+    <value>Неверный порт Identity (1–65535).</value>
+  </data>
+  <data name="Common_BadPortFiles" xml:space="preserve">
+    <value>Неверный порт Files (1–65535).</value>
+  </data>
+  <data name="Common_BadPortUsers" xml:space="preserve">
+    <value>Неверный порт Users (1–65535).</value>
+  </data>
+  <data name="Common_SaveAddressFailedFmt" xml:space="preserve">
+    <value>Не удалось сохранить адрес: {0}</value>
+  </data>
+  <data name="Common_DriveNameRule" xml:space="preserve">
+    <value>Имя диска: до 32 символов, без \ / : * ? " &lt; &gt; |</value>
+  </data>
+  <data name="Common_CacheUnavailableFmt" xml:space="preserve">
+    <value>Папка кэша недоступна: {0}</value>
+  </data>
+  <data name="Common_SelectCacheFolderTitle" xml:space="preserve">
+    <value>Выберите папку для кэша диска</value>
+  </data>
+  <data name="Common_SelectCache" xml:space="preserve">
+    <value>Выберите папку кэша.</value>
+  </data>
+  <data name="User_LoggedIn" xml:space="preserve">
+    <value>Вы вошли</value>
+  </data>
+  <data name="User_NotLoggedIn" xml:space="preserve">
+    <value>Вход не выполнен</value>
+  </data>
+  <data name="Units_Bytes" xml:space="preserve">
+    <value>Б,КБ,МБ,ГБ,ТБ</value>
+  </data>
+  <data name="Main_EngineWarningTitle" xml:space="preserve">
+    <value>Движок не запущен</value>
+  </data>
+  <data name="Main_EngineWarningText" xml:space="preserve">
+    <value>Фоновый процесс BarkCloud Drive не обнаружен.</value>
+  </data>
+  <data name="Main_StartEngine" xml:space="preserve">
+    <value>Запустить движок</value>
+  </data>
+  <data name="Main_Storage" xml:space="preserve">
+    <value>Хранилище</value>
+  </data>
+  <data name="Main_EngineUnavailableFmt" xml:space="preserve">
+    <value>Движок недоступен: {0}</value>
+  </data>
+  <data name="Main_NoFreeLetter" xml:space="preserve">
+    <value>Нет свободной буквы диска для монтирования.</value>
+  </data>
+  <data name="Main_MountErrorFmt" xml:space="preserve">
+    <value>Ошибка монтирования: {0}</value>
+  </data>
+  <data name="Main_ServerFmt" xml:space="preserve">
+    <value>Сервер: {0}</value>
+  </data>
+  <data name="Main_StorageUsageFmt" xml:space="preserve">
+    <value>{0} из {1}</value>
+  </data>
+  <data name="Main_DriveMountedFmt" xml:space="preserve">
+    <value>Диск {0}: примонтирован ({1})</value>
+  </data>
+  <data name="Main_DriveNotMounted" xml:space="preserve">
+    <value>Диск не примонтирован</value>
+  </data>
+  <data name="Main_SyncFmt" xml:space="preserve">
+    <value>Синхронизация: {0}</value>
+  </data>
+  <data name="Tray_Open" xml:space="preserve">
+    <value>Открыть</value>
+  </data>
+  <data name="Tray_Mount" xml:space="preserve">
+    <value>Примонтировать</value>
+  </data>
+  <data name="Tray_Unmount" xml:space="preserve">
+    <value>Отмонтировать</value>
+  </data>
+  <data name="Tray_Exit" xml:space="preserve">
+    <value>Закрыть приложение</value>
+  </data>
+  <data name="Wizard_Title" xml:space="preserve">
+    <value>Настройка BarkCloud Drive</value>
+  </data>
+  <data name="Wizard_Step1" xml:space="preserve">
+    <value>Шаг 1 из 5 · Адрес сервера</value>
+  </data>
+  <data name="Wizard_ServerPrompt" xml:space="preserve">
+    <value>Адрес вашего сервера BarkCloud:</value>
+  </data>
+  <data name="Wizard_Step2" xml:space="preserve">
+    <value>Шаг 2 из 5 · Вход</value>
+  </data>
+  <data name="Wizard_LoginPlaceholder" xml:space="preserve">
+    <value>Логин или email</value>
+  </data>
+  <data name="Wizard_PasswordPlaceholder" xml:space="preserve">
+    <value>Пароль</value>
+  </data>
+  <data name="Wizard_OtpPlaceholder" xml:space="preserve">
+    <value>OTP-код (если включён 2FA)</value>
+  </data>
+  <data name="Wizard_Step3" xml:space="preserve">
+    <value>Шаг 3 из 5 · Диск</value>
+  </data>
+  <data name="Wizard_Step4" xml:space="preserve">
+    <value>Шаг 4 из 5 · Папка кэша</value>
+  </data>
+  <data name="Wizard_CachePrompt" xml:space="preserve">
+    <value>Куда складывать скачанное содержимое файлов:</value>
+  </data>
+  <data name="Wizard_Step5" xml:space="preserve">
+    <value>Шаг 5 из 5 · Автозагрузка</value>
+  </data>
+  <data name="Wizard_AutostartPrompt" xml:space="preserve">
+    <value>Запускать при входе в Windows:</value>
+  </data>
+  <data name="Wizard_AlreadyLoggedIn" xml:space="preserve">
+    <value>Вы уже вошли. Нажмите «Далее».</value>
+  </data>
+  <data name="Wizard_LoggedInAsFmt" xml:space="preserve">
+    <value>Вы вошли как {0}. Нажмите «Далее».</value>
+  </data>
+  <data name="Wizard_EnterLoginPassword" xml:space="preserve">
+    <value>Введите логин и пароль.</value>
+  </data>
+  <data name="Wizard_LoginFailed" xml:space="preserve">
+    <value>Не удалось войти.</value>
+  </data>
+  <data name="Wizard_EnterDriveName" xml:space="preserve">
+    <value>Введите имя диска.</value>
+  </data>
+  <data name="Wizard_SelectLetter" xml:space="preserve">
+    <value>Выберите букву диска.</value>
+  </data>
+  <data name="Wizard_EngineUnavailableAfterServer" xml:space="preserve">
+    <value>Движок недоступен после смены адреса сервера.</value>
+  </data>
+  <data name="Wizard_CreateDriveFailed" xml:space="preserve">
+    <value>Не удалось создать диск.</value>
+  </data>
+  <data name="Wizard_CreateDriveErrorFmt" xml:space="preserve">
+    <value>Ошибка создания диска: {0}</value>
+  </data>
+  <data name="Settings_Account" xml:space="preserve">
+    <value>Аккаунт</value>
+  </data>
+  <data name="Settings_Logout" xml:space="preserve">
+    <value>Выйти</value>
+  </data>
+  <data name="Settings_Server" xml:space="preserve">
+    <value>Сервер</value>
+  </data>
+  <data name="Settings_ApplyAddress" xml:space="preserve">
+    <value>Применить адрес</value>
+  </data>
+  <data name="Settings_ApplyAddressHint" xml:space="preserve">
+    <value>Движок перезапустится; при смене сервера может потребоваться повторный вход.</value>
+  </data>
+  <data name="Settings_Drive" xml:space="preserve">
+    <value>Диск</value>
+  </data>
+  <data name="Settings_Rename" xml:space="preserve">
+    <value>Переименовать</value>
+  </data>
+  <data name="Settings_ChangeLetter" xml:space="preserve">
+    <value>Сменить букву</value>
+  </data>
+  <data name="Settings_DriveHint" xml:space="preserve">
+    <value>Переименование и смена буквы кратко переподключают диск.</value>
+  </data>
+  <data name="Settings_Cache" xml:space="preserve">
+    <value>Папка кэша</value>
+  </data>
+  <data name="Settings_Autostart" xml:space="preserve">
+    <value>Автозагрузка (при входе в Windows)</value>
+  </data>
+  <data name="Settings_Engine" xml:space="preserve">
+    <value>Движок</value>
+  </data>
+  <data name="Settings_RestartEngine" xml:space="preserve">
+    <value>Перезапустить движок</value>
+  </data>
+  <data name="Settings_LogoutErrorFmt" xml:space="preserve">
+    <value>Ошибка выхода: {0}</value>
+  </data>
+  <data name="Settings_ApplyingAddress" xml:space="preserve">
+    <value>Применение адреса, перезапуск движка…</value>
+  </data>
+  <data name="Settings_EngineUnavailableAfterServer" xml:space="preserve">
+    <value>Движок недоступен после смены адреса.</value>
+  </data>
+  <data name="Settings_AddressSavedWizard" xml:space="preserve">
+    <value>Адрес сохранён. Требуется вход — откроется мастер.</value>
+  </data>
+  <data name="Settings_AddressUpdated" xml:space="preserve">
+    <value>Адрес сервера обновлён.</value>
+  </data>
+  <data name="Settings_Mounted" xml:space="preserve">
+    <value>Примонтировано</value>
+  </data>
+  <data name="Settings_Unmounted" xml:space="preserve">
+    <value>Отмонтировано</value>
+  </data>
+  <data name="Settings_DriveRenamed" xml:space="preserve">
+    <value>Диск переименован</value>
+  </data>
+  <data name="Settings_NameSaved" xml:space="preserve">
+    <value>Имя сохранено (примонтируйте диск)</value>
+  </data>
+  <data name="Settings_LetterChangedFmt" xml:space="preserve">
+    <value>Буква изменена на {0}:</value>
+  </data>
+  <data name="Settings_LetterSaved" xml:space="preserve">
+    <value>Буква сохранена (примонтируйте диск)</value>
+  </data>
+  <data name="Settings_CacheUpdated" xml:space="preserve">
+    <value>Папка кэша обновлена. Ранее скачанное осталось в прежней папке.</value>
+  </data>
+  <data name="Settings_CacheChangeFailedFmt" xml:space="preserve">
+    <value>Не удалось сменить папку кэша: {0}</value>
+  </data>
+  <data name="Settings_RestartingEngine" xml:space="preserve">
+    <value>Перезапуск движка…</value>
+  </data>
+  <data name="Settings_EngineUnavailableAfterRestart" xml:space="preserve">
+    <value>Движок недоступен после перезапуска.</value>
+  </data>
+  <data name="Settings_EngineRestarted" xml:space="preserve">
+    <value>Движок перезапущен.</value>
+  </data>
+  <data name="Settings_AutostartUpdated" xml:space="preserve">
+    <value>Автозагрузка обновлена.</value>
+  </data>
+  <data name="Eng_LoginRequired" xml:space="preserve">
+    <value>Введите логин и пароль</value>
+  </data>
+  <data name="Eng_AuthSuccess" xml:space="preserve">
+    <value>Авторизация успешна</value>
+  </data>
+  <data name="Eng_LoggedOut" xml:space="preserve">
+    <value>Выполнен выход</value>
+  </data>
+  <data name="Eng_LoginFirst" xml:space="preserve">
+    <value>Сначала выполните вход</value>
+  </data>
+  <data name="Eng_AlreadyMounted" xml:space="preserve">
+    <value>Диск уже примонтирован</value>
+  </data>
+  <data name="Eng_MountedFmt" xml:space="preserve">
+    <value>Примонтировано {0}:</value>
+  </data>
+  <data name="Eng_DokanMissing" xml:space="preserve">
+    <value>Не найден драйвер Dokany (dokan2.dll). Установите Dokany 2.x — github.com/dokan-dev/dokany/releases (DokanSetup.exe) — и перезапустите.</value>
+  </data>
+  <data name="Eng_NoDriveLetter" xml:space="preserve">
+    <value>Не задана буква диска</value>
+  </data>
+  <data name="Eng_RemountedFmt" xml:space="preserve">
+    <value>Перемонтировано {0}: ({1})</value>
+  </data>
+  <data name="Eng_DokanMissingShort" xml:space="preserve">
+    <value>Не найден драйвер Dokany (dokan2.dll). Установите Dokany 2.x и перезапустите.</value>
+  </data>
+  <data name="Eng_Unmounted" xml:space="preserve">
+    <value>Отмонтировано</value>
+  </data>
+  <data name="Eng_EmptyCachePath" xml:space="preserve">
+    <value>Пустой путь к папке кэша</value>
+  </data>
+  <data name="Eng_SyncFailedFmt" xml:space="preserve">
+    <value>Не удалось сохранить «{0}» в облако: {1}</value>
+  </data>
+  <data name="Launcher_ConnectFailed" xml:space="preserve">
+    <value>не удалось подключиться к движку</value>
+  </data>
+  <data name="Launcher_EngineNotFoundFmt" xml:space="preserve">
+    <value>не найден движок: {0}</value>
+  </data>
+</root>

@@ -6,6 +6,7 @@ using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 
 using BarkCloud.Drive.Contracts;
+using BarkCloud.Drive.Contracts.Localization;
 
 using Wpf.Ui.Controls;
 
@@ -97,7 +98,7 @@ public partial class MainWindow : FluentWindow
         }
         catch (Exception ex)
         {
-            StatusText.Text = $"Движок недоступен: {ex.Message}";
+            StatusText.Text = Loc.T("Main_EngineUnavailableFmt", ex.Message);
         }
 
         if (!_statusTimer.IsEnabled && IsVisible && WindowState != WindowState.Minimized)
@@ -112,10 +113,11 @@ public partial class MainWindow : FluentWindow
         try
         {
             _engine = await EngineLauncher.ConnectAsync();
+            await _engine.SetLanguageAsync(Loc.CurrentCode); // движок мог стартовать с другой культурой
         }
         catch (Exception ex)
         {
-            StatusText.Text = $"Движок недоступен: {ex.Message}";
+            StatusText.Text = Loc.T("Main_EngineUnavailableFmt", ex.Message);
         }
 
         UpdateEngineBanner();
@@ -148,7 +150,7 @@ public partial class MainWindow : FluentWindow
         var letter = PreferredLetter();
         if (letter == null)
         {
-            StatusText.Text = "Нет свободной буквы диска для монтирования.";
+            StatusText.Text = Loc.T("Main_NoFreeLetter");
             return;
         }
 
@@ -165,7 +167,7 @@ public partial class MainWindow : FluentWindow
         }
         catch (Exception ex)
         {
-            StatusText.Text = $"Ошибка монтирования: {ex.Message}";
+            StatusText.Text = Loc.T("Main_MountErrorFmt", ex.Message);
         }
     }
 
@@ -183,8 +185,8 @@ public partial class MainWindow : FluentWindow
     {
         UsernameText.Text = !string.IsNullOrEmpty(s.Username)
             ? s.Username
-            : (s.Authenticated ? "Вы вошли" : "Вход не выполнен");
-        ServerText.Text = string.IsNullOrEmpty(s.ServerHost) ? string.Empty : $"Сервер: {s.ServerHost}";
+            : Loc.T(s.Authenticated ? "User_LoggedIn" : "User_NotLoggedIn");
+        ServerText.Text = string.IsNullOrEmpty(s.ServerHost) ? string.Empty : Loc.T("Main_ServerFmt", s.ServerHost);
 
         if (s.Authenticated)
         {
@@ -203,7 +205,7 @@ public partial class MainWindow : FluentWindow
         if (s.LimitBytes > 0)
         {
             UsageBar.Value = s.UsedBytes * 100.0 / s.LimitBytes;
-            UsageText.Text = $"{Bytes(s.UsedBytes)} из {Bytes(s.LimitBytes)}";
+            UsageText.Text = Loc.T("Main_StorageUsageFmt", Bytes(s.UsedBytes), Bytes(s.LimitBytes));
         }
         else
         {
@@ -212,13 +214,13 @@ public partial class MainWindow : FluentWindow
         }
 
         DriveStateText.Text = s.Mounted
-            ? $"Диск {s.DriveLetter}: примонтирован ({s.VolumeLabel})"
-            : "Диск не примонтирован";
+            ? Loc.T("Main_DriveMountedFmt", s.DriveLetter ?? string.Empty, s.VolumeLabel ?? string.Empty)
+            : Loc.T("Main_DriveNotMounted");
 
         StatusText.Text = !string.IsNullOrEmpty(s.Error)
-            ? $"Ошибка: {s.Error}"
+            ? Loc.T("Common_ErrorFmt", s.Error)
             : !string.IsNullOrEmpty(s.LastSyncError)
-                ? $"Синхронизация: {s.LastSyncError}"
+                ? Loc.T("Main_SyncFmt", s.LastSyncError)
                 : (s.Message ?? string.Empty);
     }
 
@@ -298,7 +300,7 @@ public partial class MainWindow : FluentWindow
     {
         if (_engine == null)
         {
-            StatusText.Text = "Движок не запущен.";
+            StatusText.Text = Loc.T("Common_EngineNotRunning");
             return;
         }
 
@@ -339,7 +341,7 @@ public partial class MainWindow : FluentWindow
         }
         catch (Exception ex)
         {
-            StatusText.Text = $"Ошибка: {ex.Message}";
+            StatusText.Text = Loc.T("Common_ErrorFmt", ex.Message);
         }
     }
 
@@ -386,7 +388,7 @@ public partial class MainWindow : FluentWindow
 
     private static string Bytes(long b)
     {
-        string[] units = ["Б", "КБ", "МБ", "ГБ", "ТБ"];
+        var units = Loc.T("Units_Bytes").Split(',');
         double v = b;
         var i = 0;
         while (v >= 1024 && i < units.Length - 1)

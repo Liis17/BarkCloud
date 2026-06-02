@@ -1,5 +1,6 @@
 using System.Security.AccessControl;
 
+using BarkCloud.Drive.Contracts.Localization;
 using BarkCloud.Proto.Files;
 
 using DokanNet;
@@ -155,7 +156,7 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
             // записи в облако выставляем ошибку в статус, чтобы App показал её пользователю.
             EngineLog.Error($"Cleanup(\"{fileName}\")", ex);
             if (info.Context is WriteSession)
-                LastSyncError = $"Не удалось сохранить «{Path.GetFileName(fileName)}» в облако: {ex.Message}";
+                LastSyncError = Loc.T("Eng_SyncFailedFmt", Path.GetFileName(fileName), ex.Message);
         }
     }
 
