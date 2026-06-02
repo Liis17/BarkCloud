@@ -270,7 +270,21 @@ struct AlbumDetailScreen: View {
                 Task { await vm?.uploadAndAddAssets(assets) }
             }
         }
-        .fullScreenCover(item: $selected) { item in viewer(item) }
+        .fullScreenCover(item: $selected) { item in
+            if let vm {
+                MediaPagerScreen(
+                    ids: vm.state.items.map(\.id),
+                    startIndex: vm.state.items.firstIndex(where: { $0.id == item.id }) ?? 0,
+                    resolve: MediaPagerResolver.cloud(transfer: env.fileTransfer, cache: env.fileCache),
+                    loadMore: {
+                        guard let last = vm.state.items.last else { return vm.state.items.map(\.id) }
+                        await vm.loadMoreIfNeeded(current: last)
+                        return vm.state.items.map(\.id)
+                    },
+                    onClose: { selected = nil }
+                )
+            }
+        }
         .alert(String(localized: "albums_rename_title"), isPresented: $showRename) {
             TextField(String(localized: "albums_name_placeholder"), text: $renameText)
             Button(String(localized: "action_save")) {
@@ -413,17 +427,6 @@ struct AlbumDetailScreen: View {
             } label: {
                 Image(systemName: "ellipsis.circle")
             }
-        }
-    }
-
-    private func viewer(_ item: MediaItem) -> some View {
-        NavigationStack {
-            RemoteFilePreviewScreen(fileID: item.id, fileName: item.fileName, transfer: env.fileTransfer, cache: env.fileCache)
-                .toolbar {
-                    ToolbarItem(placement: .topBarLeading) {
-                        Button(String(localized: "action_close")) { selected = nil }
-                    }
-                }
         }
     }
 

@@ -252,6 +252,33 @@ struct OutgoingShare: Identifiable, Hashable, Sendable {
     var id: String { grantID }
 }
 
+/// Один исходящий грант с полной инфой о файле (зеркалит `OutgoingShareFull`).
+/// Бэкенд отдаёт плоский список по всем моим файлам; группировку по файлу для
+/// таба «Я поделился» делает клиент. `recipientUserID` резолвится в `CloudUser`.
+struct OutgoingShareFull: Identifiable, Hashable, Sendable {
+    let grantID: String
+    let file: MediaAsset
+    let recipientUserID: Int64
+    let sharedAt: Date
+
+    init(_ e: Barkcloud_Files_OutgoingShareFull) {
+        self.grantID = e.grantID
+        self.file = MediaAsset(e.file)
+        self.recipientUserID = e.recipientUserID
+        self.sharedAt = e.hasSharedAt ? e.sharedAt.date : Date(timeIntervalSince1970: 0)
+    }
+
+    var id: String { grantID }
+}
+
+/// Страница плоского списка исходящих грантов с курсором пагинации.
+struct OutgoingSharesAllPage: Sendable {
+    let items: [OutgoingShareFull]
+    let nextCursorSharedAt: Date?
+    let nextCursorGrantID: String
+    var hasMore: Bool { nextCursorSharedAt != nil }
+}
+
 /// Страница медиа-галереи с курсором пагинации.
 struct MediaPage: Sendable {
     let items: [MediaAsset]

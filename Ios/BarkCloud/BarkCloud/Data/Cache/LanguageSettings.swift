@@ -26,6 +26,16 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         case .de: return "language_de"
         }
     }
+
+    /// Эмодзи-флаг для строки в настройках. У «Системного» нет страны — глобус.
+    var flag: String {
+        switch self {
+        case .system: return "🌐"
+        case .ru: return "🇷🇺"
+        case .en: return "🇬🇧"
+        case .de: return "🇩🇪"
+        }
+    }
 }
 
 /// Обёртка над `UserDefaults` для выбранного языка интерфейса. Потокобезопасна

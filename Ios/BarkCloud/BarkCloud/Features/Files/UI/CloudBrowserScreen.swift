@@ -20,6 +20,8 @@ struct CloudBrowserScreen: View {
     @State private var moveSubject: MoveSubject?
     @State private var openFile: CloudFileEntry?
     @State private var shareWithUserContext: ShareWithUserContext?
+    @State private var showBatchMove = false
+    @State private var showBatchDeleteConfirm = false
 
     var body: some View {
         Group {
@@ -60,6 +62,18 @@ struct CloudBrowserScreen: View {
                 performMove(subject, to: targetID)
             }
         }
+        .sheet(isPresented: $showBatchMove) {
+            CloudMovePicker(cloud: env.cloudRepository) { targetID in
+                Task { await vm?.moveSelected(toDirectory: targetID) }
+            }
+        }
+        .safeAreaInset(edge: .bottom) {
+            if let vm, vm.state.isSelecting {
+                selectionBar(vm)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .animation(.spring(response: 0.35, dampingFraction: 0.85), value: vm?.state.isSelecting ?? false)
         .sheet(item: $shareWithUserContext) { context in
             ShareWithUserSheet(context: context) { shareWithUserContext = nil }
         }
@@ -104,21 +118,36 @@ struct CloudBrowserScreen: View {
         } else {
             List {
                 ForEach(vm.state.subdirs) { dir in
-                    NavigationLink {
-                        CloudBrowserScreen(directoryID: dir.id, title: dir.name)
-                    } label: {
-                        folderRow(dir)
-                    }
-                    .swipeActions(edge: .trailing) {
-                        deleteButton { vm.deleteDirectory(dir) }
-                        moveButton { moveSubject = .directory(dir) }
-                        renameButton {
-                            renameText = dir.name
-                            renameSubject = .directory(dir)
+                    if vm.state.isSelecting {
+                        selectableRow(isSelected: vm.state.selectedDirs.contains(dir.id)) {
+                            folderRow(dir)
+                        }
+                        .contentShape(Rectangle())
+                        .onTapGesture { vm.toggleDirectory(dir) }
+                    } else {
+                        NavigationLink {
+                            CloudBrowserScreen(directoryID: dir.id, title: dir.name)
+                        } label: {
+                            folderRow(dir)
+                        }
+                        .swipeActions(edge: .trailing) {
+                            deleteButton { vm.deleteDirectory(dir) }
+                            moveButton { moveSubject = .directory(dir) }
+                            renameButton {
+                                renameText = dir.name
+                                renameSubject = .directory(dir)
+                            }
                         }
                     }
                 }
                 ForEach(vm.state.files) { entry in
+                    if vm.state.isSelecting {
+                        selectableRow(isSelected: vm.state.selectedFiles.contains(entry.id)) {
+                            fileRow(entry)
+                        }
+                        .contentShape(Rectangle())
+                        .onTapGesture { vm.toggleFile(entry) }
+                    } else {
                     fileRow(entry)
                         .contentShape(Rectangle())
                         .onTapGesture { openFile = entry }
@@ -158,6 +187,7 @@ struct CloudBrowserScreen: View {
                                 Label(String(localized: "action_delete"), systemImage: "trash")
                             }
                         }
+                    }
                 }
             }
             .listStyle(.plain)
@@ -210,10 +240,18 @@ struct CloudBrowserScreen: View {
 
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
-        ToolbarItem(placement: .topBarTrailing) {
-            if vm?.state.isUploading == true {
-                ProgressView()
-            } else {
+        if let vm, vm.state.isSelecting {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button(String(localized: "action_cancel")) { vm.exitSelection() }
+            }
+        } else if vm?.state.isUploading == true {
+            ToolbarItem(placement: .topBarTrailing) { ProgressView() }
+        } else {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button(String(localized: "gallery_select")) { vm?.enterSelection() }
+                    .disabled(vm?.state.isEmpty ?? true)
+            }
+            ToolbarItem(placement: .topBarTrailing) {
                 Menu {
                     Button {
                         folderName = ""
@@ -234,6 +272,90 @@ struct CloudBrowserScreen: View {
                 }
             }
         }
+    }
+
+    /// Строка списка в режиме выбора: ведущая галочка + контент.
+    @ViewBuilder
+    private func selectableRow<Content: View>(isSelected: Bool, @ViewBuilder content: () -> Content) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                .font(.system(size: 20))
+                .foregroundStyle(isSelected ? AppColors.accent : AppColors.onSurfaceVariant)
+            content()
+        }
+    }
+
+    /// Нижняя панель режима выбора: счётчик + «Переместить»/«Удалить» (или прогресс батча).
+    @ViewBuilder
+    private func selectionBar(_ vm: CloudBrowserViewModel) -> some View {
+        VStack(spacing: 8) {
+            if vm.state.isProcessing {
+                VStack(spacing: 6) {
+                    Text(verbatim: "\(String(localized: "media_deleting")) \(vm.state.processDone)/\(vm.state.processTotal)")
+                        .font(AppTypography.bodySmall)
+                        .foregroundStyle(AppColors.onSurfaceVariant)
+                    ProgressView(value: Double(vm.state.processDone), total: Double(max(vm.state.processTotal, 1)))
+                        .tint(AppColors.accent)
+                }
+                .transition(.opacity)
+            } else {
+                Text(String(format: NSLocalizedString("media_selected_count", comment: ""), vm.state.selectedCount))
+                    .font(AppTypography.bodySmall)
+                    .foregroundStyle(AppColors.onSurfaceVariant)
+                HStack(spacing: 12) {
+                    Button {
+                        showBatchMove = true
+                    } label: {
+                        Label("action_move", systemImage: "folder")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(AppColors.accent)
+
+                    Button(role: .destructive) {
+                        showBatchDeleteConfirm = true
+                    } label: {
+                        Label("action_delete", systemImage: "trash")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(AppColors.error)
+                    .popover(isPresented: $showBatchDeleteConfirm, arrowEdge: .bottom) {
+                        batchDeleteConfirm(vm)
+                    }
+                }
+                .controlSize(.large)
+                .disabled(!vm.state.hasSelection)
+                .transition(.opacity)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(.bar)
+        .animation(.easeInOut(duration: 0.2), value: vm.state.isProcessing)
+    }
+
+    private func batchDeleteConfirm(_ vm: CloudBrowserViewModel) -> some View {
+        VStack(spacing: 14) {
+            Text(String(format: NSLocalizedString("cloud_delete_selected_message", comment: ""), vm.state.selectedCount))
+                .font(AppTypography.bodyMedium)
+                .foregroundStyle(AppColors.onSurface)
+                .multilineTextAlignment(.center)
+            Button(role: .destructive) {
+                showBatchDeleteConfirm = false
+                Task { await vm.deleteSelected() }
+            } label: {
+                Label("action_delete", systemImage: "trash")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(AppColors.error)
+            .controlSize(.large)
+        }
+        .padding(16)
+        .frame(width: 240)
+        .presentationCompactAdaptation(.popover)
     }
 
     @ViewBuilder

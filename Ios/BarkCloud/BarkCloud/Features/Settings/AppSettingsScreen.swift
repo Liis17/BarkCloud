@@ -17,7 +17,9 @@ struct AppSettingsScreen: View {
                     Button {
                         env.language.setLanguage(lang)
                     } label: {
-                        HStack {
+                        HStack(spacing: 12) {
+                            Text(verbatim: lang.flag)
+                                .font(.system(size: 22))
                             Text(lang.displayNameKey)
                                 .font(AppTypography.titleMedium)
                                 .foregroundStyle(AppColors.onSurface)

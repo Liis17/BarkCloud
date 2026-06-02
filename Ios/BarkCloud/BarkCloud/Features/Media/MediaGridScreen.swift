@@ -60,7 +60,21 @@ struct MediaGridScreen: View {
                 Task { await vm?.reload() }
             }
         }
-        .fullScreenCover(item: $selected) { item in viewer(item) }
+        .fullScreenCover(item: $selected) { item in
+            if let vm {
+                MediaPagerScreen(
+                    ids: vm.state.items.map(\.id),
+                    startIndex: vm.state.items.firstIndex(where: { $0.id == item.id }) ?? 0,
+                    resolve: MediaPagerResolver.cloud(transfer: env.fileTransfer, cache: env.fileCache),
+                    loadMore: {
+                        guard let last = vm.state.items.last else { return vm.state.items.map(\.id) }
+                        await vm.loadMoreIfNeeded(current: last)
+                        return vm.state.items.map(\.id)
+                    },
+                    onClose: { selected = nil }
+                )
+            }
+        }
         .sheet(isPresented: $showPicker) {
             DeviceAssetPickerScreen(
                 filter: kind.isVideo ? .video : .photo,
@@ -313,14 +327,4 @@ struct MediaGridScreen: View {
         }
     }
 
-    private func viewer(_ item: MediaItem) -> some View {
-        NavigationStack {
-            RemoteFilePreviewScreen(fileID: item.id, fileName: item.fileName, transfer: env.fileTransfer, cache: env.fileCache)
-                .toolbar {
-                    ToolbarItem(placement: .topBarLeading) {
-                        Button(String(localized: "action_close")) { selected = nil }
-                    }
-                }
-        }
-    }
 }
