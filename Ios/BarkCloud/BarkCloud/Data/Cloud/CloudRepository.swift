@@ -337,21 +337,6 @@ final class CloudRepository: Sendable {
 
     // MARK: - Загрузка
 
-    /// Имя авто-папки для медиа из вкладок Фото/Видео/Галерея. Совпадает с
-    /// веб-клиентом (`RECENT_FOLDER`), чтобы у загруженного медиа была запись
-    /// каталога (тогда работают корзина/переименование) и оно попадало в эту папку.
-    static let recentUploadsFolderName = "Недавно загруженные"
-
-    /// id папки «Недавно загруженные» в корне; создаёт её при отсутствии.
-    /// Повторяет `ensureRecentFolder()` веб-клиента.
-    func ensureRecentUploadsFolder() async throws -> String {
-        let listing = try await listDirectory("")
-        if let existing = listing.subdirs.first(where: { $0.name == Self.recentUploadsFolderName }) {
-            return existing.id
-        }
-        return try await createDirectory(parentID: "", name: Self.recentUploadsFolderName).id
-    }
-
     /// Загрузить файл в облако. Если `routeByMediaKind == true` — сервер сам
     /// разложит файл по системным папкам «Фото»/«Видео»/«Другие документы» по типу
     /// медиа (явный `directoryID` игнорируется). Иначе при заданном `directoryID` —

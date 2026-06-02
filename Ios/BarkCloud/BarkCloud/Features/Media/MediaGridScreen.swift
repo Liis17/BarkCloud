@@ -53,6 +53,13 @@ struct MediaGridScreen: View {
             }
             await vm?.loadIfNeeded()
         }
+        // Автозагрузка медиатеки завершилась (баннер прогресса погас) — подтянуть
+        // свежезагруженные медиа в сетку, пока вкладка открыта, без ручного refresh.
+        .onChange(of: env.uploadProgress.isActive) { wasActive, isActive in
+            if wasActive, !isActive, env.uploadProgress.currentSource == .backup {
+                Task { await vm?.reload() }
+            }
+        }
         .fullScreenCover(item: $selected) { item in viewer(item) }
         .sheet(isPresented: $showPicker) {
             DeviceAssetPickerScreen(

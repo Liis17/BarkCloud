@@ -27,14 +27,14 @@ final class ShareInboxUploader {
         guard !items.isEmpty else { return }
         isRunning = true
         Task { [cloud] in
-            // Привязываем к авто-папке «Недавно загруженные», как остальные загрузки.
-            let folderID = try? await cloud.ensureRecentUploadsFolder()
             for item in items {
                 do {
+                    // Без папки: сервер разложит по «Фото»/«Видео»/«Другие
+                    // документы» по типу медиа (см. attach в AppEnvironment).
                     _ = try await cloud.enqueueBackgroundUpload(
                         sourceFile: item,
                         fileName: item.lastPathComponent,
-                        toDirectory: folderID,
+                        toDirectory: nil,
                         source: .share
                     )
                     ShareInbox.remove(item)

@@ -86,20 +86,36 @@ final class AppEnvironment {
         uploads.onPersistentFailure = {
             scheduleRetryBGTaskIfNeeded()
         }
-        // Системный observer: при completed — привязать файл к папке. Через
+        // Системный observer: при completed — привязать файл к каталогу. Через
         // addObserver, чтобы UI-наблюдатели (UploadProgressObserver) могли
         // подписаться независимо, не перетирая друг друга.
+        //
+        // Куда привязывать:
+        // - `.backup` (автозагрузка медиатеки) и `.share` без выбранной папки —
+        //   по типу медиа: сервер сам кладёт в «Фото»/«Видео»/«Другие документы»
+        //   (`route_by_media_kind`). Папка «Недавно загруженные» больше не нужна.
+        // - всё остальное (ручная загрузка в Cloud Browser, шаринг с выбранной
+        //   папкой) — в конкретный `directoryID`.
         uploads.addObserver(completion: { snapshot in
             Task { [weak cloudRef] in
-                guard let cloudRef,
-                      let directoryID = snapshot.directoryID,
-                      !directoryID.isEmpty,
-                      !snapshot.preparedFileID.isEmpty else { return }
-                try? await cloudRef.attachFile(
-                    fileID: snapshot.preparedFileID,
-                    directoryID: directoryID,
-                    name: snapshot.fileName
-                )
+                guard let cloudRef, !snapshot.preparedFileID.isEmpty else { return }
+                let directoryID = snapshot.directoryID ?? ""
+                let routeByMediaKind = snapshot.source == .backup
+                    || (snapshot.source == .share && directoryID.isEmpty)
+                if routeByMediaKind {
+                    try? await cloudRef.attachFile(
+                        fileID: snapshot.preparedFileID,
+                        directoryID: "",
+                        name: snapshot.fileName,
+                        routeByMediaKind: true
+                    )
+                } else if !directoryID.isEmpty {
+                    try? await cloudRef.attachFile(
+                        fileID: snapshot.preparedFileID,
+                        directoryID: directoryID,
+                        name: snapshot.fileName
+                    )
+                }
             }
         })
 

@@ -164,14 +164,45 @@ AppEnvironment подписывает системный хук attachFile, Uplo
 ассеты (`processedAssetIDs: Set<String>` в BackupManager). Если есть автозагрузка
 и в `pendingUpload` появились новые — `uploadLoop` сам поднимется через `classify`.
 
+⚠️ `startScanIfNeeded` теперь обнуляет `scanTask = nil` по завершении скана — иначе
+`refreshScanForNewAssets` (guard `scanTask == nil`) никогда не запускался повторно
+после первого скана, и новые фото/возобновление не подхватывались.
+
+### Возобновление автозагрузки при возврате в foreground
+
+`BackupManager.resumeOnForeground()` (зовётся из `BarkCloudApp.scenePhase == .active`
+вместо прежнего `refreshScanForNewAssets`). Чинит «зависшую» автозагрузку после
+сворачивания: цикл подачи мог завершиться (вся очередь подана в URLSession), а часть
+фоновых передач — прерваться, и их ассеты остаются в `processedAssetIDs`, так что
+обычный повторный скан их пропустит.
+1. `startUploadLoop()` — оживляет цикл, если он умер, а в памяти ещё есть `pendingUpload`.
+2. Если backup-передач в очереди сейчас НЕТ (загрузка действительно встала) —
+   пере-сверка: `processedAssetIDs = confirmedInCloudIDs ∪ {pendingUpload} ∪ {currentAsset}`,
+   т.е. из «обработанных» выкидываем всё, что ещё НЕ подтверждено на сервере, и
+   `refreshScanForNewAssets` пере-проверяет это по `checkFileHashes` → недостающее
+   уходит в загрузку снова (бэкенд дедуплицирует по SHA256). Если передачи идут —
+   не пере-сверяем, чтобы не задублировать ещё не дозагруженные ассеты.
+- `confirmedInCloudIDs: Set<String>` — ассеты, подтверждённые на сервере (classify
+  увидел `exists==true`). Только они безусловно пропускаются при пере-сверке.
+
+### Auto-refresh сетки «Альбомы» по завершении автозагрузки
+
+`Features/Media/MediaGridScreen.swift` (сегменты Фото/Видео вкладки «Альбомы») —
+`.onChange(of: env.uploadProgress.isActive)`: когда баннер прогресса гаснет
+(`true → false`) и `currentSource == .backup`, вызывает `vm.reload()`. Так
+свежезагруженные автобэкапом медиа появляются в сетке, пока вкладка открыта, без
+ручного pull-to-refresh. Срабатывает после grace-периода баннера (1.5 с), т.е.
+после фактического attach последних файлов.
+
 ### Жизненный цикл
 
 **Main app старт** (`AppEnvironment.init`):
 1. Создать `BackgroundUploadCoordinator.shared` — сразу при обращении создаёт
    `URLSession` с background-config'ом. Если в системе остались задачи
    предыдущей сессии — делегатные события придут в эту инстанцию.
-2. Установить `tokenProvider`, `onJobCompleted` (auto attachFile если есть
-   directoryID), `onPersistentFailure` (schedule BGTask).
+2. Установить `tokenProvider`, completion-observer (attachFile: `.backup` и
+   `.share` без папки → `route_by_media_kind`; иначе → в `directoryID`),
+   `onPersistentFailure` (schedule BGTask).
 3. `attachAndResubmitOrphans()`: для UploadJob в `running` без живой URLSession
    task — сбросить в `pending` и submit заново. Это случается после kill main app.
 
@@ -196,8 +227,14 @@ AppEnvironment подписывает системный хук attachFile, Uplo
 - Лимит 5 одновременных backup-job в очереди (`UploadQueueStore.activeJobs()`).
 - `DeviceAssetResource.writeOriginal(asset:to:)` — поток в файл через
   `PHAssetResourceManager.requestData` (без RAM, важно для видео).
-- `cloud.enqueueBackgroundUpload(sourceFile:fileName:directoryID:source: .backup)`.
-- attachFile в `«Недавно загруженные»` делает координатор через `onJobCompleted`.
+- `cloud.enqueueBackgroundUpload(sourceFile:fileName:toDirectory: nil, source: .backup)`
+  — **без папки**. Привязку делает координатор через completion-observer
+  AppEnvironment с `route_by_media_kind`: сервер сам кладёт в системные
+  «Фото»/«Видео»/«Другие документы» по типу медиа. Папка «Недавно загруженные»
+  больше не создаётся (метод `ensureRecentUploadsFolder` удалён).
+- В `reclaimable` (предложить удалить оригинал) ассет попадает только когда
+  следующий скан подтвердит его на сервере (`classify`), а не сразу после подачи
+  в очередь — до подтверждения предлагать удаление нельзя.
 
 **Manual** (`CloudBrowserViewModel.upload`):
 - Сразу `cloud.enqueueBackgroundUpload(data:fileName:directoryID:)`. UI не
