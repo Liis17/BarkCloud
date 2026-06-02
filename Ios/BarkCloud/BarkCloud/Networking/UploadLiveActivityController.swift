@@ -66,11 +66,14 @@ final class UploadLiveActivityController {
 
         let activeStates: Set<UploadJobState> = [.pending, .preparing, .running]
         let activeJobs = jobs.filter { activeStates.contains($0.state) }
+        // Осиротевшие `.running` (их background-task умер) Activity не держат —
+        // иначе зомби-загрузка вечно висит в Dynamic Island после завершения.
+        let blockingJobs = await BackgroundUploadCoordinator.shared.blockingActiveJobs(from: activeJobs)
 
-        // Зафиксировать окно сессии на createdAt самого раннего активного job,
+        // Зафиксировать окно сессии на createdAt самого раннего блокирующего job,
         // иначе следующий вызов notifyChanged отсечёт свои же jobs.
-        if sessionStartedAt == nil, !activeJobs.isEmpty {
-            let earliest = activeJobs.map(\.createdAt).min() ?? Date()
+        if sessionStartedAt == nil, !blockingJobs.isEmpty {
+            let earliest = blockingJobs.map(\.createdAt).min() ?? Date()
             sessionStartedAt = earliest.addingTimeInterval(-1)
         }
 
@@ -95,7 +98,9 @@ final class UploadLiveActivityController {
             }
         }
         let overallProgress = totalBytes > 0 ? min(1.0, Double(sentBytes) / Double(totalBytes)) : 0
-        let isFinished = total > 0 && (completed + failed == total)
+        // Завершено, когда не осталось блокирующих (живых) активных jobs: все
+        // терминальны или остались только осиротевшие (мёртвый task).
+        let isFinished = blockingJobs.isEmpty
 
         let state = UploadActivityAttributes.ContentState(
             totalFiles: total,

@@ -130,13 +130,20 @@ final class BackgroundUploadCoordinator: NSObject, @unchecked Sendable {
 
     // MARK: - Attach (re-cinching on app start)
 
-    /// При старте main app: прицепиться к существующей background-сессии и
-    /// синхронизировать UploadJob со списком живых задач.
-    /// - Задачи, которые ещё живы — оставляем как есть.
-    /// - UploadJob в running без живой задачи (главное приложение было убито
-    ///   до того как делегат отработал) — сбрасываем в pending и пере-submit'им.
+    /// При старте main app: прицепиться к существующей background-сессии и привести
+    /// очередь в порядок.
+    /// - Задачи, которые ещё живы (in-flight task пережил перезапуск в фоновом
+    ///   демоне) — оставляем как есть.
+    /// - Любой осиротевший job (нет живого task) — **удаляем, НЕ перезаливаем**.
+    ///   Возобновить его нельзя: `uploadURL` одноразовый/протухший, повторный POST
+    ///   на него падает → вечный retry и фантомная панель «1 из N» на уже
+    ///   загруженных файлах. Реально недостающие файлы заново подберёт скан
+    ///   BackupManager (дедуп по SHA256 — дубликатов не будет) со свежим uploadURL.
     func attachAndResubmitOrphans() async {
         _ = self.session
+        // Подчистить давно завершённые jobs, чтобы они не копились и не висели в
+        // часовом окне recentJobs (источник прогресса баннера/Live Activity).
+        await queueStore.purgeCompleted(olderThan: Date().addingTimeInterval(-600))
         let liveIdentifiers = await currentTaskIdentifiers()
         let active = await queueStore.activeJobs()
         for snapshot in active {
@@ -144,8 +151,8 @@ final class BackgroundUploadCoordinator: NSObject, @unchecked Sendable {
                liveIdentifiers.contains(snapshot.sessionTaskIdentifier) {
                 continue
             }
-            await queueStore.resetForRetry(id: snapshot.id)
-            await submit(jobID: snapshot.id)
+            try? FileManager.default.removeItem(atPath: snapshot.multipartBodyPath)
+            await queueStore.delete(id: snapshot.id)
         }
         // Обновить Live Activity и UI: если main app открылся после того как
         // Share Extension стартовал Activity и ушёл — controller подцепился к
@@ -159,6 +166,29 @@ final class BackgroundUploadCoordinator: NSObject, @unchecked Sendable {
             session.getAllTasks { tasks in
                 continuation.resume(returning: Set(tasks.map(\.taskIdentifier)))
             }
+        }
+    }
+
+    /// За сколько секунд без обновления активный job считаем «подзависшим» и
+    /// проверяем, жив ли его background-task.
+    private static let staleActiveAfter: TimeInterval = 15
+
+    /// Из набора активных jobs вернуть те, что реально держат UI прогресса:
+    /// недавно прогрессировавшие (`updatedAt` свежий) либо подзависшие, но с живым
+    /// URLSession-task. Осиротевший `.running` (его task умер с прошлым запуском
+    /// приложения, событий по нему уже не будет) исключается — иначе он навсегда
+    /// держал бы баннер и Live Activity, и `completed+failed` никогда не сравнялось
+    /// бы с `total`. getAllTasks дёргаем только если есть подзависшие — на горячем
+    /// пути активной загрузки (свежие jobs) лишних системных вызовов нет.
+    func blockingActiveJobs(from active: [UploadJobSnapshot]) async -> [UploadJobSnapshot] {
+        guard !active.isEmpty else { return [] }
+        let cutoff = Date().addingTimeInterval(-Self.staleActiveAfter)
+        let stale = active.filter { $0.updatedAt <= cutoff }
+        guard !stale.isEmpty else { return active }
+        let live = await currentTaskIdentifiers()
+        return active.filter { job in
+            guard job.updatedAt <= cutoff else { return true }
+            return job.state == .running ? live.contains(job.sessionTaskIdentifier) : true
         }
     }
 

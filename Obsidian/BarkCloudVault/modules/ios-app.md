@@ -531,6 +531,14 @@ xcodebuild test -project BarkCloud.xcodeproj -scheme BarkCloud \
 - `Networking/UploadLiveActivityController.swift` (`@MainActor`) — управляет
   одной агрегированной Live Activity «Загружаю в BarkCloud» (Lock Screen +
   Dynamic Island), пересчитывает прогресс по всем jobs за последний час.
+  **Завершение/скрытие** (и Live Activity, и баннер `UploadProgressObserver`)
+  считается по `BackgroundUploadCoordinator.blockingActiveJobs(from:)`: активный
+  job держит UI, только если недавно прогрессировал (`updatedAt`) **или** его
+  URLSession-task ещё жив. Осиротевший `.running` (task умер с прошлым запуском —
+  событий по нему уже не будет) исключается, иначе `completed+failed` никогда не
+  сравняется с `total` и зомби-Activity висит в Dynamic Island навсегда.
+  `getAllTasks` дёргается только при наличии подзависших jobs (горячий путь —
+  без лишних системных вызовов).
 - `Shared/UploadActivityAttributes.swift` — `ActivityAttributes`, membership:
   main app + BarkCloudWidgets + ShareExtension.
 - `BarkCloudWidgets/UploadLiveActivity.swift` — SwiftUI рендеринг Live Activity
