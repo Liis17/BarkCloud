@@ -1,7 +1,9 @@
 using System.IO;
 using System.Windows;
+using System.Windows.Controls;
 
 using BarkCloud.Drive.Contracts;
+using BarkCloud.Drive.Contracts.Localization;
 
 using Microsoft.Win32;
 
@@ -21,6 +23,7 @@ public partial class FirstRunWizard : FluentWindow
     private bool _serverFileSaved; // server.json уже записан → движок точно стартовал с него
     private int _step;
     private bool _authenticated;
+    private bool _langReady; // селектор языка инициализирован (чтобы первичный SelectionChanged не сработал)
 
     internal FirstRunWizard(IDriveEngine engine, AppSettings settings, Func<Task<IDriveEngine?>> restartEngine)
     {
@@ -34,8 +37,24 @@ public partial class FirstRunWizard : FluentWindow
         if (LetterCombo.Items.Count > 0)
             LetterCombo.SelectedIndex = 0;
 
+        LanguageCombo.ItemsSource = Languages.All;
+        LanguageCombo.SelectedItem = Languages.All.FirstOrDefault(l => l.Code == Loc.CurrentCode) ?? Languages.All[0];
+        _langReady = true;
+
         Loaded += OnLoaded;
         ShowStep();
+    }
+
+    private void LanguageChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!_langReady || LanguageCombo.SelectedItem is not Language lang)
+            return;
+
+        Loc.SetCulture(lang.Code);
+        _settings.Language = lang.Code;
+        _settings.Save();
+        _ = _engine.SetLanguageAsync(lang.Code);
+        ShowStep(); // обновить подпись кнопки «Далее/Готово» (она ставится из кода)
     }
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
@@ -65,8 +84,8 @@ public partial class FirstRunWizard : FluentWindow
                 LoginFields.Visibility = Visibility.Collapsed;
                 AlreadyLoggedIn.Visibility = Visibility.Visible;
                 AlreadyLoggedIn.Text = string.IsNullOrEmpty(status.Username)
-                    ? "Вы уже вошли. Нажмите «Далее»."
-                    : $"Вы вошли как {status.Username}. Нажмите «Далее».";
+                    ? Loc.T("Wizard_AlreadyLoggedIn")
+                    : Loc.T("Wizard_LoggedInAsFmt", status.Username);
             }
         }
         catch
@@ -84,7 +103,7 @@ public partial class FirstRunWizard : FluentWindow
         StepAutostart.Visibility = _step == 4 ? Visibility.Visible : Visibility.Collapsed;
 
         BackButton.IsEnabled = _step > 0;
-        NextButton.Content = _step == 4 ? "Готово" : "Далее";
+        NextButton.Content = Loc.T(_step == 4 ? "Common_Finish" : "Common_Next");
         WizardStatus.Visibility = Visibility.Collapsed;
     }
 
@@ -137,11 +156,11 @@ public partial class FirstRunWizard : FluentWindow
 
                 var login = UsernameBox.Text.Trim();
                 if (string.IsNullOrEmpty(login) || string.IsNullOrEmpty(PasswordBox.Password))
-                    return Fail("Введите логин и пароль.");
+                    return Fail(Loc.T("Wizard_EnterLoginPassword"));
 
                 var status = await _engine.LoginAsync(login, PasswordBox.Password, NullIfEmpty(OtpBox.Text));
                 if (!status.Authenticated)
-                    return Fail(string.IsNullOrEmpty(status.Error) ? "Не удалось войти." : status.Error!);
+                    return Fail(string.IsNullOrEmpty(status.Error) ? Loc.T("Wizard_LoginFailed") : status.Error!);
 
                 _authenticated = true;
                 PasswordBox.Password = string.Empty; // не держим пароль/одноразовый OTP в полях
@@ -151,24 +170,24 @@ public partial class FirstRunWizard : FluentWindow
             case 2:
                 var label = VolumeLabelBox.Text.Trim();
                 if (string.IsNullOrEmpty(label))
-                    return Fail("Введите имя диска.");
+                    return Fail(Loc.T("Wizard_EnterDriveName"));
                 if (label.Length > 32 || label.IndexOfAny(InvalidLabelChars) >= 0)
-                    return Fail("Имя диска: до 32 символов, без \\ / : * ? \" < > |");
+                    return Fail(Loc.T("Common_DriveNameRule"));
                 if (LetterCombo.SelectedItem is not string)
-                    return Fail("Выберите букву диска.");
+                    return Fail(Loc.T("Wizard_SelectLetter"));
                 return true;
 
             case 3:
                 var dir = CacheDirBox.Text.Trim();
                 if (string.IsNullOrEmpty(dir))
-                    return Fail("Выберите папку кэша.");
+                    return Fail(Loc.T("Common_SelectCache"));
                 try
                 {
                     Directory.CreateDirectory(dir);
                 }
                 catch (Exception ex)
                 {
-                    return Fail($"Папка кэша недоступна: {ex.Message}");
+                    return Fail(Loc.T("Common_CacheUnavailableFmt", ex.Message));
                 }
 
                 return true;
@@ -184,13 +203,13 @@ public partial class FirstRunWizard : FluentWindow
     {
         var host = ServerInput.StripScheme(HostBox.Text);
         if (string.IsNullOrEmpty(host))
-            return Fail("Введите адрес сервера.");
+            return Fail(Loc.T("Common_EnterServer"));
         if (!ServerInput.TryPort(IdentityPortBox.Text, out var ip))
-            return Fail("Неверный порт Identity (1–65535).");
+            return Fail(Loc.T("Common_BadPortIdentity"));
         if (!ServerInput.TryPort(FilesPortBox.Text, out var fp))
-            return Fail("Неверный порт Files (1–65535).");
+            return Fail(Loc.T("Common_BadPortFiles"));
         if (!ServerInput.TryPort(UsersPortBox.Text, out var up))
-            return Fail("Неверный порт Users (1–65535).");
+            return Fail(Loc.T("Common_BadPortUsers"));
 
         var cfg = new ServerConfig
         {
@@ -213,12 +232,12 @@ public partial class FirstRunWizard : FluentWindow
         }
         catch (Exception ex)
         {
-            return Fail($"Не удалось сохранить адрес: {ex.Message}");
+            return Fail(Loc.T("Common_SaveAddressFailedFmt", ex.Message));
         }
 
         var engine = await _restartEngine();
         if (engine == null)
-            return Fail("Движок недоступен после смены адреса сервера.");
+            return Fail(Loc.T("Wizard_EngineUnavailableAfterServer"));
 
         _engine = engine;
         _appliedServer = cfg;
@@ -234,8 +253,8 @@ public partial class FirstRunWizard : FluentWindow
                 LoginFields.Visibility = Visibility.Collapsed;
                 AlreadyLoggedIn.Visibility = Visibility.Visible;
                 AlreadyLoggedIn.Text = string.IsNullOrEmpty(st.Username)
-                    ? "Вы уже вошли. Нажмите «Далее»."
-                    : $"Вы вошли как {st.Username}. Нажмите «Далее».";
+                    ? Loc.T("Wizard_AlreadyLoggedIn")
+                    : Loc.T("Wizard_LoggedInAsFmt", st.Username);
             }
             else
             {
@@ -257,7 +276,7 @@ public partial class FirstRunWizard : FluentWindow
 
     private void BrowseClick(object sender, RoutedEventArgs e)
     {
-        var dialog = new OpenFolderDialog { Title = "Выберите папку для кэша диска", Multiselect = false };
+        var dialog = new OpenFolderDialog { Title = Loc.T("Common_SelectCacheFolderTitle"), Multiselect = false };
         if (!string.IsNullOrEmpty(CacheDirBox.Text))
             dialog.InitialDirectory = CacheDirBox.Text;
         if (dialog.ShowDialog() == true)
@@ -272,7 +291,7 @@ public partial class FirstRunWizard : FluentWindow
 
         if (string.IsNullOrEmpty(cacheDir))
         {
-            Fail("Выберите папку кэша.");
+            Fail(Loc.T("Common_SelectCache"));
             return;
         }
 
@@ -282,7 +301,7 @@ public partial class FirstRunWizard : FluentWindow
         }
         catch (Exception ex)
         {
-            Fail($"Папка кэша недоступна: {ex.Message}");
+            Fail(Loc.T("Common_CacheUnavailableFmt", ex.Message));
             return;
         }
 
@@ -292,7 +311,7 @@ public partial class FirstRunWizard : FluentWindow
             var status = await _engine.MountAsync(letter, label);
             if (!status.Mounted)
             {
-                Fail(string.IsNullOrEmpty(status.Error) ? "Не удалось создать диск." : status.Error!);
+                Fail(string.IsNullOrEmpty(status.Error) ? Loc.T("Wizard_CreateDriveFailed") : status.Error!);
                 return;
             }
 
@@ -309,7 +328,7 @@ public partial class FirstRunWizard : FluentWindow
         }
         catch (Exception ex)
         {
-            Fail($"Ошибка создания диска: {ex.Message}");
+            Fail(Loc.T("Wizard_CreateDriveErrorFmt", ex.Message));
         }
     }
 

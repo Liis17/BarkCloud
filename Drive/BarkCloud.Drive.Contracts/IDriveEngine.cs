@@ -34,6 +34,10 @@ public interface IDriveEngine
     // в прежней папке. Возвращает применённые настройки.
     Task<EngineSettings> SetCacheDirAsync(string path);
 
+    // Язык для строк статуса/ошибок, которые движок кладёт в EngineStatus
+    // (применяется к последующим сообщениям). Код культуры: "ru"/"en"/"de".
+    Task SetLanguageAsync(string culture);
+
     // Отмонтировать и завершить процесс движка.
     Task ShutdownAsync();
 }
