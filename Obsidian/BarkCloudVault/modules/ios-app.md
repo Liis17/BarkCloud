@@ -250,7 +250,13 @@ BarkCloud/
   плане (без BGTaskScheduler/фоновой URLSession): `uploadLoop` берёт следующий ассет → `originalData`
   → `CloudRepository.uploadFile(toDirectory: ensureRecentUploadsFolder())`; тогл персистится в
   **`AutoUploadSettings`** (обёртка над `UserDefaults`, ключ `BarkCloud.autoUpload.enabled`), при старте
-  приложения `BackupManager.resumeIfEnabled()` (из `AppEnvironment.init`) докачивает остаток.
+  приложения `BackupManager.resumeIfEnabled()` (из `AppEnvironment.init`) докачивает остаток. **Новые
+  фото/видео ловит свой `PHPhotoLibraryChangeObserver`** (`BackupPhotoLibraryObserver` → `refreshScanForNewAssets`)
+  — автозагрузка стартует сразу, без перезапуска и смены вкладки (раньше скан дёргался только на
+  старте/возврате в foreground/смене таба, и новое фото на открытом таб-Галереи не грузилось).
+  **Очистка осиротевших jobs** (`attachAndResubmitOrphans` на старте и каждом возврате в foreground):
+  job без живого URLSession-task **удаляется** (не перезаливается — `uploadURL` одноразовый), но только
+  если старше 60с — свежие jobs текущей сессии не трогаем (иначе гонка с submit «съедала» новые загрузки).
   **«Освободить место»** — `PHPhotoLibrary.shared().performChanges { PHAssetChangeRequest.deleteAssets }`
   (iOS сам показывает системное подтверждение; отмена → throw, без эффекта); при успехе показывается
   `SpaceFreedView` — оверлей с пиксель-лисой `BarkMascot` + радиальный «glow» под ним (оранжевый
@@ -531,14 +537,25 @@ xcodebuild test -project BarkCloud.xcodeproj -scheme BarkCloud \
 - `Networking/UploadLiveActivityController.swift` (`@MainActor`) — управляет
   одной агрегированной Live Activity «Загружаю в BarkCloud» (Lock Screen +
   Dynamic Island), пересчитывает прогресс по всем jobs за последний час.
-  **Завершение/скрытие** (и Live Activity, и баннер `UploadProgressObserver`)
-  считается по `BackgroundUploadCoordinator.blockingActiveJobs(from:)`: активный
-  job держит UI, только если недавно прогрессировал (`updatedAt`) **или** его
-  URLSession-task ещё жив. Осиротевший `.running` (task умер с прошлым запуском —
-  событий по нему уже не будет) исключается, иначе `completed+failed` никогда не
-  сравняется с `total` и зомби-Activity висит в Dynamic Island навсегда.
-  `getAllTasks` дёргается только при наличии подзависших jobs (горячий путь —
-  без лишних системных вызовов).
+  **Завершение/скрытие Live Activity** считается по
+  `BackgroundUploadCoordinator.blockingActiveJobs(from:)`: активный job держит
+  UI, только если недавно прогрессировал (`updatedAt`) **или** его URLSession-task
+  ещё жив. Осиротевший `.running` (task умер с прошлым запуском — событий по нему
+  уже не будет) исключается, иначе `completed+failed` никогда не сравняется с
+  `total` и зомби-Activity висит в Dynamic Island навсегда. `getAllTasks`
+  дёргается только при наличии подзависших jobs (горячий путь — без лишних
+  системных вызовов).
+- `Networking/UploadProgressObserver.swift` (`@MainActor @Observable`) — источник
+  глобального баннера над TabBar (`GlobalUploadBanner`). **Источник истины
+  раздельный**: для автозагрузки медиатеки баннер зеркалит in-memory счётчики
+  `BackupManager` (`uploadDone/uploadFailed/remainingCount/currentFileName`) —
+  те же, что [[ios-app#Backup|кнопка облака в Галерее]]. Это намеренно: очередь
+  URLSession наполняется порциями (`inFlightLimit`), там в любой момент 1–5 задач,
+  и счёт total по ней «застревал на первом файле», хотя в `pendingUpload` десятки.
+  `BackupManager` знает весь бэклог и ведёт монотонные счётчики. Реактивность —
+  `withObservationTracking` на счётчиках (повторная регистрация из recompute).
+  Ручные / share-загрузки по-прежнему считаются из `recentJobs(since:)` (бэкап
+  отфильтрован), скрытие — через `blockingActiveJobs`.
 - `Shared/UploadActivityAttributes.swift` — `ActivityAttributes`, membership:
   main app + BarkCloudWidgets + ShareExtension.
 - `BarkCloudWidgets/UploadLiveActivity.swift` — SwiftUI рендеринг Live Activity

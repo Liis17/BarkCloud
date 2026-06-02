@@ -145,12 +145,17 @@ final class BackgroundUploadCoordinator: NSObject, @unchecked Sendable {
         // часовом окне recentJobs (источник прогресса баннера/Live Activity).
         await queueStore.purgeCompleted(olderThan: Date().addingTimeInterval(-600))
         let liveIdentifiers = await currentTaskIdentifiers()
+        // Зовётся и на каждом возврате в foreground, поэтому свежие jobs (этой
+        // сессии) не трогаем: BackupManager/ShareInbox прямо сейчас их создают и
+        // сабмитят, удаление гонилось бы с submit и «съедало» новые загрузки.
+        let staleCutoff = Date().addingTimeInterval(-60)
         let active = await queueStore.activeJobs()
         for snapshot in active {
             if snapshot.state == .running,
                liveIdentifiers.contains(snapshot.sessionTaskIdentifier) {
                 continue
             }
+            guard snapshot.createdAt < staleCutoff else { continue }
             try? FileManager.default.removeItem(atPath: snapshot.multipartBodyPath)
             await queueStore.delete(id: snapshot.id)
         }

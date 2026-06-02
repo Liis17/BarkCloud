@@ -27,6 +27,9 @@ final class BackupManager {
     var uploadDone = 0
     var uploadFailed = 0
     var currentAsset: PHAsset?
+    /// Имя файла текущего загружаемого ассета — для баннера прогресса над TabBar
+    /// ([[UploadProgressObserver]]), который зеркалит эти счётчики.
+    var currentFileName = ""
 
     // Освобождение места.
     private(set) var reclaimable: [PHAsset] = []
@@ -49,11 +52,17 @@ final class BackupManager {
     /// пользователь возвращается на вкладку Галереи) пропускаем — это и SHA256
     /// не считаем второй раз, и в `pendingUpload` дубликаты не плодим.
     private var processedAssetIDs: Set<String> = []
+    /// Наблюдатель медиатеки: новое фото/видео сразу запускает повторный скан и
+    /// автозагрузку — без перезапуска приложения или смены вкладки.
+    private var libraryObserver: BackupPhotoLibraryObserver?
 
     init(cloud: CloudRepository, settings: AutoUploadSettings) {
         self.cloud = cloud
         self.settings = settings
         self.autoUploadEnabled = settings.autoUploadEnabled
+        self.libraryObserver = BackupPhotoLibraryObserver { [weak self] in
+            Task { @MainActor in await self?.refreshScanForNewAssets() }
+        }
     }
 
     /// Текущий загружаемый + следующие 3 в очереди (как в Google Photos).
@@ -193,6 +202,7 @@ final class BackupManager {
             uploadTask?.cancel()
             uploadTask = nil
             currentAsset = nil
+            currentFileName = ""
             Task { await BackgroundUploadCoordinator.shared.cancelActiveJobs(source: .backup) }
         }
     }
@@ -228,6 +238,7 @@ final class BackupManager {
             }
             let asset = pendingUpload.removeFirst()
             currentAsset = asset
+            currentFileName = PHAssetResource.assetResources(for: asset).first?.originalFilename ?? ""
             do {
                 try await enqueueAssetForBackup(asset, folderID: folderID)
                 uploadDone += 1
@@ -239,6 +250,7 @@ final class BackupManager {
             }
         }
         currentAsset = nil
+        currentFileName = ""
         await loadStorageInfo()
     }
 
@@ -290,4 +302,26 @@ final class BackupManager {
     }
 
     func dismissCelebration() { lastFreedBytes = nil }
+}
+
+/// Мост к PhotoKit для автозагрузки: `PHPhotoLibraryChangeObserver` требует
+/// `NSObject`. При изменении медиатеки дёргает повторный скан, чтобы новые
+/// фото/видео уходили в облако без перезапуска и смены вкладки. Колбэк прилетает
+/// с фонового потока — потребитель сам уходит на MainActor.
+private final class BackupPhotoLibraryObserver: NSObject, PHPhotoLibraryChangeObserver {
+    private let onChange: @Sendable () -> Void
+
+    init(onChange: @escaping @Sendable () -> Void) {
+        self.onChange = onChange
+        super.init()
+        PHPhotoLibrary.shared().register(self)
+    }
+
+    deinit {
+        PHPhotoLibrary.shared().unregisterChangeObserver(self)
+    }
+
+    func photoLibraryDidChange(_ changeInstance: PHChange) {
+        onChange()
+    }
 }

@@ -1,13 +1,22 @@
 import Foundation
 import Observation
 
-/// Наблюдает за `BackgroundUploadCoordinator` и держит агрегированное состояние
-/// текущей сессии загрузки для UI (`GlobalUploadBanner` над TabBar). Источник
-/// истины — `UploadQueueStore.recentJobs(since:)`: смотрим только то, что было
-/// создано после старта текущей сессии, чтобы старые завершённые job не висели.
+/// Держит агрегированное состояние текущей загрузки для глобального баннера над
+/// TabBar ([[GlobalUploadBanner]]).
 ///
-/// Запускается из `AppEnvironment` (`addObserver(progress:completion:failure:)`).
-/// Подписка живёт всё время жизни приложения.
+/// Источник истины зависит от типа загрузки:
+/// - **Автозагрузка медиатеки** — счётчики `BackupManager` напрямую (как
+///   [[BackupSheet]], кнопка облака в Галерее). Это критично: `BackupManager`
+///   подаёт задачи в URLSession порциями (`inFlightLimit`), поэтому в самой
+///   очереди в любой момент лежит лишь 1–5 задач, хотя в `pendingUpload` их могут
+///   быть десятки. Если считать total по очереди — баннер «застревает на первом
+///   файле». `BackupManager` же знает весь бэклог и ведёт монотонные in-memory
+///   счётчики, которые не отравляются «осиротевшими» job из прошлых сессий.
+/// - **Ручные / share-загрузки** — из `UploadQueueStore.recentJobs(since:)`
+///   (бэкап отфильтрован).
+///
+/// Запускается из `AppEnvironment` (`attach(to:)`). Подписка живёт всё время
+/// жизни приложения.
 @MainActor
 @Observable
 final class UploadProgressObserver {
@@ -18,27 +27,28 @@ final class UploadProgressObserver {
     private(set) var failedFiles = 0
     private(set) var currentFileName = ""
     private(set) var overallProgress: Double = 0
-    /// Источник самого свежего активного job (для иконки в баннере).
+    /// Источник самого свежего активного job (для иконки/заголовка в баннере).
     private(set) var currentSource: UploadJobSource = .manual
 
     private let queueStore: UploadQueueStore
-    /// Когда вошли в текущую сессию (первый job после простоя). nil — пока
-    /// активной сессии нет. Используется как фильтр `recentJobs(since:)`.
+    private let backupManager: BackupManager
+    /// Когда вошли в текущую сессию ручных/share-загрузок (фильтр `recentJobs`).
     private var sessionStartedAt: Date?
     /// Дебаунс recompute: didSendBodyData приходит 50+ раз в секунду на большом
     /// файле, а пересчёт лезет в SwiftData. Достаточно ~10 fps для UI.
     private var pendingRecompute: Task<Void, Never>?
-    /// Отложенное скрытие баннера после завершения всех jobs. Cancellable —
-    /// если в течение 1.5с появится новый активный job, мы отменяем reset,
-    /// иначе баннер исчезал бы даже когда уже шла следующая загрузка.
+    /// Отложенное скрытие баннера после завершения. Cancellable — если в течение
+    /// 1.5с появится новая активность, отменяем, иначе баннер исчезал бы даже
+    /// когда уже идёт следующая загрузка.
     private var resetTask: Task<Void, Never>?
 
-    init(queueStore: UploadQueueStore) {
+    init(queueStore: UploadQueueStore, backupManager: BackupManager) {
         self.queueStore = queueStore
+        self.backupManager = backupManager
     }
 
-    /// Подписаться на координатор. Все события идут через единый `recompute()` —
-    /// прогресс лишь триггерит дебаунс, completion/failure — пересчитывают сразу.
+    /// Подписаться на координатор. Прогресс лишь триггерит дебаунс,
+    /// completion/failure — пересчитывают сразу.
     func attach(to coordinator: BackgroundUploadCoordinator) {
         coordinator.addObserver(
             progress: { [weak self] _ in self?.scheduleRecompute() },
@@ -62,28 +72,95 @@ final class UploadProgressObserver {
     }
 
     private func recompute() async {
-        // Окно «недавно»: если сессии ещё не было — берём 1 час, чтобы зацепить
-        // только что созданный job. После первого появления активного job окно
-        // фиксируется минимальным createdAt активных — иначе свои же jobs из
-        // прошлого (созданные Share Extension'ом до старта main app) отсекутся.
-        let since = sessionStartedAt ?? Date().addingTimeInterval(-3600)
-        let jobs = await queueStore.recentJobs(since: since)
-        if jobs.isEmpty {
-            reset()
+        observeBackupChanges()
+
+        // Приоритет — автозагрузка медиатеки (её счётчики авторитетны).
+        if let agg = backupAggregate() {
+            apply(agg)
             return
+        }
+        // Иначе — ручные/share-загрузки из очереди URLSession.
+        if let agg = await queueAggregate() {
+            apply(agg)
+            return
+        }
+        // Активных загрузок нет. Если баннер ещё виден — показать завершённое
+        // состояние («N/N, 100%») мгновение, затем скрыть.
+        if isActive {
+            completedFiles = max(completedFiles, totalFiles - failedFiles)
+            overallProgress = totalFiles > 0 ? 1 : overallProgress
+            scheduleReset()
+        } else {
+            reset()
+        }
+    }
+
+    private struct Aggregate {
+        let total: Int
+        let completed: Int
+        let failed: Int
+        let fileName: String
+        let progress: Double
+        let source: UploadJobSource
+    }
+
+    // MARK: - Автозагрузка (in-memory счётчики BackupManager)
+
+    private func backupAggregate() -> Aggregate? {
+        let m = backupManager
+        guard m.remainingCount > 0 else { return nil }
+        let total = m.uploadDone + m.uploadFailed + m.remainingCount
+        let progress = total > 0 ? Double(m.uploadDone) / Double(total) : 0
+        return Aggregate(
+            total: total,
+            completed: m.uploadDone,
+            failed: m.uploadFailed,
+            fileName: m.currentFileName,
+            progress: progress,
+            source: .backup
+        )
+    }
+
+    /// Перезапускать recompute при изменении счётчиков `BackupManager`, чтобы
+    /// баннер обновлялся синхронно с модалкой, а не только по событиям URLSession
+    /// (которых для уже поданных, но ещё не стартовавших задач может не быть).
+    /// `withObservationTracking` одноразовый — повторная регистрация идёт из
+    /// recompute, образуя непрерывную цепочку.
+    private func observeBackupChanges() {
+        withObservationTracking {
+            let m = backupManager
+            _ = m.uploadDone
+            _ = m.uploadFailed
+            _ = m.remainingCount
+            _ = m.currentFileName
+        } onChange: { [weak self] in
+            Task { @MainActor in self?.recomputeNow() }
+        }
+    }
+
+    // MARK: - Ручные / share-загрузки (из очереди URLSession)
+
+    private func queueAggregate() async -> Aggregate? {
+        // Окно «недавно»: до старта сессии — 1 час (зацепить только что созданный
+        // job). После — фиксируется минимальным createdAt активных.
+        let since = sessionStartedAt ?? Date().addingTimeInterval(-3600)
+        let jobs = (await queueStore.recentJobs(since: since)).filter { $0.source != .backup }
+        guard !jobs.isEmpty else {
+            sessionStartedAt = nil
+            return nil
         }
 
         let activeStates: Set<UploadJobState> = [.pending, .preparing, .running]
         let activeJobs = jobs.filter { activeStates.contains($0.state) }
-        // Осиротевшие `.running` (их background-task умер) баннер не держат — иначе
-        // один такой job навсегда оставлял бы баннер: событий по нему уже не будет,
-        // и completed+failed никогда не сравняется с total.
+        // Осиротевшие `.running` (их background-task умер) баннер не держат —
+        // иначе один такой job навсегда оставлял бы баннер.
         let blockingJobs = await BackgroundUploadCoordinator.shared.blockingActiveJobs(from: activeJobs)
-        let hasActive = !blockingJobs.isEmpty
+        guard !blockingJobs.isEmpty else {
+            sessionStartedAt = nil
+            return nil
+        }
 
-        if sessionStartedAt == nil, hasActive {
-            // Фиксируем окно сессии на момент самого старого блокирующего job
-            // (минус 1с буфер), чтобы он гарантированно попадал в фильтр.
+        if sessionStartedAt == nil {
             let earliest = blockingJobs.map(\.createdAt).min() ?? Date()
             sessionStartedAt = earliest.addingTimeInterval(-1)
         }
@@ -95,40 +172,40 @@ final class UploadProgressObserver {
 
         let totalBytes = jobs.reduce(Int64(0)) { $0 + max($1.totalBytes, 0) }
         let sentBytes = jobs.reduce(Int64(0)) { acc, j in
-            switch j.state {
-            case .completed: return acc + max(j.totalBytes, 0)
-            default:         return acc + j.bytesSent
-            }
+            j.state == .completed ? acc + max(j.totalBytes, 0) : acc + j.bytesSent
         }
-        let overall = totalBytes > 0 ? min(1.0, Double(sentBytes) / Double(totalBytes)) : 0
-        // Завершено, когда не осталось блокирующих (живых) активных jobs: либо все
-        // терминальны, либо остались только осиротевшие.
-        let finished = !hasActive
+        let progress = totalBytes > 0 ? min(1.0, Double(sentBytes) / Double(totalBytes)) : 0
 
-        totalFiles = total
-        completedFiles = completed
-        failedFiles = failed
-        currentFileName = running?.fileName ?? jobs.last?.fileName ?? ""
-        overallProgress = overall
-        currentSource = running?.source ?? jobs.last?.source ?? .manual
-        isActive = !finished
+        return Aggregate(
+            total: total,
+            completed: completed,
+            failed: failed,
+            fileName: running?.fileName ?? jobs.last?.fileName ?? "",
+            progress: progress,
+            source: running?.source ?? jobs.last?.source ?? .manual
+        )
+    }
 
-        if finished {
-            // Дать пользователю секунду посмотреть «100%», потом скрыть.
-            // Cancellable: если в окне отсрочки появится новый активный job
-            // (например, BackupManager только что добавил следующий) — отменим
-            // и вычислим заново. Без cancellation баннер исчезал бы посреди
-            // продолжающейся загрузки.
-            resetTask?.cancel()
-            resetTask = Task { [weak self] in
-                try? await Task.sleep(nanoseconds: 1_500_000_000)
-                guard !Task.isCancelled else { return }
-                self?.reset()
-            }
-        } else {
-            // Появились активные job'ы — отменяем запланированное скрытие.
-            resetTask?.cancel()
-            resetTask = nil
+    // MARK: - Применение / скрытие
+
+    private func apply(_ agg: Aggregate) {
+        resetTask?.cancel()
+        resetTask = nil
+        totalFiles = agg.total
+        completedFiles = agg.completed
+        failedFiles = agg.failed
+        currentFileName = agg.fileName
+        overallProgress = agg.progress
+        currentSource = agg.source
+        isActive = true
+    }
+
+    private func scheduleReset() {
+        guard resetTask == nil else { return }
+        resetTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 1_500_000_000)
+            guard !Task.isCancelled else { return }
+            self?.reset()
         }
     }
 
