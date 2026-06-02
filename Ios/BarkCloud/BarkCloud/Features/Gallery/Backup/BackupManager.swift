@@ -52,6 +52,11 @@ final class BackupManager {
     /// пользователь возвращается на вкладку Галереи) пропускаем — это и SHA256
     /// не считаем второй раз, и в `pendingUpload` дубликаты не плодим.
     private var processedAssetIDs: Set<String> = []
+    /// localIdentifier ассетов, ПОДТВЕРЖДЁННЫХ на сервере (classify увидел
+    /// exists==true). При возврате на передний план только их безусловно пропускаем
+    /// при пере-сверке — всё прочее сверяем с облаком заново, чтобы подобрать
+    /// передачи, прервавшиеся в фоне.
+    private var confirmedInCloudIDs: Set<String> = []
     /// Наблюдатель медиатеки: новое фото/видео сразу запускает повторный скан и
     /// автозагрузку — без перезапуска приложения или смены вкладки.
     private var libraryObserver: BackupPhotoLibraryObserver?
@@ -92,6 +97,29 @@ final class BackupManager {
         startUploadLoop()
     }
 
+    /// Вызывать при возврате приложения на передний план. Чинит «зависшую»
+    /// автозагрузку после сворачивания: цикл подачи мог завершиться (вся очередь
+    /// уже подана в URLSession), а часть фоновых передач — прерваться. Сначала
+    /// оживляем цикл (если он умер, а в памяти ещё остались ассеты). Затем, если
+    /// фоновых backup-передач сейчас нет (значит загрузка действительно встала),
+    /// заново сверяем медиатеку с облаком: из «обработанных» выкидываем всё, что
+    /// ещё НЕ подтверждено на сервере (кроме того, что прямо сейчас в очереди),
+    /// и пере-сканируем — недостающее уйдёт в загрузку снова (бэкенд дедуплицирует
+    /// по SHA256). Если передачи идут — не пере-сверяем, чтобы не задублировать
+    /// ещё не дозагруженные ассеты.
+    func resumeOnForeground() async {
+        guard autoUploadEnabled else { return }
+        startUploadLoop()
+        let hasActiveBackup = await UploadQueueStore.shared.activeJobs().contains { $0.source == .backup }
+        if !hasActiveBackup {
+            var keep = confirmedInCloudIDs
+            keep.formUnion(pendingUpload.map(\.localIdentifier))
+            if let currentAsset { keep.insert(currentAsset.localIdentifier) }
+            processedAssetIDs = keep
+        }
+        await refreshScanForNewAssets()
+    }
+
     /// Вызывать при возврате на таб «Галерея»: пересканировать медиатеку на
     /// предмет новых ассетов (которые могли появиться, пока приложение было
     /// открыто на другой вкладке). Если предыдущий скан ещё не закончился —
@@ -124,6 +152,7 @@ final class BackupManager {
         scanTask = Task(priority: .utility) { [weak self] in
             await self?.scan()
             self?.isScanning = false
+            self?.scanTask = nil
         }
     }
 
@@ -171,8 +200,11 @@ final class BackupManager {
         for item in batch {
             processedAssetIDs.insert(item.asset.localIdentifier)
             if results[item.hash] == true {
-                reclaimable.append(item.asset)
-                reclaimableBytes += DeviceAssetResource.originalByteSize(for: item.asset)
+                // insert(...).inserted защищает reclaimable от дублей при пере-сверке.
+                if confirmedInCloudIDs.insert(item.asset.localIdentifier).inserted {
+                    reclaimable.append(item.asset)
+                    reclaimableBytes += DeviceAssetResource.originalByteSize(for: item.asset)
+                }
             } else {
                 pendingUpload.append(item.asset)
             }
@@ -221,7 +253,6 @@ final class BackupManager {
     private let inFlightLimit = 5
 
     private func uploadLoop() async {
-        let folderID = try? await cloud.ensureRecentUploadsFolder()
         while autoUploadEnabled, !Task.isCancelled {
             guard !pendingUpload.isEmpty else {
                 if isScanning {
@@ -240,10 +271,11 @@ final class BackupManager {
             currentAsset = asset
             currentFileName = PHAssetResource.assetResources(for: asset).first?.originalFilename ?? ""
             do {
-                try await enqueueAssetForBackup(asset, folderID: folderID)
+                try await enqueueAssetForBackup(asset)
                 uploadDone += 1
-                reclaimable.append(asset)
-                reclaimableBytes += DeviceAssetResource.originalByteSize(for: asset)
+                // В reclaimable ассет попадёт, только когда следующий скан
+                // подтвердит его на сервере (classify) — до подтверждения
+                // предлагать удалить оригинал нельзя.
                 await loadStorageInfo()
             } catch {
                 uploadFailed += 1
@@ -257,7 +289,7 @@ final class BackupManager {
     /// Подготовить файл оригинала ассета в App Group container стримом (без RAM),
     /// получить uploadURL и поставить UploadJob в координатор. Фактическая
     /// передача идёт в фоне — переживает сворачивание и kill main app.
-    private func enqueueAssetForBackup(_ asset: PHAsset, folderID: String?) async throws {
+    private func enqueueAssetForBackup(_ asset: PHAsset) async throws {
         guard let stagingDir = UploadConstants.stagingDirectory else {
             throw DeviceAssetError.noResource
         }
@@ -266,11 +298,13 @@ final class BackupManager {
         let renamed = originalPath.deletingLastPathComponent().appendingPathComponent("\(UUID().uuidString)-\(fileName)")
         try? FileManager.default.moveItem(at: originalPath, to: renamed)
         let sourcePath = FileManager.default.fileExists(atPath: renamed.path) ? renamed : originalPath
+        // Без явной папки: сервер разложит по системным «Фото»/«Видео»/«Другие
+        // документы» по типу медиа (route_by_media_kind) при attach в main app.
         _ = try await cloud.enqueueBackgroundUpload(
             sourceFile: sourcePath,
             fileName: fileName,
             mimeType: nil,
-            toDirectory: folderID,
+            toDirectory: nil,
             source: .backup
         )
     }

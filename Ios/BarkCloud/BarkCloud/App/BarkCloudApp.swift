@@ -23,7 +23,7 @@ struct BarkCloudApp: App {
                 env.shareInboxUploader.uploadPendingIfNeeded()
                 Task {
                     await env.backgroundUploads.attachAndResubmitOrphans()
-                    await env.backupManager.refreshScanForNewAssets()
+                    await env.backupManager.resumeOnForeground()
                     await UploadLiveActivityController.shared.setForegroundActive(true)
                 }
             }
