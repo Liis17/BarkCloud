@@ -58,12 +58,25 @@ service CloudApi {
   rpc ListMyShares         (ListMySharesRequest)         returns (ListMySharesResponse);     // Мои публичные ссылки (от новых к старым, cursor pagination)
   rpc RevokeShare          (RevokeShareRequest)          returns (CloudEmpty);               // Отозвать публичную ссылку
 
+  // ───────── Публичные папки (динамическая страница /f/{token}) ─────────
+  rpc CreateFolderShare    (CreateFolderShareRequest)    returns (FolderShareInfo);          // Сделать папку публичной (идемпотентно — вернёт существующую)
+  rpc ListMyFolderShares   (ListMyFolderSharesRequest)   returns (ListMyFolderSharesResponse); // Мои публичные папки (от новых к старым, cursor pagination)
+  rpc RevokeFolderShare    (RevokeFolderShareRequest)    returns (CloudEmpty);               // Отозвать публичность папки (+ снять все публичные ссылки файлов поддерева)
+
   // ───────── Шаринг между пользователями (приватные гранты) ─────────
   rpc ShareFileWithUser    (ShareFileWithUserRequest)    returns (CloudEmpty);                    // Поделиться файлом с конкретным пользователем
   rpc RevokeUserShare      (RevokeUserShareRequest)      returns (CloudEmpty);                    // Отозвать грант доступа (владелец)
   rpc ListMyOutgoingShares (ListMyOutgoingSharesRequest) returns (ListMyOutgoingSharesResponse);  // С кем поделён файл (управление)
+  rpc ListMyOutgoingSharesAll (ListMyOutgoingSharesAllRequest) returns (ListMyOutgoingSharesAllResponse); // Все мои исходящие гранты (от новых к старым, cursor pagination)
   rpc ListSharedWithMe     (ListSharedWithMeRequest)     returns (ListSharedWithMeResponse);      // Доступные мне файлы (от новых к старым, cursor pagination)
   rpc GetSharedFileDownloadUrl (GetSharedFileDownloadUrlRequest) returns (GetSharedFileDownloadUrlResponse); // Временная ссылка на скачивание доступного мне файла
+
+  // ───────── Шаринг папки между пользователями (приватные гранты на папку) ─────────
+  rpc ShareFolderWithUser        (ShareFolderWithUserRequest)        returns (CloudEmpty);                       // Поделиться папкой с конкретным пользователем (рекурсивно)
+  rpc RevokeFolderUserShare      (RevokeFolderUserShareRequest)      returns (CloudEmpty);                       // Отозвать грант доступа к папке (владелец)
+  rpc ListMyOutgoingFolderShares (ListMyOutgoingFolderSharesRequest) returns (ListMyOutgoingFolderSharesResponse); // С кем поделены мои папки (для «я поделился»)
+  rpc ListSharedFoldersWithMe    (ListSharedFoldersWithMeRequest)    returns (ListSharedFoldersWithMeResponse);    // Папки, доступные мне
+  rpc ListSharedDirectory        (ListSharedDirectoryRequest)        returns (ListSharedDirectoryResponse);        // Листинг доступной мне папки (навигация по поддереву)
 }
 
 service FilesServerApi {
@@ -76,6 +89,8 @@ service FilesServerApi {
   rpc UploadAvatarServer(UploadAvatarServerRequest) returns(UploadAvatarServerResponse); // Загрузить аватарку пользователя (для админ-панели)
 
   rpc ResolveShare(ResolveShareRequest) returns(ResolveShareResponse); // Резолв публичного токена → файл + публичный URL скачивания
+
+  rpc ResolveFolderShare(ResolveFolderShareRequest) returns(ResolveFolderShareResponse); // Резолв публичной папки → листинг (подпапки + файлы с публичными URL)
 }
 
 service AlbumApi {
@@ -632,6 +647,25 @@ message ListMyOutgoingSharesResponse {
   repeated OutgoingShareEntry items = 1;
 }
 
+message ListMyOutgoingSharesAllRequest {
+  int32 limit = 1;                                 // 1..200, default 50
+  google.protobuf.Timestamp cursor_shared_at = 2;  // exclusive; пусто = с самых свежих
+  string cursor_grant_id = 3;                      // tie-breaker
+}
+
+message OutgoingShareFull {
+  string grant_id = 1;
+  UploadFileInfo file = 2;        // полная инфо файла (имя, превью, размеры)
+  int64 recipient_user_id = 3;    // кому выдан доступ (имя резолвит веб-слой через Users)
+  google.protobuf.Timestamp shared_at = 4;
+}
+
+message ListMyOutgoingSharesAllResponse {
+  repeated OutgoingShareFull items = 1;
+  google.protobuf.Timestamp next_cursor_shared_at = 2; // пусто = больше нет страниц
+  string next_cursor_grant_id = 3;
+}
+
 message ListSharedWithMeRequest {
   int32 limit = 1;                                 // 1..200, default 50
   google.protobuf.Timestamp cursor_shared_at = 2;  // exclusive; пусто = с самых свежих
@@ -657,4 +691,117 @@ message GetSharedFileDownloadUrlRequest {
 
 message GetSharedFileDownloadUrlResponse {
   string download_url = 1;
+}
+
+// ============ Публичные папки (динамическая страница) ============
+
+message FolderShareInfo {
+  string id = 1;                            // Идентификатор публичной папки
+  string token = 2;                         // URL-safe токен (для /f/{token})
+  string directory_id = 3;                  // Идентификатор папки
+  string name = 4;                          // Имя папки на момент публикации
+  google.protobuf.Timestamp created_at = 5; // Когда опубликована
+  int64 click_count = 6;                    // Сколько раз открывали
+}
+
+message CreateFolderShareRequest {
+  string directory_id = 1;
+  string name = 2;
+}
+
+message ListMyFolderSharesRequest {
+  int32 limit = 1;                                       // 1..200, default 50
+  google.protobuf.Timestamp cursor_created_at = 2;       // exclusive; пусто = с самых свежих
+  string cursor_folder_share_id = 3;                     // tie-breaker
+}
+
+message ListMyFolderSharesResponse {
+  repeated FolderShareInfo shares = 1;
+  google.protobuf.Timestamp next_cursor_created_at = 2;  // пусто = больше нет страниц
+  string next_cursor_folder_share_id = 3;
+}
+
+message RevokeFolderShareRequest {
+  string folder_share_id = 1;
+}
+
+message ResolveFolderShareRequest {
+  string token = 1;
+  string dir = 2;   // подпапка внутри расшаренного поддерева (пусто = корень папки)
+}
+
+message PublicDirEntry {
+  string id = 1;
+  string name = 2;
+}
+
+message PublicFileEntry {
+  string file_id = 1;
+  string name = 2;
+  MediaKind media_kind = 3;
+  string download_url = 4;   // публичный URL скачивания (temp)
+  string preview_url = 5;    // публичный URL превью (пусто если нет)
+  int64 file_size = 6;
+  int32 image_width = 7;
+  int32 image_height = 8;
+}
+
+message ResolveFolderShareResponse {
+  bool found = 1;                       // false = папка не найдена / отозвана / dir вне поддерева
+  string folder_name = 2;               // имя корневой расшаренной папки
+  string current_dir = 3;               // id текущей папки ('' = корень расшаренной папки)
+  string current_name = 4;              // имя текущей папки
+  repeated PublicDirEntry subdirs = 5;  // подпапки текущей папки
+  repeated PublicFileEntry files = 6;   // файлы текущей папки
+}
+
+// ============ Шаринг папки между пользователями (приватные гранты) ============
+
+message ShareFolderWithUserRequest {
+  string directory_id = 1;
+  int64 recipient_user_id = 2;
+}
+
+message RevokeFolderUserShareRequest {
+  string grant_id = 1;
+}
+
+message ListMyOutgoingFolderSharesRequest {}
+
+message OutgoingFolderShare {
+  string grant_id = 1;
+  string directory_id = 2;
+  string name = 3;                          // имя папки
+  int64 recipient_user_id = 4;              // кому выдан доступ
+  google.protobuf.Timestamp shared_at = 5;
+}
+
+message ListMyOutgoingFolderSharesResponse {
+  repeated OutgoingFolderShare items = 1;
+}
+
+message ListSharedFoldersWithMeRequest {}
+
+message SharedFolderEntry {
+  string grant_id = 1;
+  string directory_id = 2;
+  string name = 3;                          // имя папки
+  int64 owner_user_id = 4;                  // от кого (имя резолвит веб-слой)
+  google.protobuf.Timestamp shared_at = 5;
+}
+
+message ListSharedFoldersWithMeResponse {
+  repeated SharedFolderEntry items = 1;
+}
+
+message ListSharedDirectoryRequest {
+  string directory_id = 1;   // папка внутри доступного мне поддерева (валидируется грантом)
+}
+
+message ListSharedDirectoryResponse {
+  bool found = 1;                       // false = нет доступа / папка не найдена
+  string directory_id = 2;              // id текущей папки
+  string name = 3;                      // имя текущей папки
+  repeated PublicDirEntry subdirs = 4;  // подпапки
+  repeated PublicFileEntry files = 5;   // файлы (с публичными temp-URL и превью)
 }

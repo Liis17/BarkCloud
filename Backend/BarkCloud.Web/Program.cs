@@ -115,8 +115,9 @@ app.MapFallback(async (HttpContext http, AuthGateway auth) =>
     if (http.Request.Path.StartsWithSegments("/api"))
         return Results.NotFound();
 
-    // Публичная страница просмотра по шаринг-ссылке (/v/{token}) — доступна без авторизации.
-    var isPublicView = http.Request.Path.StartsWithSegments("/v");
+    // Публичные страницы по шаринг-ссылке — доступны без авторизации:
+    // /v/{token} (просмотр файла) и /f/{token} (публичная папка).
+    var isPublicView = http.Request.Path.StartsWithSegments("/v") || http.Request.Path.StartsWithSegments("/f");
     if (!isPublicView && await auth.AuthenticateAsync(http) is null)
         return Results.Redirect("/login");
 

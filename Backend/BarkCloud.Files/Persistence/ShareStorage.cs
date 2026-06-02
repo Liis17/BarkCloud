@@ -38,6 +38,17 @@ public class ShareStorage : IShareStorage
             .ExecuteDeleteAsync(cancellationToken);
     }
 
+    /// <summary>Удалить все публичные ссылки владельца на набор файлов (каскад при отзыве публичной папки).</summary>
+    public async Task<int> RemoveByFiles(long ownerId, IReadOnlyCollection<Guid> fileIds, CancellationToken cancellationToken = default)
+    {
+        if (fileIds.Count == 0)
+            return 0;
+
+        return await _context.ShareLinks
+            .Where(x => x.OwnerId == ownerId && fileIds.Contains(x.FileId))
+            .ExecuteDeleteAsync(cancellationToken);
+    }
+
     /// <summary>Атомарно увеличить счётчик переходов по ссылке.</summary>
     public async Task IncrementClicks(Guid id, CancellationToken cancellationToken = default)
     {

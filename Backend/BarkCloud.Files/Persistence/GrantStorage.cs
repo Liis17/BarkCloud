@@ -80,6 +80,33 @@ public class GrantStorage : IGrantStorage
             .ToListAsync(cancellationToken);
     }
 
+    /// <summary>
+    /// Страница «я поделился» владельца по (CreatedAt desc, Id desc) с cursor-пагинацией.
+    /// Все исходящие гранты владельца (по всем файлам). Возвращает limit+1 для определения следующей страницы.
+    /// </summary>
+    public async Task<List<FileGrant>> ListByOwnerPage(
+        long ownerId, DateTime? cursorCreatedAt, Guid? cursorGrantId, int limit, CancellationToken cancellationToken = default)
+    {
+        var query = _context.FileGrants
+            .AsNoTracking()
+            .Where(x => x.OwnerId == ownerId);
+
+        if (cursorCreatedAt.HasValue && cursorGrantId.HasValue)
+        {
+            var cursorAt = DateTime.SpecifyKind(cursorCreatedAt.Value, DateTimeKind.Utc);
+            var cursorId = cursorGrantId.Value;
+            query = query.Where(x =>
+                x.CreatedAt < cursorAt
+                || (x.CreatedAt == cursorAt && x.Id.ToString().CompareTo(cursorId.ToString()) < 0));
+        }
+
+        return await query
+            .OrderByDescending(x => x.CreatedAt)
+            .ThenByDescending(x => x.Id)
+            .Take(limit + 1)
+            .ToListAsync(cancellationToken);
+    }
+
     /// <summary>Гранты владельца на конкретный файл (с кем поделено) — для управления.</summary>
     public async Task<List<FileGrant>> ListByOwnerFile(long ownerId, Guid fileId, CancellationToken cancellationToken = default)
     {

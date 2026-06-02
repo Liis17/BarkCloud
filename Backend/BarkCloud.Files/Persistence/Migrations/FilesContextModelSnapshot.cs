@@ -175,6 +175,36 @@ namespace BarkCloud.Files.Persistence.Migrations
                     b.ToTable("CloudFileEntries");
                 });
 
+            modelBuilder.Entity("BarkCloud.Files.Domain.DirectoryGrant", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("DirectoryId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("OwnerId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("RecipientId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DirectoryId");
+
+                    b.HasIndex("RecipientId", "CreatedAt");
+
+                    b.HasIndex("OwnerId", "DirectoryId", "RecipientId")
+                        .IsUnique();
+
+                    b.ToTable("DirectoryGrants");
+                });
+
             modelBuilder.Entity("BarkCloud.Files.Domain.FavoriteFile", b =>
                 {
                     b.Property<Guid>("Id")
@@ -363,6 +393,45 @@ namespace BarkCloud.Files.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("FilePreviews");
+                });
+
+            modelBuilder.Entity("BarkCloud.Files.Domain.FolderShareLink", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("ClickCount")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("DirectoryId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<long>("OwnerId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Token")
+                        .IsUnique();
+
+                    b.HasIndex("OwnerId", "CreatedAt");
+
+                    b.HasIndex("OwnerId", "DirectoryId")
+                        .IsUnique();
+
+                    b.ToTable("FolderShareLinks");
                 });
 
             modelBuilder.Entity("BarkCloud.Files.Domain.ShareLink", b =>

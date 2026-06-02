@@ -211,6 +211,42 @@ public static class WebEndpoints
             }
         });
 
+        // Анонимный JSON для публичной страницы папки (/f/{token}): листинг подпапок + файлов.
+        // dir — подпапка внутри расшаренного поддерева (пусто = корень папки).
+        app.MapGet("/f/{token}/list", async (string token, string? dir, FilesServerApi.FilesServerApiClient filesServer) =>
+        {
+            try
+            {
+                var resp = await filesServer.ResolveFolderShareAsync(new ResolveFolderShareRequest { Token = token, Dir = dir ?? "" });
+                if (!resp.Found)
+                    return Results.NotFound(new { found = false });
+
+                return Results.Json(new
+                {
+                    found = true,
+                    folderName = resp.FolderName,
+                    currentDir = resp.CurrentDir,
+                    currentName = resp.CurrentName,
+                    subdirs = resp.Subdirs.Select(d => new { id = d.Id, name = d.Name }).ToArray(),
+                    files = resp.Files.Select(f => new
+                    {
+                        fileId = f.FileId,
+                        name = f.Name,
+                        mediaKind = f.MediaKind.ToString().ToLowerInvariant(),
+                        downloadUrl = f.DownloadUrl,
+                        previewUrl = f.PreviewUrl,
+                        fileSize = f.FileSize,
+                        imageWidth = f.ImageWidth,
+                        imageHeight = f.ImageHeight
+                    }).ToArray()
+                });
+            }
+            catch (RpcException)
+            {
+                return Results.NotFound(new { found = false });
+            }
+        });
+
         // ───────── Защищённые страницы ─────────
         // Страницы приложения (/photos, /videos, /files, /favorites, /trash, /settings, /shared)
         // отдаёт React-SPA через SPA-fallback в Program.cs (UseStaticFiles + MapFallback).

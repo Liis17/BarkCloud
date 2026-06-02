@@ -1,5 +1,6 @@
 using BarkCloud.Files.Helpers;
 using BarkCloud.Files.Persistence;
+using BarkCloud.Files.Services;
 using BarkCloud.GrpcServer.Settings;
 using BarkCloud.GrpcServer.XAuth;
 using BarkCloud.Proto.Files;
@@ -14,6 +15,7 @@ namespace BarkCloud.Files.Features.Cloud.GetSharedFileDownloadUrl;
 public class GetSharedFileDownloadUrlCommandHandler : IRequestHandler<GetSharedFileDownloadUrlCommand, GetSharedFileDownloadUrlResponse>
 {
     private readonly IGrantStorage _grantStorage;
+    private readonly FolderGrantAccessService _folderAccess;
     private readonly IUploadedFilesStorage _filesStorage;
     private readonly ITempFilesStorage _tempFilesStorage;
     private readonly UserContext _userContext;
@@ -22,6 +24,7 @@ public class GetSharedFileDownloadUrlCommandHandler : IRequestHandler<GetSharedF
 
     public GetSharedFileDownloadUrlCommandHandler(
         IGrantStorage grantStorage,
+        FolderGrantAccessService folderAccess,
         IUploadedFilesStorage filesStorage,
         ITempFilesStorage tempFilesStorage,
         UserContext userContext,
@@ -29,6 +32,7 @@ public class GetSharedFileDownloadUrlCommandHandler : IRequestHandler<GetSharedF
         IConfiguration configuration)
     {
         _grantStorage = grantStorage;
+        _folderAccess = folderAccess;
         _filesStorage = filesStorage;
         _tempFilesStorage = tempFilesStorage;
         _userContext = userContext;
@@ -40,8 +44,10 @@ public class GetSharedFileDownloadUrlCommandHandler : IRequestHandler<GetSharedF
     {
         var recipientId = _userContext.UserId;
 
-        // Скачать может только получатель, которому файл реально расшарен.
-        if (!await _grantStorage.RecipientHasAccess(recipientId, request.FileId, cancellationToken))
+        // Скачать может только получатель: либо прямой грант на файл, либо доступ через расшаренную папку.
+        var hasAccess = await _grantStorage.RecipientHasAccess(recipientId, request.FileId, cancellationToken)
+            || await _folderAccess.RecipientCanAccessFileViaFolder(recipientId, request.FileId, cancellationToken);
+        if (!hasAccess)
             throw new CloudAccessDeniedException();
 
         var file = await _filesStorage.GetFile(request.FileId);

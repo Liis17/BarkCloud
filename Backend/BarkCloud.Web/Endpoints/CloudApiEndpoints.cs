@@ -309,6 +309,42 @@ public static class CloudApiEndpoints
                 return Results.Json(new { ok = true }, Json);
             }));
 
+        // ───────────────────────── Публичные папки (динамическая страница /f/{token}) ─────────────────────────
+
+        api.MapGet("/folder-shares", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud,
+            int? limit, string? cursorAt, string? cursorId) =>
+            await Guarded(http, auth, async token =>
+            {
+                var req = new ListMyFolderSharesRequest { Limit = limit is > 0 and <= 200 ? limit.Value : 60 };
+                if (DateTimeOffset.TryParse(cursorAt, out var dt))
+                    req.CursorCreatedAt = Timestamp.FromDateTimeOffset(dt.ToUniversalTime());
+                if (!string.IsNullOrEmpty(cursorId))
+                    req.CursorFolderShareId = cursorId;
+
+                var resp = await cloud.ListMyFolderSharesAsync(req, token);
+                return Results.Json(new
+                {
+                    items = resp.Shares.Select(s => FolderShareJson(http, s)).ToArray(),
+                    nextCursorAt = resp.NextCursorCreatedAt?.ToDateTimeOffset(),
+                    nextCursorId = resp.NextCursorFolderShareId
+                }, Json);
+            }));
+
+        api.MapPost("/folder-shares", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud, FolderShareCreateReq body) =>
+            await Guarded(http, auth, async token =>
+            {
+                var info = await cloud.CreateFolderShareAsync(
+                    new CreateFolderShareRequest { DirectoryId = body.DirectoryId, Name = body.Name ?? "" }, token);
+                return Results.Json(FolderShareJson(http, info), Json);
+            }));
+
+        api.MapPost("/folder-shares/revoke", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud, FolderShareIdReq body) =>
+            await Guarded(http, auth, async token =>
+            {
+                await cloud.RevokeFolderShareAsync(new RevokeFolderShareRequest { FolderShareId = body.FolderShareId }, token);
+                return Results.Json(new { ok = true }, Json);
+            }));
+
         // ───────────────────────── Шаринг между пользователями ─────────────────────────
 
         // Поиск получателей (юзернейм/имя, минимум 2 символа).
@@ -359,6 +395,33 @@ public static class CloudApiEndpoints
                 }, Json);
             }));
 
+        // Я поделился: все мои исходящие гранты (файлы + кому), от новых к старым.
+        api.MapGet("/shared/i-shared", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud,
+            UsersServerApi.UsersServerApiClient usersServer, int? limit, string? cursorAt, string? cursorId) =>
+            await Guarded(http, auth, async token =>
+            {
+                var req = new ListMyOutgoingSharesAllRequest { Limit = limit is > 0 and <= 200 ? limit.Value : 60 };
+                if (DateTimeOffset.TryParse(cursorAt, out var dt))
+                    req.CursorSharedAt = Timestamp.FromDateTimeOffset(dt.ToUniversalTime());
+                if (!string.IsNullOrEmpty(cursorId))
+                    req.CursorGrantId = cursorId;
+
+                var resp = await cloud.ListMyOutgoingSharesAllAsync(req, token);
+                var byId = await ResolveUsers(usersServer, resp.Items.Select(i => i.RecipientUserId));
+                return Results.Json(new
+                {
+                    items = resp.Items.Select(i => new
+                    {
+                        grantId = i.GrantId,
+                        file = CloudJson.Media(i.File),
+                        sharedAt = i.SharedAt?.ToDateTimeOffset(),
+                        recipient = byId.TryGetValue(i.RecipientUserId, out var u) ? UserJson(u) : MinimalUserJson(i.RecipientUserId)
+                    }).ToArray(),
+                    nextCursorAt = resp.NextCursorSharedAt?.ToDateTimeOffset(),
+                    nextCursorId = resp.NextCursorGrantId
+                }, Json);
+            }));
+
         // Доступные мне файлы (раздел «мне доступны»).
         api.MapGet("/shared/with-me", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud,
             UsersServerApi.UsersServerApiClient usersServer, int? limit, string? cursorAt, string? cursorId) =>
@@ -392,6 +455,93 @@ public static class CloudApiEndpoints
             {
                 var resp = await cloud.GetSharedFileDownloadUrlAsync(new GetSharedFileDownloadUrlRequest { FileId = body.FileId }, token);
                 return Results.Json(new { downloadUrl = resp.DownloadUrl }, Json);
+            }));
+
+        // ───────────────────────── Шаринг папок между пользователями ─────────────────────────
+
+        // Поделиться папкой с пользователем.
+        api.MapPost("/shared/grant-folder", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud, GrantFolderReq body) =>
+            await Guarded(http, auth, async token =>
+            {
+                await cloud.ShareFolderWithUserAsync(
+                    new ShareFolderWithUserRequest { DirectoryId = body.DirectoryId, RecipientUserId = body.RecipientUserId }, token);
+                return Results.Json(new { ok = true }, Json);
+            }));
+
+        // Отозвать грант доступа к папке.
+        api.MapPost("/shared/revoke-folder-grant", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud, GrantIdReq body) =>
+            await Guarded(http, auth, async token =>
+            {
+                await cloud.RevokeFolderUserShareAsync(new RevokeFolderUserShareRequest { GrantId = body.GrantId }, token);
+                return Results.Json(new { ok = true }, Json);
+            }));
+
+        // Я поделился (папки): какие папки и кому я отдал.
+        api.MapGet("/shared/i-shared-folders", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud,
+            UsersServerApi.UsersServerApiClient usersServer) =>
+            await Guarded(http, auth, async token =>
+            {
+                var resp = await cloud.ListMyOutgoingFolderSharesAsync(new ListMyOutgoingFolderSharesRequest(), token);
+                var byId = await ResolveUsers(usersServer, resp.Items.Select(i => i.RecipientUserId));
+                return Results.Json(new
+                {
+                    items = resp.Items.Select(i => new
+                    {
+                        grantId = i.GrantId,
+                        directoryId = i.DirectoryId,
+                        name = i.Name,
+                        sharedAt = i.SharedAt?.ToDateTimeOffset(),
+                        recipient = byId.TryGetValue(i.RecipientUserId, out var u) ? UserJson(u) : MinimalUserJson(i.RecipientUserId)
+                    }).ToArray()
+                }, Json);
+            }));
+
+        // Мне доступны (папки): какие папки расшарили мне.
+        api.MapGet("/shared/folders-with-me", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud,
+            UsersServerApi.UsersServerApiClient usersServer) =>
+            await Guarded(http, auth, async token =>
+            {
+                var resp = await cloud.ListSharedFoldersWithMeAsync(new ListSharedFoldersWithMeRequest(), token);
+                var byId = await ResolveUsers(usersServer, resp.Items.Select(i => i.OwnerUserId));
+                return Results.Json(new
+                {
+                    items = resp.Items.Select(i => new
+                    {
+                        grantId = i.GrantId,
+                        directoryId = i.DirectoryId,
+                        name = i.Name,
+                        sharedAt = i.SharedAt?.ToDateTimeOffset(),
+                        owner = byId.TryGetValue(i.OwnerUserId, out var u) ? UserJson(u) : MinimalUserJson(i.OwnerUserId)
+                    }).ToArray()
+                }, Json);
+            }));
+
+        // Листинг доступной мне папки (навигация по поддереву; проверка гранта на сервере).
+        api.MapGet("/shared/dir", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud, string dir) =>
+            await Guarded(http, auth, async token =>
+            {
+                var resp = await cloud.ListSharedDirectoryAsync(new ListSharedDirectoryRequest { DirectoryId = dir }, token);
+                if (!resp.Found)
+                    return Results.Json(new { found = false }, Json, statusCode: 404);
+
+                return Results.Json(new
+                {
+                    found = true,
+                    directoryId = resp.DirectoryId,
+                    name = resp.Name,
+                    subdirs = resp.Subdirs.Select(d => new { id = d.Id, name = d.Name }).ToArray(),
+                    files = resp.Files.Select(f => new
+                    {
+                        fileId = f.FileId,
+                        name = f.Name,
+                        mediaKind = f.MediaKind.ToString().ToLowerInvariant(),
+                        downloadUrl = f.DownloadUrl,
+                        previewUrl = f.PreviewUrl,
+                        fileSize = f.FileSize,
+                        imageWidth = f.ImageWidth,
+                        imageHeight = f.ImageHeight
+                    }).ToArray()
+                }, Json);
             }));
 
         // ───────────────────────── Альбомы ─────────────────────────
@@ -665,6 +815,23 @@ public static class CloudApiEndpoints
         };
     }
 
+    /// <summary>JSON-представление публичной папки. Дружелюбный URL `/f/{token}` собирается из хоста запроса.</summary>
+    private static object FolderShareJson(HttpContext http, FolderShareInfo s)
+    {
+        var origin = $"{http.Request.Scheme}://{http.Request.Host}";
+        return new
+        {
+            id = s.Id,
+            token = s.Token,
+            kind = "folder",
+            url = $"{origin}/f/{s.Token}",
+            directoryId = s.DirectoryId,
+            name = s.Name,
+            createdAt = s.CreatedAt?.ToDateTimeOffset(),
+            clickCount = s.ClickCount
+        };
+    }
+
     private static object UserJson(User u) => new
     {
         id = u.Id,
@@ -771,6 +938,7 @@ public static class CloudApiEndpoints
     private sealed record EntryIdReq(string EntryId);
     private sealed record FileIdReq(string FileId);
     private sealed record GrantReq(string FileId, long RecipientUserId);
+    private sealed record GrantFolderReq(string DirectoryId, long RecipientUserId);
     private sealed record GrantIdReq(string GrantId);
     private sealed record AlbumCreate(string Name, string? Description);
     private sealed record AlbumUpdate(string Album, string? Name, string? Description, string? CoverFileId);
@@ -780,4 +948,6 @@ public static class CloudApiEndpoints
     private sealed record VideoThumbReq(string VideoFileId, string ImageFileId);
     private sealed record ShareCreateReq(string FileId, string? Name);
     private sealed record ShareIdReq(string ShareId);
+    private sealed record FolderShareCreateReq(string DirectoryId, string? Name);
+    private sealed record FolderShareIdReq(string FolderShareId);
 }

@@ -29,7 +29,11 @@ public class FilesContext : DbContext
 
     public DbSet<ShareLink> ShareLinks { get; set; }
 
+    public DbSet<FolderShareLink> FolderShareLinks { get; set; }
+
     public DbSet<FileGrant> FileGrants { get; set; }
+
+    public DbSet<DirectoryGrant> DirectoryGrants { get; set; }
 
     public DbSet<FileMetadata> FileMetadata { get; set; }
 
@@ -114,6 +118,16 @@ public class FilesContext : DbContext
             b.HasIndex(x => new { x.OwnerId, x.CreatedAt });
         });
 
+        modelBuilder.Entity<FolderShareLink>(b =>
+        {
+            // Резолв публичной папки по токену — токен уникален.
+            b.HasIndex(x => x.Token).IsUnique();
+            // Один публичный шар на папку владельца (идемпотентность CreateFolderShare).
+            b.HasIndex(x => new { x.OwnerId, x.DirectoryId }).IsUnique();
+            // Cursor-пагинация списка публичных папок владельца по дате создания.
+            b.HasIndex(x => new { x.OwnerId, x.CreatedAt });
+        });
+
         modelBuilder.Entity<FileGrant>(b =>
         {
             // Идемпотентность: один файл — максимум один грант владельца конкретному получателю.
@@ -122,6 +136,16 @@ public class FilesContext : DbContext
             b.HasIndex(x => new { x.RecipientId, x.CreatedAt });
             // Обратный поиск/чистка по файлу.
             b.HasIndex(x => x.FileId);
+        });
+
+        modelBuilder.Entity<DirectoryGrant>(b =>
+        {
+            // Идемпотентность: одна папка — максимум один грант владельца конкретному получателю.
+            b.HasIndex(x => new { x.OwnerId, x.DirectoryId, x.RecipientId }).IsUnique();
+            // Раздел «мне доступны» (папки) получателя.
+            b.HasIndex(x => new { x.RecipientId, x.CreatedAt });
+            // Обратный поиск/чистка по папке.
+            b.HasIndex(x => x.DirectoryId);
         });
     }
 }

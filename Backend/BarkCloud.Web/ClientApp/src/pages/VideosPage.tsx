@@ -45,16 +45,16 @@ function VideoCard({ m, selecting, checked, onToggle, onOpen, onMenu }: {
   m: MediaItem;
   selecting: boolean;
   checked: boolean;
-  onToggle: (m: MediaItem) => void;
+  onToggle: (shift: boolean) => void;
   onOpen: (m: MediaItem) => void;
   onMenu: (e: React.MouseEvent, m: MediaItem) => void;
 }) {
   const res = resLabel(m);
   return (
-    <div className={'vcard' + (checked ? ' checked' : '')} onClick={() => (selecting ? onToggle(m) : onOpen(m))} onContextMenu={(e) => onMenu(e, m)}>
+    <div className={'vcard' + (checked ? ' checked' : '')} onClick={(e) => (selecting ? onToggle(e.shiftKey) : onOpen(m))} onContextMenu={(e) => onMenu(e, m)}>
       <div className="vthumb">
         <MediaThumb media={m} sizes="(max-width: 700px) 100vw, 320px" />
-        <button className="selbox" onClick={(e) => { e.stopPropagation(); onToggle(m); }} title="Выбрать">
+        <button className="selbox" onClick={(e) => { e.stopPropagation(); onToggle(e.shiftKey); }} title="Выбрать">
           {checked ? <Icon.check size={14} /> : null}
         </button>
         <button className="play">
@@ -312,7 +312,7 @@ export function VideosPage() {
                   m={m}
                   selecting={bulk.active}
                   checked={bulk.isSelected(m.id)}
-                  onToggle={() => bulk.toggle(m.id)}
+                  onToggle={(shift) => bulk.toggle(m.id, shift)}
                   onOpen={() => setLightbox(idx)}
                   onMenu={actionsCtx.openMenu}
                 />
