@@ -1,4 +1,5 @@
 using BarkCloud.Drive.Contracts;
+using BarkCloud.Drive.Contracts.Localization;
 
 using Grpc.Core;
 
@@ -36,13 +37,13 @@ public sealed class DriveEngine : IDriveEngine
         // Пустой логин → сервер кинул бы FailedPrecondition «Не передан ни логин ни email».
         // Отсекаем здесь: при восстановленной из refresh.bin сессии вход вообще не нужен.
         if (string.IsNullOrWhiteSpace(login) || string.IsNullOrWhiteSpace(password))
-            return ErrorMessage("Введите логин и пароль");
+            return ErrorMessage(Loc.T("Eng_LoginRequired"));
 
         try
         {
             await _tokens.LoginAsync(login, password, otpCode);
             await _profile.EnsureLoadedAsync();
-            return Status("Авторизация успешна");
+            return Status(Loc.T("Eng_AuthSuccess"));
         }
         catch (Exception ex)
         {
@@ -58,7 +59,7 @@ public sealed class DriveEngine : IDriveEngine
             _mount.Unmount();
             _tokens.Logout();
             _profile.Clear();
-            return Task.FromResult(Status("Выполнен выход"));
+            return Task.FromResult(Status(Loc.T("Eng_LoggedOut")));
         }
         catch (Exception ex)
         {
@@ -71,23 +72,21 @@ public sealed class DriveEngine : IDriveEngine
         try
         {
             if (!_tokens.IsAuthenticated)
-                return Task.FromResult(ErrorMessage("Сначала выполните вход"));
+                return Task.FromResult(ErrorMessage(Loc.T("Eng_LoginFirst")));
 
             if (_mount.IsMounted)
-                return Task.FromResult(Status("Диск уже примонтирован")); // идемпотентность (гонка авто-монтажа движка и UI)
+                return Task.FromResult(Status(Loc.T("Eng_AlreadyMounted"))); // идемпотентность (гонка авто-монтажа движка и UI)
 
             if (!string.IsNullOrWhiteSpace(volumeLabel))
                 _fs.VolumeLabel = volumeLabel.Trim();
 
             _mount.Mount(driveLetter, _fs);
             _settings.SetLastMount(driveLetter, _fs.VolumeLabel);
-            return Task.FromResult(Status($"Примонтировано {driveLetter}:"));
+            return Task.FromResult(Status(Loc.T("Eng_MountedFmt", driveLetter)));
         }
         catch (Exception ex) when (IsDokanMissing(ex))
         {
-            return Task.FromResult(ErrorMessage(
-                "Не найден драйвер Dokany (dokan2.dll). Установите Dokany 2.x — " +
-                "github.com/dokan-dev/dokany/releases (DokanSetup.exe) — и перезапустите."));
+            return Task.FromResult(ErrorMessage(Loc.T("Eng_DokanMissing")));
         }
         catch (Exception ex)
         {
@@ -102,10 +101,10 @@ public sealed class DriveEngine : IDriveEngine
         try
         {
             if (!_tokens.IsAuthenticated)
-                return Task.FromResult(ErrorMessage("Сначала выполните вход"));
+                return Task.FromResult(ErrorMessage(Loc.T("Eng_LoginFirst")));
 
             var letter = (string.IsNullOrWhiteSpace(driveLetter) ? _mount.DriveLetter : driveLetter.Trim())
-                ?? throw new InvalidOperationException("Не задана буква диска");
+                ?? throw new InvalidOperationException(Loc.T("Eng_NoDriveLetter"));
 
             if (!string.IsNullOrWhiteSpace(volumeLabel))
                 _fs.VolumeLabel = volumeLabel.Trim();
@@ -115,12 +114,11 @@ public sealed class DriveEngine : IDriveEngine
 
             _mount.Mount(letter, _fs);
             _settings.SetLastMount(letter, _fs.VolumeLabel);
-            return Task.FromResult(Status($"Перемонтировано {letter}: ({_fs.VolumeLabel})"));
+            return Task.FromResult(Status(Loc.T("Eng_RemountedFmt", letter, _fs.VolumeLabel)));
         }
         catch (Exception ex) when (IsDokanMissing(ex))
         {
-            return Task.FromResult(ErrorMessage(
-                "Не найден драйвер Dokany (dokan2.dll). Установите Dokany 2.x и перезапустите."));
+            return Task.FromResult(ErrorMessage(Loc.T("Eng_DokanMissingShort")));
         }
         catch (Exception ex)
         {
@@ -143,7 +141,7 @@ public sealed class DriveEngine : IDriveEngine
         {
             _gateway.FlushPending(); // дослать буферизованные удаления до размонтирования
             _mount.Unmount();
-            return Task.FromResult(Status("Отмонтировано"));
+            return Task.FromResult(Status(Loc.T("Eng_Unmounted")));
         }
         catch (Exception ex)
         {
@@ -171,12 +169,19 @@ public sealed class DriveEngine : IDriveEngine
     public Task<EngineSettings> SetCacheDirAsync(string path)
     {
         if (string.IsNullOrWhiteSpace(path))
-            throw new ArgumentException("Пустой путь к папке кэша");
+            throw new ArgumentException(Loc.T("Eng_EmptyCachePath"));
 
         _settings.SetCacheDir(path);
         _gateway.SetCacheDir(path);
         EngineLog.Info($"Папка кэша изменена: {path}");
         return Task.FromResult(new EngineSettings { CacheDir = path });
+    }
+
+    public Task SetLanguageAsync(string culture)
+    {
+        // Последующие Status()/ErrorMessage()/LastSyncError формируются на этом языке.
+        Loc.SetCulture(culture);
+        return Task.CompletedTask;
     }
 
     public Task ShutdownAsync()
