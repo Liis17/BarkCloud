@@ -20,6 +20,8 @@ Parent: [[index]] · See also: [[structure/overview]] · [[structure/entrypoints
 
 `Backend/nginx/cloud.barkfluff.conf` — конфиг внешнего nginx (на хосте/перед compose, не отдельный сервис в dev-compose). Терминирует TLS на едином субдомене `cloud.barkfluff.com` и проксирует к сервисам по **внешнему порту**, внутрь — h2c (plaintext gRPC). Сертификат самоподписанный, поэтому клиенты доверяют всем (Android/iOS).
 
+> **Keepalive (производительность):** апстримы оформлены `upstream`-блоками с `keepalive` — nginx держит пул постоянных h2c-соединений к бэкендам и не устанавливает TCP+HTTP/2 на каждый RPC (ранее `grpc_pass $variable` это делал, что душило rps). Размен: имена бэкендов резолвятся при загрузке конфига; после **пересоздания** backend-контейнера (обновление образа → новый IP) nginx ходит на старый IP до перезагрузки — выполнить `docker exec cloud-nginx nginx -s reload` (важно для self-update через web).
+
 | Внешний порт (TLS) | Внутренний backend |
 |---|---|
 | `7020` | `grpc://cloud-identity:7000` |
@@ -32,7 +34,7 @@ Parent: [[index]] · See also: [[structure/overview]] · [[structure/entrypoints
 
 | Сервис | Образ | Назначение |
 |--------|-------|-----------|
-| `postgres_barkcloud` | `postgres:18` | Единая PostgreSQL для всех сервисов (схемы изолируют) |
+| `postgres_barkcloud` | `postgres:18` | Единая PostgreSQL для всех сервисов (схемы изолируют). В прод-`docker-compose.yml` запускается с тюнингом через `command` (`-c shared_buffers=1GB`, `effective_cache_size=3GB`, `work_mem=16MB`, `jit=off`, параллелизм под 2 ядра) — дефолты PG18 (128MB) под 8 ГБ малы. Движок **не меняем**: тормозили seq-scan'ы из-за отсутствия индексов + дефолтный конфиг, а не сам Postgres. |
 | `rabbitmq` | `rabbitmq:latest` | Очередь сообщений между сервисами; контракты в [[modules/shared-queue]] |
 | `minio` | `quay.io/minio/minio` | S3-совместимое хранилище для файлов, аватаров, стикеров |
 | `seq` | `datalust/seq:latest` | Централизованный лог-агрегатор; логи через Serilog |
