@@ -206,8 +206,14 @@ BarkCloud/
   `confirmationDialog` «часть файлов уже в облаке — загрузить ещё раз?» (Загрузить всё / Только новые /
   Отмена). Серверный дедуп снят (Plan 01) → ручная загрузка всегда создаёт копию; автозагрузка
   (`BackupManager.classify`) по-прежнему пропускает уже-загруженное по серверному хешу (`CheckFileHashes`).
-  *Авто-распределение по типу (`route_by_media_kind`, отказ от «Недавно загруженные») для iOS отложено —
-  требует регенерации `Generated/Proto/files_api.pb.swift` и сборки на macOS.*
+  **Авто-распределение по типу** (`route_by_media_kind`): передние загрузки через `CloudRepository.uploadFile`
+  (`GalleryViewModel.uploadSelected`/`ensureCloudFileID`, `MediaGridViewModel.uploadAssets`) грузят **без явной
+  папки** с `routeByMediaKind: true` — сервер сам кладёт в системные «Фото»/«Видео»/«Другие документы»
+  (`uploadFile`/`attachFile` принимают флаг и шлют `AttachFileRequest.route_by_media_kind`). Фоновые загрузки
+  (`BackupManager` автозагрузка, `ShareInboxUploader`/Share Extension) пока используют `ensureRecentUploadsFolder`:
+  их привязка отложена через персистентный `UploadJob` (+ отдельный таргет Share Extension), поэтому проброс
+  флага туда не сделан, а сам хелпер `ensureRecentUploadsFolder`/`recentUploadsFolderName` оставлен. Сборка на
+  macOS не выполнялась (хост недоступен) — правки верифицированы анализом кода.
   **Резервная копия / BarkCloud** (`Features/Gallery/Backup/`) — кнопка-облако (`icloud`) в тулбаре
   правее «Выбрать» открывает модалку `BackupSheet` (плавающая карточка с отступами: `fullScreenCover` +
   `.presentationBackground(.clear)` + затемнение + `.padding(20)` + `.regularMaterial`; заголовок

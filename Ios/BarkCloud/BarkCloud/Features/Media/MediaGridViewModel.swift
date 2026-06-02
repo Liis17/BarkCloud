@@ -111,15 +111,13 @@ final class MediaGridViewModel {
     func uploadAssets(_ assets: [PHAsset]) async {
         guard !assets.isEmpty else { return }
         state.isUploading = true
-        // Привязываем медиа к авто-папке «Недавно загруженные» (как веб-клиент),
-        // чтобы у него была запись каталога. Best-effort: если папку не получить —
-        // файл всё равно попадёт в галерею (ListUserMedia по uploader'у).
-        let folderID = try? await cloud.ensureRecentUploadsFolder()
         var anyFailed = false
         for asset in assets {
             do {
                 let (data, name) = try await DeviceAssetResource.originalData(for: asset)
-                _ = try await cloud.uploadFile(data: data, fileName: name, toDirectory: folderID)
+                // Без явной папки: сервер раскладывает по системным «Фото»/«Видео»/
+                // «Другие документы» по типу медиа (route_by_media_kind).
+                _ = try await cloud.uploadFile(data: data, fileName: name, routeByMediaKind: true)
             } catch {
                 anyFailed = true
             }
