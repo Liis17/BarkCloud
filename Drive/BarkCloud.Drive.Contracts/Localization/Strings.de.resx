@@ -1,0 +1,383 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="Common_Settings" xml:space="preserve">
+    <value>Einstellungen</value>
+  </data>
+  <data name="Common_Back" xml:space="preserve">
+    <value>Zurück</value>
+  </data>
+  <data name="Common_Next" xml:space="preserve">
+    <value>Weiter</value>
+  </data>
+  <data name="Common_Cancel" xml:space="preserve">
+    <value>Abbrechen</value>
+  </data>
+  <data name="Common_Finish" xml:space="preserve">
+    <value>Fertig</value>
+  </data>
+  <data name="Common_Browse" xml:space="preserve">
+    <value>Durchsuchen…</value>
+  </data>
+  <data name="Common_Language" xml:space="preserve">
+    <value>Sprache</value>
+  </data>
+  <data name="Common_ServerHost" xml:space="preserve">
+    <value>Server (Host oder IP)</value>
+  </data>
+  <data name="Common_Ports" xml:space="preserve">
+    <value>Dienst-Ports</value>
+  </data>
+  <data name="Common_AcceptCert" xml:space="preserve">
+    <value>Selbstsigniertem Zertifikat vertrauen</value>
+  </data>
+  <data name="Common_DriveName" xml:space="preserve">
+    <value>Laufwerksname</value>
+  </data>
+  <data name="Common_DriveLetter" xml:space="preserve">
+    <value>Laufwerksbuchstabe</value>
+  </data>
+  <data name="Common_AutostartApp" xml:space="preserve">
+    <value>Anwendung (Infobereich-Symbol)</value>
+  </data>
+  <data name="Common_AutostartEngine" xml:space="preserve">
+    <value>Dienst (Laufwerk beim Anmelden einbinden)</value>
+  </data>
+  <data name="Common_ErrorFmt" xml:space="preserve">
+    <value>Fehler: {0}</value>
+  </data>
+  <data name="Common_EngineNotRunning" xml:space="preserve">
+    <value>Dienst läuft nicht.</value>
+  </data>
+  <data name="Common_EnterServer" xml:space="preserve">
+    <value>Serveradresse eingeben.</value>
+  </data>
+  <data name="Common_BadPortIdentity" xml:space="preserve">
+    <value>Ungültiger Identity-Port (1–65535).</value>
+  </data>
+  <data name="Common_BadPortFiles" xml:space="preserve">
+    <value>Ungültiger Files-Port (1–65535).</value>
+  </data>
+  <data name="Common_BadPortUsers" xml:space="preserve">
+    <value>Ungültiger Users-Port (1–65535).</value>
+  </data>
+  <data name="Common_SaveAddressFailedFmt" xml:space="preserve">
+    <value>Adresse konnte nicht gespeichert werden: {0}</value>
+  </data>
+  <data name="Common_DriveNameRule" xml:space="preserve">
+    <value>Laufwerksname: bis zu 32 Zeichen, ohne \ / : * ? " &lt; &gt; |</value>
+  </data>
+  <data name="Common_CacheUnavailableFmt" xml:space="preserve">
+    <value>Cache-Ordner nicht verfügbar: {0}</value>
+  </data>
+  <data name="Common_SelectCacheFolderTitle" xml:space="preserve">
+    <value>Ordner für den Laufwerks-Cache auswählen</value>
+  </data>
+  <data name="Common_SelectCache" xml:space="preserve">
+    <value>Cache-Ordner auswählen.</value>
+  </data>
+  <data name="User_LoggedIn" xml:space="preserve">
+    <value>Angemeldet</value>
+  </data>
+  <data name="User_NotLoggedIn" xml:space="preserve">
+    <value>Nicht angemeldet</value>
+  </data>
+  <data name="Units_Bytes" xml:space="preserve">
+    <value>B,KB,MB,GB,TB</value>
+  </data>
+  <data name="Main_EngineWarningTitle" xml:space="preserve">
+    <value>Dienst läuft nicht</value>
+  </data>
+  <data name="Main_EngineWarningText" xml:space="preserve">
+    <value>Der BarkCloud Drive-Hintergrundprozess wurde nicht gefunden.</value>
+  </data>
+  <data name="Main_StartEngine" xml:space="preserve">
+    <value>Dienst starten</value>
+  </data>
+  <data name="Main_Storage" xml:space="preserve">
+    <value>Speicher</value>
+  </data>
+  <data name="Main_EngineUnavailableFmt" xml:space="preserve">
+    <value>Dienst nicht verfügbar: {0}</value>
+  </data>
+  <data name="Main_NoFreeLetter" xml:space="preserve">
+    <value>Kein freier Laufwerksbuchstabe zum Einbinden verfügbar.</value>
+  </data>
+  <data name="Main_MountErrorFmt" xml:space="preserve">
+    <value>Einbindungsfehler: {0}</value>
+  </data>
+  <data name="Main_ServerFmt" xml:space="preserve">
+    <value>Server: {0}</value>
+  </data>
+  <data name="Main_StorageUsageFmt" xml:space="preserve">
+    <value>{0} von {1}</value>
+  </data>
+  <data name="Main_DriveMountedFmt" xml:space="preserve">
+    <value>Laufwerk {0}: eingebunden ({1})</value>
+  </data>
+  <data name="Main_DriveNotMounted" xml:space="preserve">
+    <value>Laufwerk nicht eingebunden</value>
+  </data>
+  <data name="Main_SyncFmt" xml:space="preserve">
+    <value>Synchronisierung: {0}</value>
+  </data>
+  <data name="Tray_Open" xml:space="preserve">
+    <value>Öffnen</value>
+  </data>
+  <data name="Tray_Mount" xml:space="preserve">
+    <value>Einbinden</value>
+  </data>
+  <data name="Tray_Unmount" xml:space="preserve">
+    <value>Aushängen</value>
+  </data>
+  <data name="Tray_Exit" xml:space="preserve">
+    <value>Anwendung beenden</value>
+  </data>
+  <data name="Wizard_Title" xml:space="preserve">
+    <value>BarkCloud Drive einrichten</value>
+  </data>
+  <data name="Wizard_Step1" xml:space="preserve">
+    <value>Schritt 1 von 5 · Serveradresse</value>
+  </data>
+  <data name="Wizard_ServerPrompt" xml:space="preserve">
+    <value>Adresse Ihres BarkCloud-Servers:</value>
+  </data>
+  <data name="Wizard_Step2" xml:space="preserve">
+    <value>Schritt 2 von 5 · Anmeldung</value>
+  </data>
+  <data name="Wizard_LoginPlaceholder" xml:space="preserve">
+    <value>Benutzername oder E-Mail</value>
+  </data>
+  <data name="Wizard_PasswordPlaceholder" xml:space="preserve">
+    <value>Passwort</value>
+  </data>
+  <data name="Wizard_OtpPlaceholder" xml:space="preserve">
+    <value>OTP-Code (falls 2FA aktiviert)</value>
+  </data>
+  <data name="Wizard_Step3" xml:space="preserve">
+    <value>Schritt 3 von 5 · Laufwerk</value>
+  </data>
+  <data name="Wizard_Step4" xml:space="preserve">
+    <value>Schritt 4 von 5 · Cache-Ordner</value>
+  </data>
+  <data name="Wizard_CachePrompt" xml:space="preserve">
+    <value>Wo heruntergeladene Dateiinhalte gespeichert werden:</value>
+  </data>
+  <data name="Wizard_Step5" xml:space="preserve">
+    <value>Schritt 5 von 5 · Autostart</value>
+  </data>
+  <data name="Wizard_AutostartPrompt" xml:space="preserve">
+    <value>Beim Windows-Start ausführen:</value>
+  </data>
+  <data name="Wizard_AlreadyLoggedIn" xml:space="preserve">
+    <value>Sie sind bereits angemeldet. Klicken Sie auf „Weiter“.</value>
+  </data>
+  <data name="Wizard_LoggedInAsFmt" xml:space="preserve">
+    <value>Angemeldet als {0}. Klicken Sie auf „Weiter“.</value>
+  </data>
+  <data name="Wizard_EnterLoginPassword" xml:space="preserve">
+    <value>Benutzername und Passwort eingeben.</value>
+  </data>
+  <data name="Wizard_LoginFailed" xml:space="preserve">
+    <value>Anmeldung fehlgeschlagen.</value>
+  </data>
+  <data name="Wizard_EnterDriveName" xml:space="preserve">
+    <value>Laufwerksnamen eingeben.</value>
+  </data>
+  <data name="Wizard_SelectLetter" xml:space="preserve">
+    <value>Laufwerksbuchstaben auswählen.</value>
+  </data>
+  <data name="Wizard_EngineUnavailableAfterServer" xml:space="preserve">
+    <value>Dienst nach Änderung der Serveradresse nicht verfügbar.</value>
+  </data>
+  <data name="Wizard_CreateDriveFailed" xml:space="preserve">
+    <value>Laufwerk konnte nicht erstellt werden.</value>
+  </data>
+  <data name="Wizard_CreateDriveErrorFmt" xml:space="preserve">
+    <value>Fehler beim Erstellen des Laufwerks: {0}</value>
+  </data>
+  <data name="Settings_Account" xml:space="preserve">
+    <value>Konto</value>
+  </data>
+  <data name="Settings_Logout" xml:space="preserve">
+    <value>Abmelden</value>
+  </data>
+  <data name="Settings_Server" xml:space="preserve">
+    <value>Server</value>
+  </data>
+  <data name="Settings_ApplyAddress" xml:space="preserve">
+    <value>Adresse übernehmen</value>
+  </data>
+  <data name="Settings_ApplyAddressHint" xml:space="preserve">
+    <value>Der Dienst wird neu gestartet; bei einem Serverwechsel ist möglicherweise eine erneute Anmeldung erforderlich.</value>
+  </data>
+  <data name="Settings_Drive" xml:space="preserve">
+    <value>Laufwerk</value>
+  </data>
+  <data name="Settings_Rename" xml:space="preserve">
+    <value>Umbenennen</value>
+  </data>
+  <data name="Settings_ChangeLetter" xml:space="preserve">
+    <value>Buchstabe ändern</value>
+  </data>
+  <data name="Settings_DriveHint" xml:space="preserve">
+    <value>Umbenennen und Buchstabenwechsel verbinden das Laufwerk kurz neu.</value>
+  </data>
+  <data name="Settings_Cache" xml:space="preserve">
+    <value>Cache-Ordner</value>
+  </data>
+  <data name="Settings_Autostart" xml:space="preserve">
+    <value>Autostart (bei Windows-Anmeldung)</value>
+  </data>
+  <data name="Settings_Engine" xml:space="preserve">
+    <value>Dienst</value>
+  </data>
+  <data name="Settings_RestartEngine" xml:space="preserve">
+    <value>Dienst neu starten</value>
+  </data>
+  <data name="Settings_LogoutErrorFmt" xml:space="preserve">
+    <value>Abmeldefehler: {0}</value>
+  </data>
+  <data name="Settings_ApplyingAddress" xml:space="preserve">
+    <value>Adresse wird übernommen, Dienst wird neu gestartet…</value>
+  </data>
+  <data name="Settings_EngineUnavailableAfterServer" xml:space="preserve">
+    <value>Dienst nach Adressänderung nicht verfügbar.</value>
+  </data>
+  <data name="Settings_AddressSavedWizard" xml:space="preserve">
+    <value>Adresse gespeichert. Anmeldung erforderlich – der Assistent wird geöffnet.</value>
+  </data>
+  <data name="Settings_AddressUpdated" xml:space="preserve">
+    <value>Serveradresse aktualisiert.</value>
+  </data>
+  <data name="Settings_Mounted" xml:space="preserve">
+    <value>Eingebunden</value>
+  </data>
+  <data name="Settings_Unmounted" xml:space="preserve">
+    <value>Ausgehängt</value>
+  </data>
+  <data name="Settings_DriveRenamed" xml:space="preserve">
+    <value>Laufwerk umbenannt</value>
+  </data>
+  <data name="Settings_NameSaved" xml:space="preserve">
+    <value>Name gespeichert (Laufwerk einbinden)</value>
+  </data>
+  <data name="Settings_LetterChangedFmt" xml:space="preserve">
+    <value>Buchstabe geändert auf {0}:</value>
+  </data>
+  <data name="Settings_LetterSaved" xml:space="preserve">
+    <value>Buchstabe gespeichert (Laufwerk einbinden)</value>
+  </data>
+  <data name="Settings_CacheUpdated" xml:space="preserve">
+    <value>Cache-Ordner aktualisiert. Bereits heruntergeladene Inhalte verbleiben im alten Ordner.</value>
+  </data>
+  <data name="Settings_CacheChangeFailedFmt" xml:space="preserve">
+    <value>Cache-Ordner konnte nicht geändert werden: {0}</value>
+  </data>
+  <data name="Settings_RestartingEngine" xml:space="preserve">
+    <value>Dienst wird neu gestartet…</value>
+  </data>
+  <data name="Settings_EngineUnavailableAfterRestart" xml:space="preserve">
+    <value>Dienst nach Neustart nicht verfügbar.</value>
+  </data>
+  <data name="Settings_EngineRestarted" xml:space="preserve">
+    <value>Dienst neu gestartet.</value>
+  </data>
+  <data name="Settings_AutostartUpdated" xml:space="preserve">
+    <value>Autostart aktualisiert.</value>
+  </data>
+  <data name="Eng_LoginRequired" xml:space="preserve">
+    <value>Benutzername und Passwort eingeben</value>
+  </data>
+  <data name="Eng_AuthSuccess" xml:space="preserve">
+    <value>Erfolgreich angemeldet</value>
+  </data>
+  <data name="Eng_LoggedOut" xml:space="preserve">
+    <value>Abgemeldet</value>
+  </data>
+  <data name="Eng_LoginFirst" xml:space="preserve">
+    <value>Bitte zuerst anmelden</value>
+  </data>
+  <data name="Eng_AlreadyMounted" xml:space="preserve">
+    <value>Laufwerk ist bereits eingebunden</value>
+  </data>
+  <data name="Eng_MountedFmt" xml:space="preserve">
+    <value>Eingebunden {0}:</value>
+  </data>
+  <data name="Eng_DokanMissing" xml:space="preserve">
+    <value>Dokany-Treiber (dokan2.dll) nicht gefunden. Installieren Sie Dokany 2.x — github.com/dokan-dev/dokany/releases (DokanSetup.exe) — und starten Sie neu.</value>
+  </data>
+  <data name="Eng_NoDriveLetter" xml:space="preserve">
+    <value>Kein Laufwerksbuchstabe angegeben</value>
+  </data>
+  <data name="Eng_RemountedFmt" xml:space="preserve">
+    <value>Neu eingebunden {0}: ({1})</value>
+  </data>
+  <data name="Eng_DokanMissingShort" xml:space="preserve">
+    <value>Dokany-Treiber (dokan2.dll) nicht gefunden. Installieren Sie Dokany 2.x und starten Sie neu.</value>
+  </data>
+  <data name="Eng_Unmounted" xml:space="preserve">
+    <value>Ausgehängt</value>
+  </data>
+  <data name="Eng_EmptyCachePath" xml:space="preserve">
+    <value>Leerer Cache-Ordnerpfad</value>
+  </data>
+  <data name="Eng_SyncFailedFmt" xml:space="preserve">
+    <value>„{0}“ konnte nicht in die Cloud gespeichert werden: {1}</value>
+  </data>
+  <data name="Launcher_ConnectFailed" xml:space="preserve">
+    <value>Verbindung zum Dienst fehlgeschlagen</value>
+  </data>
+  <data name="Launcher_EngineNotFoundFmt" xml:space="preserve">
+    <value>Dienst nicht gefunden: {0}</value>
+  </data>
+</root>
