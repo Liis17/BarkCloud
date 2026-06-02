@@ -13,6 +13,28 @@ struct AppSettingsScreen: View {
     var body: some View {
         List {
             Section {
+                ForEach(AppLanguage.allCases) { lang in
+                    Button {
+                        env.language.setLanguage(lang)
+                    } label: {
+                        HStack {
+                            Text(lang.displayNameKey)
+                                .font(AppTypography.titleMedium)
+                                .foregroundStyle(AppColors.onSurface)
+                            Spacer()
+                            if env.language.selected == lang {
+                                Image(systemName: "checkmark")
+                                    .foregroundStyle(AppColors.accent)
+                            }
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+            } header: {
+                Text("settings_language")
+            }
+
+            Section {
                 Toggle(isOn: lockToggle) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("app_lock_settings_title")

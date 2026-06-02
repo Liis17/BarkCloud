@@ -3,6 +3,7 @@
                  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                  xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
                  xmlns:tray="clr-namespace:Wpf.Ui.Tray.Controls;assembly=Wpf.Ui.Tray"
+                 xmlns:loc="clr-namespace:BarkCloud.Drive.App.Localization"
                  Title="BarkCloud Drive" Height="520" Width="420"
                  ExtendsContentIntoTitleBar="True"
                  WindowBackdropType="Mica"
@@ -21,12 +22,12 @@
                          TooltipText="BarkCloud Drive">
             <tray:NotifyIcon.Menu>
                 <ContextMenu>
-                    <MenuItem Header="Открыть" Click="ShowClick"/>
+                    <MenuItem Header="{loc:Tr Tray_Open}" Click="ShowClick"/>
                     <Separator/>
-                    <MenuItem Header="Примонтировать" Click="MountClick"/>
-                    <MenuItem Header="Отмонтировать" Click="UnmountClick"/>
+                    <MenuItem Header="{loc:Tr Tray_Mount}" Click="MountClick"/>
+                    <MenuItem Header="{loc:Tr Tray_Unmount}" Click="UnmountClick"/>
                     <Separator/>
-                    <MenuItem Header="Закрыть приложение" Click="ExitClick"/>
+                    <MenuItem Header="{loc:Tr Tray_Exit}" Click="ExitClick"/>
                 </ContextMenu>
             </tray:NotifyIcon.Menu>
         </tray:NotifyIcon>
@@ -36,10 +37,10 @@
             <Border x:Name="EngineWarning" Visibility="Collapsed"
                     Background="#33FF8C00" CornerRadius="6" Padding="12" Margin="0,0,0,12">
                 <StackPanel>
-                    <TextBlock Text="Движок не запущен" FontWeight="Bold"/>
-                    <TextBlock Text="Фоновый процесс BarkCloud Drive не обнаружен."
+                    <TextBlock Text="{loc:Tr Main_EngineWarningTitle}" FontWeight="Bold"/>
+                    <TextBlock Text="{loc:Tr Main_EngineWarningText}"
                                TextWrapping="Wrap" Margin="0,2,0,8"/>
-                    <ui:Button Content="Запустить движок" Appearance="Primary" Click="StartEngineClick"/>
+                    <ui:Button Content="{loc:Tr Main_StartEngine}" Appearance="Primary" Click="StartEngineClick"/>
                 </StackPanel>
             </Border>
 
@@ -66,14 +67,14 @@
             <!-- Хранилище -->
             <ui:Card Margin="0,12,0,0">
                 <StackPanel>
-                    <TextBlock Text="Хранилище" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                    <TextBlock Text="{loc:Tr Main_Storage}" FontWeight="SemiBold" Margin="0,0,0,8"/>
                     <ProgressBar x:Name="UsageBar" Minimum="0" Maximum="100" Height="6"/>
                     <TextBlock x:Name="UsageText" Margin="0,8,0,0" Text="—"/>
                     <TextBlock x:Name="DriveStateText" Opacity="0.7" Margin="0,2,0,0" Text="—"/>
                 </StackPanel>
             </ui:Card>
 
-            <ui:Button x:Name="SettingsButton" Content="Настройки" HorizontalAlignment="Right"
+            <ui:Button x:Name="SettingsButton" Content="{loc:Tr Common_Settings}" HorizontalAlignment="Right"
                        Margin="0,16,0,0" Click="OpenSettingsClick"/>
 
             <TextBlock x:Name="StatusText" TextWrapping="Wrap" Opacity="0.7" Margin="0,12,0,0"/>

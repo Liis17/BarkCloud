@@ -10,6 +10,7 @@ struct BarkCloudApp: App {
         WindowGroup {
             RootView()
                 .environment(env)
+                .environment(\.locale, env.language.locale)
                 .modifier(BarkCloudTheme())
         }
         .onChange(of: scenePhase) { _, phase in
