@@ -2,6 +2,7 @@ using BarkCloud.GrpcServer.Metrics;
 
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
 using Serilog;
 using Serilog.Events;
@@ -31,14 +32,21 @@ public static class SerilogExtensions
                 .Enrich.WithEnvironmentName()
                 .Enrich.WithThreadId()
                 .Enrich.WithProperty("Application", serviceName)
-                .WriteTo.Console(
-                    outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss} [{Level:u3}] [{SourceContext}] {Message:lj}{NewLine}{Exception}")
                 .WriteTo.Seq(seqUrl,
                     bufferBaseFilename: "logs/seq-buffer",
                     bufferSizeLimitBytes: 104857600,
                     batchPostingLimit: 100,
                     period: TimeSpan.FromSeconds(2),
                     queueSizeLimit: 100000);
+
+            // Console — синхронный sink (пишет в stdout под локом в логирующем потоке).
+            // В Production выключаем: логи уходят в Seq (durable-буфер переживает временную
+            // недоступность Seq). В Development консоль остаётся для `docker logs` / локальной отладки.
+            if (!context.HostingEnvironment.IsProduction())
+            {
+                loggerConfig.WriteTo.Console(
+                    outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss} [{Level:u3}] [{SourceContext}] {Message:lj}{NewLine}{Exception}");
+            }
         });
 
         return builder;
