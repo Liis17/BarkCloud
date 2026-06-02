@@ -75,12 +75,16 @@ final class UploadProgressObserver {
 
         let activeStates: Set<UploadJobState> = [.pending, .preparing, .running]
         let activeJobs = jobs.filter { activeStates.contains($0.state) }
-        let hasActive = !activeJobs.isEmpty
+        // Осиротевшие `.running` (их background-task умер) баннер не держат — иначе
+        // один такой job навсегда оставлял бы баннер: событий по нему уже не будет,
+        // и completed+failed никогда не сравняется с total.
+        let blockingJobs = await BackgroundUploadCoordinator.shared.blockingActiveJobs(from: activeJobs)
+        let hasActive = !blockingJobs.isEmpty
 
         if sessionStartedAt == nil, hasActive {
-            // Фиксируем окно сессии на момент самого старого активного job
+            // Фиксируем окно сессии на момент самого старого блокирующего job
             // (минус 1с буфер), чтобы он гарантированно попадал в фильтр.
-            let earliest = activeJobs.map(\.createdAt).min() ?? Date()
+            let earliest = blockingJobs.map(\.createdAt).min() ?? Date()
             sessionStartedAt = earliest.addingTimeInterval(-1)
         }
 
@@ -97,7 +101,9 @@ final class UploadProgressObserver {
             }
         }
         let overall = totalBytes > 0 ? min(1.0, Double(sentBytes) / Double(totalBytes)) : 0
-        let finished = completed + failed == total
+        // Завершено, когда не осталось блокирующих (живых) активных jobs: либо все
+        // терминальны, либо остались только осиротевшие.
+        let finished = !hasActive
 
         totalFiles = total
         completedFiles = completed
