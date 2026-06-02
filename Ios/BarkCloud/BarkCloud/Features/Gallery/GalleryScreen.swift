@@ -45,7 +45,15 @@ struct GalleryScreen: View {
         .onReceive(NotificationCenter.default.publisher(for: .galleryDidFocus)) { _ in
             vm?.reload()
         }
-        .fullScreenCover(item: $viewer) { item in viewerScreen(item.asset) }
+        .fullScreenCover(item: $viewer) { item in
+            let assets = vm?.assets ?? []
+            MediaPagerScreen(
+                ids: assets.map(\.localIdentifier),
+                startIndex: assets.firstIndex(where: { $0.localIdentifier == item.id }) ?? 0,
+                resolve: Self.deviceResolve(assets: assets),
+                onClose: { viewer = nil }
+            )
+        }
         .fullScreenCover(isPresented: $showBackup) {
             BackupSheet(onClose: { showBackup = false })
                 .presentationBackground(.clear)
@@ -288,14 +296,17 @@ struct GalleryScreen: View {
         }
     }
 
-    private func viewerScreen(_ asset: PHAsset) -> some View {
-        NavigationStack {
-            DeviceMediaViewer(asset: asset)
-                .toolbar {
-                    ToolbarItem(placement: .topBarLeading) {
-                        Button(String(localized: "action_close")) { viewer = nil }
-                    }
-                }
+    /// Резолвер URL для свайп-просмотрщика: фото — экспорт во временный файл
+    /// (нативные фишки QuickLook), видео — прямой URL файла из медиатеки.
+    private static func deviceResolve(assets: [PHAsset]) -> (String) async -> URL? {
+        let byID = Dictionary(assets.map { ($0.localIdentifier, $0) }, uniquingKeysWith: { first, _ in first })
+        return { id in
+            guard let asset = byID[id] else { return nil }
+            if asset.mediaType == .video {
+                return await DeviceMediaImageLoader.shared.videoFileURL(for: asset)
+            } else {
+                return await DeviceMediaImageLoader.shared.exportPhotoToTempFile(for: asset)
+            }
         }
     }
 }

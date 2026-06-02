@@ -13,7 +13,19 @@ struct CloudBrowserUiState {
     /// URL созданной публичной ссылки → системный Share Sheet.
     var pendingShareURL: ShareableURL?
 
+    // MARK: Мультивыбор
+    var isSelecting = false
+    /// Выбранные файлы и папки — по их `id` (entry_id / directory_id).
+    var selectedFiles: Set<String> = []
+    var selectedDirs: Set<String> = []
+    /// Идёт батч-операция (перемещение/удаление) — показываем прогресс вместо кнопок.
+    var isProcessing = false
+    var processDone = 0
+    var processTotal = 0
+
     var isEmpty: Bool { subdirs.isEmpty && files.isEmpty }
+    var selectedCount: Int { selectedFiles.count + selectedDirs.count }
+    var hasSelection: Bool { selectedCount > 0 }
 }
 
 @MainActor
@@ -178,5 +190,85 @@ final class CloudBrowserViewModel {
         } catch {
             state.snackbar = domainErrorMessage(error)
         }
+    }
+
+    // MARK: - Мультивыбор
+
+    func enterSelection() {
+        guard !state.isLoading else { return }
+        state.isSelecting = true
+    }
+
+    func exitSelection() {
+        state.isSelecting = false
+        state.selectedFiles = []
+        state.selectedDirs = []
+    }
+
+    func toggleFile(_ entry: CloudFileEntry) {
+        if state.selectedFiles.contains(entry.id) {
+            state.selectedFiles.remove(entry.id)
+        } else {
+            state.selectedFiles.insert(entry.id)
+        }
+    }
+
+    func toggleDirectory(_ dir: CloudDirectory) {
+        if state.selectedDirs.contains(dir.id) {
+            state.selectedDirs.remove(dir.id)
+        } else {
+            state.selectedDirs.insert(dir.id)
+        }
+    }
+
+    /// Батч-удаление выбранных папок и файлов — последовательно, с прогрессом.
+    /// Без undo (для одиночного удаления есть отложенная очередь со snackbar).
+    func deleteSelected() async {
+        let dirs = state.subdirs.filter { state.selectedDirs.contains($0.id) }
+        let files = state.files.filter { state.selectedFiles.contains($0.id) }
+        guard !dirs.isEmpty || !files.isEmpty else { return }
+        state.isProcessing = true
+        state.processTotal = dirs.count + files.count
+        state.processDone = 0
+        var anyFailed = false
+        for dir in dirs {
+            do { try await cloud.deleteDirectory(dir.id) } catch { anyFailed = true }
+            state.processDone += 1
+        }
+        for entry in files {
+            do { try await cloud.deleteFileEntry(entry.id) } catch { anyFailed = true }
+            state.processDone += 1
+        }
+        finishBatch(anyFailed: anyFailed)
+        await reload(showSpinner: false)
+    }
+
+    /// Батч-перемещение выбранных папок и файлов в папку `targetID`.
+    func moveSelected(toDirectory targetID: String) async {
+        let dirs = state.subdirs.filter { state.selectedDirs.contains($0.id) }
+        let files = state.files.filter { state.selectedFiles.contains($0.id) }
+        guard !dirs.isEmpty || !files.isEmpty else { return }
+        state.isProcessing = true
+        state.processTotal = dirs.count + files.count
+        state.processDone = 0
+        var anyFailed = false
+        for dir in dirs {
+            do { try await cloud.moveDirectory(dir.id, newParentID: targetID) } catch { anyFailed = true }
+            state.processDone += 1
+        }
+        for entry in files {
+            do { try await cloud.moveFileEntry(entry.id, newDirectoryID: targetID) } catch { anyFailed = true }
+            state.processDone += 1
+        }
+        finishBatch(anyFailed: anyFailed)
+        await reload(showSpinner: false)
+    }
+
+    private func finishBatch(anyFailed: Bool) {
+        state.isProcessing = false
+        state.processTotal = 0
+        state.processDone = 0
+        exitSelection()
+        if anyFailed { state.snackbar = String(localized: "cloud_batch_failed") }
     }
 }

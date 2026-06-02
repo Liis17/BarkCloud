@@ -174,13 +174,14 @@ BarkCloud/
   выключение — биометрии.
 - **Галерея** (`Features/Gallery/`) — таб №1, локальная медиатека устройства через **PhotoKit**
   (`PHAsset`, разрешение `NSPhotoLibraryUsageDescription` в build-settings pbxproj). Сетка фото+видео
-  (`PHCachingImageManager`), тап → полноэкранный просмотр. **Фото** показываются через
-  **QuickLook** (`FilePreviewController`) — тот же просмотрщик, что в Альбомах/облачном браузере, поэтому
+  (`PHCachingImageManager`), тап → полноэкранный просмотр **со свайпом влево/вправо** между файлами
+  (`MediaPagerScreen`, см. [[#Свайп-просмотрщик]]). **Фото** показываются через **QuickLook**, поэтому
   доступны нативные фишки iOS: выделение объекта на фото (Visual Look Up / subject lifting), Live Text,
   зум, шаринг. Для этого `DeviceMediaImageLoader.exportPhotoToTempFile(for:)` потоково выгружает оригинал
   ассета во временный файл (`PHAssetResourceManager.writeData`, приоритет ресурсов как при загрузке —
-  имя сохраняет расширение, чтобы QuickLook определил тип) и отдаёт URL в `FilePreviewController`.
-  **Видео** остаётся на `requestPlayerItem`+`VideoPlayer` (тяжёлые файлы на диск не гоняем).
+  имя сохраняет расширение, чтобы QuickLook определил тип). **Видео** тоже идёт в QuickLook через прямой
+  URL файла медиатеки (`DeviceMediaImageLoader.videoFileURL` → `requestAVAsset`/`AVURLAsset.url`, без
+  копии на диск; ранее — `VideoPlayer`, теперь единый просмотрщик ради свайпа).
   Режим выбора → загрузка выбранных в облако (`DeviceAssetResource.originalData` → `CloudRepository.uploadFile`).
   **Медиа привязывается к авто-папке «Недавно загруженные»** (`CloudRepository.ensureRecentUploadsFolder()`:
   листает корень, ищет папку с именем `recentUploadsFolderName`="Недавно загруженные", создаёт при отсутствии →
@@ -273,7 +274,8 @@ BarkCloud/
   заголовок шапки — `icloud.fill` в accent-шайбе + крупный `BarkCloud`, крестик — кружок-кнопка.
 - **Альбомы** (`Features/Media/`, таб №3, по умолчанию) — `CloudMediaScreen` с переключателем
   **Фото / Видео / Альбомы**. Фото/Видео: `CloudApi.ListUserMedia(kind)` с cursor-пагинацией и догрузкой,
-  превью через `RemoteImage`, тап → полноэкранный QuickLook (`GetTempDownloadUrl` → download),
+  превью через `RemoteImage`, тап → полноэкранный QuickLook (`GetTempDownloadUrl` → download)
+  **со свайпом влево/вправо** ([[#Свайп-просмотрщик]]),
   загрузка через кастомный `DeviceAssetPickerScreen` (сетка медиатеки устройства как в Галерее, бейджи
   «уже в облаке» из `CloudPresenceTracker`; в Фото/Видео уже загруженные нельзя выбрать повторно)
   → `DeviceAssetResource.originalData` → `GetUploadUrl(CLOUD_FILE)` → HTTP. **Мультивыбор** в Фото/Видео:
@@ -316,7 +318,29 @@ BarkCloud/
   pull-to-refresh `.barkRefreshable` → `reload(showSpinner: false)` — флаг отключает подъём
   `isLoading` при потягивании, чтобы не свернуть `List` (с жестом и лисой) в полноэкранный `ProgressView`; программные обновления
   после CRUD зовут `reload()` со спиннером (и на пустой папке через `ScrollView`))
-  и «Общие файлы» → `ComingSoonScreen` (на бэкенде нет API расшаривания — заглушка «скоро»).
+  и «Общий доступ» → `SharedHubScreen`.
+  **Мультивыбор в облачном браузере** (`CloudBrowserViewModel`/`CloudBrowserScreen`): кнопка
+  «Выбрать» в тулбаре включает режим выбора (галочки `checkmark.circle`, навигация по папкам и
+  открытие файлов отключены, можно выделять и **файлы, и папки** — `selectedFiles`/`selectedDirs`).
+  Нижняя панель (`safeAreaInset`, фон `.bar`): «Переместить» (`CloudMovePicker` → `moveSelected`)
+  и «Удалить» (подтверждение поповером → `deleteSelected`, батч последовательно с прогрессом
+  done/total, без undo — зеркалит `MediaGridViewModel`).
+- **Общий доступ** (`Features/Shared/SharedHubScreen.swift`) — хаб с **тремя** сегментами:
+  - **Мои публичные** (`MySharesListView`/`MySharesViewModel`) — постоянные публичные ссылки
+    (`CloudApi.ListMyShares`, копировать/отозвать). См. [[share-links-client-guide]].
+  - **Я поделился** (`MyOutgoingSharesListView`/`MyOutgoingSharesViewModel`) — файлы, которыми я
+    поделился с конкретными пользователями (приватные гранты), и с кем. Источник —
+    `CloudApi.ListMyOutgoingSharesAll` (плоский список грантов с `UploadFileInfo`, курсор-пагинация);
+    VM **группирует по файлу** (`SharedByMeGroup` — порядок по первому появлению, raw отсортирован от
+    свежих) и резолвит получателей через `UserRepository.getUser`. Карточка: превью + имя файла +
+    чипсы получателей (`FlowLayout`) с крестиком — отзыв гранта `revokeUserShare` (оптимистично).
+    Зеркалит веб-таб `SharedPage.tsx` (`/api/shared/i-shared`).
+  - **Мне доступны** (`SharedWithMeListView`/`SharedWithMeViewModel`) — входящие гранты
+    (`ListSharedWithMe`, скачивание через `GetSharedFileDownloadUrl` → `UIDocumentPicker`).
+  VM каждого таба создаётся/грузится лениво при первом переключении. Выдача гранта на файл —
+  `ShareWithUserSheet` (поиск пользователя), управление одним файлом — `OutgoingSharesSheet`;
+  обе вызываются из контекстного меню (`CloudBrowserScreen`/сетки). Бэкенд: новый RPC
+  `ListMyOutgoingSharesAll` + фича `Features/Cloud/ListMyOutgoingSharesAll` в сервисе Files.
 - **Контекстное меню по удержанию на сетках** (`Features/Shared/ShakeContextMenu.swift`) — кастомный
   `ViewModifier` `.shakeContextMenu(isActive:menu:)` вместо нативного `.contextMenu`: по
   `.onLongPressGesture(minimumDuration:0.4)` ячейка увеличивается (`scaleEffect 1.09`), «трясётся»
@@ -346,6 +370,37 @@ BarkCloud/
   На Галерее устройства у `PHAsset` нет `file_id` — `GalleryViewModel.ensureCloudFileID(for:)` резолвит его
   по SHA256 (`cachedSHA256` → `CloudApi.CheckFileHash`, одиночный), а при отсутствии заливает оригинал
   (дедуп по хешу) в авто-папку «Недавно загруженные»; на время резолва — оверлей `isUploading`.
+
+### Свайп-просмотрщик
+
+`Features/Shared/MediaPagerScreen.swift` — полноэкранный просмотрщик с листанием
+влево/вправо между файлами коллекции. Применён в **Альбомы-таб** (`MediaGridScreen`
+Фото/Видео), **Галерее** устройства (`GalleryScreen`) и **содержимом альбома**
+(`AlbumDetailScreen`) — заменил одиночные `RemoteFilePreviewScreen`/`DeviceMediaViewer`
+(последний удалён).
+
+- **Почему многоэлементный `QLPreviewController`, а не внешний пейджер:** внутренний
+  скролл-вью QuickLook (зум) перехватывает горизонтальные жесты, поэтому обёртка в
+  `TabView`/`ScrollView(.paging)` не листала бы. QL сам реализует свайп между
+  элементами + нижнюю ленту превью + зум.
+- **Ленивый резолв URL:** `MediaPager` (UIViewControllerRepresentable) принимает `ids`
+  + `startIndex` + `resolve: (String) async -> URL?`. `Coordinator` (dataSource) на
+  каждый запрос элемента резолвит его и соседей (`ensure`), для нерезолвленных отдаёт
+  прозрачную 1×1 PNG-заглушку; когда URL текущего готов — `refreshCurrentPreviewItem()`.
+  Стартовый элемент применяется один раз и в `make`, и в `update` (QL иногда игнорит
+  ранний `currentPreviewItemIndex`).
+- **Резолверы:** облако — `MediaPagerResolver.cloud(transfer:cache:)` (скачивает оригинал
+  через дисковый кеш, тот же путь, что `RemoteFilePreviewScreen`); устройство —
+  `GalleryScreen.deviceResolve` (фото → `exportPhotoToTempFile`, видео → `videoFileURL`).
+- **Пагинация:** опциональный `loadMore: () async -> [String]` — при подходе к концу
+  (`index >= ids.count - 2`) `Coordinator` догружает следующую страницу через VM
+  (`loadMoreIfNeeded`), дописывает `ids` и зовёт `reloadData()` с восстановлением текущей
+  позиции — листается до конца без выхода к сетке. Передан в Альбомы-таб и содержимое
+  альбома; в Галерее устройства `nil` (медиатека грузится целиком, пагинации нет).
+- **Ограничения:** видео играет в QuickLook **без автостарта** (у `QLPreviewController`
+  нет API автозапуска; ковыряние внутренней иерархии вью отвергнуто как хрупкое/риск App
+  Store). При первом открытии не-кешированного файла короткий пустой кадр, пока идёт
+  докачка; неуспешный резолв оставляет прозрачную заглушку.
 
 ### PendingDelete
 
@@ -447,6 +502,7 @@ BarkCloud — self-hosted, поэтому адреса микросервисо�
   локаль устройства (через `Locale.autoupdatingCurrent`), отдельного кода не нужно.
 - **Выбор в настройках (live, без перезапуска)** — Настройки → Приложение
   (`AppSettingsScreen`), новая `Section` «Язык»: 4 строки (`AppLanguage.allCases`),
+  в начале строки — эмодзи-флаг (`AppLanguage.flag`: 🌐 системный, 🇷🇺/🇬🇧/🇩🇪),
   тап → `env.language.setLanguage(_:)`, текущий помечен `checkmark`.
 - **Компоненты**:
   - `Data/Cache/LanguageSettings.swift` — `enum AppLanguage { system, ru, en, de }`

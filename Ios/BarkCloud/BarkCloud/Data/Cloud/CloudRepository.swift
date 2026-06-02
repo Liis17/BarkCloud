@@ -195,6 +195,32 @@ final class CloudRepository: Sendable {
         _ = try await stub.revokeUserShare(req)
     }
 
+    /// Все мои исходящие гранты — файлы, которыми я поделился с пользователями
+    /// (плоский список грант-за-грантом, от свежих к старым). Группировку по
+    /// файлу для таба «Я поделился» делает вызывающий VM. Курсорная пагинация:
+    /// `cursorSharedAt = nil` — первая страница.
+    func listMyOutgoingSharesAll(
+        limit: Int = 60,
+        cursorSharedAt: Date? = nil,
+        cursorGrantID: String = ""
+    ) async throws -> OutgoingSharesAllPage {
+        let stub = try await grpc.cloudStub()
+        var req = Barkcloud_Files_ListMyOutgoingSharesAllRequest()
+        req.limit = Int32(max(1, min(200, limit)))
+        if let cursorSharedAt {
+            req.cursorSharedAt = Google_Protobuf_Timestamp(date: cursorSharedAt)
+        }
+        if !cursorGrantID.isEmpty {
+            req.cursorGrantID = cursorGrantID
+        }
+        let resp = try await stub.listMyOutgoingSharesAll(req)
+        return OutgoingSharesAllPage(
+            items: resp.items.map(OutgoingShareFull.init),
+            nextCursorSharedAt: resp.hasNextCursorSharedAt ? resp.nextCursorSharedAt.date : nil,
+            nextCursorGrantID: resp.nextCursorGrantID
+        )
+    }
+
     // MARK: - Каталоги
 
     /// Содержимое папки с полной информацией о файлах (превью/размеры). `""` = корень.

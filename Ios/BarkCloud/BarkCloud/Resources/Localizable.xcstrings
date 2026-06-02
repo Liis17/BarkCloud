@@ -3771,19 +3771,19 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Скоро"
+            "value" : "Публичные ссылки и доступ для пользователей"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Soon"
+            "value" : "Public links and user access"
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Demnächst"
+            "value" : "Öffentliche Links und Nutzerzugriff"
           }
         }
       }
@@ -8865,6 +8865,144 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Deutsch"
+          }
+        }
+      }
+    },
+    "shared_tab_ishared" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Я поделился"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shared by me"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Von mir geteilt"
+          }
+        }
+      }
+    },
+    "shared_ishared_empty_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Вы пока ни с кем не делились"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You haven't shared anything yet"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sie haben noch nichts geteilt"
+          }
+        }
+      }
+    },
+    "shared_ishared_empty_hint" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Откройте меню файла и выберите «Поделиться с пользователем» — он появится здесь."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open a file’s menu and choose “Share with user” — it will appear here."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Öffnen Sie das Menü einer Datei und wählen Sie „Mit Nutzer teilen“ — sie erscheint hier."
+          }
+        }
+      }
+    },
+    "shared_ishared_recipients" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Доступ у:"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shared with:"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geteilt mit:"
+          }
+        }
+      }
+    },
+    "cloud_delete_selected_message" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Удалить выбранные (%lld)?"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete selected (%lld)?"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ausgewählte (%lld) löschen?"
+          }
+        }
+      }
+    },
+    "cloud_batch_failed" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не удалось выполнить операцию"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Operation failed"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vorgang fehlgeschlagen"
           }
         }
       }

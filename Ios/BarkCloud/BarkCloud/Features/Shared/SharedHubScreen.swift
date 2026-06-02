@@ -1,19 +1,21 @@
 import SwiftUI
 import UIKit
 
-/// Экран «Общий доступ» с двумя табами: «Мои публичные» и «Мне доступны».
-/// Открывается из toolbar `FilesRootScreen` → `NavigationLink`. На этапе 1
-/// «Мне доступны» — заглушка; будет реализована в этапе 3.
+/// Экран «Общий доступ» с тремя табами: «Мои публичные», «Я поделился» и
+/// «Мне доступны». Открывается из toolbar `FilesRootScreen` → `NavigationLink`.
+/// VM каждого таба создаётся и грузится лениво при первом переключении на него.
 struct SharedHubScreen: View {
     @Environment(AppEnvironment.self) private var env
     @State private var tab: SharedHubTab = .myPublic
     @State private var mySharesVM: MySharesViewModel?
+    @State private var iSharedVM: MyOutgoingSharesViewModel?
     @State private var sharedWithMeVM: SharedWithMeViewModel?
 
     var body: some View {
         VStack(spacing: 0) {
             Picker("", selection: $tab) {
                 Text(String(localized: "shared_tab_public")).tag(SharedHubTab.myPublic)
+                Text(String(localized: "shared_tab_ishared")).tag(SharedHubTab.iShared)
                 Text(String(localized: "shared_tab_with_me")).tag(SharedHubTab.sharedWithMe)
             }
             .pickerStyle(.segmented)
@@ -25,6 +27,12 @@ struct SharedHubScreen: View {
             case .myPublic:
                 if let mySharesVM {
                     MySharesListView(vm: mySharesVM)
+                } else {
+                    ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+            case .iShared:
+                if let iSharedVM {
+                    MyOutgoingSharesListView(vm: iSharedVM)
                 } else {
                     ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
@@ -45,9 +53,18 @@ struct SharedHubScreen: View {
             await mySharesVM?.loadIfNeeded()
         }
         .task(id: tab) {
-            // Лениво создаём и грузим «Мне доступны» только при первом переключении
-            // на этот таб — не тратим запрос если пользователь не зайдёт.
-            if tab == .sharedWithMe {
+            // Лениво создаём и грузим VM таба только при первом переключении на
+            // него — не тратим запрос, если пользователь туда не зайдёт.
+            switch tab {
+            case .iShared:
+                if iSharedVM == nil {
+                    iSharedVM = MyOutgoingSharesViewModel(
+                        cloud: env.cloudRepository,
+                        users: env.userRepository
+                    )
+                }
+                await iSharedVM?.loadIfNeeded()
+            case .sharedWithMe:
                 if sharedWithMeVM == nil {
                     sharedWithMeVM = SharedWithMeViewModel(
                         cloud: env.cloudRepository,
@@ -55,6 +72,8 @@ struct SharedHubScreen: View {
                     )
                 }
                 await sharedWithMeVM?.loadIfNeeded()
+            case .myPublic:
+                break
             }
         }
     }
@@ -62,5 +81,6 @@ struct SharedHubScreen: View {
 
 enum SharedHubTab: Hashable {
     case myPublic
+    case iShared
     case sharedWithMe
 }

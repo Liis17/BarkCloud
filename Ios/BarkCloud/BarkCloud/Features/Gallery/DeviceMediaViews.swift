@@ -23,13 +23,18 @@ final class DeviceMediaImageLoader: @unchecked Sendable {
         }
     }
 
-    func playerItem(for asset: PHAsset) async -> AVPlayerItem? {
+    /// URL файла видео-ассета для QuickLook (свайп-просмотрщик). Для локальных
+    /// видео `requestAVAsset` отдаёт `AVURLAsset` с прямым путём в контейнере
+    /// медиатеки — копировать оригинал на диск не нужно (тяжёлые файлы не гоняем).
+    /// `nil`, если ассет не является `AVURLAsset` (напр. slow-mo/композиция) —
+    /// тогда просмотрщик покажет заглушку.
+    func videoFileURL(for asset: PHAsset) async -> URL? {
         await withCheckedContinuation { cont in
             let options = PHVideoRequestOptions()
             options.isNetworkAccessAllowed = true
             options.deliveryMode = .automatic
-            manager.requestPlayerItem(forVideo: asset, options: options) { item, _ in
-                cont.resume(returning: item)
+            manager.requestAVAsset(forVideo: asset, options: options) { avAsset, _, _ in
+                cont.resume(returning: (avAsset as? AVURLAsset)?.url)
             }
         }
     }
@@ -132,64 +137,3 @@ struct DeviceMediaThumb: View {
     }
 }
 
-/// Полноэкранный просмотр ассета устройства: фото — через QuickLook
-/// (`FilePreviewController`), что даёт нативные фишки iOS (выделение объекта,
-/// Live Text, зум, шаринг) — как в просмотрщике Альбомов; видео — плеер.
-struct DeviceMediaViewer: View {
-    let asset: PHAsset
-
-    @State private var photoURL: URL?
-    @State private var player: AVPlayer?
-    @State private var failed = false
-
-    var body: some View {
-        Group {
-            if asset.mediaType == .video {
-                ZStack {
-                    Color.black.ignoresSafeArea()
-                    if let player {
-                        VideoPlayer(player: player).ignoresSafeArea()
-                    } else {
-                        statusView
-                    }
-                }
-            } else {
-                if let photoURL {
-                    FilePreviewController(fileURL: photoURL)
-                        .ignoresSafeArea()
-                } else {
-                    ZStack {
-                        Color.black.ignoresSafeArea()
-                        statusView
-                    }
-                }
-            }
-        }
-        .task { await load() }
-    }
-
-    @ViewBuilder
-    private var statusView: some View {
-        if failed {
-            ContentUnavailableView(String(localized: "preview_failed"), systemImage: "exclamationmark.triangle")
-                .foregroundStyle(.white)
-        } else {
-            ProgressView().tint(.white)
-        }
-    }
-
-    private func load() async {
-        if asset.mediaType == .video {
-            if let item = await DeviceMediaImageLoader.shared.playerItem(for: asset) {
-                let player = AVPlayer(playerItem: item)
-                self.player = player
-                player.play()
-            } else {
-                failed = true
-            }
-        } else {
-            photoURL = await DeviceMediaImageLoader.shared.exportPhotoToTempFile(for: asset)
-            if photoURL == nil { failed = true }
-        }
-    }
-}
