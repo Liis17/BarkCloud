@@ -46,7 +46,7 @@ Parent: [[index]] · See also: [[api/users-api]] · [[modules/shared-queue]]
 - `Contexts/UsersContext.cs`, `UsersContextFactory.cs`
 - `Services/UsersStorage.cs` (+ `ChangeBio`, `SearchUsers`, `DeleteUser`, `GetOrCreatePrivacy`, `UpdatePrivacy`)
 - `Services/DevicesStorage.cs` (+ `SetFirebaseToken`)
-- `Migrations/20260518171439_InitialCreate.cs`, `20260524215052_AddBioPrivacyFirebaseToken.cs`
+- `Migrations/20260518171439_InitialCreate.cs`, `20260524215052_AddBioPrivacyFirebaseToken.cs`, `20260602120000_AddUserLookupIndexes.cs` (raw-SQL индексы производительности: функциональные `lower("Username")`/`lower("Email")` под точный логин + триграммные GIN `pg_trgm` на `lower(Username/FirstName/LastName)` под подстрочный `SearchUsers` — ранее seq-scan)
 
 ## Features (реализованные)
 
