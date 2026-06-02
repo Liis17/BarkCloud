@@ -68,7 +68,7 @@ BarkCloud/
 │   ├── AppTypography.swift         Material 3 size scale через Font.system(size:weight:)
 │   └── BarkCloudTheme.swift        ViewModifier с .tint(AppColors.accent)
 ├── Resources/
-│   └── Localizable.xcstrings       Все строки из Android strings.xml, sourceLanguage = "ru"
+│   └── Localizable.xcstrings       Все строки, sourceLanguage = "ru"; локализации ru/en/de (см. [[#Локализация]])
 ├── Generated/Proto/                сгенерённые стабы: {identity,users,files,shared}_api.{pb,grpc}.swift
 └── Assets.xcassets/                AccentColor, AppIcon (от стартера)
 ```
@@ -89,7 +89,7 @@ BarkCloud/
 | `SWIFT_APPROACHABLE_CONCURRENCY` | `YES` |
 | `LOCALIZATION_PREFERS_STRING_CATALOGS` | `YES` |
 | `ENABLE_APP_SANDBOX` | `YES` |
-| `knownRegions` | `en, ru, Base` |
+| `knownRegions` | `en, ru, de, Base` |
 
 ## Зависимости (SPM, подключены)
 
@@ -420,6 +420,36 @@ BarkCloud — self-hosted, поэтому адреса микросервисо�
 `AppLockScreen`, когда `env.appLock.shouldShowLock` (`isEnabled && !isUnlocked`). `BarkCloudApp`
 в `onChange(of: scenePhase)` зовёт `appLock.handleScenePhase(phase)` — этим и реализована
 30-секундная задержка между сворачиваниями.
+
+### Локализация
+
+Три языка интерфейса: **ru** (sourceLanguage), **en**, **de**. Все строки в
+`Resources/Localizable.xcstrings` переведены на все три (≈385 ключей; 4 чисто
+символьных ключа — `""`, `..`, `@%@`, `%lld` — без переводов, рендерятся как есть).
+`knownRegions` в pbxproj = `en, ru, de, Base`, `developmentRegion = en` (фолбэк).
+
+- **Подхват от системы** — по умолчанию: при `Язык = Системный` iOS сам выбирает
+  локаль устройства (через `Locale.autoupdatingCurrent`), отдельного кода не нужно.
+- **Выбор в настройках (live, без перезапуска)** — Настройки → Приложение
+  (`AppSettingsScreen`), новая `Section` «Язык»: 4 строки (`AppLanguage.allCases`),
+  тап → `env.language.setLanguage(_:)`, текущий помечен `checkmark`.
+- **Компоненты**:
+  - `Data/Cache/LanguageSettings.swift` — `enum AppLanguage { system, ru, en, de }`
+    (`localeIdentifier`, `displayNameKey`) + UserDefaults-обёртка (ключ
+    `BarkCloud.app.language`, образец — `AutoUploadSettings`).
+  - `App/Bundle+Language.swift` — подмена класса `Bundle.main` на `LocalizedBundle`
+    (`object_setClass` + associated object с `.lproj`-бандлом), переопределяет
+    `localizedString(forKey:value:table:)`. **Зачем:** SwiftUI `Text("key")` реагирует
+    на `.environment(\.locale,…)`, но программные `String(localized:)`/`NSLocalizedString`
+    environment не видят — их перенаправляет подмена бандла. `.system` → подмена снята.
+  - `Features/Settings/LanguageManager.swift` — `@MainActor @Observable` (живёт в
+    `AppEnvironment`): `selected`, `locale`, `setLanguage(_:)`, `reset()`; в `init`
+    применяет язык к бандлу. Образец — `AppLockManager`.
+- **Внедрение**: `AppEnvironment` создаёт `languageSettings`/`language` и зовёт
+  `language.reset()` в `resetLocalState()` (паритет «свежей установки» → системный язык).
+  `BarkCloudApp` вешает `.environment(\.locale, env.language.locale)` на `RootView` —
+  корневой источник локали для всех `Text`/форматтеров (перерисовка на месте, навигация
+  не сбрасывается).
 
 **Важно для превью/скачивания**: файловый сервис на `:7025` с self-signed TLS — превью и оригиналы
 грузятся через `InsecureHTTP.session` (`AsyncImage` их бы отверг), поэтому в сетках используется
