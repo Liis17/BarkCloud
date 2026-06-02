@@ -1,0 +1,383 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="Common_Settings" xml:space="preserve">
+    <value>Settings</value>
+  </data>
+  <data name="Common_Back" xml:space="preserve">
+    <value>Back</value>
+  </data>
+  <data name="Common_Next" xml:space="preserve">
+    <value>Next</value>
+  </data>
+  <data name="Common_Cancel" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
+  <data name="Common_Finish" xml:space="preserve">
+    <value>Finish</value>
+  </data>
+  <data name="Common_Browse" xml:space="preserve">
+    <value>Browse…</value>
+  </data>
+  <data name="Common_Language" xml:space="preserve">
+    <value>Language</value>
+  </data>
+  <data name="Common_ServerHost" xml:space="preserve">
+    <value>Server (host or IP)</value>
+  </data>
+  <data name="Common_Ports" xml:space="preserve">
+    <value>Service ports</value>
+  </data>
+  <data name="Common_AcceptCert" xml:space="preserve">
+    <value>Trust self-signed certificate</value>
+  </data>
+  <data name="Common_DriveName" xml:space="preserve">
+    <value>Drive name</value>
+  </data>
+  <data name="Common_DriveLetter" xml:space="preserve">
+    <value>Drive letter</value>
+  </data>
+  <data name="Common_AutostartApp" xml:space="preserve">
+    <value>Application (tray icon)</value>
+  </data>
+  <data name="Common_AutostartEngine" xml:space="preserve">
+    <value>Engine (mount drive at sign-in)</value>
+  </data>
+  <data name="Common_ErrorFmt" xml:space="preserve">
+    <value>Error: {0}</value>
+  </data>
+  <data name="Common_EngineNotRunning" xml:space="preserve">
+    <value>Engine not running.</value>
+  </data>
+  <data name="Common_EnterServer" xml:space="preserve">
+    <value>Enter the server address.</value>
+  </data>
+  <data name="Common_BadPortIdentity" xml:space="preserve">
+    <value>Invalid Identity port (1–65535).</value>
+  </data>
+  <data name="Common_BadPortFiles" xml:space="preserve">
+    <value>Invalid Files port (1–65535).</value>
+  </data>
+  <data name="Common_BadPortUsers" xml:space="preserve">
+    <value>Invalid Users port (1–65535).</value>
+  </data>
+  <data name="Common_SaveAddressFailedFmt" xml:space="preserve">
+    <value>Failed to save address: {0}</value>
+  </data>
+  <data name="Common_DriveNameRule" xml:space="preserve">
+    <value>Drive name: up to 32 characters, without \ / : * ? " &lt; &gt; |</value>
+  </data>
+  <data name="Common_CacheUnavailableFmt" xml:space="preserve">
+    <value>Cache folder unavailable: {0}</value>
+  </data>
+  <data name="Common_SelectCacheFolderTitle" xml:space="preserve">
+    <value>Select a folder for the drive cache</value>
+  </data>
+  <data name="Common_SelectCache" xml:space="preserve">
+    <value>Select a cache folder.</value>
+  </data>
+  <data name="User_LoggedIn" xml:space="preserve">
+    <value>Signed in</value>
+  </data>
+  <data name="User_NotLoggedIn" xml:space="preserve">
+    <value>Not signed in</value>
+  </data>
+  <data name="Units_Bytes" xml:space="preserve">
+    <value>B,KB,MB,GB,TB</value>
+  </data>
+  <data name="Main_EngineWarningTitle" xml:space="preserve">
+    <value>Engine not running</value>
+  </data>
+  <data name="Main_EngineWarningText" xml:space="preserve">
+    <value>The BarkCloud Drive background process was not found.</value>
+  </data>
+  <data name="Main_StartEngine" xml:space="preserve">
+    <value>Start engine</value>
+  </data>
+  <data name="Main_Storage" xml:space="preserve">
+    <value>Storage</value>
+  </data>
+  <data name="Main_EngineUnavailableFmt" xml:space="preserve">
+    <value>Engine unavailable: {0}</value>
+  </data>
+  <data name="Main_NoFreeLetter" xml:space="preserve">
+    <value>No free drive letter available to mount.</value>
+  </data>
+  <data name="Main_MountErrorFmt" xml:space="preserve">
+    <value>Mount error: {0}</value>
+  </data>
+  <data name="Main_ServerFmt" xml:space="preserve">
+    <value>Server: {0}</value>
+  </data>
+  <data name="Main_StorageUsageFmt" xml:space="preserve">
+    <value>{0} of {1}</value>
+  </data>
+  <data name="Main_DriveMountedFmt" xml:space="preserve">
+    <value>Drive {0}: mounted ({1})</value>
+  </data>
+  <data name="Main_DriveNotMounted" xml:space="preserve">
+    <value>Drive not mounted</value>
+  </data>
+  <data name="Main_SyncFmt" xml:space="preserve">
+    <value>Sync: {0}</value>
+  </data>
+  <data name="Tray_Open" xml:space="preserve">
+    <value>Open</value>
+  </data>
+  <data name="Tray_Mount" xml:space="preserve">
+    <value>Mount</value>
+  </data>
+  <data name="Tray_Unmount" xml:space="preserve">
+    <value>Unmount</value>
+  </data>
+  <data name="Tray_Exit" xml:space="preserve">
+    <value>Exit application</value>
+  </data>
+  <data name="Wizard_Title" xml:space="preserve">
+    <value>BarkCloud Drive Setup</value>
+  </data>
+  <data name="Wizard_Step1" xml:space="preserve">
+    <value>Step 1 of 5 · Server address</value>
+  </data>
+  <data name="Wizard_ServerPrompt" xml:space="preserve">
+    <value>Your BarkCloud server address:</value>
+  </data>
+  <data name="Wizard_Step2" xml:space="preserve">
+    <value>Step 2 of 5 · Sign in</value>
+  </data>
+  <data name="Wizard_LoginPlaceholder" xml:space="preserve">
+    <value>Username or email</value>
+  </data>
+  <data name="Wizard_PasswordPlaceholder" xml:space="preserve">
+    <value>Password</value>
+  </data>
+  <data name="Wizard_OtpPlaceholder" xml:space="preserve">
+    <value>OTP code (if 2FA is enabled)</value>
+  </data>
+  <data name="Wizard_Step3" xml:space="preserve">
+    <value>Step 3 of 5 · Drive</value>
+  </data>
+  <data name="Wizard_Step4" xml:space="preserve">
+    <value>Step 4 of 5 · Cache folder</value>
+  </data>
+  <data name="Wizard_CachePrompt" xml:space="preserve">
+    <value>Where to store downloaded file contents:</value>
+  </data>
+  <data name="Wizard_Step5" xml:space="preserve">
+    <value>Step 5 of 5 · Autostart</value>
+  </data>
+  <data name="Wizard_AutostartPrompt" xml:space="preserve">
+    <value>Launch at Windows sign-in:</value>
+  </data>
+  <data name="Wizard_AlreadyLoggedIn" xml:space="preserve">
+    <value>You are already signed in. Click “Next”.</value>
+  </data>
+  <data name="Wizard_LoggedInAsFmt" xml:space="preserve">
+    <value>Signed in as {0}. Click “Next”.</value>
+  </data>
+  <data name="Wizard_EnterLoginPassword" xml:space="preserve">
+    <value>Enter username and password.</value>
+  </data>
+  <data name="Wizard_LoginFailed" xml:space="preserve">
+    <value>Sign-in failed.</value>
+  </data>
+  <data name="Wizard_EnterDriveName" xml:space="preserve">
+    <value>Enter a drive name.</value>
+  </data>
+  <data name="Wizard_SelectLetter" xml:space="preserve">
+    <value>Select a drive letter.</value>
+  </data>
+  <data name="Wizard_EngineUnavailableAfterServer" xml:space="preserve">
+    <value>Engine unavailable after changing the server address.</value>
+  </data>
+  <data name="Wizard_CreateDriveFailed" xml:space="preserve">
+    <value>Failed to create the drive.</value>
+  </data>
+  <data name="Wizard_CreateDriveErrorFmt" xml:space="preserve">
+    <value>Drive creation error: {0}</value>
+  </data>
+  <data name="Settings_Account" xml:space="preserve">
+    <value>Account</value>
+  </data>
+  <data name="Settings_Logout" xml:space="preserve">
+    <value>Sign out</value>
+  </data>
+  <data name="Settings_Server" xml:space="preserve">
+    <value>Server</value>
+  </data>
+  <data name="Settings_ApplyAddress" xml:space="preserve">
+    <value>Apply address</value>
+  </data>
+  <data name="Settings_ApplyAddressHint" xml:space="preserve">
+    <value>The engine will restart; changing the server may require signing in again.</value>
+  </data>
+  <data name="Settings_Drive" xml:space="preserve">
+    <value>Drive</value>
+  </data>
+  <data name="Settings_Rename" xml:space="preserve">
+    <value>Rename</value>
+  </data>
+  <data name="Settings_ChangeLetter" xml:space="preserve">
+    <value>Change letter</value>
+  </data>
+  <data name="Settings_DriveHint" xml:space="preserve">
+    <value>Renaming and changing the letter briefly reconnect the drive.</value>
+  </data>
+  <data name="Settings_Cache" xml:space="preserve">
+    <value>Cache folder</value>
+  </data>
+  <data name="Settings_Autostart" xml:space="preserve">
+    <value>Autostart (at Windows sign-in)</value>
+  </data>
+  <data name="Settings_Engine" xml:space="preserve">
+    <value>Engine</value>
+  </data>
+  <data name="Settings_RestartEngine" xml:space="preserve">
+    <value>Restart engine</value>
+  </data>
+  <data name="Settings_LogoutErrorFmt" xml:space="preserve">
+    <value>Sign-out error: {0}</value>
+  </data>
+  <data name="Settings_ApplyingAddress" xml:space="preserve">
+    <value>Applying address, restarting engine…</value>
+  </data>
+  <data name="Settings_EngineUnavailableAfterServer" xml:space="preserve">
+    <value>Engine unavailable after changing the address.</value>
+  </data>
+  <data name="Settings_AddressSavedWizard" xml:space="preserve">
+    <value>Address saved. Sign-in required — the wizard will open.</value>
+  </data>
+  <data name="Settings_AddressUpdated" xml:space="preserve">
+    <value>Server address updated.</value>
+  </data>
+  <data name="Settings_Mounted" xml:space="preserve">
+    <value>Mounted</value>
+  </data>
+  <data name="Settings_Unmounted" xml:space="preserve">
+    <value>Unmounted</value>
+  </data>
+  <data name="Settings_DriveRenamed" xml:space="preserve">
+    <value>Drive renamed</value>
+  </data>
+  <data name="Settings_NameSaved" xml:space="preserve">
+    <value>Name saved (mount the drive)</value>
+  </data>
+  <data name="Settings_LetterChangedFmt" xml:space="preserve">
+    <value>Letter changed to {0}:</value>
+  </data>
+  <data name="Settings_LetterSaved" xml:space="preserve">
+    <value>Letter saved (mount the drive)</value>
+  </data>
+  <data name="Settings_CacheUpdated" xml:space="preserve">
+    <value>Cache folder updated. Previously downloaded content remains in the old folder.</value>
+  </data>
+  <data name="Settings_CacheChangeFailedFmt" xml:space="preserve">
+    <value>Failed to change the cache folder: {0}</value>
+  </data>
+  <data name="Settings_RestartingEngine" xml:space="preserve">
+    <value>Restarting engine…</value>
+  </data>
+  <data name="Settings_EngineUnavailableAfterRestart" xml:space="preserve">
+    <value>Engine unavailable after restart.</value>
+  </data>
+  <data name="Settings_EngineRestarted" xml:space="preserve">
+    <value>Engine restarted.</value>
+  </data>
+  <data name="Settings_AutostartUpdated" xml:space="preserve">
+    <value>Autostart updated.</value>
+  </data>
+  <data name="Eng_LoginRequired" xml:space="preserve">
+    <value>Enter username and password</value>
+  </data>
+  <data name="Eng_AuthSuccess" xml:space="preserve">
+    <value>Signed in successfully</value>
+  </data>
+  <data name="Eng_LoggedOut" xml:space="preserve">
+    <value>Signed out</value>
+  </data>
+  <data name="Eng_LoginFirst" xml:space="preserve">
+    <value>Sign in first</value>
+  </data>
+  <data name="Eng_AlreadyMounted" xml:space="preserve">
+    <value>Drive is already mounted</value>
+  </data>
+  <data name="Eng_MountedFmt" xml:space="preserve">
+    <value>Mounted {0}:</value>
+  </data>
+  <data name="Eng_DokanMissing" xml:space="preserve">
+    <value>Dokany driver (dokan2.dll) not found. Install Dokany 2.x — github.com/dokan-dev/dokany/releases (DokanSetup.exe) — and restart.</value>
+  </data>
+  <data name="Eng_NoDriveLetter" xml:space="preserve">
+    <value>No drive letter specified</value>
+  </data>
+  <data name="Eng_RemountedFmt" xml:space="preserve">
+    <value>Remounted {0}: ({1})</value>
+  </data>
+  <data name="Eng_DokanMissingShort" xml:space="preserve">
+    <value>Dokany driver (dokan2.dll) not found. Install Dokany 2.x and restart.</value>
+  </data>
+  <data name="Eng_Unmounted" xml:space="preserve">
+    <value>Unmounted</value>
+  </data>
+  <data name="Eng_EmptyCachePath" xml:space="preserve">
+    <value>Empty cache folder path</value>
+  </data>
+  <data name="Eng_SyncFailedFmt" xml:space="preserve">
+    <value>Failed to save “{0}” to the cloud: {1}</value>
+  </data>
+  <data name="Launcher_ConnectFailed" xml:space="preserve">
+    <value>could not connect to the engine</value>
+  </data>
+  <data name="Launcher_EngineNotFoundFmt" xml:space="preserve">
+    <value>engine not found: {0}</value>
+  </data>
+</root>

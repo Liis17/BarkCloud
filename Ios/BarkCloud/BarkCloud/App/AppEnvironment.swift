@@ -18,6 +18,8 @@ final class AppEnvironment {
     let fileCacheSettings: FileCacheSettings
     let autoUploadSettings: AutoUploadSettings
     let backupManager: BackupManager
+    let languageSettings: LanguageSettings
+    let language: LanguageManager
     let vault: VaultStore
     let biometric: BiometricGate
     let appLockSettings: AppLockSettings
@@ -30,6 +32,10 @@ final class AppEnvironment {
 
     init() {
         self.serverConfig = ServerConfigStore()
+
+        let langSettings = LanguageSettings()
+        self.languageSettings = langSettings
+        self.language = LanguageManager(settings: langSettings)
 
         let session = SessionStore()
         let grpc = GrpcManager(session: session)
@@ -164,6 +170,7 @@ final class AppEnvironment {
         fileCacheSettings.reset()
         appLockSettings.disable()
         vault.removeAll()
+        language.reset()
         serverConfig.reset()
     }
 }
