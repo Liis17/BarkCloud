@@ -152,6 +152,35 @@
 
 Запуск требует драйвера **Dokany 2.x** + бэкенда; адрес — в `Engine/appsettings.json`.
 
+## Локализация (RU + EN + DE)
+
+UI и сообщения статуса/ошибок движка локализованы; легко добавить язык.
+
+- **Ресурсы — в `BarkCloud.Drive.Contracts/Localization/`** (одна точка перевода для App и Engine,
+  оба ссылаются на Contracts): `Strings.resx` — **русский** (нейтральная/базовая культура,
+  `<NeutralLanguage>ru</NeutralLanguage>` в csproj), `Strings.en.resx`, `Strings.de.resx`
+  (сателлитные сборки собираются SDK автоматически). ~110 ключей.
+- **`Loc`** (Contracts): хранит текущий язык **явным полем** (а не `CurrentUICulture` потока —
+  чтобы строки одинаково локализовались на потоках StreamJsonRpc и колбэках Dokany).
+  `Loc.T(key[, args])` для code-behind/Engine; индексатор `Loc.Instance[key]` + `INotifyPropertyChanged`
+  для XAML; `Loc.SetCulture(code)` поднимает `PropertyChanged("Item[]")` → все привязки обновляются
+  **на лету**; `Loc.CurrentCode`.
+- **`Languages`** (Contracts): список `(Code, NativeName)` — `ru/en/de`. `DefaultForSystem()` —
+  авто по языку Windows (ru/de → он же, иначе en). **Добавить язык = +1 запись + `Strings.<code>.resx`.**
+- **App:** markup-расширение `{loc:Tr Key}` (`Localization/TrExtension.cs`) — OneWay-привязка на индексатор.
+  Все XAML-литералы (3 окна) и code-behind-строки заменены на `{loc:Tr …}` / `Loc.T(…)`.
+  `AppSettings.Language` (в `app.json`) хранит выбор; `App.OnStartup` ставит культуру
+  (`settings.Language ?? Languages.DefaultForSystem()`). Селектор языка — в `FirstRunWizard`
+  (шапка, вне нумерации шагов) и в `SettingsWindow` (карточка «Язык», смена сразу).
+- **Engine:** новый IPC-метод `IDriveEngine.SetLanguageAsync(culture)` → `Loc.SetCulture`.
+  App вызывает его сразу после подключения к движку (`EngineLauncher.ConnectAsync` в
+  `MainWindow.EnsureEngineAsync`, т.к. движок мог стартовать с другой культурой) и при каждой смене языка.
+  Локализованы строки в `DriveEngine.cs` (`Eng_*`) и `LastSyncError` в `BarkCloudFileSystem.cs`.
+- **Вне локализации (passthrough):** `DriveEngine.Error(ex)` → `RpcException.Status.Detail` / `ex.Message`
+  (строки бэкенда/.NET, в т.ч. часть `{1}` в `Eng_SyncFailedFmt`); диагностические логи `EngineLog`/`Program.cs`;
+  внутренние/защитные исключения `CloudGateway`/`MountManager` (движок заранее отдаёт локализованный статус).
+- **Ограничение live-смены:** уже показанные сообщения движка — снимок; перелокализуются только последующие.
+
 ## План фаз
 
 1. ~~Core: gRPC-клиенты + refresh-менеджер~~ ← **сделано** (в Engine: TokenManager + авторефреш)

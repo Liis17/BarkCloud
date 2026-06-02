@@ -3,6 +3,7 @@ using System.IO;
 using System.IO.Pipes;
 
 using BarkCloud.Drive.Contracts;
+using BarkCloud.Drive.Contracts.Localization;
 
 using StreamJsonRpc;
 
@@ -30,7 +31,7 @@ internal static class EngineLauncher
             await Task.Delay(500);
         }
 
-        throw new InvalidOperationException("не удалось подключиться к движку");
+        throw new InvalidOperationException(Loc.T("Launcher_ConnectFailed"));
     }
 
     private static async Task<IDriveEngine?> TryConnectAsync(int timeoutMs)
@@ -67,7 +68,7 @@ internal static class EngineLauncher
     {
         var exe = ResolveEnginePath();
         if (!File.Exists(exe))
-            throw new FileNotFoundException($"не найден движок: {exe}");
+            throw new FileNotFoundException(Loc.T("Launcher_EngineNotFoundFmt", exe));
 
         Process.Start(new ProcessStartInfo(exe) { UseShellExecute = false, CreateNoWindow = true });
     }

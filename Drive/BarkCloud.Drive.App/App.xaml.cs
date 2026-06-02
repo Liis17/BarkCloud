@@ -1,6 +1,8 @@
 using System.Threading;
 using System.Windows;
 
+using BarkCloud.Drive.Contracts.Localization;
+
 namespace BarkCloud.Drive.App;
 
 public partial class App : Application
@@ -14,6 +16,9 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+
+        // Язык UI: выбранный пользователем либо авто по языку Windows.
+        Loc.SetCulture(AppSettings.Load().Language ?? Languages.DefaultForSystem());
 
         _mutex = new Mutex(initiallyOwned: true, MutexName, out var isNew);
         if (!isNew)
