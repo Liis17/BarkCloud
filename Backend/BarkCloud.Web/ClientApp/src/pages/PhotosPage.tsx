@@ -21,14 +21,14 @@ function Photo({ m, selecting, checked, onToggle, onOpen, onMenu }: {
   m: MediaItem;
   selecting: boolean;
   checked: boolean;
-  onToggle: (m: MediaItem) => void;
+  onToggle: (shift: boolean) => void;
   onOpen: (m: MediaItem) => void;
   onMenu: (e: React.MouseEvent, m: MediaItem) => void;
 }) {
   return (
-    <div className={'photo' + (checked ? ' checked' : '')} onClick={() => (selecting ? onToggle(m) : onOpen(m))} onContextMenu={(e) => onMenu(e, m)}>
+    <div className={'photo' + (checked ? ' checked' : '')} onClick={(e) => (selecting ? onToggle(e.shiftKey) : onOpen(m))} onContextMenu={(e) => onMenu(e, m)}>
       <MediaThumb media={m} sizes={GRID_SIZES} />
-      <button className="selbox" onClick={(e) => { e.stopPropagation(); onToggle(m); }} title="Выбрать">
+      <button className="selbox" onClick={(e) => { e.stopPropagation(); onToggle(e.shiftKey); }} title="Выбрать">
         {checked ? <Icon.check size={14} /> : null}
       </button>
       {m.kind === 'video' && (
@@ -236,7 +236,7 @@ export function PhotosPage() {
                       m={m}
                       selecting={bulk.active}
                       checked={bulk.isSelected(m.id)}
-                      onToggle={() => bulk.toggle(m.id)}
+                      onToggle={(shift) => bulk.toggle(m.id, shift)}
                       onOpen={() => setLightbox(photos.findIndex((p) => p.id === m.id))}
                       onMenu={actionsCtx.openMenu}
                     />

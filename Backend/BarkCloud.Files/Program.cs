@@ -61,7 +61,10 @@ public class Program
         builder.Services.AddScoped<IAlbumStorage, AlbumStorage>();
         builder.Services.AddScoped<IFavoriteFilesStorage, FavoriteFilesStorage>();
         builder.Services.AddScoped<IShareStorage, ShareStorage>();
+        builder.Services.AddScoped<IFolderShareStorage, FolderShareStorage>();
         builder.Services.AddScoped<IGrantStorage, GrantStorage>();
+        builder.Services.AddScoped<IDirectoryGrantStorage, DirectoryGrantStorage>();
+        builder.Services.AddScoped<FolderGrantAccessService>();
         builder.Services.AddScoped<IFileMetadataStorage, FileMetadataStorage>();
         builder.Services.AddSingleton<ImageCompressor>();
         builder.Services.AddSingleton<VideoThumbnailExtractor>();

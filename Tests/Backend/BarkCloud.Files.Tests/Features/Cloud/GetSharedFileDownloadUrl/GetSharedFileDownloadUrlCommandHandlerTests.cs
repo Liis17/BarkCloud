@@ -1,5 +1,7 @@
+using BarkCloud.Files.Domain;
 using BarkCloud.Files.Features.Cloud.GetSharedFileDownloadUrl;
 using BarkCloud.Files.Persistence;
+using BarkCloud.Files.Services;
 using BarkCloud.Files.Tests._Helpers;
 using BarkCloud.GrpcServer.Settings;
 using BarkCloud.Shared.Exceptions.Files;
@@ -15,9 +17,20 @@ public class GetSharedFileDownloadUrlCommandHandlerTests
     private readonly Mock<IGrantStorage> _grants = new();
     private readonly Mock<IUploadedFilesStorage> _files = new();
     private readonly Mock<ITempFilesStorage> _temp = new();
+    private readonly Mock<IDirectoryGrantStorage> _dirGrants = new();
+    private readonly Mock<ICloudHierarchyStorage> _hierarchy = new();
+
+    public GetSharedFileDownloadUrlCommandHandlerTests()
+    {
+        // По умолчанию у получателя нет грантов на папки (доступ через папку = false).
+        _dirGrants.Setup(s => s.ListByRecipient(It.IsAny<long>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<DirectoryGrant>());
+    }
 
     private GetSharedFileDownloadUrlCommandHandler CreateSut() => new(
-        _grants.Object, _files.Object, _temp.Object,
+        _grants.Object,
+        new FolderGrantAccessService(_dirGrants.Object, _hierarchy.Object),
+        _files.Object, _temp.Object,
         UserContextFactory.Create(RecipientId),
         new RunSettings { Host = "http://localhost", Http1Port = 7026 }, TestConfiguration.Empty());
 

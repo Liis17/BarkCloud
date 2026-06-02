@@ -6,6 +6,8 @@ import { Lightbox } from '../components/media/Lightbox';
 import { Modal } from '../components/ui/Modal';
 import { ConfirmModal } from '../components/ui/ConfirmModal';
 import { PropertiesModal } from '../components/ui/PropertiesModal';
+import { ShareWithUserModal } from '../components/ui/ShareWithUserModal';
+import { MoveToFolderModal } from '../components/ui/MoveToFolderModal';
 import { EmptyState, Loading } from '../components/ui/EmptyState';
 import { useContextMenu, type ContextItem } from '../components/ui/ContextMenu';
 import { SelectionBar } from '../components/ui/SelectionBar';
@@ -16,7 +18,7 @@ import { useDuplicatePrompt } from '../hooks/useDuplicatePrompt';
 import { useSelection } from '../hooks/useSelection';
 import { usePageHeader } from '../hooks/usePageHeader';
 import { apiGet, apiPost, pickFiles, uploadFile, checkDuplicate } from '../lib/api';
-import { createShare } from '../lib/share';
+import { createShare, createFolderShare } from '../lib/share';
 import type { Album, CardFile, DirInfo, Entry, Listing } from '../lib/types';
 
 const ruDate = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -69,7 +71,7 @@ function FileRow({ entry, selected, bulkChecked, onBulkToggle, onSelect, onRenam
   entry: Entry;
   selected: boolean;
   bulkChecked: boolean;
-  onBulkToggle: (e: Entry) => void;
+  onBulkToggle: (e: Entry, shift: boolean) => void;
   onSelect: (e: Entry) => void;
   onRename: (e: Entry) => void;
   onDelete: (e: Entry) => void;
@@ -80,7 +82,12 @@ function FileRow({ entry, selected, bulkChecked, onBulkToggle, onSelect, onRenam
   return (
     <tr className={(selected ? 'selected' : '') + (bulkChecked ? ' checked' : '')} onClick={() => onSelect(entry)} onContextMenu={(e) => onMenu(e, entry)}>
       <td className="selcell" onClick={(e) => e.stopPropagation()}>
-        <input type="checkbox" checked={bulkChecked} onChange={() => onBulkToggle(entry)} />
+        <input
+          type="checkbox"
+          checked={bulkChecked}
+          onChange={() => {}}
+          onClick={(e) => onBulkToggle(entry, e.shiftKey)}
+        />
       </td>
       <td className="name">
         <div className={'file-icon ' + (m?.iconKind || 'doc')}>{m?.ext || 'FILE'}</div>
@@ -213,8 +220,11 @@ export function FilesPage() {
   const [name, setName] = React.useState('');
   const [albums, setAlbums] = React.useState<Album[]>([]);
   const [props, setProps] = React.useState<CardFile | null>(null);
+  const [shareWith, setShareWith] = React.useState<Entry | null>(null);
+  const [shareDirWith, setShareDirWith] = React.useState<DirInfo | null>(null);
   const [confirmDel, setConfirmDel] = React.useState<RenameTarget | null>(null);
   const [bulkConfirm, setBulkConfirm] = React.useState(false);
+  const [bulkMoving, setBulkMoving] = React.useState(false);
   const [toastNode, toast] = useToast();
   const dup = useDuplicatePrompt();
   const { menu, openAt } = useContextMenu();
@@ -359,6 +369,7 @@ export function FilesPage() {
     const out: ContextItem[] = [
       { label: 'Копировать ссылку', icon: 'link', onClick: () => copyLink(entry.fileId) },
       { label: 'Создать публичную ссылку', icon: 'share', onClick: () => createShare(entry.fileId, entry.name, toast) },
+      { label: 'Поделиться с пользователем', icon: 'user', onClick: () => setShareWith(entry) },
       { label: 'Переименовать', icon: 'pencil', onClick: () => startRename(entry, false) },
     ];
     if (isMedia) {
@@ -379,6 +390,8 @@ export function FilesPage() {
   }
   function dirMenu(dir: DirInfo): ContextItem[] {
     return [
+      { label: 'Сделать папку публичной', icon: 'share', onClick: () => createFolderShare(dir.id, dir.name, toast) },
+      { label: 'Поделиться с пользователем', icon: 'user', onClick: () => setShareDirWith(dir) },
       { label: 'Переименовать', icon: 'pencil', onClick: () => startRename(dir, true) },
       { divider: true },
       { label: 'Удалить', icon: 'trash', danger: true, onClick: () => requestDelete(dir, true) },
@@ -426,6 +439,24 @@ export function FilesPage() {
     fsel.clear();
     if (ok) {
       toast(`Перемещено в корзину: ${ok}`);
+      load();
+    }
+  }
+  async function bulkMove(targetDir: string) {
+    const chosen = (listing?.files || []).filter((e) => fsel.has(e.entryId));
+    let ok = 0;
+    for (const e of chosen) {
+      try {
+        await apiPost('/api/cloud/entry/move', { entryId: e.entryId, dir: targetDir });
+        ok++;
+      } catch (err) {
+        toast(`«${e.name}»: ${(err as Error).message}`, 'err');
+      }
+    }
+    setBulkMoving(false);
+    fsel.clear();
+    if (ok) {
+      toast(`Перемещено: ${ok}`);
       load();
     }
   }
@@ -480,6 +511,7 @@ export function FilesPage() {
         count={fsel.count}
         onClear={fsel.clear}
         actions={[
+          { label: 'Переместить', icon: 'folder', onClick: () => setBulkMoving(true) },
           { label: 'Копировать ссылки', icon: 'link', onClick: bulkCopyLinks },
           { label: 'Удалить', icon: 'trash', danger: true, onClick: () => setBulkConfirm(true) },
         ]}
@@ -570,7 +602,7 @@ export function FilesPage() {
                       entry={e}
                       selected={!!sel && sel.entryId === e.entryId}
                       bulkChecked={fsel.has(e.entryId)}
-                      onBulkToggle={(t) => fsel.toggle(t.entryId)}
+                      onBulkToggle={(t, shift) => fsel.select(t.entryId, files.map((f) => f.entryId), shift)}
                       onSelect={setSel}
                       onDownload={download}
                       onRename={(t) => startRename(t, false)}
@@ -656,6 +688,18 @@ export function FilesPage() {
       )}
 
       {props && <PropertiesModal fileId={props.id} fallback={props} onClose={() => setProps(null)} />}
+
+      {shareWith && (
+        <ShareWithUserModal fileId={shareWith.fileId} fileName={shareWith.name} onClose={() => setShareWith(null)} toast={toast} />
+      )}
+
+      {shareDirWith && (
+        <ShareWithUserModal folderId={shareDirWith.id} fileName={shareDirWith.name} onClose={() => setShareDirWith(null)} toast={toast} />
+      )}
+
+      {bulkMoving && (
+        <MoveToFolderModal count={fsel.count} currentDir={currentDir} onPick={bulkMove} onClose={() => setBulkMoving(false)} />
+      )}
 
       {menu}
 

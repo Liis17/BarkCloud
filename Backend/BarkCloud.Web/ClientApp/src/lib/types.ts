@@ -127,15 +127,17 @@ export interface FileMetadata {
   documentPageCount?: number;
 }
 
-/** Публичная ссылка на файл (GET/POST /api/shares). */
+/** Публичная ссылка на файл (/api/shares) или папку (/api/folder-shares). */
 export interface ShareLink {
   id: string;
   token: string;
   url: string;
-  fileId: string;
+  fileId?: string;
+  directoryId?: string;
   name: string;
   createdAt: string | null;
   clickCount: number;
+  kind?: 'file' | 'folder';
 }
 
 /** Ответ курсор-пагинации. */

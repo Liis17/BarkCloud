@@ -56,13 +56,15 @@ public class UserDeletedConsumer(
         var albums = await context.Albums.Where(x => x.OwnerId == userId).ExecuteDeleteAsync();
         var favorites = await context.FavoriteFiles.Where(x => x.OwnerId == userId).ExecuteDeleteAsync();
         var shares = await context.ShareLinks.Where(x => x.OwnerId == userId).ExecuteDeleteAsync();
+        var folderShares = await context.FolderShareLinks.Where(x => x.OwnerId == userId).ExecuteDeleteAsync();
         // Гранты доступа, где пользователь — владелец ИЛИ получатель (не оставляем висящие доступы на/от удалённого).
         var grants = await context.FileGrants.Where(x => x.OwnerId == userId || x.RecipientId == userId).ExecuteDeleteAsync();
+        var dirGrants = await context.DirectoryGrants.Where(x => x.OwnerId == userId || x.RecipientId == userId).ExecuteDeleteAsync();
 
         metrics.Increment("accounts_cleaned_files");
 
         logger.LogInformation(
-            "Данные Files для пользователя {UserId} очищены: блобов откреплено {Files}, записей {Entries}, папок {Dirs}, альбомов {Albums} (элементов {AlbumItems}), избранного {Favorites}, ссылок {Shares}, грантов {Grants}",
-            userId, files.Count, entries, dirs, albums, albumItems, favorites, shares, grants);
+            "Данные Files для пользователя {UserId} очищены: блобов откреплено {Files}, записей {Entries}, папок {Dirs}, альбомов {Albums} (элементов {AlbumItems}), избранного {Favorites}, ссылок {Shares}, публичных папок {FolderShares}, грантов файлов {Grants}, грантов папок {DirGrants}",
+            userId, files.Count, entries, dirs, albums, albumItems, favorites, shares, folderShares, grants, dirGrants);
     }
 }

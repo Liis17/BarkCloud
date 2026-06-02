@@ -18,15 +18,21 @@ namespace BarkCloud.Files.Features.Cloud.DeleteDirectory;
 public class DeleteDirectoryCommandHandler : IRequestHandler<DeleteDirectoryCommand, CloudEmpty>
 {
     private readonly ICloudHierarchyStorage _storage;
+    private readonly IFolderShareStorage _folderShares;
+    private readonly IDirectoryGrantStorage _dirGrants;
     private readonly UserContext _userContext;
     private readonly ILogger<DeleteDirectoryCommandHandler> _logger;
 
     public DeleteDirectoryCommandHandler(
         ICloudHierarchyStorage storage,
+        IFolderShareStorage folderShares,
+        IDirectoryGrantStorage dirGrants,
         UserContext userContext,
         ILogger<DeleteDirectoryCommandHandler> logger)
     {
         _storage = storage;
+        _folderShares = folderShares;
+        _dirGrants = dirGrants;
         _userContext = userContext;
         _logger = logger;
     }
@@ -62,9 +68,14 @@ public class DeleteDirectoryCommandHandler : IRequestHandler<DeleteDirectoryComm
 
         await _storage.SaveChangesAsync(cancellationToken);
 
+        // Снимаем публичность и приватные гранты со всех удаляемых папок поддерева:
+        // публичная страница /f и доступ получателей должны прекратиться немедленно.
+        var removedFolderShares = await _folderShares.RemoveByDirectories(ownerId, subtreeIds, cancellationToken);
+        var removedDirGrants = await _dirGrants.RemoveByDirectories(ownerId, subtreeIds, cancellationToken);
+
         _logger.LogInformation(
-            "Удалена папка {DirectoryId} рекурсивно (директорий: {DirCount}, файлов в корзину: {FileCount}, Owner: {OwnerId})",
-            root.Id, subtree.Count, entries.Count, ownerId);
+            "Удалена папка {DirectoryId} рекурсивно (директорий: {DirCount}, файлов в корзину: {FileCount}, публичных папок снято: {FolderShares}, грантов папок снято: {DirGrants}, Owner: {OwnerId})",
+            root.Id, subtree.Count, entries.Count, removedFolderShares, removedDirGrants, ownerId);
 
         return new CloudEmpty();
     }

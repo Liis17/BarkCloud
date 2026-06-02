@@ -23,14 +23,19 @@ const inputStyle: React.CSSProperties = {
 };
 const hint: React.CSSProperties = { color: 'var(--md-on-surface-variant)', fontSize: 13, margin: '10px 2px 0' };
 
-/** Модалка «Поделиться с пользователем»: поиск получателей и выдача гранта доступа. */
+/**
+ * Модалка «Поделиться с пользователем»: поиск получателей и выдача гранта доступа.
+ * Если передан folderId — выдаётся грант на папку (рекурсивно), иначе на файл.
+ */
 export function ShareWithUserModal({
   fileId,
+  folderId,
   fileName,
   onClose,
   toast,
 }: {
-  fileId: string;
+  fileId?: string;
+  folderId?: string;
   fileName: string;
   onClose: () => void;
   toast: ToastPush;
@@ -62,7 +67,8 @@ export function ShareWithUserModal({
 
   async function share(u: SearchUser) {
     try {
-      await apiPost('/api/shared/grant', { fileId, recipientUserId: u.id });
+      if (folderId) await apiPost('/api/shared/grant-folder', { directoryId: folderId, recipientUserId: u.id });
+      else await apiPost('/api/shared/grant', { fileId, recipientUserId: u.id });
       setShared((prev) => new Set(prev).add(u.id));
       toast(`Доступ выдан: ${u.username || u.firstName || 'пользователь'}`);
     } catch (e) {

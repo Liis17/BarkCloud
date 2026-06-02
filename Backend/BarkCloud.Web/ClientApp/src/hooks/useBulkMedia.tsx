@@ -27,6 +27,9 @@ export function useBulkMedia({ items, albums, toast, onRemoved, onReloadAlbums }
 
   const chosen = React.useCallback(() => items.filter((m) => sel.has(m.id)), [items, sel]);
 
+  // Клик по «галке»/карточке в режиме выбора: Shift тянет диапазон в порядке отображения.
+  const select = React.useCallback((id: string, shift: boolean) => sel.select(id, items.map((m) => m.id), shift), [sel, items]);
+
   async function bulkDelete() {
     const list = chosen();
     let ok = 0;
@@ -108,5 +111,5 @@ export function useBulkMedia({ items, albums, toast, onRemoved, onReloadAlbums }
     </>
   );
 
-  return { isSelected: sel.has, toggle: sel.toggle, active: sel.active, count: sel.count, clear: sel.clear, bar, overlay };
+  return { isSelected: sel.has, toggle: select, active: sel.active, count: sel.count, clear: sel.clear, bar, overlay };
 }

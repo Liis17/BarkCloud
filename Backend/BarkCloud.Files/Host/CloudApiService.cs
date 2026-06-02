@@ -9,6 +9,9 @@ using BarkCloud.Files.Features.Cloud.DeleteUserMedia;
 using BarkCloud.Files.Features.Cloud.EmptyTrash;
 using BarkCloud.Files.Features.Cloud.GetPath;
 using BarkCloud.Files.Features.Cloud.CreateShare;
+using BarkCloud.Files.Features.Cloud.CreateFolderShare;
+using BarkCloud.Files.Features.Cloud.ListMyFolderShares;
+using BarkCloud.Files.Features.Cloud.RevokeFolderShare;
 using BarkCloud.Files.Features.Cloud.ListFavorites;
 using BarkCloud.Files.Features.Cloud.ListMyShares;
 using BarkCloud.Files.Features.Cloud.ListTrash;
@@ -25,7 +28,13 @@ using BarkCloud.Files.Features.Cloud.RestoreFromTrash;
 using BarkCloud.Files.Features.Cloud.RevokeShare;
 using BarkCloud.Files.Features.Cloud.RevokeUserShare;
 using BarkCloud.Files.Features.Cloud.ShareFileWithUser;
+using BarkCloud.Files.Features.Cloud.ShareFolderWithUser;
+using BarkCloud.Files.Features.Cloud.RevokeFolderUserShare;
+using BarkCloud.Files.Features.Cloud.ListMyOutgoingFolderShares;
+using BarkCloud.Files.Features.Cloud.ListSharedFoldersWithMe;
+using BarkCloud.Files.Features.Cloud.ListSharedDirectory;
 using BarkCloud.Files.Features.Cloud.ListMyOutgoingShares;
+using BarkCloud.Files.Features.Cloud.ListMyOutgoingSharesAll;
 using BarkCloud.Files.Features.Cloud.ListSharedWithMe;
 using BarkCloud.Files.Features.Cloud.GetSharedFileDownloadUrl;
 using BarkCloud.Files.Features.Cloud.SetVideoThumbnail;
@@ -349,6 +358,38 @@ public class CloudApiService : CloudApi.CloudApiBase
         return _mediator.Send(new RevokeShareCommand { ShareId = Guid.Parse(request.ShareId) });
     }
 
+    public override Task<FolderShareInfo> CreateFolderShare(CreateFolderShareRequest request, ServerCallContext context)
+    {
+        return _mediator.Send(new CreateFolderShareCommand
+        {
+            DirectoryId = Guid.Parse(request.DirectoryId),
+            Name = request.Name
+        });
+    }
+
+    public override Task<ListMyFolderSharesResponse> ListMyFolderShares(ListMyFolderSharesRequest request, ServerCallContext context)
+    {
+        DateTime? cursorCreatedAt = null;
+        Guid? cursorId = null;
+        if (request.CursorCreatedAt is not null && !string.IsNullOrWhiteSpace(request.CursorFolderShareId))
+        {
+            cursorCreatedAt = request.CursorCreatedAt.ToDateTime();
+            cursorId = Guid.Parse(request.CursorFolderShareId);
+        }
+
+        return _mediator.Send(new ListMyFolderSharesCommand
+        {
+            Limit = request.Limit,
+            CursorCreatedAt = cursorCreatedAt,
+            CursorFolderShareId = cursorId
+        });
+    }
+
+    public override Task<CloudEmpty> RevokeFolderShare(RevokeFolderShareRequest request, ServerCallContext context)
+    {
+        return _mediator.Send(new RevokeFolderShareCommand { FolderShareId = Guid.Parse(request.FolderShareId) });
+    }
+
     public override Task<CloudEmpty> ShareFileWithUser(ShareFileWithUserRequest request, ServerCallContext context)
     {
         var command = new ShareFileWithUserCommand
@@ -367,6 +408,24 @@ public class CloudApiService : CloudApi.CloudApiBase
     public override Task<ListMyOutgoingSharesResponse> ListMyOutgoingShares(ListMyOutgoingSharesRequest request, ServerCallContext context)
     {
         return _mediator.Send(new ListMyOutgoingSharesCommand { FileId = Guid.Parse(request.FileId) });
+    }
+
+    public override Task<ListMyOutgoingSharesAllResponse> ListMyOutgoingSharesAll(ListMyOutgoingSharesAllRequest request, ServerCallContext context)
+    {
+        DateTime? cursorSharedAt = null;
+        Guid? cursorGrantId = null;
+        if (request.CursorSharedAt is not null && !string.IsNullOrWhiteSpace(request.CursorGrantId))
+        {
+            cursorSharedAt = request.CursorSharedAt.ToDateTime();
+            cursorGrantId = Guid.Parse(request.CursorGrantId);
+        }
+
+        return _mediator.Send(new ListMyOutgoingSharesAllCommand
+        {
+            Limit = request.Limit,
+            CursorSharedAt = cursorSharedAt,
+            CursorGrantId = cursorGrantId
+        });
     }
 
     public override Task<ListSharedWithMeResponse> ListSharedWithMe(ListSharedWithMeRequest request, ServerCallContext context)
@@ -390,6 +449,35 @@ public class CloudApiService : CloudApi.CloudApiBase
     public override Task<GetSharedFileDownloadUrlResponse> GetSharedFileDownloadUrl(GetSharedFileDownloadUrlRequest request, ServerCallContext context)
     {
         return _mediator.Send(new GetSharedFileDownloadUrlCommand { FileId = Guid.Parse(request.FileId) });
+    }
+
+    public override Task<CloudEmpty> ShareFolderWithUser(ShareFolderWithUserRequest request, ServerCallContext context)
+    {
+        return _mediator.Send(new ShareFolderWithUserCommand
+        {
+            DirectoryId = Guid.Parse(request.DirectoryId),
+            RecipientUserId = request.RecipientUserId
+        });
+    }
+
+    public override Task<CloudEmpty> RevokeFolderUserShare(RevokeFolderUserShareRequest request, ServerCallContext context)
+    {
+        return _mediator.Send(new RevokeFolderUserShareCommand { GrantId = Guid.Parse(request.GrantId) });
+    }
+
+    public override Task<ListMyOutgoingFolderSharesResponse> ListMyOutgoingFolderShares(ListMyOutgoingFolderSharesRequest request, ServerCallContext context)
+    {
+        return _mediator.Send(new ListMyOutgoingFolderSharesCommand());
+    }
+
+    public override Task<ListSharedFoldersWithMeResponse> ListSharedFoldersWithMe(ListSharedFoldersWithMeRequest request, ServerCallContext context)
+    {
+        return _mediator.Send(new ListSharedFoldersWithMeCommand());
+    }
+
+    public override Task<ListSharedDirectoryResponse> ListSharedDirectory(ListSharedDirectoryRequest request, ServerCallContext context)
+    {
+        return _mediator.Send(new ListSharedDirectoryCommand { DirectoryId = Guid.Parse(request.DirectoryId) });
     }
 
     public override Task<PathResponse> GetPath(GetPathRequest request, ServerCallContext context)

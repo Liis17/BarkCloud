@@ -15,3 +15,14 @@ export async function createShare(fileId: string, name: string, toast: ToastPush
     toast((e as Error).message || 'Не удалось создать ссылку', 'err');
   }
 }
+
+/** Сделать папку публичной (идемпотентно) и скопировать ссылку /f/{token} в буфер. */
+export async function createFolderShare(directoryId: string, name: string, toast: ToastPush): Promise<void> {
+  try {
+    const link = await apiPost<{ url: string }>('/api/folder-shares', { directoryId, name });
+    await navigator.clipboard.writeText(link.url);
+    toast('Ссылка на папку скопирована');
+  } catch (e) {
+    toast((e as Error).message || 'Не удалось сделать папку публичной', 'err');
+  }
+}

@@ -14,9 +14,13 @@ public class DeleteDirectoryCommandHandlerTests
 {
     private const long OwnerId = 42;
     private readonly Mock<ICloudHierarchyStorage> _storage = new();
+    private readonly Mock<IFolderShareStorage> _folderShares = new();
+    private readonly Mock<IDirectoryGrantStorage> _dirGrants = new();
 
     private DeleteDirectoryCommandHandler CreateSut() => new(
         _storage.Object,
+        _folderShares.Object,
+        _dirGrants.Object,
         UserContextFactory.Create(OwnerId),
         NullLogger<DeleteDirectoryCommandHandler>.Instance);
 
