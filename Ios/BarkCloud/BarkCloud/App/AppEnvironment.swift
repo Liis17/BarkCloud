@@ -104,7 +104,7 @@ final class AppEnvironment {
         })
 
         // Глобальный баннер прогресса над TabBar.
-        let progress = UploadProgressObserver(queueStore: .shared)
+        let progress = UploadProgressObserver(queueStore: .shared, backupManager: self.backupManager)
         self.uploadProgress = progress
         progress.attach(to: uploads)
 
