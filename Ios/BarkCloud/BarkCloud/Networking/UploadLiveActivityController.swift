@@ -26,10 +26,17 @@ final class UploadLiveActivityController {
         self.queueStore = queueStore
         // Подцепиться к Activity, начатой в Share Extension'е (если она ещё жива).
         // Иначе main app создал бы вторую активность, а старая зомби-висела бы
-        // до staleDate.
-        if let existing = Activity<UploadActivityAttributes>.activities.first {
-            self.currentActivity = existing
-            self.sessionStartedAt = existing.attributes.startedAt
+        // до staleDate. Если их несколько (race между Share Extension и main app
+        // в прошлой сессии), берём самую свежую, остальные тут же закрываем —
+        // иначе в Dynamic Island видны несколько одинаковых иконок.
+        let all = Activity<UploadActivityAttributes>.activities
+        let sorted = all.sorted { $0.attributes.startedAt > $1.attributes.startedAt }
+        if let newest = sorted.first {
+            self.currentActivity = newest
+            self.sessionStartedAt = newest.attributes.startedAt
+            for stale in sorted.dropFirst() {
+                Task { await stale.end(stale.content, dismissalPolicy: .immediate) }
+            }
         }
     }
 
