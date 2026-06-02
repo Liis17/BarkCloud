@@ -187,6 +187,46 @@ services:
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
       POSTGRES_DB: "${POSTGRES_DB}"
       PGDATA: /var/lib/postgresql/data/pgdata
+    # Тюнинг под 2 ядра / 8 ГБ на машине, где Postgres делит ресурсы с 6 .NET-сервисами,
+    # RabbitMQ и Seq. Значения консервативны: память отдаётся не вся, чтобы не уйти в своп.
+    #   shared_buffers=1GB              — собственный кэш страниц PG (~12% ОЗУ)
+    #   effective_cache_size=3GB        — оценка доступного ОС-кэша (планировщику, память не резервирует)
+    #   work_mem=16MB                   — на сортировку/hash на операцию
+    #   maintenance_work_mem=256MB      — VACUUM / CREATE INDEX
+    #   random_page_cost=1.1, effective_io_concurrency=200 — диск считаем SSD
+    #   max_parallel_workers*=… подрезаны под 2 ядра; jit=off — короткие OLTP-запросы без задержки на JIT
+    command:
+      - "postgres"
+      - "-c"
+      - "shared_buffers=1GB"
+      - "-c"
+      - "effective_cache_size=3GB"
+      - "-c"
+      - "work_mem=16MB"
+      - "-c"
+      - "maintenance_work_mem=256MB"
+      - "-c"
+      - "max_connections=100"
+      - "-c"
+      - "wal_buffers=16MB"
+      - "-c"
+      - "min_wal_size=1GB"
+      - "-c"
+      - "max_wal_size=4GB"
+      - "-c"
+      - "checkpoint_completion_target=0.9"
+      - "-c"
+      - "random_page_cost=1.1"
+      - "-c"
+      - "effective_io_concurrency=200"
+      - "-c"
+      - "max_worker_processes=2"
+      - "-c"
+      - "max_parallel_workers=2"
+      - "-c"
+      - "max_parallel_workers_per_gather=1"
+      - "-c"
+      - "jit=off"
     volumes:
       - pgdata:/var/lib/postgresql
       - backup_volume:/backup
