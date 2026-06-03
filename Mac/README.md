@@ -5,6 +5,8 @@
 (`X:` через Dokany), см. [Drive/README.md](../Drive/README.md) и заметку памяти
 `Obsidian/BarkCloudVault/modules/macos-drive.md`.
 
+➡️ **Пошаговый план для выполнения на Mac: [PLAN.md](PLAN.md)** (этапы 0→3 с проверками).
+
 ## Решения
 
 - **ФС: FSKit** (`FSUnaryFileSystem`, macOS 15.4+) — нативно, без kext, нотаризуется.
