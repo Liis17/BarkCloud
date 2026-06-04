@@ -57,8 +57,22 @@ xcodebuild build -scheme BarkCloudDrive -configuration Debug CODE_SIGNING_ALLOWE
 - **Риск к проверке:** `FSItem.Identifier(rawValue:)` для произвольных inode-id — если это
   закрытый enum `{0,1,2}`, узлам нужен другой носитель id.
 
-## Осталось (после рантайм-проверки)
+## Релиз (Этап 3)
 
-- Локализация RU/EN/DE (сейчас строки RU инлайн).
-- Загрузка аватара в дашборде через `InsecureHTTP` (self-signed TLS).
-- **Этап 3:** `.pkg`/`.dmg`, подпись Developer ID + нотаризация (`notarytool`), staple, онбординг.
+Сборка дистрибутива — `scripts/build_release.sh` (archive → .dmg/.pkg → подпись Developer ID →
+нотаризация → staple). Нужен платный Apple Developer аккаунт и сертификаты Developer ID в Keychain:
+
+```bash
+TEAM_ID=ABCDE12345 \
+SIGN_APP="Developer ID Application: <Team> (ABCDE12345)" \
+SIGN_PKG="Developer ID Installer: <Team> (ABCDE12345)" \
+NOTARY_PROFILE=barkcloud-notary \
+scripts/build_release.sh
+```
+
+## Осталось (рантайм, после проверки на устройстве)
+
+- Реальный механизм монтирования FSKit-тома (см. раздел про `MountManager` выше).
+- Эмпирическая проверка read/write семантики и `FSItem.Identifier`.
+
+Локализация RU/EN/DE и аватар профиля — **готовы**.

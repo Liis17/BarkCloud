@@ -113,9 +113,13 @@ SwiftUI app + menu-bar (`MenuBarExtra`), переиспользует `BarkCloud
   `DashboardView` (профиль `getUser`, прогресс `storageInfo`, монтаж/размонтаж), `SettingsView`
   (logout, смена сервера, автозапуск `SMAppService.mainApp`), `MenuBarView`.
 - `MountManager` — обёртка `mount`/`umount` (⚠️ механизм FSKit-маунта URL-FS непроверяем, см. ниже).
-**Осталось по Этапу 2:** локализация RU/EN/DE (сейчас строки RU инлайн), загрузка аватара
-(self-signed → нужен `InsecureHTTP`), реальный механизм монтирования (рантайм).
-**Этап 3 (упаковка `.pkg`/`.dmg` + нотаризация + онбординг) — не начат.**
+Локализация RU/EN/DE — **готова** (`Localizable.xcstrings`, 29 ключей, в бандле de/en/ru .lproj),
+аватар — **готов** (`RemoteAvatar` через `InsecureHTTP`). Осталось по Этапу 2: реальный механизм
+монтирования (рантайм).
+
+**Этап 3 (упаковка) — скрипт готов:** `Mac/BarkCloudDrive/scripts/build_release.sh`
+(archive → .dmg/.pkg → подпись Developer ID → `notarytool` → staple), запуск — на стороне
+пользователя (нужен Developer ID). Автозапуск — `SMAppService` в настройках.
 
 ## Переиспользуемый код iOS ([[ios-app]])
 
@@ -131,4 +135,4 @@ SwiftUI app + menu-bar (`MenuBarExtra`), переиспользует `BarkCloud
 0. Общий пакет `BarkCloudKit` + миграция iOS ← **ВЫПОЛНЕН** (сборки зелёные)
 1. FSKit-расширение `BarkCloudFS` (FSVolume-операции → облако) ← **код read+write компилируется; осталась рантайм-проверка (маунт)**
 2. Контейнер-app (server setup, логин, монтаж, дашборд, настройки, автозапуск) ← **код компилируется; осталась локализация + рантайм-монтаж**
-3. Упаковка `.pkg`/`.dmg` + нотаризация + онбординг включения расширения
+3. Упаковка `.pkg`/`.dmg` + нотаризация + онбординг включения расширения ← **скрипт `scripts/build_release.sh` готов; запуск с Developer ID — за пользователем**
