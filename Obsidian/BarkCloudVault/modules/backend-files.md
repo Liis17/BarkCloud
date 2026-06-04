@@ -72,6 +72,7 @@ Parent: [[index]] · See also: [[api/files-api]] · [[modules/backend-files-clou
 - `CloudHierarchyStorage.cs` — см. [[modules/backend-files-cloud]]; метод `FileEntryExistsForFile` для инварианта одной директории
 - `AlbumStorage.cs` — CRUD альбомов и их элементов, cursor-пагинация
 - `FavoriteFilesStorage.cs` — избранное: `Exists`/`Add`/`Remove`/`ListPage` (cursor-пагинация), по образцу item-методов `AlbumStorage`
+- `UploadedFilesStorage.cs` — добавлены `ListMemoriesForDay` (фото/видео с `FileMetadata.TakenAt` за месяц+день любых лет, для «Воспоминаний») и `ListMediaWithLocationPage` (медиа с `Latitude/Longitude`, cursor, для карты). Оба фильтруют как `ListUserMediaPage` (живые блобы владельца, не превью, не в корзине) + join к `FileMetadata`. DTO-записи `MemoryMediaItem`/`LocatedMediaItem` объявлены в `IUploadedFilesStorage.cs`. **Отдельных индексов нет**: запросы ведутся через GIN по `Uploaders` + PK `FileMetadata.FileId`
 - `ShareStorage.cs` — публичные ссылки: `Add`/`GetByToken`/`Remove` (scoped по владельцу, идемпотентно)/`IncrementClicks`/`ListPage` (cursor-пагинация), по образцу `FavoriteFilesStorage`
 - `FileMetadataStorage.cs` — метаданные блоба: `Get`/`AddIfMissing` (идемпотентно, не перезаписывает)/`ListFilesMissingMetadata` (LEFT JOIN-выборка для бэкафилла)
 - `Migrations/`:
@@ -120,6 +121,8 @@ Parent: [[index]] · See also: [[api/files-api]] · [[modules/backend-files-clou
 ### Облачная иерархия + галерея (вложенно в `Features/Cloud/`)
 
 `CreateDirectory`, `RenameDirectory`, `MoveDirectory`, `DeleteDirectory`, `ListDirectory`, `ListDirectoryDetailed`, `AttachFile`, `RenameFileEntry`, `MoveFileEntry`, `DeleteFileEntry`, `GetPath`, `ListUserImages` (deprecated), `ListUserMedia` (фото/видео по `MediaKind`), `SetVideoThumbnail`. **Корзина**: `ListTrash`, `RestoreFromTrash`, `DeleteFromTrash`, `EmptyTrash` (`DeleteFileEntry`/`DeleteDirectory` теперь soft-delete). **Избранное**: `AddFavorite`/`RemoveFavorite` (по `file_id`, идемпотентны), `ListFavorites` (cursor-пагинация, исключает корзину и осиротевшие ссылки). **Публичные ссылки**: `CreateShare` (проверка владения, токен base64url), `ListMyShares` (cursor-пагинация), `RevokeShare` (идемпотентно). `CopyFileEntry` **удалён** (инвариант одной директории). Подробнее — [[modules/backend-files-cloud]].
+
+**Воспоминания / Карта** (вложенно в `Features/Cloud/`): `GetMemories` («В этот день» — фото/видео за сегодняшнюю дату прошлых лет, сгруппированы по году от свежего к старому; группировка в памяти из выборки ≤500, ≤`per_year_limit` превью на год) и `ListMediaLocations` (точки для карты — медиа с GPS, cursor-пагинация; на точку отдаётся узкое превью; клиент кластеризует). Read-only, без миграций — опираются на уже извлечённые `FileMetadata`. См. [[api/files-api]] · `CloudApi`.
 
 `ResolveShare` (публичный резолв токена) — в служебном `FilesServerApi` (`Features/Cloud/ResolveShare/`, без `UserContext`): по токену отдаёт `download_url` через `FileUrlHelper` и инкрементит `ClickCount`. Зовётся из Web-роута `/s/{token}`.
 
