@@ -81,6 +81,13 @@ Mac/BarkCloudKit/scripts/sync_proto.sh    # → Sources/BarkCloudKit/Generated/,
 
 ## Этап 1 — FSKit-расширение `BarkCloudFS.appex`
 
+> **СТАТУС: read-path скаффолд КОМПИЛИРУЕТСЯ** (`Mac/BarkCloudDrive/`). Проект app+appex создан,
+> оба таргета линкуют `BarkCloudKit`, `xcodebuild` зелёный (CODE_SIGNING_ALLOWED=NO). Реализованы
+> mount/activate/enumerate/attributes/lookup/reclaim/read (через `RangeBlockReader`) + volumeStatistics.
+> Карта реального FSKit API — `Obsidian/BarkCloudVault/modules/macos-fskit-api.md`.
+> **Осталось:** write-path (1.5), авторефреш токена (1.6), рантайм-маунт (нужен Team ID + включение
+> расширения в System Settings — на стороне пользователя).
+
 Цель: реализовать том, маппящий FS-операции на облако через `BarkCloudKit`.
 
 ### 1.1 Создать Xcode-проект `Mac/BarkCloudDrive/`

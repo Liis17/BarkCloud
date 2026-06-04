@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>CFBundleDisplayName</key>
+	<string>BarkCloud File System</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>EXAppExtensionAttributes</key>
+	<dict>
+		<key>EXExtensionPointIdentifier</key>
+		<string>com.apple.fskit.fsmodule</string>
+		<key>FSName</key>
+		<string>BarkCloud</string>
+		<key>FSShortName</key>
+		<string>BarkCloud</string>
+		<key>FSSupportsBlockResources</key>
+		<false/>
+		<key>FSSupportedSchemes</key>
+		<array>
+			<string>barkcloud</string>
+		</array>
+		<key>FSPersonalities</key>
+		<dict>
+			<key>BarkCloud</key>
+			<dict>
+				<key>FSShortName</key>
+				<string>BarkCloud</string>
+			</dict>
+		</dict>
+	</dict>
+</dict>
+</plist>
