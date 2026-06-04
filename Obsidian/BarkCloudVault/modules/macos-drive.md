@@ -85,7 +85,10 @@ deployment 15.4. `xcodebuild` обеих схем зелёный (CODE_SIGNING_A
 - `BarkCloudVolume.swift` — `FSVolume.Operations`+`PathConfOperations`+`ReadWriteOperations`:
   activate/deactivate/mount/unmount/sync, attributes, lookup, reclaim, **enumerateDirectory**
   (через `CloudRepository.listDirectory` + packer), **read** (через `RangeBlockReader`),
-  volumeStatistics (`storageInfo`). Write/create/remove/rename — стабы `EROFS`/`ENOTSUP` (1.5).
+  volumeStatistics (`storageInfo`). **Write-path (1.5):** createItem (mkdir →
+  `createDirectory`; file → отложенный upload), write (рабочая копия на диске),
+  open/close (`closeItem` → `uploadFile` на закрытии, блобы иммутабельны), removeItem
+  (`deleteFileEntry`/`deleteDirectory`), renameItem (`rename*`/`move*`). Симлинки — `ENOTSUP`.
 - `BarkCloudItem.swift` — узел `FSItem` (directory/file, стабильный id-реестр).
 - `BarkCloudSession.swift` — ленивый `GrpcManager`/`FileTransferService`/`CloudRepository`/
   `RangeBlockReader` из App Group + Keychain.
@@ -98,8 +101,11 @@ deployment 15.4. `xcodebuild` обеих схем зелёный (CODE_SIGNING_A
 из контейнер-app (Этап 2) или вручную. **Риск проверить на устройстве:** `FSItem.Identifier(rawValue:)`
 для произвольных inode-id (компилируется; если это закрытый enum {0,1,2} — нужен другой носитель id).
 
-**Осталось по Этапу 1:** write-path (1.5 — create/write/remove/rename/mkdir + upload на close),
-авто-рефреш токена в расширении (1.6). **Этапы 2–3 (контейнер-app UI, инсталлятор) — не начаты.**
+**Этап 1 готов в части кода** (read+write компилируются). Авторефреш токена (1.6) покрыт
+существующим проактивным рефрешем `GrpcManager.validAccessToken` (срабатывает на каждом FS-запросе);
+отдельный фоновый таймер для idle-маунта — опциональное улучшение. **Не сделано (рантайм/устройство):**
+маунт и эмпирическая проверка read/write семантики (нужен Team ID + включение расширения).
+**Этапы 2–3 (контейнер-app UI с server setup/логином/монтажом, инсталлятор) — не начаты.**
 
 ## Переиспользуемый код iOS ([[ios-app]])
 
@@ -113,6 +119,6 @@ deployment 15.4. `xcodebuild` обеих схем зелёный (CODE_SIGNING_A
 ## План фаз
 
 0. Общий пакет `BarkCloudKit` + миграция iOS ← **ВЫПОЛНЕН** (сборки зелёные)
-1. FSKit-расширение `BarkCloudFS` (FSVolume-операции → облако) ← **read-path компилируется; осталось write-path (1.5) + авторефреш (1.6)**
+1. FSKit-расширение `BarkCloudFS` (FSVolume-операции → облако) ← **код read+write компилируется; осталась рантайм-проверка (маунт)**
 2. Контейнер-app (server setup, логин, монтаж, дашборд, настройки, автозапуск)
 3. Упаковка `.pkg`/`.dmg` + нотаризация + онбординг включения расширения
