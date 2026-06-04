@@ -24,6 +24,8 @@ final class GalleryViewModel {
     var selection: Set<String> = []   // localIdentifier выбранных
     var isSelecting = false
     var isUploading = false
+    /// Идёт блокирующая операция мультивыбора (резолв file_id + облачное удаление).
+    var isProcessing = false
     var uploadDone = 0
     var uploadTotal = 0
     var snackbar: String?
@@ -185,6 +187,79 @@ final class GalleryViewModel {
         snackbar = anyFailed
             ? String(localized: "gallery_upload_failed")
             : String(localized: "gallery_upload_done")
+    }
+
+    // MARK: - Удаление выбранных (режим мультивыбора)
+
+    /// Есть ли среди выбранных хотя бы один файл, точно присутствующий в облаке
+    /// (по известной презенс-карте). Управляет доступностью кнопки «Удалить везде».
+    var selectionHasCloud: Bool {
+        selection.contains { cloudPresence[$0] == true }
+    }
+
+    /// Удалить все выбранные ассеты только с устройства (один системный диалог).
+    func deleteSelectedFromDevice() async {
+        let targets = fetchSelectedAssets()
+        guard !targets.isEmpty else { return }
+        guard await deleteAssetsFromDevice(targets) else { return }
+        selection.removeAll()
+        isSelecting = false
+    }
+
+    /// «Удалить везде» для выбранных: из облака уходят те, что там есть (по
+    /// презенс-карте — остальные пропускаем), с устройства — все выбранные. file_id
+    /// резолвим, пока ассеты живы; затем системное удаление (отмена → облако не
+    /// трогаем); затем облачные удаления (в корзину).
+    func deleteSelectedEverywhere() async {
+        let targets = fetchSelectedAssets()
+        guard !targets.isEmpty else { return }
+        isProcessing = true
+        var cloudFileIDs: [String] = []
+        for asset in targets where cloudPresence[asset.localIdentifier] == true {
+            if let fid = await resolveCloudFileIDIfPresent(for: asset) {
+                cloudFileIDs.append(fid)
+            }
+        }
+        guard await deleteAssetsFromDevice(targets) else {
+            isProcessing = false
+            return
+        }
+        for fid in cloudFileIDs {
+            try? await cloud.deleteUserMedia(fileID: fid)
+            await CloudDeviceLinkStore.shared.remove(fileIDs: [fid])
+        }
+        isProcessing = false
+        selection.removeAll()
+        isSelecting = false
+    }
+
+    private func fetchSelectedAssets() -> [PHAsset] {
+        let ids = Array(selection)
+        guard !ids.isEmpty else { return [] }
+        let fetched = PHAsset.fetchAssets(withLocalIdentifiers: ids, options: nil)
+        var targets: [PHAsset] = []
+        fetched.enumerateObjects { asset, _, _ in targets.append(asset) }
+        return targets
+    }
+
+    /// Удалить пачку ассетов с устройства одним `performChanges` (один системный
+    /// диалог). Чистит осиротевшие связи/хеши. `false`, если пользователь отменил.
+    @discardableResult
+    private func deleteAssetsFromDevice(_ targets: [PHAsset]) async -> Bool {
+        guard !targets.isEmpty else { return false }
+        do {
+            try await PHPhotoLibrary.shared().performChanges {
+                PHAssetChangeRequest.deleteAssets(targets as NSArray)
+            }
+            let ids = targets.map(\.localIdentifier)
+            assets.removeAll { ids.contains($0.localIdentifier) }
+            await CloudDeviceLinkStore.shared.remove(localIds: ids)
+            await AssetHashStore.shared.remove(localIds: ids)
+            return true
+        } catch {
+            // Пользователь отменил удаление — не ошибка.
+            return false
+        }
     }
 
     // MARK: - Одиночные действия (контекстное меню по удержанию)

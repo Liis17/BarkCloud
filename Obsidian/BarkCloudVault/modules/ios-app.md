@@ -464,6 +464,12 @@ store с одной активной записью `Pending { id, label, action
     (SHA256 → `checkFileHash` **без заливки**, nil если в облаке нет) → сначала системное удаление
     ассета; если отменили — облако не трогаем; иначе `deleteUserMedia` (в корзину). `deleteFromDevice`
     теперь `@discardableResult -> Bool` и чистит осиротевшие `CloudDeviceLinkStore`/`AssetHashStore`.
+  - **Режим мультивыбора** (нижняя панель `selectionBar`, рядом с «Загрузить выбранные»):
+    «Удалить с устройства» (`deleteSelectedFromDevice`, один `performChanges`) и «Удалить везде»
+    (`deleteSelectedEverywhere`): резолвит `file_id` тех выбранных, что в облаке (по презенс-карте —
+    не-облачные пропускаются для облака, но с устройства удаляются все), затем системное удаление
+    (отмена → облако не трогаем), затем `deleteUserMedia`. Кнопка «Удалить везде» **дизейблится**,
+    если в выделении нет ни одного облачного (`selectionHasCloud`). Блокирующий оверлей `isProcessing`.
 - **Направление облако → устройство** (`Features/Shared/DeviceCopyCleaner.swift`, `@MainActor enum`):
   `deleteDeviceCopies(forCloudFileIDs:)` резолвит `localIdentifier` через индекс → `PHAsset.fetchAssets`
   → один `PHAssetChangeRequest.deleteAssets` на пачку (системный диалог) → чистит индекс и кеш хешей.

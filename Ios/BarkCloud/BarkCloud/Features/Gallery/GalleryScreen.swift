@@ -79,6 +79,17 @@ struct GalleryScreen: View {
             )
         }
         .overlay { if vm?.isUploading == true { uploadingOverlay(vm!) } }
+        .overlay { if vm?.isProcessing == true { processingOverlay } }
+    }
+
+    private var processingOverlay: some View {
+        ZStack {
+            Color.black.opacity(0.25).ignoresSafeArea()
+            ProgressView()
+                .padding(24)
+                .background(.regularMaterial)
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+        }
     }
 
     @ViewBuilder
@@ -119,31 +130,55 @@ struct GalleryScreen: View {
                 }
             }
         }
-        .safeAreaInset(edge: .bottom) { uploadBar(vm) }
+        .safeAreaInset(edge: .bottom) { selectionBar(vm) }
         .overlay(alignment: .bottom) { snackbar(vm) }
     }
 
     @ViewBuilder
-    private func uploadBar(_ vm: GalleryViewModel) -> some View {
+    private func selectionBar(_ vm: GalleryViewModel) -> some View {
         if vm.isSelecting && vm.hasSelection {
-            Button {
-                Task { await vm.uploadSelected() }
-            } label: {
-                Label(
-                    "\(String(localized: "gallery_upload_selected")) (\(vm.selection.count))",
-                    systemImage: "icloud.and.arrow.up"
-                )
-                .font(AppTypography.titleMedium)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
-                .background(AppColors.accent)
-                .foregroundStyle(.white)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+            VStack(spacing: 8) {
+                Button {
+                    Task { await vm.uploadSelected() }
+                } label: {
+                    Label(
+                        "\(String(localized: "gallery_upload_selected")) (\(vm.selection.count))",
+                        systemImage: "icloud.and.arrow.up"
+                    )
+                    .font(AppTypography.titleMedium)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(AppColors.accent)
+                    .foregroundStyle(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+                Button(role: .destructive) {
+                    Task { await vm.deleteSelectedFromDevice() }
+                } label: {
+                    deleteButtonLabel("ctx_delete_device", systemImage: "trash", enabled: true)
+                }
+                Button(role: .destructive) {
+                    Task { await vm.deleteSelectedEverywhere() }
+                } label: {
+                    deleteButtonLabel("ctx_delete_everywhere", systemImage: "trash.slash", enabled: vm.selectionHasCloud)
+                }
+                .disabled(!vm.selectionHasCloud)
             }
             .padding(.horizontal, 16)
+            .padding(.top, 8)
             .padding(.bottom, 8)
             .background(.regularMaterial)
         }
+    }
+
+    private func deleteButtonLabel(_ key: String.LocalizationValue, systemImage: String, enabled: Bool) -> some View {
+        Label(String(localized: key), systemImage: systemImage)
+            .font(AppTypography.titleMedium)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 12)
+            .background(AppColors.error.opacity(enabled ? 0.12 : 0.05))
+            .foregroundStyle(enabled ? AppColors.error : AppColors.onSurfaceVariant)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
     /// Пункты контекстного меню одного ассета устройства (по удержанию ячейки).
