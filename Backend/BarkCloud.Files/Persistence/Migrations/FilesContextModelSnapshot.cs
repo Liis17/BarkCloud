@@ -558,6 +558,9 @@ namespace BarkCloud.Files.Persistence.Migrations
                     b.Property<int?>("ImageWidth")
                         .HasColumnType("integer");
 
+                    b.Property<Guid?>("JpegViewFileId")
+                        .HasColumnType("uuid");
+
                     b.Property<int>("MediaKind")
                         .HasColumnType("integer");
 

@@ -172,34 +172,33 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
             }
         }
 
-        // HEIC → JPEG: перекодируем оригинал до хеширования, чтобы дедуп, превью и веб-отдача
-        // работали с JPEG (браузеры HEIC не отображают, ImageSharp его не декодирует).
+        // HEIC оригинал НЕ конвертируем — храним как есть, чтобы его SHA256 совпадал
+        // с тем, что считает клиент (иначе ломается дедуп и индикатор «уже в облаке»).
+        // Но ImageSharp HEIC не декодирует, поэтому для размеров/превью и для JpegView
+        // готовим отдельное полноразмерное JPEG-представление через ffmpeg.
+        byte[]? heicJpegBytes = null;
         if (isHeic && tempFilePath is not null)
         {
             try
             {
-                var jpegBytes = await _heicConverter.ConvertToJpegAsync(tempFilePath, cancellationToken);
-
-                await originalStream.DisposeAsync();
-                CleanupTempFile();
-                tempFilePath = null;
-
-                originalStream = new MemoryStream(jpegBytes);
-
-                // С этого момента файл — JPEG: имя, content-type и размер обновляем соответственно.
-                file.Filename = Path.ChangeExtension(file.Filename, ".jpg");
-                contentType = "image/jpeg";
-                fileSize = jpegBytes.Length;
-
-                _logger.LogInformation("HEIC {FileId} сконвертирован в JPEG ({Size} байт)", file.Id, jpegBytes.Length);
+                heicJpegBytes = await _heicConverter.ConvertToJpegAsync(tempFilePath, cancellationToken);
+                _logger.LogInformation(
+                    "HEIC {FileId}: получено JPEG-представление ({Size} байт), оригинал сохраняется как есть",
+                    file.Id, heicJpegBytes.Length);
             }
             catch (Exception ex)
             {
-                // Фолбэк: если ffmpeg не справился — грузим оригинальный HEIC как есть (как было раньше).
-                _logger.LogError(ex, "Не удалось сконвертировать HEIC {FileId} в JPEG, загружаю оригинал", file.Id);
+                _logger.LogError(ex, "Не удалось получить JPEG-представление HEIC {FileId}", file.Id);
+            }
+            finally
+            {
                 originalStream.Position = 0;
             }
         }
+
+        // Стрим, который умеет декодировать ImageSharp: HEIC → его JPEG-представление,
+        // прочие изображения → сам оригинал. null — нечем декодировать (HEIC без конверсии).
+        MemoryStream? heicViewStream = heicJpegBytes is not null ? new MemoryStream(heicJpegBytes) : null;
 
         // Compute SHA256 hash of the file
         string fileHash;
@@ -227,16 +226,27 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
 
         List<MultiPreviewItem>? generatedPreviews = null;
 
+        // Источник для ImageSharp (размеры/превью/JpegView): HEIC → его JPEG-представление,
+        // прочие изображения → сам оригинал. null — нечем декодировать (HEIC без конверсии).
+        Stream? imageViewStream = isHeic ? heicViewStream : (isImageContent ? originalStream : null);
+        if (isImageContent && imageViewStream is null)
+        {
+            needsDimensions = false;
+            needsCloudPreviews = false;
+        }
+        // Полноразмерный JPEG для просмотра в вебе/не-Apple. Заполняется ниже.
+        byte[]? jpegViewBytes = null;
+
         try
         {
             // 1) Размеры + сжатие оригинала (если нужно). Превью отдельным проходом ниже.
-            if (needsDimensions)
+            if (needsDimensions && imageViewStream is not null)
             {
-                originalStream.Position = 0;
+                imageViewStream.Position = 0;
                 try
                 {
                     var imageResult = await _imageCompressor.ProcessImageAllInOneAsync(
-                        originalStream,
+                        imageViewStream,
                         enforceOriginalLimits: false,
                         previewWidth: null,
                         cancellationToken);
@@ -254,18 +264,18 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
                 }
                 finally
                 {
-                    originalStream.Position = 0;
+                    imageViewStream.Position = 0;
                 }
             }
 
             // 2) Мультиразмерные превью
-            if (needsCloudPreviews)
+            if (needsCloudPreviews && imageViewStream is not null)
             {
-                originalStream.Position = 0;
+                imageViewStream.Position = 0;
                 try
                 {
                     generatedPreviews = await _imageCompressor.GenerateMultiplePreviewsAsync(
-                        originalStream, CloudPreviewWidths, cancellationToken);
+                        imageViewStream, CloudPreviewWidths, cancellationToken);
                 }
                 catch (Exception ex)
                 {
@@ -273,7 +283,34 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
                 }
                 finally
                 {
-                    originalStream.Position = 0;
+                    imageViewStream.Position = 0;
+                }
+            }
+
+            // 2-jpeg) Полноразмерный JPEG-вид: HEIC уже сконвертирован (heicJpegBytes);
+            // прочие НЕ-jpeg изображения перекодируем в JPEG 90% (оригинал-JPEG ссылается
+            // на себя позже, без отдельного блоба).
+            if (file.Type == UploadFileType.CloudFile && isImageContent && contentType != "image/jpeg")
+            {
+                if (isHeic)
+                {
+                    jpegViewBytes = heicJpegBytes;
+                }
+                else if (imageViewStream is not null)
+                {
+                    try
+                    {
+                        imageViewStream.Position = 0;
+                        jpegViewBytes = await _imageCompressor.EncodeFullJpegAsync(imageViewStream, 90, cancellationToken);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Не удалось сгенерировать JpegView для {FileId}", file.Id);
+                    }
+                    finally
+                    {
+                        imageViewStream.Position = 0;
+                    }
                 }
             }
 
@@ -376,6 +413,29 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
         {
             await originalStream.DisposeAsync();
             CleanupTempFile();
+        }
+
+        // JpegView: для оригинала-JPEG ссылаемся на сам файл (без лишнего блоба); для прочих
+        // изображений — отдельный полноразмерный JPEG-блоб. Он регистрируется как превью
+        // (TargetWidth=0), поэтому автоматически исключается из галереи и чистится при удалении.
+        if (file.Type == UploadFileType.CloudFile && isImageContent)
+        {
+            if (contentType == "image/jpeg")
+            {
+                file.JpegViewFileId = file.Id;
+            }
+            else if (jpegViewBytes is not null)
+            {
+                try
+                {
+                    file.JpegViewFileId = await _previewPersistence.PersistJpegViewAsync(
+                        file, jpegViewBytes, file.ImageWidth ?? 0, file.ImageHeight ?? 0, bucketName, cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Не удалось сохранить JpegView-блоб для {FileId}", file.Id);
+                }
+            }
         }
 
         // Сохраняем оригинал + его хеш
