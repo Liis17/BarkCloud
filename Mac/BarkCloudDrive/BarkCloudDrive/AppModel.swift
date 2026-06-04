@@ -92,9 +92,21 @@ final class AppModel {
         session.clearSession()
         InsecureHTTP.clearCaches()
         await grpc.shutdown()
+        await domain.disable()
+        AppModel.clearProviderCache()
         user = nil
         storageUsed = 0
         storageLimit = 0
+    }
+
+    /// Удалить persistent cache File Provider'a в App Group container.
+    /// Расширение в новом запуске поднимется с пустым снимком.
+    private static func clearProviderCache() {
+        guard let container = BarkCloudAppGroup.containerURL else { return }
+        let cacheFile = container
+            .appendingPathComponent("FileProvider", isDirectory: true)
+            .appendingPathComponent("items-cache.json")
+        try? FileManager.default.removeItem(at: cacheFile)
     }
 
     // MARK: - Dashboard data
