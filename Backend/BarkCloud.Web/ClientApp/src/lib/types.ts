@@ -31,6 +31,25 @@ export interface MediaItem extends CardFile {
   entryIds: string[];
 }
 
+/** Группа «Воспоминаний» за один год (CloudJson.MemoryGroup). */
+export interface MemoryGroup {
+  year: number;
+  yearsAgo: number;
+  totalCount: number;
+  items: CardFile[];
+}
+
+/** Точка на карте — медиа с GPS (CloudJson.MapPoint). */
+export interface MapPoint {
+  id: string;
+  lat: number;
+  lng: number;
+  kind: MediaKind;
+  previewUrl: string;
+  takenAt: string | null;
+  createdAt: string | null;
+}
+
 /** Папка (CloudJson.Dir). */
 export interface DirInfo {
   id: string;

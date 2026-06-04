@@ -229,6 +229,41 @@ public static class CloudApiEndpoints
                 }, Json);
             }));
 
+        // «Воспоминания — В этот день»: фото/видео за сегодняшнюю дату прошлых лет, по группам-годам.
+        api.MapGet("/cloud/memories", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud,
+            int? month, int? day, int? perYear) =>
+            await Guarded(http, auth, async token =>
+            {
+                var req = new GetMemoriesRequest
+                {
+                    Month = month is >= 1 and <= 12 ? month.Value : 0,
+                    Day = day is >= 1 and <= 31 ? day.Value : 0,
+                    PerYearLimit = perYear is > 0 ? perYear.Value : 0
+                };
+                var resp = await cloud.GetMemoriesAsync(req, token);
+                return Results.Json(new { groups = resp.Groups.Select(CloudJson.MemoryGroup).ToArray() }, Json);
+            }));
+
+        // Точки для карты: медиа с GPS-координатами (cursor-пагинация, клиент кластеризует).
+        api.MapGet("/cloud/map", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud,
+            int? limit, string? cursorAt, string? cursorId) =>
+            await Guarded(http, auth, async token =>
+            {
+                var req = new ListMediaLocationsRequest { Limit = limit is > 0 and <= 1000 ? limit.Value : 500 };
+                if (DateTimeOffset.TryParse(cursorAt, out var dt))
+                    req.CursorCreatedAt = Timestamp.FromDateTimeOffset(dt.ToUniversalTime());
+                if (!string.IsNullOrEmpty(cursorId))
+                    req.CursorFileId = cursorId;
+
+                var resp = await cloud.ListMediaLocationsAsync(req, token);
+                return Results.Json(new
+                {
+                    points = resp.Points.Select(CloudJson.MapPoint).ToArray(),
+                    nextCursorAt = resp.NextCursorCreatedAt?.ToDateTimeOffset(),
+                    nextCursorId = resp.NextCursorFileId
+                }, Json);
+            }));
+
         // Заменить превью видео загруженной картинкой-кадром (sourceImageFileId — уже загруженный файл).
         api.MapPost("/cloud/video/thumbnail", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud, VideoThumbReq body) =>
             await Guarded(http, auth, async token =>

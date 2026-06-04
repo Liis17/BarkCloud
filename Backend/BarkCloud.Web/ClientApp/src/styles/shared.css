@@ -1093,3 +1093,55 @@ img.avatar { object-fit: cover; }
 }
 .album-pick-row:hover { background: var(--md-surface-container-high); }
 .album-pick-row .cnt { color: var(--md-on-surface-variant); font-size: 12px; }
+
+/* ───────── Воспоминания «В этот день» ───────── */
+.memories { margin: 4px 0 8px; }
+.mem-head {
+  display: flex; align-items: center; gap: 8px;
+  padding: 0 24px 8px; color: var(--md-on-surface);
+}
+.mem-head h3 { margin: 0; font-size: 15px; font-weight: 600; }
+.mem-strip {
+  display: flex; gap: 12px; overflow-x: auto; overflow-y: hidden;
+  padding: 2px 24px 12px; scrollbar-width: thin;
+}
+.mem-card {
+  position: relative; flex: 0 0 auto;
+  width: 160px; aspect-ratio: 4 / 3;
+  border-radius: var(--r-lg); overflow: hidden; cursor: pointer;
+  transition: transform var(--d-med) var(--m-emph);
+}
+.mem-card:hover { transform: translateY(-2px) scale(1.01); }
+.mem-card .mem-thumb { width: 100%; height: 100%; object-fit: cover; }
+.mem-meta {
+  position: absolute; inset: 0;
+  background: linear-gradient(180deg, transparent 45%, rgba(0,0,0,.72) 100%);
+  padding: 10px 12px;
+  display: flex; flex-direction: column; justify-content: flex-end;
+}
+.mem-when { font-size: 13px; font-weight: 600; color: #fff; line-height: 1.2; }
+.mem-year { font-size: 11px; color: rgba(255,255,255,.85); margin-top: 2px; }
+.mem-count {
+  position: absolute; top: 8px; right: 8px;
+  min-width: 22px; height: 22px; padding: 0 6px;
+  border-radius: var(--r-full); background: rgba(0,0,0,.55); color: #fff;
+  font-size: 11px; font-weight: 600;
+  display: flex; align-items: center; justify-content: center;
+}
+
+/* ───────── Карта ───────── */
+.map-wrap { position: relative; height: calc(100vh - 160px); min-height: 420px; padding: 0 24px 16px; }
+.map-canvas { width: 100%; height: 100%; border-radius: var(--r-lg); overflow: hidden; }
+.map-hint {
+  position: absolute; z-index: 500; top: 10px; left: 36px;
+  padding: 6px 12px; border-radius: var(--r-full);
+  background: var(--md-surface-container-high); color: var(--md-on-surface);
+  font-size: 12px; font-weight: 600; box-shadow: 0 2px 8px rgba(0,0,0,.18);
+}
+.leaflet-tooltip.cluster-label {
+  background: transparent; border: 0; box-shadow: none;
+  color: #fff; font-weight: 700; font-size: 12px;
+}
+.leaflet-tooltip.cluster-label::before { display: none; }
+.map-popup { border: 0; background: none; padding: 0; cursor: pointer; display: block; }
+.map-popup img { width: 160px; height: 120px; object-fit: cover; border-radius: var(--r-md); display: block; }
