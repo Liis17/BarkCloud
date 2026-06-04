@@ -46,6 +46,9 @@ public struct MediaAsset: Identifiable, Hashable, Sendable {
     /// Имя устройства, с которого блоб был загружен в первый раз (сохраняется при дедупликации).
     /// Пусто, если бэкенд не передал значение (легаси-файлы до миграции `AddUploadDeviceName`).
     public let uploadDeviceName: String?
+    /// file_id полноразмерного JPEG-вида для просмотра (HEIC и пр. браузеро-недружелюбные форматы).
+    /// Пусто — нет вида (видео/документ/легаси); тогда показываем оригинал. Для оригинала-JPEG = собственный id.
+    public let jpegViewFileID: String
 
     public init(_ info: Barkcloud_Files_UploadFileInfo) {
         self.id = info.id
@@ -58,6 +61,7 @@ public struct MediaAsset: Identifiable, Hashable, Sendable {
         self.uploadedAt = info.hasUploadedAt ? info.uploadedAt.date : nil
         self.etag = info.etag
         self.uploadDeviceName = info.uploadDeviceName.isEmpty ? nil : info.uploadDeviceName
+        self.jpegViewFileID = info.jpegViewFileID
         self.previews = info.previews.compactMap { p in
             guard !p.previewURL.isEmpty, let url = URL(string: p.previewURL) else { return nil }
             return MediaPreview(url: url, width: Int(p.targetWidth))

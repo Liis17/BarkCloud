@@ -87,6 +87,14 @@ final class GalleryViewModel {
         loadAssets()
     }
 
+    /// Pull-to-refresh: пересобрать список ассетов и заново перепроверить, какие из
+    /// них есть в облаке (обновляет иконки-облачка). Полезно после загрузок и после
+    /// серверного фикса совпадения хешей HEIC.
+    func refresh() async {
+        reload()
+        await presence.recheck(assets)
+    }
+
     private func apply(_ status: PHAuthorizationStatus) {
         switch status {
         case .authorized: access = .authorized
