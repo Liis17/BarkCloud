@@ -9,7 +9,6 @@ import { AppShell } from './components/shell/AppShell';
 import { PhotosPage } from './pages/PhotosPage';
 import { VideosPage } from './pages/VideosPage';
 import { FilesPage } from './pages/FilesPage';
-import { MapPage } from './pages/MapPage';
 import { FavoritesPage } from './pages/FavoritesPage';
 import { TrashPage } from './pages/TrashPage';
 import { SharedPage } from './pages/SharedPage';
@@ -28,7 +27,6 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           <Route path="photos" element={<PhotosPage />} />
           <Route path="videos" element={<VideosPage />} />
           <Route path="files" element={<FilesPage />} />
-          <Route path="map" element={<MapPage />} />
           <Route path="favorites" element={<FavoritesPage />} />
           <Route path="trash" element={<TrashPage />} />
           <Route path="shared" element={<SharedPage />} />

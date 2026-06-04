@@ -44,6 +44,8 @@ export function PropertiesModal({ fileId, fallback, onClose }: PropertiesModalPr
   ];
 
   const metaRows = buildMetadataRows(info?.metadata);
+  const meta = info?.metadata;
+  const hasGeo = meta?.latitude != null && meta?.longitude != null;
 
   return (
     <Modal title="Свойства" onClose={onClose} actions={<button className="btn primary" onClick={onClose}>Закрыть</button>}>
@@ -70,7 +72,32 @@ export function PropertiesModal({ fileId, fallback, onClose }: PropertiesModalPr
           </div>
         </>
       )}
+
+      {hasGeo && (
+        <>
+          <div className="prop-section">Место съёмки</div>
+          <FileLocationMap lat={meta!.latitude!} lon={meta!.longitude!} />
+        </>
+      )}
     </Modal>
+  );
+}
+
+/** Мини-карта с маркером в точке съёмки (встроенный OpenStreetMap, без JS-зависимостей). */
+function FileLocationMap({ lat, lon }: { lat: number; lon: number }) {
+  const d = 0.008; // полуразмер видимой области в градусах (~900 м) — задаёт стартовый зум
+  const bbox = `${lon - d},${lat - d},${lon + d},${lat + d}`;
+  const src =
+    `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${lat},${lon}`;
+  return (
+    <div className="prop-map">
+      <iframe
+        src={src}
+        title="Карта места съёмки"
+        loading="lazy"
+        referrerPolicy="no-referrer"
+      />
+    </div>
   );
 }
 

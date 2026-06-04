@@ -1129,19 +1129,11 @@ img.avatar { object-fit: cover; }
   display: flex; align-items: center; justify-content: center;
 }
 
-/* ───────── Карта ───────── */
-.map-wrap { position: relative; height: calc(100vh - 160px); min-height: 420px; padding: 0 24px 16px; }
-.map-canvas { width: 100%; height: 100%; border-radius: var(--r-lg); overflow: hidden; }
-.map-hint {
-  position: absolute; z-index: 500; top: 10px; left: 36px;
-  padding: 6px 12px; border-radius: var(--r-full);
-  background: var(--md-surface-container-high); color: var(--md-on-surface);
-  font-size: 12px; font-weight: 600; box-shadow: 0 2px 8px rgba(0,0,0,.18);
+/* ───────── Карта в свойствах файла ───────── */
+.prop-map {
+  margin-top: 14px;
+  border-radius: var(--r-md);
+  overflow: hidden;
+  border: 1px solid var(--md-outline-variant);
 }
-.leaflet-tooltip.cluster-label {
-  background: transparent; border: 0; box-shadow: none;
-  color: #fff; font-weight: 700; font-size: 12px;
-}
-.leaflet-tooltip.cluster-label::before { display: none; }
-.map-popup { border: 0; background: none; padding: 0; cursor: pointer; display: block; }
-.map-popup img { width: 160px; height: 120px; object-fit: cover; border-radius: var(--r-md); display: block; }
+.prop-map iframe { display: block; width: 100%; height: 220px; border: 0; }
