@@ -31,6 +31,25 @@ export interface MediaItem extends CardFile {
   entryIds: string[];
 }
 
+/** Группа «Воспоминаний» за один год (CloudJson.MemoryGroup). */
+export interface MemoryGroup {
+  year: number;
+  yearsAgo: number;
+  totalCount: number;
+  items: CardFile[];
+}
+
+/** Точка на карте — медиа с GPS (CloudJson.MapPoint). */
+export interface MapPoint {
+  id: string;
+  lat: number;
+  lng: number;
+  kind: MediaKind;
+  previewUrl: string;
+  takenAt: string | null;
+  createdAt: string | null;
+}
+
 /** Папка (CloudJson.Dir). */
 export interface DirInfo {
   id: string;
@@ -74,6 +93,29 @@ export interface Album {
   coverFileId: string;
   coverUrl: string;
   count: number;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+/** Правило умной папки (поле/оператор/значение — числовые коды совпадают с proto). */
+export interface DynamicFolderRule {
+  field: number;
+  op: number;
+  value: string;
+}
+
+/** Умная (динамическая) папка (CloudJson.DynamicFolder). */
+export interface DynamicFolder {
+  id: string;
+  name: string;
+  isSystem: boolean;
+  combinator: number; // 0 = все условия (И), 1 = любое (ИЛИ)
+  rules: DynamicFolderRule[];
+  iconKey: string;
+  coverColor: string;
+  coverUrl: string;
+  count: number;
+  sortOrder: number;
   createdAt: string | null;
   updatedAt: string | null;
 }

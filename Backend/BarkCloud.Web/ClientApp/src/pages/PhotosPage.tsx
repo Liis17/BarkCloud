@@ -6,6 +6,7 @@ import { EmptyState, Loading } from '../components/ui/EmptyState';
 import { AlbumCard } from '../components/albums/AlbumCard';
 import { AlbumFormModal } from '../components/albums/AlbumFormModal';
 import { AlbumDetail } from '../components/albums/AlbumDetail';
+import { MemoriesStrip } from '../components/memories/MemoriesStrip';
 import { useToast } from '../hooks/useToast';
 import { useInfiniteMedia } from '../hooks/useInfiniteMedia';
 import { useMediaActions } from '../hooks/useMediaActions';
@@ -202,6 +203,8 @@ export function PhotosPage() {
             </div>
           </div>
         ))}
+
+      {tab === 'photos' && <MemoriesStrip />}
 
       {tab === 'photos' &&
         (loading && photos.length === 0 ? (

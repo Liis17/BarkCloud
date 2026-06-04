@@ -58,20 +58,21 @@ public class FileHashesStorage : IFileHashesStorage
     }
 
     /// <summary>
-    /// Пакетная проверка: из переданного набора хешей возвращает те, что есть в
-    /// хранилище. Один запрос (WHERE Hash IN ...), без побочных эффектов.
-    /// Ожидает уже нормализованные (lowercase) хеши.
+    /// Пакетная проверка, ограниченная файлами ТЕКУЩЕГО пользователя: из набора хешей возвращает те,
+    /// для которых у владельца есть живая (не в корзине) запись в облаке. Так дедуп-подсказка не
+    /// раскрывает наличие файлов других пользователей. Ожидает нормализованные (lowercase) хеши.
     /// </summary>
-    public async Task<HashSet<string>> GetExistingHashes(IReadOnlyCollection<string> hashes)
+    public async Task<HashSet<string>> GetExistingHashesForOwner(long ownerId, IReadOnlyCollection<string> hashes, CancellationToken cancellationToken = default)
     {
         if (hashes.Count == 0)
             return new HashSet<string>();
 
         var found = await _context.FileHashes
             .AsNoTracking()
-            .Where(x => hashes.Contains(x.Hash))
-            .Select(x => x.Hash)
-            .ToListAsync();
+            .Where(h => hashes.Contains(h.Hash)
+                        && _context.CloudFileEntries.Any(e => e.OwnerId == ownerId && e.FileId == h.FileId && !e.IsDeleted))
+            .Select(h => h.Hash)
+            .ToListAsync(cancellationToken);
 
         return found.ToHashSet();
     }

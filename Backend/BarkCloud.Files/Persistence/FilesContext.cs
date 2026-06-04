@@ -1,6 +1,10 @@
+using System.Text.Json;
+
 using BarkCloud.Files.Domain;
 
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace BarkCloud.Files.Persistence;
 
@@ -24,6 +28,8 @@ public class FilesContext : DbContext
     public DbSet<Album> Albums { get; set; }
 
     public DbSet<AlbumItem> AlbumItems { get; set; }
+
+    public DbSet<DynamicFolder> DynamicFolders { get; set; }
 
     public DbSet<FavoriteFile> FavoriteFiles { get; set; }
 
@@ -100,6 +106,29 @@ public class FilesContext : DbContext
             b.HasIndex(x => new { x.AlbumId, x.AddedAt });
             // Обратный поиск «в каких альбомах файл».
             b.HasIndex(x => x.FileId);
+        });
+
+        modelBuilder.Entity<DynamicFolder>(b =>
+        {
+            // Уникальность имени умной папки в рамках владельца.
+            b.HasIndex(x => new { x.OwnerId, x.Name }).IsUnique();
+            // Порядок ленты у владельца.
+            b.HasIndex(x => new { x.OwnerId, x.SortOrder });
+
+            // Критерии храним как единый jsonb-документ. В SQL внутрь не запрашиваем —
+            // десериализуем POCO и строим запрос файлов в коде (DynamicFolderQueryBuilder).
+            var jsonOptions = new JsonSerializerOptions();
+            var converter = new ValueConverter<DynamicFolderCriteria, string>(
+                v => JsonSerializer.Serialize(v, jsonOptions),
+                v => JsonSerializer.Deserialize<DynamicFolderCriteria>(v, jsonOptions) ?? new DynamicFolderCriteria());
+            var comparer = new ValueComparer<DynamicFolderCriteria>(
+                (a, c) => JsonSerializer.Serialize(a, jsonOptions) == JsonSerializer.Serialize(c, jsonOptions),
+                v => v == null ? 0 : JsonSerializer.Serialize(v, jsonOptions).GetHashCode(),
+                v => JsonSerializer.Deserialize<DynamicFolderCriteria>(JsonSerializer.Serialize(v, jsonOptions), jsonOptions)!);
+
+            b.Property(x => x.Criteria)
+                .HasConversion(converter, comparer)
+                .HasColumnType("jsonb");
         });
 
         modelBuilder.Entity<FavoriteFile>(b =>

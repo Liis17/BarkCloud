@@ -59,6 +59,7 @@ public class Program
         builder.Services.AddScoped<IFileHashesStorage, FileHashesStorage>();
         builder.Services.AddScoped<ICloudHierarchyStorage, CloudHierarchyStorage>();
         builder.Services.AddScoped<IAlbumStorage, AlbumStorage>();
+        builder.Services.AddScoped<IDynamicFolderStorage, DynamicFolderStorage>();
         builder.Services.AddScoped<IFavoriteFilesStorage, FavoriteFilesStorage>();
         builder.Services.AddScoped<IShareStorage, ShareStorage>();
         builder.Services.AddScoped<IFolderShareStorage, FolderShareStorage>();
@@ -72,6 +73,7 @@ public class Program
         builder.Services.AddSingleton<FileMetadataExtractor>();
         builder.Services.AddScoped<PreviewPersistenceService>();
         builder.Services.AddScoped<AlbumViewBuilder>();
+        builder.Services.AddScoped<DynamicFolderViewBuilder>();
         builder.Services.AddScoped<ITrashPurgeService, TrashPurgeService>();
         builder.Services.AddHostedService<TempFileCleanupService>();
         builder.Services.AddHostedService<TrashCleanupService>();
@@ -135,6 +137,7 @@ public class Program
         app.MapGrpcService<FilesServerApiService>();
         app.MapGrpcService<CloudApiService>();
         app.MapGrpcService<AlbumApiService>();
+        app.MapGrpcService<DynamicFolderApiService>();
 
         app.Lifetime.ApplicationStopped.Register(Log.CloseAndFlush);
         app.Run();

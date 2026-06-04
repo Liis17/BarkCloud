@@ -13,6 +13,7 @@ const NAV_PRIMARY: NavItem[] = [
   { key: 'photos', to: '/photos', label: 'Фото', icon: 'photo' },
   { key: 'videos', to: '/videos', label: 'Видео', icon: 'video' },
   { key: 'files', to: '/files', label: 'Файлы', icon: 'folder' },
+  { key: 'map', to: '/map', label: 'Карта', icon: 'globe' },
 ];
 const NAV_SHARE: NavItem[] = [
   { key: 'shared', to: '/shared', label: 'Общие', icon: 'share' },

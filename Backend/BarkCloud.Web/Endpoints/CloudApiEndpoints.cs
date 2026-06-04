@@ -229,6 +229,41 @@ public static class CloudApiEndpoints
                 }, Json);
             }));
 
+        // «Воспоминания — В этот день»: фото/видео за сегодняшнюю дату прошлых лет, по группам-годам.
+        api.MapGet("/cloud/memories", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud,
+            int? month, int? day, int? perYear) =>
+            await Guarded(http, auth, async token =>
+            {
+                var req = new GetMemoriesRequest
+                {
+                    Month = month is >= 1 and <= 12 ? month.Value : 0,
+                    Day = day is >= 1 and <= 31 ? day.Value : 0,
+                    PerYearLimit = perYear is > 0 ? perYear.Value : 0
+                };
+                var resp = await cloud.GetMemoriesAsync(req, token);
+                return Results.Json(new { groups = resp.Groups.Select(CloudJson.MemoryGroup).ToArray() }, Json);
+            }));
+
+        // Точки для карты: медиа с GPS-координатами (cursor-пагинация, клиент кластеризует).
+        api.MapGet("/cloud/map", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud,
+            int? limit, string? cursorAt, string? cursorId) =>
+            await Guarded(http, auth, async token =>
+            {
+                var req = new ListMediaLocationsRequest { Limit = limit is > 0 and <= 1000 ? limit.Value : 500 };
+                if (DateTimeOffset.TryParse(cursorAt, out var dt))
+                    req.CursorCreatedAt = Timestamp.FromDateTimeOffset(dt.ToUniversalTime());
+                if (!string.IsNullOrEmpty(cursorId))
+                    req.CursorFileId = cursorId;
+
+                var resp = await cloud.ListMediaLocationsAsync(req, token);
+                return Results.Json(new
+                {
+                    points = resp.Points.Select(CloudJson.MapPoint).ToArray(),
+                    nextCursorAt = resp.NextCursorCreatedAt?.ToDateTimeOffset(),
+                    nextCursorId = resp.NextCursorFileId
+                }, Json);
+            }));
+
         // Заменить превью видео загруженной картинкой-кадром (sourceImageFileId — уже загруженный файл).
         api.MapPost("/cloud/video/thumbnail", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud, VideoThumbReq body) =>
             await Guarded(http, auth, async token =>
@@ -634,6 +669,80 @@ public static class CloudApiEndpoints
                 return Results.Json(new { ok = true }, Json);
             }));
 
+        // ───────────────────────── Умные (динамические) папки ─────────────────────────
+
+        api.MapGet("/dynamic-folders", async (HttpContext http, AuthGateway auth, DynamicFolderApi.DynamicFolderApiClient folders) =>
+            await Guarded(http, auth, async token =>
+            {
+                var resp = await folders.ListDynamicFoldersAsync(new ListDynamicFoldersRequest(), token);
+                return Results.Json(new { folders = resp.Folders.Select(CloudJson.DynamicFolder).ToArray() }, Json);
+            }));
+
+        api.MapGet("/dynamic-folders/items", async (HttpContext http, AuthGateway auth, DynamicFolderApi.DynamicFolderApiClient folders,
+            string folder, string? kind, int? limit, string? cursorAt, string? cursorId) =>
+            await Guarded(http, auth, async token =>
+            {
+                var req = new ListDynamicFolderItemsRequest
+                {
+                    FolderId = folder,
+                    Limit = limit is > 0 and <= 200 ? limit.Value : 100
+                };
+                if (kind == "photo") req.KindFilter = MediaKind.Photo;
+                else if (kind == "video") req.KindFilter = MediaKind.Video;
+                if (DateTimeOffset.TryParse(cursorAt, out var dt))
+                    req.CursorCreatedAt = Timestamp.FromDateTimeOffset(dt.ToUniversalTime());
+                if (!string.IsNullOrEmpty(cursorId))
+                    req.CursorFileId = cursorId;
+
+                var resp = await folders.ListDynamicFolderItemsAsync(req, token);
+                return Results.Json(new
+                {
+                    items = resp.Items.Select(CloudJson.Media).ToArray(),
+                    nextCursorAt = resp.NextCursorCreatedAt?.ToDateTimeOffset(),
+                    nextCursorId = resp.NextCursorFileId
+                }, Json);
+            }));
+
+        api.MapPost("/dynamic-folders", async (HttpContext http, AuthGateway auth, DynamicFolderApi.DynamicFolderApiClient folders, DfCreate body) =>
+            await Guarded(http, auth, async token =>
+            {
+                var req = new CreateDynamicFolderRequest
+                {
+                    Name = body.Name,
+                    Combinator = (DfCombinator)body.Combinator,
+                    IconKey = body.IconKey ?? "",
+                    CoverColor = body.CoverColor ?? ""
+                };
+                if (body.Rules is not null)
+                    req.Rules.AddRange(body.Rules.Select(ToProtoRule));
+                var info = await folders.CreateDynamicFolderAsync(req, token);
+                return Results.Json(CloudJson.DynamicFolder(info), Json);
+            }));
+
+        api.MapPost("/dynamic-folders/update", async (HttpContext http, AuthGateway auth, DynamicFolderApi.DynamicFolderApiClient folders, DfUpdate body) =>
+            await Guarded(http, auth, async token =>
+            {
+                var req = new UpdateDynamicFolderRequest
+                {
+                    FolderId = body.Folder,
+                    Combinator = (DfCombinator)body.Combinator
+                };
+                if (body.Name is not null) req.Name = body.Name;
+                if (body.IconKey is not null) req.IconKey = body.IconKey;
+                if (body.CoverColor is not null) req.CoverColor = body.CoverColor;
+                if (body.Rules is not null)
+                    req.Rules.AddRange(body.Rules.Select(ToProtoRule));
+                var info = await folders.UpdateDynamicFolderAsync(req, token);
+                return Results.Json(CloudJson.DynamicFolder(info), Json);
+            }));
+
+        api.MapPost("/dynamic-folders/delete", async (HttpContext http, AuthGateway auth, DynamicFolderApi.DynamicFolderApiClient folders, DfIdReq body) =>
+            await Guarded(http, auth, async token =>
+            {
+                await folders.DeleteDynamicFolderAsync(new DeleteDynamicFolderRequest { FolderId = body.Folder }, token);
+                return Results.Json(new { ok = true }, Json);
+            }));
+
         // ───────────────────────── Файлы: загрузка / оригинал ─────────────────────────
 
         // Проверка наличия по SHA256-хешу (без побочных эффектов): клиент считает хеш в браузере
@@ -944,6 +1053,17 @@ public static class CloudApiEndpoints
     private sealed record AlbumUpdate(string Album, string? Name, string? Description, string? CoverFileId);
     private sealed record AlbumIdReq(string Album);
     private sealed record AlbumItems(string Album, string[]? FileIds);
+    private sealed record DfRuleDto(int Field, int Op, string? Value);
+    private sealed record DfCreate(string Name, int Combinator, DfRuleDto[]? Rules, string? IconKey, string? CoverColor);
+    private sealed record DfUpdate(string Folder, int Combinator, DfRuleDto[]? Rules, string? Name, string? IconKey, string? CoverColor);
+    private sealed record DfIdReq(string Folder);
+
+    private static DfRule ToProtoRule(DfRuleDto r) => new()
+    {
+        Field = (DfField)r.Field,
+        Operator = (DfOperator)r.Op,
+        Value = r.Value ?? ""
+    };
     private sealed record HashReq(string? Hash);
     private sealed record VideoThumbReq(string VideoFileId, string ImageFileId);
     private sealed record ShareCreateReq(string FileId, string? Name);

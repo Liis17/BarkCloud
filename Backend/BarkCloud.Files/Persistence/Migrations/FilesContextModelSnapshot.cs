@@ -205,6 +205,54 @@ namespace BarkCloud.Files.Persistence.Migrations
                     b.ToTable("DirectoryGrants");
                 });
 
+            modelBuilder.Entity("BarkCloud.Files.Domain.DynamicFolder", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CoverColor")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Criteria")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("IconKey")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("IsSystem")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<long>("OwnerId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("SystemKey")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OwnerId", "Name")
+                        .IsUnique();
+
+                    b.HasIndex("OwnerId", "SortOrder");
+
+                    b.ToTable("DynamicFolders");
+                });
+
             modelBuilder.Entity("BarkCloud.Files.Domain.FavoriteFile", b =>
                 {
                     b.Property<Guid>("Id")
