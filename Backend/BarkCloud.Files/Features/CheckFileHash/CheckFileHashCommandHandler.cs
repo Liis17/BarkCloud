@@ -56,19 +56,28 @@ public partial class CheckFileHashCommandHandler : IRequestHandler<CheckFileHash
             return new CheckFileHashResponse { FileId = string.Empty, Exists = false };
         }
 
-        _logger.LogInformation("Файл с хешем {FileHash} найден ({Count} блоб(ов))", normalizedHash, fileIds.Count);
+        // Наличие определяем ТОЛЬКО по файлам текущего пользователя (его живым записям в облаке).
+        // Глобальное присутствие хеша не раскрываем — иначе ответ палил бы наличие контента у
+        // других пользователей. AddUploaderToFile здесь намеренно НЕ вызывается: проверка без
+        // побочных эффектов, решение «грузить копию / открыть существующий» принимает клиент.
+        var ownerId = _userContext.UserId;
+        var entries = await _hierarchyStorage.GetLiveEntriesForFiles(ownerId, fileIds, cancellationToken);
+        if (entries.Count == 0)
+        {
+            _logger.LogInformation("Файл с хешем {FileHash} у пользователя {Owner} не найден", normalizedHash, ownerId);
+            return new CheckFileHashResponse { FileId = string.Empty, Exists = false };
+        }
+
+        _logger.LogInformation("Файл с хешем {FileHash} найден у пользователя {Owner} ({Count} запис(ей))",
+            normalizedHash, ownerId, entries.Count);
 
         var response = new CheckFileHashResponse
         {
-            FileId = fileIds[0].ToString(),
+            FileId = entries[0].FileId.ToString(),
             Exists = true
         };
 
         // Локации существующих копий пользователя (имя + папка) — для модалки «файл уже есть».
-        // AddUploaderToFile здесь намеренно НЕ вызывается: проверка без побочных эффектов,
-        // решение «грузить копию / открыть существующий» принимает клиент.
-        var ownerId = _userContext.UserId;
-        var entries = await _hierarchyStorage.GetLiveEntriesForFiles(ownerId, fileIds, cancellationToken);
         foreach (var entry in entries)
         {
             var isRoot = entry.DirectoryId == CloudHierarchyStorage.RootDirectoryId;
