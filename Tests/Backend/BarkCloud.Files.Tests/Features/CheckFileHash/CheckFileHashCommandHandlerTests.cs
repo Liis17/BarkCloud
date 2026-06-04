@@ -79,9 +79,10 @@ public class CheckFileHashCommandHandlerTests
     }
 
     [Fact]
-    public async Task Handle_HashFoundButNoUserEntries_ReturnsExistsWithoutLocations()
+    public async Task Handle_HashFoundButNoUserEntries_ReturnsNotExists()
     {
         // Контент есть в системе (например, чужой блоб с тем же хешем), но у пользователя записей нет.
+        // Приватность: наличие чужого файла не раскрываем — отвечаем «не существует».
         var fileId = Guid.NewGuid();
         var hash = new string('c', 64);
         _hashes.Setup(s => s.GetFileIdsByHash(hash, It.IsAny<CancellationToken>())).ReturnsAsync(new List<Guid> { fileId });
@@ -90,7 +91,8 @@ public class CheckFileHashCommandHandlerTests
 
         var response = await CreateSut().Handle(new CheckFileHashCommand { FileHash = hash }, default);
 
-        response.Exists.Should().BeTrue();
+        response.Exists.Should().BeFalse();
+        response.FileId.Should().BeEmpty();
         response.ExistingLocations.Should().BeEmpty();
     }
 
@@ -121,7 +123,10 @@ public class CheckFileHashCommandHandlerTests
         var hash = new string('A', 64);
         _hashes.Setup(s => s.GetFileIdsByHash(hash.ToLowerInvariant(), It.IsAny<CancellationToken>())).ReturnsAsync(new List<Guid> { fileId });
         _hierarchy.Setup(s => s.GetLiveEntriesForFiles(It.IsAny<long>(), It.IsAny<IReadOnlyCollection<Guid>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<CloudFileEntry>());
+            .ReturnsAsync(new List<CloudFileEntry>
+            {
+                new() { Id = Guid.NewGuid(), OwnerId = 42, FileId = fileId, DirectoryId = CloudHierarchyStorage.RootDirectoryId, Name = "file.bin" }
+            });
 
         var response = await CreateSut().Handle(new CheckFileHashCommand { FileHash = hash }, default);
 
