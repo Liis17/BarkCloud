@@ -1,6 +1,7 @@
 import SwiftUI
 import UIKit
 import Photos
+import BarkCloudKit
 
 /// Что показывать в пикере: только фото, только видео, или и то и другое.
 enum DeviceAssetPickerFilter {

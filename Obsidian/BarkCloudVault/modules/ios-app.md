@@ -18,6 +18,17 @@ Parent: [[index]]
 
 ## Текущая структура
 
+> ⚠️ **С 2026-06-03 (Этап 0 macOS, [[macos-drive]]) сетевой слой вынесен в общий SwiftPM-пакет
+> `BarkCloudKit` (`Mac/BarkCloudKit/`).** Физически перенесены (`git mv`): `Networking/`
+> (кроме upload-файлов), `Session/SessionStore.swift`, `Data/Cloud|Auth|Users/*`, и proto
+> (`Generated/`). В iOS-коде теперь `import BarkCloudKit`; API этих типов — `public`. В дереве
+> ниже эти файлы помечают **логическую** структуру, но живут в пакете. Остаются в iOS-таргете:
+> `Networking/{BackgroundUploadCoordinator,UploadConstants,UploadLiveActivityController,
+> UploadProgressObserver}.swift`, `Data/Cache/{UploadJob,UploadQueueStore}.swift` (см.
+> [[ios-background-upload]]) и `Data/Cloud/CloudRepository+BackgroundUpload.swift` (фоновая
+> загрузка — расширение над пакетным `CloudRepository`). App Group id для `ServerConfig`/
+> `SessionStore` в пакете задаёт `BarkCloudAppGroup` (на macOS — своя ветка).
+
 ```
 BarkCloud/
 ├── App/

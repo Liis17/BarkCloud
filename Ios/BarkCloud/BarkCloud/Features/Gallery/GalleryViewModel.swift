@@ -2,6 +2,7 @@ import Foundation
 import Observation
 import Photos
 import UIKit
+import BarkCloudKit
 
 extension Notification.Name {
     /// MainScreen → GalleryScreen: пользователь только что переключился на

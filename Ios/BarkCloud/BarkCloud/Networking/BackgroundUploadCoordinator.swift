@@ -1,4 +1,5 @@
 import Foundation
+import BarkCloudKit
 
 /// Замыкание, возвращающее свежий access-token. main app и Share Extension
 /// устанавливают своё (через `GrpcManager.validAccessToken`).

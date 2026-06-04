@@ -1,5 +1,6 @@
 import UIKit
 import UniformTypeIdentifiers
+import BarkCloudKit
 
 /// Share Extension «Сохранить в BarkCloud». Принятые из системного share sheet
 /// фото/видео/файлы пользователь может загрузить в выбранную папку: по умолчанию

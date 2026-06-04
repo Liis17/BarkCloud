@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import BarkCloudKit
 
 /// Получатель внутри группы «Я поделился» — один грант на файл.
 struct SharedByMeRecipient: Identifiable, Hashable, Sendable {
