@@ -105,7 +105,17 @@ deployment 15.4. `xcodebuild` обеих схем зелёный (CODE_SIGNING_A
 существующим проактивным рефрешем `GrpcManager.validAccessToken` (срабатывает на каждом FS-запросе);
 отдельный фоновый таймер для idle-маунта — опциональное улучшение. **Не сделано (рантайм/устройство):**
 маунт и эмпирическая проверка read/write семантики (нужен Team ID + включение расширения).
-**Этапы 2–3 (контейнер-app UI с server setup/логином/монтажом, инсталлятор) — не начаты.**
+**Этап 2 (контейнер-app) — код КОМПИЛИРУЕТСЯ** (`Mac/BarkCloudDrive/BarkCloudDrive/`, 2026-06-04):
+SwiftUI app + menu-bar (`MenuBarExtra`), переиспользует `BarkCloudKit`.
+- `AppModel` — @Observable сервис-контейнер (Grpc/Session/Auth/User/Transfer) + фазы
+  serverSetup→login→dashboard (по `ServerConfig.isConfigured` + `hasValidRefreshToken`).
+- `ServerSetupView` (хост+порты+self-signed → `ServerConfig.persist`), `LoginView` (auth+OTP),
+  `DashboardView` (профиль `getUser`, прогресс `storageInfo`, монтаж/размонтаж), `SettingsView`
+  (logout, смена сервера, автозапуск `SMAppService.mainApp`), `MenuBarView`.
+- `MountManager` — обёртка `mount`/`umount` (⚠️ механизм FSKit-маунта URL-FS непроверяем, см. ниже).
+**Осталось по Этапу 2:** локализация RU/EN/DE (сейчас строки RU инлайн), загрузка аватара
+(self-signed → нужен `InsecureHTTP`), реальный механизм монтирования (рантайм).
+**Этап 3 (упаковка `.pkg`/`.dmg` + нотаризация + онбординг) — не начат.**
 
 ## Переиспользуемый код iOS ([[ios-app]])
 
@@ -120,5 +130,5 @@ deployment 15.4. `xcodebuild` обеих схем зелёный (CODE_SIGNING_A
 
 0. Общий пакет `BarkCloudKit` + миграция iOS ← **ВЫПОЛНЕН** (сборки зелёные)
 1. FSKit-расширение `BarkCloudFS` (FSVolume-операции → облако) ← **код read+write компилируется; осталась рантайм-проверка (маунт)**
-2. Контейнер-app (server setup, логин, монтаж, дашборд, настройки, автозапуск)
+2. Контейнер-app (server setup, логин, монтаж, дашборд, настройки, автозапуск) ← **код компилируется; осталась локализация + рантайм-монтаж**
 3. Упаковка `.pkg`/`.dmg` + нотаризация + онбординг включения расширения

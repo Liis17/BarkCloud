@@ -145,6 +145,12 @@ File System Extensions), смонтировать том → появляетс�
 
 SwiftUI + menu-bar (`NSStatusItem`), паритет с Windows-`App` (трей + 3 окна).
 
+> **СТАТУС: код контейнер-app КОМПИЛИРУЕТСЯ** (`Mac/BarkCloudDrive/BarkCloudDrive/`). `AppModel`
+> (@Observable, фазы serverSetup→login→dashboard) + экраны ServerSetup/Login/Dashboard/Settings/
+> MenuBar + `MountManager`. `xcodebuild` схемы BarkCloudDrive зелёный. Осталось: локализация
+> RU/EN/DE (строки RU инлайн), загрузка аватара через `InsecureHTTP`, реальный механизм монтирования
+> (рантайм-риск — `FSClient` без mount-API; обёртка над `mount`/`umount` непроверяема сборкой).
+
 - **Первый запуск:** экран адреса сервера (host + порты Identity/Users/Files + self-signed) →
   `ServerConfig.persist()` → логин (`AuthRepository`, OTP) → токены в Keychain → имя тома →
   монтирование.
