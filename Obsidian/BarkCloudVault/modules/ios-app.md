@@ -727,7 +727,9 @@ Home Screen виджет «Хранилище BarkCloud» (`.systemSmall` + `.sy
   `UserDefaults(suiteName: group.com.barkfluff.BarkCloud)` и дёргает
   `WidgetCenter.reloadTimelines(ofKind: "StorageWidget")`. Зовётся там же, где
   приложение получает квоту: `ProfileViewModel.load()` и
-  `BackupManager.loadStorageInfo()` (после `transfer.storageInfo()`).
+  `BackupManager.loadStorageInfo()` (после `transfer.storageInfo()`). Последний
+  дёргается и на каждом выходе app на передний план (`scenePhase == .active` в
+  `BarkCloudApp`) — освежает виджет при старте/возврате (best-effort).
 - `BarkCloudWidgets/StorageWidget.swift` — `StaticConfiguration` (kind
   `StorageWidget`), `TimelineProvider` читает `StorageSnapshot.current()` из тех
   же ключей (контракт — строковые ключи, общего типа между таргетами нет),
