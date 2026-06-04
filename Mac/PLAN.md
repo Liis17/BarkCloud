@@ -1,12 +1,14 @@
 # План реализации macOS-клиента (выполнять на Mac)
 
-Пошаговый чеклист для разработки нативного macOS-клиента виртуального диска BarkCloud
-(том в Finder через **FSKit**). Обзор и решения — [README.md](README.md); память проекта —
-`Obsidian/BarkCloudVault/modules/macos-drive.md`; референс — Windows-клиент `Drive/`.
+Пошаговый чеклист для разработки нативного macOS-клиента BarkCloud (папка
+облака в Finder через **NSFileProviderReplicatedExtension**). Обзор и решения —
+[README.md](README.md); память проекта — `Obsidian/BarkCloudVault/modules/macos-drive.md`;
+референс — Windows-клиент `Drive/`.
 
-> **Требования среды:** macOS 15.4+, Xcode 16+, Apple Developer аккаунт (Developer ID для
-> подписи/нотаризации). Инструменты генерации proto: `brew install protobuf swift-protobuf grpc-swift`.
-> Ветка разработки: `claude/mac-virtual-disk-display-S8lTc`.
+> **Требования среды:** macOS 15.4+, Xcode 16+, Apple Developer-аккаунт
+> (для рантайма — даже Personal team, в отличие от FSKit; для нотаризации/
+> распространения — платный с Developer ID). Инструменты proto:
+> `brew install protobuf swift-protobuf grpc-swift`.
 
 Легенда проверки: `✅ verify:` — как убедиться, что шаг выполнен.
 
@@ -14,188 +16,123 @@
 
 ## Этап 0 — Общий пакет `BarkCloudKit` + миграция iOS
 
-> **СТАТУС: ВЫПОЛНЕН** (ветка `claude/mac-virtual-disk-display-S8lTc`). Сетевой слой перенесён
-> в пакет, API сделан `public`, добавлены macOS-ветки (`XDeviceInterceptor`/`XOsInterceptor`,
-> `BarkCloudAppGroup`), iOS переведён на `import BarkCloudKit`. `swift build` + `xcodebuild`
-> (app/ShareExtension/Widgets) + `build-for-testing` — зелёные. Фоновая загрузка iOS-only
-> вынесена в `Ios/.../Data/Cloud/CloudRepository+BackgroundUpload.swift`. iOS-фаза «Sync Shared
-> Proto» удалена (proto теперь из пакета). Не сделано: `RangeBlockReaderTests` (см. 0.6) —
-> отложен до Этапа 1.
-
-Цель: единый источник правды для сетевого слоя. Сейчас в `Mac/BarkCloudKit/` лежит только
-новый код (Range-ридер, батч-удаление) и манифест — пакет **не собирается**, пока не перенесены
-файлы из iOS.
-
-### 0.1 Перенести платформо-независимые файлы из iOS в пакет
-Переместить (git mv) в `Mac/BarkCloudKit/Sources/BarkCloudKit/` из `Ios/BarkCloud/BarkCloud/`:
-- `Networking/`: `GrpcManager.swift` (вкл. `ServerConfig`/`GrpcEndpoint`), `FileTransferService.swift`,
-  `InsecureURLSession.swift`, `MultipartBodyBuilder.swift`, `Base64Header.swift`, `GrpcError.swift`,
-  `AuthErrorCodes.swift`, `CloudErrorCodes.swift`, `AuthInterceptor.swift`, `XDeviceInterceptor.swift`,
-  `XOsInterceptor.swift`, `XAppInterceptor.swift`, `XIpInterceptor.swift`
-- `Session/SessionStore.swift`
-- `Data/Cloud/`: `CloudRepository.swift`, `CloudModels.swift`, `AlbumRepository.swift`
-- `Data/Auth/`: `AuthRepository.swift`, `AuthResult.swift`
-- `Data/Users/*`
-
-**НЕ переносить** (iOS-only, остаются в iOS-таргете): `BackgroundUploadCoordinator.swift`,
-`UploadLiveActivityController.swift`, `UploadProgressObserver.swift`, `UploadConstants.swift`
-(App Group id), всё, что тянет UIKit/ActivityKit/BGTask.
-
-### 0.2 Перегенерировать proto в пакет
-```bash
-Mac/BarkCloudKit/scripts/sync_proto.sh    # → Sources/BarkCloudKit/Generated/, Visibility=Public
-```
-Удалить старые `Ios/BarkCloud/BarkCloud/Generated/Proto/*` после перевода iOS на пакет (0.5).
-
-### 0.3 Сделать API публичным
-Используемые из app/extension типы и методы → `public`: `GrpcManager`, `SessionStore`,
-`ServerConfig`/`GrpcEndpoint`, `FileTransferService`, `CloudRepository`, `AuthRepository`,
-модели (`CloudListing`, `CloudFileEntry`, `CloudDirectory`, `CloudFile`…), интерцепторы по
-необходимости. В `CloudRepository.swift`: `private let grpc` → `let grpc` (нужно для
-`CloudRepository+BatchDelete.swift`).
-
-### 0.4 macOS-ветки платформенного кода
-- `XDeviceInterceptor`: имя устройства через `Host.current().localizedName` / `ProcessInfo`
-  под `#if os(macOS)` (на iOS было `UIDevice`). Значения заголовков — **Base64(UTF8)**,
-  `x-auth-token` — сырой (иначе Auth падает `XDeviceNameIsRequired` и т.п.).
-- `ServerConfig.store` и `SessionStore`: App Group id и keychain-access-group, **общие** у
-  контейнера и расширения (см. 1.5). На macOS App Group — `group.<TeamID>.com.barkfluff.BarkCloud…`.
-- `InsecureURLSession`: проверить, что self-signed-делегат работает на macOS (должен — тот же API).
-
-### 0.5 Подключить пакет к iOS-проекту
-- В `BarkCloud.xcodeproj` добавить локальную зависимость `Mac/BarkCloudKit` (Add Local Package).
-- Добавить продукт `BarkCloudKit` в таргеты: main app, ShareExtension, Widgets (где использовалось).
-- Удалить перенесённые файлы из таргетов; заменить импорты на `import BarkCloudKit`; снять
-  `internal`-ограничения, где обращались к ставшим `public` типам.
-
-### 0.6 Тесты пакета
-`Tests/BarkCloudKitTests/RangeBlockReaderTests.swift`: локальный HTTP-сервер, отвечающий `206`
-с `Content-Range` → проверить сборку файла из блоков и откат на whole при `200`.
-
-**✅ verify Этап 0:**
-- `swift build` пакета — успешно; `swift test` — зелёный.
-- `xcodebuild` iOS-таргетов собирается; `BarkCloudTests` зелёные; поведение iOS не изменилось
-  (логин, галерея, загрузка, share — вручную смоук-тест).
+**СТАТУС: ВЫПОЛНЕН.** Сетевой слой iOS перенесён в SwiftPM-пакет
+`Mac/BarkCloudKit/` — единый источник правды для iOS, контейнер-app и
+File Provider-расширения. `swift build` + `xcodebuild` iOS-таргетов —
+зелёные.
 
 ---
 
-## Этап 1 — FSKit-расширение `BarkCloudFS.appex`
+## Этап 1 — File Provider-расширение `BarkCloudFS.appex`
 
-> **СТАТУС: read+write код КОМПИЛИРУЕТСЯ** (`Mac/BarkCloudDrive/`). Проект app+appex создан,
-> оба таргета линкуют `BarkCloudKit`, `xcodebuild` зелёный (CODE_SIGNING_ALLOWED=NO). Реализованы
-> mount/activate/enumerate/attributes/lookup/reclaim/read (`RangeBlockReader`) + volumeStatistics
-> (read-path) и create/write/remove/rename/mkdir + upload-на-close (write-path 1.5). Авторефреш (1.6)
-> покрыт проактивным рефрешем `GrpcManager` (на каждом FS-запросе). Карта FSKit API —
-> `Obsidian/BarkCloudVault/modules/macos-fskit-api.md`.
-> **Осталось:** рантайм-маунт и эмпирическая проверка семантики (нужен Team ID + включение
-> расширения в System Settings — на стороне пользователя); опциональный фоновый таймер рефреша.
+**СТАТУС: КОМПИЛИРУЕТСЯ.** `Mac/BarkCloudDrive/BarkCloudFS/` — app-extension
+типа `com.apple.fileprovider-nonui`.
 
-Цель: реализовать том, маппящий FS-операции на облако через `BarkCloudKit`.
+Файлы:
+- `BarkCloudFileProvider.swift` — `NSFileProviderReplicatedExtension`,
+  `loadServices()` lazy (@MainActor, gRPC + Keychain из App Group),
+  `item(for:)`, `enumerator(for:)`, `fetchContents`, `createItem`,
+  `modifyItem`, `deleteItem`.
+- `BarkCloudFileProviderItem.swift` — `NSFileProviderItem` (директория /
+  файл / root), `itemIdentifier` = `"d:<dirID>"` / `"f:<entryID>"` /
+  `.rootContainer`, `itemVersion(contentVersion: fileID,
+  metadataVersion: name+parent+modified)`, capabilities per-type.
+- `BarkCloudItemCache.swift` — `actor` cache `identifier → CloudDirectory/
+  CloudFileEntry`, заполняется при enumerate. На cache miss — `.noSuchItem`,
+  fileproviderd перезапросит листинг родителя.
+- `BarkCloudEnumerator.swift` — per-container enumerator + EmptyEnumerator
+  (working-set/trash) + PendingEnumerator (резолв подпапки из actor-кэша,
+  т.к. `enumerator(for:)` синхронный).
 
-### 1.1 Создать Xcode-проект `Mac/BarkCloudDrive/`
-- App-таргет (контейнер) + таргет расширения типа **File System Module** (`com.apple.fskit.fsmodule`).
-- Оба зависят от `BarkCloudKit` (Add Local Package).
-- Deployment target: macOS 15.4.
+**Семантика записи** (наследуется от Windows): блобы иммутабельны → правка
+существующего файла = `deleteFileEntry` + `uploadFile` + `attachFile` как
+новый (новый `entryID`/identifier, fileproviderd подменяет).
 
-### 1.2 `FSUnaryFileSystem` + `FSUnaryFileSystemOperations`
-- `probeResource`/`loadResource` → подготовить ресурс тома (для cloud-FS — unary, без блочного устройства).
-- Создать `FSVolume` с меткой «BarkCloud», атрибутами read-write.
+**Сессия в расширении:** `loadServices()` поднимает `SessionStore`
+(Keychain) + `GrpcManager` (адрес из App Group UserDefaults) + проактивный
+авторефреш `CreateToken` на каждом запросе.
 
-### 1.3 `FSVolume.Operations` (маппинг Dokany → FSKit)
-Реализовать протоколы операций тома (имена API уточнить по SDK конкретной версии macOS):
+**Entitlements расширения:** app-sandbox, network, App Group, keychain-access-group
+— общие с app. **БЕЗ** `com.apple.developer.fskit.fsmodule`.
 
-| Dokany (`BarkCloudFileSystem.cs`) | FSKit | BarkCloud (`BarkCloudKit`) |
-|---|---|---|
-| `GetVolumeInformation` | атрибуты тома | метка «BarkCloud», read-write |
-| `GetDiskFreeSpace` | `FSStatFSResult` | `FileTransferService.storageInfo()` (used/limit) |
-| `FindFiles` | `enumerateDirectory` | `CloudRepository.listDirectory(dirID)` |
-| `GetFileInformation` | `getAttributes(of:)` | из кэша листинга (`CloudModels`) |
-| `CreateFile`(open) | `lookupItem`/`openItem` | резолв `entryId`/`fileId`, без скачивания |
-| `ReadFile(offset)` | `read(...)` | `RangeBlockReader.read(fileID:fileLength:offset:length:)` |
-| `WriteFile`+`Cleanup` | `write` + `closeItem` | буфер→`getUploadURL`→`POST /web/upload`→`attachFile` |
-| `CreateDirectory` | `createItem(.directory)` | `createDirectory` |
-| `DeleteFile`/`DeleteDirectory` | `removeItem` | `batchDeleteFileEntries`/`deleteDirectory` |
-| `MoveFile` | `renameItem` | `rename*`/`move*` Directory/FileEntry |
+**Info.plist расширения:** `NSExtension.NSExtensionPointIdentifier =
+com.apple.fileprovider-nonui`, `NSExtensionPrincipalClass = ...BarkCloudFileProvider`,
+`NSExtensionFileProviderSupportsEnumeration = YES`.
 
-### 1.4 Модель узлов `FSItem`
-Дерево `FSItem`-узлов с привязкой `entryId`/`fileId`/`directoryId`, кэш по lookup. Путевой
-строковый резолвер (как `CloudGateway.Resolve` на Windows) **не нужен** — FSKit оперирует нодами.
-
-### 1.5 Семантика записи (наследуется от Windows)
-- Блобы иммутабельны → правка существующего файла = перезалив целиком на `closeItem`, если
-  содержимое менялось; если эффективный `fileId` совпал — no-op.
-- Реальный upload/replace — на закрытии item (аналог `Cleanup`), не на каждом `write`.
-- Рабочие копии записи и блоки чтения — в `~/Library/Caches/BarkCloud.Drive/`.
-- Ошибки синхронизации не глушить → пробрасывать в статус (в дашборд через общее хранилище).
-
-### 1.6 Сессия в расширении
-- Расширение читает `ServerConfig` (App Group UserDefaults) и refresh-токен (shared Keychain),
-  поднимает свой `GrpcManager` + **фоновый авторефреш** (добавить таймер в `GrpcManager`, как
-  `TokenManager.RefreshLoopAsync` на Windows — токен ~30 мин, маунт длинный).
-- Entitlements расширения: client networking, App Group, keychain-access-group — **общие с app**.
-
-**✅ verify Этап 1:** включить расширение (System Settings → General → Login Items & Extensions →
-File System Extensions), смонтировать том → появляется в Finder; листинг, чтение большого файла
-(в логе Range-блоки, не целиком), запись/копирование (виден после ремаунта), удаление пачкой
-(`DeleteFileEntries`), mkdir/rename/move.
+**✅ verify Этап 1:** `xcodebuild build -scheme BarkCloudFS
+CODE_SIGNING_ALLOWED=NO` — зелёный. После регистрации домена (Этап 2)
+проверить листинг в Finder, скачивание файла (cache в
+`~/Library/Containers/com.barkfluff.BarkCloud.Drive.FileProvider/Data`),
+mkdir/rename/move/delete, контент-edit (delete+reupload).
 
 ---
 
 ## Этап 2 — Контейнер-приложение `BarkCloud Drive.app`
 
-SwiftUI + menu-bar (`NSStatusItem`), паритет с Windows-`App` (трей + 3 окна).
+**СТАТУС: КОМПИЛИРУЕТСЯ.** `Mac/BarkCloudDrive/BarkCloudDrive/`. SwiftUI +
+menu-bar (`MenuBarExtra`), переиспользует `BarkCloudKit`.
 
-> **СТАТУС: код контейнер-app КОМПИЛИРУЕТСЯ** (`Mac/BarkCloudDrive/BarkCloudDrive/`). `AppModel`
-> (@Observable, фазы serverSetup→login→dashboard) + экраны ServerSetup/Login/Dashboard/Settings/
-> MenuBar + `MountManager`. `xcodebuild` схемы BarkCloudDrive зелёный. Осталось: локализация
-> RU/EN/DE (строки RU инлайн), загрузка аватара через `InsecureHTTP`, реальный механизм монтирования
-> (рантайм-риск — `FSClient` без mount-API; обёртка над `mount`/`umount` непроверяема сборкой).
+- `AppModel` — @Observable сервис-контейнер (Grpc/Session/Auth/User/Transfer)
+  + фазы serverSetup→login→dashboard.
+- `ServerSetupView`, `LoginView` (auth+OTP), `DashboardView`, `SettingsView`,
+  `MenuBarView`.
+- **`FileProviderDomainManager`** (бывший `MountManager`): `refreshState()`,
+  `enable()` (`NSFileProviderManager.add(domain:)`), `disable()` (`remove`),
+  `revealInFinder()` (через `getUserVisibleURL(.rootContainer)` +
+  `NSWorkspace.activateFileViewerSelecting`).
+- Локализация RU/EN/DE — `Localizable.xcstrings` (29 ключей), аватар —
+  `RemoteAvatar` через `InsecureHTTP`.
 
-- **Первый запуск:** экран адреса сервера (host + порты Identity/Users/Files + self-signed) →
-  `ServerConfig.persist()` → логин (`AuthRepository`, OTP) → токены в Keychain → имя тома →
-  монтирование.
-- **Дашборд:** аватар (`UsersApi.GetUser(0)`), имя, сервер, прогресс хранилища, баннер ошибок
-  синхронизации, кнопки монтаж/размонтаж/настройки.
-- **Menu-bar:** Открыть / Примонтировать / Отмонтировать / Выход.
-- **Монтаж/размонтаж:** через FSKit API контейнера (зарегистрировать/смонтировать том своего
-  модуля; `unmount`). Имя тома = метка + точка монтирования.
-- **Настройки:** разлогин (`SessionStore.clearSession` + `ServerConfig.clear`), смена адреса
-  сервера, переименование тома, выбор папки кэша, автозапуск.
-- **Автозапуск:** `SMAppService.mainApp.register()` (Login Item).
-- **Локализация (RU/EN/DE):** String Catalogs или порт ключей из
-  `Drive/BarkCloud.Drive.Contracts/Localization/Strings*.resx`.
+**Автозапуск:** `SMAppService.mainApp.register()` (Login Item) — в
+`SettingsView`.
 
-**✅ verify Этап 2:** полный цикл первого запуска → монтирование; закрытие окна не размонтирует;
-выход размонтирует; перезапуск с восстановленной сессией; смена языка на лету; Login Item
-монтирует том при входе в систему.
+**✅ verify Этап 2:** полный цикл первого запуска → подключение домена;
+закрытие окна не отключает домен; выход не отключает домен (он персистится в
+системе до явного `remove`); перезапуск с восстановленной сессией; смена
+языка на лету; Login Item стартует app при входе в систему.
 
 ---
 
 ## Этап 3 — Упаковка и автозапуск
 
-> **СТАТУС: скрипт готов** — `Mac/BarkCloudDrive/scripts/build_release.sh` (archive → export →
-> .dmg/.pkg → подпись Developer ID → `notarytool` → staple). Параметризован env-переменными
-> (`TEAM_ID`/`SIGN_APP`/`SIGN_PKG`/`NOTARY_PROFILE`). Фактический запуск — на стороне пользователя
-> (нужны платный Apple Developer аккаунт + сертификаты Developer ID в Keychain). Автозапуск —
-> `SMAppService.mainApp` уже в `SettingsView`. Синтаксис скрипта проверен (`bash -n`).
+**СТАТУС: скрипт готов** — `Mac/BarkCloudDrive/scripts/build_release.sh`
+(archive → export → .dmg/.pkg → подпись Developer ID → `notarytool` →
+staple). Параметризован env-переменными (`TEAM_ID`/`SIGN_APP`/`SIGN_PKG`/
+`NOTARY_PROFILE`).
 
-- `.pkg`/`.dmg` (`productbuild`/`create-dmg`), подпись **Developer ID** + **нотаризация** (`notarytool`),
-  staple. Бандл расширения — внутри `.app`.
-- Онбординг: инструкция включить расширение в System Settings → File System Extensions
-  (FSKit требует явного включения пользователем) — показать в первом запуске + README.
-- Login Item через `SMAppService`.
+> Подпись/нотаризация — на стороне пользователя (платный Apple Developer +
+> сертификаты Developer ID в Keychain). Для разработки и проверки на своей
+> машине достаточно Personal team подписи.
 
-**✅ verify Этап 3:** установка `.pkg` на чистую систему → онбординг → монтирование; `spctl`/
-`stapler validate` проходят; автозапуск при входе.
+**✅ verify Этап 3:** установка `.pkg` на чистую систему → онбординг →
+подключение домена; `spctl`/`stapler validate` проходят; автозапуск при
+входе.
 
 ---
 
 ## Риски и заметки
 
-- **FSKit незрелый** (15.4+): имена/сигнатуры `FSVolume.*Operations` уточнять по SDK; Range/write-
-  семантику проверять эмпирически — главный технический риск.
-- **Device-заголовки обязательны** для Auth (Base64(UTF8); `x-auth-token` — сырой); `x-device-id`
-  персистить (на macOS — в App Support/Keychain, стабильный per-install).
-- **Бэкенд правок не требует:** Range (206) — `Backend/BarkCloud.Files/Host/FilesController.cs` +
-  `S3Uploader.DownloadRangeAsync`; батч — `CloudApi.DeleteFileEntries`.
-- **Память проекта:** обновлять `Obsidian/BarkCloudVault/modules/macos-drive.md` по мере фаз.
+- **Persistent cache.** Сейчас `BarkCloudItemCache` — in-memory actor.
+  После рестарта fileproviderd кэш пустой; fileproviderd обычно сразу делает
+  enumerate корня и переходит вглубь, восстанавливая cache. Если этого
+  окажется недостаточно (пин/recents в Finder обращаются к item'у не из
+  enumerate-цепочки) — добавить persistent cache в App Group UserDefaults
+  или SQLite.
+- **`findEntry` после upload.** После `cloud.uploadFile` (= getUploadURL +
+  upload + attachFile) бэкенд не возвращает `entryID`, поэтому делаем
+  `listDirectory(parentDirID)` и ищем по `fileID + name`. Эпизодически
+  может быть гонка — мониторить, при необходимости добавить proto-метод
+  «attach и верни entryID».
+- **`enumerateChanges` без incremental sync.** Сейчас возвращаем
+  `finishEnumeratingChanges(upTo: anchor, moreComing: false)` — это значит
+  «никаких изменений», что заставляет fileproviderd периодически делать
+  полный `enumerateItems`. Для пуш-обновлений (изменения с других клиентов)
+  понадобится бэкенд-стрим изменений (proto-метод) и нормальный
+  `currentSyncAnchor`.
+- **Device-заголовки обязательны** для Auth (Base64(UTF8); `x-auth-token`
+  — сырой); `x-device-id` персистить (на macOS — в App Support/Keychain,
+  стабильный per-install).
+- **Бэкенд правок не требует.** Те же API, что у Windows-клиента
+  (`CloudApi.*`, `FilesApi.*`).
+- **Память проекта:** обновлять `Obsidian/BarkCloudVault/modules/macos-drive.md`
+  по мере фаз.
