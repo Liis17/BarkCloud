@@ -112,23 +112,24 @@ staple). Параметризован env-переменными (`TEAM_ID`/`SIG
 
 ## Риски и заметки
 
-- **Persistent cache.** Сейчас `BarkCloudItemCache` — in-memory actor.
-  После рестарта fileproviderd кэш пустой; fileproviderd обычно сразу делает
-  enumerate корня и переходит вглубь, восстанавливая cache. Если этого
-  окажется недостаточно (пин/recents в Finder обращаются к item'у не из
-  enumerate-цепочки) — добавить persistent cache в App Group UserDefaults
-  или SQLite.
+- **Persistent cache — ВЫПОЛНЕН.** `BarkCloudItemCache` пишет состояние в
+  JSON-файл `~/Library/Containers/com.barkfluff.BarkCloud.Drive.FileProvider/
+  Data/Library/Application Support/BarkCloud.FileProvider/items-cache.json`
+  атомарно после каждой мутации. Выживает рестарт fileproviderd. Для
+  десятков тысяч item'ов JSON нормально; если станет узким местом — заменить
+  на SQLite.
+- **Incremental sync — частично.** Cache держит монотонный `UInt64`-anchor.
+  `currentSyncAnchor` отдаёт текущий, `enumerateChanges` сравнивает с
+  переданным — при расхождении возвращает `.syncAnchorExpired`, и
+  fileproviderd делает полный `enumerateItems`. Локальные мутации bump'ают
+  anchor + `signalEnumerator(for:)` для затронутых контейнеров (двух при
+  move). Это покрывает «изменения внутри клиента». Пуш-обновления с других
+  клиентов потребуют бэкенд-стрим изменений + change log в cache.
 - **`findEntry` после upload.** После `cloud.uploadFile` (= getUploadURL +
   upload + attachFile) бэкенд не возвращает `entryID`, поэтому делаем
   `listDirectory(parentDirID)` и ищем по `fileID + name`. Эпизодически
   может быть гонка — мониторить, при необходимости добавить proto-метод
   «attach и верни entryID».
-- **`enumerateChanges` без incremental sync.** Сейчас возвращаем
-  `finishEnumeratingChanges(upTo: anchor, moreComing: false)` — это значит
-  «никаких изменений», что заставляет fileproviderd периодически делать
-  полный `enumerateItems`. Для пуш-обновлений (изменения с других клиентов)
-  понадобится бэкенд-стрим изменений (proto-метод) и нормальный
-  `currentSyncAnchor`.
 - **Device-заголовки обязательны** для Auth (Base64(UTF8); `x-auth-token`
   — сырой); `x-device-id` персистить (на macOS — в App Support/Keychain,
   стабильный per-install).

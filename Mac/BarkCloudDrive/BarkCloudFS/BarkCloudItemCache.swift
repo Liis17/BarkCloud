@@ -2,74 +2,174 @@ import Foundation
 import FileProvider
 import BarkCloudKit
 
-/// In-memory кэш ассоциаций «identifier → облачные id», заполняется при
-/// enumerate. `fileproviderd` адресует item'ы по `NSFileProviderItemIdentifier`,
-/// а API облака — по `directoryID`/`entryID`/`fileID`; кэш закрывает разрыв
-/// без обращения к бэкенду в горячем пути.
+/// Кэш ассоциаций «identifier → облачные id» с persistent JSON-хранилищем в
+/// Application Support песочницы расширения.
 ///
-/// При cache miss провайдер отвечает `.noSuchItem`, что заставляет систему
-/// перезапросить листинг родителя (см. `BarkCloudFileProvider.item(for:)`).
-/// Persistence на диске — задел на будущее (после рестарта расширения кэш
-/// пустой; работает за счёт повторного enumerate корня).
+/// Зачем persistent: `fileproviderd` адресует item'ы по `NSFileProviderItemIdentifier`,
+/// сохраняя их между рестартами демона/расширения. После cold-start cache
+/// должен ответить на `item(for:)` без обращения к бэкенду, иначе пин/recents
+/// в Finder теряют файл (для них нет цепочки enumerate сверху).
+///
+/// Структура хранения: один JSON-файл `items-cache.json`. Атомарная запись
+/// после каждой мутации (для облака до десятков тысяч item'ов нормально;
+/// если станет узким местом — заменить на SQLite).
+///
+/// Sync anchor: монотонный счётчик `UInt64`. Bump'ится при каждой локальной
+/// мутации (`createItem`/`modifyItem`/`deleteItem`). `enumerateChanges`
+/// сравнивает старый anchor с текущим — при расхождении возвращает
+/// `.syncAnchorExpired`, чтобы fileproviderd сделал полный `enumerateItems`.
 actor BarkCloudItemCache {
 
-    struct DirInfo: Sendable {
+    struct DirInfo: Sendable, Codable {
         let dirID: String
-        let parentIdentifier: NSFileProviderItemIdentifier
+        let parentIdentifierRaw: String
         let name: String
         let modified: Date
+
+        var parentIdentifier: NSFileProviderItemIdentifier {
+            NSFileProviderItemIdentifier(parentIdentifierRaw)
+        }
     }
 
-    struct FileInfo: Sendable {
+    struct FileInfo: Sendable, Codable {
         let entryID: String
         let fileID: String
         let parentDirID: String
-        let parentIdentifier: NSFileProviderItemIdentifier
+        let parentIdentifierRaw: String
         let name: String
         let size: Int64
         let modified: Date
+
+        var parentIdentifier: NSFileProviderItemIdentifier {
+            NSFileProviderItemIdentifier(parentIdentifierRaw)
+        }
     }
 
-    private var dirs: [String: DirInfo] = [:]
-    private var files: [String: FileInfo] = [:]
+    private struct Snapshot: Codable {
+        var dirs: [String: DirInfo] = [:]
+        var files: [String: FileInfo] = [:]
+        var anchor: UInt64 = 1
+    }
+
+    private var snapshot: Snapshot
+    private let storeURL: URL
+
+    init() {
+        let appSupport = FileManager.default
+            .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("BarkCloud.FileProvider", isDirectory: true)
+        try? FileManager.default.createDirectory(at: appSupport, withIntermediateDirectories: true)
+        self.storeURL = appSupport.appendingPathComponent("items-cache.json")
+        if let data = try? Data(contentsOf: storeURL),
+           let snap = try? JSONDecoder().decode(Snapshot.self, from: data) {
+            self.snapshot = snap
+        } else {
+            self.snapshot = Snapshot()
+        }
+    }
+
+    // MARK: - Mutators
+    //
+    // `put*` не bump'ают anchor — они используются и при enumerate (чтение
+    // с бэкенда), и при локальных мутациях. Anchor поднимает отдельный
+    // `bumpAnchorAndPersist()`, который провайдер вызывает после успешной
+    // локальной операции.
 
     func put(directory d: CloudDirectory, parent: NSFileProviderItemIdentifier) {
-        let id = "d:\(d.id)"
-        dirs[id] = DirInfo(dirID: d.id, parentIdentifier: parent, name: d.name, modified: Date())
+        snapshot.dirs["d:\(d.id)"] = DirInfo(
+            dirID: d.id,
+            parentIdentifierRaw: parent.rawValue,
+            name: d.name,
+            modified: Date()
+        )
+        persist()
     }
 
     func put(file f: CloudFileEntry, parentDirID: String, parent: NSFileProviderItemIdentifier) {
-        let id = "f:\(f.id)"
-        files[id] = FileInfo(entryID: f.id,
-                             fileID: f.fileID,
-                             parentDirID: parentDirID,
-                             parentIdentifier: parent,
-                             name: f.name,
-                             size: f.asset.fileSize,
-                             modified: f.asset.uploadedAt ?? f.asset.createdAt)
+        snapshot.files["f:\(f.id)"] = FileInfo(
+            entryID: f.id,
+            fileID: f.fileID,
+            parentDirID: parentDirID,
+            parentIdentifierRaw: parent.rawValue,
+            name: f.name,
+            size: f.asset.fileSize,
+            modified: f.asset.uploadedAt ?? f.asset.createdAt
+        )
+        persist()
     }
 
     func putDirectory(dirID: String, parent: NSFileProviderItemIdentifier, name: String, modified: Date) {
-        dirs["d:\(dirID)"] = DirInfo(dirID: dirID, parentIdentifier: parent, name: name, modified: modified)
+        snapshot.dirs["d:\(dirID)"] = DirInfo(
+            dirID: dirID,
+            parentIdentifierRaw: parent.rawValue,
+            name: name,
+            modified: modified
+        )
+        persist()
     }
 
     func putFile(entryID: String, fileID: String, parentDirID: String,
                  parent: NSFileProviderItemIdentifier, name: String, size: Int64, modified: Date) {
-        files["f:\(entryID)"] = FileInfo(entryID: entryID, fileID: fileID,
-                                         parentDirID: parentDirID, parentIdentifier: parent,
-                                         name: name, size: size, modified: modified)
-    }
-
-    func directory(for identifier: NSFileProviderItemIdentifier) -> DirInfo? {
-        dirs[identifier.rawValue]
-    }
-
-    func file(for identifier: NSFileProviderItemIdentifier) -> FileInfo? {
-        files[identifier.rawValue]
+        snapshot.files["f:\(entryID)"] = FileInfo(
+            entryID: entryID,
+            fileID: fileID,
+            parentDirID: parentDirID,
+            parentIdentifierRaw: parent.rawValue,
+            name: name,
+            size: size,
+            modified: modified
+        )
+        persist()
     }
 
     func forget(_ identifier: NSFileProviderItemIdentifier) {
-        dirs.removeValue(forKey: identifier.rawValue)
-        files.removeValue(forKey: identifier.rawValue)
+        let removedDir = snapshot.dirs.removeValue(forKey: identifier.rawValue) != nil
+        let removedFile = snapshot.files.removeValue(forKey: identifier.rawValue) != nil
+        if removedDir || removedFile { persist() }
+    }
+
+    // MARK: - Accessors
+
+    func directory(for identifier: NSFileProviderItemIdentifier) -> DirInfo? {
+        snapshot.dirs[identifier.rawValue]
+    }
+
+    func file(for identifier: NSFileProviderItemIdentifier) -> FileInfo? {
+        snapshot.files[identifier.rawValue]
+    }
+
+    // MARK: - Sync anchor
+
+    /// Текущий монотонный anchor (UInt64 big-endian, 8 байт).
+    func currentAnchorData() -> Data {
+        var value = snapshot.anchor.bigEndian
+        return Data(bytes: &value, count: MemoryLayout<UInt64>.size)
+    }
+
+    /// `true` если данный anchor равен текущему — тогда изменений нет.
+    func isAnchorCurrent(_ data: Data) -> Bool {
+        return data == currentAnchorData()
+    }
+
+    /// Bump anchor + persist. Вызывается провайдером после успешной локальной
+    /// мутации (createItem/modifyItem/deleteItem), чтобы при следующем
+    /// `enumerateChanges` система получила `.syncAnchorExpired` и сделала
+    /// полный enumerate родителя.
+    func bumpAnchorAndPersist() {
+        snapshot.anchor &+= 1
+        persist()
+    }
+
+    private func persist() {
+        guard let data = try? JSONEncoder().encode(snapshot) else { return }
+        try? data.write(to: storeURL, options: .atomic)
+    }
+
+    // MARK: - Reset
+
+    /// Полностью очистить cache (на logout / смену сервера).
+    func reset() {
+        snapshot = Snapshot()
+        persist()
     }
 }

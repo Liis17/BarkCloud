@@ -54,13 +54,30 @@ final class BarkCloudEnumerator: NSObject, NSFileProviderEnumerator {
 
     func enumerateChanges(for observer: NSFileProviderChangeObserver,
                           from syncAnchor: NSFileProviderSyncAnchor) {
-        // Без incremental sync: сообщаем, что изменений нет. Систему это
-        // устраивает — она перезапросит enumerateItems по invalidation.
-        observer.finishEnumeratingChanges(upTo: syncAnchor, moreComing: false)
+        guard let provider else {
+            observer.finishEnumeratingWithError(NSFileProviderError(.providerNotFound))
+            return
+        }
+        Task {
+            if await provider.cache.isAnchorCurrent(syncAnchor.rawValue) {
+                observer.finishEnumeratingChanges(upTo: syncAnchor, moreComing: false)
+            } else {
+                // Изменения были (локальные мутации bump'ают anchor) → пусть
+                // система сделает полный enumerateItems, мы не ведём change log.
+                observer.finishEnumeratingWithError(NSFileProviderError(.syncAnchorExpired))
+            }
+        }
     }
 
     func currentSyncAnchor(completionHandler: @escaping (NSFileProviderSyncAnchor?) -> Void) {
-        completionHandler(NSFileProviderSyncAnchor(Data("v1".utf8)))
+        guard let provider else {
+            completionHandler(nil)
+            return
+        }
+        Task {
+            let data = await provider.cache.currentAnchorData()
+            completionHandler(NSFileProviderSyncAnchor(data))
+        }
     }
 }
 
