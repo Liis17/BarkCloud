@@ -106,6 +106,7 @@ export interface DynamicFolder {
   coverColor: string;
   coverUrl: string;
   count: number;
+  viewMode: number; // 0 = сетка, 1 = список
   sortOrder: number;
   createdAt: string | null;
   updatedAt: string | null;
