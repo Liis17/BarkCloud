@@ -110,19 +110,34 @@ public static class DynamicFolderQueryBuilder
             case DfField.Size:
                 if (!long.TryParse(value, out var size))
                     return false;
-                predicate = rule.Operator == DfOperator.LessThan ? f => f.Size < size : f => f.Size > size;
+                predicate = rule.Operator switch
+                {
+                    DfOperator.LessThan => f => f.Size < size,
+                    DfOperator.Equals => f => f.Size == size,
+                    _ => f => f.Size > size,
+                };
                 return true;
 
             case DfField.ImageWidth:
                 if (!int.TryParse(value, out var width))
                     return false;
-                predicate = rule.Operator == DfOperator.LessThan ? f => f.ImageWidth < width : f => f.ImageWidth > width;
+                predicate = rule.Operator switch
+                {
+                    DfOperator.LessThan => f => f.ImageWidth < width,
+                    DfOperator.Equals => f => f.ImageWidth == width,
+                    _ => f => f.ImageWidth > width,
+                };
                 return true;
 
             case DfField.ImageHeight:
                 if (!int.TryParse(value, out var height))
                     return false;
-                predicate = rule.Operator == DfOperator.LessThan ? f => f.ImageHeight < height : f => f.ImageHeight > height;
+                predicate = rule.Operator switch
+                {
+                    DfOperator.LessThan => f => f.ImageHeight < height,
+                    DfOperator.Equals => f => f.ImageHeight == height,
+                    _ => f => f.ImageHeight > height,
+                };
                 return true;
 
             case DfField.MediaKind:
