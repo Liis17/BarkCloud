@@ -375,9 +375,15 @@ BarkCloud/
   `List` поверх базовых полей: **Общее** (taken_at, creator_tool), **Камера** (make+model одной строкой,
   lens), **Параметры съёмки** (focal_length мм, f/N, выдержка `1/N с`/`X.X с`, ISO, вспышка Да/Нет),
   **Видео** (длительность mm:ss/h:mm:ss, video/audio codec uppercase, битрейт Мбит/с или кбит/с, fps),
-  **Геолокация** (координаты с 6 знаками после точки, высота в м) и **Документ** (title, author, subject,
+  **Геолокация** (координаты с 6 знаками после точки, высота в м + **блок карты места съёмки**) и **Документ** (title, author, subject,
   pages). При `has_metadata=false` (легаси-блобы без бэкафилла, либо файл без EXIF/ffprobe-полей) — секции
   не показываются, базовые поля остаются.
+  **Карта места съёмки** (`locationMap(latitude:longitude:title:)`, нативный MapKit `import MapKit`) — статичная
+  мини-карта (`Map` с `interactionModes: []`, высота 180, скруглённые углы) с маркером в точке съёмки; тап →
+  `MKMapItem.openInMaps()` (полноценный Apple Maps). Аналог веб-блока «Место съёмки» (OSM-iframe в `PropertiesModal.tsx`).
+  Показывается для `.cloud` при `m.hasCoordinates` (EXIF с сервера, внутри секции «Геолокация») **и** для `.device`
+  при `asset.location != nil` (нативный `PHAsset.location` — отдельная GPS-секция, которой у устройства раньше не было;
+  паритет, недоступный вебу). Бэкенд/прото не трогались — данные уже были (`CloudFileMetadata.latitude/longitude`).
   На Галерее устройства у `PHAsset` нет `file_id` — `GalleryViewModel.ensureCloudFileID(for:)` резолвит его
   по SHA256 (`cachedSHA256` → `CloudApi.CheckFileHash`, одиночный), а при отсутствии заливает оригинал
   (дедуп по хешу) в авто-папку «Недавно загруженные»; на время резолва — оверлей `isUploading`.
