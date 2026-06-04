@@ -71,6 +71,7 @@ final class ProfileViewModel {
         if let storage = try? await transfer.storageInfo() {
             state.usedStorage = storage.used
             state.storageLimit = storage.limit
+            StorageWidgetBridge.update(used: storage.used, limit: storage.limit)
         }
         state.isLoading = false
     }

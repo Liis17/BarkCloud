@@ -141,6 +141,7 @@ final class BackupManager {
         if let info = try? await cloud.transfer.storageInfo() {
             usedStorage = info.used
             storageLimit = info.limit
+            StorageWidgetBridge.update(used: info.used, limit: info.limit)
         }
     }
 
