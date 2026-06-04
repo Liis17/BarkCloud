@@ -7,8 +7,9 @@
 ## Архитектурные решения
 
 - **Содержимое не материализуется** — нет junction-таблицы; вычисляется на лету из критериев при каждом листинге/подсчёте.
-- **Системные папки виртуальные** — не хранятся в БД, отдаются кодом с well-known id `sys-recent` / `sys-large` / `sys-screenshots`. Критерии захардкожены в `Domain/SystemDynamicFolders.cs`. Нельзя редактировать/удалять.
-  - «Недавно загруженные» — `CreatedAt` за последние **3 дня**.
+- **Системные папки виртуальные** — не хранятся в БД, отдаются кодом с well-known id `sys-recent-media` / `sys-recent-docs` / `sys-large` / `sys-screenshots`. Критерии захардкожены в `Domain/SystemDynamicFolders.cs`. Нельзя редактировать/удалять.
+  - «Недавние фото и видео» — `CreatedAt` за последние **3 дня** И `MediaKind ∈ {фото, видео}`; вид — сетка.
+  - «Недавние документы» — `CreatedAt` за последние **3 дня** И `MediaKind = документ`; вид — список.
   - «Большие файлы» — `Size > 100 МБ` (104857600 байт).
   - «Скриншоты» — имя содержит `screenshot` (регистронезависимо).
 - **Критерии — `jsonb`-колонка** через `ValueConverter<DynamicFolderCriteria,string>` (System.Text.Json) + `ValueComparer` в `FilesContext`. В SQL внутрь JSON не запрашиваем.
@@ -28,11 +29,18 @@
 
 Дата загрузки, дата съёмки (`FileMetadata.TakenAt`), размер, имя, формат (`MediaKind`), расширение, ширина/высота изображения, устройство загрузки. Операторы: за последние N дней / до / после / больше / меньше / содержит / равно / начинается / заканчивается.
 
+- Числовые поля (размер, ширина, высота) поддерживают **равно** наравне с больше/меньше (см. `TryBuildRule`).
+- Правило `MediaKind` принимает **набор** кодов через запятую (`"1,2"` = фото или видео) — это позволяет одним правилом выразить «фото или видео» (используется системной папкой «Недавние фото и видео»). Парсинг — `ParseMediaKinds`.
+
+### Режим отображения
+
+`DynamicFolder.ViewMode` (enum `DfViewMode`: `Grid` / `List`) — хранится отдельной колонкой `ViewMode` (миграция `AddDynamicFolderViewMode`, default 0 = сетка), не входит в jsonb-критерии. Задаётся при создании/обновлении. Системные папки задают его в коде. На UI определяет рендер содержимого (сетка превью или список строк).
+
 ## API (proto `files_api.proto` → `DynamicFolderApi`)
 
-`CreateDynamicFolder`, `UpdateDynamicFolder`, `DeleteDynamicFolder`, `ListDynamicFolders` (системные первыми + пользовательские), `ListDynamicFolderItems` (содержимое по критериям, cursor). См. [[api/files-api]].
+`CreateDynamicFolder`, `UpdateDynamicFolder`, `DeleteDynamicFolder`, `ListDynamicFolders` (системные первыми + пользовательские), `ListDynamicFolderItems` (содержимое по критериям, cursor). Запросы Create/Update/Info несут `view_mode` (enum `DfViewMode`). `ListDynamicFolderItems` отдаёт `UserImageItem` (файл + записи каталога владельца: `entryIds`/`entryNames`) — нужно фронту для переименования/удаления/«показать в папке». См. [[api/files-api]].
 
 ## Веб
 
 - Эндпоинты `/api/dynamic-folders[...]` в `Endpoints/CloudApiEndpoints.cs`, маппер `CloudJson.DynamicFolder`, gRPC-клиент в `Program.cs`.
-- React: `components/dynamic-folders/` — `DynamicFoldersStrip` (горизонтальная лента, 2 ряда), `DynamicFolderCard` (квадратная плитка), `DynamicFolderFormModal` (конструктор правил + И/ИЛИ), `DynamicFolderDetail` (просмотр на месте). Врезка в `pages/FilesPage.tsx` между шапкой и списком файлов. CSS — `.dynamic-folders` / `.df-*` в `styles/shared.css`.
+- React: `components/dynamic-folders/` — `DynamicFoldersStrip` (горизонтальная лента, 2 ряда), `DynamicFolderCard` (квадратная плитка), `DynamicFolderFormModal` (конструктор правил + И/ИЛИ + переключатель сетка/список), `DynamicFolderDetail` (просмотр на месте: рендер сеткой или списком по `viewMode`, ПКМ-меню через `useMediaActions`). Врезка в `pages/FilesPage.tsx` между шапкой и списком файлов (туда же передаются `albums`/`reloadAlbums` для меню). CSS — `.dynamic-folders` / `.df-*` / `.df-list*` в `styles/shared.css`.
