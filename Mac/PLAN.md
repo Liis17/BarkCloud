@@ -173,6 +173,12 @@ SwiftUI + menu-bar (`NSStatusItem`), паритет с Windows-`App` (трей +
 
 ## Этап 3 — Упаковка и автозапуск
 
+> **СТАТУС: скрипт готов** — `Mac/BarkCloudDrive/scripts/build_release.sh` (archive → export →
+> .dmg/.pkg → подпись Developer ID → `notarytool` → staple). Параметризован env-переменными
+> (`TEAM_ID`/`SIGN_APP`/`SIGN_PKG`/`NOTARY_PROFILE`). Фактический запуск — на стороне пользователя
+> (нужны платный Apple Developer аккаунт + сертификаты Developer ID в Keychain). Автозапуск —
+> `SMAppService.mainApp` уже в `SettingsView`. Синтаксис скрипта проверен (`bash -n`).
+
 - `.pkg`/`.dmg` (`productbuild`/`create-dmg`), подпись **Developer ID** + **нотаризация** (`notarytool`),
   staple. Бандл расширения — внутри `.app`.
 - Онбординг: инструкция включить расширение в System Settings → File System Extensions
