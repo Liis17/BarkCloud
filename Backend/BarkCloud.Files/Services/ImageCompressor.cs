@@ -116,6 +116,22 @@ public partial class ImageCompressor
     }
 
     /// <summary>
+    /// Полноразмерный JPEG заданного качества (без ресайза) — для «JpegView»:
+    /// браузеро-дружелюбное представление изображений, оригинал которых не JPEG
+    /// (HEIC/PNG/WebP/…). Альфа-канал композитится на белый фон.
+    /// </summary>
+    public virtual async Task<byte[]> EncodeFullJpegAsync(
+        Stream inputStream, int quality = 90, CancellationToken cancellationToken = default)
+    {
+        using var image = await Image.LoadAsync(inputStream, cancellationToken);
+        image.Mutate(x => x.BackgroundColor(Color.White));
+
+        using var ms = new MemoryStream();
+        await image.SaveAsync(ms, new JpegEncoder { Quality = quality }, cancellationToken);
+        return ms.ToArray();
+    }
+
+    /// <summary>
     /// Объединённая обработка изображения за один <c>Image.LoadAsync</c>:
     /// возвращает размеры, опционально сжатый оригинал (если включён enforceOriginalLimits)
     /// и опционально превью (если задан previewWidth).

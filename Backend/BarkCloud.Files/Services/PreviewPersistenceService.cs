@@ -113,4 +113,79 @@ public class PreviewPersistenceService
 
         await _context.SaveChangesAsync(cancellationToken);
     }
+
+    /// <summary>
+    /// Сохраняет полноразмерный JPEG-вид оригинала («JpegView») как отдельный блоб и
+    /// связывает его через <see cref="FilePreview"/> со служебной шириной <c>TargetWidth = 0</c>.
+    /// За счёт этой связки блоб автоматически исключается из галереи (листинги пропускают
+    /// превью-блобы) и чистится при удалении оригинала. Возвращает file_id вида.
+    /// Дедуп по SHA256 — как у обычных превью.
+    /// </summary>
+    public virtual async Task<Guid> PersistJpegViewAsync(
+        UploadFile original,
+        byte[] jpegBytes,
+        int width,
+        int height,
+        string bucketName,
+        CancellationToken cancellationToken)
+    {
+        var existing = await _context.FilePreviews
+            .FirstOrDefaultAsync(x => x.OriginalFileId == original.Id && x.TargetWidth == 0, cancellationToken);
+        if (existing is not null)
+            return existing.PreviewFileId;
+
+        string viewHash;
+        using (var sha256 = SHA256.Create())
+        {
+            viewHash = Convert.ToHexString(sha256.ComputeHash(jpegBytes)).ToLowerInvariant();
+        }
+
+        var existingByHash = await _hashesStorage.GetFileIdByHash(viewHash);
+        Guid viewFileId;
+
+        if (existingByHash.HasValue)
+        {
+            viewFileId = existingByHash.Value;
+            foreach (var uploaderId in original.Uploaders)
+                await _filesStorage.AddUploaderToFile(viewFileId, uploaderId);
+        }
+        else
+        {
+            viewFileId = Guid.NewGuid();
+            using var ms = new MemoryStream(jpegBytes);
+            var etag = await _s3Uploader.UploadAsync(bucketName, $"{viewFileId}", ms, "image/jpeg");
+
+            var viewFile = new UploadFile
+            {
+                Id = viewFileId,
+                Uploaders = original.Uploaders.ToList(),
+                CreatedAt = DateTime.UtcNow,
+                UploadedAt = DateTime.UtcNow,
+                Etag = etag,
+                Type = UploadFileType.CloudFile,
+                MediaKind = MediaKind.Photo,
+                Filename = "view.jpg",
+                Size = jpegBytes.Length,
+                ImageWidth = width > 0 ? width : null,
+                ImageHeight = height > 0 ? height : null
+            };
+
+            await _filesStorage.AddToStorage(viewFile);
+            await _hashesStorage.AddHash(new FileHash { FileId = viewFileId, Hash = viewHash });
+        }
+
+        _context.FilePreviews.Add(new FilePreview
+        {
+            Id = Guid.NewGuid(),
+            OriginalFileId = original.Id,
+            PreviewFileId = viewFileId,
+            TargetWidth = 0,
+            ActualWidth = width,
+            ActualHeight = height,
+            CreatedAt = DateTime.UtcNow
+        });
+
+        await _context.SaveChangesAsync(cancellationToken);
+        return viewFileId;
+    }
 }

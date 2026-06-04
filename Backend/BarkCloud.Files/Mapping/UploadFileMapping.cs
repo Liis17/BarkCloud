@@ -39,9 +39,11 @@ public static class UploadFileMapping
 
         info.Uploaders.AddRange(file.Uploaders);
 
-        if (previews is { Count: > 0 })
+        // TargetWidth == 0 — служебная связка JpegView (полноразмерный вид), не обычное превью.
+        var realPreviews = previews?.Where(x => x.TargetWidth > 0).OrderBy(x => x.TargetWidth).ToList();
+        if (realPreviews is { Count: > 0 })
         {
-            foreach (var p in previews.OrderBy(x => x.TargetWidth))
+            foreach (var p in realPreviews)
             {
                 info.Previews.Add(new FilePreviewInfo
                 {
@@ -56,10 +58,19 @@ public static class UploadFileMapping
             }
 
             // Для legacy-клиентов отдаём ссылку на самое узкое превью.
-            var smallest = previews.OrderBy(x => x.TargetWidth).First();
+            var smallest = realPreviews.First();
             info.PreviewUrl = publicBaseUrl is null
                 ? string.Empty
                 : FileUrlHelper.GenerateDownloadUrl(publicBaseUrl, smallest.PreviewFileId);
+        }
+
+        // JpegView: полноразмерный JPEG для просмотра. Для оригинала-JPEG указывает на сам файл.
+        if (file.JpegViewFileId.HasValue)
+        {
+            info.JpegViewFileId = file.JpegViewFileId.Value.ToString();
+            info.JpegViewUrl = publicBaseUrl is null
+                ? string.Empty
+                : FileUrlHelper.GenerateDownloadUrl(publicBaseUrl, file.JpegViewFileId.Value);
         }
 
         return info;
