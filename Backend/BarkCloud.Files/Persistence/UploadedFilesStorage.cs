@@ -243,6 +243,67 @@ public class UploadedFilesStorage : IUploadedFilesStorage
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<List<MemoryMediaItem>> ListMemoriesForDay(long ownerId, int month, int day, int maxTotal, CancellationToken cancellationToken = default)
+    {
+        // Базовый фильтр «живых» медиа владельца (как ListUserMediaPage), плюс join к метаданным
+        // по дате съёмки. Сравнение по месяцу/дню Npgsql транслирует в date_part('month'/'day').
+        var query =
+            from f in _context.UploadedFiles.AsNoTracking()
+            join m in _context.FileMetadata on f.Id equals m.FileId
+            where f.Uploaders.Contains(ownerId)
+                  && f.Type == UploadFileType.CloudFile
+                  && (f.MediaKind == MediaKind.Photo || f.MediaKind == MediaKind.Video)
+                  && m.TakenAt != null
+                  && m.TakenAt.Value.Month == month
+                  && m.TakenAt.Value.Day == day
+                  && !_context.FilePreviews.Any(p => p.PreviewFileId == f.Id)
+                  && !(_context.CloudFileEntries.Any(e => e.OwnerId == ownerId && e.FileId == f.Id && e.IsDeleted)
+                       && !_context.CloudFileEntries.Any(e => e.OwnerId == ownerId && e.FileId == f.Id && !e.IsDeleted))
+            orderby m.TakenAt descending
+            select new { File = f, m.TakenAt };
+
+        var rows = await query.Take(maxTotal).ToListAsync(cancellationToken);
+
+        return rows
+            .Select(x => new MemoryMediaItem(x.File, x.TakenAt!.Value))
+            .ToList();
+    }
+
+    public async Task<List<LocatedMediaItem>> ListMediaWithLocationPage(long ownerId, DateTime? cursorCreatedAt, Guid? cursorFileId, int limit, CancellationToken cancellationToken = default)
+    {
+        var query =
+            from f in _context.UploadedFiles.AsNoTracking()
+            join m in _context.FileMetadata on f.Id equals m.FileId
+            where f.Uploaders.Contains(ownerId)
+                  && f.Type == UploadFileType.CloudFile
+                  && (f.MediaKind == MediaKind.Photo || f.MediaKind == MediaKind.Video)
+                  && m.Latitude != null
+                  && m.Longitude != null
+                  && !_context.FilePreviews.Any(p => p.PreviewFileId == f.Id)
+                  && !(_context.CloudFileEntries.Any(e => e.OwnerId == ownerId && e.FileId == f.Id && e.IsDeleted)
+                       && !_context.CloudFileEntries.Any(e => e.OwnerId == ownerId && e.FileId == f.Id && !e.IsDeleted))
+            select new { File = f, m.Latitude, m.Longitude, m.TakenAt };
+
+        if (cursorCreatedAt.HasValue && cursorFileId.HasValue)
+        {
+            var cursorAt = DateTime.SpecifyKind(cursorCreatedAt.Value, DateTimeKind.Utc);
+            var cursorId = cursorFileId.Value;
+            query = query.Where(x =>
+                x.File.CreatedAt < cursorAt
+                || (x.File.CreatedAt == cursorAt && x.File.Id.ToString().CompareTo(cursorId.ToString()) < 0));
+        }
+
+        var rows = await query
+            .OrderByDescending(x => x.File.CreatedAt)
+            .ThenByDescending(x => x.File.Id)
+            .Take(limit + 1)
+            .ToListAsync(cancellationToken);
+
+        return rows
+            .Select(x => new LocatedMediaItem(x.File, x.Latitude!.Value, x.Longitude!.Value, x.TakenAt))
+            .ToList();
+    }
+
     /// <summary>
     /// Снимает все превью оригинала: убирает владельца из Uploaders превью-блобов и удаляет
     /// записи FilePreview. Используется при ручной смене превью видео.
