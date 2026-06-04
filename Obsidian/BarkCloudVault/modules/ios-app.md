@@ -736,6 +736,21 @@ Home Screen виджет «Хранилище BarkCloud» (`.systemSmall` + `.sy
   политика обновления `.after(+1h)`. UI: капсульный прогресс-бар (`CapsuleProgressBar`,
   градиентная заливка, оранжевый → красный при ≥ 90 %), процент, занято/свободно/
   всего (`ByteCountFormatter` `.binary`). Нет данных (`limit ≤ 0`) → заглушка
-  «Откройте приложение». Зарегистрирован в `BarkCloudWidgetsBundle.swift`.
+  «Откройте приложение». В правом верхнем углу обоих размеров — полупрозрачная
+  кнопка ручного обновления (`RefreshButton` → `Button(intent:)`). Зарегистрирован
+  в `BarkCloudWidgetsBundle.swift`.
+- `BarkCloudWidgets/RefreshStorageIntent.swift` — интерактивный `AppIntent`
+  (iOS 17+, `openAppWhenRun = false`). В отличие от простого reload **реально
+  тянет** свежую квоту прямо в процессе виджета: поднимает временный
+  `GrpcManager(session: SessionStore()) → FileTransferService`, зовёт
+  `storageInfo()`, пишет те же три ключа App Group, `grpc.shutdown()` и
+  `reloadTimelines`. Адреса берутся из `ServerConfig` (App Group), токены — из
+  общего keychain.
+- **Для фетча из виджета** widget extension теперь линкует `BarkCloudKit`
+  (`packageProductDependencies` в pbxproj) и имеет `keychain-access-groups =
+  $(AppIdentifierPrefix)com.barkfluff.BarkCloud` в `BarkCloudWidgets.entitlements`
+  (та же группа, что у app/Share Extension — иначе `SessionStore` не прочитает
+  токены). На устройстве нужна включённая capability Keychain Sharing у App ID
+  виджета (автоподпись подхватывает из entitlements).
 - Бэкенд/прото не трогались — `transfer.storageInfo()` уже существовал
   (`Files.GetUserStorageInfo`). App Group и так был в обоих entitlements.
