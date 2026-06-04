@@ -1,29 +1,39 @@
 import SwiftUI
 
-/// Контейнер-приложение macOS-клиента (Этап 2 — server setup, логин, монтаж,
-/// дашборд). Пока заглушка: FSKit-расширение `BarkCloudFS` собирается и встраивается
-/// в этот бандл; реальный UI и монтирование добавляются на Этапе 2.
+/// Контейнер-приложение macOS-клиента BarkCloud: окно (server setup → логин →
+/// дашборд) + значок в menu-bar. FSKit-расширение `BarkCloudFS` встроено в этот
+/// бандл; монтирование инициируется отсюда (`MountManager`).
 @main
 struct BarkCloudDriveApp: App {
+    @State private var model = AppModel()
+
     var body: some Scene {
-        WindowGroup("BarkCloud Drive") {
-            ContentView()
+        WindowGroup("BarkCloud Drive", id: "main") {
+            RootView()
+                .environment(model)
+                .frame(minWidth: 440, minHeight: 360)
         }
         .windowResizability(.contentSize)
+
+        MenuBarExtra("BarkCloud Drive", systemImage: "externaldrive.badge.icloud") {
+            MenuBarView()
+                .environment(model)
+        }
     }
 }
 
-struct ContentView: View {
+/// Гейт: нет адреса сервера → ServerSetup; нет сессии → Login; иначе → Dashboard.
+struct RootView: View {
+    @Environment(AppModel.self) private var model
+
     var body: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "externaldrive.badge.icloud")
-                .font(.system(size: 48))
-            Text("BarkCloud Drive")
-                .font(.title2).bold()
-            Text("FSKit-том. UI и монтирование — Этап 2.")
-                .foregroundStyle(.secondary)
+        Group {
+            switch model.phase {
+            case .serverSetup: ServerSetupView()
+            case .login: LoginView()
+            case .dashboard: DashboardView()
+            }
         }
-        .padding(40)
-        .frame(minWidth: 360, minHeight: 240)
+        .animation(.default, value: model.phase)
     }
 }
