@@ -11,8 +11,8 @@ struct DashboardView: View {
         VStack(alignment: .leading, spacing: 20) {
             header
             storageCard
-            mountCard
-            if case let .failed(message) = model.mount.state {
+            domainCard
+            if case let .failed(message) = model.domain.state {
                 Label(message, systemImage: "exclamationmark.triangle")
                     .foregroundStyle(.orange).font(.callout)
             }
@@ -23,7 +23,10 @@ struct DashboardView: View {
             Button { showSettings = true } label: { Image(systemName: "gearshape") }
         }
         .sheet(isPresented: $showSettings) { SettingsView() }
-        .task { await model.loadProfile() }
+        .task {
+            await model.loadProfile()
+            await model.domain.refreshState()
+        }
     }
 
     private var header: some View {
@@ -57,21 +60,26 @@ struct DashboardView: View {
         .background(.quaternary, in: RoundedRectangle(cornerRadius: 10))
     }
 
-    private var mountCard: some View {
+    private var domainCard: some View {
         HStack {
             VStack(alignment: .leading) {
-                Text(model.mount.isMounted ? "Том примонтирован" : "Том не примонтирован")
+                Text(model.domain.isEnabled ? "Папка подключена" : "Папка не подключена")
                     .font(.headline)
-                Text(model.mount.mountPoint.path)
-                    .font(.caption).foregroundStyle(.secondary)
+                if let url = model.domain.visibleURL {
+                    Text(url.path).font(.caption).foregroundStyle(.secondary)
+                } else {
+                    Text("~/Library/CloudStorage/BarkCloud")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
             }
             Spacer()
-            if model.mount.state == .mounting || model.mount.state == .unmounting {
+            if model.domain.state == .enabling || model.domain.state == .disabling {
                 ProgressView().controlSize(.small)
-            } else if model.mount.isMounted {
-                Button("Размонтировать") { Task { await model.mount.unmount() } }
+            } else if model.domain.isEnabled {
+                Button("Открыть в Finder") { model.domain.revealInFinder() }
+                Button("Отключить") { Task { await model.domain.disable() } }
             } else {
-                Button("Примонтировать") { Task { await model.mount.mount() } }
+                Button("Подключить") { Task { await model.domain.enable() } }
                     .buttonStyle(.borderedProminent)
             }
         }

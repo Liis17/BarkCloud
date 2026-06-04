@@ -21,7 +21,7 @@ struct SettingsView: View {
                 Section("Общие") {
                     Toggle("Запускать при входе в систему", isOn: $launchAtLogin)
                         .onChange(of: launchAtLogin) { _, on in setLaunchAtLogin(on) }
-                    LabeledContent("Точка монтирования", value: model.mount.mountPoint.path)
+                    LabeledContent("Папка облака", value: model.domain.visibleURL?.path ?? "~/Library/CloudStorage/BarkCloud")
                 }
                 Section("Аккаунт") {
                     Button("Выйти из аккаунта", role: .destructive) {

@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Меню в строке состояния: открыть окно / монтаж / размонтаж / выход.
+/// Меню в строке состояния: открыть окно / подключение домена / выход.
 struct MenuBarView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.openWindow) private var openWindow
@@ -12,10 +12,11 @@ struct MenuBarView: View {
         }
         Divider()
         if model.phase == .dashboard {
-            if model.mount.isMounted {
-                Button("Размонтировать") { Task { await model.mount.unmount() } }
+            if model.domain.isEnabled {
+                Button("Открыть в Finder") { model.domain.revealInFinder() }
+                Button("Отключить") { Task { await model.domain.disable() } }
             } else {
-                Button("Примонтировать") { Task { await model.mount.mount() } }
+                Button("Подключить") { Task { await model.domain.enable() } }
             }
         }
         Divider()
