@@ -57,7 +57,9 @@ public static class CloudJson
                 })
                 .ToArray(),
             ["createdAt"] = Iso(f.CreatedAt),
-            ["uploadedAt"] = Iso(f.UploadedAt)
+            ["uploadedAt"] = Iso(f.UploadedAt),
+            // Полноразмерный JPEG для просмотра (HEIC и пр. браузеро-недружелюбные); пусто — показывать оригинал.
+            ["jpegViewUrl"] = f.JpegViewUrl
         };
     }
 
@@ -128,18 +130,6 @@ public static class CloudJson
         yearsAgo = g.YearsAgo,
         totalCount = g.TotalCount,
         items = g.Items.Select(Media).ToArray()
-    };
-
-    /// <summary>Точка на карте: координаты + узкое превью + тип/даты.</summary>
-    public static object MapPoint(MediaLocationPoint p) => new
-    {
-        id = p.FileId,
-        lat = p.Latitude,
-        lng = p.Longitude,
-        kind = MediaKindName(p.MediaKind),
-        previewUrl = p.PreviewUrl,
-        takenAt = p.TakenAt?.ToDateTimeOffset(),
-        createdAt = p.CreatedAt?.ToDateTimeOffset()
     };
 
     private static string MediaKindName(MediaKind kind) => kind switch
