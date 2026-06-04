@@ -116,6 +116,7 @@ final class AppModel {
         if let info = try? await transfer.storageInfo() {
             storageUsed = info.used
             storageLimit = info.limit
+            StorageWidgetBridge.update(used: info.used, limit: info.limit)
         }
     }
 }
