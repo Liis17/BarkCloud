@@ -15,7 +15,7 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "17CCC43F64DD423CF1E7CCE9"
-               BuildableName = "BarkCloudDrive.app"
+               BuildableName = "BarkCloud Drive.app"
                BlueprintName = "BarkCloudDrive"
                ReferencedContainer = "container:BarkCloudDrive.xcodeproj">
             </BuildableReference>
@@ -31,7 +31,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "17CCC43F64DD423CF1E7CCE9"
-            BuildableName = "BarkCloudDrive.app"
+            BuildableName = "BarkCloud Drive.app"
             BlueprintName = "BarkCloudDrive"
             ReferencedContainer = "container:BarkCloudDrive.xcodeproj">
          </BuildableReference>
@@ -54,7 +54,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "17CCC43F64DD423CF1E7CCE9"
-            BuildableName = "BarkCloudDrive.app"
+            BuildableName = "BarkCloud Drive.app"
             BlueprintName = "BarkCloudDrive"
             ReferencedContainer = "container:BarkCloudDrive.xcodeproj">
          </BuildableReference>
@@ -71,7 +71,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "17CCC43F64DD423CF1E7CCE9"
-            BuildableName = "BarkCloudDrive.app"
+            BuildableName = "BarkCloud Drive.app"
             BlueprintName = "BarkCloudDrive"
             ReferencedContainer = "container:BarkCloudDrive.xcodeproj">
          </BuildableReference>

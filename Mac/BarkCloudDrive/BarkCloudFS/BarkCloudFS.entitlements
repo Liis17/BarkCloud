@@ -6,8 +6,6 @@
 	<true/>
 	<key>com.apple.security.network.client</key>
 	<true/>
-	<key>com.apple.developer.fskit.fsmodule</key>
-	<true/>
 	<key>com.apple.security.application-groups</key>
 	<array>
 		<string>group.$(TeamIdentifierPrefix)com.barkfluff.BarkCloud</string>
