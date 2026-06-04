@@ -49,7 +49,8 @@ final class BarkCloudFileProviderItem: NSObject, NSFileProviderItem {
         self.isUploaded = isUploaded
     }
 
-    /// Корневой контейнер тома (`directoryID == ""` на бэкенде).
+    /// Корневой контейнер тома (`directoryID == ""` на бэкенде). Root нельзя
+    /// переименовывать/удалять/перемещать, но в него можно добавлять дочерние.
     static func root() -> BarkCloudFileProviderItem {
         BarkCloudFileProviderItem(
             itemIdentifier: .rootContainer,
@@ -60,7 +61,7 @@ final class BarkCloudFileProviderItem: NSObject, NSFileProviderItem {
             modified: Date(),
             contentVersion: Data("root".utf8),
             metadataVersion: Data("root".utf8),
-            capabilities: [.allowsContentEnumerating],
+            capabilities: [.allowsContentEnumerating, .allowsAddingSubItems],
             isUploaded: true
         )
     }
@@ -83,7 +84,13 @@ final class BarkCloudFileProviderItem: NSObject, NSFileProviderItem {
             modified: modified,
             contentVersion: Data("d:\(id)".utf8),
             metadataVersion: Data("\(name)|\(parent.rawValue)".utf8),
-            capabilities: [.allowsContentEnumerating],
+            capabilities: [
+                .allowsContentEnumerating,
+                .allowsAddingSubItems,
+                .allowsRenaming,
+                .allowsDeleting,
+                .allowsReparenting
+            ],
             isUploaded: true
         )
     }
@@ -109,7 +116,13 @@ final class BarkCloudFileProviderItem: NSObject, NSFileProviderItem {
             modified: modified,
             contentVersion: Data(fileID.utf8),
             metadataVersion: Data("\(name)|\(parent.rawValue)|\(Int(modified.timeIntervalSinceReferenceDate))".utf8),
-            capabilities: [.allowsReading],
+            capabilities: [
+                .allowsReading,
+                .allowsWriting,
+                .allowsRenaming,
+                .allowsDeleting,
+                .allowsReparenting
+            ],
             isUploaded: true
         )
     }

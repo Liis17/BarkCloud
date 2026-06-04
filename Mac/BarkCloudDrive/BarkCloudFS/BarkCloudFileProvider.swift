@@ -137,6 +137,10 @@ final class BarkCloudFileProvider: NSObject, NSFileProviderReplicatedExtension {
     }
 
     // MARK: - write-path (стадия C)
+    //
+    // Семантика: блобы иммутабельны → modify contents = удалить старый entry +
+    // upload+attach как новый (новый entryID/identifier; fileproviderd подменит).
+    // Rename/move папок и файлов — отдельные RPC `rename*`/`move*`.
 
     func createItem(basedOn itemTemplate: NSFileProviderItem,
                     fields: NSFileProviderItemFields,
@@ -144,7 +148,45 @@ final class BarkCloudFileProvider: NSObject, NSFileProviderReplicatedExtension {
                     options: NSFileProviderCreateItemOptions = [],
                     request: NSFileProviderRequest,
                     completionHandler: @escaping (NSFileProviderItem?, NSFileProviderItemFields, Bool, Error?) -> Void) -> Progress {
-        completionHandler(nil, [], false, NSFileProviderError(.serverUnreachable))
+        Task {
+            do {
+                let parent = itemTemplate.parentItemIdentifier
+                guard let parentDirID = await parentDirID(for: parent) else {
+                    completionHandler(nil, [], false, NSFileProviderError(.noSuchItem))
+                    return
+                }
+                let services = try await loadServices()
+                let isFolder = itemTemplate.contentType?.conforms(to: .folder) ?? false
+                let name = itemTemplate.filename
+                if isFolder {
+                    let d = try await services.cloud.createDirectory(parentID: parentDirID, name: name)
+                    await cache.put(directory: d, parent: parent)
+                    let item = BarkCloudFileProviderItem.directory(d, parent: parent)
+                    completionHandler(item, [], false, nil)
+                } else {
+                    guard let src = url else {
+                        completionHandler(nil, [], false, NSFileProviderError(.noSuchItem))
+                        return
+                    }
+                    let data = try Data(contentsOf: src)
+                    let fileID = try await services.cloud.uploadFile(data: data,
+                                                                     fileName: name,
+                                                                     toDirectory: parentDirID)
+                    // entryID назад не возвращается — резолвим листингом.
+                    guard let entry = try await Self.findEntry(in: services.cloud,
+                                                               directoryID: parentDirID,
+                                                               name: name,
+                                                               fileID: fileID) else {
+                        completionHandler(nil, [], false, NSFileProviderError(.cannotSynchronize))
+                        return
+                    }
+                    await cache.put(file: entry, parentDirID: parentDirID, parent: parent)
+                    completionHandler(BarkCloudFileProviderItem.file(entry, parent: parent), [], false, nil)
+                }
+            } catch {
+                completionHandler(nil, [], false, error)
+            }
+        }
         return Progress()
     }
 
@@ -155,7 +197,75 @@ final class BarkCloudFileProvider: NSObject, NSFileProviderReplicatedExtension {
                     options: NSFileProviderModifyItemOptions = [],
                     request: NSFileProviderRequest,
                     completionHandler: @escaping (NSFileProviderItem?, NSFileProviderItemFields, Bool, Error?) -> Void) -> Progress {
-        completionHandler(nil, [], false, NSFileProviderError(.serverUnreachable))
+        Task {
+            do {
+                let services = try await loadServices()
+                let id = item.itemIdentifier
+                let newName = item.filename
+                let newParent = item.parentItemIdentifier
+
+                if let dir = await cache.directory(for: id) {
+                    if changedFields.contains(.parentItemIdentifier),
+                       let newParentDirID = await parentDirID(for: newParent),
+                       newParentDirID != dir.parentIdentifier.rawValue {
+                        try await services.cloud.moveDirectory(dir.dirID, newParentID: newParentDirID)
+                    }
+                    if changedFields.contains(.filename) && newName != dir.name {
+                        try await services.cloud.renameDirectory(dir.dirID, newName: newName)
+                    }
+                    await cache.putDirectory(dirID: dir.dirID, parent: newParent, name: newName, modified: Date())
+                    let updated = BarkCloudFileProviderItem.directory(id: dir.dirID, name: newName,
+                                                                     parent: newParent, modified: Date())
+                    completionHandler(updated, [], false, nil)
+                    return
+                }
+
+                if let file = await cache.file(for: id) {
+                    // Contents-modify (блобы иммутабельны) → delete old + upload as new
+                    if changedFields.contains(.contents), let src = newContents,
+                       let newParentDirID = await parentDirID(for: newParent) {
+                        let data = try Data(contentsOf: src)
+                        try? await services.cloud.deleteFileEntry(file.entryID)
+                        await cache.forget(id)
+                        let fileID = try await services.cloud.uploadFile(data: data,
+                                                                         fileName: newName,
+                                                                         toDirectory: newParentDirID)
+                        guard let entry = try await Self.findEntry(in: services.cloud,
+                                                                   directoryID: newParentDirID,
+                                                                   name: newName,
+                                                                   fileID: fileID) else {
+                            completionHandler(nil, [], false, NSFileProviderError(.cannotSynchronize))
+                            return
+                        }
+                        await cache.put(file: entry, parentDirID: newParentDirID, parent: newParent)
+                        completionHandler(BarkCloudFileProviderItem.file(entry, parent: newParent), [], false, nil)
+                        return
+                    }
+                    // Только метаданные: rename / move
+                    if changedFields.contains(.parentItemIdentifier),
+                       let newParentDirID = await parentDirID(for: newParent),
+                       newParentDirID != file.parentDirID {
+                        try await services.cloud.moveFileEntry(file.entryID, newDirectoryID: newParentDirID)
+                    }
+                    if changedFields.contains(.filename) && newName != file.name {
+                        try await services.cloud.renameFileEntry(file.entryID, newName: newName)
+                    }
+                    let newParentDirID = (await parentDirID(for: newParent)) ?? file.parentDirID
+                    await cache.putFile(entryID: file.entryID, fileID: file.fileID,
+                                        parentDirID: newParentDirID, parent: newParent,
+                                        name: newName, size: file.size, modified: Date())
+                    let updated = BarkCloudFileProviderItem.file(entryID: file.entryID, fileID: file.fileID,
+                                                                 name: newName, size: file.size,
+                                                                 modified: Date(), parent: newParent)
+                    completionHandler(updated, [], false, nil)
+                    return
+                }
+
+                completionHandler(nil, [], false, NSFileProviderError(.noSuchItem))
+            } catch {
+                completionHandler(nil, [], false, error)
+            }
+        }
         return Progress()
     }
 
@@ -164,8 +274,45 @@ final class BarkCloudFileProvider: NSObject, NSFileProviderReplicatedExtension {
                     options: NSFileProviderDeleteItemOptions = [],
                     request: NSFileProviderRequest,
                     completionHandler: @escaping (Error?) -> Void) -> Progress {
-        completionHandler(NSFileProviderError(.serverUnreachable))
+        Task {
+            do {
+                let services = try await loadServices()
+                if let dir = await cache.directory(for: identifier) {
+                    try await services.cloud.deleteDirectory(dir.dirID)
+                    await cache.forget(identifier)
+                    completionHandler(nil)
+                    return
+                }
+                if let file = await cache.file(for: identifier) {
+                    try await services.cloud.deleteFileEntry(file.entryID)
+                    await cache.forget(identifier)
+                    completionHandler(nil)
+                    return
+                }
+                completionHandler(NSFileProviderError(.noSuchItem))
+            } catch {
+                completionHandler(error)
+            }
+        }
         return Progress()
+    }
+
+    // MARK: - утилиты
+
+    private func parentDirID(for parent: NSFileProviderItemIdentifier) async -> String? {
+        if parent == .rootContainer { return "" }
+        return await cache.directory(for: parent)?.dirID
+    }
+
+    /// Найти `CloudFileEntry` в листинге директории по имени и (опционально) fileID
+    /// — после `uploadFile`+`attachFile` бэкенд не возвращает entryID, а нам он нужен.
+    private static func findEntry(in cloud: CloudRepository,
+                                  directoryID: String,
+                                  name: String,
+                                  fileID: String) async throws -> CloudFileEntry? {
+        let listing = try await cloud.listDirectory(directoryID)
+        if let f = listing.files.first(where: { $0.fileID == fileID && $0.name == name }) { return f }
+        return listing.files.first(where: { $0.name == name })
     }
 }
 
