@@ -20,4 +20,7 @@ public class UpdateDynamicFolderCommand : IRequest<DynamicFolderInfo>
 
     /// <summary>null = не менять.</summary>
     public string? CoverColor { get; set; }
+
+    /// <summary>null = не менять режим отображения.</summary>
+    public Domain.DfViewMode? ViewMode { get; set; }
 }

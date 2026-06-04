@@ -96,6 +96,7 @@ public static class CloudJson
         coverColor = f.CoverColor,
         coverUrl = f.CoverPreviewUrl,
         count = f.ItemsCount,
+        viewMode = (int)f.ViewMode,
         sortOrder = f.SortOrder,
         createdAt = Iso(f.CreatedAt),
         updatedAt = Iso(f.UpdatedAt)

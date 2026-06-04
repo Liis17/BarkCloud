@@ -70,7 +70,7 @@ public static class DynamicFolderQueryBuilder
             case DfField.ImageHeight:
                 return int.TryParse(value, out _);
             case DfField.MediaKind:
-                return int.TryParse(value, out var kind) && kind is >= 0 and <= 4;
+                return ParseMediaKinds(value).Count > 0;
             case DfField.Name:
             case DfField.Extension:
             case DfField.Device:
@@ -141,10 +141,11 @@ public static class DynamicFolderQueryBuilder
                 return true;
 
             case DfField.MediaKind:
-                if (!int.TryParse(value, out var kindInt))
+                // Значение — один код или набор через запятую («1,2» = фото или видео).
+                var kinds = ParseMediaKinds(value);
+                if (kinds.Count == 0)
                     return false;
-                var kind = (MediaKind)kindInt;
-                predicate = f => f.MediaKind == kind;
+                predicate = f => kinds.Contains(f.MediaKind);
                 return true;
 
             case DfField.Name:
@@ -205,6 +206,21 @@ public static class DynamicFolderQueryBuilder
             default:
                 return false;
         }
+    }
+
+    /// <summary>
+    /// Разбирает значение правила <see cref="DfField.MediaKind"/>: один код («3») или набор через запятую («1,2»).
+    /// Невалидные/выходящие за диапазон коды отбрасываются. Дубликаты схлопываются.
+    /// </summary>
+    private static List<MediaKind> ParseMediaKinds(string value)
+    {
+        return value
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(s => int.TryParse(s, out var k) && k is >= 0 and <= 4 ? (MediaKind?)(MediaKind)k : null)
+            .Where(k => k is not null)
+            .Select(k => k!.Value)
+            .Distinct()
+            .ToList();
     }
 
     private static bool TryParseDate(string value, out DateTime utc)
