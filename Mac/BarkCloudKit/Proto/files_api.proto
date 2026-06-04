@@ -1,0 +1,807 @@
+syntax = "proto3";
+
+option csharp_namespace = "BarkCloud.Proto.Files";
+
+import "google/protobuf/timestamp.proto";
+
+package barkcloud.files;
+
+service FilesApi {
+  rpc GetUploadUrl(GetUploadUrlRequest) returns(GetUploadUrlResponse); // Получить ссылку для загрузки файла
+
+  rpc GetTempDownloadUrl(GetTempDownloadUrlRequest) returns(GetTempDownloadUrlResponse); // Получить ссылку для скачивания файла
+
+  rpc CheckFileHash(CheckFileHashRequest) returns(CheckFileHashResponse); // Проверить существует ли файл с таким хешем
+
+  rpc CheckFileHashes(CheckFileHashesRequest) returns(CheckFileHashesResponse); // Пакетная проверка наличия файлов по списку SHA256-хешей (без побочных эффектов)
+
+  rpc GetUserStorageInfo(GetUserStorageInfoRequest) returns(GetUserStorageInfoResponse); // Получить информацию о хранилище пользователя
+
+  rpc GetFileMetadata(GetFileMetadataRequest) returns(GetFileMetadataResponse); // Метаданные файла (EXIF/ffprobe/Office) для диалога «Свойства»
+}
+
+service CloudApi {
+  rpc CreateDirectory      (CreateDirectoryRequest)      returns (DirectoryInfo);            // Создать папку
+  rpc RenameDirectory      (RenameDirectoryRequest)      returns (CloudEmpty);               // Переименовать папку
+  rpc MoveDirectory        (MoveDirectoryRequest)        returns (CloudEmpty);               // Переместить папку
+  rpc DeleteDirectory      (DeleteDirectoryRequest)      returns (CloudEmpty);               // Удалить папку рекурсивно
+  rpc ListDirectory        (ListDirectoryRequest)        returns (DirectoryListing);         // Листинг содержимого папки (только метаданные)
+  rpc ListDirectoryDetailed(ListDirectoryRequest)        returns (DirectoryListingDetailed); // Листинг с полной информацией о каждом файле (URL, превью, размеры)
+
+  rpc AttachFile           (AttachFileRequest)           returns (CloudEmpty);               // Привязать загруженный файл к папке
+  rpc RenameFileEntry      (RenameFileEntryRequest)      returns (CloudEmpty);               // Переименовать запись о файле
+  rpc MoveFileEntry        (MoveFileEntryRequest)        returns (CloudEmpty);               // Переместить запись о файле
+  rpc DeleteFileEntry      (DeleteFileEntryRequest)      returns (CloudEmpty);               // Удалить запись о файле
+  rpc DeleteFileEntries    (DeleteFileEntriesRequest)    returns (DeleteFileEntriesResponse); // Массовое удаление записей в корзину (до 100 за запрос)
+
+  rpc ListUserImages       (ListUserImagesRequest)       returns (ListUserImagesResponse);   // [DEPRECATED] Все изображения пользователя; используйте ListUserMedia(PHOTO)
+  rpc ListUserMedia        (ListUserMediaRequest)        returns (ListUserMediaResponse);     // Медиа пользователя по типу (фото / видео) от новых к старым (cursor pagination)
+  rpc DeleteUserMedia      (DeleteUserMediaRequest)      returns (CloudEmpty);                // Удалить медиа из галереи по file_id: живые записи каталога → в корзину; если записей нет — снять владельца (жёстко)
+
+  rpc GetPath              (GetPathRequest)              returns (PathResponse);             // Построить путь до объекта в иерархии
+
+  rpc SetVideoThumbnail    (SetVideoThumbnailRequest)    returns (CloudEmpty);               // Заменить превью видео загруженной картинкой
+
+  // ───────── Корзина ─────────
+  rpc ListTrash            (ListTrashRequest)            returns (ListTrashResponse);        // Список файлов в корзине (от новых к старым)
+  rpc RestoreFromTrash     (RestoreFromTrashRequest)     returns (CloudEmpty);               // Восстановить файл из корзины
+  rpc DeleteFromTrash      (DeleteFromTrashRequest)      returns (CloudEmpty);               // Удалить файл из корзины навсегда (немедленно)
+  rpc EmptyTrash           (EmptyTrashRequest)           returns (CloudEmpty);               // Очистить корзину целиком
+
+  // ───────── Избранное ─────────
+  rpc AddFavorite          (AddFavoriteRequest)          returns (CloudEmpty);               // Добавить файл в избранное
+  rpc RemoveFavorite       (RemoveFavoriteRequest)       returns (CloudEmpty);               // Убрать файл из избранного
+  rpc ListFavorites        (ListFavoritesRequest)        returns (ListFavoritesResponse);    // Все избранные файлы (от новых к старым)
+
+  // ───────── Публичные ссылки ─────────
+  rpc CreateShare          (CreateShareRequest)          returns (ShareInfo);                // Создать постоянную публичную ссылку на файл
+  rpc ListMyShares         (ListMySharesRequest)         returns (ListMySharesResponse);     // Мои публичные ссылки (от новых к старым, cursor pagination)
+  rpc RevokeShare          (RevokeShareRequest)          returns (CloudEmpty);               // Отозвать публичную ссылку
+
+  // ───────── Публичные папки (динамическая страница /f/{token}) ─────────
+  rpc CreateFolderShare    (CreateFolderShareRequest)    returns (FolderShareInfo);          // Сделать папку публичной (идемпотентно — вернёт существующую)
+  rpc ListMyFolderShares   (ListMyFolderSharesRequest)   returns (ListMyFolderSharesResponse); // Мои публичные папки (от новых к старым, cursor pagination)
+  rpc RevokeFolderShare    (RevokeFolderShareRequest)    returns (CloudEmpty);               // Отозвать публичность папки (+ снять все публичные ссылки файлов поддерева)
+
+  // ───────── Шаринг между пользователями (приватные гранты) ─────────
+  rpc ShareFileWithUser    (ShareFileWithUserRequest)    returns (CloudEmpty);                    // Поделиться файлом с конкретным пользователем
+  rpc RevokeUserShare      (RevokeUserShareRequest)      returns (CloudEmpty);                    // Отозвать грант доступа (владелец)
+  rpc ListMyOutgoingShares (ListMyOutgoingSharesRequest) returns (ListMyOutgoingSharesResponse);  // С кем поделён файл (управление)
+  rpc ListMyOutgoingSharesAll (ListMyOutgoingSharesAllRequest) returns (ListMyOutgoingSharesAllResponse); // Все мои исходящие гранты (от новых к старым, cursor pagination)
+  rpc ListSharedWithMe     (ListSharedWithMeRequest)     returns (ListSharedWithMeResponse);      // Доступные мне файлы (от новых к старым, cursor pagination)
+  rpc GetSharedFileDownloadUrl (GetSharedFileDownloadUrlRequest) returns (GetSharedFileDownloadUrlResponse); // Временная ссылка на скачивание доступного мне файла
+
+  // ───────── Шаринг папки между пользователями (приватные гранты на папку) ─────────
+  rpc ShareFolderWithUser        (ShareFolderWithUserRequest)        returns (CloudEmpty);                       // Поделиться папкой с конкретным пользователем (рекурсивно)
+  rpc RevokeFolderUserShare      (RevokeFolderUserShareRequest)      returns (CloudEmpty);                       // Отозвать грант доступа к папке (владелец)
+  rpc ListMyOutgoingFolderShares (ListMyOutgoingFolderSharesRequest) returns (ListMyOutgoingFolderSharesResponse); // С кем поделены мои папки (для «я поделился»)
+  rpc ListSharedFoldersWithMe    (ListSharedFoldersWithMeRequest)    returns (ListSharedFoldersWithMeResponse);    // Папки, доступные мне
+  rpc ListSharedDirectory        (ListSharedDirectoryRequest)        returns (ListSharedDirectoryResponse);        // Листинг доступной мне папки (навигация по поддереву)
+}
+
+service FilesServerApi {
+  rpc GetFileData(GetFileDataRequest) returns(GetFileDataResponse); // Получить информацию о загруженном файле
+
+  rpc GetFilesData(GetFilesDataRequest) returns(GetFilesDataResponse); // Получить информацию о загруженных файлах
+
+  rpc GetUserStorageInfoServer(GetUserStorageInfoServerRequest) returns(GetUserStorageInfoResponse); // Получить информацию о хранилище пользователя (для админ-панели)
+
+  rpc UploadAvatarServer(UploadAvatarServerRequest) returns(UploadAvatarServerResponse); // Загрузить аватарку пользователя (для админ-панели)
+
+  rpc ResolveShare(ResolveShareRequest) returns(ResolveShareResponse); // Резолв публичного токена → файл + публичный URL скачивания
+
+  rpc ResolveFolderShare(ResolveFolderShareRequest) returns(ResolveFolderShareResponse); // Резолв публичной папки → листинг (подпапки + файлы с публичными URL)
+}
+
+service AlbumApi {
+  rpc CreateAlbum         (CreateAlbumRequest)         returns (AlbumInfo);            // Создать альбом
+  rpc UpdateAlbum         (UpdateAlbumRequest)         returns (AlbumInfo);            // Изменить имя / описание / обложку
+  rpc DeleteAlbum         (DeleteAlbumRequest)         returns (CloudEmpty);           // Удалить альбом
+  rpc AddItemsToAlbum     (AddItemsToAlbumRequest)     returns (CloudEmpty);           // Добавить фото/видео в альбом
+  rpc RemoveItemsFromAlbum(RemoveItemsFromAlbumRequest) returns (CloudEmpty);          // Убрать фото/видео из альбома
+  rpc ListAlbums          (ListAlbumsRequest)          returns (ListAlbumsResponse);   // Список альбомов (обложка / описание / счётчик)
+  rpc ListAlbumItems      (ListAlbumItemsRequest)      returns (ListAlbumItemsResponse); // Содержимое альбома (фото/видео с превью)
+}
+
+message GetTempDownloadUrlRequest {
+  repeated string file_ids = 1; // Идентификаторы файлов
+}
+
+message GetTempDownloadUrlResponse {
+
+  message DownloadFileData {
+    string file_id = 1; // идентификатор файла
+    string url = 2; // ссылка на загрузку
+    string preview_url = 3; // ссылка на превью файла
+  }
+
+  repeated DownloadFileData file_urls = 1; // ссылки на файлы
+
+}
+
+message GetFilesDataRequest {
+  repeated string file_ids = 1; // Идентификаторы файлов
+}
+
+message GetFilesDataResponse {
+  repeated UploadFileInfo files_infos = 1; // Информация о файлах
+}
+
+message GetFileDataRequest {
+  string file_id = 1;
+}
+
+message GetFileDataResponse {
+    UploadFileInfo file_info = 1;
+}
+
+message UploadFileInfo {
+  string id = 1; // Идентификатор файла
+  repeated int64 uploaders = 2; // Идентификаторы пользователей загрузивших файл
+  google.protobuf.Timestamp created_at = 3; // Время создания
+  google.protobuf.Timestamp uploaded_at = 4; // время загрузки
+  string etag = 5; // Etag S3
+  UploadFileType type = 6; // Тип загруженного файла
+  string file_name = 7; // Имя файла
+  string file_url = 8; // Ссылка на загрузку файла
+  string preview_url = 9; // [DEPRECATED] Ссылка на «главное» превью; см. previews для мультиразмерных
+  int64 file_size = 10; // Размер файла в байтах
+  repeated FilePreviewInfo previews = 11; // Превью изображения/видео (если есть) — 128 / 512 / 1024 по ширине
+  int32 image_width = 12; // Ширина изображения/кадра в пикселях (0 если не медиа)
+  int32 image_height = 13; // Высота изображения/кадра в пикселях (0 если не медиа)
+  MediaKind media_kind = 14; // Категория медиа (фото / видео / документ / аудио)
+  string upload_device_name = 15; // Имя устройства, с которого файл был загружен (первая успешная загрузка блоба)
+}
+
+enum MediaKind {
+  MEDIA_KIND_OTHER = 0;
+  MEDIA_KIND_PHOTO = 1;
+  MEDIA_KIND_VIDEO = 2;
+  MEDIA_KIND_DOCUMENT = 3;
+  MEDIA_KIND_AUDIO = 4;
+}
+
+message FilePreviewInfo {
+  string preview_file_id = 1; // ID отдельного UploadFile с байтами превью
+  int32 target_width = 2;     // Запрошенная ширина (128 / 512 / 1024)
+  int32 actual_width = 3;     // Фактическая ширина после ресайза
+  int32 actual_height = 4;    // Фактическая высота после ресайза
+  string preview_url = 5;     // Публичная ссылка на скачивание превью
+}
+
+// ───────── Метаданные блоба (EXIF / ffprobe / PDF / Office) ─────────
+
+message GetFileMetadataRequest {
+  string file_id = 1;
+}
+
+message GetFileMetadataResponse {
+  bool has_metadata = 1;                 // false — для файла не извлечено ни одного поля (или ещё не успели)
+  FileMetadataInfo metadata = 2;         // заполнено только при has_metadata=true
+}
+
+// Все поля опциональны (через optional) — клиент должен показывать только заданные.
+message FileMetadataInfo {
+  // Общие
+  optional google.protobuf.Timestamp taken_at = 1; // Дата/время съёмки/создания контента (UTC)
+  optional string creator_tool = 2;                // Программа создания/редактирования
+
+  // GPS
+  optional double latitude = 3;
+  optional double longitude = 4;
+  optional double altitude = 5;                    // Метры; отрицательно — ниже уровня моря
+
+  // Камера
+  optional string camera_make = 6;
+  optional string camera_model = 7;
+  optional string lens_model = 8;
+
+  // Параметры съёмки
+  optional double focal_length_mm = 9;
+  optional double f_number = 10;
+  optional double exposure_time_seconds = 11;
+  optional int32 iso = 12;
+  optional int32 orientation = 13;                 // EXIF Orientation 1..8
+  optional bool flash = 14;
+
+  // Видео
+  optional double duration_seconds = 15;
+  optional string video_codec = 16;
+  optional string audio_codec = 17;
+  optional int64 bitrate = 18;                     // бит/с
+  optional double frame_rate = 19;
+
+  // Документ
+  optional string document_author = 20;
+  optional string document_title = 21;
+  optional string document_subject = 22;
+  optional int32 document_page_count = 23;
+}
+
+message GetUploadUrlRequest {
+  UploadFileType file_type = 1; // Тип загружаемого файла
+}
+
+message GetUploadUrlResponse {
+  string url = 1; // адрес для загрузки файла
+  string file_id = 2; // идентификатор файла
+}
+
+enum UploadFileType {
+  UPLOAD_FILE_TYPE_UNKNOWN = 0;
+
+  USER_AVATAR = 1; // Аватарка пользователя
+
+  CLOUD_FILE = 2; // Файл в облачном хранилище пользователя
+}
+
+message GetUserStorageInfoServerRequest {
+  int64 user_id = 1;
+}
+
+message UploadAvatarServerRequest {
+  bytes image_data = 1;   // содержимое файла
+  string filename = 2;    // имя файла
+  int64 user_id = 3;      // идентификатор пользователя
+}
+
+message UploadAvatarServerResponse {
+  string file_url = 1;          // ссылка на полное изображение
+  string preview_url = 2;       // ссылка на превью
+  string file_id = 3;           // идентификатор файла
+}
+
+message CheckFileHashRequest {
+  string file_hash = 1; // SHA256 хеш файла (hex строка, 64 символа)
+}
+
+message CheckFileHashResponse {
+  string file_id = 1; // Идентификатор файла если найден, пустая строка если не найден
+  bool exists = 2; // true → контент с таким хешем уже есть в облаке
+  repeated ExistingLocation existing_locations = 3; // Существующие копии этого контента у пользователя (имя + папка) для модалки «файл уже есть»
+}
+
+message ExistingLocation {
+  string entry_id = 1;
+  string name = 2;
+  string directory_id = 3; // Пустая строка — корень владельца
+  string directory_name = 4; // Имя папки (пусто для корня)
+}
+
+message CheckFileHashesRequest {
+  repeated string file_hashes = 1; // SHA256 хеши файлов (hex строки по 64 символа)
+}
+
+message HashCheckResult {
+  string file_hash = 1; // исходный хеш (нормализован к нижнему регистру)
+  bool exists = 2;      // true — файл с таким хешем есть в хранилище
+}
+
+message CheckFileHashesResponse {
+  repeated HashCheckResult results = 1; // результат по каждому уникальному валидному хешу
+}
+
+message GetUserStorageInfoRequest {
+}
+
+// ============ CloudApi messages ============
+
+message CloudEmpty {}
+
+message DirectoryInfo {
+  string id = 1; // Идентификатор папки
+  string parent_id = 2; // Идентификатор родительской папки, пустая строка для корня
+  string name = 3; // Имя папки
+  google.protobuf.Timestamp created_at = 4;
+  google.protobuf.Timestamp updated_at = 5;
+}
+
+message FileEntryInfo {
+  string id = 1; // Идентификатор записи в иерархии
+  string directory_id = 2; // Папка, в которой лежит запись
+  string file_id = 3; // Идентификатор реального UploadFile
+  string name = 4; // Имя файла в иерархии
+  google.protobuf.Timestamp created_at = 5;
+}
+
+message CreateDirectoryRequest {
+  string parent_id = 1; // Пустая строка означает корень владельца
+  string name = 2;
+}
+
+message RenameDirectoryRequest {
+  string directory_id = 1;
+  string new_name = 2;
+}
+
+message MoveDirectoryRequest {
+  string directory_id = 1;
+  string new_parent_id = 2; // Пустая строка означает перемещение в корень
+}
+
+message DeleteDirectoryRequest {
+  string directory_id = 1;
+}
+
+message ListDirectoryRequest {
+  optional string directory_id = 1; // Не указан или пустой = корень владельца
+}
+
+message DirectoryListing {
+  repeated DirectoryInfo subdirs = 1;
+  repeated FileEntryInfo files = 2;
+}
+
+message AttachFileRequest {
+  string directory_id = 1; // Пустая строка означает корень владельца (игнорируется при route_by_media_kind)
+  string file_id = 2;
+  string name = 3;
+  bool route_by_media_kind = 4; // true → сервер кладёт файл в системную папку Фото/Видео/Другие документы по типу медиа
+}
+
+message RenameFileEntryRequest {
+  string entry_id = 1;
+  string new_name = 2;
+}
+
+message MoveFileEntryRequest {
+  string entry_id = 1;
+  string new_directory_id = 2; // Пустая строка означает корень владельца
+}
+
+message DeleteFileEntryRequest {
+  string entry_id = 1;
+}
+
+message DeleteFileEntriesRequest {
+  repeated string entry_ids = 1; // id записей каталога, до 100 за запрос
+}
+
+message DeleteFileEntriesResponse {
+  int32 deleted_count = 1; // сколько записей реально перемещено в корзину
+}
+
+message DeleteUserMediaRequest {
+  string file_id = 1; // id блоба из ListUserMedia
+}
+
+// ============ Детальный листинг и галерея ============
+
+message FileEntryDetailed {
+  FileEntryInfo entry = 1; // id / directory_id / file_id / name / created_at
+  UploadFileInfo file = 2; // полная информация о блобе (URL, размеры, превью)
+}
+
+message DirectoryListingDetailed {
+  repeated DirectoryInfo subdirs = 1;
+  repeated FileEntryDetailed files = 2;
+}
+
+message ListUserImagesRequest {
+  int32 limit = 1;                                  // 1..200, default 50
+  google.protobuf.Timestamp cursor_created_at = 2;  // exclusive; пусто = с самой свежей загрузки
+  string cursor_file_id = 3;                        // tie-breaker для стабильной cursor-пагинации
+}
+
+message UserImageItem {
+  UploadFileInfo file = 1;          // карточка по UploadFile
+  int32 entries_count = 2;          // сколько копий записи у владельца
+  repeated string entry_names = 3;  // имена в папках, до 5 шт.
+  repeated string entry_ids = 4;    // id записей каталога владельца (для rename/delete из галереи)
+}
+
+message ListUserImagesResponse {
+  repeated UserImageItem items = 1;
+  google.protobuf.Timestamp next_cursor_created_at = 2; // пусто = больше нет страниц
+  string next_cursor_file_id = 3;
+}
+
+message ListUserMediaRequest {
+  MediaKind kind = 1;                               // PHOTO или VIDEO — какой тип медиа листать
+  int32 limit = 2;                                  // 1..200, default 50
+  google.protobuf.Timestamp cursor_created_at = 3;  // exclusive; пусто = с самой свежей загрузки
+  string cursor_file_id = 4;                        // tie-breaker для стабильной cursor-пагинации
+}
+
+message ListUserMediaResponse {
+  repeated UserImageItem items = 1;
+  google.protobuf.Timestamp next_cursor_created_at = 2; // пусто = больше нет страниц
+  string next_cursor_file_id = 3;
+}
+
+message SetVideoThumbnailRequest {
+  string video_file_id = 1;         // идентификатор видео-файла
+  string source_image_file_id = 2;  // загруженная пользователем картинка-кадр для нового превью
+}
+
+// ============ Корзина ============
+
+message ListTrashRequest {
+  int32 limit = 1;                                  // 1..200, default 50
+  google.protobuf.Timestamp cursor_deleted_at = 2;  // exclusive; пусто = с самых свежеудалённых
+  string cursor_entry_id = 3;                       // tie-breaker для стабильной cursor-пагинации
+}
+
+message TrashEntry {
+  FileEntryInfo entry = 1;                  // id / directory_id / file_id / name / created_at
+  UploadFileInfo file = 2;                  // полная информация о блобе (URL, размеры, превью)
+  google.protobuf.Timestamp deleted_at = 3; // когда перемещён в корзину
+  google.protobuf.Timestamp purge_at = 4;   // когда будет удалён окончательно
+}
+
+message ListTrashResponse {
+  repeated TrashEntry items = 1;
+  google.protobuf.Timestamp next_cursor_deleted_at = 2; // пусто = больше нет страниц
+  string next_cursor_entry_id = 3;
+}
+
+message RestoreFromTrashRequest {
+  string entry_id = 1;
+}
+
+message DeleteFromTrashRequest {
+  string entry_id = 1;
+}
+
+message EmptyTrashRequest {
+}
+
+// ============ Избранное ============
+
+message AddFavoriteRequest {
+  string file_id = 1; // Идентификатор реального UploadFile (фото / видео / документ)
+}
+
+message RemoveFavoriteRequest {
+  string file_id = 1;
+}
+
+message ListFavoritesRequest {
+  int32 limit = 1;                                    // 1..200, default 50
+  google.protobuf.Timestamp cursor_favorited_at = 2;  // exclusive; пусто = с самых свежих
+  string cursor_file_id = 3;                          // tie-breaker для стабильной cursor-пагинации
+}
+
+message FavoriteEntry {
+  UploadFileInfo file = 1;                    // полная информация о блобе (URL, размеры, превью)
+  google.protobuf.Timestamp favorited_at = 2; // когда файл добавлен в избранное
+}
+
+message ListFavoritesResponse {
+  repeated FavoriteEntry items = 1;
+  google.protobuf.Timestamp next_cursor_favorited_at = 2; // пусто = больше нет страниц
+  string next_cursor_file_id = 3;
+}
+
+message GetPathRequest {
+  oneof target {
+    string directory_id = 1;
+    string entry_id = 2;
+  }
+}
+
+message PathSegment {
+  string id = 1; // Идентификатор папки сегмента
+  string name = 2; // Имя сегмента
+}
+
+message PathResponse {
+  // Сегменты от корня до целевого объекта (не включая сам объект).
+  // Для объекта в корне — пустой список.
+  repeated PathSegment segments = 1;
+  // Полный текстовый путь, например /A/B/C/file.txt
+  string full_path = 2;
+}
+
+message GetUserStorageInfoResponse {
+  message StorageByType {
+    UploadFileType file_type = 1; // Тип файла
+    int64 used_storage = 2; // Занятое пространство для данного типа в байтах
+  }
+
+  int64 total_used_storage = 1; // Общее занятое пространство в байтах
+  int64 storage_limit = 2; // Лимит хранилища в байтах
+  repeated StorageByType storage_by_types = 3; // Использованное пространство по типам файлов
+}
+
+// ============ AlbumApi messages ============
+
+message AlbumInfo {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  string cover_file_id = 4;       // ID файла-обложки (пусто, если нет)
+  string cover_preview_url = 5;   // URL превью обложки (пусто, если нет)
+  int32 items_count = 6;          // Количество элементов в альбоме
+  google.protobuf.Timestamp created_at = 7;
+  google.protobuf.Timestamp updated_at = 8;
+}
+
+message CreateAlbumRequest {
+  string name = 1;
+  string description = 2;
+}
+
+message UpdateAlbumRequest {
+  string album_id = 1;
+  optional string name = 2;          // не задано = не менять
+  optional string description = 3;   // не задано = не менять
+  optional string cover_file_id = 4; // не задано = не менять; пустая строка = сбросить обложку
+}
+
+message DeleteAlbumRequest {
+  string album_id = 1;
+}
+
+message AddItemsToAlbumRequest {
+  string album_id = 1;
+  repeated string file_ids = 2;
+}
+
+message RemoveItemsFromAlbumRequest {
+  string album_id = 1;
+  repeated string file_ids = 2;
+}
+
+message ListAlbumsRequest {
+  int32 limit = 1;                                  // 1..200, default 50
+  google.protobuf.Timestamp cursor_updated_at = 2;  // exclusive; пусто = с самых свежих
+  string cursor_album_id = 3;                       // tie-breaker
+}
+
+message ListAlbumsResponse {
+  repeated AlbumInfo albums = 1;
+  google.protobuf.Timestamp next_cursor_updated_at = 2; // пусто = больше нет страниц
+  string next_cursor_album_id = 3;
+}
+
+message ListAlbumItemsRequest {
+  string album_id = 1;
+  int32 limit = 2;                                  // 1..200, default 50
+  google.protobuf.Timestamp cursor_added_at = 3;    // exclusive; пусто = с самых свежих
+  string cursor_file_id = 4;                        // tie-breaker
+  optional MediaKind kind_filter = 5;               // не задано = все типы
+}
+
+message AlbumItemEntry {
+  UploadFileInfo file = 1;                  // полная информация о файле (URL, превью, размеры)
+  google.protobuf.Timestamp added_at = 2;   // когда добавлен в альбом
+}
+
+message ListAlbumItemsResponse {
+  repeated AlbumItemEntry items = 1;
+  google.protobuf.Timestamp next_cursor_added_at = 2; // пусто = больше нет страниц
+  string next_cursor_file_id = 3;
+}
+
+// ============ Публичные ссылки ============
+
+message ShareInfo {
+  string id = 1;                            // Идентификатор ссылки
+  string token = 2;                         // URL-safe токен ссылки
+  string file_id = 3;                       // Идентификатор файла
+  string name = 4;                          // Имя файла на момент создания ссылки
+  google.protobuf.Timestamp created_at = 5; // Когда создана ссылка
+  int64 click_count = 6;                    // Сколько раз по ссылке переходили
+}
+
+message CreateShareRequest {
+  string file_id = 1; // Идентификатор файла, на который создаётся ссылка
+  string name = 2;    // Имя файла (для отображения в списке)
+}
+
+message ListMySharesRequest {
+  int32 limit = 1;                                  // 1..200, default 50
+  google.protobuf.Timestamp cursor_created_at = 2;  // exclusive; пусто = с самых свежих
+  string cursor_share_id = 3;                       // tie-breaker для стабильной cursor-пагинации
+}
+
+message ListMySharesResponse {
+  repeated ShareInfo shares = 1;
+  google.protobuf.Timestamp next_cursor_created_at = 2; // пусто = больше нет страниц
+  string next_cursor_share_id = 3;
+}
+
+message RevokeShareRequest {
+  string share_id = 1;
+}
+
+message ResolveShareRequest {
+  string token = 1;
+}
+
+message ResolveShareResponse {
+  bool found = 1;          // false = ссылка не найдена / отозвана
+  string file_id = 2;      // Идентификатор файла
+  string name = 3;         // Имя файла
+  string download_url = 4; // Публичный URL скачивания
+  MediaKind media_kind = 5;   // фото / видео / прочее — для отрисовки публичной страницы
+  string preview_url = 6;     // публичный URL превью (фото/видео), пусто если превью нет
+  int32 image_width = 7;      // размеры оригинала (если известны)
+  int32 image_height = 8;
+  int64 file_size = 9;        // размер оригинала, байт
+}
+
+// ============ Шаринг между пользователями (приватные гранты) ============
+
+message ShareFileWithUserRequest {
+  string file_id = 1;
+  int64 recipient_user_id = 2;
+}
+
+message RevokeUserShareRequest {
+  string grant_id = 1;
+}
+
+message ListMyOutgoingSharesRequest {
+  string file_id = 1;
+}
+
+message OutgoingShareEntry {
+  string grant_id = 1;
+  int64 recipient_user_id = 2;
+  google.protobuf.Timestamp shared_at = 3;
+}
+
+message ListMyOutgoingSharesResponse {
+  repeated OutgoingShareEntry items = 1;
+}
+
+message ListMyOutgoingSharesAllRequest {
+  int32 limit = 1;                                 // 1..200, default 50
+  google.protobuf.Timestamp cursor_shared_at = 2;  // exclusive; пусто = с самых свежих
+  string cursor_grant_id = 3;                      // tie-breaker
+}
+
+message OutgoingShareFull {
+  string grant_id = 1;
+  UploadFileInfo file = 2;        // полная инфо файла (имя, превью, размеры)
+  int64 recipient_user_id = 3;    // кому выдан доступ (имя резолвит веб-слой через Users)
+  google.protobuf.Timestamp shared_at = 4;
+}
+
+message ListMyOutgoingSharesAllResponse {
+  repeated OutgoingShareFull items = 1;
+  google.protobuf.Timestamp next_cursor_shared_at = 2; // пусто = больше нет страниц
+  string next_cursor_grant_id = 3;
+}
+
+message ListSharedWithMeRequest {
+  int32 limit = 1;                                 // 1..200, default 50
+  google.protobuf.Timestamp cursor_shared_at = 2;  // exclusive; пусто = с самых свежих
+  string cursor_grant_id = 3;                      // tie-breaker
+}
+
+message SharedWithMeEntry {
+  string grant_id = 1;
+  UploadFileInfo file = 2;     // полная инфо файла (имя, превью, размеры); превью публичны
+  int64 owner_user_id = 3;     // от кого (имя резолвит веб-слой через Users)
+  google.protobuf.Timestamp shared_at = 4;
+}
+
+message ListSharedWithMeResponse {
+  repeated SharedWithMeEntry items = 1;
+  google.protobuf.Timestamp next_cursor_shared_at = 2; // пусто = больше нет страниц
+  string next_cursor_grant_id = 3;
+}
+
+message GetSharedFileDownloadUrlRequest {
+  string file_id = 1;
+}
+
+message GetSharedFileDownloadUrlResponse {
+  string download_url = 1;
+}
+
+// ============ Публичные папки (динамическая страница) ============
+
+message FolderShareInfo {
+  string id = 1;                            // Идентификатор публичной папки
+  string token = 2;                         // URL-safe токен (для /f/{token})
+  string directory_id = 3;                  // Идентификатор папки
+  string name = 4;                          // Имя папки на момент публикации
+  google.protobuf.Timestamp created_at = 5; // Когда опубликована
+  int64 click_count = 6;                    // Сколько раз открывали
+}
+
+message CreateFolderShareRequest {
+  string directory_id = 1;
+  string name = 2;
+}
+
+message ListMyFolderSharesRequest {
+  int32 limit = 1;                                       // 1..200, default 50
+  google.protobuf.Timestamp cursor_created_at = 2;       // exclusive; пусто = с самых свежих
+  string cursor_folder_share_id = 3;                     // tie-breaker
+}
+
+message ListMyFolderSharesResponse {
+  repeated FolderShareInfo shares = 1;
+  google.protobuf.Timestamp next_cursor_created_at = 2;  // пусто = больше нет страниц
+  string next_cursor_folder_share_id = 3;
+}
+
+message RevokeFolderShareRequest {
+  string folder_share_id = 1;
+}
+
+message ResolveFolderShareRequest {
+  string token = 1;
+  string dir = 2;   // подпапка внутри расшаренного поддерева (пусто = корень папки)
+}
+
+message PublicDirEntry {
+  string id = 1;
+  string name = 2;
+}
+
+message PublicFileEntry {
+  string file_id = 1;
+  string name = 2;
+  MediaKind media_kind = 3;
+  string download_url = 4;   // публичный URL скачивания (temp)
+  string preview_url = 5;    // публичный URL превью (пусто если нет)
+  int64 file_size = 6;
+  int32 image_width = 7;
+  int32 image_height = 8;
+}
+
+message ResolveFolderShareResponse {
+  bool found = 1;                       // false = папка не найдена / отозвана / dir вне поддерева
+  string folder_name = 2;               // имя корневой расшаренной папки
+  string current_dir = 3;               // id текущей папки ('' = корень расшаренной папки)
+  string current_name = 4;              // имя текущей папки
+  repeated PublicDirEntry subdirs = 5;  // подпапки текущей папки
+  repeated PublicFileEntry files = 6;   // файлы текущей папки
+}
+
+// ============ Шаринг папки между пользователями (приватные гранты) ============
+
+message ShareFolderWithUserRequest {
+  string directory_id = 1;
+  int64 recipient_user_id = 2;
+}
+
+message RevokeFolderUserShareRequest {
+  string grant_id = 1;
+}
+
+message ListMyOutgoingFolderSharesRequest {}
+
+message OutgoingFolderShare {
+  string grant_id = 1;
+  string directory_id = 2;
+  string name = 3;                          // имя папки
+  int64 recipient_user_id = 4;              // кому выдан доступ
+  google.protobuf.Timestamp shared_at = 5;
+}
+
+message ListMyOutgoingFolderSharesResponse {
+  repeated OutgoingFolderShare items = 1;
+}
+
+message ListSharedFoldersWithMeRequest {}
+
+message SharedFolderEntry {
+  string grant_id = 1;
+  string directory_id = 2;
+  string name = 3;                          // имя папки
+  int64 owner_user_id = 4;                  // от кого (имя резолвит веб-слой)
+  google.protobuf.Timestamp shared_at = 5;
+}
+
+message ListSharedFoldersWithMeResponse {
+  repeated SharedFolderEntry items = 1;
+}
+
+message ListSharedDirectoryRequest {
+  string directory_id = 1;   // папка внутри доступного мне поддерева (валидируется грантом)
+}
+
+message ListSharedDirectoryResponse {
+  bool found = 1;                       // false = нет доступа / папка не найдена
+  string directory_id = 2;              // id текущей папки
+  string name = 3;                      // имя текущей папки
+  repeated PublicDirEntry subdirs = 4;  // подпапки
+  repeated PublicFileEntry files = 5;   // файлы (с публичными temp-URL и превью)
+}
