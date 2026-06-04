@@ -49,11 +49,27 @@ actor BarkCloudItemCache {
                              modified: f.asset.uploadedAt ?? f.asset.createdAt)
     }
 
+    func putDirectory(dirID: String, parent: NSFileProviderItemIdentifier, name: String, modified: Date) {
+        dirs["d:\(dirID)"] = DirInfo(dirID: dirID, parentIdentifier: parent, name: name, modified: modified)
+    }
+
+    func putFile(entryID: String, fileID: String, parentDirID: String,
+                 parent: NSFileProviderItemIdentifier, name: String, size: Int64, modified: Date) {
+        files["f:\(entryID)"] = FileInfo(entryID: entryID, fileID: fileID,
+                                         parentDirID: parentDirID, parentIdentifier: parent,
+                                         name: name, size: size, modified: modified)
+    }
+
     func directory(for identifier: NSFileProviderItemIdentifier) -> DirInfo? {
         dirs[identifier.rawValue]
     }
 
     func file(for identifier: NSFileProviderItemIdentifier) -> FileInfo? {
         files[identifier.rawValue]
+    }
+
+    func forget(_ identifier: NSFileProviderItemIdentifier) {
+        dirs.removeValue(forKey: identifier.rawValue)
+        files.removeValue(forKey: identifier.rawValue)
     }
 }
