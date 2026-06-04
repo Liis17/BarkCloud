@@ -12,8 +12,10 @@
 		15344A41DC88EEAB2EAFB27F /* BarkCloudDriveApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1CF4D96395D3FA04F549C1A /* BarkCloudDriveApp.swift */; };
 		156B06671D1676B7D031CB26 /* BarkCloudKit in Frameworks */ = {isa = PBXBuildFile; productRef = 746E94F5EE782185AD663E94 /* BarkCloudKit */; };
 		208564C0AE710B3D6DD00B6B /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 95C19A02855B5D8E85C031DA /* Cocoa.framework */; };
-		2BA67B4728058D5C403A4F82 /* BarkCloudSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 494BE53B5626FABA6F3EABF3 /* BarkCloudSession.swift */; };
 		3EAA4923514778D78120DFF2 /* BarkCloudFS.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 1E50AFF8D3690B19132666D6 /* BarkCloudFS.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		3F0E0001000000000000000A /* BarkCloudFileProviderItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F0E0001000000000000000B /* BarkCloudFileProviderItem.swift */; };
+		3F0E0001000000000000000C /* BarkCloudItemCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F0E0001000000000000000D /* BarkCloudItemCache.swift */; };
+		3F0E0001000000000000000E /* BarkCloudEnumerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F0E0001000000000000000F /* BarkCloudEnumerator.swift */; };
 		45AECBB915482296E2B35262 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21ED27B11311898E7A24AB22 /* SettingsView.swift */; };
 		6C6FB8C1441C82B6DBEF1EAC /* MenuBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50B6130C2EAADE13E9A91EBC /* MenuBarView.swift */; };
 		6DED464EE03A3EB64D0F2C47 /* ServerSetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 766125E7C7420FAEC4EADAF8 /* ServerSetupView.swift */; };
@@ -54,7 +56,9 @@
 		1E50AFF8D3690B19132666D6 /* BarkCloudFS.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = BarkCloudFS.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		21ED27B11311898E7A24AB22 /* SettingsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		387B7BB1925CB3E77BDF3291 /* LoginView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
-		494BE53B5626FABA6F3EABF3 /* BarkCloudSession.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BarkCloudSession.swift; sourceTree = "<group>"; };
+		3F0E0001000000000000000B /* BarkCloudFileProviderItem.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BarkCloudFileProviderItem.swift; sourceTree = "<group>"; };
+		3F0E0001000000000000000D /* BarkCloudItemCache.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BarkCloudItemCache.swift; sourceTree = "<group>"; };
+		3F0E0001000000000000000F /* BarkCloudEnumerator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BarkCloudEnumerator.swift; sourceTree = "<group>"; };
 		50B6130C2EAADE13E9A91EBC /* MenuBarView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MenuBarView.swift; sourceTree = "<group>"; };
 		523071DFD9CF395F2A8B51EC /* MountManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MountManager.swift; sourceTree = "<group>"; };
 		5F883AA7898F2181D7434162 /* BarkCloudFileProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BarkCloudFileProvider.swift; sourceTree = "<group>"; };
@@ -127,7 +131,9 @@
 			isa = PBXGroup;
 			children = (
 				5F883AA7898F2181D7434162 /* BarkCloudFileProvider.swift */,
-				494BE53B5626FABA6F3EABF3 /* BarkCloudSession.swift */,
+				3F0E0001000000000000000B /* BarkCloudFileProviderItem.swift */,
+				3F0E0001000000000000000D /* BarkCloudItemCache.swift */,
+				3F0E0001000000000000000F /* BarkCloudEnumerator.swift */,
 			);
 			path = BarkCloudFS;
 			sourceTree = "<group>";
@@ -250,7 +256,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				B945DF5E4CC02EB1C132ED59 /* BarkCloudFileProvider.swift in Sources */,
-				2BA67B4728058D5C403A4F82 /* BarkCloudSession.swift in Sources */,
+				3F0E0001000000000000000A /* BarkCloudFileProviderItem.swift in Sources */,
+				3F0E0001000000000000000C /* BarkCloudItemCache.swift in Sources */,
+				3F0E0001000000000000000E /* BarkCloudEnumerator.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
