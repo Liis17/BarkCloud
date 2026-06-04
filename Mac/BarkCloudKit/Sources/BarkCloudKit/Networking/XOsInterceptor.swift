@@ -1,13 +1,20 @@
 import Foundation
+#if os(iOS)
 import UIKit
+#endif
 import GRPCCore
 
 struct XOsInterceptor: ClientInterceptor {
     let osName: String
 
     init() {
+        #if os(iOS)
         let device = UIDevice.current
         self.osName = Base64Header.encode("\(device.systemName) \(device.systemVersion)")
+        #else
+        let v = ProcessInfo.processInfo.operatingSystemVersion
+        self.osName = Base64Header.encode("macOS \(v.majorVersion).\(v.minorVersion)")
+        #endif
     }
 
     @concurrent

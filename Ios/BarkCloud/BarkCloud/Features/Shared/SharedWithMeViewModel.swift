@@ -1,6 +1,7 @@
 import Foundation
 import Observation
 import UIKit
+import BarkCloudKit
 
 /// Состояние таба «Мне доступны» в `SharedHubScreen`.
 struct SharedWithMeUiState {

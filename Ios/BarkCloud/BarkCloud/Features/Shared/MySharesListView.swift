@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import BarkCloudKit
 
 /// Список «Мои публичные ссылки»: имя файла, обрезанный URL, переходы и дата
 /// создания. Действия: «Скопировать» — кладёт URL в буфер; «Отозвать» —
@@ -7,7 +8,7 @@ import UIKit
 /// при появлении последней карточки.
 struct MySharesListView: View {
     @Bindable var vm: MySharesViewModel
-    @State private var pendingRevoke: ShareLink?
+    @State private var pendingRevoke: BarkCloudKit.ShareLink?
 
     var body: some View {
         Group {
@@ -102,14 +103,14 @@ struct MySharesListView: View {
         .padding(.vertical, 60)
     }
 
-    private func copy(_ link: ShareLink) {
+    private func copy(_ link: BarkCloudKit.ShareLink) {
         guard let url = link.url else { return }
         vm.state.pendingShareURL = ShareableURL(url: url)
     }
 }
 
 private struct ShareLinkRow: View {
-    let link: ShareLink
+    let link: BarkCloudKit.ShareLink
     let onCopy: () -> Void
     let onRevoke: () -> Void
 

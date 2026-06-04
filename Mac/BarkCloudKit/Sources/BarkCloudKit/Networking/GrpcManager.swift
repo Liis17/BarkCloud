@@ -7,18 +7,34 @@ import SwiftProtobuf
 /// микросервисов задаёт пользователь при первом запуске (см. `ServerSetupScreen`)
 /// и хранятся в App Group UserDefaults — общем хранилище main app и Share Extension
 /// (тот же контейнер `group.com.barkfluff.BarkCloud`, что у фоновой загрузки).
-struct ServerConfig: Sendable, Equatable {
-    var identityHost: String
-    var identityPort: Int
-    var usersHost: String
-    var usersPort: Int
-    var filesHost: String
-    var filesPort: Int
-    var useTLS: Bool
-    var allowSelfSigned: Bool
+public struct ServerConfig: Sendable, Equatable {
+    public var identityHost: String
+    public var identityPort: Int
+    public var usersHost: String
+    public var usersPort: Int
+    public var filesHost: String
+    public var filesPort: Int
+    public var useTLS: Bool
+    public var allowSelfSigned: Bool
+
+    public init(
+        identityHost: String, identityPort: Int,
+        usersHost: String, usersPort: Int,
+        filesHost: String, filesPort: Int,
+        useTLS: Bool, allowSelfSigned: Bool
+    ) {
+        self.identityHost = identityHost
+        self.identityPort = identityPort
+        self.usersHost = usersHost
+        self.usersPort = usersPort
+        self.filesHost = filesHost
+        self.filesPort = filesPort
+        self.useTLS = useTLS
+        self.allowSelfSigned = allowSelfSigned
+    }
 
     /// Значения боевого деплоя — дефолт и предзаполнение формы первого запуска.
-    static let production = ServerConfig(
+    public static let production = ServerConfig(
         identityHost: "cloud.barkfluff.com", identityPort: 7020,
         usersHost: "cloud.barkfluff.com", usersPort: 7021,
         filesHost: "cloud.barkfluff.com", filesPort: 7025,
@@ -38,14 +54,14 @@ struct ServerConfig: Sendable, Equatable {
     }
 
     private static var store: UserDefaults {
-        UserDefaults(suiteName: UploadConstants.appGroupID) ?? .standard
+        UserDefaults(suiteName: BarkCloudAppGroup.identifier) ?? .standard
     }
 
     /// Пользователь хотя бы раз сохранил адреса. До этого `RootView` показывает экран ввода.
-    static var isConfigured: Bool { store.bool(forKey: Key.configured) }
+    public static var isConfigured: Bool { store.bool(forKey: Key.configured) }
 
     /// Текущая конфигурация. До первой настройки — `production`-дефолты.
-    static var current: ServerConfig {
+    public static var current: ServerConfig {
         let d = store
         guard d.bool(forKey: Key.configured) else { return .production }
         let p = ServerConfig.production
@@ -66,7 +82,7 @@ struct ServerConfig: Sendable, Equatable {
     }
 
     /// Сохранить адреса и отметить конфигурацию завершённой.
-    func persist() {
+    public func persist() {
         let d = Self.store
         d.set(identityHost, forKey: Key.identityHost)
         d.set(identityPort, forKey: Key.identityPort)
@@ -81,7 +97,7 @@ struct ServerConfig: Sendable, Equatable {
 
     /// Полный сброс адресов сервера — после него `isConfigured == false`, и
     /// `RootView` снова показывает экран ввода адресов (`ServerSetupScreen`).
-    static func clear() {
+    public static func clear() {
         let d = store
         [Key.identityHost, Key.identityPort, Key.usersHost, Key.usersPort,
          Key.filesHost, Key.filesPort, Key.useTLS, Key.allowSelfSigned, Key.configured]
@@ -92,27 +108,27 @@ struct ServerConfig: Sendable, Equatable {
 /// Эндпоинты микросервисов поверх `ServerConfig`. nginx терминирует TLS и
 /// маршрутизирует gRPC по портам (см. Backend/nginx/cloud.barkfluff.conf):
 /// Identity :7020, Users :7021, Files :7025 — но хосты/порты задаёт пользователь.
-enum GrpcEndpoint {
-    static var identityHost: String { ServerConfig.current.identityHost }
-    static var identityPort: Int { ServerConfig.current.identityPort }
-    static var usersHost: String { ServerConfig.current.usersHost }
-    static var usersPort: Int { ServerConfig.current.usersPort }
-    static var filesHost: String { ServerConfig.current.filesHost }
-    static var filesPort: Int { ServerConfig.current.filesPort }
-    static var useTLS: Bool { ServerConfig.current.useTLS }
-    static var allowSelfSigned: Bool { ServerConfig.current.allowSelfSigned }
+public enum GrpcEndpoint {
+    public static var identityHost: String { ServerConfig.current.identityHost }
+    public static var identityPort: Int { ServerConfig.current.identityPort }
+    public static var usersHost: String { ServerConfig.current.usersHost }
+    public static var usersPort: Int { ServerConfig.current.usersPort }
+    public static var filesHost: String { ServerConfig.current.filesHost }
+    public static var filesPort: Int { ServerConfig.current.filesPort }
+    public static var useTLS: Bool { ServerConfig.current.useTLS }
+    public static var allowSelfSigned: Bool { ServerConfig.current.allowSelfSigned }
 
     private static var scheme: String { useTLS ? "https" : "http" }
 
     /// База HTTP-раздачи файлов через nginx (`/web/download/{id}`, `/web/upload/{id}`).
-    static var filesWebBase: String { "\(scheme)://\(filesHost):\(filesPort)/web" }
+    public static var filesWebBase: String { "\(scheme)://\(filesHost):\(filesPort)/web" }
 
     /// Адрес веб-UI (порт 443) — туда ведут публичные share-ссылки `/s/{token}`.
     /// Маршрут `/s/...` обслуживает только веб-сервер, не gRPC Files. Берём хост Files.
-    static var webHost: String { "\(scheme)://\(filesHost)" }
+    public static var webHost: String { "\(scheme)://\(filesHost)" }
 
     /// Публичный URL share-ссылки. `token` — base64url (URL-safe), экранировать не нужно.
-    static func publicShareURL(token: String) -> URL? {
+    public static func publicShareURL(token: String) -> URL? {
         guard !token.isEmpty else { return nil }
         return URL(string: "\(webHost)/s/\(token)")
     }
@@ -123,7 +139,7 @@ enum GrpcEndpoint {
     /// недостижимый/устаревший хост. Берём идентификатор файла из пути
     /// `.../download/{id}` и собираем ссылку заново на текущем хосте. Если путь не
     /// похож на ссылку скачивания — возвращаем исходный URL без изменений.
-    static func normalizedFileDownloadURL(_ raw: String) -> URL? {
+    public static func normalizedFileDownloadURL(_ raw: String) -> URL? {
         guard !raw.isEmpty else { return nil }
         guard let comps = URLComponents(string: raw) else { return URL(string: raw) }
         let parts = comps.path.split(separator: "/").map(String.init)
@@ -138,13 +154,13 @@ enum GrpcEndpoint {
 /// `GRPCClient` (общий транспорт + интерсепторы), поверх которого создаются
 /// типизированные стабы. FilesApi / CloudApi / AlbumApi живут на одном порту (:7025)
 /// и делят общий клиент.
-actor GrpcManager {
-    typealias Transport = HTTP2ClientTransport.Posix
-    typealias IdentityClient = Barkcloud_Identity_IdentityApi.Client<Transport>
-    typealias UsersClient = Barkcloud_Users_UsersApi.Client<Transport>
-    typealias FilesClient = Barkcloud_Files_FilesApi.Client<Transport>
-    typealias CloudClient = Barkcloud_Files_CloudApi.Client<Transport>
-    typealias AlbumClient = Barkcloud_Files_AlbumApi.Client<Transport>
+public actor GrpcManager {
+    public typealias Transport = HTTP2ClientTransport.Posix
+    public typealias IdentityClient = Barkcloud_Identity_IdentityApi.Client<Transport>
+    public typealias UsersClient = Barkcloud_Users_UsersApi.Client<Transport>
+    public typealias FilesClient = Barkcloud_Files_FilesApi.Client<Transport>
+    public typealias CloudClient = Barkcloud_Files_CloudApi.Client<Transport>
+    public typealias AlbumClient = Barkcloud_Files_AlbumApi.Client<Transport>
 
     private let session: SessionStore
     private var clients: [String: GRPCClient<Transport>] = [:]
@@ -158,27 +174,27 @@ actor GrpcManager {
     /// За сколько секунд до истечения токена обновлять его проактивно.
     private let proactiveRefreshThreshold: TimeInterval = 60
 
-    init(session: SessionStore) {
+    public init(session: SessionStore) {
         self.session = session
     }
 
-    func identityStub() async throws -> IdentityClient {
+    public func identityStub() async throws -> IdentityClient {
         IdentityClient(wrapping: try await client(host: GrpcEndpoint.identityHost, port: GrpcEndpoint.identityPort))
     }
 
-    func usersStub() async throws -> UsersClient {
+    public func usersStub() async throws -> UsersClient {
         UsersClient(wrapping: try await client(host: GrpcEndpoint.usersHost, port: GrpcEndpoint.usersPort))
     }
 
-    func filesStub() async throws -> FilesClient {
+    public func filesStub() async throws -> FilesClient {
         FilesClient(wrapping: try await client(host: GrpcEndpoint.filesHost, port: GrpcEndpoint.filesPort))
     }
 
-    func cloudStub() async throws -> CloudClient {
+    public func cloudStub() async throws -> CloudClient {
         CloudClient(wrapping: try await client(host: GrpcEndpoint.filesHost, port: GrpcEndpoint.filesPort))
     }
 
-    func albumStub() async throws -> AlbumClient {
+    public func albumStub() async throws -> AlbumClient {
         AlbumClient(wrapping: try await client(host: GrpcEndpoint.filesHost, port: GrpcEndpoint.filesPort))
     }
 
@@ -220,7 +236,7 @@ actor GrpcManager {
         return client
     }
 
-    func shutdown() async {
+    public func shutdown() async {
         for task in runTasks.values { task.cancel() }
         runTasks.removeAll()
         clients.removeAll()
@@ -239,14 +255,14 @@ actor GrpcManager {
 
     /// Токен для запроса конкретного метода. Публичным RPC отдаёт `nil`, прочие
     /// получают валидный (при необходимости проактивно обновлённый) токен.
-    func accessToken(forMethod method: String) async -> String? {
+    public func accessToken(forMethod method: String) async -> String? {
         if Self.unauthenticatedMethods.contains(method) { return nil }
         return await validAccessToken()
     }
 
     /// Возвращает действующий access-токен, обновив его при необходимости.
     /// Используется интерсептором gRPC и HTTP-загрузкой файлов.
-    func validAccessToken() async -> String? {
+    public func validAccessToken() async -> String? {
         let snap = await session.snapshot()
 
         // Токен ещё свеж — отдаём как есть.

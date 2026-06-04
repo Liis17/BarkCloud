@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import BarkCloudKit
 
 /// Одноразовая миграция legacy `ShareInbox/<uuid>/<file>` (формат старой версии
 /// Share Extension, который только складывал файлы в App Group). Теперь Share

@@ -22,8 +22,8 @@ private final class SelfSignedTrustDelegate: NSObject, URLSessionDelegate, @unch
 /// Общий `URLSession`, доверяющий self-signed сертификату сервера. Нужен для HTTP
 /// upload/download и загрузки превью: стандартный `AsyncImage`/`URLSession` отвергает
 /// self-signed TLS, на котором работает файловый сервис (:7025/web/...).
-enum InsecureHTTP {
-    static let session: URLSession = {
+public enum InsecureHTTP {
+    public static let session: URLSession = {
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 60
         config.timeoutIntervalForResource = 600
@@ -32,7 +32,7 @@ enum InsecureHTTP {
 
     /// Сбросить URL-кэш, куки и хранилище учётных данных сессии. Вызывается при
     /// выходе из аккаунта, чтобы не осталось закэшированных ответов файлового сервиса.
-    static func clearCaches() {
+    public static func clearCaches() {
         session.reset {}
     }
 }

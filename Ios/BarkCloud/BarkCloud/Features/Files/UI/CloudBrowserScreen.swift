@@ -1,6 +1,7 @@
 import SwiftUI
 import PhotosUI
 import UniformTypeIdentifiers
+import BarkCloudKit
 
 /// Браузер облачного хранилища: навигация по папкам, операции CRUD, загрузка
 /// и открытие файлов. Рекурсивно переиспользует себя для вложенных папок.

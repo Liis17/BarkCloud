@@ -2,16 +2,16 @@ import Foundation
 import GRPCCore
 import SwiftProtobuf
 
-final class AuthRepository: Sendable {
+public final class AuthRepository: Sendable {
     private let grpc: GrpcManager
     private let session: SessionStore
 
-    init(grpc: GrpcManager, session: SessionStore) {
+    public init(grpc: GrpcManager, session: SessionStore) {
         self.grpc = grpc
         self.session = session
     }
 
-    func auth(login: String, password: String, otpCode: String? = nil) async -> AuthResult {
+    public func auth(login: String, password: String, otpCode: String? = nil) async -> AuthResult {
         do {
             let stub = try await grpc.identityStub()
             var req = Barkcloud_Identity_AuthRequest()
@@ -44,7 +44,7 @@ final class AuthRepository: Sendable {
     /// Серверный отзыв текущей сессии. Использует auth-контекст из интерсепторов
     /// (`x-auth-token` + устройство), поэтому вызывается до очистки токенов.
     /// Best-effort: ошибки игнорируются — сессия могла истечь или отсутствует сеть.
-    func logout() async {
+    public func logout() async {
         do {
             let stub = try await grpc.identityStub()
             _ = try await stub.logout(Barkcloud_Identity_LogoutRequest())

@@ -21,8 +21,8 @@ fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAP
 }
 
 /// Кому доступно поле/действие
-enum Barkcloud_Users_PrivacyVisibility: SwiftProtobuf.Enum, Swift.CaseIterable {
-  typealias RawValue = Int
+public enum Barkcloud_Users_PrivacyVisibility: SwiftProtobuf.Enum, Swift.CaseIterable {
+  public typealias RawValue = Int
 
   /// Всем
   case everyone // = 0
@@ -34,11 +34,11 @@ enum Barkcloud_Users_PrivacyVisibility: SwiftProtobuf.Enum, Swift.CaseIterable {
   case nobody // = 2
   case UNRECOGNIZED(Int)
 
-  init() {
+  public init() {
     self = .everyone
   }
 
-  init?(rawValue: Int) {
+  public init?(rawValue: Int) {
     switch rawValue {
     case 0: self = .everyone
     case 1: self = .contacts
@@ -47,7 +47,7 @@ enum Barkcloud_Users_PrivacyVisibility: SwiftProtobuf.Enum, Swift.CaseIterable {
     }
   }
 
-  var rawValue: Int {
+  public var rawValue: Int {
     switch self {
     case .everyone: return 0
     case .contacts: return 1
@@ -57,7 +57,7 @@ enum Barkcloud_Users_PrivacyVisibility: SwiftProtobuf.Enum, Swift.CaseIterable {
   }
 
   // The compiler won't synthesize support with the UNRECOGNIZED case.
-  static let allCases: [Barkcloud_Users_PrivacyVisibility] = [
+  public static let allCases: [Barkcloud_Users_PrivacyVisibility] = [
     .everyone,
     .contacts,
     .nobody,
@@ -66,649 +66,649 @@ enum Barkcloud_Users_PrivacyVisibility: SwiftProtobuf.Enum, Swift.CaseIterable {
 }
 
 /// Установить аватарку (серверный)
-struct Barkcloud_Users_SetProfilePictureServerRequest: Sendable {
+public struct Barkcloud_Users_SetProfilePictureServerRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var userID: Int64 = 0
+  public var userID: Int64 = 0
 
   /// ссылка на полное изображение
-  var profilePictureURL: String = String()
+  public var profilePictureURL: String = String()
 
   /// ссылка на превью
-  var profilePicturePreviewURL: String = String()
+  public var profilePicturePreviewURL: String = String()
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Users_SetProfilePictureServerResponse: Sendable {
+public struct Barkcloud_Users_SetProfilePictureServerResponse: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
 /// Обновить профиль пользователя (серверный, для админ-панели)
-struct Barkcloud_Users_UpdateProfileServerRequest: Sendable {
+public struct Barkcloud_Users_UpdateProfileServerRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var userID: Int64 = 0
+  public var userID: Int64 = 0
 
-  var firstName: String = String()
+  public var firstName: String = String()
 
-  var lastName: String = String()
+  public var lastName: String = String()
 
-  var username: String = String()
+  public var username: String = String()
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Users_UpdateProfileServerResponse: Sendable {
+public struct Barkcloud_Users_UpdateProfileServerResponse: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
 /// Обновление лимита хранилища
-struct Barkcloud_Users_UpdateStorageLimitRequest: Sendable {
+public struct Barkcloud_Users_UpdateStorageLimitRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var userID: Int64 = 0
+  public var userID: Int64 = 0
 
   /// 1-250
-  var storageLimitGb: Int32 = 0
+  public var storageLimitGb: Int32 = 0
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Users_UpdateStorageLimitResponse: Sendable {
+public struct Barkcloud_Users_UpdateStorageLimitResponse: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var user: Barkcloud_Users_User {
+  public var user: Barkcloud_Users_User {
     get {_user ?? Barkcloud_Users_User()}
     set {_user = newValue}
   }
   /// Returns true if `user` has been explicitly set.
-  var hasUser: Bool {self._user != nil}
+  public var hasUser: Bool {self._user != nil}
   /// Clears the value of `user`. Subsequent reads from it will return its default value.
-  mutating func clearUser() {self._user = nil}
+  public mutating func clearUser() {self._user = nil}
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 
   fileprivate var _user: Barkcloud_Users_User? = nil
 }
 
-struct Barkcloud_Users_ChangeUsernameRequest: Sendable {
+public struct Barkcloud_Users_ChangeUsernameRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// Имя пользователя
-  var username: String = String()
+  public var username: String = String()
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Users_ChangeUsernameResponse: Sendable {
+public struct Barkcloud_Users_ChangeUsernameResponse: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Users_ChangeNameRequest: Sendable {
+public struct Barkcloud_Users_ChangeNameRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// Имя
-  var firstName: String = String()
+  public var firstName: String = String()
 
   /// Фамилия
-  var lastName: String = String()
+  public var lastName: String = String()
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Users_ChangeNameResponse: Sendable {
+public struct Barkcloud_Users_ChangeNameResponse: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Users_ChangeBioRequest: Sendable {
+public struct Barkcloud_Users_ChangeBioRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// Описание профиля (до 200 символов), пустая строка — очистить
-  var bio: String = String()
+  public var bio: String = String()
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Users_ChangeBioResponse: Sendable {
+public struct Barkcloud_Users_ChangeBioResponse: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Users_SearchUsersRequest: Sendable {
+public struct Barkcloud_Users_SearchUsersRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// Поисковая строка (юзернейм/имя/фамилия), минимум 2 символа
-  var query: String = String()
+  public var query: String = String()
 
   /// Максимум результатов (1-50, по умолчанию 20)
-  var limit: Int32 = 0
+  public var limit: Int32 = 0
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Users_SearchUsersResponse: Sendable {
+public struct Barkcloud_Users_SearchUsersResponse: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// Найденные пользователи
-  var users: [Barkcloud_Users_User] = []
+  public var users: [Barkcloud_Users_User] = []
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Users_DeleteAccountRequest: Sendable {
+public struct Barkcloud_Users_DeleteAccountRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Users_DeleteAccountResponse: Sendable {
+public struct Barkcloud_Users_DeleteAccountResponse: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Users_DeleteDeviceRequest: Sendable {
+public struct Barkcloud_Users_DeleteDeviceRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// Идентификатор устройства (GUID)
-  var deviceID: String = String()
+  public var deviceID: String = String()
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Users_DeleteDeviceResponse: Sendable {
+public struct Barkcloud_Users_DeleteDeviceResponse: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Users_SetFirebaseTokenRequest: Sendable {
+public struct Barkcloud_Users_SetFirebaseTokenRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// Push-токен Firebase для текущего устройства, пустая строка — сброс
-  var firebaseToken: String = String()
+  public var firebaseToken: String = String()
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Users_SetFirebaseTokenResponse: Sendable {
+public struct Barkcloud_Users_SetFirebaseTokenResponse: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Users_PrivacySettings: Sendable {
+public struct Barkcloud_Users_PrivacySettings: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// Кто видит профиль (аватар/имя/bio)
-  var profileVisibility: Barkcloud_Users_PrivacyVisibility = .everyone
+  public var profileVisibility: Barkcloud_Users_PrivacyVisibility = .everyone
 
   /// Кто видит email
-  var emailVisibility: Barkcloud_Users_PrivacyVisibility = .everyone
+  public var emailVisibility: Barkcloud_Users_PrivacyVisibility = .everyone
 
   /// Кто видит время последнего захода
-  var lastSeenVisibility: Barkcloud_Users_PrivacyVisibility = .everyone
+  public var lastSeenVisibility: Barkcloud_Users_PrivacyVisibility = .everyone
 
   /// Находится ли пользователь через SearchUsers
-  var searchableByUsername: Bool = false
+  public var searchableByUsername: Bool = false
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Users_GetPrivacySettingsRequest: Sendable {
+public struct Barkcloud_Users_GetPrivacySettingsRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Users_GetPrivacySettingsResponse: Sendable {
+public struct Barkcloud_Users_GetPrivacySettingsResponse: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// Текущие настройки приватности
-  var settings: Barkcloud_Users_PrivacySettings {
+  public var settings: Barkcloud_Users_PrivacySettings {
     get {_settings ?? Barkcloud_Users_PrivacySettings()}
     set {_settings = newValue}
   }
   /// Returns true if `settings` has been explicitly set.
-  var hasSettings: Bool {self._settings != nil}
+  public var hasSettings: Bool {self._settings != nil}
   /// Clears the value of `settings`. Subsequent reads from it will return its default value.
-  mutating func clearSettings() {self._settings = nil}
+  public mutating func clearSettings() {self._settings = nil}
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 
   fileprivate var _settings: Barkcloud_Users_PrivacySettings? = nil
 }
 
-struct Barkcloud_Users_UpdatePrivacySettingsRequest: Sendable {
+public struct Barkcloud_Users_UpdatePrivacySettingsRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// Новые настройки приватности (передаются целиком)
-  var settings: Barkcloud_Users_PrivacySettings {
+  public var settings: Barkcloud_Users_PrivacySettings {
     get {_settings ?? Barkcloud_Users_PrivacySettings()}
     set {_settings = newValue}
   }
   /// Returns true if `settings` has been explicitly set.
-  var hasSettings: Bool {self._settings != nil}
+  public var hasSettings: Bool {self._settings != nil}
   /// Clears the value of `settings`. Subsequent reads from it will return its default value.
-  mutating func clearSettings() {self._settings = nil}
+  public mutating func clearSettings() {self._settings = nil}
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 
   fileprivate var _settings: Barkcloud_Users_PrivacySettings? = nil
 }
 
-struct Barkcloud_Users_UpdatePrivacySettingsResponse: Sendable {
+public struct Barkcloud_Users_UpdatePrivacySettingsResponse: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// Актуальные настройки после обновления
-  var settings: Barkcloud_Users_PrivacySettings {
+  public var settings: Barkcloud_Users_PrivacySettings {
     get {_settings ?? Barkcloud_Users_PrivacySettings()}
     set {_settings = newValue}
   }
   /// Returns true if `settings` has been explicitly set.
-  var hasSettings: Bool {self._settings != nil}
+  public var hasSettings: Bool {self._settings != nil}
   /// Clears the value of `settings`. Subsequent reads from it will return its default value.
-  mutating func clearSettings() {self._settings = nil}
+  public mutating func clearSettings() {self._settings = nil}
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 
   fileprivate var _settings: Barkcloud_Users_PrivacySettings? = nil
 }
 
-struct Barkcloud_Users_ListByIdsRequest: Sendable {
+public struct Barkcloud_Users_ListByIdsRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// айдишники
-  var ids: [Int64] = []
+  public var ids: [Int64] = []
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Users_ListByIdsResponse: Sendable {
+public struct Barkcloud_Users_ListByIdsResponse: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// пользователи
-  var users: [Barkcloud_Users_User] = []
+  public var users: [Barkcloud_Users_User] = []
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Users_SetProfilePictureRequest: Sendable {
+public struct Barkcloud_Users_SetProfilePictureRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// идентификатор файла
-  var fileID: String = String()
+  public var fileID: String = String()
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Users_SetProfilePictureResponse: Sendable {
+public struct Barkcloud_Users_SetProfilePictureResponse: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Users_GetUserContactsRequest: Sendable {
+public struct Barkcloud_Users_GetUserContactsRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// идентификатор пользователя
-  var userID: Int64 = 0
+  public var userID: Int64 = 0
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Users_GetUserContactsResponse: Sendable {
+public struct Barkcloud_Users_GetUserContactsResponse: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// пользователь
-  var user: Barkcloud_Users_User {
+  public var user: Barkcloud_Users_User {
     get {_user ?? Barkcloud_Users_User()}
     set {_user = newValue}
   }
   /// Returns true if `user` has been explicitly set.
-  var hasUser: Bool {self._user != nil}
+  public var hasUser: Bool {self._user != nil}
   /// Clears the value of `user`. Subsequent reads from it will return its default value.
-  mutating func clearUser() {self._user = nil}
+  public mutating func clearUser() {self._user = nil}
 
   /// контакты пользователя
-  var contact: Barkcloud_Users_UserContact {
+  public var contact: Barkcloud_Users_UserContact {
     get {_contact ?? Barkcloud_Users_UserContact()}
     set {_contact = newValue}
   }
   /// Returns true if `contact` has been explicitly set.
-  var hasContact: Bool {self._contact != nil}
+  public var hasContact: Bool {self._contact != nil}
   /// Clears the value of `contact`. Subsequent reads from it will return its default value.
-  mutating func clearContact() {self._contact = nil}
+  public mutating func clearContact() {self._contact = nil}
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 
   fileprivate var _user: Barkcloud_Users_User? = nil
   fileprivate var _contact: Barkcloud_Users_UserContact? = nil
 }
 
-struct Barkcloud_Users_UserContact: Sendable {
+public struct Barkcloud_Users_UserContact: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// эл. почта
-  var email: String = String()
+  public var email: String = String()
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Users_GetByIdRequest: Sendable {
+public struct Barkcloud_Users_GetByIdRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// идентификатор пользователя
-  var userID: Int64 = 0
+  public var userID: Int64 = 0
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Users_GetByIdResponse: Sendable {
+public struct Barkcloud_Users_GetByIdResponse: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// пользователь
-  var user: Barkcloud_Users_User {
+  public var user: Barkcloud_Users_User {
     get {_user ?? Barkcloud_Users_User()}
     set {_user = newValue}
   }
   /// Returns true if `user` has been explicitly set.
-  var hasUser: Bool {self._user != nil}
+  public var hasUser: Bool {self._user != nil}
   /// Clears the value of `user`. Subsequent reads from it will return its default value.
-  mutating func clearUser() {self._user = nil}
+  public mutating func clearUser() {self._user = nil}
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 
   fileprivate var _user: Barkcloud_Users_User? = nil
 }
 
-struct Barkcloud_Users_GetUserRequest: Sendable {
+public struct Barkcloud_Users_GetUserRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// идентификатор пользователя
-  var userID: Int64 = 0
+  public var userID: Int64 = 0
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Users_GetUserResponse: Sendable {
+public struct Barkcloud_Users_GetUserResponse: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// пользователь
-  var user: Barkcloud_Users_User {
+  public var user: Barkcloud_Users_User {
     get {_user ?? Barkcloud_Users_User()}
     set {_user = newValue}
   }
   /// Returns true if `user` has been explicitly set.
-  var hasUser: Bool {self._user != nil}
+  public var hasUser: Bool {self._user != nil}
   /// Clears the value of `user`. Subsequent reads from it will return its default value.
-  mutating func clearUser() {self._user = nil}
+  public mutating func clearUser() {self._user = nil}
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 
   fileprivate var _user: Barkcloud_Users_User? = nil
 }
 
-struct Barkcloud_Users_ConfirmUserRequest: Sendable {
+public struct Barkcloud_Users_ConfirmUserRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// идентификатор пользователя
-  var userID: Int64 = 0
+  public var userID: Int64 = 0
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Users_ConfirmUserResponse: Sendable {
+public struct Barkcloud_Users_ConfirmUserResponse: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Users_AddDraftUserRequest: Sendable {
+public struct Barkcloud_Users_AddDraftUserRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// имя
-  var firstName: String = String()
+  public var firstName: String = String()
 
   /// фамилия
-  var lastName: String = String()
+  public var lastName: String = String()
 
   /// имя пользователя
-  var username: String = String()
+  public var username: String = String()
 
   /// почта
-  var email: String = String()
+  public var email: String = String()
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Users_AddDraftUserResponse: Sendable {
+public struct Barkcloud_Users_AddDraftUserResponse: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// идентификатор пользователя
-  var userID: Int64 = 0
+  public var userID: Int64 = 0
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Users_CheckExistEmailRequest: Sendable {
+public struct Barkcloud_Users_CheckExistEmailRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// эл. почта
-  var email: String = String()
+  public var email: String = String()
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Users_CheckExistUsernameRequest: Sendable {
+public struct Barkcloud_Users_CheckExistUsernameRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// имя пользователя
-  var username: String = String()
+  public var username: String = String()
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Users_CheckExistResponse: Sendable {
+public struct Barkcloud_Users_CheckExistResponse: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// существует или нет
-  var exist: Bool = false
+  public var exist: Bool = false
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Users_FindByLoginRequest: Sendable {
+public struct Barkcloud_Users_FindByLoginRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var login: Barkcloud_Users_FindByLoginRequest.OneOf_Login? = nil
+  public var login: Barkcloud_Users_FindByLoginRequest.OneOf_Login? = nil
 
   /// имя пользователя
-  var username: String {
+  public var username: String {
     get {
       if case .username(let v)? = login {return v}
       return String()
@@ -717,7 +717,7 @@ struct Barkcloud_Users_FindByLoginRequest: Sendable {
   }
 
   /// почта
-  var email: String {
+  public var email: String {
     get {
       if case .email(let v)? = login {return v}
       return String()
@@ -725,9 +725,9 @@ struct Barkcloud_Users_FindByLoginRequest: Sendable {
     set {login = .email(newValue)}
   }
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  enum OneOf_Login: Equatable, Sendable {
+  public enum OneOf_Login: Equatable, Sendable {
     /// имя пользователя
     case username(String)
     /// почта
@@ -735,307 +735,307 @@ struct Barkcloud_Users_FindByLoginRequest: Sendable {
 
   }
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Users_FindByLoginResponse: Sendable {
+public struct Barkcloud_Users_FindByLoginResponse: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// пользователь
-  var user: Barkcloud_Users_User {
+  public var user: Barkcloud_Users_User {
     get {_user ?? Barkcloud_Users_User()}
     set {_user = newValue}
   }
   /// Returns true if `user` has been explicitly set.
-  var hasUser: Bool {self._user != nil}
+  public var hasUser: Bool {self._user != nil}
   /// Clears the value of `user`. Subsequent reads from it will return its default value.
-  mutating func clearUser() {self._user = nil}
+  public mutating func clearUser() {self._user = nil}
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 
   fileprivate var _user: Barkcloud_Users_User? = nil
 }
 
-struct Barkcloud_Users_User: Sendable {
+public struct Barkcloud_Users_User: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// идентификатор пользователя
-  var id: Int64 = 0
+  public var id: Int64 = 0
 
   /// имя
-  var firstName: String = String()
+  public var firstName: String = String()
 
   /// фамилия
-  var lastName: String = String()
+  public var lastName: String = String()
 
   /// юзернейм
-  var username: String = String()
+  public var username: String = String()
 
   /// дата регистрации
-  var registrationDate: SwiftProtobuf.Google_Protobuf_Timestamp {
+  public var registrationDate: SwiftProtobuf.Google_Protobuf_Timestamp {
     get {_registrationDate ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
     set {_registrationDate = newValue}
   }
   /// Returns true if `registrationDate` has been explicitly set.
-  var hasRegistrationDate: Bool {self._registrationDate != nil}
+  public var hasRegistrationDate: Bool {self._registrationDate != nil}
   /// Clears the value of `registrationDate`. Subsequent reads from it will return its default value.
-  mutating func clearRegistrationDate() {self._registrationDate = nil}
+  public mutating func clearRegistrationDate() {self._registrationDate = nil}
 
   /// ссылка на аватарку пользователя
-  var profilePicture: String = String()
+  public var profilePicture: String = String()
 
   /// ссылка на превью аватарки
-  var profilePicturePreview: String = String()
+  public var profilePicturePreview: String = String()
 
   /// лимит хранилища в гигабайтах
-  var storageLimitGb: Int32 = 0
+  public var storageLimitGb: Int32 = 0
 
   /// описание профиля (о себе)
-  var bio: String = String()
+  public var bio: String = String()
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 
   fileprivate var _registrationDate: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
 }
 
-struct Barkcloud_Users_Device: Sendable {
+public struct Barkcloud_Users_Device: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// Уникальный идентификатор устройства (GUID)
-  var deviceID: String = String()
+  public var deviceID: String = String()
 
   /// Идентификатор пользователя
-  var userID: Int64 = 0
+  public var userID: Int64 = 0
 
   /// Оригинальное имя устройства
-  var originalName: String = String()
+  public var originalName: String = String()
 
   /// Кастомное имя устройства (задается пользователем)
-  var customName: String = String()
+  public var customName: String = String()
 
   /// Дата и время авторизации
-  var authorizedAt: SwiftProtobuf.Google_Protobuf_Timestamp {
+  public var authorizedAt: SwiftProtobuf.Google_Protobuf_Timestamp {
     get {_authorizedAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
     set {_authorizedAt = newValue}
   }
   /// Returns true if `authorizedAt` has been explicitly set.
-  var hasAuthorizedAt: Bool {self._authorizedAt != nil}
+  public var hasAuthorizedAt: Bool {self._authorizedAt != nil}
   /// Clears the value of `authorizedAt`. Subsequent reads from it will return its default value.
-  mutating func clearAuthorizedAt() {self._authorizedAt = nil}
+  public mutating func clearAuthorizedAt() {self._authorizedAt = nil}
 
   /// Имя приложения
-  var appName: String = String()
+  public var appName: String = String()
 
   /// Операционная система
-  var operationSystem: String = String()
+  public var operationSystem: String = String()
 
   /// Страна/город
-  var location: String = String()
+  public var location: String = String()
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 
   fileprivate var _authorizedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
 }
 
 /// Запросы и ответы для получения списка устройств
-struct Barkcloud_Users_GetDevicesRequest: Sendable {
+public struct Barkcloud_Users_GetDevicesRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Users_GetDevicesResponse: Sendable {
+public struct Barkcloud_Users_GetDevicesResponse: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// Список устройств пользователя
-  var devices: [Barkcloud_Users_Device] = []
+  public var devices: [Barkcloud_Users_Device] = []
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
 /// Запросы и ответы для получения текущего устройства
-struct Barkcloud_Users_GetCurrentDeviceRequest: Sendable {
+public struct Barkcloud_Users_GetCurrentDeviceRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Users_GetCurrentDeviceResponse: Sendable {
+public struct Barkcloud_Users_GetCurrentDeviceResponse: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// Текущее устройство
-  var device: Barkcloud_Users_Device {
+  public var device: Barkcloud_Users_Device {
     get {_device ?? Barkcloud_Users_Device()}
     set {_device = newValue}
   }
   /// Returns true if `device` has been explicitly set.
-  var hasDevice: Bool {self._device != nil}
+  public var hasDevice: Bool {self._device != nil}
   /// Clears the value of `device`. Subsequent reads from it will return its default value.
-  mutating func clearDevice() {self._device = nil}
+  public mutating func clearDevice() {self._device = nil}
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 
   fileprivate var _device: Barkcloud_Users_Device? = nil
 }
 
 /// Запросы и ответы для переименования устройства
-struct Barkcloud_Users_RenameDeviceRequest: Sendable {
+public struct Barkcloud_Users_RenameDeviceRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// Идентификатор устройства
-  var deviceID: String = String()
+  public var deviceID: String = String()
 
   /// Новое кастомное имя
-  var customName: String = String()
+  public var customName: String = String()
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Users_RenameDeviceResponse: Sendable {
+public struct Barkcloud_Users_RenameDeviceResponse: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
 /// Запросы и ответы для регистрации устройства (внутренний эндпоинт)
-struct Barkcloud_Users_RegisterDeviceRequest: Sendable {
+public struct Barkcloud_Users_RegisterDeviceRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// Уникальный идентификатор устройства (GUID)
-  var deviceID: String = String()
+  public var deviceID: String = String()
 
   /// Идентификатор пользователя
-  var userID: Int64 = 0
+  public var userID: Int64 = 0
 
   /// Оригинальное имя устройства
-  var originalName: String = String()
+  public var originalName: String = String()
 
   /// Имя приложения
-  var appName: String = String()
+  public var appName: String = String()
 
   /// Операционная система
-  var operationSystem: String = String()
+  public var operationSystem: String = String()
 
   /// Страна/город
-  var location: String = String()
+  public var location: String = String()
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Users_RegisterDeviceResponse: Sendable {
+public struct Barkcloud_Users_RegisterDeviceResponse: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// Зарегистрированное устройство
-  var device: Barkcloud_Users_Device {
+  public var device: Barkcloud_Users_Device {
     get {_device ?? Barkcloud_Users_Device()}
     set {_device = newValue}
   }
   /// Returns true if `device` has been explicitly set.
-  var hasDevice: Bool {self._device != nil}
+  public var hasDevice: Bool {self._device != nil}
   /// Clears the value of `device`. Subsequent reads from it will return its default value.
-  mutating func clearDevice() {self._device = nil}
+  public mutating func clearDevice() {self._device = nil}
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 
   fileprivate var _device: Barkcloud_Users_Device? = nil
 }
 
 /// Запросы и ответы для получения устройств пользователя (внутренний эндпоинт)
-struct Barkcloud_Users_GetUserDevicesRequest: Sendable {
+public struct Barkcloud_Users_GetUserDevicesRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// Идентификатор пользователя
-  var userID: Int64 = 0
+  public var userID: Int64 = 0
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Users_GetUserDevicesResponse: Sendable {
+public struct Barkcloud_Users_GetUserDevicesResponse: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// Список устройств
-  var devices: [Barkcloud_Users_Device] = []
+  public var devices: [Barkcloud_Users_Device] = []
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
 /// Запросы и ответы для удаления устройства пользователя (внутренний эндпоинт)
-struct Barkcloud_Users_DeleteUserDeviceRequest: Sendable {
+public struct Barkcloud_Users_DeleteUserDeviceRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// Идентификатор устройства
-  var deviceID: String = String()
+  public var deviceID: String = String()
 
   /// Идентификатор пользователя
-  var userID: Int64 = 0
+  public var userID: Int64 = 0
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Users_DeleteUserDeviceResponse: Sendable {
+public struct Barkcloud_Users_DeleteUserDeviceResponse: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
@@ -1043,14 +1043,14 @@ struct Barkcloud_Users_DeleteUserDeviceResponse: Sendable {
 fileprivate let _protobuf_package = "barkcloud.users"
 
 extension Barkcloud_Users_PrivacyVisibility: SwiftProtobuf._ProtoNameProviding {
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0PRIVACY_VISIBILITY_EVERYONE\0\u{1}PRIVACY_VISIBILITY_CONTACTS\0\u{1}PRIVACY_VISIBILITY_NOBODY\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0PRIVACY_VISIBILITY_EVERYONE\0\u{1}PRIVACY_VISIBILITY_CONTACTS\0\u{1}PRIVACY_VISIBILITY_NOBODY\0")
 }
 
 extension Barkcloud_Users_SetProfilePictureServerRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".SetProfilePictureServerRequest"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}user_id\0\u{3}profile_picture_url\0\u{3}profile_picture_preview_url\0")
+  public static let protoMessageName: String = _protobuf_package + ".SetProfilePictureServerRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}user_id\0\u{3}profile_picture_url\0\u{3}profile_picture_preview_url\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -1064,7 +1064,7 @@ extension Barkcloud_Users_SetProfilePictureServerRequest: SwiftProtobuf.Message,
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if self.userID != 0 {
       try visitor.visitSingularInt64Field(value: self.userID, fieldNumber: 1)
     }
@@ -1077,7 +1077,7 @@ extension Barkcloud_Users_SetProfilePictureServerRequest: SwiftProtobuf.Message,
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Users_SetProfilePictureServerRequest, rhs: Barkcloud_Users_SetProfilePictureServerRequest) -> Bool {
+  public static func ==(lhs: Barkcloud_Users_SetProfilePictureServerRequest, rhs: Barkcloud_Users_SetProfilePictureServerRequest) -> Bool {
     if lhs.userID != rhs.userID {return false}
     if lhs.profilePictureURL != rhs.profilePictureURL {return false}
     if lhs.profilePicturePreviewURL != rhs.profilePicturePreviewURL {return false}
@@ -1087,29 +1087,29 @@ extension Barkcloud_Users_SetProfilePictureServerRequest: SwiftProtobuf.Message,
 }
 
 extension Barkcloud_Users_SetProfilePictureServerResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".SetProfilePictureServerResponse"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap()
+  public static let protoMessageName: String = _protobuf_package + ".SetProfilePictureServerResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap()
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     // Load everything into unknown fields
     while try decoder.nextFieldNumber() != nil {}
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Users_SetProfilePictureServerResponse, rhs: Barkcloud_Users_SetProfilePictureServerResponse) -> Bool {
+  public static func ==(lhs: Barkcloud_Users_SetProfilePictureServerResponse, rhs: Barkcloud_Users_SetProfilePictureServerResponse) -> Bool {
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
 extension Barkcloud_Users_UpdateProfileServerRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".UpdateProfileServerRequest"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}user_id\0\u{3}first_name\0\u{3}last_name\0\u{1}username\0")
+  public static let protoMessageName: String = _protobuf_package + ".UpdateProfileServerRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}user_id\0\u{3}first_name\0\u{3}last_name\0\u{1}username\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -1124,7 +1124,7 @@ extension Barkcloud_Users_UpdateProfileServerRequest: SwiftProtobuf.Message, Swi
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if self.userID != 0 {
       try visitor.visitSingularInt64Field(value: self.userID, fieldNumber: 1)
     }
@@ -1140,7 +1140,7 @@ extension Barkcloud_Users_UpdateProfileServerRequest: SwiftProtobuf.Message, Swi
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Users_UpdateProfileServerRequest, rhs: Barkcloud_Users_UpdateProfileServerRequest) -> Bool {
+  public static func ==(lhs: Barkcloud_Users_UpdateProfileServerRequest, rhs: Barkcloud_Users_UpdateProfileServerRequest) -> Bool {
     if lhs.userID != rhs.userID {return false}
     if lhs.firstName != rhs.firstName {return false}
     if lhs.lastName != rhs.lastName {return false}
@@ -1151,29 +1151,29 @@ extension Barkcloud_Users_UpdateProfileServerRequest: SwiftProtobuf.Message, Swi
 }
 
 extension Barkcloud_Users_UpdateProfileServerResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".UpdateProfileServerResponse"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap()
+  public static let protoMessageName: String = _protobuf_package + ".UpdateProfileServerResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap()
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     // Load everything into unknown fields
     while try decoder.nextFieldNumber() != nil {}
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Users_UpdateProfileServerResponse, rhs: Barkcloud_Users_UpdateProfileServerResponse) -> Bool {
+  public static func ==(lhs: Barkcloud_Users_UpdateProfileServerResponse, rhs: Barkcloud_Users_UpdateProfileServerResponse) -> Bool {
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
 extension Barkcloud_Users_UpdateStorageLimitRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".UpdateStorageLimitRequest"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}user_id\0\u{3}storage_limit_gb\0")
+  public static let protoMessageName: String = _protobuf_package + ".UpdateStorageLimitRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}user_id\0\u{3}storage_limit_gb\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -1186,7 +1186,7 @@ extension Barkcloud_Users_UpdateStorageLimitRequest: SwiftProtobuf.Message, Swif
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if self.userID != 0 {
       try visitor.visitSingularInt64Field(value: self.userID, fieldNumber: 1)
     }
@@ -1196,7 +1196,7 @@ extension Barkcloud_Users_UpdateStorageLimitRequest: SwiftProtobuf.Message, Swif
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Users_UpdateStorageLimitRequest, rhs: Barkcloud_Users_UpdateStorageLimitRequest) -> Bool {
+  public static func ==(lhs: Barkcloud_Users_UpdateStorageLimitRequest, rhs: Barkcloud_Users_UpdateStorageLimitRequest) -> Bool {
     if lhs.userID != rhs.userID {return false}
     if lhs.storageLimitGb != rhs.storageLimitGb {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
@@ -1205,10 +1205,10 @@ extension Barkcloud_Users_UpdateStorageLimitRequest: SwiftProtobuf.Message, Swif
 }
 
 extension Barkcloud_Users_UpdateStorageLimitResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".UpdateStorageLimitResponse"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}user\0")
+  public static let protoMessageName: String = _protobuf_package + ".UpdateStorageLimitResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}user\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -1220,7 +1220,7 @@ extension Barkcloud_Users_UpdateStorageLimitResponse: SwiftProtobuf.Message, Swi
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     // The use of inline closures is to circumvent an issue where the compiler
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
@@ -1231,7 +1231,7 @@ extension Barkcloud_Users_UpdateStorageLimitResponse: SwiftProtobuf.Message, Swi
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Users_UpdateStorageLimitResponse, rhs: Barkcloud_Users_UpdateStorageLimitResponse) -> Bool {
+  public static func ==(lhs: Barkcloud_Users_UpdateStorageLimitResponse, rhs: Barkcloud_Users_UpdateStorageLimitResponse) -> Bool {
     if lhs._user != rhs._user {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -1239,10 +1239,10 @@ extension Barkcloud_Users_UpdateStorageLimitResponse: SwiftProtobuf.Message, Swi
 }
 
 extension Barkcloud_Users_ChangeUsernameRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".ChangeUsernameRequest"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}username\0")
+  public static let protoMessageName: String = _protobuf_package + ".ChangeUsernameRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}username\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -1254,14 +1254,14 @@ extension Barkcloud_Users_ChangeUsernameRequest: SwiftProtobuf.Message, SwiftPro
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if !self.username.isEmpty {
       try visitor.visitSingularStringField(value: self.username, fieldNumber: 1)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Users_ChangeUsernameRequest, rhs: Barkcloud_Users_ChangeUsernameRequest) -> Bool {
+  public static func ==(lhs: Barkcloud_Users_ChangeUsernameRequest, rhs: Barkcloud_Users_ChangeUsernameRequest) -> Bool {
     if lhs.username != rhs.username {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -1269,29 +1269,29 @@ extension Barkcloud_Users_ChangeUsernameRequest: SwiftProtobuf.Message, SwiftPro
 }
 
 extension Barkcloud_Users_ChangeUsernameResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".ChangeUsernameResponse"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap()
+  public static let protoMessageName: String = _protobuf_package + ".ChangeUsernameResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap()
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     // Load everything into unknown fields
     while try decoder.nextFieldNumber() != nil {}
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Users_ChangeUsernameResponse, rhs: Barkcloud_Users_ChangeUsernameResponse) -> Bool {
+  public static func ==(lhs: Barkcloud_Users_ChangeUsernameResponse, rhs: Barkcloud_Users_ChangeUsernameResponse) -> Bool {
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
 extension Barkcloud_Users_ChangeNameRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".ChangeNameRequest"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}first_name\0\u{3}last_name\0")
+  public static let protoMessageName: String = _protobuf_package + ".ChangeNameRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}first_name\0\u{3}last_name\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -1304,7 +1304,7 @@ extension Barkcloud_Users_ChangeNameRequest: SwiftProtobuf.Message, SwiftProtobu
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if !self.firstName.isEmpty {
       try visitor.visitSingularStringField(value: self.firstName, fieldNumber: 1)
     }
@@ -1314,7 +1314,7 @@ extension Barkcloud_Users_ChangeNameRequest: SwiftProtobuf.Message, SwiftProtobu
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Users_ChangeNameRequest, rhs: Barkcloud_Users_ChangeNameRequest) -> Bool {
+  public static func ==(lhs: Barkcloud_Users_ChangeNameRequest, rhs: Barkcloud_Users_ChangeNameRequest) -> Bool {
     if lhs.firstName != rhs.firstName {return false}
     if lhs.lastName != rhs.lastName {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
@@ -1323,29 +1323,29 @@ extension Barkcloud_Users_ChangeNameRequest: SwiftProtobuf.Message, SwiftProtobu
 }
 
 extension Barkcloud_Users_ChangeNameResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".ChangeNameResponse"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap()
+  public static let protoMessageName: String = _protobuf_package + ".ChangeNameResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap()
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     // Load everything into unknown fields
     while try decoder.nextFieldNumber() != nil {}
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Users_ChangeNameResponse, rhs: Barkcloud_Users_ChangeNameResponse) -> Bool {
+  public static func ==(lhs: Barkcloud_Users_ChangeNameResponse, rhs: Barkcloud_Users_ChangeNameResponse) -> Bool {
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
 extension Barkcloud_Users_ChangeBioRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".ChangeBioRequest"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}bio\0")
+  public static let protoMessageName: String = _protobuf_package + ".ChangeBioRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}bio\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -1357,14 +1357,14 @@ extension Barkcloud_Users_ChangeBioRequest: SwiftProtobuf.Message, SwiftProtobuf
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if !self.bio.isEmpty {
       try visitor.visitSingularStringField(value: self.bio, fieldNumber: 1)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Users_ChangeBioRequest, rhs: Barkcloud_Users_ChangeBioRequest) -> Bool {
+  public static func ==(lhs: Barkcloud_Users_ChangeBioRequest, rhs: Barkcloud_Users_ChangeBioRequest) -> Bool {
     if lhs.bio != rhs.bio {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -1372,29 +1372,29 @@ extension Barkcloud_Users_ChangeBioRequest: SwiftProtobuf.Message, SwiftProtobuf
 }
 
 extension Barkcloud_Users_ChangeBioResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".ChangeBioResponse"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap()
+  public static let protoMessageName: String = _protobuf_package + ".ChangeBioResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap()
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     // Load everything into unknown fields
     while try decoder.nextFieldNumber() != nil {}
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Users_ChangeBioResponse, rhs: Barkcloud_Users_ChangeBioResponse) -> Bool {
+  public static func ==(lhs: Barkcloud_Users_ChangeBioResponse, rhs: Barkcloud_Users_ChangeBioResponse) -> Bool {
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
 extension Barkcloud_Users_SearchUsersRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".SearchUsersRequest"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}query\0\u{1}limit\0")
+  public static let protoMessageName: String = _protobuf_package + ".SearchUsersRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}query\0\u{1}limit\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -1407,7 +1407,7 @@ extension Barkcloud_Users_SearchUsersRequest: SwiftProtobuf.Message, SwiftProtob
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if !self.query.isEmpty {
       try visitor.visitSingularStringField(value: self.query, fieldNumber: 1)
     }
@@ -1417,7 +1417,7 @@ extension Barkcloud_Users_SearchUsersRequest: SwiftProtobuf.Message, SwiftProtob
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Users_SearchUsersRequest, rhs: Barkcloud_Users_SearchUsersRequest) -> Bool {
+  public static func ==(lhs: Barkcloud_Users_SearchUsersRequest, rhs: Barkcloud_Users_SearchUsersRequest) -> Bool {
     if lhs.query != rhs.query {return false}
     if lhs.limit != rhs.limit {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
@@ -1426,10 +1426,10 @@ extension Barkcloud_Users_SearchUsersRequest: SwiftProtobuf.Message, SwiftProtob
 }
 
 extension Barkcloud_Users_SearchUsersResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".SearchUsersResponse"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}users\0")
+  public static let protoMessageName: String = _protobuf_package + ".SearchUsersResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}users\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -1441,14 +1441,14 @@ extension Barkcloud_Users_SearchUsersResponse: SwiftProtobuf.Message, SwiftProto
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if !self.users.isEmpty {
       try visitor.visitRepeatedMessageField(value: self.users, fieldNumber: 1)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Users_SearchUsersResponse, rhs: Barkcloud_Users_SearchUsersResponse) -> Bool {
+  public static func ==(lhs: Barkcloud_Users_SearchUsersResponse, rhs: Barkcloud_Users_SearchUsersResponse) -> Bool {
     if lhs.users != rhs.users {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -1456,48 +1456,48 @@ extension Barkcloud_Users_SearchUsersResponse: SwiftProtobuf.Message, SwiftProto
 }
 
 extension Barkcloud_Users_DeleteAccountRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".DeleteAccountRequest"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap()
+  public static let protoMessageName: String = _protobuf_package + ".DeleteAccountRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap()
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     // Load everything into unknown fields
     while try decoder.nextFieldNumber() != nil {}
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Users_DeleteAccountRequest, rhs: Barkcloud_Users_DeleteAccountRequest) -> Bool {
+  public static func ==(lhs: Barkcloud_Users_DeleteAccountRequest, rhs: Barkcloud_Users_DeleteAccountRequest) -> Bool {
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
 extension Barkcloud_Users_DeleteAccountResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".DeleteAccountResponse"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap()
+  public static let protoMessageName: String = _protobuf_package + ".DeleteAccountResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap()
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     // Load everything into unknown fields
     while try decoder.nextFieldNumber() != nil {}
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Users_DeleteAccountResponse, rhs: Barkcloud_Users_DeleteAccountResponse) -> Bool {
+  public static func ==(lhs: Barkcloud_Users_DeleteAccountResponse, rhs: Barkcloud_Users_DeleteAccountResponse) -> Bool {
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
 extension Barkcloud_Users_DeleteDeviceRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".DeleteDeviceRequest"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}device_id\0")
+  public static let protoMessageName: String = _protobuf_package + ".DeleteDeviceRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}device_id\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -1509,14 +1509,14 @@ extension Barkcloud_Users_DeleteDeviceRequest: SwiftProtobuf.Message, SwiftProto
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if !self.deviceID.isEmpty {
       try visitor.visitSingularStringField(value: self.deviceID, fieldNumber: 1)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Users_DeleteDeviceRequest, rhs: Barkcloud_Users_DeleteDeviceRequest) -> Bool {
+  public static func ==(lhs: Barkcloud_Users_DeleteDeviceRequest, rhs: Barkcloud_Users_DeleteDeviceRequest) -> Bool {
     if lhs.deviceID != rhs.deviceID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -1524,29 +1524,29 @@ extension Barkcloud_Users_DeleteDeviceRequest: SwiftProtobuf.Message, SwiftProto
 }
 
 extension Barkcloud_Users_DeleteDeviceResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".DeleteDeviceResponse"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap()
+  public static let protoMessageName: String = _protobuf_package + ".DeleteDeviceResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap()
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     // Load everything into unknown fields
     while try decoder.nextFieldNumber() != nil {}
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Users_DeleteDeviceResponse, rhs: Barkcloud_Users_DeleteDeviceResponse) -> Bool {
+  public static func ==(lhs: Barkcloud_Users_DeleteDeviceResponse, rhs: Barkcloud_Users_DeleteDeviceResponse) -> Bool {
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
 extension Barkcloud_Users_SetFirebaseTokenRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".SetFirebaseTokenRequest"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}firebase_token\0")
+  public static let protoMessageName: String = _protobuf_package + ".SetFirebaseTokenRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}firebase_token\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -1558,14 +1558,14 @@ extension Barkcloud_Users_SetFirebaseTokenRequest: SwiftProtobuf.Message, SwiftP
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if !self.firebaseToken.isEmpty {
       try visitor.visitSingularStringField(value: self.firebaseToken, fieldNumber: 1)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Users_SetFirebaseTokenRequest, rhs: Barkcloud_Users_SetFirebaseTokenRequest) -> Bool {
+  public static func ==(lhs: Barkcloud_Users_SetFirebaseTokenRequest, rhs: Barkcloud_Users_SetFirebaseTokenRequest) -> Bool {
     if lhs.firebaseToken != rhs.firebaseToken {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -1573,29 +1573,29 @@ extension Barkcloud_Users_SetFirebaseTokenRequest: SwiftProtobuf.Message, SwiftP
 }
 
 extension Barkcloud_Users_SetFirebaseTokenResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".SetFirebaseTokenResponse"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap()
+  public static let protoMessageName: String = _protobuf_package + ".SetFirebaseTokenResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap()
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     // Load everything into unknown fields
     while try decoder.nextFieldNumber() != nil {}
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Users_SetFirebaseTokenResponse, rhs: Barkcloud_Users_SetFirebaseTokenResponse) -> Bool {
+  public static func ==(lhs: Barkcloud_Users_SetFirebaseTokenResponse, rhs: Barkcloud_Users_SetFirebaseTokenResponse) -> Bool {
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
 extension Barkcloud_Users_PrivacySettings: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".PrivacySettings"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}profile_visibility\0\u{3}email_visibility\0\u{3}last_seen_visibility\0\u{3}searchable_by_username\0")
+  public static let protoMessageName: String = _protobuf_package + ".PrivacySettings"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}profile_visibility\0\u{3}email_visibility\0\u{3}last_seen_visibility\0\u{3}searchable_by_username\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -1610,7 +1610,7 @@ extension Barkcloud_Users_PrivacySettings: SwiftProtobuf.Message, SwiftProtobuf.
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if self.profileVisibility != .everyone {
       try visitor.visitSingularEnumField(value: self.profileVisibility, fieldNumber: 1)
     }
@@ -1626,7 +1626,7 @@ extension Barkcloud_Users_PrivacySettings: SwiftProtobuf.Message, SwiftProtobuf.
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Users_PrivacySettings, rhs: Barkcloud_Users_PrivacySettings) -> Bool {
+  public static func ==(lhs: Barkcloud_Users_PrivacySettings, rhs: Barkcloud_Users_PrivacySettings) -> Bool {
     if lhs.profileVisibility != rhs.profileVisibility {return false}
     if lhs.emailVisibility != rhs.emailVisibility {return false}
     if lhs.lastSeenVisibility != rhs.lastSeenVisibility {return false}
@@ -1637,29 +1637,29 @@ extension Barkcloud_Users_PrivacySettings: SwiftProtobuf.Message, SwiftProtobuf.
 }
 
 extension Barkcloud_Users_GetPrivacySettingsRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".GetPrivacySettingsRequest"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap()
+  public static let protoMessageName: String = _protobuf_package + ".GetPrivacySettingsRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap()
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     // Load everything into unknown fields
     while try decoder.nextFieldNumber() != nil {}
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Users_GetPrivacySettingsRequest, rhs: Barkcloud_Users_GetPrivacySettingsRequest) -> Bool {
+  public static func ==(lhs: Barkcloud_Users_GetPrivacySettingsRequest, rhs: Barkcloud_Users_GetPrivacySettingsRequest) -> Bool {
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
 extension Barkcloud_Users_GetPrivacySettingsResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".GetPrivacySettingsResponse"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}settings\0")
+  public static let protoMessageName: String = _protobuf_package + ".GetPrivacySettingsResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}settings\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -1671,7 +1671,7 @@ extension Barkcloud_Users_GetPrivacySettingsResponse: SwiftProtobuf.Message, Swi
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     // The use of inline closures is to circumvent an issue where the compiler
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
@@ -1682,7 +1682,7 @@ extension Barkcloud_Users_GetPrivacySettingsResponse: SwiftProtobuf.Message, Swi
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Users_GetPrivacySettingsResponse, rhs: Barkcloud_Users_GetPrivacySettingsResponse) -> Bool {
+  public static func ==(lhs: Barkcloud_Users_GetPrivacySettingsResponse, rhs: Barkcloud_Users_GetPrivacySettingsResponse) -> Bool {
     if lhs._settings != rhs._settings {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -1690,10 +1690,10 @@ extension Barkcloud_Users_GetPrivacySettingsResponse: SwiftProtobuf.Message, Swi
 }
 
 extension Barkcloud_Users_UpdatePrivacySettingsRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".UpdatePrivacySettingsRequest"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}settings\0")
+  public static let protoMessageName: String = _protobuf_package + ".UpdatePrivacySettingsRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}settings\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -1705,7 +1705,7 @@ extension Barkcloud_Users_UpdatePrivacySettingsRequest: SwiftProtobuf.Message, S
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     // The use of inline closures is to circumvent an issue where the compiler
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
@@ -1716,7 +1716,7 @@ extension Barkcloud_Users_UpdatePrivacySettingsRequest: SwiftProtobuf.Message, S
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Users_UpdatePrivacySettingsRequest, rhs: Barkcloud_Users_UpdatePrivacySettingsRequest) -> Bool {
+  public static func ==(lhs: Barkcloud_Users_UpdatePrivacySettingsRequest, rhs: Barkcloud_Users_UpdatePrivacySettingsRequest) -> Bool {
     if lhs._settings != rhs._settings {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -1724,10 +1724,10 @@ extension Barkcloud_Users_UpdatePrivacySettingsRequest: SwiftProtobuf.Message, S
 }
 
 extension Barkcloud_Users_UpdatePrivacySettingsResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".UpdatePrivacySettingsResponse"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}settings\0")
+  public static let protoMessageName: String = _protobuf_package + ".UpdatePrivacySettingsResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}settings\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -1739,7 +1739,7 @@ extension Barkcloud_Users_UpdatePrivacySettingsResponse: SwiftProtobuf.Message, 
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     // The use of inline closures is to circumvent an issue where the compiler
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
@@ -1750,7 +1750,7 @@ extension Barkcloud_Users_UpdatePrivacySettingsResponse: SwiftProtobuf.Message, 
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Users_UpdatePrivacySettingsResponse, rhs: Barkcloud_Users_UpdatePrivacySettingsResponse) -> Bool {
+  public static func ==(lhs: Barkcloud_Users_UpdatePrivacySettingsResponse, rhs: Barkcloud_Users_UpdatePrivacySettingsResponse) -> Bool {
     if lhs._settings != rhs._settings {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -1758,10 +1758,10 @@ extension Barkcloud_Users_UpdatePrivacySettingsResponse: SwiftProtobuf.Message, 
 }
 
 extension Barkcloud_Users_ListByIdsRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".ListByIdsRequest"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}ids\0")
+  public static let protoMessageName: String = _protobuf_package + ".ListByIdsRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}ids\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -1773,14 +1773,14 @@ extension Barkcloud_Users_ListByIdsRequest: SwiftProtobuf.Message, SwiftProtobuf
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if !self.ids.isEmpty {
       try visitor.visitPackedInt64Field(value: self.ids, fieldNumber: 1)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Users_ListByIdsRequest, rhs: Barkcloud_Users_ListByIdsRequest) -> Bool {
+  public static func ==(lhs: Barkcloud_Users_ListByIdsRequest, rhs: Barkcloud_Users_ListByIdsRequest) -> Bool {
     if lhs.ids != rhs.ids {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -1788,10 +1788,10 @@ extension Barkcloud_Users_ListByIdsRequest: SwiftProtobuf.Message, SwiftProtobuf
 }
 
 extension Barkcloud_Users_ListByIdsResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".ListByIdsResponse"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}users\0")
+  public static let protoMessageName: String = _protobuf_package + ".ListByIdsResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}users\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -1803,14 +1803,14 @@ extension Barkcloud_Users_ListByIdsResponse: SwiftProtobuf.Message, SwiftProtobu
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if !self.users.isEmpty {
       try visitor.visitRepeatedMessageField(value: self.users, fieldNumber: 1)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Users_ListByIdsResponse, rhs: Barkcloud_Users_ListByIdsResponse) -> Bool {
+  public static func ==(lhs: Barkcloud_Users_ListByIdsResponse, rhs: Barkcloud_Users_ListByIdsResponse) -> Bool {
     if lhs.users != rhs.users {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -1818,10 +1818,10 @@ extension Barkcloud_Users_ListByIdsResponse: SwiftProtobuf.Message, SwiftProtobu
 }
 
 extension Barkcloud_Users_SetProfilePictureRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".SetProfilePictureRequest"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}file_id\0")
+  public static let protoMessageName: String = _protobuf_package + ".SetProfilePictureRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}file_id\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -1833,14 +1833,14 @@ extension Barkcloud_Users_SetProfilePictureRequest: SwiftProtobuf.Message, Swift
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if !self.fileID.isEmpty {
       try visitor.visitSingularStringField(value: self.fileID, fieldNumber: 1)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Users_SetProfilePictureRequest, rhs: Barkcloud_Users_SetProfilePictureRequest) -> Bool {
+  public static func ==(lhs: Barkcloud_Users_SetProfilePictureRequest, rhs: Barkcloud_Users_SetProfilePictureRequest) -> Bool {
     if lhs.fileID != rhs.fileID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -1848,29 +1848,29 @@ extension Barkcloud_Users_SetProfilePictureRequest: SwiftProtobuf.Message, Swift
 }
 
 extension Barkcloud_Users_SetProfilePictureResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".SetProfilePictureResponse"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap()
+  public static let protoMessageName: String = _protobuf_package + ".SetProfilePictureResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap()
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     // Load everything into unknown fields
     while try decoder.nextFieldNumber() != nil {}
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Users_SetProfilePictureResponse, rhs: Barkcloud_Users_SetProfilePictureResponse) -> Bool {
+  public static func ==(lhs: Barkcloud_Users_SetProfilePictureResponse, rhs: Barkcloud_Users_SetProfilePictureResponse) -> Bool {
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
 extension Barkcloud_Users_GetUserContactsRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".GetUserContactsRequest"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}user_id\0")
+  public static let protoMessageName: String = _protobuf_package + ".GetUserContactsRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}user_id\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -1882,14 +1882,14 @@ extension Barkcloud_Users_GetUserContactsRequest: SwiftProtobuf.Message, SwiftPr
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if self.userID != 0 {
       try visitor.visitSingularInt64Field(value: self.userID, fieldNumber: 1)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Users_GetUserContactsRequest, rhs: Barkcloud_Users_GetUserContactsRequest) -> Bool {
+  public static func ==(lhs: Barkcloud_Users_GetUserContactsRequest, rhs: Barkcloud_Users_GetUserContactsRequest) -> Bool {
     if lhs.userID != rhs.userID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -1897,10 +1897,10 @@ extension Barkcloud_Users_GetUserContactsRequest: SwiftProtobuf.Message, SwiftPr
 }
 
 extension Barkcloud_Users_GetUserContactsResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".GetUserContactsResponse"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}user\0\u{1}contact\0")
+  public static let protoMessageName: String = _protobuf_package + ".GetUserContactsResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}user\0\u{1}contact\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -1913,7 +1913,7 @@ extension Barkcloud_Users_GetUserContactsResponse: SwiftProtobuf.Message, SwiftP
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     // The use of inline closures is to circumvent an issue where the compiler
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
@@ -1927,7 +1927,7 @@ extension Barkcloud_Users_GetUserContactsResponse: SwiftProtobuf.Message, SwiftP
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Users_GetUserContactsResponse, rhs: Barkcloud_Users_GetUserContactsResponse) -> Bool {
+  public static func ==(lhs: Barkcloud_Users_GetUserContactsResponse, rhs: Barkcloud_Users_GetUserContactsResponse) -> Bool {
     if lhs._user != rhs._user {return false}
     if lhs._contact != rhs._contact {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
@@ -1936,10 +1936,10 @@ extension Barkcloud_Users_GetUserContactsResponse: SwiftProtobuf.Message, SwiftP
 }
 
 extension Barkcloud_Users_UserContact: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".UserContact"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}email\0")
+  public static let protoMessageName: String = _protobuf_package + ".UserContact"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}email\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -1951,14 +1951,14 @@ extension Barkcloud_Users_UserContact: SwiftProtobuf.Message, SwiftProtobuf._Mes
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if !self.email.isEmpty {
       try visitor.visitSingularStringField(value: self.email, fieldNumber: 1)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Users_UserContact, rhs: Barkcloud_Users_UserContact) -> Bool {
+  public static func ==(lhs: Barkcloud_Users_UserContact, rhs: Barkcloud_Users_UserContact) -> Bool {
     if lhs.email != rhs.email {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -1966,10 +1966,10 @@ extension Barkcloud_Users_UserContact: SwiftProtobuf.Message, SwiftProtobuf._Mes
 }
 
 extension Barkcloud_Users_GetByIdRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".GetByIdRequest"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}user_id\0")
+  public static let protoMessageName: String = _protobuf_package + ".GetByIdRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}user_id\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -1981,14 +1981,14 @@ extension Barkcloud_Users_GetByIdRequest: SwiftProtobuf.Message, SwiftProtobuf._
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if self.userID != 0 {
       try visitor.visitSingularInt64Field(value: self.userID, fieldNumber: 1)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Users_GetByIdRequest, rhs: Barkcloud_Users_GetByIdRequest) -> Bool {
+  public static func ==(lhs: Barkcloud_Users_GetByIdRequest, rhs: Barkcloud_Users_GetByIdRequest) -> Bool {
     if lhs.userID != rhs.userID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -1996,10 +1996,10 @@ extension Barkcloud_Users_GetByIdRequest: SwiftProtobuf.Message, SwiftProtobuf._
 }
 
 extension Barkcloud_Users_GetByIdResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".GetByIdResponse"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}user\0")
+  public static let protoMessageName: String = _protobuf_package + ".GetByIdResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}user\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -2011,7 +2011,7 @@ extension Barkcloud_Users_GetByIdResponse: SwiftProtobuf.Message, SwiftProtobuf.
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     // The use of inline closures is to circumvent an issue where the compiler
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
@@ -2022,7 +2022,7 @@ extension Barkcloud_Users_GetByIdResponse: SwiftProtobuf.Message, SwiftProtobuf.
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Users_GetByIdResponse, rhs: Barkcloud_Users_GetByIdResponse) -> Bool {
+  public static func ==(lhs: Barkcloud_Users_GetByIdResponse, rhs: Barkcloud_Users_GetByIdResponse) -> Bool {
     if lhs._user != rhs._user {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -2030,10 +2030,10 @@ extension Barkcloud_Users_GetByIdResponse: SwiftProtobuf.Message, SwiftProtobuf.
 }
 
 extension Barkcloud_Users_GetUserRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".GetUserRequest"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}user_id\0")
+  public static let protoMessageName: String = _protobuf_package + ".GetUserRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}user_id\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -2045,14 +2045,14 @@ extension Barkcloud_Users_GetUserRequest: SwiftProtobuf.Message, SwiftProtobuf._
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if self.userID != 0 {
       try visitor.visitSingularInt64Field(value: self.userID, fieldNumber: 1)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Users_GetUserRequest, rhs: Barkcloud_Users_GetUserRequest) -> Bool {
+  public static func ==(lhs: Barkcloud_Users_GetUserRequest, rhs: Barkcloud_Users_GetUserRequest) -> Bool {
     if lhs.userID != rhs.userID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -2060,10 +2060,10 @@ extension Barkcloud_Users_GetUserRequest: SwiftProtobuf.Message, SwiftProtobuf._
 }
 
 extension Barkcloud_Users_GetUserResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".GetUserResponse"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}user\0")
+  public static let protoMessageName: String = _protobuf_package + ".GetUserResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}user\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -2075,7 +2075,7 @@ extension Barkcloud_Users_GetUserResponse: SwiftProtobuf.Message, SwiftProtobuf.
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     // The use of inline closures is to circumvent an issue where the compiler
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
@@ -2086,7 +2086,7 @@ extension Barkcloud_Users_GetUserResponse: SwiftProtobuf.Message, SwiftProtobuf.
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Users_GetUserResponse, rhs: Barkcloud_Users_GetUserResponse) -> Bool {
+  public static func ==(lhs: Barkcloud_Users_GetUserResponse, rhs: Barkcloud_Users_GetUserResponse) -> Bool {
     if lhs._user != rhs._user {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -2094,10 +2094,10 @@ extension Barkcloud_Users_GetUserResponse: SwiftProtobuf.Message, SwiftProtobuf.
 }
 
 extension Barkcloud_Users_ConfirmUserRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".ConfirmUserRequest"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}user_id\0")
+  public static let protoMessageName: String = _protobuf_package + ".ConfirmUserRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}user_id\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -2109,14 +2109,14 @@ extension Barkcloud_Users_ConfirmUserRequest: SwiftProtobuf.Message, SwiftProtob
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if self.userID != 0 {
       try visitor.visitSingularInt64Field(value: self.userID, fieldNumber: 1)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Users_ConfirmUserRequest, rhs: Barkcloud_Users_ConfirmUserRequest) -> Bool {
+  public static func ==(lhs: Barkcloud_Users_ConfirmUserRequest, rhs: Barkcloud_Users_ConfirmUserRequest) -> Bool {
     if lhs.userID != rhs.userID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -2124,29 +2124,29 @@ extension Barkcloud_Users_ConfirmUserRequest: SwiftProtobuf.Message, SwiftProtob
 }
 
 extension Barkcloud_Users_ConfirmUserResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".ConfirmUserResponse"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap()
+  public static let protoMessageName: String = _protobuf_package + ".ConfirmUserResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap()
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     // Load everything into unknown fields
     while try decoder.nextFieldNumber() != nil {}
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Users_ConfirmUserResponse, rhs: Barkcloud_Users_ConfirmUserResponse) -> Bool {
+  public static func ==(lhs: Barkcloud_Users_ConfirmUserResponse, rhs: Barkcloud_Users_ConfirmUserResponse) -> Bool {
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
 extension Barkcloud_Users_AddDraftUserRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".AddDraftUserRequest"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}first_name\0\u{3}last_name\0\u{1}username\0\u{1}email\0")
+  public static let protoMessageName: String = _protobuf_package + ".AddDraftUserRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}first_name\0\u{3}last_name\0\u{1}username\0\u{1}email\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -2161,7 +2161,7 @@ extension Barkcloud_Users_AddDraftUserRequest: SwiftProtobuf.Message, SwiftProto
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if !self.firstName.isEmpty {
       try visitor.visitSingularStringField(value: self.firstName, fieldNumber: 1)
     }
@@ -2177,7 +2177,7 @@ extension Barkcloud_Users_AddDraftUserRequest: SwiftProtobuf.Message, SwiftProto
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Users_AddDraftUserRequest, rhs: Barkcloud_Users_AddDraftUserRequest) -> Bool {
+  public static func ==(lhs: Barkcloud_Users_AddDraftUserRequest, rhs: Barkcloud_Users_AddDraftUserRequest) -> Bool {
     if lhs.firstName != rhs.firstName {return false}
     if lhs.lastName != rhs.lastName {return false}
     if lhs.username != rhs.username {return false}
@@ -2188,10 +2188,10 @@ extension Barkcloud_Users_AddDraftUserRequest: SwiftProtobuf.Message, SwiftProto
 }
 
 extension Barkcloud_Users_AddDraftUserResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".AddDraftUserResponse"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}user_id\0")
+  public static let protoMessageName: String = _protobuf_package + ".AddDraftUserResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}user_id\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -2203,14 +2203,14 @@ extension Barkcloud_Users_AddDraftUserResponse: SwiftProtobuf.Message, SwiftProt
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if self.userID != 0 {
       try visitor.visitSingularInt64Field(value: self.userID, fieldNumber: 1)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Users_AddDraftUserResponse, rhs: Barkcloud_Users_AddDraftUserResponse) -> Bool {
+  public static func ==(lhs: Barkcloud_Users_AddDraftUserResponse, rhs: Barkcloud_Users_AddDraftUserResponse) -> Bool {
     if lhs.userID != rhs.userID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -2218,10 +2218,10 @@ extension Barkcloud_Users_AddDraftUserResponse: SwiftProtobuf.Message, SwiftProt
 }
 
 extension Barkcloud_Users_CheckExistEmailRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".CheckExistEmailRequest"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}email\0")
+  public static let protoMessageName: String = _protobuf_package + ".CheckExistEmailRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}email\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -2233,14 +2233,14 @@ extension Barkcloud_Users_CheckExistEmailRequest: SwiftProtobuf.Message, SwiftPr
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if !self.email.isEmpty {
       try visitor.visitSingularStringField(value: self.email, fieldNumber: 1)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Users_CheckExistEmailRequest, rhs: Barkcloud_Users_CheckExistEmailRequest) -> Bool {
+  public static func ==(lhs: Barkcloud_Users_CheckExistEmailRequest, rhs: Barkcloud_Users_CheckExistEmailRequest) -> Bool {
     if lhs.email != rhs.email {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -2248,10 +2248,10 @@ extension Barkcloud_Users_CheckExistEmailRequest: SwiftProtobuf.Message, SwiftPr
 }
 
 extension Barkcloud_Users_CheckExistUsernameRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".CheckExistUsernameRequest"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}username\0")
+  public static let protoMessageName: String = _protobuf_package + ".CheckExistUsernameRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}username\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -2263,14 +2263,14 @@ extension Barkcloud_Users_CheckExistUsernameRequest: SwiftProtobuf.Message, Swif
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if !self.username.isEmpty {
       try visitor.visitSingularStringField(value: self.username, fieldNumber: 1)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Users_CheckExistUsernameRequest, rhs: Barkcloud_Users_CheckExistUsernameRequest) -> Bool {
+  public static func ==(lhs: Barkcloud_Users_CheckExistUsernameRequest, rhs: Barkcloud_Users_CheckExistUsernameRequest) -> Bool {
     if lhs.username != rhs.username {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -2278,10 +2278,10 @@ extension Barkcloud_Users_CheckExistUsernameRequest: SwiftProtobuf.Message, Swif
 }
 
 extension Barkcloud_Users_CheckExistResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".CheckExistResponse"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}exist\0")
+  public static let protoMessageName: String = _protobuf_package + ".CheckExistResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}exist\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -2293,14 +2293,14 @@ extension Barkcloud_Users_CheckExistResponse: SwiftProtobuf.Message, SwiftProtob
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if self.exist != false {
       try visitor.visitSingularBoolField(value: self.exist, fieldNumber: 1)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Users_CheckExistResponse, rhs: Barkcloud_Users_CheckExistResponse) -> Bool {
+  public static func ==(lhs: Barkcloud_Users_CheckExistResponse, rhs: Barkcloud_Users_CheckExistResponse) -> Bool {
     if lhs.exist != rhs.exist {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -2308,10 +2308,10 @@ extension Barkcloud_Users_CheckExistResponse: SwiftProtobuf.Message, SwiftProtob
 }
 
 extension Barkcloud_Users_FindByLoginRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".FindByLoginRequest"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}username\0\u{1}email\0")
+  public static let protoMessageName: String = _protobuf_package + ".FindByLoginRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}username\0\u{1}email\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -2338,7 +2338,7 @@ extension Barkcloud_Users_FindByLoginRequest: SwiftProtobuf.Message, SwiftProtob
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     // The use of inline closures is to circumvent an issue where the compiler
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
@@ -2357,7 +2357,7 @@ extension Barkcloud_Users_FindByLoginRequest: SwiftProtobuf.Message, SwiftProtob
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Users_FindByLoginRequest, rhs: Barkcloud_Users_FindByLoginRequest) -> Bool {
+  public static func ==(lhs: Barkcloud_Users_FindByLoginRequest, rhs: Barkcloud_Users_FindByLoginRequest) -> Bool {
     if lhs.login != rhs.login {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -2365,10 +2365,10 @@ extension Barkcloud_Users_FindByLoginRequest: SwiftProtobuf.Message, SwiftProtob
 }
 
 extension Barkcloud_Users_FindByLoginResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".FindByLoginResponse"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}user\0")
+  public static let protoMessageName: String = _protobuf_package + ".FindByLoginResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}user\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -2380,7 +2380,7 @@ extension Barkcloud_Users_FindByLoginResponse: SwiftProtobuf.Message, SwiftProto
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     // The use of inline closures is to circumvent an issue where the compiler
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
@@ -2391,7 +2391,7 @@ extension Barkcloud_Users_FindByLoginResponse: SwiftProtobuf.Message, SwiftProto
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Users_FindByLoginResponse, rhs: Barkcloud_Users_FindByLoginResponse) -> Bool {
+  public static func ==(lhs: Barkcloud_Users_FindByLoginResponse, rhs: Barkcloud_Users_FindByLoginResponse) -> Bool {
     if lhs._user != rhs._user {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -2399,10 +2399,10 @@ extension Barkcloud_Users_FindByLoginResponse: SwiftProtobuf.Message, SwiftProto
 }
 
 extension Barkcloud_Users_User: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".User"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{3}first_name\0\u{3}last_name\0\u{1}username\0\u{3}registration_date\0\u{3}profile_picture\0\u{3}profile_picture_preview\0\u{3}storage_limit_gb\0\u{1}bio\0")
+  public static let protoMessageName: String = _protobuf_package + ".User"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{3}first_name\0\u{3}last_name\0\u{1}username\0\u{3}registration_date\0\u{3}profile_picture\0\u{3}profile_picture_preview\0\u{3}storage_limit_gb\0\u{1}bio\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -2422,7 +2422,7 @@ extension Barkcloud_Users_User: SwiftProtobuf.Message, SwiftProtobuf._MessageImp
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     // The use of inline closures is to circumvent an issue where the compiler
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
@@ -2457,7 +2457,7 @@ extension Barkcloud_Users_User: SwiftProtobuf.Message, SwiftProtobuf._MessageImp
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Users_User, rhs: Barkcloud_Users_User) -> Bool {
+  public static func ==(lhs: Barkcloud_Users_User, rhs: Barkcloud_Users_User) -> Bool {
     if lhs.id != rhs.id {return false}
     if lhs.firstName != rhs.firstName {return false}
     if lhs.lastName != rhs.lastName {return false}
@@ -2473,10 +2473,10 @@ extension Barkcloud_Users_User: SwiftProtobuf.Message, SwiftProtobuf._MessageImp
 }
 
 extension Barkcloud_Users_Device: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".Device"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}device_id\0\u{3}user_id\0\u{3}original_name\0\u{3}custom_name\0\u{3}authorized_at\0\u{3}app_name\0\u{3}operation_system\0\u{1}location\0")
+  public static let protoMessageName: String = _protobuf_package + ".Device"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}device_id\0\u{3}user_id\0\u{3}original_name\0\u{3}custom_name\0\u{3}authorized_at\0\u{3}app_name\0\u{3}operation_system\0\u{1}location\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -2495,7 +2495,7 @@ extension Barkcloud_Users_Device: SwiftProtobuf.Message, SwiftProtobuf._MessageI
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     // The use of inline closures is to circumvent an issue where the compiler
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
@@ -2527,7 +2527,7 @@ extension Barkcloud_Users_Device: SwiftProtobuf.Message, SwiftProtobuf._MessageI
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Users_Device, rhs: Barkcloud_Users_Device) -> Bool {
+  public static func ==(lhs: Barkcloud_Users_Device, rhs: Barkcloud_Users_Device) -> Bool {
     if lhs.deviceID != rhs.deviceID {return false}
     if lhs.userID != rhs.userID {return false}
     if lhs.originalName != rhs.originalName {return false}
@@ -2542,29 +2542,29 @@ extension Barkcloud_Users_Device: SwiftProtobuf.Message, SwiftProtobuf._MessageI
 }
 
 extension Barkcloud_Users_GetDevicesRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".GetDevicesRequest"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap()
+  public static let protoMessageName: String = _protobuf_package + ".GetDevicesRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap()
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     // Load everything into unknown fields
     while try decoder.nextFieldNumber() != nil {}
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Users_GetDevicesRequest, rhs: Barkcloud_Users_GetDevicesRequest) -> Bool {
+  public static func ==(lhs: Barkcloud_Users_GetDevicesRequest, rhs: Barkcloud_Users_GetDevicesRequest) -> Bool {
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
 extension Barkcloud_Users_GetDevicesResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".GetDevicesResponse"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}devices\0")
+  public static let protoMessageName: String = _protobuf_package + ".GetDevicesResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}devices\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -2576,14 +2576,14 @@ extension Barkcloud_Users_GetDevicesResponse: SwiftProtobuf.Message, SwiftProtob
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if !self.devices.isEmpty {
       try visitor.visitRepeatedMessageField(value: self.devices, fieldNumber: 1)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Users_GetDevicesResponse, rhs: Barkcloud_Users_GetDevicesResponse) -> Bool {
+  public static func ==(lhs: Barkcloud_Users_GetDevicesResponse, rhs: Barkcloud_Users_GetDevicesResponse) -> Bool {
     if lhs.devices != rhs.devices {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -2591,29 +2591,29 @@ extension Barkcloud_Users_GetDevicesResponse: SwiftProtobuf.Message, SwiftProtob
 }
 
 extension Barkcloud_Users_GetCurrentDeviceRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".GetCurrentDeviceRequest"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap()
+  public static let protoMessageName: String = _protobuf_package + ".GetCurrentDeviceRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap()
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     // Load everything into unknown fields
     while try decoder.nextFieldNumber() != nil {}
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Users_GetCurrentDeviceRequest, rhs: Barkcloud_Users_GetCurrentDeviceRequest) -> Bool {
+  public static func ==(lhs: Barkcloud_Users_GetCurrentDeviceRequest, rhs: Barkcloud_Users_GetCurrentDeviceRequest) -> Bool {
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
 extension Barkcloud_Users_GetCurrentDeviceResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".GetCurrentDeviceResponse"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}device\0")
+  public static let protoMessageName: String = _protobuf_package + ".GetCurrentDeviceResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}device\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -2625,7 +2625,7 @@ extension Barkcloud_Users_GetCurrentDeviceResponse: SwiftProtobuf.Message, Swift
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     // The use of inline closures is to circumvent an issue where the compiler
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
@@ -2636,7 +2636,7 @@ extension Barkcloud_Users_GetCurrentDeviceResponse: SwiftProtobuf.Message, Swift
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Users_GetCurrentDeviceResponse, rhs: Barkcloud_Users_GetCurrentDeviceResponse) -> Bool {
+  public static func ==(lhs: Barkcloud_Users_GetCurrentDeviceResponse, rhs: Barkcloud_Users_GetCurrentDeviceResponse) -> Bool {
     if lhs._device != rhs._device {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -2644,10 +2644,10 @@ extension Barkcloud_Users_GetCurrentDeviceResponse: SwiftProtobuf.Message, Swift
 }
 
 extension Barkcloud_Users_RenameDeviceRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".RenameDeviceRequest"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}device_id\0\u{3}custom_name\0")
+  public static let protoMessageName: String = _protobuf_package + ".RenameDeviceRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}device_id\0\u{3}custom_name\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -2660,7 +2660,7 @@ extension Barkcloud_Users_RenameDeviceRequest: SwiftProtobuf.Message, SwiftProto
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if !self.deviceID.isEmpty {
       try visitor.visitSingularStringField(value: self.deviceID, fieldNumber: 1)
     }
@@ -2670,7 +2670,7 @@ extension Barkcloud_Users_RenameDeviceRequest: SwiftProtobuf.Message, SwiftProto
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Users_RenameDeviceRequest, rhs: Barkcloud_Users_RenameDeviceRequest) -> Bool {
+  public static func ==(lhs: Barkcloud_Users_RenameDeviceRequest, rhs: Barkcloud_Users_RenameDeviceRequest) -> Bool {
     if lhs.deviceID != rhs.deviceID {return false}
     if lhs.customName != rhs.customName {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
@@ -2679,29 +2679,29 @@ extension Barkcloud_Users_RenameDeviceRequest: SwiftProtobuf.Message, SwiftProto
 }
 
 extension Barkcloud_Users_RenameDeviceResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".RenameDeviceResponse"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap()
+  public static let protoMessageName: String = _protobuf_package + ".RenameDeviceResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap()
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     // Load everything into unknown fields
     while try decoder.nextFieldNumber() != nil {}
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Users_RenameDeviceResponse, rhs: Barkcloud_Users_RenameDeviceResponse) -> Bool {
+  public static func ==(lhs: Barkcloud_Users_RenameDeviceResponse, rhs: Barkcloud_Users_RenameDeviceResponse) -> Bool {
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
 extension Barkcloud_Users_RegisterDeviceRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".RegisterDeviceRequest"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}device_id\0\u{3}user_id\0\u{3}original_name\0\u{3}app_name\0\u{3}operation_system\0\u{1}location\0")
+  public static let protoMessageName: String = _protobuf_package + ".RegisterDeviceRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}device_id\0\u{3}user_id\0\u{3}original_name\0\u{3}app_name\0\u{3}operation_system\0\u{1}location\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -2718,7 +2718,7 @@ extension Barkcloud_Users_RegisterDeviceRequest: SwiftProtobuf.Message, SwiftPro
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if !self.deviceID.isEmpty {
       try visitor.visitSingularStringField(value: self.deviceID, fieldNumber: 1)
     }
@@ -2740,7 +2740,7 @@ extension Barkcloud_Users_RegisterDeviceRequest: SwiftProtobuf.Message, SwiftPro
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Users_RegisterDeviceRequest, rhs: Barkcloud_Users_RegisterDeviceRequest) -> Bool {
+  public static func ==(lhs: Barkcloud_Users_RegisterDeviceRequest, rhs: Barkcloud_Users_RegisterDeviceRequest) -> Bool {
     if lhs.deviceID != rhs.deviceID {return false}
     if lhs.userID != rhs.userID {return false}
     if lhs.originalName != rhs.originalName {return false}
@@ -2753,10 +2753,10 @@ extension Barkcloud_Users_RegisterDeviceRequest: SwiftProtobuf.Message, SwiftPro
 }
 
 extension Barkcloud_Users_RegisterDeviceResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".RegisterDeviceResponse"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}device\0")
+  public static let protoMessageName: String = _protobuf_package + ".RegisterDeviceResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}device\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -2768,7 +2768,7 @@ extension Barkcloud_Users_RegisterDeviceResponse: SwiftProtobuf.Message, SwiftPr
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     // The use of inline closures is to circumvent an issue where the compiler
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
@@ -2779,7 +2779,7 @@ extension Barkcloud_Users_RegisterDeviceResponse: SwiftProtobuf.Message, SwiftPr
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Users_RegisterDeviceResponse, rhs: Barkcloud_Users_RegisterDeviceResponse) -> Bool {
+  public static func ==(lhs: Barkcloud_Users_RegisterDeviceResponse, rhs: Barkcloud_Users_RegisterDeviceResponse) -> Bool {
     if lhs._device != rhs._device {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -2787,10 +2787,10 @@ extension Barkcloud_Users_RegisterDeviceResponse: SwiftProtobuf.Message, SwiftPr
 }
 
 extension Barkcloud_Users_GetUserDevicesRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".GetUserDevicesRequest"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}user_id\0")
+  public static let protoMessageName: String = _protobuf_package + ".GetUserDevicesRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}user_id\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -2802,14 +2802,14 @@ extension Barkcloud_Users_GetUserDevicesRequest: SwiftProtobuf.Message, SwiftPro
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if self.userID != 0 {
       try visitor.visitSingularInt64Field(value: self.userID, fieldNumber: 1)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Users_GetUserDevicesRequest, rhs: Barkcloud_Users_GetUserDevicesRequest) -> Bool {
+  public static func ==(lhs: Barkcloud_Users_GetUserDevicesRequest, rhs: Barkcloud_Users_GetUserDevicesRequest) -> Bool {
     if lhs.userID != rhs.userID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -2817,10 +2817,10 @@ extension Barkcloud_Users_GetUserDevicesRequest: SwiftProtobuf.Message, SwiftPro
 }
 
 extension Barkcloud_Users_GetUserDevicesResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".GetUserDevicesResponse"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}devices\0")
+  public static let protoMessageName: String = _protobuf_package + ".GetUserDevicesResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}devices\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -2832,14 +2832,14 @@ extension Barkcloud_Users_GetUserDevicesResponse: SwiftProtobuf.Message, SwiftPr
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if !self.devices.isEmpty {
       try visitor.visitRepeatedMessageField(value: self.devices, fieldNumber: 1)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Users_GetUserDevicesResponse, rhs: Barkcloud_Users_GetUserDevicesResponse) -> Bool {
+  public static func ==(lhs: Barkcloud_Users_GetUserDevicesResponse, rhs: Barkcloud_Users_GetUserDevicesResponse) -> Bool {
     if lhs.devices != rhs.devices {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -2847,10 +2847,10 @@ extension Barkcloud_Users_GetUserDevicesResponse: SwiftProtobuf.Message, SwiftPr
 }
 
 extension Barkcloud_Users_DeleteUserDeviceRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".DeleteUserDeviceRequest"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}device_id\0\u{3}user_id\0")
+  public static let protoMessageName: String = _protobuf_package + ".DeleteUserDeviceRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}device_id\0\u{3}user_id\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -2863,7 +2863,7 @@ extension Barkcloud_Users_DeleteUserDeviceRequest: SwiftProtobuf.Message, SwiftP
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if !self.deviceID.isEmpty {
       try visitor.visitSingularStringField(value: self.deviceID, fieldNumber: 1)
     }
@@ -2873,7 +2873,7 @@ extension Barkcloud_Users_DeleteUserDeviceRequest: SwiftProtobuf.Message, SwiftP
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Users_DeleteUserDeviceRequest, rhs: Barkcloud_Users_DeleteUserDeviceRequest) -> Bool {
+  public static func ==(lhs: Barkcloud_Users_DeleteUserDeviceRequest, rhs: Barkcloud_Users_DeleteUserDeviceRequest) -> Bool {
     if lhs.deviceID != rhs.deviceID {return false}
     if lhs.userID != rhs.userID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
@@ -2882,19 +2882,19 @@ extension Barkcloud_Users_DeleteUserDeviceRequest: SwiftProtobuf.Message, SwiftP
 }
 
 extension Barkcloud_Users_DeleteUserDeviceResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".DeleteUserDeviceResponse"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap()
+  public static let protoMessageName: String = _protobuf_package + ".DeleteUserDeviceResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap()
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     // Load everything into unknown fields
     while try decoder.nextFieldNumber() != nil {}
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Users_DeleteUserDeviceResponse, rhs: Barkcloud_Users_DeleteUserDeviceResponse) -> Bool {
+  public static func ==(lhs: Barkcloud_Users_DeleteUserDeviceResponse, rhs: Barkcloud_Users_DeleteUserDeviceResponse) -> Bool {
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

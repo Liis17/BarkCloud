@@ -1,7 +1,7 @@
 import Foundation
 import GRPCCore
 
-extension RPCError {
+public extension RPCError {
     var errorCode: String? {
         for (key, value) in metadata {
             guard key.lowercased() == "x-error-code" else { continue }

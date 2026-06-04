@@ -15,208 +15,208 @@ import GRPCProtobuf
 
 /// Namespace containing generated types for the "barkcloud.identity.IdentityApi" service.
 @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
-internal enum Barkcloud_Identity_IdentityApi: Sendable {
+public enum Barkcloud_Identity_IdentityApi: Sendable {
     /// Service descriptor for the "barkcloud.identity.IdentityApi" service.
-    internal static let descriptor = GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.identity.IdentityApi")
+    public static let descriptor = GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.identity.IdentityApi")
     /// Namespace for method metadata.
-    internal enum Method: Sendable {
+    public enum Method: Sendable {
         /// Namespace for "Auth" metadata.
-        internal enum Auth: Sendable {
+        public enum Auth: Sendable {
             /// Request type for "Auth".
-            internal typealias Input = Barkcloud_Identity_AuthRequest
+            public typealias Input = Barkcloud_Identity_AuthRequest
             /// Response type for "Auth".
-            internal typealias Output = Barkcloud_Identity_AuthResponse
+            public typealias Output = Barkcloud_Identity_AuthResponse
             /// Descriptor for "Auth".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.identity.IdentityApi"),
                 method: "Auth",
                 type: .unary
             )
         }
         /// Namespace for "FastAuth" metadata.
-        internal enum FastAuth: Sendable {
+        public enum FastAuth: Sendable {
             /// Request type for "FastAuth".
-            internal typealias Input = Barkcloud_Identity_FastAuthRequest
+            public typealias Input = Barkcloud_Identity_FastAuthRequest
             /// Response type for "FastAuth".
-            internal typealias Output = Barkcloud_Identity_AuthResponse
+            public typealias Output = Barkcloud_Identity_AuthResponse
             /// Descriptor for "FastAuth".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.identity.IdentityApi"),
                 method: "FastAuth",
                 type: .unary
             )
         }
         /// Namespace for "CreateToken" metadata.
-        internal enum CreateToken: Sendable {
+        public enum CreateToken: Sendable {
             /// Request type for "CreateToken".
-            internal typealias Input = Barkcloud_Identity_CreateTokenRequest
+            public typealias Input = Barkcloud_Identity_CreateTokenRequest
             /// Response type for "CreateToken".
-            internal typealias Output = Barkcloud_Identity_CreateTokenResponse
+            public typealias Output = Barkcloud_Identity_CreateTokenResponse
             /// Descriptor for "CreateToken".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.identity.IdentityApi"),
                 method: "CreateToken",
                 type: .unary
             )
         }
         /// Namespace for "CreateAccount" metadata.
-        internal enum CreateAccount: Sendable {
+        public enum CreateAccount: Sendable {
             /// Request type for "CreateAccount".
-            internal typealias Input = Barkcloud_Identity_CreateAccountRequest
+            public typealias Input = Barkcloud_Identity_CreateAccountRequest
             /// Response type for "CreateAccount".
-            internal typealias Output = Barkcloud_Identity_CreateAccountResponse
+            public typealias Output = Barkcloud_Identity_CreateAccountResponse
             /// Descriptor for "CreateAccount".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.identity.IdentityApi"),
                 method: "CreateAccount",
                 type: .unary
             )
         }
         /// Namespace for "ConfirmAccount" metadata.
-        internal enum ConfirmAccount: Sendable {
+        public enum ConfirmAccount: Sendable {
             /// Request type for "ConfirmAccount".
-            internal typealias Input = Barkcloud_Identity_ConfirmAccountRequest
+            public typealias Input = Barkcloud_Identity_ConfirmAccountRequest
             /// Response type for "ConfirmAccount".
-            internal typealias Output = Barkcloud_Identity_ConfirmAccountResponse
+            public typealias Output = Barkcloud_Identity_ConfirmAccountResponse
             /// Descriptor for "ConfirmAccount".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.identity.IdentityApi"),
                 method: "ConfirmAccount",
                 type: .unary
             )
         }
         /// Namespace for "GetActiveSessions" metadata.
-        internal enum GetActiveSessions: Sendable {
+        public enum GetActiveSessions: Sendable {
             /// Request type for "GetActiveSessions".
-            internal typealias Input = Barkcloud_Identity_GetActiveSessionsRequest
+            public typealias Input = Barkcloud_Identity_GetActiveSessionsRequest
             /// Response type for "GetActiveSessions".
-            internal typealias Output = Barkcloud_Identity_GetActiveSessionsResponse
+            public typealias Output = Barkcloud_Identity_GetActiveSessionsResponse
             /// Descriptor for "GetActiveSessions".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.identity.IdentityApi"),
                 method: "GetActiveSessions",
                 type: .unary
             )
         }
         /// Namespace for "RemoveActiveSession" metadata.
-        internal enum RemoveActiveSession: Sendable {
+        public enum RemoveActiveSession: Sendable {
             /// Request type for "RemoveActiveSession".
-            internal typealias Input = Barkcloud_Identity_RemoveActiveSessionRequest
+            public typealias Input = Barkcloud_Identity_RemoveActiveSessionRequest
             /// Response type for "RemoveActiveSession".
-            internal typealias Output = Barkcloud_Identity_RemoveActiveSessionResponse
+            public typealias Output = Barkcloud_Identity_RemoveActiveSessionResponse
             /// Descriptor for "RemoveActiveSession".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.identity.IdentityApi"),
                 method: "RemoveActiveSession",
                 type: .unary
             )
         }
         /// Namespace for "EnableOtpVerification" metadata.
-        internal enum EnableOtpVerification: Sendable {
+        public enum EnableOtpVerification: Sendable {
             /// Request type for "EnableOtpVerification".
-            internal typealias Input = Barkcloud_Identity_EnableOtpVerificationRequest
+            public typealias Input = Barkcloud_Identity_EnableOtpVerificationRequest
             /// Response type for "EnableOtpVerification".
-            internal typealias Output = Barkcloud_Identity_EnableOtpVerificationResponse
+            public typealias Output = Barkcloud_Identity_EnableOtpVerificationResponse
             /// Descriptor for "EnableOtpVerification".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.identity.IdentityApi"),
                 method: "EnableOtpVerification",
                 type: .unary
             )
         }
         /// Namespace for "ConfirmOtpVerification" metadata.
-        internal enum ConfirmOtpVerification: Sendable {
+        public enum ConfirmOtpVerification: Sendable {
             /// Request type for "ConfirmOtpVerification".
-            internal typealias Input = Barkcloud_Identity_ConfirmOtpVerificationRequest
+            public typealias Input = Barkcloud_Identity_ConfirmOtpVerificationRequest
             /// Response type for "ConfirmOtpVerification".
-            internal typealias Output = Barkcloud_Identity_ConfirmOtpVerificationResponse
+            public typealias Output = Barkcloud_Identity_ConfirmOtpVerificationResponse
             /// Descriptor for "ConfirmOtpVerification".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.identity.IdentityApi"),
                 method: "ConfirmOtpVerification",
                 type: .unary
             )
         }
         /// Namespace for "DisableOtpVerification" metadata.
-        internal enum DisableOtpVerification: Sendable {
+        public enum DisableOtpVerification: Sendable {
             /// Request type for "DisableOtpVerification".
-            internal typealias Input = Barkcloud_Identity_DisableOtpVerificationRequest
+            public typealias Input = Barkcloud_Identity_DisableOtpVerificationRequest
             /// Response type for "DisableOtpVerification".
-            internal typealias Output = Barkcloud_Identity_DisableOtpVerificationResponse
+            public typealias Output = Barkcloud_Identity_DisableOtpVerificationResponse
             /// Descriptor for "DisableOtpVerification".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.identity.IdentityApi"),
                 method: "DisableOtpVerification",
                 type: .unary
             )
         }
         /// Namespace for "ListOtpVerification" metadata.
-        internal enum ListOtpVerification: Sendable {
+        public enum ListOtpVerification: Sendable {
             /// Request type for "ListOtpVerification".
-            internal typealias Input = Barkcloud_Identity_ListOtpVerificationRequest
+            public typealias Input = Barkcloud_Identity_ListOtpVerificationRequest
             /// Response type for "ListOtpVerification".
-            internal typealias Output = Barkcloud_Identity_ListOtpVerificationResponse
+            public typealias Output = Barkcloud_Identity_ListOtpVerificationResponse
             /// Descriptor for "ListOtpVerification".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.identity.IdentityApi"),
                 method: "ListOtpVerification",
                 type: .unary
             )
         }
         /// Namespace for "ResetPassword" metadata.
-        internal enum ResetPassword: Sendable {
+        public enum ResetPassword: Sendable {
             /// Request type for "ResetPassword".
-            internal typealias Input = Barkcloud_Identity_ResetPasswordRequest
+            public typealias Input = Barkcloud_Identity_ResetPasswordRequest
             /// Response type for "ResetPassword".
-            internal typealias Output = Barkcloud_Identity_ResetPasswordResponse
+            public typealias Output = Barkcloud_Identity_ResetPasswordResponse
             /// Descriptor for "ResetPassword".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.identity.IdentityApi"),
                 method: "ResetPassword",
                 type: .unary
             )
         }
         /// Namespace for "ConfirmResetPassword" metadata.
-        internal enum ConfirmResetPassword: Sendable {
+        public enum ConfirmResetPassword: Sendable {
             /// Request type for "ConfirmResetPassword".
-            internal typealias Input = Barkcloud_Identity_ConfirmResetPasswordRequest
+            public typealias Input = Barkcloud_Identity_ConfirmResetPasswordRequest
             /// Response type for "ConfirmResetPassword".
-            internal typealias Output = Barkcloud_Identity_ConfirmResetPasswordResponse
+            public typealias Output = Barkcloud_Identity_ConfirmResetPasswordResponse
             /// Descriptor for "ConfirmResetPassword".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.identity.IdentityApi"),
                 method: "ConfirmResetPassword",
                 type: .unary
             )
         }
         /// Namespace for "SetPassword" metadata.
-        internal enum SetPassword: Sendable {
+        public enum SetPassword: Sendable {
             /// Request type for "SetPassword".
-            internal typealias Input = Barkcloud_Identity_SetPasswordRequest
+            public typealias Input = Barkcloud_Identity_SetPasswordRequest
             /// Response type for "SetPassword".
-            internal typealias Output = Barkcloud_Identity_SetPasswordResponse
+            public typealias Output = Barkcloud_Identity_SetPasswordResponse
             /// Descriptor for "SetPassword".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.identity.IdentityApi"),
                 method: "SetPassword",
                 type: .unary
             )
         }
         /// Namespace for "Logout" metadata.
-        internal enum Logout: Sendable {
+        public enum Logout: Sendable {
             /// Request type for "Logout".
-            internal typealias Input = Barkcloud_Identity_LogoutRequest
+            public typealias Input = Barkcloud_Identity_LogoutRequest
             /// Response type for "Logout".
-            internal typealias Output = Barkcloud_Identity_LogoutResponse
+            public typealias Output = Barkcloud_Identity_LogoutResponse
             /// Descriptor for "Logout".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.identity.IdentityApi"),
                 method: "Logout",
                 type: .unary
             )
         }
         /// Descriptors for all methods in the "barkcloud.identity.IdentityApi" service.
-        internal static let descriptors: [GRPCCore.MethodDescriptor] = [
+        public static let descriptors: [GRPCCore.MethodDescriptor] = [
             Auth.descriptor,
             FastAuth.descriptor,
             CreateToken.descriptor,
@@ -239,7 +239,7 @@ internal enum Barkcloud_Identity_IdentityApi: Sendable {
 @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
 extension GRPCCore.ServiceDescriptor {
     /// Service descriptor for the "barkcloud.identity.IdentityApi" service.
-    internal static let barkcloud_identity_IdentityApi = GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.identity.IdentityApi")
+    public static let barkcloud_identity_IdentityApi = GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.identity.IdentityApi")
 }
 
 // MARK: barkcloud.identity.IdentityApi (server)
@@ -256,7 +256,7 @@ extension Barkcloud_Identity_IdentityApi {
     ///
     /// Where possible, prefer using the stricter, less-verbose ``ServiceProtocol``
     /// or ``SimpleServiceProtocol`` instead.
-    internal protocol StreamingServiceProtocol: GRPCCore.RegistrableRPCService {
+    public protocol StreamingServiceProtocol: GRPCCore.RegistrableRPCService {
         /// Handle the "Auth" method.
         ///
         /// > Source IDL Documentation:
@@ -535,7 +535,7 @@ extension Barkcloud_Identity_IdentityApi {
     /// trailing response metadata. If you don't need these then consider using
     /// the ``SimpleServiceProtocol``. If you need fine grained control over your RPCs then
     /// use ``StreamingServiceProtocol``.
-    internal protocol ServiceProtocol: Barkcloud_Identity_IdentityApi.StreamingServiceProtocol {
+    public protocol ServiceProtocol: Barkcloud_Identity_IdentityApi.StreamingServiceProtocol {
         /// Handle the "Auth" method.
         ///
         /// > Source IDL Documentation:
@@ -812,7 +812,7 @@ extension Barkcloud_Identity_IdentityApi {
     /// This is the highest level protocol for the service. The API is the easiest to use but
     /// doesn't provide access to request or response metadata. If you need access to these
     /// then use ``ServiceProtocol`` instead.
-    internal protocol SimpleServiceProtocol: Barkcloud_Identity_IdentityApi.ServiceProtocol {
+    public protocol SimpleServiceProtocol: Barkcloud_Identity_IdentityApi.ServiceProtocol {
         /// Handle the "Auth" method.
         ///
         /// > Source IDL Documentation:
@@ -1088,7 +1088,7 @@ extension Barkcloud_Identity_IdentityApi {
 // Default implementation of 'registerMethods(with:)'.
 @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
 extension Barkcloud_Identity_IdentityApi.StreamingServiceProtocol {
-    internal func registerMethods<Transport>(with router: inout GRPCCore.RPCRouter<Transport>) where Transport: GRPCCore.ServerTransport {
+    public func registerMethods<Transport>(with router: inout GRPCCore.RPCRouter<Transport>) where Transport: GRPCCore.ServerTransport {
         router.registerHandler(
             forMethod: Barkcloud_Identity_IdentityApi.Method.Auth.descriptor,
             deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Identity_AuthRequest>(),
@@ -1260,7 +1260,7 @@ extension Barkcloud_Identity_IdentityApi.StreamingServiceProtocol {
 // Default implementation of streaming methods from 'StreamingServiceProtocol'.
 @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
 extension Barkcloud_Identity_IdentityApi.ServiceProtocol {
-    internal func auth(
+    public func auth(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Identity_AuthRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Identity_AuthResponse> {
@@ -1271,7 +1271,7 @@ extension Barkcloud_Identity_IdentityApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func fastAuth(
+    public func fastAuth(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Identity_FastAuthRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Identity_AuthResponse> {
@@ -1282,7 +1282,7 @@ extension Barkcloud_Identity_IdentityApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func createToken(
+    public func createToken(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Identity_CreateTokenRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Identity_CreateTokenResponse> {
@@ -1293,7 +1293,7 @@ extension Barkcloud_Identity_IdentityApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func createAccount(
+    public func createAccount(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Identity_CreateAccountRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Identity_CreateAccountResponse> {
@@ -1304,7 +1304,7 @@ extension Barkcloud_Identity_IdentityApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func confirmAccount(
+    public func confirmAccount(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Identity_ConfirmAccountRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Identity_ConfirmAccountResponse> {
@@ -1315,7 +1315,7 @@ extension Barkcloud_Identity_IdentityApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func getActiveSessions(
+    public func getActiveSessions(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Identity_GetActiveSessionsRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Identity_GetActiveSessionsResponse> {
@@ -1326,7 +1326,7 @@ extension Barkcloud_Identity_IdentityApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func removeActiveSession(
+    public func removeActiveSession(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Identity_RemoveActiveSessionRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Identity_RemoveActiveSessionResponse> {
@@ -1337,7 +1337,7 @@ extension Barkcloud_Identity_IdentityApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func enableOtpVerification(
+    public func enableOtpVerification(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Identity_EnableOtpVerificationRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Identity_EnableOtpVerificationResponse> {
@@ -1348,7 +1348,7 @@ extension Barkcloud_Identity_IdentityApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func confirmOtpVerification(
+    public func confirmOtpVerification(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Identity_ConfirmOtpVerificationRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Identity_ConfirmOtpVerificationResponse> {
@@ -1359,7 +1359,7 @@ extension Barkcloud_Identity_IdentityApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func disableOtpVerification(
+    public func disableOtpVerification(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Identity_DisableOtpVerificationRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Identity_DisableOtpVerificationResponse> {
@@ -1370,7 +1370,7 @@ extension Barkcloud_Identity_IdentityApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func listOtpVerification(
+    public func listOtpVerification(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Identity_ListOtpVerificationRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Identity_ListOtpVerificationResponse> {
@@ -1381,7 +1381,7 @@ extension Barkcloud_Identity_IdentityApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func resetPassword(
+    public func resetPassword(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Identity_ResetPasswordRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Identity_ResetPasswordResponse> {
@@ -1392,7 +1392,7 @@ extension Barkcloud_Identity_IdentityApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func confirmResetPassword(
+    public func confirmResetPassword(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Identity_ConfirmResetPasswordRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Identity_ConfirmResetPasswordResponse> {
@@ -1403,7 +1403,7 @@ extension Barkcloud_Identity_IdentityApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func setPassword(
+    public func setPassword(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Identity_SetPasswordRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Identity_SetPasswordResponse> {
@@ -1414,7 +1414,7 @@ extension Barkcloud_Identity_IdentityApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func logout(
+    public func logout(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Identity_LogoutRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Identity_LogoutResponse> {
@@ -1429,7 +1429,7 @@ extension Barkcloud_Identity_IdentityApi.ServiceProtocol {
 // Default implementation of methods from 'ServiceProtocol'.
 @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
 extension Barkcloud_Identity_IdentityApi.SimpleServiceProtocol {
-    internal func auth(
+    public func auth(
         request: GRPCCore.ServerRequest<Barkcloud_Identity_AuthRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Identity_AuthResponse> {
@@ -1442,7 +1442,7 @@ extension Barkcloud_Identity_IdentityApi.SimpleServiceProtocol {
         )
     }
 
-    internal func fastAuth(
+    public func fastAuth(
         request: GRPCCore.ServerRequest<Barkcloud_Identity_FastAuthRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Identity_AuthResponse> {
@@ -1455,7 +1455,7 @@ extension Barkcloud_Identity_IdentityApi.SimpleServiceProtocol {
         )
     }
 
-    internal func createToken(
+    public func createToken(
         request: GRPCCore.ServerRequest<Barkcloud_Identity_CreateTokenRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Identity_CreateTokenResponse> {
@@ -1468,7 +1468,7 @@ extension Barkcloud_Identity_IdentityApi.SimpleServiceProtocol {
         )
     }
 
-    internal func createAccount(
+    public func createAccount(
         request: GRPCCore.ServerRequest<Barkcloud_Identity_CreateAccountRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Identity_CreateAccountResponse> {
@@ -1481,7 +1481,7 @@ extension Barkcloud_Identity_IdentityApi.SimpleServiceProtocol {
         )
     }
 
-    internal func confirmAccount(
+    public func confirmAccount(
         request: GRPCCore.ServerRequest<Barkcloud_Identity_ConfirmAccountRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Identity_ConfirmAccountResponse> {
@@ -1494,7 +1494,7 @@ extension Barkcloud_Identity_IdentityApi.SimpleServiceProtocol {
         )
     }
 
-    internal func getActiveSessions(
+    public func getActiveSessions(
         request: GRPCCore.ServerRequest<Barkcloud_Identity_GetActiveSessionsRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Identity_GetActiveSessionsResponse> {
@@ -1507,7 +1507,7 @@ extension Barkcloud_Identity_IdentityApi.SimpleServiceProtocol {
         )
     }
 
-    internal func removeActiveSession(
+    public func removeActiveSession(
         request: GRPCCore.ServerRequest<Barkcloud_Identity_RemoveActiveSessionRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Identity_RemoveActiveSessionResponse> {
@@ -1520,7 +1520,7 @@ extension Barkcloud_Identity_IdentityApi.SimpleServiceProtocol {
         )
     }
 
-    internal func enableOtpVerification(
+    public func enableOtpVerification(
         request: GRPCCore.ServerRequest<Barkcloud_Identity_EnableOtpVerificationRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Identity_EnableOtpVerificationResponse> {
@@ -1533,7 +1533,7 @@ extension Barkcloud_Identity_IdentityApi.SimpleServiceProtocol {
         )
     }
 
-    internal func confirmOtpVerification(
+    public func confirmOtpVerification(
         request: GRPCCore.ServerRequest<Barkcloud_Identity_ConfirmOtpVerificationRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Identity_ConfirmOtpVerificationResponse> {
@@ -1546,7 +1546,7 @@ extension Barkcloud_Identity_IdentityApi.SimpleServiceProtocol {
         )
     }
 
-    internal func disableOtpVerification(
+    public func disableOtpVerification(
         request: GRPCCore.ServerRequest<Barkcloud_Identity_DisableOtpVerificationRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Identity_DisableOtpVerificationResponse> {
@@ -1559,7 +1559,7 @@ extension Barkcloud_Identity_IdentityApi.SimpleServiceProtocol {
         )
     }
 
-    internal func listOtpVerification(
+    public func listOtpVerification(
         request: GRPCCore.ServerRequest<Barkcloud_Identity_ListOtpVerificationRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Identity_ListOtpVerificationResponse> {
@@ -1572,7 +1572,7 @@ extension Barkcloud_Identity_IdentityApi.SimpleServiceProtocol {
         )
     }
 
-    internal func resetPassword(
+    public func resetPassword(
         request: GRPCCore.ServerRequest<Barkcloud_Identity_ResetPasswordRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Identity_ResetPasswordResponse> {
@@ -1585,7 +1585,7 @@ extension Barkcloud_Identity_IdentityApi.SimpleServiceProtocol {
         )
     }
 
-    internal func confirmResetPassword(
+    public func confirmResetPassword(
         request: GRPCCore.ServerRequest<Barkcloud_Identity_ConfirmResetPasswordRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Identity_ConfirmResetPasswordResponse> {
@@ -1598,7 +1598,7 @@ extension Barkcloud_Identity_IdentityApi.SimpleServiceProtocol {
         )
     }
 
-    internal func setPassword(
+    public func setPassword(
         request: GRPCCore.ServerRequest<Barkcloud_Identity_SetPasswordRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Identity_SetPasswordResponse> {
@@ -1611,7 +1611,7 @@ extension Barkcloud_Identity_IdentityApi.SimpleServiceProtocol {
         )
     }
 
-    internal func logout(
+    public func logout(
         request: GRPCCore.ServerRequest<Barkcloud_Identity_LogoutRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Identity_LogoutResponse> {
@@ -1633,7 +1633,7 @@ extension Barkcloud_Identity_IdentityApi {
     ///
     /// You don't need to implement this protocol directly, use the generated
     /// implementation, ``Client``.
-    internal protocol ClientProtocol: Sendable {
+    public protocol ClientProtocol: Sendable {
         /// Call the "Auth" method.
         ///
         /// > Source IDL Documentation:
@@ -1985,14 +1985,14 @@ extension Barkcloud_Identity_IdentityApi {
     /// The ``Client`` provides an implementation of ``ClientProtocol`` which wraps
     /// a `GRPCCore.GRPCCClient`. The underlying `GRPCClient` provides the long-lived
     /// means of communication with the remote peer.
-    internal struct Client<Transport>: ClientProtocol where Transport: GRPCCore.ClientTransport {
+    public struct Client<Transport>: ClientProtocol where Transport: GRPCCore.ClientTransport {
         private let client: GRPCCore.GRPCClient<Transport>
 
         /// Creates a new client wrapping the provided `GRPCCore.GRPCClient`.
         ///
         /// - Parameters:
         ///   - client: A `GRPCCore.GRPCClient` providing a communication channel to the service.
-        internal init(wrapping client: GRPCCore.GRPCClient<Transport>) {
+        public init(wrapping client: GRPCCore.GRPCClient<Transport>) {
             self.client = client
         }
 
@@ -2011,7 +2011,7 @@ extension Barkcloud_Identity_IdentityApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func auth<Result>(
+        public func auth<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Identity_AuthRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Identity_AuthRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Identity_AuthResponse>,
@@ -2045,7 +2045,7 @@ extension Barkcloud_Identity_IdentityApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func fastAuth<Result>(
+        public func fastAuth<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Identity_FastAuthRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Identity_FastAuthRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Identity_AuthResponse>,
@@ -2079,7 +2079,7 @@ extension Barkcloud_Identity_IdentityApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func createToken<Result>(
+        public func createToken<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Identity_CreateTokenRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Identity_CreateTokenRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Identity_CreateTokenResponse>,
@@ -2113,7 +2113,7 @@ extension Barkcloud_Identity_IdentityApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func createAccount<Result>(
+        public func createAccount<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Identity_CreateAccountRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Identity_CreateAccountRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Identity_CreateAccountResponse>,
@@ -2147,7 +2147,7 @@ extension Barkcloud_Identity_IdentityApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func confirmAccount<Result>(
+        public func confirmAccount<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Identity_ConfirmAccountRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Identity_ConfirmAccountRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Identity_ConfirmAccountResponse>,
@@ -2181,7 +2181,7 @@ extension Barkcloud_Identity_IdentityApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func getActiveSessions<Result>(
+        public func getActiveSessions<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Identity_GetActiveSessionsRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Identity_GetActiveSessionsRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Identity_GetActiveSessionsResponse>,
@@ -2215,7 +2215,7 @@ extension Barkcloud_Identity_IdentityApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func removeActiveSession<Result>(
+        public func removeActiveSession<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Identity_RemoveActiveSessionRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Identity_RemoveActiveSessionRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Identity_RemoveActiveSessionResponse>,
@@ -2249,7 +2249,7 @@ extension Barkcloud_Identity_IdentityApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func enableOtpVerification<Result>(
+        public func enableOtpVerification<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Identity_EnableOtpVerificationRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Identity_EnableOtpVerificationRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Identity_EnableOtpVerificationResponse>,
@@ -2283,7 +2283,7 @@ extension Barkcloud_Identity_IdentityApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func confirmOtpVerification<Result>(
+        public func confirmOtpVerification<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Identity_ConfirmOtpVerificationRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Identity_ConfirmOtpVerificationRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Identity_ConfirmOtpVerificationResponse>,
@@ -2317,7 +2317,7 @@ extension Barkcloud_Identity_IdentityApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func disableOtpVerification<Result>(
+        public func disableOtpVerification<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Identity_DisableOtpVerificationRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Identity_DisableOtpVerificationRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Identity_DisableOtpVerificationResponse>,
@@ -2351,7 +2351,7 @@ extension Barkcloud_Identity_IdentityApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func listOtpVerification<Result>(
+        public func listOtpVerification<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Identity_ListOtpVerificationRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Identity_ListOtpVerificationRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Identity_ListOtpVerificationResponse>,
@@ -2385,7 +2385,7 @@ extension Barkcloud_Identity_IdentityApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func resetPassword<Result>(
+        public func resetPassword<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Identity_ResetPasswordRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Identity_ResetPasswordRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Identity_ResetPasswordResponse>,
@@ -2419,7 +2419,7 @@ extension Barkcloud_Identity_IdentityApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func confirmResetPassword<Result>(
+        public func confirmResetPassword<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Identity_ConfirmResetPasswordRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Identity_ConfirmResetPasswordRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Identity_ConfirmResetPasswordResponse>,
@@ -2453,7 +2453,7 @@ extension Barkcloud_Identity_IdentityApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func setPassword<Result>(
+        public func setPassword<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Identity_SetPasswordRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Identity_SetPasswordRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Identity_SetPasswordResponse>,
@@ -2487,7 +2487,7 @@ extension Barkcloud_Identity_IdentityApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func logout<Result>(
+        public func logout<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Identity_LogoutRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Identity_LogoutRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Identity_LogoutResponse>,
@@ -2524,7 +2524,7 @@ extension Barkcloud_Identity_IdentityApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func auth<Result>(
+    public func auth<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Identity_AuthRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Identity_AuthResponse>) async throws -> Result = { response in
@@ -2553,7 +2553,7 @@ extension Barkcloud_Identity_IdentityApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func fastAuth<Result>(
+    public func fastAuth<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Identity_FastAuthRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Identity_AuthResponse>) async throws -> Result = { response in
@@ -2582,7 +2582,7 @@ extension Barkcloud_Identity_IdentityApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func createToken<Result>(
+    public func createToken<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Identity_CreateTokenRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Identity_CreateTokenResponse>) async throws -> Result = { response in
@@ -2611,7 +2611,7 @@ extension Barkcloud_Identity_IdentityApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func createAccount<Result>(
+    public func createAccount<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Identity_CreateAccountRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Identity_CreateAccountResponse>) async throws -> Result = { response in
@@ -2640,7 +2640,7 @@ extension Barkcloud_Identity_IdentityApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func confirmAccount<Result>(
+    public func confirmAccount<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Identity_ConfirmAccountRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Identity_ConfirmAccountResponse>) async throws -> Result = { response in
@@ -2669,7 +2669,7 @@ extension Barkcloud_Identity_IdentityApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func getActiveSessions<Result>(
+    public func getActiveSessions<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Identity_GetActiveSessionsRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Identity_GetActiveSessionsResponse>) async throws -> Result = { response in
@@ -2698,7 +2698,7 @@ extension Barkcloud_Identity_IdentityApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func removeActiveSession<Result>(
+    public func removeActiveSession<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Identity_RemoveActiveSessionRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Identity_RemoveActiveSessionResponse>) async throws -> Result = { response in
@@ -2727,7 +2727,7 @@ extension Barkcloud_Identity_IdentityApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func enableOtpVerification<Result>(
+    public func enableOtpVerification<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Identity_EnableOtpVerificationRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Identity_EnableOtpVerificationResponse>) async throws -> Result = { response in
@@ -2756,7 +2756,7 @@ extension Barkcloud_Identity_IdentityApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func confirmOtpVerification<Result>(
+    public func confirmOtpVerification<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Identity_ConfirmOtpVerificationRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Identity_ConfirmOtpVerificationResponse>) async throws -> Result = { response in
@@ -2785,7 +2785,7 @@ extension Barkcloud_Identity_IdentityApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func disableOtpVerification<Result>(
+    public func disableOtpVerification<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Identity_DisableOtpVerificationRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Identity_DisableOtpVerificationResponse>) async throws -> Result = { response in
@@ -2814,7 +2814,7 @@ extension Barkcloud_Identity_IdentityApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func listOtpVerification<Result>(
+    public func listOtpVerification<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Identity_ListOtpVerificationRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Identity_ListOtpVerificationResponse>) async throws -> Result = { response in
@@ -2843,7 +2843,7 @@ extension Barkcloud_Identity_IdentityApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func resetPassword<Result>(
+    public func resetPassword<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Identity_ResetPasswordRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Identity_ResetPasswordResponse>) async throws -> Result = { response in
@@ -2872,7 +2872,7 @@ extension Barkcloud_Identity_IdentityApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func confirmResetPassword<Result>(
+    public func confirmResetPassword<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Identity_ConfirmResetPasswordRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Identity_ConfirmResetPasswordResponse>) async throws -> Result = { response in
@@ -2901,7 +2901,7 @@ extension Barkcloud_Identity_IdentityApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func setPassword<Result>(
+    public func setPassword<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Identity_SetPasswordRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Identity_SetPasswordResponse>) async throws -> Result = { response in
@@ -2930,7 +2930,7 @@ extension Barkcloud_Identity_IdentityApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func logout<Result>(
+    public func logout<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Identity_LogoutRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Identity_LogoutResponse>) async throws -> Result = { response in
@@ -2964,7 +2964,7 @@ extension Barkcloud_Identity_IdentityApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func auth<Result>(
+    public func auth<Result>(
         _ message: Barkcloud_Identity_AuthRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -2997,7 +2997,7 @@ extension Barkcloud_Identity_IdentityApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func fastAuth<Result>(
+    public func fastAuth<Result>(
         _ message: Barkcloud_Identity_FastAuthRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -3030,7 +3030,7 @@ extension Barkcloud_Identity_IdentityApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func createToken<Result>(
+    public func createToken<Result>(
         _ message: Barkcloud_Identity_CreateTokenRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -3063,7 +3063,7 @@ extension Barkcloud_Identity_IdentityApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func createAccount<Result>(
+    public func createAccount<Result>(
         _ message: Barkcloud_Identity_CreateAccountRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -3096,7 +3096,7 @@ extension Barkcloud_Identity_IdentityApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func confirmAccount<Result>(
+    public func confirmAccount<Result>(
         _ message: Barkcloud_Identity_ConfirmAccountRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -3129,7 +3129,7 @@ extension Barkcloud_Identity_IdentityApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func getActiveSessions<Result>(
+    public func getActiveSessions<Result>(
         _ message: Barkcloud_Identity_GetActiveSessionsRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -3162,7 +3162,7 @@ extension Barkcloud_Identity_IdentityApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func removeActiveSession<Result>(
+    public func removeActiveSession<Result>(
         _ message: Barkcloud_Identity_RemoveActiveSessionRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -3195,7 +3195,7 @@ extension Barkcloud_Identity_IdentityApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func enableOtpVerification<Result>(
+    public func enableOtpVerification<Result>(
         _ message: Barkcloud_Identity_EnableOtpVerificationRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -3228,7 +3228,7 @@ extension Barkcloud_Identity_IdentityApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func confirmOtpVerification<Result>(
+    public func confirmOtpVerification<Result>(
         _ message: Barkcloud_Identity_ConfirmOtpVerificationRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -3261,7 +3261,7 @@ extension Barkcloud_Identity_IdentityApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func disableOtpVerification<Result>(
+    public func disableOtpVerification<Result>(
         _ message: Barkcloud_Identity_DisableOtpVerificationRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -3294,7 +3294,7 @@ extension Barkcloud_Identity_IdentityApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func listOtpVerification<Result>(
+    public func listOtpVerification<Result>(
         _ message: Barkcloud_Identity_ListOtpVerificationRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -3327,7 +3327,7 @@ extension Barkcloud_Identity_IdentityApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func resetPassword<Result>(
+    public func resetPassword<Result>(
         _ message: Barkcloud_Identity_ResetPasswordRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -3360,7 +3360,7 @@ extension Barkcloud_Identity_IdentityApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func confirmResetPassword<Result>(
+    public func confirmResetPassword<Result>(
         _ message: Barkcloud_Identity_ConfirmResetPasswordRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -3393,7 +3393,7 @@ extension Barkcloud_Identity_IdentityApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func setPassword<Result>(
+    public func setPassword<Result>(
         _ message: Barkcloud_Identity_SetPasswordRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -3426,7 +3426,7 @@ extension Barkcloud_Identity_IdentityApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func logout<Result>(
+    public func logout<Result>(
         _ message: Barkcloud_Identity_LogoutRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -3450,91 +3450,91 @@ extension Barkcloud_Identity_IdentityApi.ClientProtocol {
 
 /// Namespace containing generated types for the "barkcloud.identity.IdentityServerApi" service.
 @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
-internal enum Barkcloud_Identity_IdentityServerApi: Sendable {
+public enum Barkcloud_Identity_IdentityServerApi: Sendable {
     /// Service descriptor for the "barkcloud.identity.IdentityServerApi" service.
-    internal static let descriptor = GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.identity.IdentityServerApi")
+    public static let descriptor = GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.identity.IdentityServerApi")
     /// Namespace for method metadata.
-    internal enum Method: Sendable {
+    public enum Method: Sendable {
         /// Namespace for "ListOtpVerificationServer" metadata.
-        internal enum ListOtpVerificationServer: Sendable {
+        public enum ListOtpVerificationServer: Sendable {
             /// Request type for "ListOtpVerificationServer".
-            internal typealias Input = Barkcloud_Identity_ListOtpVerificationServerRequest
+            public typealias Input = Barkcloud_Identity_ListOtpVerificationServerRequest
             /// Response type for "ListOtpVerificationServer".
-            internal typealias Output = Barkcloud_Identity_ListOtpVerificationResponse
+            public typealias Output = Barkcloud_Identity_ListOtpVerificationResponse
             /// Descriptor for "ListOtpVerificationServer".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.identity.IdentityServerApi"),
                 method: "ListOtpVerificationServer",
                 type: .unary
             )
         }
         /// Namespace for "DisableOtpVerificationServer" metadata.
-        internal enum DisableOtpVerificationServer: Sendable {
+        public enum DisableOtpVerificationServer: Sendable {
             /// Request type for "DisableOtpVerificationServer".
-            internal typealias Input = Barkcloud_Identity_DisableOtpVerificationServerRequest
+            public typealias Input = Barkcloud_Identity_DisableOtpVerificationServerRequest
             /// Response type for "DisableOtpVerificationServer".
-            internal typealias Output = Barkcloud_Identity_DisableOtpVerificationResponse
+            public typealias Output = Barkcloud_Identity_DisableOtpVerificationResponse
             /// Descriptor for "DisableOtpVerificationServer".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.identity.IdentityServerApi"),
                 method: "DisableOtpVerificationServer",
                 type: .unary
             )
         }
         /// Namespace for "GetActiveSessionsServer" metadata.
-        internal enum GetActiveSessionsServer: Sendable {
+        public enum GetActiveSessionsServer: Sendable {
             /// Request type for "GetActiveSessionsServer".
-            internal typealias Input = Barkcloud_Identity_GetActiveSessionsServerRequest
+            public typealias Input = Barkcloud_Identity_GetActiveSessionsServerRequest
             /// Response type for "GetActiveSessionsServer".
-            internal typealias Output = Barkcloud_Identity_GetActiveSessionsResponse
+            public typealias Output = Barkcloud_Identity_GetActiveSessionsResponse
             /// Descriptor for "GetActiveSessionsServer".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.identity.IdentityServerApi"),
                 method: "GetActiveSessionsServer",
                 type: .unary
             )
         }
         /// Namespace for "RemoveActiveSessionServer" metadata.
-        internal enum RemoveActiveSessionServer: Sendable {
+        public enum RemoveActiveSessionServer: Sendable {
             /// Request type for "RemoveActiveSessionServer".
-            internal typealias Input = Barkcloud_Identity_RemoveActiveSessionServerRequest
+            public typealias Input = Barkcloud_Identity_RemoveActiveSessionServerRequest
             /// Response type for "RemoveActiveSessionServer".
-            internal typealias Output = Barkcloud_Identity_RemoveActiveSessionResponse
+            public typealias Output = Barkcloud_Identity_RemoveActiveSessionResponse
             /// Descriptor for "RemoveActiveSessionServer".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.identity.IdentityServerApi"),
                 method: "RemoveActiveSessionServer",
                 type: .unary
             )
         }
         /// Namespace for "CreateSessionForUserServer" metadata.
-        internal enum CreateSessionForUserServer: Sendable {
+        public enum CreateSessionForUserServer: Sendable {
             /// Request type for "CreateSessionForUserServer".
-            internal typealias Input = Barkcloud_Identity_CreateSessionForUserServerRequest
+            public typealias Input = Barkcloud_Identity_CreateSessionForUserServerRequest
             /// Response type for "CreateSessionForUserServer".
-            internal typealias Output = Barkcloud_Identity_CreateSessionForUserServerResponse
+            public typealias Output = Barkcloud_Identity_CreateSessionForUserServerResponse
             /// Descriptor for "CreateSessionForUserServer".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.identity.IdentityServerApi"),
                 method: "CreateSessionForUserServer",
                 type: .unary
             )
         }
         /// Namespace for "ForceSetPasswordServer" metadata.
-        internal enum ForceSetPasswordServer: Sendable {
+        public enum ForceSetPasswordServer: Sendable {
             /// Request type for "ForceSetPasswordServer".
-            internal typealias Input = Barkcloud_Identity_ForceSetPasswordServerRequest
+            public typealias Input = Barkcloud_Identity_ForceSetPasswordServerRequest
             /// Response type for "ForceSetPasswordServer".
-            internal typealias Output = Barkcloud_Identity_ForceSetPasswordServerResponse
+            public typealias Output = Barkcloud_Identity_ForceSetPasswordServerResponse
             /// Descriptor for "ForceSetPasswordServer".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.identity.IdentityServerApi"),
                 method: "ForceSetPasswordServer",
                 type: .unary
             )
         }
         /// Descriptors for all methods in the "barkcloud.identity.IdentityServerApi" service.
-        internal static let descriptors: [GRPCCore.MethodDescriptor] = [
+        public static let descriptors: [GRPCCore.MethodDescriptor] = [
             ListOtpVerificationServer.descriptor,
             DisableOtpVerificationServer.descriptor,
             GetActiveSessionsServer.descriptor,
@@ -3548,7 +3548,7 @@ internal enum Barkcloud_Identity_IdentityServerApi: Sendable {
 @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
 extension GRPCCore.ServiceDescriptor {
     /// Service descriptor for the "barkcloud.identity.IdentityServerApi" service.
-    internal static let barkcloud_identity_IdentityServerApi = GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.identity.IdentityServerApi")
+    public static let barkcloud_identity_IdentityServerApi = GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.identity.IdentityServerApi")
 }
 
 // MARK: barkcloud.identity.IdentityServerApi (server)
@@ -3569,7 +3569,7 @@ extension Barkcloud_Identity_IdentityServerApi {
     /// > Source IDL Documentation:
     /// >
     /// > Серверное API для админ-панели
-    internal protocol StreamingServiceProtocol: GRPCCore.RegistrableRPCService {
+    public protocol StreamingServiceProtocol: GRPCCore.RegistrableRPCService {
         /// Handle the "ListOtpVerificationServer" method.
         ///
         /// > Source IDL Documentation:
@@ -3692,7 +3692,7 @@ extension Barkcloud_Identity_IdentityServerApi {
     /// > Source IDL Documentation:
     /// >
     /// > Серверное API для админ-панели
-    internal protocol ServiceProtocol: Barkcloud_Identity_IdentityServerApi.StreamingServiceProtocol {
+    public protocol ServiceProtocol: Barkcloud_Identity_IdentityServerApi.StreamingServiceProtocol {
         /// Handle the "ListOtpVerificationServer" method.
         ///
         /// > Source IDL Documentation:
@@ -3813,7 +3813,7 @@ extension Barkcloud_Identity_IdentityServerApi {
     /// > Source IDL Documentation:
     /// >
     /// > Серверное API для админ-панели
-    internal protocol SimpleServiceProtocol: Barkcloud_Identity_IdentityServerApi.ServiceProtocol {
+    public protocol SimpleServiceProtocol: Barkcloud_Identity_IdentityServerApi.ServiceProtocol {
         /// Handle the "ListOtpVerificationServer" method.
         ///
         /// > Source IDL Documentation:
@@ -3929,7 +3929,7 @@ extension Barkcloud_Identity_IdentityServerApi {
 // Default implementation of 'registerMethods(with:)'.
 @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
 extension Barkcloud_Identity_IdentityServerApi.StreamingServiceProtocol {
-    internal func registerMethods<Transport>(with router: inout GRPCCore.RPCRouter<Transport>) where Transport: GRPCCore.ServerTransport {
+    public func registerMethods<Transport>(with router: inout GRPCCore.RPCRouter<Transport>) where Transport: GRPCCore.ServerTransport {
         router.registerHandler(
             forMethod: Barkcloud_Identity_IdentityServerApi.Method.ListOtpVerificationServer.descriptor,
             deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Identity_ListOtpVerificationServerRequest>(),
@@ -4002,7 +4002,7 @@ extension Barkcloud_Identity_IdentityServerApi.StreamingServiceProtocol {
 // Default implementation of streaming methods from 'StreamingServiceProtocol'.
 @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
 extension Barkcloud_Identity_IdentityServerApi.ServiceProtocol {
-    internal func listOtpVerificationServer(
+    public func listOtpVerificationServer(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Identity_ListOtpVerificationServerRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Identity_ListOtpVerificationResponse> {
@@ -4013,7 +4013,7 @@ extension Barkcloud_Identity_IdentityServerApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func disableOtpVerificationServer(
+    public func disableOtpVerificationServer(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Identity_DisableOtpVerificationServerRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Identity_DisableOtpVerificationResponse> {
@@ -4024,7 +4024,7 @@ extension Barkcloud_Identity_IdentityServerApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func getActiveSessionsServer(
+    public func getActiveSessionsServer(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Identity_GetActiveSessionsServerRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Identity_GetActiveSessionsResponse> {
@@ -4035,7 +4035,7 @@ extension Barkcloud_Identity_IdentityServerApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func removeActiveSessionServer(
+    public func removeActiveSessionServer(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Identity_RemoveActiveSessionServerRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Identity_RemoveActiveSessionResponse> {
@@ -4046,7 +4046,7 @@ extension Barkcloud_Identity_IdentityServerApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func createSessionForUserServer(
+    public func createSessionForUserServer(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Identity_CreateSessionForUserServerRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Identity_CreateSessionForUserServerResponse> {
@@ -4057,7 +4057,7 @@ extension Barkcloud_Identity_IdentityServerApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func forceSetPasswordServer(
+    public func forceSetPasswordServer(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Identity_ForceSetPasswordServerRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Identity_ForceSetPasswordServerResponse> {
@@ -4072,7 +4072,7 @@ extension Barkcloud_Identity_IdentityServerApi.ServiceProtocol {
 // Default implementation of methods from 'ServiceProtocol'.
 @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
 extension Barkcloud_Identity_IdentityServerApi.SimpleServiceProtocol {
-    internal func listOtpVerificationServer(
+    public func listOtpVerificationServer(
         request: GRPCCore.ServerRequest<Barkcloud_Identity_ListOtpVerificationServerRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Identity_ListOtpVerificationResponse> {
@@ -4085,7 +4085,7 @@ extension Barkcloud_Identity_IdentityServerApi.SimpleServiceProtocol {
         )
     }
 
-    internal func disableOtpVerificationServer(
+    public func disableOtpVerificationServer(
         request: GRPCCore.ServerRequest<Barkcloud_Identity_DisableOtpVerificationServerRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Identity_DisableOtpVerificationResponse> {
@@ -4098,7 +4098,7 @@ extension Barkcloud_Identity_IdentityServerApi.SimpleServiceProtocol {
         )
     }
 
-    internal func getActiveSessionsServer(
+    public func getActiveSessionsServer(
         request: GRPCCore.ServerRequest<Barkcloud_Identity_GetActiveSessionsServerRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Identity_GetActiveSessionsResponse> {
@@ -4111,7 +4111,7 @@ extension Barkcloud_Identity_IdentityServerApi.SimpleServiceProtocol {
         )
     }
 
-    internal func removeActiveSessionServer(
+    public func removeActiveSessionServer(
         request: GRPCCore.ServerRequest<Barkcloud_Identity_RemoveActiveSessionServerRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Identity_RemoveActiveSessionResponse> {
@@ -4124,7 +4124,7 @@ extension Barkcloud_Identity_IdentityServerApi.SimpleServiceProtocol {
         )
     }
 
-    internal func createSessionForUserServer(
+    public func createSessionForUserServer(
         request: GRPCCore.ServerRequest<Barkcloud_Identity_CreateSessionForUserServerRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Identity_CreateSessionForUserServerResponse> {
@@ -4137,7 +4137,7 @@ extension Barkcloud_Identity_IdentityServerApi.SimpleServiceProtocol {
         )
     }
 
-    internal func forceSetPasswordServer(
+    public func forceSetPasswordServer(
         request: GRPCCore.ServerRequest<Barkcloud_Identity_ForceSetPasswordServerRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Identity_ForceSetPasswordServerResponse> {
@@ -4163,7 +4163,7 @@ extension Barkcloud_Identity_IdentityServerApi {
     /// > Source IDL Documentation:
     /// >
     /// > Серверное API для админ-панели
-    internal protocol ClientProtocol: Sendable {
+    public protocol ClientProtocol: Sendable {
         /// Call the "ListOtpVerificationServer" method.
         ///
         /// > Source IDL Documentation:
@@ -4314,14 +4314,14 @@ extension Barkcloud_Identity_IdentityServerApi {
     /// > Source IDL Documentation:
     /// >
     /// > Серверное API для админ-панели
-    internal struct Client<Transport>: ClientProtocol where Transport: GRPCCore.ClientTransport {
+    public struct Client<Transport>: ClientProtocol where Transport: GRPCCore.ClientTransport {
         private let client: GRPCCore.GRPCClient<Transport>
 
         /// Creates a new client wrapping the provided `GRPCCore.GRPCClient`.
         ///
         /// - Parameters:
         ///   - client: A `GRPCCore.GRPCClient` providing a communication channel to the service.
-        internal init(wrapping client: GRPCCore.GRPCClient<Transport>) {
+        public init(wrapping client: GRPCCore.GRPCClient<Transport>) {
             self.client = client
         }
 
@@ -4340,7 +4340,7 @@ extension Barkcloud_Identity_IdentityServerApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func listOtpVerificationServer<Result>(
+        public func listOtpVerificationServer<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Identity_ListOtpVerificationServerRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Identity_ListOtpVerificationServerRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Identity_ListOtpVerificationResponse>,
@@ -4374,7 +4374,7 @@ extension Barkcloud_Identity_IdentityServerApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func disableOtpVerificationServer<Result>(
+        public func disableOtpVerificationServer<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Identity_DisableOtpVerificationServerRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Identity_DisableOtpVerificationServerRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Identity_DisableOtpVerificationResponse>,
@@ -4408,7 +4408,7 @@ extension Barkcloud_Identity_IdentityServerApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func getActiveSessionsServer<Result>(
+        public func getActiveSessionsServer<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Identity_GetActiveSessionsServerRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Identity_GetActiveSessionsServerRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Identity_GetActiveSessionsResponse>,
@@ -4442,7 +4442,7 @@ extension Barkcloud_Identity_IdentityServerApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func removeActiveSessionServer<Result>(
+        public func removeActiveSessionServer<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Identity_RemoveActiveSessionServerRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Identity_RemoveActiveSessionServerRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Identity_RemoveActiveSessionResponse>,
@@ -4477,7 +4477,7 @@ extension Barkcloud_Identity_IdentityServerApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func createSessionForUserServer<Result>(
+        public func createSessionForUserServer<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Identity_CreateSessionForUserServerRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Identity_CreateSessionForUserServerRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Identity_CreateSessionForUserServerResponse>,
@@ -4512,7 +4512,7 @@ extension Barkcloud_Identity_IdentityServerApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func forceSetPasswordServer<Result>(
+        public func forceSetPasswordServer<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Identity_ForceSetPasswordServerRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Identity_ForceSetPasswordServerRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Identity_ForceSetPasswordServerResponse>,
@@ -4549,7 +4549,7 @@ extension Barkcloud_Identity_IdentityServerApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func listOtpVerificationServer<Result>(
+    public func listOtpVerificationServer<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Identity_ListOtpVerificationServerRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Identity_ListOtpVerificationResponse>) async throws -> Result = { response in
@@ -4578,7 +4578,7 @@ extension Barkcloud_Identity_IdentityServerApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func disableOtpVerificationServer<Result>(
+    public func disableOtpVerificationServer<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Identity_DisableOtpVerificationServerRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Identity_DisableOtpVerificationResponse>) async throws -> Result = { response in
@@ -4607,7 +4607,7 @@ extension Barkcloud_Identity_IdentityServerApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func getActiveSessionsServer<Result>(
+    public func getActiveSessionsServer<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Identity_GetActiveSessionsServerRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Identity_GetActiveSessionsResponse>) async throws -> Result = { response in
@@ -4636,7 +4636,7 @@ extension Barkcloud_Identity_IdentityServerApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func removeActiveSessionServer<Result>(
+    public func removeActiveSessionServer<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Identity_RemoveActiveSessionServerRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Identity_RemoveActiveSessionResponse>) async throws -> Result = { response in
@@ -4666,7 +4666,7 @@ extension Barkcloud_Identity_IdentityServerApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func createSessionForUserServer<Result>(
+    public func createSessionForUserServer<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Identity_CreateSessionForUserServerRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Identity_CreateSessionForUserServerResponse>) async throws -> Result = { response in
@@ -4696,7 +4696,7 @@ extension Barkcloud_Identity_IdentityServerApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func forceSetPasswordServer<Result>(
+    public func forceSetPasswordServer<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Identity_ForceSetPasswordServerRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Identity_ForceSetPasswordServerResponse>) async throws -> Result = { response in
@@ -4730,7 +4730,7 @@ extension Barkcloud_Identity_IdentityServerApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func listOtpVerificationServer<Result>(
+    public func listOtpVerificationServer<Result>(
         _ message: Barkcloud_Identity_ListOtpVerificationServerRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -4763,7 +4763,7 @@ extension Barkcloud_Identity_IdentityServerApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func disableOtpVerificationServer<Result>(
+    public func disableOtpVerificationServer<Result>(
         _ message: Barkcloud_Identity_DisableOtpVerificationServerRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -4796,7 +4796,7 @@ extension Barkcloud_Identity_IdentityServerApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func getActiveSessionsServer<Result>(
+    public func getActiveSessionsServer<Result>(
         _ message: Barkcloud_Identity_GetActiveSessionsServerRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -4829,7 +4829,7 @@ extension Barkcloud_Identity_IdentityServerApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func removeActiveSessionServer<Result>(
+    public func removeActiveSessionServer<Result>(
         _ message: Barkcloud_Identity_RemoveActiveSessionServerRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -4863,7 +4863,7 @@ extension Barkcloud_Identity_IdentityServerApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func createSessionForUserServer<Result>(
+    public func createSessionForUserServer<Result>(
         _ message: Barkcloud_Identity_CreateSessionForUserServerRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -4897,7 +4897,7 @@ extension Barkcloud_Identity_IdentityServerApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func forceSetPasswordServer<Result>(
+    public func forceSetPasswordServer<Result>(
         _ message: Barkcloud_Identity_ForceSetPasswordServerRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,

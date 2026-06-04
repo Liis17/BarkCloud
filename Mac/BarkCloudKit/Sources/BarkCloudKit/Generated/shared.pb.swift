@@ -21,20 +21,20 @@ fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAP
 }
 
 /// Запрос постраничной выборки. Используется во всех list-RPC.
-struct Barkcloud_Shared_PageRequest: Sendable {
+public struct Barkcloud_Shared_PageRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// Количество элементов для пропуска
-  var offset: Int32 = 0
+  public var offset: Int32 = 0
 
   /// Размер элементов на странице
-  var size: Int32 = 0
+  public var size: Int32 = 0
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
@@ -42,10 +42,10 @@ struct Barkcloud_Shared_PageRequest: Sendable {
 fileprivate let _protobuf_package = "barkcloud.shared"
 
 extension Barkcloud_Shared_PageRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".PageRequest"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}offset\0\u{1}size\0")
+  public static let protoMessageName: String = _protobuf_package + ".PageRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}offset\0\u{1}size\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -58,7 +58,7 @@ extension Barkcloud_Shared_PageRequest: SwiftProtobuf.Message, SwiftProtobuf._Me
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if self.offset != 0 {
       try visitor.visitSingularInt32Field(value: self.offset, fieldNumber: 1)
     }
@@ -68,7 +68,7 @@ extension Barkcloud_Shared_PageRequest: SwiftProtobuf.Message, SwiftProtobuf._Me
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Shared_PageRequest, rhs: Barkcloud_Shared_PageRequest) -> Bool {
+  public static func ==(lhs: Barkcloud_Shared_PageRequest, rhs: Barkcloud_Shared_PageRequest) -> Bool {
     if lhs.offset != rhs.offset {return false}
     if lhs.size != rhs.size {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}

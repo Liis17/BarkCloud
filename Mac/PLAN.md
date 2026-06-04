@@ -14,6 +14,14 @@
 
 ## Этап 0 — Общий пакет `BarkCloudKit` + миграция iOS
 
+> **СТАТУС: ВЫПОЛНЕН** (ветка `claude/mac-virtual-disk-display-S8lTc`). Сетевой слой перенесён
+> в пакет, API сделан `public`, добавлены macOS-ветки (`XDeviceInterceptor`/`XOsInterceptor`,
+> `BarkCloudAppGroup`), iOS переведён на `import BarkCloudKit`. `swift build` + `xcodebuild`
+> (app/ShareExtension/Widgets) + `build-for-testing` — зелёные. Фоновая загрузка iOS-only
+> вынесена в `Ios/.../Data/Cloud/CloudRepository+BackgroundUpload.swift`. iOS-фаза «Sync Shared
+> Proto» удалена (proto теперь из пакета). Не сделано: `RangeBlockReaderTests` (см. 0.6) —
+> отложен до Этапа 1.
+
 Цель: единый источник правды для сетевого слоя. Сейчас в `Mac/BarkCloudKit/` лежит только
 новый код (Range-ридер, батч-удаление) и манифест — пакет **не собирается**, пока не перенесены
 файлы из iOS.
