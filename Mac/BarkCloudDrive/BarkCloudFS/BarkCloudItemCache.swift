@@ -55,11 +55,20 @@ actor BarkCloudItemCache {
     private let storeURL: URL
 
     init() {
-        let appSupport = FileManager.default
-            .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("BarkCloud.FileProvider", isDirectory: true)
-        try? FileManager.default.createDirectory(at: appSupport, withIntermediateDirectories: true)
-        self.storeURL = appSupport.appendingPathComponent("items-cache.json")
+        // Предпочитаем App Group container — он доступен и расширению, и
+        // контейнер-app (нужно для очистки cache при logout). Fallback на
+        // sandbox-Application Support, если App Group недоступен (например,
+        // отсутствует TeamID prefix в Info.plist).
+        let dir: URL
+        if let container = BarkCloudAppGroup.containerURL {
+            dir = container.appendingPathComponent("FileProvider", isDirectory: true)
+        } else {
+            dir = FileManager.default
+                .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+                .appendingPathComponent("BarkCloud.FileProvider", isDirectory: true)
+        }
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        self.storeURL = dir.appendingPathComponent("items-cache.json")
         if let data = try? Data(contentsOf: storeURL),
            let snap = try? JSONDecoder().decode(Snapshot.self, from: data) {
             self.snapshot = snap
