@@ -24,8 +24,8 @@
 		<string>com.apple.fileprovider-nonui</string>
 		<key>NSExtensionPrincipalClass</key>
 		<string>$(PRODUCT_MODULE_NAME).BarkCloudFileProvider</string>
+		<key>NSExtensionFileProviderSupportsEnumeration</key>
+		<true/>
 	</dict>
-	<key>NSExtensionFileProviderSupportsEnumeration</key>
-	<true/>
 </dict>
 </plist>
