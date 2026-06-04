@@ -81,6 +81,7 @@
 		4F0E0001000000000000A005 /* BarkCloudWidgets.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = BarkCloudWidgets.entitlements; sourceTree = "<group>"; };
 		4F0E0001000000000000A006 /* StorageWidgetBridge.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = StorageWidgetBridge.swift; sourceTree = "<group>"; };
 		4F0E0001000000000000A007 /* BarkCloudWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = BarkCloudWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		4F0E0001000000000000A008 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		50B6130C2EAADE13E9A91EBC /* MenuBarView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MenuBarView.swift; sourceTree = "<group>"; };
 		523071DFD9CF395F2A8B51EC /* FileProviderDomainManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FileProviderDomainManager.swift; sourceTree = "<group>"; };
 		5F883AA7898F2181D7434162 /* BarkCloudFileProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BarkCloudFileProvider.swift; sourceTree = "<group>"; };
@@ -184,6 +185,7 @@
 				21ED27B11311898E7A24AB22 /* SettingsView.swift */,
 				50B6130C2EAADE13E9A91EBC /* MenuBarView.swift */,
 				90041203061702053BB45DF5 /* Localizable.xcstrings */,
+				4F0E0001000000000000A008 /* Info.plist */,
 			);
 			path = BarkCloudDrive;
 			sourceTree = "<group>";
@@ -457,10 +459,8 @@
 				ENABLE_RESOURCE_ACCESS_PRINTING = NO;
 				ENABLE_RESOURCE_ACCESS_USB = NO;
 				ENABLE_USER_SELECTED_FILES = readwrite;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_BarkCloudAppGroupID = "group.$(TeamIdentifierPrefix)com.barkfluff.BarkCloud";
-				INFOPLIST_KEY_LSUIElement = YES;
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = BarkCloudDrive/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -641,10 +641,8 @@
 				ENABLE_RESOURCE_ACCESS_PRINTING = NO;
 				ENABLE_RESOURCE_ACCESS_USB = NO;
 				ENABLE_USER_SELECTED_FILES = readwrite;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_BarkCloudAppGroupID = "group.$(TeamIdentifierPrefix)com.barkfluff.BarkCloud";
-				INFOPLIST_KEY_LSUIElement = YES;
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = BarkCloudDrive/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
