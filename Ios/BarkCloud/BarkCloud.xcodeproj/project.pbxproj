@@ -21,6 +21,7 @@
 		87A95CEB6AFFD5A43FB676ED /* BackgroundUploadCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A61969CD78B8E955562C882 /* BackgroundUploadCoordinator.swift */; };
 		9128E67319944ADA4E313F96 /* BarkCloudKit in Frameworks */ = {isa = PBXBuildFile; productRef = C901278C7027FC233377C64E /* BarkCloudKit */; };
 		B78BC2CB5C43E4CB77E4CF57 /* GRPCNIOTransportHTTP2 in Frameworks */ = {isa = PBXBuildFile; productRef = AEF847B678D0D2F29670306C /* GRPCNIOTransportHTTP2 */; };
+		D175701B0000000000000B01 /* BarkCloudKit in Frameworks */ = {isa = PBXBuildFile; productRef = D175701B0000000000000B02 /* BarkCloudKit */; };
 		E8A8BE766449D1887D7FC303 /* UploadActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27A85F89053CD1A2308756B7 /* UploadActivityAttributes.swift */; };
 		EA3B6C441ACE9EAE571B7121 /* UploadJob.swift in Sources */ = {isa = PBXBuildFile; fileRef = 325595313544346519E96798 /* UploadJob.swift */; };
 		EAFCA3958EDF37757D562C90 /* UploadActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27A85F89053CD1A2308756B7 /* UploadActivityAttributes.swift */; };
@@ -166,6 +167,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D175701B0000000000000B01 /* BarkCloudKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -299,6 +301,9 @@
 				4CF4A57742092EC99EA9D6D2 /* BarkCloudWidgets */,
 			);
 			name = BarkCloudWidgets;
+			packageProductDependencies = (
+				D175701B0000000000000B02 /* BarkCloudKit */,
+			);
 			productName = BarkCloudWidgets;
 			productReference = 25F2313879CF10ED77037E1E /* BarkCloudWidgets.appex */;
 			productType = "com.apple.product-type.app-extension";
@@ -928,6 +933,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 58D2F8B08B083E0B6FBCC3FB /* XCRemoteSwiftPackageReference "grpc-swift-2" */;
 			productName = GRPCCore;
+		};
+		D175701B0000000000000B02 /* BarkCloudKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B18B3244AA0AE48E22D3161E /* XCLocalSwiftPackageReference "../../Mac/BarkCloudKit" */;
+			productName = BarkCloudKit;
 		};
 		DC0A6231AEF4F15474767117 /* SwiftProtobuf */ = {
 			isa = XCSwiftPackageProductDependency;

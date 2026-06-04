@@ -97,6 +97,23 @@ private func formatBytes(_ bytes: Int64) -> String {
     return f.string(fromByteCount: max(0, bytes))
 }
 
+// MARK: - Кнопка обновления
+
+/// Полупрозрачная кнопка ручного обновления квоты в углу виджета. Запускает
+/// `RefreshStorageIntent` (iOS 17+ interactive widget) — реальный фетч по gRPC.
+private struct RefreshButton: View {
+    var body: some View {
+        Button(intent: RefreshStorageIntent()) {
+            Image(systemName: "arrow.clockwise")
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(accentOrange.opacity(0.9))
+                .frame(width: 24, height: 24)
+                .background(accentOrange.opacity(0.12), in: Circle())
+        }
+        .buttonStyle(.plain)
+    }
+}
+
 // MARK: - Прогресс-бар
 
 /// Капсульный индикатор в стиле iOS: мягкий трек + градиентная заливка со
@@ -152,6 +169,8 @@ private struct SmallStorageView: View {
                 Text("BarkCloud")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(.secondary)
+                Spacer()
+                RefreshButton()
             }
             Spacer(minLength: 6)
             if snapshot.hasData {
@@ -199,6 +218,7 @@ private struct MediumStorageView: View {
                         .font(.system(size: 22, weight: .bold, design: .rounded))
                         .foregroundStyle(barColors(snapshot.fraction).last ?? accentOrange)
                 }
+                RefreshButton()
             }
             if snapshot.hasData {
                 CapsuleProgressBar(fraction: snapshot.fraction)
