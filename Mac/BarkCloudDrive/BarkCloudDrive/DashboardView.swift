@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 import BarkCloudKit
 
 /// Дашборд: профиль, сервер, прогресс хранилища, кнопки монтаж/размонтаж/настройки.
@@ -27,15 +28,13 @@ struct DashboardView: View {
 
     private var header: some View {
         HStack(spacing: 14) {
-            Image(systemName: "person.crop.circle.fill")
-                .font(.system(size: 44))
-                .foregroundStyle(.tint)
+            RemoteAvatar(urlString: model.user?.profilePicture)
             VStack(alignment: .leading, spacing: 2) {
-                Text(displayName).font(.title3).bold()
+                Text(verbatim: displayName).font(.title3).bold()
                 if let u = model.user, !u.username.isEmpty {
-                    Text("@\(u.username)").foregroundStyle(.secondary)
+                    Text(verbatim: "@\(u.username)").foregroundStyle(.secondary)
                 }
-                Text(ServerConfig.current.filesHost).font(.caption).foregroundStyle(.secondary)
+                Text(verbatim: ServerConfig.current.filesHost).font(.caption).foregroundStyle(.secondary)
             }
         }
     }
@@ -82,5 +81,34 @@ struct DashboardView: View {
 
     private func bytes(_ n: Int64) -> String {
         ByteCountFormatter.string(fromByteCount: n, countStyle: .file)
+    }
+}
+
+/// Аватар профиля с подкачкой по self-signed TLS (`InsecureHTTP`). Плейсхолдер —
+/// системная иконка, пока картинка не загружена / нет URL.
+struct RemoteAvatar: View {
+    let urlString: String?
+    @State private var image: NSImage?
+
+    var body: some View {
+        Group {
+            if let image {
+                Image(nsImage: image).resizable().scaledToFill()
+            } else {
+                Image(systemName: "person.crop.circle.fill")
+                    .resizable().scaledToFit().foregroundStyle(.tint)
+            }
+        }
+        .frame(width: 44, height: 44)
+        .clipShape(Circle())
+        .task(id: urlString) { await load() }
+    }
+
+    private func load() async {
+        guard let s = urlString, !s.isEmpty,
+              let url = GrpcEndpoint.normalizedFileDownloadURL(s) else { image = nil; return }
+        if let (data, _) = try? await InsecureHTTP.session.data(from: url) {
+            image = NSImage(data: data)
+        }
     }
 }
