@@ -16,6 +16,7 @@ using MediatR;
 using Microsoft.AspNetCore.Authorization;
 
 using DomainMediaKind = BarkCloud.Files.Domain.MediaKind;
+using DomainViewMode = BarkCloud.Files.Domain.DfViewMode;
 
 namespace BarkCloud.Files.Host;
 
@@ -40,7 +41,8 @@ public class DynamicFolderApiService : DynamicFolderApi.DynamicFolderApiBase
             Name = request.Name,
             Criteria = DynamicFolderMapping.ToDomainCriteria(request.Combinator, request.Rules),
             IconKey = request.IconKey,
-            CoverColor = request.CoverColor
+            CoverColor = request.CoverColor,
+            ViewMode = (DomainViewMode)(int)request.ViewMode
         };
 
         return _mediator.Send(command);
@@ -57,7 +59,8 @@ public class DynamicFolderApiService : DynamicFolderApi.DynamicFolderApiBase
             Name = request.HasName ? request.Name : null,
             Criteria = DynamicFolderMapping.ToDomainCriteria(request.Combinator, request.Rules),
             IconKey = request.HasIconKey ? request.IconKey : null,
-            CoverColor = request.HasCoverColor ? request.CoverColor : null
+            CoverColor = request.HasCoverColor ? request.CoverColor : null,
+            ViewMode = request.HasViewMode ? (DomainViewMode)(int)request.ViewMode : null
         };
 
         return _mediator.Send(command);

@@ -7,6 +7,7 @@ using PRule = BarkCloud.Proto.Files.DfRule;
 using PField = BarkCloud.Proto.Files.DfField;
 using POperator = BarkCloud.Proto.Files.DfOperator;
 using PCombinator = BarkCloud.Proto.Files.DfCombinator;
+using PViewMode = BarkCloud.Proto.Files.DfViewMode;
 
 namespace BarkCloud.Files.Mapping;
 
@@ -28,6 +29,7 @@ public static class DynamicFolderMapping
             CoverColor = folder.CoverColor ?? string.Empty,
             CoverPreviewUrl = coverUrl ?? string.Empty,
             ItemsCount = itemsCount,
+            ViewMode = (PViewMode)(int)folder.ViewMode,
             SortOrder = folder.SortOrder,
             CreatedAt = Timestamp.FromDateTime(DateTime.SpecifyKind(folder.CreatedAt, DateTimeKind.Utc)),
             UpdatedAt = Timestamp.FromDateTime(DateTime.SpecifyKind(folder.UpdatedAt, DateTimeKind.Utc))

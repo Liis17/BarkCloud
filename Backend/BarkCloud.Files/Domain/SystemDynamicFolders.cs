@@ -8,7 +8,8 @@ namespace BarkCloud.Files.Domain;
 /// </summary>
 public static class SystemDynamicFolders
 {
-    public const string KeyRecent = "sys-recent";
+    public const string KeyRecentMedia = "sys-recent-media";
+    public const string KeyRecentDocs = "sys-recent-docs";
     public const string KeyLarge = "sys-large";
     public const string KeyScreenshots = "sys-screenshots";
 
@@ -27,15 +28,27 @@ public static class SystemDynamicFolders
     /// </summary>
     public static IReadOnlyList<DynamicFolder> All()
     {
+        var recentDays = new DynamicFolderRule { Field = DfField.Date, Operator = DfOperator.WithinLastDays, Value = RecentDays.ToString() };
+        var mediaKinds = new DynamicFolderRule
+        {
+            Field = DfField.MediaKind,
+            Operator = DfOperator.Equals,
+            Value = $"{(int)MediaKind.Photo},{(int)MediaKind.Video}"
+        };
+        var docKind = new DynamicFolderRule { Field = DfField.MediaKind, Operator = DfOperator.Equals, Value = ((int)MediaKind.Document).ToString() };
+
         return new[]
         {
-            Build(KeyRecent, "Недавно загруженные", "clock", "#4F9DDE", 0,
-                new DynamicFolderRule { Field = DfField.Date, Operator = DfOperator.WithinLastDays, Value = RecentDays.ToString() }),
+            Build(KeyRecentMedia, "Недавние фото и видео", "clock", "#4F9DDE", 0, DfViewMode.Grid,
+                recentDays, mediaKinds),
 
-            Build(KeyLarge, "Большие файлы", "hdd", "#E0883B", 1,
+            Build(KeyRecentDocs, "Недавние документы", "doc", "#5C97A8", 1, DfViewMode.List,
+                recentDays, docKind),
+
+            Build(KeyLarge, "Большие файлы", "hdd", "#E0883B", 2, DfViewMode.Grid,
                 new DynamicFolderRule { Field = DfField.Size, Operator = DfOperator.GreaterThan, Value = LargeSizeBytes.ToString() }),
 
-            Build(KeyScreenshots, "Скриншоты", "camera", "#7E57C2", 2,
+            Build(KeyScreenshots, "Скриншоты", "camera", "#7E57C2", 3, DfViewMode.Grid,
                 new DynamicFolderRule { Field = DfField.Name, Operator = DfOperator.Contains, Value = ScreenshotToken }),
         };
     }
@@ -51,7 +64,7 @@ public static class SystemDynamicFolders
 
     public static bool IsSystemKey(string? id) => id is not null && id.StartsWith("sys-", StringComparison.Ordinal);
 
-    private static DynamicFolder Build(string key, string name, string icon, string color, int order, DynamicFolderRule rule)
+    private static DynamicFolder Build(string key, string name, string icon, string color, int order, DfViewMode viewMode, params DynamicFolderRule[] rules)
     {
         return new DynamicFolder
         {
@@ -62,11 +75,12 @@ public static class SystemDynamicFolders
             SystemKey = key,
             IconKey = icon,
             CoverColor = color,
+            ViewMode = viewMode,
             SortOrder = order,
             Criteria = new DynamicFolderCriteria
             {
                 Combinator = DfCombinator.All,
-                Rules = new List<DynamicFolderRule> { rule }
+                Rules = rules.ToList()
             },
             CreatedAt = DateTime.UnixEpoch,
             UpdatedAt = DateTime.UnixEpoch

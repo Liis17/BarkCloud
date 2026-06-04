@@ -677,7 +677,7 @@ public static class CloudApiEndpoints
                 var resp = await folders.ListDynamicFolderItemsAsync(req, token);
                 return Results.Json(new
                 {
-                    items = resp.Items.Select(CloudJson.Media).ToArray(),
+                    items = resp.Items.Select(CloudJson.MediaItem).ToArray(),
                     nextCursorAt = resp.NextCursorCreatedAt?.ToDateTimeOffset(),
                     nextCursorId = resp.NextCursorFileId
                 }, Json);
@@ -691,7 +691,8 @@ public static class CloudApiEndpoints
                     Name = body.Name,
                     Combinator = (DfCombinator)body.Combinator,
                     IconKey = body.IconKey ?? "",
-                    CoverColor = body.CoverColor ?? ""
+                    CoverColor = body.CoverColor ?? "",
+                    ViewMode = (DfViewMode)(body.ViewMode ?? 0)
                 };
                 if (body.Rules is not null)
                     req.Rules.AddRange(body.Rules.Select(ToProtoRule));
@@ -710,6 +711,7 @@ public static class CloudApiEndpoints
                 if (body.Name is not null) req.Name = body.Name;
                 if (body.IconKey is not null) req.IconKey = body.IconKey;
                 if (body.CoverColor is not null) req.CoverColor = body.CoverColor;
+                if (body.ViewMode is not null) req.ViewMode = (DfViewMode)body.ViewMode.Value;
                 if (body.Rules is not null)
                     req.Rules.AddRange(body.Rules.Select(ToProtoRule));
                 var info = await folders.UpdateDynamicFolderAsync(req, token);
@@ -1034,8 +1036,8 @@ public static class CloudApiEndpoints
     private sealed record AlbumIdReq(string Album);
     private sealed record AlbumItems(string Album, string[]? FileIds);
     private sealed record DfRuleDto(int Field, int Op, string? Value);
-    private sealed record DfCreate(string Name, int Combinator, DfRuleDto[]? Rules, string? IconKey, string? CoverColor);
-    private sealed record DfUpdate(string Folder, int Combinator, DfRuleDto[]? Rules, string? Name, string? IconKey, string? CoverColor);
+    private sealed record DfCreate(string Name, int Combinator, DfRuleDto[]? Rules, string? IconKey, string? CoverColor, int? ViewMode);
+    private sealed record DfUpdate(string Folder, int Combinator, DfRuleDto[]? Rules, string? Name, string? IconKey, string? CoverColor, int? ViewMode);
     private sealed record DfIdReq(string Folder);
 
     private static DfRule ToProtoRule(DfRuleDto r) => new()

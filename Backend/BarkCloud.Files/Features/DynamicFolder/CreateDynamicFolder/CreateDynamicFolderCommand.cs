@@ -14,4 +14,6 @@ public class CreateDynamicFolderCommand : IRequest<DynamicFolderInfo>
     public string? IconKey { get; set; }
 
     public string? CoverColor { get; set; }
+
+    public Domain.DfViewMode ViewMode { get; set; } = Domain.DfViewMode.Grid;
 }

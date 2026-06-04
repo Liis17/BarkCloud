@@ -57,6 +57,8 @@ public class UpdateDynamicFolderCommandHandler : IRequestHandler<UpdateDynamicFo
             folder.IconKey = string.IsNullOrWhiteSpace(request.IconKey) ? null : request.IconKey.Trim();
         if (request.CoverColor is not null)
             folder.CoverColor = string.IsNullOrWhiteSpace(request.CoverColor) ? null : request.CoverColor.Trim();
+        if (request.ViewMode is not null)
+            folder.ViewMode = request.ViewMode.Value;
 
         folder.UpdatedAt = DateTime.UtcNow;
         await _storage.UpdateFolder(folder, cancellationToken);

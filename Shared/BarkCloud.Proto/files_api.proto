@@ -623,6 +623,11 @@ enum DfCombinator {
   DF_ANY = 1; // любое правило (ИЛИ)
 }
 
+enum DfViewMode {
+  DF_VIEW_GRID = 0; // сетка превью (удобно для фото/видео)
+  DF_VIEW_LIST = 1; // список строк (удобно для документов/аудио)
+}
+
 message DfRule {
   DfField field = 1;
   DfOperator operator = 2;
@@ -642,6 +647,7 @@ message DynamicFolderInfo {
   int32 sort_order = 10;
   google.protobuf.Timestamp created_at = 11;
   google.protobuf.Timestamp updated_at = 12;
+  DfViewMode view_mode = 13;      // как отображать содержимое: сетка / список
 }
 
 message CreateDynamicFolderRequest {
@@ -650,6 +656,7 @@ message CreateDynamicFolderRequest {
   repeated DfRule rules = 3;
   string icon_key = 4;
   string cover_color = 5;
+  DfViewMode view_mode = 6;
 }
 
 message UpdateDynamicFolderRequest {
@@ -659,6 +666,7 @@ message UpdateDynamicFolderRequest {
   repeated DfRule rules = 4;
   optional string icon_key = 5;
   optional string cover_color = 6;
+  optional DfViewMode view_mode = 7; // не задано = не менять
 }
 
 message DeleteDynamicFolderRequest {
@@ -680,7 +688,7 @@ message ListDynamicFolderItemsRequest {
 }
 
 message ListDynamicFolderItemsResponse {
-  repeated UploadFileInfo items = 1;
+  repeated UserImageItem items = 1;                     // файл + записи каталога владельца (entryIds для ПКМ)
   google.protobuf.Timestamp next_cursor_created_at = 2; // пусто = больше нет страниц
   string next_cursor_file_id = 3;
 }

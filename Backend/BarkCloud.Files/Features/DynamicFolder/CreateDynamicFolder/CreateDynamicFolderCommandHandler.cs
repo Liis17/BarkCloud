@@ -56,6 +56,7 @@ public class CreateDynamicFolderCommandHandler : IRequestHandler<CreateDynamicFo
             Criteria = request.Criteria,
             IconKey = string.IsNullOrWhiteSpace(request.IconKey) ? null : request.IconKey.Trim(),
             CoverColor = string.IsNullOrWhiteSpace(request.CoverColor) ? null : request.CoverColor.Trim(),
+            ViewMode = request.ViewMode,
             SortOrder = await _storage.GetMaxSortOrder(ownerId, cancellationToken) + 1,
             CreatedAt = now,
             UpdatedAt = now
