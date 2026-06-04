@@ -131,8 +131,10 @@ final class CloudBrowserViewModel {
         pendingDelete.schedule(
             label: entry.name,
             action: { [weak self, cloud] in
-                do { try await cloud.deleteFileEntry(entry.id) }
-                catch {
+                do {
+                    try await cloud.deleteFileEntry(entry.id)
+                    await DeviceCopyCleaner.deleteDeviceCopy(forCloudFileID: entry.fileID)
+                } catch {
                     self?.state.snackbar = domainErrorMessage(error)
                     await self?.reload(showSpinner: false)
                 }
@@ -236,10 +238,14 @@ final class CloudBrowserViewModel {
             do { try await cloud.deleteDirectory(dir.id) } catch { anyFailed = true }
             state.processDone += 1
         }
+        var deletedFileIDs: [String] = []
         for entry in files {
-            do { try await cloud.deleteFileEntry(entry.id) } catch { anyFailed = true }
+            do { try await cloud.deleteFileEntry(entry.id); deletedFileIDs.append(entry.fileID) }
+            catch { anyFailed = true }
             state.processDone += 1
         }
+        // Убираем копии удалённых файлов и с устройства (один системный диалог).
+        await DeviceCopyCleaner.deleteDeviceCopies(forCloudFileIDs: deletedFileIDs)
         finishBatch(anyFailed: anyFailed)
         await reload(showSpinner: false)
     }

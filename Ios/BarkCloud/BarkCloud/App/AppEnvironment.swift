@@ -184,6 +184,7 @@ final class AppEnvironment {
         InsecureHTTP.clearCaches()
         await fileCache.clearAll()
         await AssetHashStore.shared.clearAll()
+        await CloudDeviceLinkStore.shared.clearAll()
         fileCacheSettings.reset()
         appLockSettings.disable()
         vault.removeAll()

@@ -169,9 +169,11 @@ final class GalleryViewModel {
                 let (data, name) = try await DeviceAssetResource.originalData(for: asset)
                 // Без явной папки: сервер раскладывает по системным «Фото»/«Видео»/
                 // «Другие документы» по типу медиа (route_by_media_kind).
-                _ = try await cloud.uploadFile(data: data, fileName: name, routeByMediaKind: true)
+                let fileID = try await cloud.uploadFile(data: data, fileName: name, routeByMediaKind: true)
                 // Файл теперь в облаке — сразу показываем иконку.
                 presence.markPresent(asset.localIdentifier)
+                // Запоминаем связь облако↔устройство для синхронного удаления.
+                await CloudDeviceLinkStore.shared.link(fileID: fileID, localIdentifier: asset.localIdentifier)
             } catch {
                 anyFailed = true
             }
@@ -194,11 +196,13 @@ final class GalleryViewModel {
         if let hash = await DeviceAssetResource.cachedSHA256(for: asset),
            let existing = try await cloud.checkFileHash(hash) {
             presence.markPresent(asset.localIdentifier)
+            await CloudDeviceLinkStore.shared.link(fileID: existing, localIdentifier: asset.localIdentifier)
             return existing
         }
         let (data, name) = try await DeviceAssetResource.originalData(for: asset)
         let id = try await cloud.uploadFile(data: data, fileName: name, routeByMediaKind: true)
         presence.markPresent(asset.localIdentifier)
+        await CloudDeviceLinkStore.shared.link(fileID: id, localIdentifier: asset.localIdentifier)
         return id
     }
 
@@ -263,16 +267,45 @@ final class GalleryViewModel {
         }
     }
 
+    /// `file_id` ассета в облаке БЕЗ заливки: резолвим по SHA256-хешу. `nil`, если
+    /// файла в облаке нет (тогда «Удалить» снимет его только с устройства).
+    private func resolveCloudFileIDIfPresent(for asset: PHAsset) async -> String? {
+        guard let hash = await DeviceAssetResource.cachedSHA256(for: asset) else { return nil }
+        return try? await cloud.checkFileHash(hash)
+    }
+
+    /// «Удалить»: убрать копию и с устройства, и из облака (если файл там есть —
+    /// в корзину, восстановимо). Сначала системное удаление ассета; если
+    /// пользователь его отменил — облако не трогаем (операция атомарна по намерению).
+    func deleteEverywhere(asset: PHAsset) async {
+        let fileID = await resolveCloudFileIDIfPresent(for: asset)
+        guard await deleteFromDevice(asset: asset) else { return }
+        guard let fileID else { return }
+        do {
+            try await cloud.deleteUserMedia(fileID: fileID)
+            await CloudDeviceLinkStore.shared.remove(fileIDs: [fileID])
+        } catch {
+            snackbar = domainErrorMessage(error)
+        }
+    }
+
     /// Удалить ассет с устройства. iOS сам показывает системное подтверждение;
-    /// отмена → throw, тогда оставляем как есть.
-    func deleteFromDevice(asset: PHAsset) async {
+    /// отмена → throw, тогда оставляем как есть. Возвращает `true`, если ассет
+    /// действительно удалён.
+    @discardableResult
+    func deleteFromDevice(asset: PHAsset) async -> Bool {
         do {
             try await PHPhotoLibrary.shared().performChanges {
                 PHAssetChangeRequest.deleteAssets([asset] as NSArray)
             }
             assets.removeAll { $0.localIdentifier == asset.localIdentifier }
+            // Чистим осиротевшие связи/хеш — localIdentifier больше не существует.
+            await CloudDeviceLinkStore.shared.remove(localIds: [asset.localIdentifier])
+            await AssetHashStore.shared.remove(localIds: [asset.localIdentifier])
+            return true
         } catch {
             // Пользователь отменил удаление — не ошибка.
+            return false
         }
     }
 

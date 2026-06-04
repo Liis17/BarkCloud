@@ -164,6 +164,9 @@ struct GalleryScreen: View {
         Button(String(localized: "ctx_add_to_album")) {
             albumPickerAsset = PickerAsset(id: asset.localIdentifier, asset: asset)
         }
+        Button(String(localized: "ctx_delete_everywhere"), role: .destructive) {
+            Task { await vm.deleteEverywhere(asset: asset) }
+        }
         Button(String(localized: "ctx_delete_device"), role: .destructive) {
             Task { await vm.deleteFromDevice(asset: asset) }
         }

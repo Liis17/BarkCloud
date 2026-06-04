@@ -2086,6 +2086,29 @@
         }
       }
     },
+    "ctx_delete_everywhere" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Удалить везде"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete everywhere"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Überall löschen"
+          }
+        }
+      }
+    },
     "ctx_make_public" : {
       "extractionState" : "manual",
       "localizations" : {

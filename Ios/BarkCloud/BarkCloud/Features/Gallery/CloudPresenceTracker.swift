@@ -22,6 +22,7 @@ final class CloudPresenceTracker {
     private var hashingInFlight: Set<String> = []        // localId, для которых считается хеш
     private var pendingByHash: [String: [String]] = [:]  // sha256 → localId, ждущие запроса
     private var queryScheduled = false
+    private var linkedHashes: Set<String> = []           // sha256, для которых уже связан file_id
 
     init(cloud: CloudRepository) { self.cloud = cloud }
 
@@ -39,6 +40,7 @@ final class CloudPresenceTracker {
         if let hash = hashByAsset[id] {                     // хеш посчитан
             if let exists = existsByHash[hash] {
                 presence[id] = exists
+                if exists { linkFileID(forHash: hash, ids: [id]) }
             } else {
                 enqueue(hash: hash, id: id)
             }
@@ -54,6 +56,7 @@ final class CloudPresenceTracker {
             self.hashByAsset[id] = hash
             if let exists = self.existsByHash[hash] {
                 self.presence[id] = exists
+                if exists { self.linkFileID(forHash: hash, ids: [id]) }
             } else {
                 self.enqueue(hash: hash, id: id)
             }
@@ -90,10 +93,27 @@ final class CloudPresenceTracker {
                     let exists = results[hash] ?? false
                     existsByHash[hash] = exists
                     for id in snapshot[hash] ?? [] { presence[id] = exists }
+                    if exists { linkFileID(forHash: hash, ids: snapshot[hash] ?? []) }
                 }
             } catch {
                 // Не удалось — вернём хеши в очередь для следующей попытки.
                 for hash in chunk { pendingByHash[hash] = snapshot[hash] }
+            }
+        }
+    }
+
+    /// Для ассета, подтверждённого в облаке, лениво резолвим его `file_id`
+    /// (одиночный `CheckFileHash`) и записываем связь облако↔устройство в
+    /// `CloudDeviceLinkStore`. Нужно для синхронного удаления копии на устройстве
+    /// при удалении файла из облака (в т.ч. для авто-загруженных в фоне). Один
+    /// запрос на хеш — `linkedHashes` гасит повторы.
+    private func linkFileID(forHash hash: String, ids: [String]) {
+        guard !ids.isEmpty, !linkedHashes.contains(hash) else { return }
+        linkedHashes.insert(hash)
+        Task { [cloud] in
+            guard let fileID = try? await cloud.checkFileHash(hash) else { return }
+            for id in ids {
+                await CloudDeviceLinkStore.shared.link(fileID: fileID, localIdentifier: id)
             }
         }
     }

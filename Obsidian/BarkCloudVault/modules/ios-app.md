@@ -445,6 +445,38 @@ store с одной активной записью `Pending { id, label, action
 `DevicesScreen` (`trash`/`pencil`); вместо `Label(..., systemImage:)` — голый `Image(systemName:)`
 + `.accessibilityLabel(...)` для VoiceOver.
 
+### Синхронное удаление устройство↔облако
+
+Удаление держит копии на устройстве (PhotoKit) и в облаке согласованными в обе стороны.
+
+- **Индекс связей** `Data/Cache/CloudDeviceLinkStore.swift` (`@Model CloudDeviceLink`,
+  `actor CloudDeviceLinkStore.shared`, отдельная БД `BarkCloudCloudDeviceLinks.sqlite`,
+  in-memory fallback — образец `AssetHashStore`): `file_id ↔ localIdentifier`. Заполняется,
+  когда клиент достоверно знает обе стороны: при загрузке ассета в облако
+  (`GalleryViewModel.uploadSelected`/`ensureCloudFileID`, `MediaGridViewModel.uploadAssets`,
+  `AlbumDetailViewModel.uploadAndAddAssets`) и при подтверждении наличия по SHA256 в
+  `CloudPresenceTracker.linkFileID` (для подтверждённого-в-облаке ассета один `CheckFileHash`
+  резолвит `file_id` → связь; покрывает авто-загруженные в фоне, т.к. `UploadJob` не несёт
+  `localIdentifier`). Очищается в `AppEnvironment.resetLocalState()`.
+- **Направление устройство → облако** (таб «Галерея», контекстное меню):
+  - «Удалить с устройства» (`ctx_delete_device`) → `deleteFromDevice` — только медиатека, облако остаётся.
+  - «Удалить везде» (`ctx_delete_everywhere`) → `deleteEverywhere`: `resolveCloudFileIDIfPresent`
+    (SHA256 → `checkFileHash` **без заливки**, nil если в облаке нет) → сначала системное удаление
+    ассета; если отменили — облако не трогаем; иначе `deleteUserMedia` (в корзину). `deleteFromDevice`
+    теперь `@discardableResult -> Bool` и чистит осиротевшие `CloudDeviceLinkStore`/`AssetHashStore`.
+- **Направление облако → устройство** (`Features/Shared/DeviceCopyCleaner.swift`, `@MainActor enum`):
+  `deleteDeviceCopies(forCloudFileIDs:)` резолвит `localIdentifier` через индекс → `PHAsset.fetchAssets`
+  → один `PHAssetChangeRequest.deleteAssets` на пачку (системный диалог) → чистит индекс и кеш хешей.
+  Подключён **после успешного облачного удаления везде**: `MediaGridViewModel.deleteSingle`/`deleteSelected`,
+  `AlbumDetailViewModel.deleteFromCloud`, `CloudBrowserViewModel.deleteFile`/`deleteSelected`
+  (по `entry.fileID`), `TrashViewModel.deleteForever` (по `item.fileID`). Для одиночного удаления
+  через [[#PendingDelete]] чистка устройства идёт **в `action`** (после отсчёта 5 с) — Undo отменяет
+  и облако, и устройство, ценой отложенного системного диалога.
+- **Ограничения:** системный диалог удаления из медиатеки не подавить; при Limited-доступе ассет
+  может быть невидим (no-op); файл, загруженный не с этого телефона и ни разу не сканированный в
+  Галерее, не имеет связи в индексе — копия на устройстве не удалится (best-effort выбранного
+  iOS-only подхода без серверного SHA256 в `UploadFileInfo`).
+
 ### Server Setup
 
 BarkCloud — self-hosted, поэтому адреса микросервисов вводит пользователь, а не хардкод.
