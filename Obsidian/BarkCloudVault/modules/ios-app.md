@@ -400,9 +400,16 @@ BarkCloud/
   прозрачную 1×1 PNG-заглушку; когда URL текущего готов — `refreshCurrentPreviewItem()`.
   Стартовый элемент применяется один раз и в `make`, и в `update` (QL иногда игнорит
   ранний `currentPreviewItemIndex`).
-- **Резолверы:** облако — `MediaPagerResolver.cloud(transfer:cache:)` (скачивает оригинал
-  через дисковый кеш, тот же путь, что `RemoteFilePreviewScreen`); устройство —
-  `GalleryScreen.deviceResolve` (фото → `exportPhotoToTempFile`, видео → `videoFileURL`).
+- **Резолверы:** облако — `MediaPagerResolver.cloud(transfer:cache:viewIDByFileID:)`: для
+  **фото скачивает JpegView** (браузеро-/QuickLook-дружелюбный полноразмерный JPEG вместо
+  тяжёлого HEIC-оригинала) через карту `MediaPagerResolver.jpegViewMap(items)` (file_id
+  оригинала → `MediaAsset.jpegViewFileID`); видео/без-вида — по своему оригиналу. Тот же
+  дисковый кеш, что `RemoteFilePreviewScreen`. Шеринг/«копировать ссылку» по-прежнему ведут
+  на оригинал. Устройство — `GalleryScreen.deviceResolve` (фото → `exportPhotoToTempFile`,
+  видео → `videoFileURL`).
+- **Pull-to-refresh Галереи:** `GalleryScreen.barkRefreshable → GalleryViewModel.refresh()` —
+  пересобирает ассеты и через `CloudPresenceTracker.recheck(_:)` сбрасывает кеш присутствия и
+  заново пакетно перепроверяет наличие в облаке (обновляет иконки-облачка; хеши берёт из кеша).
 - **Пагинация:** опциональный `loadMore: () async -> [String]` — при подходе к концу
   (`index >= ids.count - 2`) `Coordinator` догружает следующую страницу через VM
   (`loadMoreIfNeeded`), дописывает `ids` и зовёт `reloadData()` с восстановлением текущей

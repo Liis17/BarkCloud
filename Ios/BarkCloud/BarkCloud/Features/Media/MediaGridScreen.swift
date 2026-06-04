@@ -65,7 +65,11 @@ struct MediaGridScreen: View {
                 MediaPagerScreen(
                     ids: vm.state.items.map(\.id),
                     startIndex: vm.state.items.firstIndex(where: { $0.id == item.id }) ?? 0,
-                    resolve: MediaPagerResolver.cloud(transfer: env.fileTransfer, cache: env.fileCache),
+                    resolve: MediaPagerResolver.cloud(
+                        transfer: env.fileTransfer,
+                        cache: env.fileCache,
+                        viewIDByFileID: MediaPagerResolver.jpegViewMap(vm.state.items)
+                    ),
                     loadMore: {
                         guard let last = vm.state.items.last else { return vm.state.items.map(\.id) }
                         await vm.loadMoreIfNeeded(current: last)

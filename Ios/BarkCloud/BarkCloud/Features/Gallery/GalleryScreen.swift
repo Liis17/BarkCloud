@@ -130,6 +130,7 @@ struct GalleryScreen: View {
                 }
             }
         }
+        .barkRefreshable { await vm.refresh() }
         .safeAreaInset(edge: .bottom) { selectionBar(vm) }
         .overlay(alignment: .bottom) { snackbar(vm) }
     }

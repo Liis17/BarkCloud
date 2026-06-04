@@ -32,6 +32,43 @@ final class CloudPresenceTracker {
     /// облако, чтобы сразу показать иконку без повторного запроса.
     func markPresent(_ id: String) { presence[id] = true }
 
+    /// Принудительно перепроверить наличие ассетов в облаке (для pull-to-refresh):
+    /// сбрасываем кеш присутствия и заново спрашиваем сервер пачкой. Хеши берём из
+    /// кеша (или считаем при отсутствии), чтобы не пересчитывать тяжёлое повторно.
+    func recheck(_ assets: [PHAsset]) async {
+        presence = [:]
+        existsByHash = [:]
+        linkedHashes = []
+        pendingByHash = [:]
+
+        var idsByHash: [String: [String]] = [:]
+        for asset in assets {
+            let id = asset.localIdentifier
+            let hash: String?
+            if let cached = hashByAsset[id] {
+                hash = cached
+            } else if let computed = await DeviceAssetResource.cachedSHA256(for: asset) {
+                hashByAsset[id] = computed
+                hash = computed
+            } else {
+                hash = nil
+            }
+            if let hash { idsByHash[hash, default: []].append(id) }
+        }
+
+        let allHashes = Array(idsByHash.keys)
+        for start in stride(from: 0, to: allHashes.count, by: 500) {
+            let chunk = Array(allHashes[start..<min(start + 500, allHashes.count)])
+            guard let results = try? await cloud.checkFileHashes(chunk) else { continue }
+            for hash in chunk {
+                let exists = results[hash] ?? false
+                existsByHash[hash] = exists
+                for id in idsByHash[hash] ?? [] { presence[id] = exists }
+                if exists { linkFileID(forHash: hash, ids: idsByHash[hash] ?? []) }
+            }
+        }
+    }
+
     /// Вызывать при появлении ячейки. Лениво считает SHA256 оригинала и пакетно
     /// спрашивает у сервера, есть ли файл с таким хешем в облаке.
     func observe(_ asset: PHAsset) {

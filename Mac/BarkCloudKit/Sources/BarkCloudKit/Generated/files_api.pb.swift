@@ -526,6 +526,18 @@ public struct Barkcloud_Files_UploadFileInfo: @unchecked Sendable {
     set {_uniqueStorage()._uploadDeviceName = newValue}
   }
 
+  /// file_id полноразмерного JPEG-вида для просмотра (web/не-Apple); пусто — нет (видео/документ/легаси)
+  public var jpegViewFileID: String {
+    get {_storage._jpegViewFileID}
+    set {_uniqueStorage()._jpegViewFileID = newValue}
+  }
+
+  /// Ссылка на скачивание JPEG-вида (для отображения в фуллвьювере). Оригинал — отдельной кнопкой «скачать»
+  public var jpegViewURL: String {
+    get {_storage._jpegViewURL}
+    set {_uniqueStorage()._jpegViewURL = newValue}
+  }
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -3611,7 +3623,7 @@ extension Barkcloud_Files_GetFileDataResponse: SwiftProtobuf.Message, SwiftProto
 
 extension Barkcloud_Files_UploadFileInfo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".UploadFileInfo"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}uploaders\0\u{3}created_at\0\u{3}uploaded_at\0\u{1}etag\0\u{1}type\0\u{3}file_name\0\u{3}file_url\0\u{3}preview_url\0\u{3}file_size\0\u{1}previews\0\u{3}image_width\0\u{3}image_height\0\u{3}media_kind\0\u{3}upload_device_name\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}uploaders\0\u{3}created_at\0\u{3}uploaded_at\0\u{1}etag\0\u{1}type\0\u{3}file_name\0\u{3}file_url\0\u{3}preview_url\0\u{3}file_size\0\u{1}previews\0\u{3}image_width\0\u{3}image_height\0\u{3}media_kind\0\u{3}upload_device_name\0\u{3}jpeg_view_file_id\0\u{3}jpeg_view_url\0")
 
   fileprivate class _StorageClass {
     var _id: String = String()
@@ -3629,6 +3641,8 @@ extension Barkcloud_Files_UploadFileInfo: SwiftProtobuf.Message, SwiftProtobuf._
     var _imageHeight: Int32 = 0
     var _mediaKind: Barkcloud_Files_MediaKind = .other
     var _uploadDeviceName: String = String()
+    var _jpegViewFileID: String = String()
+    var _jpegViewURL: String = String()
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -3654,6 +3668,8 @@ extension Barkcloud_Files_UploadFileInfo: SwiftProtobuf.Message, SwiftProtobuf._
       _imageHeight = source._imageHeight
       _mediaKind = source._mediaKind
       _uploadDeviceName = source._uploadDeviceName
+      _jpegViewFileID = source._jpegViewFileID
+      _jpegViewURL = source._jpegViewURL
     }
   }
 
@@ -3687,6 +3703,8 @@ extension Barkcloud_Files_UploadFileInfo: SwiftProtobuf.Message, SwiftProtobuf._
         case 13: try { try decoder.decodeSingularInt32Field(value: &_storage._imageHeight) }()
         case 14: try { try decoder.decodeSingularEnumField(value: &_storage._mediaKind) }()
         case 15: try { try decoder.decodeSingularStringField(value: &_storage._uploadDeviceName) }()
+        case 16: try { try decoder.decodeSingularStringField(value: &_storage._jpegViewFileID) }()
+        case 17: try { try decoder.decodeSingularStringField(value: &_storage._jpegViewURL) }()
         default: break
         }
       }
@@ -3744,6 +3762,12 @@ extension Barkcloud_Files_UploadFileInfo: SwiftProtobuf.Message, SwiftProtobuf._
       if !_storage._uploadDeviceName.isEmpty {
         try visitor.visitSingularStringField(value: _storage._uploadDeviceName, fieldNumber: 15)
       }
+      if !_storage._jpegViewFileID.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._jpegViewFileID, fieldNumber: 16)
+      }
+      if !_storage._jpegViewURL.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._jpegViewURL, fieldNumber: 17)
+      }
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -3768,6 +3792,8 @@ extension Barkcloud_Files_UploadFileInfo: SwiftProtobuf.Message, SwiftProtobuf._
         if _storage._imageHeight != rhs_storage._imageHeight {return false}
         if _storage._mediaKind != rhs_storage._mediaKind {return false}
         if _storage._uploadDeviceName != rhs_storage._uploadDeviceName {return false}
+        if _storage._jpegViewFileID != rhs_storage._jpegViewFileID {return false}
+        if _storage._jpegViewURL != rhs_storage._jpegViewURL {return false}
         return true
       }
       if !storagesAreEqual {return false}

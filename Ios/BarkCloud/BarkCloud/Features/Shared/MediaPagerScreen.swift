@@ -39,16 +39,38 @@ struct MediaPagerScreen: View {
 
 /// Резолверы URL для `MediaPagerScreen`.
 enum MediaPagerResolver {
-    /// Облачный файл: скачать оригинал через дисковый кеш (тот же путь, что
-    /// `RemoteFilePreviewScreen`).
-    static func cloud(transfer: FileTransferService, cache: FileCacheService) -> (String) async -> URL? {
+    /// Облачный файл: скачать через дисковый кеш (тот же путь, что
+    /// `RemoteFilePreviewScreen`). Для фото с JpegView качаем именно его
+    /// (`viewIDByFileID`: file_id оригинала → file_id JPEG-вида) — браузеро-/
+    /// QuickLook-дружелюбный JPEG вместо тяжёлого HEIC-оригинала. Видео и файлы
+    /// без вида резолвятся по своему оригинальному id.
+    static func cloud(
+        transfer: FileTransferService,
+        cache: FileCacheService,
+        viewIDByFileID: [String: String] = [:]
+    ) -> (String) async -> URL? {
         { fileID in
-            try? await cache.loadFile(fileId: fileID, variant: .original) {
-                let urls = try await transfer.tempDownloadURLs(fileIDs: [fileID])
-                guard let remote = urls[fileID] else { throw FileTransferError.downloadFailed }
+            let downloadID = viewIDByFileID[fileID] ?? fileID
+            return try? await cache.loadFile(fileId: downloadID, variant: .original) {
+                let urls = try await transfer.tempDownloadURLs(fileIDs: [downloadID])
+                guard let remote = urls[downloadID] else { throw FileTransferError.downloadFailed }
                 return remote
             }
         }
+    }
+
+    /// Карта «file_id оригинала → file_id JPEG-вида» для фото-элементов. Видео и
+    /// элементы без вида пропускаются (резолвятся по своему оригиналу).
+    static func jpegViewMap(_ items: [MediaItem]) -> [String: String] {
+        Dictionary(
+            items.compactMap { item -> (String, String)? in
+                guard !item.isVideo,
+                      let view = item.asset?.jpegViewFileID,
+                      !view.isEmpty else { return nil }
+                return (item.id, view)
+            },
+            uniquingKeysWith: { first, _ in first }
+        )
     }
 }
 
