@@ -78,6 +78,29 @@ export interface Album {
   updatedAt: string | null;
 }
 
+/** Правило умной папки (поле/оператор/значение — числовые коды совпадают с proto). */
+export interface DynamicFolderRule {
+  field: number;
+  op: number;
+  value: string;
+}
+
+/** Умная (динамическая) папка (CloudJson.DynamicFolder). */
+export interface DynamicFolder {
+  id: string;
+  name: string;
+  isSystem: boolean;
+  combinator: number; // 0 = все условия (И), 1 = любое (ИЛИ)
+  rules: DynamicFolderRule[];
+  iconKey: string;
+  coverColor: string;
+  coverUrl: string;
+  count: number;
+  sortOrder: number;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
 /** Свойства файла (GET /api/files/info). */
 export interface FileInfo extends CardFile {
   etag?: string;

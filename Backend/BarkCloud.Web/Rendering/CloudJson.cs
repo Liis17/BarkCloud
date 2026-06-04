@@ -82,6 +82,23 @@ public static class CloudJson
         updatedAt = Iso(a.UpdatedAt)
     };
 
+    /// <summary>Карточка умной папки: критерии (правила + комбинатор), обложка, счётчик, признак системной.</summary>
+    public static object DynamicFolder(DynamicFolderInfo f) => new
+    {
+        id = f.Id,
+        name = f.Name,
+        isSystem = f.IsSystem,
+        combinator = (int)f.Combinator,
+        rules = f.Rules.Select(r => new { field = (int)r.Field, op = (int)r.Operator, value = r.Value }).ToArray(),
+        iconKey = f.IconKey,
+        coverColor = f.CoverColor,
+        coverUrl = f.CoverPreviewUrl,
+        count = f.ItemsCount,
+        sortOrder = f.SortOrder,
+        createdAt = Iso(f.CreatedAt),
+        updatedAt = Iso(f.UpdatedAt)
+    };
+
     /// <summary>Запись каталога: метаданные записи + вложенная карточка файла.</summary>
     public static object Entry(FileEntryDetailed e) => new
     {
