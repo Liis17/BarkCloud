@@ -132,8 +132,6 @@
 		};
 		CA11000000000000000000A7 /* BarkCloudTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = BarkCloudTests;
 			sourceTree = "<group>";
 		};
@@ -363,7 +361,7 @@
 				2B40067EABBEA6EEDEABBC3E /* XCRemoteSwiftPackageReference "grpc-swift-nio-transport" */,
 				07369F5ACE620A0BC6078E22 /* XCRemoteSwiftPackageReference "grpc-swift-protobuf" */,
 				73F74D6EEDDFD7D6646D02A0 /* XCRemoteSwiftPackageReference "swift-protobuf" */,
-				B18B3244AA0AE48E22D3161E /* XCLocalSwiftPackageReference "BarkCloudKit" */,
+				B18B3244AA0AE48E22D3161E /* XCLocalSwiftPackageReference "../../Mac/BarkCloudKit" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 23AF708D2FBBAEED006005AF /* Products */;
@@ -849,7 +847,7 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		B18B3244AA0AE48E22D3161E /* XCLocalSwiftPackageReference "BarkCloudKit" */ = {
+		B18B3244AA0AE48E22D3161E /* XCLocalSwiftPackageReference "../../Mac/BarkCloudKit" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = ../../Mac/BarkCloudKit;
 		};
@@ -913,7 +911,7 @@
 		};
 		B65CD2CD9956C1FB5D3B365D /* BarkCloudKit */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = B18B3244AA0AE48E22D3161E /* XCLocalSwiftPackageReference "BarkCloudKit" */;
+			package = B18B3244AA0AE48E22D3161E /* XCLocalSwiftPackageReference "../../Mac/BarkCloudKit" */;
 			productName = BarkCloudKit;
 		};
 		C1A46198F3632CDB091ABA2E /* GRPCProtobuf */ = {
@@ -923,7 +921,7 @@
 		};
 		C901278C7027FC233377C64E /* BarkCloudKit */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = B18B3244AA0AE48E22D3161E /* XCLocalSwiftPackageReference "BarkCloudKit" */;
+			package = B18B3244AA0AE48E22D3161E /* XCLocalSwiftPackageReference "../../Mac/BarkCloudKit" */;
 			productName = BarkCloudKit;
 		};
 		CE6AA630EBC1B681204291DB /* GRPCCore */ = {
