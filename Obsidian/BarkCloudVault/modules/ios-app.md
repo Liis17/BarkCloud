@@ -715,3 +715,25 @@ gRPC/Networking/Generated файлы в Share Extension target + линкует 
 `ShareInboxUploader` остался как одноразовая миграция legacy очереди
 (`ShareInbox/<uuid>/<file>`) — переоформляет файлы в UploadJob через
 `cloud.enqueueBackgroundUpload(sourceFile:)` при старте app.
+
+## Widget — заполнение облачного диска
+
+Home Screen виджет «Хранилище BarkCloud» (`.systemSmall` + `.systemMedium`) в
+том же extension, что и Live Activity. Виджет в gRPC не ходит — main app кладёт
+снимок квоты в App Group `UserDefaults`, виджет читает.
+
+- `Networking/StorageWidgetBridge.swift` (main app) — `update(used:limit:)`
+  пишет три ключа (`storage_widget.used/limit/updatedAt`) в App Group
+  `UserDefaults(suiteName: group.com.barkfluff.BarkCloud)` и дёргает
+  `WidgetCenter.reloadTimelines(ofKind: "StorageWidget")`. Зовётся там же, где
+  приложение получает квоту: `ProfileViewModel.load()` и
+  `BackupManager.loadStorageInfo()` (после `transfer.storageInfo()`).
+- `BarkCloudWidgets/StorageWidget.swift` — `StaticConfiguration` (kind
+  `StorageWidget`), `TimelineProvider` читает `StorageSnapshot.current()` из тех
+  же ключей (контракт — строковые ключи, общего типа между таргетами нет),
+  политика обновления `.after(+1h)`. UI: капсульный прогресс-бар (`CapsuleProgressBar`,
+  градиентная заливка, оранжевый → красный при ≥ 90 %), процент, занято/свободно/
+  всего (`ByteCountFormatter` `.binary`). Нет данных (`limit ≤ 0`) → заглушка
+  «Откройте приложение». Зарегистрирован в `BarkCloudWidgetsBundle.swift`.
+- Бэкенд/прото не трогались — `transfer.storageInfo()` уже существовал
+  (`Files.GetUserStorageInfo`). App Group и так был в обоих entitlements.
