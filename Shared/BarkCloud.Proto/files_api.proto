@@ -42,6 +42,10 @@ service CloudApi {
 
   rpc SetVideoThumbnail    (SetVideoThumbnailRequest)    returns (CloudEmpty);               // Заменить превью видео загруженной картинкой
 
+  // ───────── Воспоминания / Карта ─────────
+  rpc GetMemories          (GetMemoriesRequest)          returns (GetMemoriesResponse);       // «В этот день»: фото/видео за сегодняшнюю дату прошлых лет, по группам-годам
+  rpc ListMediaLocations   (ListMediaLocationsRequest)   returns (ListMediaLocationsResponse); // Медиа с GPS-координатами (точки для карты, cursor pagination)
+
   // ───────── Корзина ─────────
   rpc ListTrash            (ListTrashRequest)            returns (ListTrashResponse);        // Список файлов в корзине (от новых к старым)
   rpc RestoreFromTrash     (RestoreFromTrashRequest)     returns (CloudEmpty);               // Восстановить файл из корзины
@@ -675,6 +679,49 @@ message ListDynamicFolderItemsRequest {
 
 message ListDynamicFolderItemsResponse {
   repeated UploadFileInfo items = 1;
+  google.protobuf.Timestamp next_cursor_created_at = 2; // пусто = больше нет страниц
+  string next_cursor_file_id = 3;
+}
+
+// ============ Воспоминания «В этот день» ============
+
+message GetMemoriesRequest {
+  int32 month = 1;          // 1..12; 0 = взять текущий месяц на сервере (UTC)
+  int32 day = 2;            // 1..31; 0 = взять текущий день на сервере (UTC)
+  int32 per_year_limit = 3; // максимум превью на год; 0 = default (12), max 60
+}
+
+message MemoryGroup {
+  int32 year = 1;                 // год съёмки
+  int32 years_ago = 2;            // сколько лет назад относительно текущего года
+  int32 total_count = 3;          // всего медиа в этот день за этот год (может превышать items)
+  repeated UploadFileInfo items = 4; // до per_year_limit карточек, от новых к старым
+}
+
+message GetMemoriesResponse {
+  repeated MemoryGroup groups = 1; // от самого свежего года к старому
+}
+
+// ============ Карта (медиа с GPS) ============
+
+message MediaLocationPoint {
+  string file_id = 1;
+  double latitude = 2;
+  double longitude = 3;
+  MediaKind media_kind = 4;
+  string preview_url = 5;                       // узкое превью (пусто, если нет)
+  optional google.protobuf.Timestamp taken_at = 6; // дата съёмки, если известна
+  google.protobuf.Timestamp created_at = 7;     // дата загрузки (для курсора)
+}
+
+message ListMediaLocationsRequest {
+  int32 limit = 1;                                 // 1..1000, default 500
+  google.protobuf.Timestamp cursor_created_at = 2; // exclusive; пусто = с самых свежих
+  string cursor_file_id = 3;                       // tie-breaker
+}
+
+message ListMediaLocationsResponse {
+  repeated MediaLocationPoint points = 1;
   google.protobuf.Timestamp next_cursor_created_at = 2; // пусто = больше нет страниц
   string next_cursor_file_id = 3;
 }

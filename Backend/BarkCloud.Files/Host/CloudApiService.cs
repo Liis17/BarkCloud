@@ -38,6 +38,8 @@ using BarkCloud.Files.Features.Cloud.ListMyOutgoingSharesAll;
 using BarkCloud.Files.Features.Cloud.ListSharedWithMe;
 using BarkCloud.Files.Features.Cloud.GetSharedFileDownloadUrl;
 using BarkCloud.Files.Features.Cloud.SetVideoThumbnail;
+using BarkCloud.Files.Features.Cloud.GetMemories;
+using BarkCloud.Files.Features.Cloud.ListMediaLocations;
 using BarkCloud.Proto.Files;
 using BarkCloud.Shared.Identity;
 
@@ -242,6 +244,38 @@ public class CloudApiService : CloudApi.CloudApiBase
         {
             VideoFileId = Guid.Parse(request.VideoFileId),
             SourceImageFileId = Guid.Parse(request.SourceImageFileId)
+        };
+
+        return _mediator.Send(command);
+    }
+
+    public override Task<GetMemoriesResponse> GetMemories(GetMemoriesRequest request, ServerCallContext context)
+    {
+        var command = new GetMemoriesCommand
+        {
+            Month = request.Month,
+            Day = request.Day,
+            PerYearLimit = request.PerYearLimit
+        };
+
+        return _mediator.Send(command);
+    }
+
+    public override Task<ListMediaLocationsResponse> ListMediaLocations(ListMediaLocationsRequest request, ServerCallContext context)
+    {
+        DateTime? cursorCreatedAt = null;
+        Guid? cursorFileId = null;
+        if (request.CursorCreatedAt is not null && !string.IsNullOrWhiteSpace(request.CursorFileId))
+        {
+            cursorCreatedAt = request.CursorCreatedAt.ToDateTime();
+            cursorFileId = Guid.Parse(request.CursorFileId);
+        }
+
+        var command = new ListMediaLocationsCommand
+        {
+            Limit = request.Limit,
+            CursorCreatedAt = cursorCreatedAt,
+            CursorFileId = cursorFileId
         };
 
         return _mediator.Send(command);
