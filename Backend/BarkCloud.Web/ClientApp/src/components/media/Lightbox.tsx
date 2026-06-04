@@ -93,7 +93,11 @@ export function Lightbox({ items, index = 0, media, onClose }: LightboxProps) {
   }, [isVideo]);
 
   if (!cur) return null;
+  // Оригинал (временная ссылка) — для скачивания, видео и фолбэка фото.
   const url = fileId ? urls[fileId] : null;
+  // Для фото показываем JpegView (HEIC и пр. браузеро-недружелюбные форматы), если он есть.
+  const photoSrc = isVideo ? null : (cur.jpegViewUrl && cur.jpegViewUrl.length > 0 ? cur.jpegViewUrl : url);
+  const ready = isVideo ? !!url : !!photoSrc;
 
   function onMouseDown(e: React.MouseEvent) {
     if (isVideo || scale <= 1) return;
@@ -129,16 +133,16 @@ export function Lightbox({ items, index = 0, media, onClose }: LightboxProps) {
       )}
 
       <div className="lb-stage" ref={stageRef} onClick={(e) => e.stopPropagation()}>
-        {err && <div className="lb-msg">Не удалось загрузить оригинал: {err}</div>}
-        {!err && !url && (
+        {err && <div className="lb-msg">Не удалось загрузить: {err}</div>}
+        {!err && !ready && (
           <div className="lb-msg">
-            <span className="spinner" /> Загрузка оригинала…
+            <span className="spinner" /> Загрузка…
           </div>
         )}
-        {url && isVideo && <video ref={videoRef} src={url} controls autoPlay />}
-        {url && !isVideo && (
+        {ready && isVideo && <video ref={videoRef} src={url!} controls autoPlay />}
+        {ready && !isVideo && (
           <img
-            src={url}
+            src={photoSrc!}
             alt={cur.name || ''}
             draggable={false}
             className={scale > 1 ? 'zoomed' : ''}
@@ -154,7 +158,7 @@ export function Lightbox({ items, index = 0, media, onClose }: LightboxProps) {
 
       {url && (
         <a className="lb-download btn" href={url} download={cur.name} onClick={(e) => e.stopPropagation()}>
-          <Icon.download size={16} /> Скачать
+          <Icon.download size={16} /> Скачать оригинал
         </a>
       )}
     </div>

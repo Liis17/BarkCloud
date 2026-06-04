@@ -22,6 +22,8 @@ export interface CardFile {
   previews: Preview[];
   createdAt: string | null;
   uploadedAt: string | null;
+  /** Полноразмерный JPEG для просмотра (HEIC и пр.); пусто/нет — показывать оригинал. */
+  jpegViewUrl?: string;
 }
 
 /** Элемент галереи: карточка + записи каталога владельца (CloudJson.MediaItem). */
@@ -37,17 +39,6 @@ export interface MemoryGroup {
   yearsAgo: number;
   totalCount: number;
   items: CardFile[];
-}
-
-/** Точка на карте — медиа с GPS (CloudJson.MapPoint). */
-export interface MapPoint {
-  id: string;
-  lat: number;
-  lng: number;
-  kind: MediaKind;
-  previewUrl: string;
-  takenAt: string | null;
-  createdAt: string | null;
 }
 
 /** Папка (CloudJson.Dir). */
