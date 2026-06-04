@@ -1,8 +1,15 @@
 import SwiftUI
 
 /// Контейнер-приложение macOS-клиента BarkCloud: окно (server setup → логин →
-/// дашборд) + значок в menu-bar. FSKit-расширение `BarkCloudFS` встроено в этот
-/// бандл; монтирование инициируется отсюда (`MountManager`).
+/// дашборд) + значок в menu-bar. File Provider-расширение `BarkCloudFS`
+/// встроено в этот бандл; домен регистрируется отсюда (`FileProviderDomainManager`).
+///
+/// Поведение app: menu-bar-only (`LSUIElement=YES` через
+/// `INFOPLIST_KEY_LSUIElement` в build settings) — нет иконки в Dock, нет
+/// глобального меню приложения. Закрытие окна крестиком прячет окно;
+/// процесс продолжает жить, и его можно вернуть через menu-bar (или, если
+/// окно вообще не открыто — система откроет через WindowGroup при следующем
+/// `openWindow(id: "main")`).
 @main
 struct BarkCloudDriveApp: App {
     @State private var model = AppModel()
