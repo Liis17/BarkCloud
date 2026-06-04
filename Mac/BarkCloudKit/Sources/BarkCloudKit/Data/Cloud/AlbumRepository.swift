@@ -4,12 +4,12 @@ import SwiftProtobuf
 
 /// Доступ к сервису альбомов (`AlbumApi`). Доменные ошибки пробрасываются как
 /// `RPCError`; UI маппит их через `domainErrorMessage(_:)`.
-final class AlbumRepository: Sendable {
+public final class AlbumRepository: Sendable {
     private let grpc: GrpcManager
 
-    init(grpc: GrpcManager) { self.grpc = grpc }
+    public init(grpc: GrpcManager) { self.grpc = grpc }
 
-    func listAlbums(
+    public func listAlbums(
         limit: Int32 = 50,
         cursorUpdatedAt: Date? = nil,
         cursorAlbumID: String = ""
@@ -30,7 +30,7 @@ final class AlbumRepository: Sendable {
     }
 
     /// Элементы альбома (с опциональным фильтром по типу).
-    func listItems(
+    public func listItems(
         albumID: String,
         kindFilter: CloudMediaKind? = nil,
         limit: Int32 = 50,
@@ -59,7 +59,7 @@ final class AlbumRepository: Sendable {
     }
 
     @discardableResult
-    func createAlbum(name: String, description: String = "") async throws -> AlbumCard {
+    public func createAlbum(name: String, description: String = "") async throws -> AlbumCard {
         let stub = try await grpc.albumStub()
         var req = Barkcloud_Files_CreateAlbumRequest()
         req.name = name
@@ -68,7 +68,7 @@ final class AlbumRepository: Sendable {
     }
 
     @discardableResult
-    func updateAlbum(
+    public func updateAlbum(
         albumID: String,
         name: String? = nil,
         description: String? = nil,
@@ -83,14 +83,14 @@ final class AlbumRepository: Sendable {
         return AlbumCard(try await stub.updateAlbum(req))
     }
 
-    func deleteAlbum(_ albumID: String) async throws {
+    public func deleteAlbum(_ albumID: String) async throws {
         let stub = try await grpc.albumStub()
         var req = Barkcloud_Files_DeleteAlbumRequest()
         req.albumID = albumID
         _ = try await stub.deleteAlbum(req)
     }
 
-    func addItems(albumID: String, fileIDs: [String]) async throws {
+    public func addItems(albumID: String, fileIDs: [String]) async throws {
         let stub = try await grpc.albumStub()
         var req = Barkcloud_Files_AddItemsToAlbumRequest()
         req.albumID = albumID
@@ -98,7 +98,7 @@ final class AlbumRepository: Sendable {
         _ = try await stub.addItemsToAlbum(req)
     }
 
-    func removeItems(albumID: String, fileIDs: [String]) async throws {
+    public func removeItems(albumID: String, fileIDs: [String]) async throws {
         let stub = try await grpc.albumStub()
         var req = Barkcloud_Files_RemoveItemsFromAlbumRequest()
         req.albumID = albumID

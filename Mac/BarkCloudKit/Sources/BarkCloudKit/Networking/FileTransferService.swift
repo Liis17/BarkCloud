@@ -1,7 +1,7 @@
 import Foundation
 import GRPCCore
 
-enum FileTransferError: Error {
+public enum FileTransferError: Error {
     case badURL
     case badUploadResponse
     case downloadFailed
@@ -11,17 +11,17 @@ enum FileTransferError: Error {
 /// upload/download на готовые URL, которые возвращает сервер. Загрузка/скачивание
 /// идут НЕ через gRPC, а POST/GET на `:7025/web/upload|download/{id}` через
 /// `InsecureHTTP.session` (self-signed TLS).
-final class FileTransferService: Sendable {
+public final class FileTransferService: Sendable {
     private let grpc: GrpcManager
 
-    init(grpc: GrpcManager) {
+    public init(grpc: GrpcManager) {
         self.grpc = grpc
     }
 
     // MARK: - gRPC (FilesApi)
 
     /// Получить адрес для загрузки и предварительный file_id.
-    func getUploadURL(type: Barkcloud_Files_UploadFileType) async throws -> (url: String, fileID: String) {
+    public func getUploadURL(type: Barkcloud_Files_UploadFileType) async throws -> (url: String, fileID: String) {
         let stub = try await grpc.filesStub()
         var req = Barkcloud_Files_GetUploadUrlRequest()
         req.fileType = type
@@ -30,7 +30,7 @@ final class FileTransferService: Sendable {
     }
 
     /// Временные ссылки на оригиналы по file_id (file_id → URL).
-    func tempDownloadURLs(fileIDs: [String]) async throws -> [String: URL] {
+    public func tempDownloadURLs(fileIDs: [String]) async throws -> [String: URL] {
         guard !fileIDs.isEmpty else { return [:] }
         let stub = try await grpc.filesStub()
         var req = Barkcloud_Files_GetTempDownloadUrlRequest()
@@ -44,7 +44,7 @@ final class FileTransferService: Sendable {
     }
 
     /// Информация о хранилище пользователя (использовано / лимит, в байтах).
-    func storageInfo() async throws -> (used: Int64, limit: Int64) {
+    public func storageInfo() async throws -> (used: Int64, limit: Int64) {
         let stub = try await grpc.filesStub()
         let resp = try await stub.getUserStorageInfo(Barkcloud_Files_GetUserStorageInfoRequest())
         return (resp.totalUsedStorage, resp.storageLimit)
@@ -52,7 +52,7 @@ final class FileTransferService: Sendable {
 
     /// Свежий access-токен (через проактивный refresh) — для использования в
     /// `BackgroundUploadCoordinator` при сборке `URLRequest`.
-    func validAccessToken() async -> String? {
+    public func validAccessToken() async -> String? {
         await grpc.validAccessToken()
     }
 
@@ -60,7 +60,7 @@ final class FileTransferService: Sendable {
 
     /// Залить байты по адресу из `getUploadURL`. Возвращает `fileId` ИЗ ОТВЕТА —
     /// при дедупликации он может отличаться от запрошенного, всегда используем его.
-    func upload(data: Data, fileName: String, to urlString: String) async throws -> String {
+    public func upload(data: Data, fileName: String, to urlString: String) async throws -> String {
         guard let url = URL(string: urlString) else { throw FileTransferError.badURL }
 
         var request = URLRequest(url: url)
@@ -84,7 +84,7 @@ final class FileTransferService: Sendable {
     }
 
     /// Скачать оригинал во временный файл (для предпросмотра / шеринга).
-    func download(from url: URL, suggestedName: String) async throws -> URL {
+    public func download(from url: URL, suggestedName: String) async throws -> URL {
         let (tempURL, response) = try await InsecureHTTP.session.download(from: url)
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
             throw FileTransferError.downloadFailed

@@ -1,6 +1,6 @@
 import Foundation
 
-enum AuthResult: Sendable, Equatable {
+public enum AuthResult: Sendable, Equatable {
     case success
     case otpRequired
     case invalidCredentials

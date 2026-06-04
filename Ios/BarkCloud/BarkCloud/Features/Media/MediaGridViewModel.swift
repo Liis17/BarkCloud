@@ -2,6 +2,7 @@ import Foundation
 import Observation
 import Photos
 import UIKit
+import BarkCloudKit
 
 struct MediaGridUiState {
     var items: [MediaItem] = []

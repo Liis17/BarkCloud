@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import BarkCloudKit
 
 /// UI-обёртка над `ServerConfig` (App Group UserDefaults). Источник истины для
 /// гейта первого запуска в `RootView` и для формы `ServerSetupScreen`.

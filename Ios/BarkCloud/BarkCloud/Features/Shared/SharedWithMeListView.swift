@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import BarkCloudKit
 
 /// Карточки файлов из таба «Мне доступны» в `SharedHubScreen`. Превью — через
 /// `MediaThumb` (с дисковым кешем по `fileId`), под именем владельца — дата;

@@ -20,8 +20,8 @@ fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAP
   typealias Version = _2
 }
 
-enum Barkcloud_Identity_OtpTypeId: SwiftProtobuf.Enum, Swift.CaseIterable {
-  typealias RawValue = Int
+public enum Barkcloud_Identity_OtpTypeId: SwiftProtobuf.Enum, Swift.CaseIterable {
+  public typealias RawValue = Int
 
   /// Неизвестный
   case unknown // = 0
@@ -33,11 +33,11 @@ enum Barkcloud_Identity_OtpTypeId: SwiftProtobuf.Enum, Swift.CaseIterable {
   case email // = 2
   case UNRECOGNIZED(Int)
 
-  init() {
+  public init() {
     self = .unknown
   }
 
-  init?(rawValue: Int) {
+  public init?(rawValue: Int) {
     switch rawValue {
     case 0: self = .unknown
     case 1: self = .authenticator
@@ -46,7 +46,7 @@ enum Barkcloud_Identity_OtpTypeId: SwiftProtobuf.Enum, Swift.CaseIterable {
     }
   }
 
-  var rawValue: Int {
+  public var rawValue: Int {
     switch self {
     case .unknown: return 0
     case .authenticator: return 1
@@ -56,7 +56,7 @@ enum Barkcloud_Identity_OtpTypeId: SwiftProtobuf.Enum, Swift.CaseIterable {
   }
 
   // The compiler won't synthesize support with the UNRECOGNIZED case.
-  static let allCases: [Barkcloud_Identity_OtpTypeId] = [
+  public static let allCases: [Barkcloud_Identity_OtpTypeId] = [
     .unknown,
     .authenticator,
     .email,
@@ -64,196 +64,196 @@ enum Barkcloud_Identity_OtpTypeId: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
-struct Barkcloud_Identity_CreateSessionForUserServerRequest: Sendable {
+public struct Barkcloud_Identity_CreateSessionForUserServerRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var userID: Int64 = 0
+  public var userID: Int64 = 0
 
   /// GUID нового устройства
-  var deviceID: String = String()
+  public var deviceID: String = String()
 
-  var deviceName: String = String()
+  public var deviceName: String = String()
 
-  var operationSystem: String = String()
+  public var operationSystem: String = String()
 
   /// "AppName v.X.Y.Z" (склеено вызывающим)
-  var appName: String = String()
+  public var appName: String = String()
 
-  var ipAddress: String = String()
+  public var ipAddress: String = String()
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Identity_CreateSessionForUserServerResponse: Sendable {
+public struct Barkcloud_Identity_CreateSessionForUserServerResponse: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var accessToken: Barkcloud_Identity_Token {
+  public var accessToken: Barkcloud_Identity_Token {
     get {_accessToken ?? Barkcloud_Identity_Token()}
     set {_accessToken = newValue}
   }
   /// Returns true if `accessToken` has been explicitly set.
-  var hasAccessToken: Bool {self._accessToken != nil}
+  public var hasAccessToken: Bool {self._accessToken != nil}
   /// Clears the value of `accessToken`. Subsequent reads from it will return its default value.
-  mutating func clearAccessToken() {self._accessToken = nil}
+  public mutating func clearAccessToken() {self._accessToken = nil}
 
-  var refreshToken: Barkcloud_Identity_Token {
+  public var refreshToken: Barkcloud_Identity_Token {
     get {_refreshToken ?? Barkcloud_Identity_Token()}
     set {_refreshToken = newValue}
   }
   /// Returns true if `refreshToken` has been explicitly set.
-  var hasRefreshToken: Bool {self._refreshToken != nil}
+  public var hasRefreshToken: Bool {self._refreshToken != nil}
   /// Clears the value of `refreshToken`. Subsequent reads from it will return its default value.
-  mutating func clearRefreshToken() {self._refreshToken = nil}
+  public mutating func clearRefreshToken() {self._refreshToken = nil}
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 
   fileprivate var _accessToken: Barkcloud_Identity_Token? = nil
   fileprivate var _refreshToken: Barkcloud_Identity_Token? = nil
 }
 
-struct Barkcloud_Identity_ListOtpVerificationServerRequest: Sendable {
+public struct Barkcloud_Identity_ListOtpVerificationServerRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var userID: Int64 = 0
+  public var userID: Int64 = 0
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Identity_DisableOtpVerificationServerRequest: Sendable {
+public struct Barkcloud_Identity_DisableOtpVerificationServerRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var userID: Int64 = 0
+  public var userID: Int64 = 0
 
-  var otpType: Barkcloud_Identity_OtpTypeId = .unknown
+  public var otpType: Barkcloud_Identity_OtpTypeId = .unknown
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Identity_GetActiveSessionsServerRequest: Sendable {
+public struct Barkcloud_Identity_GetActiveSessionsServerRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var userID: Int64 = 0
+  public var userID: Int64 = 0
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Identity_RemoveActiveSessionServerRequest: Sendable {
+public struct Barkcloud_Identity_RemoveActiveSessionServerRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var userID: Int64 = 0
+  public var userID: Int64 = 0
 
-  var deviceID: String = String()
+  public var deviceID: String = String()
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
 /// Принудительная смена пароля (серверный, для админ-панели)
-struct Barkcloud_Identity_ForceSetPasswordServerRequest: Sendable {
+public struct Barkcloud_Identity_ForceSetPasswordServerRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var userID: Int64 = 0
+  public var userID: Int64 = 0
 
-  var newPassword: String = String()
+  public var newPassword: String = String()
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Identity_ForceSetPasswordServerResponse: Sendable {
+public struct Barkcloud_Identity_ForceSetPasswordServerResponse: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Identity_ConfirmResetPasswordRequest: Sendable {
+public struct Barkcloud_Identity_ConfirmResetPasswordRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// идентификатор сброса пароля
-  var resetID: String = String()
+  public var resetID: String = String()
 
   /// код подтверждения
-  var otpCode: String = String()
+  public var otpCode: String = String()
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Identity_ConfirmResetPasswordResponse: Sendable {
+public struct Barkcloud_Identity_ConfirmResetPasswordResponse: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// токен доступа
-  var accessToken: Barkcloud_Identity_Token {
+  public var accessToken: Barkcloud_Identity_Token {
     get {_accessToken ?? Barkcloud_Identity_Token()}
     set {_accessToken = newValue}
   }
   /// Returns true if `accessToken` has been explicitly set.
-  var hasAccessToken: Bool {self._accessToken != nil}
+  public var hasAccessToken: Bool {self._accessToken != nil}
   /// Clears the value of `accessToken`. Subsequent reads from it will return its default value.
-  mutating func clearAccessToken() {self._accessToken = nil}
+  public mutating func clearAccessToken() {self._accessToken = nil}
 
   /// токен обновления
-  var refreshToken: Barkcloud_Identity_Token {
+  public var refreshToken: Barkcloud_Identity_Token {
     get {_refreshToken ?? Barkcloud_Identity_Token()}
     set {_refreshToken = newValue}
   }
   /// Returns true if `refreshToken` has been explicitly set.
-  var hasRefreshToken: Bool {self._refreshToken != nil}
+  public var hasRefreshToken: Bool {self._refreshToken != nil}
   /// Clears the value of `refreshToken`. Subsequent reads from it will return its default value.
-  mutating func clearRefreshToken() {self._refreshToken = nil}
+  public mutating func clearRefreshToken() {self._refreshToken = nil}
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 
   fileprivate var _accessToken: Barkcloud_Identity_Token? = nil
   fileprivate var _refreshToken: Barkcloud_Identity_Token? = nil
 }
 
-struct Barkcloud_Identity_ResetPasswordRequest: Sendable {
+public struct Barkcloud_Identity_ResetPasswordRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var login: Barkcloud_Identity_ResetPasswordRequest.OneOf_Login? = nil
+  public var login: Barkcloud_Identity_ResetPasswordRequest.OneOf_Login? = nil
 
   /// имя пользователя
-  var username: String {
+  public var username: String {
     get {
       if case .username(let v)? = login {return v}
       return String()
@@ -262,7 +262,7 @@ struct Barkcloud_Identity_ResetPasswordRequest: Sendable {
   }
 
   /// емейл
-  var email: String {
+  public var email: String {
     get {
       if case .email(let v)? = login {return v}
       return String()
@@ -271,11 +271,11 @@ struct Barkcloud_Identity_ResetPasswordRequest: Sendable {
   }
 
   /// тип кода подверждения
-  var otpType: Barkcloud_Identity_OtpTypeId = .unknown
+  public var otpType: Barkcloud_Identity_OtpTypeId = .unknown
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  enum OneOf_Login: Equatable, Sendable {
+  public enum OneOf_Login: Equatable, Sendable {
     /// имя пользователя
     case username(String)
     /// емейл
@@ -283,402 +283,402 @@ struct Barkcloud_Identity_ResetPasswordRequest: Sendable {
 
   }
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Identity_ResetPasswordResponse: Sendable {
+public struct Barkcloud_Identity_ResetPasswordResponse: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// идентификатор сброса пароля
-  var resetID: String = String()
+  public var resetID: String = String()
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Identity_FastAuthRequest: Sendable {
+public struct Barkcloud_Identity_FastAuthRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// Идентификатор быстрого входа
-  var fastAuthID: String = String()
+  public var fastAuthID: String = String()
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Identity_SendEmailOtpCodeRequest: Sendable {
+public struct Barkcloud_Identity_SendEmailOtpCodeRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Identity_SendEmailOtpCodeResponse: Sendable {
+public struct Barkcloud_Identity_SendEmailOtpCodeResponse: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Identity_ListOtpVerificationRequest: Sendable {
+public struct Barkcloud_Identity_ListOtpVerificationRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Identity_ListOtpVerificationResponse: Sendable {
+public struct Barkcloud_Identity_ListOtpVerificationResponse: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// Включен ли 2ФА по otp анутиифкатору
-  var authenticatorEnabled: Bool = false
+  public var authenticatorEnabled: Bool = false
 
   /// Включен ли 2ФА по почте
-  var emailEnabled: Bool = false
+  public var emailEnabled: Bool = false
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Identity_DisableOtpVerificationRequest: Sendable {
+public struct Barkcloud_Identity_DisableOtpVerificationRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// Тип 2ФА авторизации
-  var otpType: Barkcloud_Identity_OtpTypeId = .unknown
+  public var otpType: Barkcloud_Identity_OtpTypeId = .unknown
 
   /// Код для отключения (при отключении email не передавать)
-  var otpCode: String = String()
+  public var otpCode: String = String()
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Identity_DisableOtpVerificationResponse: Sendable {
+public struct Barkcloud_Identity_DisableOtpVerificationResponse: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Identity_ConfirmOtpVerificationRequest: Sendable {
+public struct Barkcloud_Identity_ConfirmOtpVerificationRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// ОТП код
-  var otpCode: String = String()
+  public var otpCode: String = String()
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Identity_ConfirmOtpVerificationResponse: Sendable {
+public struct Barkcloud_Identity_ConfirmOtpVerificationResponse: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Identity_EnableOtpVerificationRequest: Sendable {
+public struct Barkcloud_Identity_EnableOtpVerificationRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// Тип 2ФА авторизации
-  var otpType: Barkcloud_Identity_OtpTypeId = .unknown
+  public var otpType: Barkcloud_Identity_OtpTypeId = .unknown
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Identity_EnableOtpVerificationResponse: Sendable {
+public struct Barkcloud_Identity_EnableOtpVerificationResponse: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// base64 QR кода для подключения гугл аунтификатора
-  var otpQr: String = String()
+  public var otpQr: String = String()
 
   /// код для подключения вручную
-  var otpCode: String = String()
+  public var otpCode: String = String()
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Identity_RemoveActiveSessionRequest: Sendable {
+public struct Barkcloud_Identity_RemoveActiveSessionRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// Идентификатор устройства (GUID)
-  var deviceID: String = String()
+  public var deviceID: String = String()
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Identity_RemoveActiveSessionResponse: Sendable {
+public struct Barkcloud_Identity_RemoveActiveSessionResponse: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Identity_GetActiveSessionsRequest: Sendable {
+public struct Barkcloud_Identity_GetActiveSessionsRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Identity_GetActiveSessionsResponse: Sendable {
+public struct Barkcloud_Identity_GetActiveSessionsResponse: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// Список сессий
-  var sessions: [Barkcloud_Identity_GetActiveSessionsResponse.Session] = []
+  public var sessions: [Barkcloud_Identity_GetActiveSessionsResponse.Session] = []
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  struct Session: Sendable {
+  public struct Session: Sendable {
     // SwiftProtobuf.Message conformance is added in an extension below. See the
     // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
     // methods supported on all messages.
 
     /// Идентификатор сессии
-    var id: Int64 = 0
+    public var id: Int64 = 0
 
     /// Когда был первый вход
-    var createdAt: SwiftProtobuf.Google_Protobuf_Timestamp {
+    public var createdAt: SwiftProtobuf.Google_Protobuf_Timestamp {
       get {_createdAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
       set {_createdAt = newValue}
     }
     /// Returns true if `createdAt` has been explicitly set.
-    var hasCreatedAt: Bool {self._createdAt != nil}
+    public var hasCreatedAt: Bool {self._createdAt != nil}
     /// Clears the value of `createdAt`. Subsequent reads from it will return its default value.
-    mutating func clearCreatedAt() {self._createdAt = nil}
+    public mutating func clearCreatedAt() {self._createdAt = nil}
 
     /// Когда сессия станет недействительной
-    var expirationAt: SwiftProtobuf.Google_Protobuf_Timestamp {
+    public var expirationAt: SwiftProtobuf.Google_Protobuf_Timestamp {
       get {_expirationAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
       set {_expirationAt = newValue}
     }
     /// Returns true if `expirationAt` has been explicitly set.
-    var hasExpirationAt: Bool {self._expirationAt != nil}
+    public var hasExpirationAt: Bool {self._expirationAt != nil}
     /// Clears the value of `expirationAt`. Subsequent reads from it will return its default value.
-    mutating func clearExpirationAt() {self._expirationAt = nil}
+    public mutating func clearExpirationAt() {self._expirationAt = nil}
 
     /// Идентификатор устройства (GUID)
-    var deviceID: String = String()
+    public var deviceID: String = String()
 
     /// Оригинальное имя устройства
-    var originalName: String = String()
+    public var originalName: String = String()
 
     /// Кастомное имя устройства
-    var customName: String = String()
+    public var customName: String = String()
 
     /// Имя приложения
-    var appName: String = String()
+    public var appName: String = String()
 
     /// Операционная система
-    var operationSystem: String = String()
+    public var operationSystem: String = String()
 
     /// Страна/город
-    var location: String = String()
+    public var location: String = String()
 
-    var unknownFields = SwiftProtobuf.UnknownStorage()
+    public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-    init() {}
+    public init() {}
 
     fileprivate var _createdAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
     fileprivate var _expirationAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
   }
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Identity_GenerateTestTokenRequest: Sendable {
+public struct Barkcloud_Identity_GenerateTestTokenRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// Идентификатор пользователя
-  var userID: Int64 = 0
+  public var userID: Int64 = 0
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Identity_GenerateTestTokenResponse: Sendable {
+public struct Barkcloud_Identity_GenerateTestTokenResponse: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// Токен доступа
-  var token: String = String()
+  public var token: String = String()
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Identity_CreateAccountRequest: Sendable {
+public struct Barkcloud_Identity_CreateAccountRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// Имя
-  var firstName: String = String()
+  public var firstName: String = String()
 
   /// Фамилия
-  var lastName: String = String()
+  public var lastName: String = String()
 
   /// Имя пользователя
-  var username: String = String()
+  public var username: String = String()
 
   /// Почта
-  var email: String = String()
+  public var email: String = String()
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Identity_CreateAccountResponse: Sendable {
+public struct Barkcloud_Identity_CreateAccountResponse: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// Идентификатор кода подтверждения
-  var codeID: String = String()
+  public var codeID: String = String()
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Identity_ConfirmAccountRequest: Sendable {
+public struct Barkcloud_Identity_ConfirmAccountRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// Идентификатор кода подтверждения
-  var codeID: String = String()
+  public var codeID: String = String()
 
   /// Значение кода
-  var codeValue: String = String()
+  public var codeValue: String = String()
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Identity_ConfirmAccountResponse: Sendable {
+public struct Barkcloud_Identity_ConfirmAccountResponse: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// Токен обновления
-  var refreshToken: Barkcloud_Identity_Token {
+  public var refreshToken: Barkcloud_Identity_Token {
     get {_refreshToken ?? Barkcloud_Identity_Token()}
     set {_refreshToken = newValue}
   }
   /// Returns true if `refreshToken` has been explicitly set.
-  var hasRefreshToken: Bool {self._refreshToken != nil}
+  public var hasRefreshToken: Bool {self._refreshToken != nil}
   /// Clears the value of `refreshToken`. Subsequent reads from it will return its default value.
-  mutating func clearRefreshToken() {self._refreshToken = nil}
+  public mutating func clearRefreshToken() {self._refreshToken = nil}
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 
   fileprivate var _refreshToken: Barkcloud_Identity_Token? = nil
 }
 
-struct Barkcloud_Identity_CreateTokenRequest: Sendable {
+public struct Barkcloud_Identity_CreateTokenRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// Токен обновления
-  var refreshToken: String = String()
+  public var refreshToken: String = String()
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Identity_CreateTokenResponse: Sendable {
+public struct Barkcloud_Identity_CreateTokenResponse: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// Токен доступа
-  var accessToken: Barkcloud_Identity_Token {
+  public var accessToken: Barkcloud_Identity_Token {
     get {_accessToken ?? Barkcloud_Identity_Token()}
     set {_accessToken = newValue}
   }
   /// Returns true if `accessToken` has been explicitly set.
-  var hasAccessToken: Bool {self._accessToken != nil}
+  public var hasAccessToken: Bool {self._accessToken != nil}
   /// Clears the value of `accessToken`. Subsequent reads from it will return its default value.
-  mutating func clearAccessToken() {self._accessToken = nil}
+  public mutating func clearAccessToken() {self._accessToken = nil}
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 
   fileprivate var _accessToken: Barkcloud_Identity_Token? = nil
 }
 
-struct Barkcloud_Identity_AuthRequest: Sendable {
+public struct Barkcloud_Identity_AuthRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var login: Barkcloud_Identity_AuthRequest.OneOf_Login? = nil
+  public var login: Barkcloud_Identity_AuthRequest.OneOf_Login? = nil
 
   /// имя пользователя
-  var username: String {
+  public var username: String {
     get {
       if case .username(let v)? = login {return v}
       return String()
@@ -687,7 +687,7 @@ struct Barkcloud_Identity_AuthRequest: Sendable {
   }
 
   /// емейл
-  var email: String {
+  public var email: String {
     get {
       if case .email(let v)? = login {return v}
       return String()
@@ -696,14 +696,14 @@ struct Barkcloud_Identity_AuthRequest: Sendable {
   }
 
   /// пароль
-  var password: String = String()
+  public var password: String = String()
 
   /// Код 2ФА авторизации
-  var otpCode: String = String()
+  public var otpCode: String = String()
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  enum OneOf_Login: Equatable, Sendable {
+  public enum OneOf_Login: Equatable, Sendable {
     /// имя пользователя
     case username(String)
     /// емейл
@@ -711,111 +711,111 @@ struct Barkcloud_Identity_AuthRequest: Sendable {
 
   }
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Identity_AuthResponse: Sendable {
+public struct Barkcloud_Identity_AuthResponse: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// токен доступа
-  var accessToken: Barkcloud_Identity_Token {
+  public var accessToken: Barkcloud_Identity_Token {
     get {_accessToken ?? Barkcloud_Identity_Token()}
     set {_accessToken = newValue}
   }
   /// Returns true if `accessToken` has been explicitly set.
-  var hasAccessToken: Bool {self._accessToken != nil}
+  public var hasAccessToken: Bool {self._accessToken != nil}
   /// Clears the value of `accessToken`. Subsequent reads from it will return its default value.
-  mutating func clearAccessToken() {self._accessToken = nil}
+  public mutating func clearAccessToken() {self._accessToken = nil}
 
   /// токен обновления
-  var refreshToken: Barkcloud_Identity_Token {
+  public var refreshToken: Barkcloud_Identity_Token {
     get {_refreshToken ?? Barkcloud_Identity_Token()}
     set {_refreshToken = newValue}
   }
   /// Returns true if `refreshToken` has been explicitly set.
-  var hasRefreshToken: Bool {self._refreshToken != nil}
+  public var hasRefreshToken: Bool {self._refreshToken != nil}
   /// Clears the value of `refreshToken`. Subsequent reads from it will return its default value.
-  mutating func clearRefreshToken() {self._refreshToken = nil}
+  public mutating func clearRefreshToken() {self._refreshToken = nil}
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 
   fileprivate var _accessToken: Barkcloud_Identity_Token? = nil
   fileprivate var _refreshToken: Barkcloud_Identity_Token? = nil
 }
 
-struct Barkcloud_Identity_Token: Sendable {
+public struct Barkcloud_Identity_Token: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// значение
-  var value: String = String()
+  public var value: String = String()
 
   /// дата окончания действия
-  var expirationDate: SwiftProtobuf.Google_Protobuf_Timestamp {
+  public var expirationDate: SwiftProtobuf.Google_Protobuf_Timestamp {
     get {_expirationDate ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
     set {_expirationDate = newValue}
   }
   /// Returns true if `expirationDate` has been explicitly set.
-  var hasExpirationDate: Bool {self._expirationDate != nil}
+  public var hasExpirationDate: Bool {self._expirationDate != nil}
   /// Clears the value of `expirationDate`. Subsequent reads from it will return its default value.
-  mutating func clearExpirationDate() {self._expirationDate = nil}
+  public mutating func clearExpirationDate() {self._expirationDate = nil}
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 
   fileprivate var _expirationDate: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
 }
 
-struct Barkcloud_Identity_SetPasswordRequest: Sendable {
+public struct Barkcloud_Identity_SetPasswordRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// пароль
-  var password: String = String()
+  public var password: String = String()
 
   /// старый пароль (обязателен если пароль уже установлен)
-  var oldPassword: String = String()
+  public var oldPassword: String = String()
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Identity_SetPasswordResponse: Sendable {
+public struct Barkcloud_Identity_SetPasswordResponse: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Identity_LogoutRequest: Sendable {
+public struct Barkcloud_Identity_LogoutRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
-struct Barkcloud_Identity_LogoutResponse: Sendable {
+public struct Barkcloud_Identity_LogoutResponse: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  init() {}
+  public init() {}
 }
 
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
@@ -823,14 +823,14 @@ struct Barkcloud_Identity_LogoutResponse: Sendable {
 fileprivate let _protobuf_package = "barkcloud.identity"
 
 extension Barkcloud_Identity_OtpTypeId: SwiftProtobuf._ProtoNameProviding {
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0Unknown\0\u{1}Authenticator\0\u{1}Email\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0Unknown\0\u{1}Authenticator\0\u{1}Email\0")
 }
 
 extension Barkcloud_Identity_CreateSessionForUserServerRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".CreateSessionForUserServerRequest"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}user_id\0\u{3}device_id\0\u{3}device_name\0\u{3}operation_system\0\u{3}app_name\0\u{3}ip_address\0")
+  public static let protoMessageName: String = _protobuf_package + ".CreateSessionForUserServerRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}user_id\0\u{3}device_id\0\u{3}device_name\0\u{3}operation_system\0\u{3}app_name\0\u{3}ip_address\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -847,7 +847,7 @@ extension Barkcloud_Identity_CreateSessionForUserServerRequest: SwiftProtobuf.Me
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if self.userID != 0 {
       try visitor.visitSingularInt64Field(value: self.userID, fieldNumber: 1)
     }
@@ -869,7 +869,7 @@ extension Barkcloud_Identity_CreateSessionForUserServerRequest: SwiftProtobuf.Me
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Identity_CreateSessionForUserServerRequest, rhs: Barkcloud_Identity_CreateSessionForUserServerRequest) -> Bool {
+  public static func ==(lhs: Barkcloud_Identity_CreateSessionForUserServerRequest, rhs: Barkcloud_Identity_CreateSessionForUserServerRequest) -> Bool {
     if lhs.userID != rhs.userID {return false}
     if lhs.deviceID != rhs.deviceID {return false}
     if lhs.deviceName != rhs.deviceName {return false}
@@ -882,10 +882,10 @@ extension Barkcloud_Identity_CreateSessionForUserServerRequest: SwiftProtobuf.Me
 }
 
 extension Barkcloud_Identity_CreateSessionForUserServerResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".CreateSessionForUserServerResponse"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}access_token\0\u{3}refresh_token\0")
+  public static let protoMessageName: String = _protobuf_package + ".CreateSessionForUserServerResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}access_token\0\u{3}refresh_token\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -898,7 +898,7 @@ extension Barkcloud_Identity_CreateSessionForUserServerResponse: SwiftProtobuf.M
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     // The use of inline closures is to circumvent an issue where the compiler
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
@@ -912,7 +912,7 @@ extension Barkcloud_Identity_CreateSessionForUserServerResponse: SwiftProtobuf.M
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Identity_CreateSessionForUserServerResponse, rhs: Barkcloud_Identity_CreateSessionForUserServerResponse) -> Bool {
+  public static func ==(lhs: Barkcloud_Identity_CreateSessionForUserServerResponse, rhs: Barkcloud_Identity_CreateSessionForUserServerResponse) -> Bool {
     if lhs._accessToken != rhs._accessToken {return false}
     if lhs._refreshToken != rhs._refreshToken {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
@@ -921,10 +921,10 @@ extension Barkcloud_Identity_CreateSessionForUserServerResponse: SwiftProtobuf.M
 }
 
 extension Barkcloud_Identity_ListOtpVerificationServerRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".ListOtpVerificationServerRequest"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}user_id\0")
+  public static let protoMessageName: String = _protobuf_package + ".ListOtpVerificationServerRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}user_id\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -936,14 +936,14 @@ extension Barkcloud_Identity_ListOtpVerificationServerRequest: SwiftProtobuf.Mes
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if self.userID != 0 {
       try visitor.visitSingularInt64Field(value: self.userID, fieldNumber: 1)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Identity_ListOtpVerificationServerRequest, rhs: Barkcloud_Identity_ListOtpVerificationServerRequest) -> Bool {
+  public static func ==(lhs: Barkcloud_Identity_ListOtpVerificationServerRequest, rhs: Barkcloud_Identity_ListOtpVerificationServerRequest) -> Bool {
     if lhs.userID != rhs.userID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -951,10 +951,10 @@ extension Barkcloud_Identity_ListOtpVerificationServerRequest: SwiftProtobuf.Mes
 }
 
 extension Barkcloud_Identity_DisableOtpVerificationServerRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".DisableOtpVerificationServerRequest"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}user_id\0\u{3}otp_type\0")
+  public static let protoMessageName: String = _protobuf_package + ".DisableOtpVerificationServerRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}user_id\0\u{3}otp_type\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -967,7 +967,7 @@ extension Barkcloud_Identity_DisableOtpVerificationServerRequest: SwiftProtobuf.
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if self.userID != 0 {
       try visitor.visitSingularInt64Field(value: self.userID, fieldNumber: 1)
     }
@@ -977,7 +977,7 @@ extension Barkcloud_Identity_DisableOtpVerificationServerRequest: SwiftProtobuf.
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Identity_DisableOtpVerificationServerRequest, rhs: Barkcloud_Identity_DisableOtpVerificationServerRequest) -> Bool {
+  public static func ==(lhs: Barkcloud_Identity_DisableOtpVerificationServerRequest, rhs: Barkcloud_Identity_DisableOtpVerificationServerRequest) -> Bool {
     if lhs.userID != rhs.userID {return false}
     if lhs.otpType != rhs.otpType {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
@@ -986,10 +986,10 @@ extension Barkcloud_Identity_DisableOtpVerificationServerRequest: SwiftProtobuf.
 }
 
 extension Barkcloud_Identity_GetActiveSessionsServerRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".GetActiveSessionsServerRequest"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}user_id\0")
+  public static let protoMessageName: String = _protobuf_package + ".GetActiveSessionsServerRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}user_id\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -1001,14 +1001,14 @@ extension Barkcloud_Identity_GetActiveSessionsServerRequest: SwiftProtobuf.Messa
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if self.userID != 0 {
       try visitor.visitSingularInt64Field(value: self.userID, fieldNumber: 1)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Identity_GetActiveSessionsServerRequest, rhs: Barkcloud_Identity_GetActiveSessionsServerRequest) -> Bool {
+  public static func ==(lhs: Barkcloud_Identity_GetActiveSessionsServerRequest, rhs: Barkcloud_Identity_GetActiveSessionsServerRequest) -> Bool {
     if lhs.userID != rhs.userID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -1016,10 +1016,10 @@ extension Barkcloud_Identity_GetActiveSessionsServerRequest: SwiftProtobuf.Messa
 }
 
 extension Barkcloud_Identity_RemoveActiveSessionServerRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".RemoveActiveSessionServerRequest"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}user_id\0\u{3}device_id\0")
+  public static let protoMessageName: String = _protobuf_package + ".RemoveActiveSessionServerRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}user_id\0\u{3}device_id\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -1032,7 +1032,7 @@ extension Barkcloud_Identity_RemoveActiveSessionServerRequest: SwiftProtobuf.Mes
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if self.userID != 0 {
       try visitor.visitSingularInt64Field(value: self.userID, fieldNumber: 1)
     }
@@ -1042,7 +1042,7 @@ extension Barkcloud_Identity_RemoveActiveSessionServerRequest: SwiftProtobuf.Mes
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Identity_RemoveActiveSessionServerRequest, rhs: Barkcloud_Identity_RemoveActiveSessionServerRequest) -> Bool {
+  public static func ==(lhs: Barkcloud_Identity_RemoveActiveSessionServerRequest, rhs: Barkcloud_Identity_RemoveActiveSessionServerRequest) -> Bool {
     if lhs.userID != rhs.userID {return false}
     if lhs.deviceID != rhs.deviceID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
@@ -1051,10 +1051,10 @@ extension Barkcloud_Identity_RemoveActiveSessionServerRequest: SwiftProtobuf.Mes
 }
 
 extension Barkcloud_Identity_ForceSetPasswordServerRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".ForceSetPasswordServerRequest"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}user_id\0\u{3}new_password\0")
+  public static let protoMessageName: String = _protobuf_package + ".ForceSetPasswordServerRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}user_id\0\u{3}new_password\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -1067,7 +1067,7 @@ extension Barkcloud_Identity_ForceSetPasswordServerRequest: SwiftProtobuf.Messag
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if self.userID != 0 {
       try visitor.visitSingularInt64Field(value: self.userID, fieldNumber: 1)
     }
@@ -1077,7 +1077,7 @@ extension Barkcloud_Identity_ForceSetPasswordServerRequest: SwiftProtobuf.Messag
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Identity_ForceSetPasswordServerRequest, rhs: Barkcloud_Identity_ForceSetPasswordServerRequest) -> Bool {
+  public static func ==(lhs: Barkcloud_Identity_ForceSetPasswordServerRequest, rhs: Barkcloud_Identity_ForceSetPasswordServerRequest) -> Bool {
     if lhs.userID != rhs.userID {return false}
     if lhs.newPassword != rhs.newPassword {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
@@ -1086,29 +1086,29 @@ extension Barkcloud_Identity_ForceSetPasswordServerRequest: SwiftProtobuf.Messag
 }
 
 extension Barkcloud_Identity_ForceSetPasswordServerResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".ForceSetPasswordServerResponse"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap()
+  public static let protoMessageName: String = _protobuf_package + ".ForceSetPasswordServerResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap()
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     // Load everything into unknown fields
     while try decoder.nextFieldNumber() != nil {}
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Identity_ForceSetPasswordServerResponse, rhs: Barkcloud_Identity_ForceSetPasswordServerResponse) -> Bool {
+  public static func ==(lhs: Barkcloud_Identity_ForceSetPasswordServerResponse, rhs: Barkcloud_Identity_ForceSetPasswordServerResponse) -> Bool {
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
 extension Barkcloud_Identity_ConfirmResetPasswordRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".ConfirmResetPasswordRequest"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}reset_id\0\u{3}otp_code\0")
+  public static let protoMessageName: String = _protobuf_package + ".ConfirmResetPasswordRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}reset_id\0\u{3}otp_code\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -1121,7 +1121,7 @@ extension Barkcloud_Identity_ConfirmResetPasswordRequest: SwiftProtobuf.Message,
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if !self.resetID.isEmpty {
       try visitor.visitSingularStringField(value: self.resetID, fieldNumber: 1)
     }
@@ -1131,7 +1131,7 @@ extension Barkcloud_Identity_ConfirmResetPasswordRequest: SwiftProtobuf.Message,
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Identity_ConfirmResetPasswordRequest, rhs: Barkcloud_Identity_ConfirmResetPasswordRequest) -> Bool {
+  public static func ==(lhs: Barkcloud_Identity_ConfirmResetPasswordRequest, rhs: Barkcloud_Identity_ConfirmResetPasswordRequest) -> Bool {
     if lhs.resetID != rhs.resetID {return false}
     if lhs.otpCode != rhs.otpCode {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
@@ -1140,10 +1140,10 @@ extension Barkcloud_Identity_ConfirmResetPasswordRequest: SwiftProtobuf.Message,
 }
 
 extension Barkcloud_Identity_ConfirmResetPasswordResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".ConfirmResetPasswordResponse"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}access_token\0\u{3}refresh_token\0")
+  public static let protoMessageName: String = _protobuf_package + ".ConfirmResetPasswordResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}access_token\0\u{3}refresh_token\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -1156,7 +1156,7 @@ extension Barkcloud_Identity_ConfirmResetPasswordResponse: SwiftProtobuf.Message
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     // The use of inline closures is to circumvent an issue where the compiler
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
@@ -1170,7 +1170,7 @@ extension Barkcloud_Identity_ConfirmResetPasswordResponse: SwiftProtobuf.Message
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Identity_ConfirmResetPasswordResponse, rhs: Barkcloud_Identity_ConfirmResetPasswordResponse) -> Bool {
+  public static func ==(lhs: Barkcloud_Identity_ConfirmResetPasswordResponse, rhs: Barkcloud_Identity_ConfirmResetPasswordResponse) -> Bool {
     if lhs._accessToken != rhs._accessToken {return false}
     if lhs._refreshToken != rhs._refreshToken {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
@@ -1179,10 +1179,10 @@ extension Barkcloud_Identity_ConfirmResetPasswordResponse: SwiftProtobuf.Message
 }
 
 extension Barkcloud_Identity_ResetPasswordRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".ResetPasswordRequest"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}username\0\u{1}email\0\u{3}otp_type\0")
+  public static let protoMessageName: String = _protobuf_package + ".ResetPasswordRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}username\0\u{1}email\0\u{3}otp_type\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -1210,7 +1210,7 @@ extension Barkcloud_Identity_ResetPasswordRequest: SwiftProtobuf.Message, SwiftP
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     // The use of inline closures is to circumvent an issue where the compiler
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
@@ -1232,7 +1232,7 @@ extension Barkcloud_Identity_ResetPasswordRequest: SwiftProtobuf.Message, SwiftP
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Identity_ResetPasswordRequest, rhs: Barkcloud_Identity_ResetPasswordRequest) -> Bool {
+  public static func ==(lhs: Barkcloud_Identity_ResetPasswordRequest, rhs: Barkcloud_Identity_ResetPasswordRequest) -> Bool {
     if lhs.login != rhs.login {return false}
     if lhs.otpType != rhs.otpType {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
@@ -1241,10 +1241,10 @@ extension Barkcloud_Identity_ResetPasswordRequest: SwiftProtobuf.Message, SwiftP
 }
 
 extension Barkcloud_Identity_ResetPasswordResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".ResetPasswordResponse"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}reset_id\0")
+  public static let protoMessageName: String = _protobuf_package + ".ResetPasswordResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}reset_id\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -1256,14 +1256,14 @@ extension Barkcloud_Identity_ResetPasswordResponse: SwiftProtobuf.Message, Swift
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if !self.resetID.isEmpty {
       try visitor.visitSingularStringField(value: self.resetID, fieldNumber: 1)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Identity_ResetPasswordResponse, rhs: Barkcloud_Identity_ResetPasswordResponse) -> Bool {
+  public static func ==(lhs: Barkcloud_Identity_ResetPasswordResponse, rhs: Barkcloud_Identity_ResetPasswordResponse) -> Bool {
     if lhs.resetID != rhs.resetID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -1271,10 +1271,10 @@ extension Barkcloud_Identity_ResetPasswordResponse: SwiftProtobuf.Message, Swift
 }
 
 extension Barkcloud_Identity_FastAuthRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".FastAuthRequest"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}fast_auth_id\0")
+  public static let protoMessageName: String = _protobuf_package + ".FastAuthRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}fast_auth_id\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -1286,14 +1286,14 @@ extension Barkcloud_Identity_FastAuthRequest: SwiftProtobuf.Message, SwiftProtob
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if !self.fastAuthID.isEmpty {
       try visitor.visitSingularStringField(value: self.fastAuthID, fieldNumber: 1)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Identity_FastAuthRequest, rhs: Barkcloud_Identity_FastAuthRequest) -> Bool {
+  public static func ==(lhs: Barkcloud_Identity_FastAuthRequest, rhs: Barkcloud_Identity_FastAuthRequest) -> Bool {
     if lhs.fastAuthID != rhs.fastAuthID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -1301,67 +1301,67 @@ extension Barkcloud_Identity_FastAuthRequest: SwiftProtobuf.Message, SwiftProtob
 }
 
 extension Barkcloud_Identity_SendEmailOtpCodeRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".SendEmailOtpCodeRequest"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap()
+  public static let protoMessageName: String = _protobuf_package + ".SendEmailOtpCodeRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap()
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     // Load everything into unknown fields
     while try decoder.nextFieldNumber() != nil {}
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Identity_SendEmailOtpCodeRequest, rhs: Barkcloud_Identity_SendEmailOtpCodeRequest) -> Bool {
+  public static func ==(lhs: Barkcloud_Identity_SendEmailOtpCodeRequest, rhs: Barkcloud_Identity_SendEmailOtpCodeRequest) -> Bool {
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
 extension Barkcloud_Identity_SendEmailOtpCodeResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".SendEmailOtpCodeResponse"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap()
+  public static let protoMessageName: String = _protobuf_package + ".SendEmailOtpCodeResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap()
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     // Load everything into unknown fields
     while try decoder.nextFieldNumber() != nil {}
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Identity_SendEmailOtpCodeResponse, rhs: Barkcloud_Identity_SendEmailOtpCodeResponse) -> Bool {
+  public static func ==(lhs: Barkcloud_Identity_SendEmailOtpCodeResponse, rhs: Barkcloud_Identity_SendEmailOtpCodeResponse) -> Bool {
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
 extension Barkcloud_Identity_ListOtpVerificationRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".ListOtpVerificationRequest"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap()
+  public static let protoMessageName: String = _protobuf_package + ".ListOtpVerificationRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap()
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     // Load everything into unknown fields
     while try decoder.nextFieldNumber() != nil {}
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Identity_ListOtpVerificationRequest, rhs: Barkcloud_Identity_ListOtpVerificationRequest) -> Bool {
+  public static func ==(lhs: Barkcloud_Identity_ListOtpVerificationRequest, rhs: Barkcloud_Identity_ListOtpVerificationRequest) -> Bool {
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
 extension Barkcloud_Identity_ListOtpVerificationResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".ListOtpVerificationResponse"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}authenticator_enabled\0\u{3}email_enabled\0")
+  public static let protoMessageName: String = _protobuf_package + ".ListOtpVerificationResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}authenticator_enabled\0\u{3}email_enabled\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -1374,7 +1374,7 @@ extension Barkcloud_Identity_ListOtpVerificationResponse: SwiftProtobuf.Message,
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if self.authenticatorEnabled != false {
       try visitor.visitSingularBoolField(value: self.authenticatorEnabled, fieldNumber: 1)
     }
@@ -1384,7 +1384,7 @@ extension Barkcloud_Identity_ListOtpVerificationResponse: SwiftProtobuf.Message,
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Identity_ListOtpVerificationResponse, rhs: Barkcloud_Identity_ListOtpVerificationResponse) -> Bool {
+  public static func ==(lhs: Barkcloud_Identity_ListOtpVerificationResponse, rhs: Barkcloud_Identity_ListOtpVerificationResponse) -> Bool {
     if lhs.authenticatorEnabled != rhs.authenticatorEnabled {return false}
     if lhs.emailEnabled != rhs.emailEnabled {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
@@ -1393,10 +1393,10 @@ extension Barkcloud_Identity_ListOtpVerificationResponse: SwiftProtobuf.Message,
 }
 
 extension Barkcloud_Identity_DisableOtpVerificationRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".DisableOtpVerificationRequest"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}otp_type\0\u{3}otp_code\0")
+  public static let protoMessageName: String = _protobuf_package + ".DisableOtpVerificationRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}otp_type\0\u{3}otp_code\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -1409,7 +1409,7 @@ extension Barkcloud_Identity_DisableOtpVerificationRequest: SwiftProtobuf.Messag
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if self.otpType != .unknown {
       try visitor.visitSingularEnumField(value: self.otpType, fieldNumber: 1)
     }
@@ -1419,7 +1419,7 @@ extension Barkcloud_Identity_DisableOtpVerificationRequest: SwiftProtobuf.Messag
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Identity_DisableOtpVerificationRequest, rhs: Barkcloud_Identity_DisableOtpVerificationRequest) -> Bool {
+  public static func ==(lhs: Barkcloud_Identity_DisableOtpVerificationRequest, rhs: Barkcloud_Identity_DisableOtpVerificationRequest) -> Bool {
     if lhs.otpType != rhs.otpType {return false}
     if lhs.otpCode != rhs.otpCode {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
@@ -1428,29 +1428,29 @@ extension Barkcloud_Identity_DisableOtpVerificationRequest: SwiftProtobuf.Messag
 }
 
 extension Barkcloud_Identity_DisableOtpVerificationResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".DisableOtpVerificationResponse"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap()
+  public static let protoMessageName: String = _protobuf_package + ".DisableOtpVerificationResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap()
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     // Load everything into unknown fields
     while try decoder.nextFieldNumber() != nil {}
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Identity_DisableOtpVerificationResponse, rhs: Barkcloud_Identity_DisableOtpVerificationResponse) -> Bool {
+  public static func ==(lhs: Barkcloud_Identity_DisableOtpVerificationResponse, rhs: Barkcloud_Identity_DisableOtpVerificationResponse) -> Bool {
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
 extension Barkcloud_Identity_ConfirmOtpVerificationRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".ConfirmOtpVerificationRequest"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}otp_code\0")
+  public static let protoMessageName: String = _protobuf_package + ".ConfirmOtpVerificationRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}otp_code\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -1462,14 +1462,14 @@ extension Barkcloud_Identity_ConfirmOtpVerificationRequest: SwiftProtobuf.Messag
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if !self.otpCode.isEmpty {
       try visitor.visitSingularStringField(value: self.otpCode, fieldNumber: 1)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Identity_ConfirmOtpVerificationRequest, rhs: Barkcloud_Identity_ConfirmOtpVerificationRequest) -> Bool {
+  public static func ==(lhs: Barkcloud_Identity_ConfirmOtpVerificationRequest, rhs: Barkcloud_Identity_ConfirmOtpVerificationRequest) -> Bool {
     if lhs.otpCode != rhs.otpCode {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -1477,29 +1477,29 @@ extension Barkcloud_Identity_ConfirmOtpVerificationRequest: SwiftProtobuf.Messag
 }
 
 extension Barkcloud_Identity_ConfirmOtpVerificationResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".ConfirmOtpVerificationResponse"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap()
+  public static let protoMessageName: String = _protobuf_package + ".ConfirmOtpVerificationResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap()
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     // Load everything into unknown fields
     while try decoder.nextFieldNumber() != nil {}
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Identity_ConfirmOtpVerificationResponse, rhs: Barkcloud_Identity_ConfirmOtpVerificationResponse) -> Bool {
+  public static func ==(lhs: Barkcloud_Identity_ConfirmOtpVerificationResponse, rhs: Barkcloud_Identity_ConfirmOtpVerificationResponse) -> Bool {
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
 extension Barkcloud_Identity_EnableOtpVerificationRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".EnableOtpVerificationRequest"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}otp_type\0")
+  public static let protoMessageName: String = _protobuf_package + ".EnableOtpVerificationRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}otp_type\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -1511,14 +1511,14 @@ extension Barkcloud_Identity_EnableOtpVerificationRequest: SwiftProtobuf.Message
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if self.otpType != .unknown {
       try visitor.visitSingularEnumField(value: self.otpType, fieldNumber: 1)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Identity_EnableOtpVerificationRequest, rhs: Barkcloud_Identity_EnableOtpVerificationRequest) -> Bool {
+  public static func ==(lhs: Barkcloud_Identity_EnableOtpVerificationRequest, rhs: Barkcloud_Identity_EnableOtpVerificationRequest) -> Bool {
     if lhs.otpType != rhs.otpType {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -1526,10 +1526,10 @@ extension Barkcloud_Identity_EnableOtpVerificationRequest: SwiftProtobuf.Message
 }
 
 extension Barkcloud_Identity_EnableOtpVerificationResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".EnableOtpVerificationResponse"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}otp_qr\0\u{3}otp_code\0")
+  public static let protoMessageName: String = _protobuf_package + ".EnableOtpVerificationResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}otp_qr\0\u{3}otp_code\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -1542,7 +1542,7 @@ extension Barkcloud_Identity_EnableOtpVerificationResponse: SwiftProtobuf.Messag
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if !self.otpQr.isEmpty {
       try visitor.visitSingularStringField(value: self.otpQr, fieldNumber: 1)
     }
@@ -1552,7 +1552,7 @@ extension Barkcloud_Identity_EnableOtpVerificationResponse: SwiftProtobuf.Messag
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Identity_EnableOtpVerificationResponse, rhs: Barkcloud_Identity_EnableOtpVerificationResponse) -> Bool {
+  public static func ==(lhs: Barkcloud_Identity_EnableOtpVerificationResponse, rhs: Barkcloud_Identity_EnableOtpVerificationResponse) -> Bool {
     if lhs.otpQr != rhs.otpQr {return false}
     if lhs.otpCode != rhs.otpCode {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
@@ -1561,10 +1561,10 @@ extension Barkcloud_Identity_EnableOtpVerificationResponse: SwiftProtobuf.Messag
 }
 
 extension Barkcloud_Identity_RemoveActiveSessionRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".RemoveActiveSessionRequest"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}device_id\0")
+  public static let protoMessageName: String = _protobuf_package + ".RemoveActiveSessionRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}device_id\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -1576,14 +1576,14 @@ extension Barkcloud_Identity_RemoveActiveSessionRequest: SwiftProtobuf.Message, 
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if !self.deviceID.isEmpty {
       try visitor.visitSingularStringField(value: self.deviceID, fieldNumber: 1)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Identity_RemoveActiveSessionRequest, rhs: Barkcloud_Identity_RemoveActiveSessionRequest) -> Bool {
+  public static func ==(lhs: Barkcloud_Identity_RemoveActiveSessionRequest, rhs: Barkcloud_Identity_RemoveActiveSessionRequest) -> Bool {
     if lhs.deviceID != rhs.deviceID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -1591,48 +1591,48 @@ extension Barkcloud_Identity_RemoveActiveSessionRequest: SwiftProtobuf.Message, 
 }
 
 extension Barkcloud_Identity_RemoveActiveSessionResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".RemoveActiveSessionResponse"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap()
+  public static let protoMessageName: String = _protobuf_package + ".RemoveActiveSessionResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap()
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     // Load everything into unknown fields
     while try decoder.nextFieldNumber() != nil {}
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Identity_RemoveActiveSessionResponse, rhs: Barkcloud_Identity_RemoveActiveSessionResponse) -> Bool {
+  public static func ==(lhs: Barkcloud_Identity_RemoveActiveSessionResponse, rhs: Barkcloud_Identity_RemoveActiveSessionResponse) -> Bool {
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
 extension Barkcloud_Identity_GetActiveSessionsRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".GetActiveSessionsRequest"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap()
+  public static let protoMessageName: String = _protobuf_package + ".GetActiveSessionsRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap()
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     // Load everything into unknown fields
     while try decoder.nextFieldNumber() != nil {}
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Identity_GetActiveSessionsRequest, rhs: Barkcloud_Identity_GetActiveSessionsRequest) -> Bool {
+  public static func ==(lhs: Barkcloud_Identity_GetActiveSessionsRequest, rhs: Barkcloud_Identity_GetActiveSessionsRequest) -> Bool {
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
 extension Barkcloud_Identity_GetActiveSessionsResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".GetActiveSessionsResponse"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}sessions\0")
+  public static let protoMessageName: String = _protobuf_package + ".GetActiveSessionsResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}sessions\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -1644,14 +1644,14 @@ extension Barkcloud_Identity_GetActiveSessionsResponse: SwiftProtobuf.Message, S
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if !self.sessions.isEmpty {
       try visitor.visitRepeatedMessageField(value: self.sessions, fieldNumber: 1)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Identity_GetActiveSessionsResponse, rhs: Barkcloud_Identity_GetActiveSessionsResponse) -> Bool {
+  public static func ==(lhs: Barkcloud_Identity_GetActiveSessionsResponse, rhs: Barkcloud_Identity_GetActiveSessionsResponse) -> Bool {
     if lhs.sessions != rhs.sessions {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -1659,10 +1659,10 @@ extension Barkcloud_Identity_GetActiveSessionsResponse: SwiftProtobuf.Message, S
 }
 
 extension Barkcloud_Identity_GetActiveSessionsResponse.Session: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = Barkcloud_Identity_GetActiveSessionsResponse.protoMessageName + ".Session"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{3}created_at\0\u{3}expiration_at\0\u{3}device_id\0\u{3}original_name\0\u{3}custom_name\0\u{3}app_name\0\u{3}operation_system\0\u{1}location\0")
+  public static let protoMessageName: String = Barkcloud_Identity_GetActiveSessionsResponse.protoMessageName + ".Session"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{3}created_at\0\u{3}expiration_at\0\u{3}device_id\0\u{3}original_name\0\u{3}custom_name\0\u{3}app_name\0\u{3}operation_system\0\u{1}location\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -1682,7 +1682,7 @@ extension Barkcloud_Identity_GetActiveSessionsResponse.Session: SwiftProtobuf.Me
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     // The use of inline closures is to circumvent an issue where the compiler
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
@@ -1717,7 +1717,7 @@ extension Barkcloud_Identity_GetActiveSessionsResponse.Session: SwiftProtobuf.Me
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Identity_GetActiveSessionsResponse.Session, rhs: Barkcloud_Identity_GetActiveSessionsResponse.Session) -> Bool {
+  public static func ==(lhs: Barkcloud_Identity_GetActiveSessionsResponse.Session, rhs: Barkcloud_Identity_GetActiveSessionsResponse.Session) -> Bool {
     if lhs.id != rhs.id {return false}
     if lhs._createdAt != rhs._createdAt {return false}
     if lhs._expirationAt != rhs._expirationAt {return false}
@@ -1733,10 +1733,10 @@ extension Barkcloud_Identity_GetActiveSessionsResponse.Session: SwiftProtobuf.Me
 }
 
 extension Barkcloud_Identity_GenerateTestTokenRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".GenerateTestTokenRequest"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}user_id\0")
+  public static let protoMessageName: String = _protobuf_package + ".GenerateTestTokenRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}user_id\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -1748,14 +1748,14 @@ extension Barkcloud_Identity_GenerateTestTokenRequest: SwiftProtobuf.Message, Sw
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if self.userID != 0 {
       try visitor.visitSingularInt64Field(value: self.userID, fieldNumber: 1)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Identity_GenerateTestTokenRequest, rhs: Barkcloud_Identity_GenerateTestTokenRequest) -> Bool {
+  public static func ==(lhs: Barkcloud_Identity_GenerateTestTokenRequest, rhs: Barkcloud_Identity_GenerateTestTokenRequest) -> Bool {
     if lhs.userID != rhs.userID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -1763,10 +1763,10 @@ extension Barkcloud_Identity_GenerateTestTokenRequest: SwiftProtobuf.Message, Sw
 }
 
 extension Barkcloud_Identity_GenerateTestTokenResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".GenerateTestTokenResponse"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}token\0")
+  public static let protoMessageName: String = _protobuf_package + ".GenerateTestTokenResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}token\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -1778,14 +1778,14 @@ extension Barkcloud_Identity_GenerateTestTokenResponse: SwiftProtobuf.Message, S
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if !self.token.isEmpty {
       try visitor.visitSingularStringField(value: self.token, fieldNumber: 1)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Identity_GenerateTestTokenResponse, rhs: Barkcloud_Identity_GenerateTestTokenResponse) -> Bool {
+  public static func ==(lhs: Barkcloud_Identity_GenerateTestTokenResponse, rhs: Barkcloud_Identity_GenerateTestTokenResponse) -> Bool {
     if lhs.token != rhs.token {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -1793,10 +1793,10 @@ extension Barkcloud_Identity_GenerateTestTokenResponse: SwiftProtobuf.Message, S
 }
 
 extension Barkcloud_Identity_CreateAccountRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".CreateAccountRequest"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}first_name\0\u{3}last_name\0\u{1}username\0\u{1}email\0")
+  public static let protoMessageName: String = _protobuf_package + ".CreateAccountRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}first_name\0\u{3}last_name\0\u{1}username\0\u{1}email\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -1811,7 +1811,7 @@ extension Barkcloud_Identity_CreateAccountRequest: SwiftProtobuf.Message, SwiftP
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if !self.firstName.isEmpty {
       try visitor.visitSingularStringField(value: self.firstName, fieldNumber: 1)
     }
@@ -1827,7 +1827,7 @@ extension Barkcloud_Identity_CreateAccountRequest: SwiftProtobuf.Message, SwiftP
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Identity_CreateAccountRequest, rhs: Barkcloud_Identity_CreateAccountRequest) -> Bool {
+  public static func ==(lhs: Barkcloud_Identity_CreateAccountRequest, rhs: Barkcloud_Identity_CreateAccountRequest) -> Bool {
     if lhs.firstName != rhs.firstName {return false}
     if lhs.lastName != rhs.lastName {return false}
     if lhs.username != rhs.username {return false}
@@ -1838,10 +1838,10 @@ extension Barkcloud_Identity_CreateAccountRequest: SwiftProtobuf.Message, SwiftP
 }
 
 extension Barkcloud_Identity_CreateAccountResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".CreateAccountResponse"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}code_id\0")
+  public static let protoMessageName: String = _protobuf_package + ".CreateAccountResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}code_id\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -1853,14 +1853,14 @@ extension Barkcloud_Identity_CreateAccountResponse: SwiftProtobuf.Message, Swift
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if !self.codeID.isEmpty {
       try visitor.visitSingularStringField(value: self.codeID, fieldNumber: 1)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Identity_CreateAccountResponse, rhs: Barkcloud_Identity_CreateAccountResponse) -> Bool {
+  public static func ==(lhs: Barkcloud_Identity_CreateAccountResponse, rhs: Barkcloud_Identity_CreateAccountResponse) -> Bool {
     if lhs.codeID != rhs.codeID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -1868,10 +1868,10 @@ extension Barkcloud_Identity_CreateAccountResponse: SwiftProtobuf.Message, Swift
 }
 
 extension Barkcloud_Identity_ConfirmAccountRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".ConfirmAccountRequest"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}code_id\0\u{3}code_value\0")
+  public static let protoMessageName: String = _protobuf_package + ".ConfirmAccountRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}code_id\0\u{3}code_value\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -1884,7 +1884,7 @@ extension Barkcloud_Identity_ConfirmAccountRequest: SwiftProtobuf.Message, Swift
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if !self.codeID.isEmpty {
       try visitor.visitSingularStringField(value: self.codeID, fieldNumber: 1)
     }
@@ -1894,7 +1894,7 @@ extension Barkcloud_Identity_ConfirmAccountRequest: SwiftProtobuf.Message, Swift
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Identity_ConfirmAccountRequest, rhs: Barkcloud_Identity_ConfirmAccountRequest) -> Bool {
+  public static func ==(lhs: Barkcloud_Identity_ConfirmAccountRequest, rhs: Barkcloud_Identity_ConfirmAccountRequest) -> Bool {
     if lhs.codeID != rhs.codeID {return false}
     if lhs.codeValue != rhs.codeValue {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
@@ -1903,10 +1903,10 @@ extension Barkcloud_Identity_ConfirmAccountRequest: SwiftProtobuf.Message, Swift
 }
 
 extension Barkcloud_Identity_ConfirmAccountResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".ConfirmAccountResponse"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}refresh_token\0")
+  public static let protoMessageName: String = _protobuf_package + ".ConfirmAccountResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}refresh_token\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -1918,7 +1918,7 @@ extension Barkcloud_Identity_ConfirmAccountResponse: SwiftProtobuf.Message, Swif
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     // The use of inline closures is to circumvent an issue where the compiler
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
@@ -1929,7 +1929,7 @@ extension Barkcloud_Identity_ConfirmAccountResponse: SwiftProtobuf.Message, Swif
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Identity_ConfirmAccountResponse, rhs: Barkcloud_Identity_ConfirmAccountResponse) -> Bool {
+  public static func ==(lhs: Barkcloud_Identity_ConfirmAccountResponse, rhs: Barkcloud_Identity_ConfirmAccountResponse) -> Bool {
     if lhs._refreshToken != rhs._refreshToken {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -1937,10 +1937,10 @@ extension Barkcloud_Identity_ConfirmAccountResponse: SwiftProtobuf.Message, Swif
 }
 
 extension Barkcloud_Identity_CreateTokenRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".CreateTokenRequest"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}refresh_token\0")
+  public static let protoMessageName: String = _protobuf_package + ".CreateTokenRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}refresh_token\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -1952,14 +1952,14 @@ extension Barkcloud_Identity_CreateTokenRequest: SwiftProtobuf.Message, SwiftPro
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if !self.refreshToken.isEmpty {
       try visitor.visitSingularStringField(value: self.refreshToken, fieldNumber: 1)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Identity_CreateTokenRequest, rhs: Barkcloud_Identity_CreateTokenRequest) -> Bool {
+  public static func ==(lhs: Barkcloud_Identity_CreateTokenRequest, rhs: Barkcloud_Identity_CreateTokenRequest) -> Bool {
     if lhs.refreshToken != rhs.refreshToken {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -1967,10 +1967,10 @@ extension Barkcloud_Identity_CreateTokenRequest: SwiftProtobuf.Message, SwiftPro
 }
 
 extension Barkcloud_Identity_CreateTokenResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".CreateTokenResponse"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{4}\u{2}access_token\0")
+  public static let protoMessageName: String = _protobuf_package + ".CreateTokenResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{4}\u{2}access_token\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -1982,7 +1982,7 @@ extension Barkcloud_Identity_CreateTokenResponse: SwiftProtobuf.Message, SwiftPr
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     // The use of inline closures is to circumvent an issue where the compiler
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
@@ -1993,7 +1993,7 @@ extension Barkcloud_Identity_CreateTokenResponse: SwiftProtobuf.Message, SwiftPr
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Identity_CreateTokenResponse, rhs: Barkcloud_Identity_CreateTokenResponse) -> Bool {
+  public static func ==(lhs: Barkcloud_Identity_CreateTokenResponse, rhs: Barkcloud_Identity_CreateTokenResponse) -> Bool {
     if lhs._accessToken != rhs._accessToken {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -2001,10 +2001,10 @@ extension Barkcloud_Identity_CreateTokenResponse: SwiftProtobuf.Message, SwiftPr
 }
 
 extension Barkcloud_Identity_AuthRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".AuthRequest"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}username\0\u{1}email\0\u{1}password\0\u{3}otp_code\0")
+  public static let protoMessageName: String = _protobuf_package + ".AuthRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}username\0\u{1}email\0\u{1}password\0\u{3}otp_code\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -2033,7 +2033,7 @@ extension Barkcloud_Identity_AuthRequest: SwiftProtobuf.Message, SwiftProtobuf._
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     // The use of inline closures is to circumvent an issue where the compiler
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
@@ -2058,7 +2058,7 @@ extension Barkcloud_Identity_AuthRequest: SwiftProtobuf.Message, SwiftProtobuf._
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Identity_AuthRequest, rhs: Barkcloud_Identity_AuthRequest) -> Bool {
+  public static func ==(lhs: Barkcloud_Identity_AuthRequest, rhs: Barkcloud_Identity_AuthRequest) -> Bool {
     if lhs.login != rhs.login {return false}
     if lhs.password != rhs.password {return false}
     if lhs.otpCode != rhs.otpCode {return false}
@@ -2068,10 +2068,10 @@ extension Barkcloud_Identity_AuthRequest: SwiftProtobuf.Message, SwiftProtobuf._
 }
 
 extension Barkcloud_Identity_AuthResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".AuthResponse"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}access_token\0\u{3}refresh_token\0")
+  public static let protoMessageName: String = _protobuf_package + ".AuthResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}access_token\0\u{3}refresh_token\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -2084,7 +2084,7 @@ extension Barkcloud_Identity_AuthResponse: SwiftProtobuf.Message, SwiftProtobuf.
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     // The use of inline closures is to circumvent an issue where the compiler
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
@@ -2098,7 +2098,7 @@ extension Barkcloud_Identity_AuthResponse: SwiftProtobuf.Message, SwiftProtobuf.
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Identity_AuthResponse, rhs: Barkcloud_Identity_AuthResponse) -> Bool {
+  public static func ==(lhs: Barkcloud_Identity_AuthResponse, rhs: Barkcloud_Identity_AuthResponse) -> Bool {
     if lhs._accessToken != rhs._accessToken {return false}
     if lhs._refreshToken != rhs._refreshToken {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
@@ -2107,10 +2107,10 @@ extension Barkcloud_Identity_AuthResponse: SwiftProtobuf.Message, SwiftProtobuf.
 }
 
 extension Barkcloud_Identity_Token: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".Token"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}value\0\u{3}expiration_date\0")
+  public static let protoMessageName: String = _protobuf_package + ".Token"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}value\0\u{3}expiration_date\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -2123,7 +2123,7 @@ extension Barkcloud_Identity_Token: SwiftProtobuf.Message, SwiftProtobuf._Messag
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     // The use of inline closures is to circumvent an issue where the compiler
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
@@ -2137,7 +2137,7 @@ extension Barkcloud_Identity_Token: SwiftProtobuf.Message, SwiftProtobuf._Messag
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Identity_Token, rhs: Barkcloud_Identity_Token) -> Bool {
+  public static func ==(lhs: Barkcloud_Identity_Token, rhs: Barkcloud_Identity_Token) -> Bool {
     if lhs.value != rhs.value {return false}
     if lhs._expirationDate != rhs._expirationDate {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
@@ -2146,10 +2146,10 @@ extension Barkcloud_Identity_Token: SwiftProtobuf.Message, SwiftProtobuf._Messag
 }
 
 extension Barkcloud_Identity_SetPasswordRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".SetPasswordRequest"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}password\0\u{3}old_password\0")
+  public static let protoMessageName: String = _protobuf_package + ".SetPasswordRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}password\0\u{3}old_password\0")
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -2162,7 +2162,7 @@ extension Barkcloud_Identity_SetPasswordRequest: SwiftProtobuf.Message, SwiftPro
     }
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if !self.password.isEmpty {
       try visitor.visitSingularStringField(value: self.password, fieldNumber: 1)
     }
@@ -2172,7 +2172,7 @@ extension Barkcloud_Identity_SetPasswordRequest: SwiftProtobuf.Message, SwiftPro
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Identity_SetPasswordRequest, rhs: Barkcloud_Identity_SetPasswordRequest) -> Bool {
+  public static func ==(lhs: Barkcloud_Identity_SetPasswordRequest, rhs: Barkcloud_Identity_SetPasswordRequest) -> Bool {
     if lhs.password != rhs.password {return false}
     if lhs.oldPassword != rhs.oldPassword {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
@@ -2181,57 +2181,57 @@ extension Barkcloud_Identity_SetPasswordRequest: SwiftProtobuf.Message, SwiftPro
 }
 
 extension Barkcloud_Identity_SetPasswordResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".SetPasswordResponse"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap()
+  public static let protoMessageName: String = _protobuf_package + ".SetPasswordResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap()
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     // Load everything into unknown fields
     while try decoder.nextFieldNumber() != nil {}
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Identity_SetPasswordResponse, rhs: Barkcloud_Identity_SetPasswordResponse) -> Bool {
+  public static func ==(lhs: Barkcloud_Identity_SetPasswordResponse, rhs: Barkcloud_Identity_SetPasswordResponse) -> Bool {
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
 extension Barkcloud_Identity_LogoutRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".LogoutRequest"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap()
+  public static let protoMessageName: String = _protobuf_package + ".LogoutRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap()
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     // Load everything into unknown fields
     while try decoder.nextFieldNumber() != nil {}
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Identity_LogoutRequest, rhs: Barkcloud_Identity_LogoutRequest) -> Bool {
+  public static func ==(lhs: Barkcloud_Identity_LogoutRequest, rhs: Barkcloud_Identity_LogoutRequest) -> Bool {
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
 extension Barkcloud_Identity_LogoutResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".LogoutResponse"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap()
+  public static let protoMessageName: String = _protobuf_package + ".LogoutResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap()
 
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     // Load everything into unknown fields
     while try decoder.nextFieldNumber() != nil {}
   }
 
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Barkcloud_Identity_LogoutResponse, rhs: Barkcloud_Identity_LogoutResponse) -> Bool {
+  public static func ==(lhs: Barkcloud_Identity_LogoutResponse, rhs: Barkcloud_Identity_LogoutResponse) -> Bool {
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

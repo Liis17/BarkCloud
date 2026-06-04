@@ -4,8 +4,10 @@ import Observation
 
 @MainActor
 @Observable
-final class SessionStore {
+public final class SessionStore {
     private let service = "com.barkfluff.BarkCloud.tokens"
+
+    public init() {}
 
     /// Снимок всех токенов и их сроков — читается актором `GrpcManager` за один
     /// hop на главный поток при проактивной проверке/обновлении токена.
@@ -19,7 +21,7 @@ final class SessionStore {
     /// Поднимается, когда обновить access-токен окончательно не удалось
     /// (refresh-токен истёк или отозван сервером). `RootView` реагирует переходом
     /// на экран логина. Сбрасывается при новой авторизации.
-    var sessionExpired = false
+    public var sessionExpired = false
 
     private enum Key: String {
         case accessToken = "access_token"
@@ -28,27 +30,27 @@ final class SessionStore {
         case refreshTokenExpiresAt = "refresh_token_exp"
     }
 
-    var accessToken: String? {
+    public var accessToken: String? {
         get { read(.accessToken) }
         set { write(.accessToken, newValue) }
     }
 
-    var accessTokenExpiresAt: Date? {
+    public var accessTokenExpiresAt: Date? {
         get { readDate(.accessTokenExpiresAt) }
         set { writeDate(.accessTokenExpiresAt, newValue) }
     }
 
-    var refreshToken: String? {
+    public var refreshToken: String? {
         get { read(.refreshToken) }
         set { write(.refreshToken, newValue) }
     }
 
-    var refreshTokenExpiresAt: Date? {
+    public var refreshTokenExpiresAt: Date? {
         get { readDate(.refreshTokenExpiresAt) }
         set { writeDate(.refreshTokenExpiresAt, newValue) }
     }
 
-    func hasValidRefreshToken() -> Bool {
+    public func hasValidRefreshToken() -> Bool {
         guard let token = refreshToken, !token.isEmpty else { return false }
         guard let exp = refreshTokenExpiresAt else { return true }
         return exp > Date()
@@ -65,18 +67,18 @@ final class SessionStore {
     }
 
     /// Сохранить обновлённый access-токен (refresh-токен не трогаем).
-    func saveRefreshedAccessToken(_ value: String, expiresAt: Date?) {
+    public func saveRefreshedAccessToken(_ value: String, expiresAt: Date?) {
         accessToken = value
         accessTokenExpiresAt = expiresAt
     }
 
     /// Сессия мертва: чистим токены и поднимаем флаг для перехода на логин.
-    func invalidate() {
+    public func invalidate() {
         clearSession()
         sessionExpired = true
     }
 
-    func clearSession() {
+    public func clearSession() {
         for key in [Key.accessToken, .accessTokenExpiresAt, .refreshToken, .refreshTokenExpiresAt] {
             delete(key)
         }

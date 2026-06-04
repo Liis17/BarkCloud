@@ -15,91 +15,91 @@ import GRPCProtobuf
 
 /// Namespace containing generated types for the "barkcloud.files.FilesApi" service.
 @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
-internal enum Barkcloud_Files_FilesApi: Sendable {
+public enum Barkcloud_Files_FilesApi: Sendable {
     /// Service descriptor for the "barkcloud.files.FilesApi" service.
-    internal static let descriptor = GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.FilesApi")
+    public static let descriptor = GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.FilesApi")
     /// Namespace for method metadata.
-    internal enum Method: Sendable {
+    public enum Method: Sendable {
         /// Namespace for "GetUploadUrl" metadata.
-        internal enum GetUploadUrl: Sendable {
+        public enum GetUploadUrl: Sendable {
             /// Request type for "GetUploadUrl".
-            internal typealias Input = Barkcloud_Files_GetUploadUrlRequest
+            public typealias Input = Barkcloud_Files_GetUploadUrlRequest
             /// Response type for "GetUploadUrl".
-            internal typealias Output = Barkcloud_Files_GetUploadUrlResponse
+            public typealias Output = Barkcloud_Files_GetUploadUrlResponse
             /// Descriptor for "GetUploadUrl".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.FilesApi"),
                 method: "GetUploadUrl",
                 type: .unary
             )
         }
         /// Namespace for "GetTempDownloadUrl" metadata.
-        internal enum GetTempDownloadUrl: Sendable {
+        public enum GetTempDownloadUrl: Sendable {
             /// Request type for "GetTempDownloadUrl".
-            internal typealias Input = Barkcloud_Files_GetTempDownloadUrlRequest
+            public typealias Input = Barkcloud_Files_GetTempDownloadUrlRequest
             /// Response type for "GetTempDownloadUrl".
-            internal typealias Output = Barkcloud_Files_GetTempDownloadUrlResponse
+            public typealias Output = Barkcloud_Files_GetTempDownloadUrlResponse
             /// Descriptor for "GetTempDownloadUrl".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.FilesApi"),
                 method: "GetTempDownloadUrl",
                 type: .unary
             )
         }
         /// Namespace for "CheckFileHash" metadata.
-        internal enum CheckFileHash: Sendable {
+        public enum CheckFileHash: Sendable {
             /// Request type for "CheckFileHash".
-            internal typealias Input = Barkcloud_Files_CheckFileHashRequest
+            public typealias Input = Barkcloud_Files_CheckFileHashRequest
             /// Response type for "CheckFileHash".
-            internal typealias Output = Barkcloud_Files_CheckFileHashResponse
+            public typealias Output = Barkcloud_Files_CheckFileHashResponse
             /// Descriptor for "CheckFileHash".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.FilesApi"),
                 method: "CheckFileHash",
                 type: .unary
             )
         }
         /// Namespace for "CheckFileHashes" metadata.
-        internal enum CheckFileHashes: Sendable {
+        public enum CheckFileHashes: Sendable {
             /// Request type for "CheckFileHashes".
-            internal typealias Input = Barkcloud_Files_CheckFileHashesRequest
+            public typealias Input = Barkcloud_Files_CheckFileHashesRequest
             /// Response type for "CheckFileHashes".
-            internal typealias Output = Barkcloud_Files_CheckFileHashesResponse
+            public typealias Output = Barkcloud_Files_CheckFileHashesResponse
             /// Descriptor for "CheckFileHashes".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.FilesApi"),
                 method: "CheckFileHashes",
                 type: .unary
             )
         }
         /// Namespace for "GetUserStorageInfo" metadata.
-        internal enum GetUserStorageInfo: Sendable {
+        public enum GetUserStorageInfo: Sendable {
             /// Request type for "GetUserStorageInfo".
-            internal typealias Input = Barkcloud_Files_GetUserStorageInfoRequest
+            public typealias Input = Barkcloud_Files_GetUserStorageInfoRequest
             /// Response type for "GetUserStorageInfo".
-            internal typealias Output = Barkcloud_Files_GetUserStorageInfoResponse
+            public typealias Output = Barkcloud_Files_GetUserStorageInfoResponse
             /// Descriptor for "GetUserStorageInfo".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.FilesApi"),
                 method: "GetUserStorageInfo",
                 type: .unary
             )
         }
         /// Namespace for "GetFileMetadata" metadata.
-        internal enum GetFileMetadata: Sendable {
+        public enum GetFileMetadata: Sendable {
             /// Request type for "GetFileMetadata".
-            internal typealias Input = Barkcloud_Files_GetFileMetadataRequest
+            public typealias Input = Barkcloud_Files_GetFileMetadataRequest
             /// Response type for "GetFileMetadata".
-            internal typealias Output = Barkcloud_Files_GetFileMetadataResponse
+            public typealias Output = Barkcloud_Files_GetFileMetadataResponse
             /// Descriptor for "GetFileMetadata".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.FilesApi"),
                 method: "GetFileMetadata",
                 type: .unary
             )
         }
         /// Descriptors for all methods in the "barkcloud.files.FilesApi" service.
-        internal static let descriptors: [GRPCCore.MethodDescriptor] = [
+        public static let descriptors: [GRPCCore.MethodDescriptor] = [
             GetUploadUrl.descriptor,
             GetTempDownloadUrl.descriptor,
             CheckFileHash.descriptor,
@@ -113,7 +113,7 @@ internal enum Barkcloud_Files_FilesApi: Sendable {
 @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
 extension GRPCCore.ServiceDescriptor {
     /// Service descriptor for the "barkcloud.files.FilesApi" service.
-    internal static let barkcloud_files_FilesApi = GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.FilesApi")
+    public static let barkcloud_files_FilesApi = GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.FilesApi")
 }
 
 // MARK: barkcloud.files.FilesApi (server)
@@ -130,7 +130,7 @@ extension Barkcloud_Files_FilesApi {
     ///
     /// Where possible, prefer using the stricter, less-verbose ``ServiceProtocol``
     /// or ``SimpleServiceProtocol`` instead.
-    internal protocol StreamingServiceProtocol: GRPCCore.RegistrableRPCService {
+    public protocol StreamingServiceProtocol: GRPCCore.RegistrableRPCService {
         /// Handle the "GetUploadUrl" method.
         ///
         /// > Source IDL Documentation:
@@ -247,7 +247,7 @@ extension Barkcloud_Files_FilesApi {
     /// trailing response metadata. If you don't need these then consider using
     /// the ``SimpleServiceProtocol``. If you need fine grained control over your RPCs then
     /// use ``StreamingServiceProtocol``.
-    internal protocol ServiceProtocol: Barkcloud_Files_FilesApi.StreamingServiceProtocol {
+    public protocol ServiceProtocol: Barkcloud_Files_FilesApi.StreamingServiceProtocol {
         /// Handle the "GetUploadUrl" method.
         ///
         /// > Source IDL Documentation:
@@ -362,7 +362,7 @@ extension Barkcloud_Files_FilesApi {
     /// This is the highest level protocol for the service. The API is the easiest to use but
     /// doesn't provide access to request or response metadata. If you need access to these
     /// then use ``ServiceProtocol`` instead.
-    internal protocol SimpleServiceProtocol: Barkcloud_Files_FilesApi.ServiceProtocol {
+    public protocol SimpleServiceProtocol: Barkcloud_Files_FilesApi.ServiceProtocol {
         /// Handle the "GetUploadUrl" method.
         ///
         /// > Source IDL Documentation:
@@ -476,7 +476,7 @@ extension Barkcloud_Files_FilesApi {
 // Default implementation of 'registerMethods(with:)'.
 @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
 extension Barkcloud_Files_FilesApi.StreamingServiceProtocol {
-    internal func registerMethods<Transport>(with router: inout GRPCCore.RPCRouter<Transport>) where Transport: GRPCCore.ServerTransport {
+    public func registerMethods<Transport>(with router: inout GRPCCore.RPCRouter<Transport>) where Transport: GRPCCore.ServerTransport {
         router.registerHandler(
             forMethod: Barkcloud_Files_FilesApi.Method.GetUploadUrl.descriptor,
             deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_GetUploadUrlRequest>(),
@@ -549,7 +549,7 @@ extension Barkcloud_Files_FilesApi.StreamingServiceProtocol {
 // Default implementation of streaming methods from 'StreamingServiceProtocol'.
 @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
 extension Barkcloud_Files_FilesApi.ServiceProtocol {
-    internal func getUploadUrl(
+    public func getUploadUrl(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Files_GetUploadUrlRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_GetUploadUrlResponse> {
@@ -560,7 +560,7 @@ extension Barkcloud_Files_FilesApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func getTempDownloadUrl(
+    public func getTempDownloadUrl(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Files_GetTempDownloadUrlRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_GetTempDownloadUrlResponse> {
@@ -571,7 +571,7 @@ extension Barkcloud_Files_FilesApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func checkFileHash(
+    public func checkFileHash(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Files_CheckFileHashRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CheckFileHashResponse> {
@@ -582,7 +582,7 @@ extension Barkcloud_Files_FilesApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func checkFileHashes(
+    public func checkFileHashes(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Files_CheckFileHashesRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CheckFileHashesResponse> {
@@ -593,7 +593,7 @@ extension Barkcloud_Files_FilesApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func getUserStorageInfo(
+    public func getUserStorageInfo(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Files_GetUserStorageInfoRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_GetUserStorageInfoResponse> {
@@ -604,7 +604,7 @@ extension Barkcloud_Files_FilesApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func getFileMetadata(
+    public func getFileMetadata(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Files_GetFileMetadataRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_GetFileMetadataResponse> {
@@ -619,7 +619,7 @@ extension Barkcloud_Files_FilesApi.ServiceProtocol {
 // Default implementation of methods from 'ServiceProtocol'.
 @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
 extension Barkcloud_Files_FilesApi.SimpleServiceProtocol {
-    internal func getUploadUrl(
+    public func getUploadUrl(
         request: GRPCCore.ServerRequest<Barkcloud_Files_GetUploadUrlRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_GetUploadUrlResponse> {
@@ -632,7 +632,7 @@ extension Barkcloud_Files_FilesApi.SimpleServiceProtocol {
         )
     }
 
-    internal func getTempDownloadUrl(
+    public func getTempDownloadUrl(
         request: GRPCCore.ServerRequest<Barkcloud_Files_GetTempDownloadUrlRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_GetTempDownloadUrlResponse> {
@@ -645,7 +645,7 @@ extension Barkcloud_Files_FilesApi.SimpleServiceProtocol {
         )
     }
 
-    internal func checkFileHash(
+    public func checkFileHash(
         request: GRPCCore.ServerRequest<Barkcloud_Files_CheckFileHashRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CheckFileHashResponse> {
@@ -658,7 +658,7 @@ extension Barkcloud_Files_FilesApi.SimpleServiceProtocol {
         )
     }
 
-    internal func checkFileHashes(
+    public func checkFileHashes(
         request: GRPCCore.ServerRequest<Barkcloud_Files_CheckFileHashesRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CheckFileHashesResponse> {
@@ -671,7 +671,7 @@ extension Barkcloud_Files_FilesApi.SimpleServiceProtocol {
         )
     }
 
-    internal func getUserStorageInfo(
+    public func getUserStorageInfo(
         request: GRPCCore.ServerRequest<Barkcloud_Files_GetUserStorageInfoRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_GetUserStorageInfoResponse> {
@@ -684,7 +684,7 @@ extension Barkcloud_Files_FilesApi.SimpleServiceProtocol {
         )
     }
 
-    internal func getFileMetadata(
+    public func getFileMetadata(
         request: GRPCCore.ServerRequest<Barkcloud_Files_GetFileMetadataRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_GetFileMetadataResponse> {
@@ -706,7 +706,7 @@ extension Barkcloud_Files_FilesApi {
     ///
     /// You don't need to implement this protocol directly, use the generated
     /// implementation, ``Client``.
-    internal protocol ClientProtocol: Sendable {
+    public protocol ClientProtocol: Sendable {
         /// Call the "GetUploadUrl" method.
         ///
         /// > Source IDL Documentation:
@@ -851,14 +851,14 @@ extension Barkcloud_Files_FilesApi {
     /// The ``Client`` provides an implementation of ``ClientProtocol`` which wraps
     /// a `GRPCCore.GRPCCClient`. The underlying `GRPCClient` provides the long-lived
     /// means of communication with the remote peer.
-    internal struct Client<Transport>: ClientProtocol where Transport: GRPCCore.ClientTransport {
+    public struct Client<Transport>: ClientProtocol where Transport: GRPCCore.ClientTransport {
         private let client: GRPCCore.GRPCClient<Transport>
 
         /// Creates a new client wrapping the provided `GRPCCore.GRPCClient`.
         ///
         /// - Parameters:
         ///   - client: A `GRPCCore.GRPCClient` providing a communication channel to the service.
-        internal init(wrapping client: GRPCCore.GRPCClient<Transport>) {
+        public init(wrapping client: GRPCCore.GRPCClient<Transport>) {
             self.client = client
         }
 
@@ -877,7 +877,7 @@ extension Barkcloud_Files_FilesApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func getUploadUrl<Result>(
+        public func getUploadUrl<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Files_GetUploadUrlRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_GetUploadUrlRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_GetUploadUrlResponse>,
@@ -911,7 +911,7 @@ extension Barkcloud_Files_FilesApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func getTempDownloadUrl<Result>(
+        public func getTempDownloadUrl<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Files_GetTempDownloadUrlRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_GetTempDownloadUrlRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_GetTempDownloadUrlResponse>,
@@ -945,7 +945,7 @@ extension Barkcloud_Files_FilesApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func checkFileHash<Result>(
+        public func checkFileHash<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Files_CheckFileHashRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_CheckFileHashRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CheckFileHashResponse>,
@@ -979,7 +979,7 @@ extension Barkcloud_Files_FilesApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func checkFileHashes<Result>(
+        public func checkFileHashes<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Files_CheckFileHashesRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_CheckFileHashesRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CheckFileHashesResponse>,
@@ -1013,7 +1013,7 @@ extension Barkcloud_Files_FilesApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func getUserStorageInfo<Result>(
+        public func getUserStorageInfo<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Files_GetUserStorageInfoRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_GetUserStorageInfoRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_GetUserStorageInfoResponse>,
@@ -1047,7 +1047,7 @@ extension Barkcloud_Files_FilesApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func getFileMetadata<Result>(
+        public func getFileMetadata<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Files_GetFileMetadataRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_GetFileMetadataRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_GetFileMetadataResponse>,
@@ -1084,7 +1084,7 @@ extension Barkcloud_Files_FilesApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func getUploadUrl<Result>(
+    public func getUploadUrl<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Files_GetUploadUrlRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_GetUploadUrlResponse>) async throws -> Result = { response in
@@ -1113,7 +1113,7 @@ extension Barkcloud_Files_FilesApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func getTempDownloadUrl<Result>(
+    public func getTempDownloadUrl<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Files_GetTempDownloadUrlRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_GetTempDownloadUrlResponse>) async throws -> Result = { response in
@@ -1142,7 +1142,7 @@ extension Barkcloud_Files_FilesApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func checkFileHash<Result>(
+    public func checkFileHash<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Files_CheckFileHashRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CheckFileHashResponse>) async throws -> Result = { response in
@@ -1171,7 +1171,7 @@ extension Barkcloud_Files_FilesApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func checkFileHashes<Result>(
+    public func checkFileHashes<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Files_CheckFileHashesRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CheckFileHashesResponse>) async throws -> Result = { response in
@@ -1200,7 +1200,7 @@ extension Barkcloud_Files_FilesApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func getUserStorageInfo<Result>(
+    public func getUserStorageInfo<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Files_GetUserStorageInfoRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_GetUserStorageInfoResponse>) async throws -> Result = { response in
@@ -1229,7 +1229,7 @@ extension Barkcloud_Files_FilesApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func getFileMetadata<Result>(
+    public func getFileMetadata<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Files_GetFileMetadataRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_GetFileMetadataResponse>) async throws -> Result = { response in
@@ -1263,7 +1263,7 @@ extension Barkcloud_Files_FilesApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func getUploadUrl<Result>(
+    public func getUploadUrl<Result>(
         _ message: Barkcloud_Files_GetUploadUrlRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -1296,7 +1296,7 @@ extension Barkcloud_Files_FilesApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func getTempDownloadUrl<Result>(
+    public func getTempDownloadUrl<Result>(
         _ message: Barkcloud_Files_GetTempDownloadUrlRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -1329,7 +1329,7 @@ extension Barkcloud_Files_FilesApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func checkFileHash<Result>(
+    public func checkFileHash<Result>(
         _ message: Barkcloud_Files_CheckFileHashRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -1362,7 +1362,7 @@ extension Barkcloud_Files_FilesApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func checkFileHashes<Result>(
+    public func checkFileHashes<Result>(
         _ message: Barkcloud_Files_CheckFileHashesRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -1395,7 +1395,7 @@ extension Barkcloud_Files_FilesApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func getUserStorageInfo<Result>(
+    public func getUserStorageInfo<Result>(
         _ message: Barkcloud_Files_GetUserStorageInfoRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -1428,7 +1428,7 @@ extension Barkcloud_Files_FilesApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func getFileMetadata<Result>(
+    public func getFileMetadata<Result>(
         _ message: Barkcloud_Files_GetFileMetadataRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -1452,533 +1452,533 @@ extension Barkcloud_Files_FilesApi.ClientProtocol {
 
 /// Namespace containing generated types for the "barkcloud.files.CloudApi" service.
 @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
-internal enum Barkcloud_Files_CloudApi: Sendable {
+public enum Barkcloud_Files_CloudApi: Sendable {
     /// Service descriptor for the "barkcloud.files.CloudApi" service.
-    internal static let descriptor = GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.CloudApi")
+    public static let descriptor = GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.CloudApi")
     /// Namespace for method metadata.
-    internal enum Method: Sendable {
+    public enum Method: Sendable {
         /// Namespace for "CreateDirectory" metadata.
-        internal enum CreateDirectory: Sendable {
+        public enum CreateDirectory: Sendable {
             /// Request type for "CreateDirectory".
-            internal typealias Input = Barkcloud_Files_CreateDirectoryRequest
+            public typealias Input = Barkcloud_Files_CreateDirectoryRequest
             /// Response type for "CreateDirectory".
-            internal typealias Output = Barkcloud_Files_DirectoryInfo
+            public typealias Output = Barkcloud_Files_DirectoryInfo
             /// Descriptor for "CreateDirectory".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.CloudApi"),
                 method: "CreateDirectory",
                 type: .unary
             )
         }
         /// Namespace for "RenameDirectory" metadata.
-        internal enum RenameDirectory: Sendable {
+        public enum RenameDirectory: Sendable {
             /// Request type for "RenameDirectory".
-            internal typealias Input = Barkcloud_Files_RenameDirectoryRequest
+            public typealias Input = Barkcloud_Files_RenameDirectoryRequest
             /// Response type for "RenameDirectory".
-            internal typealias Output = Barkcloud_Files_CloudEmpty
+            public typealias Output = Barkcloud_Files_CloudEmpty
             /// Descriptor for "RenameDirectory".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.CloudApi"),
                 method: "RenameDirectory",
                 type: .unary
             )
         }
         /// Namespace for "MoveDirectory" metadata.
-        internal enum MoveDirectory: Sendable {
+        public enum MoveDirectory: Sendable {
             /// Request type for "MoveDirectory".
-            internal typealias Input = Barkcloud_Files_MoveDirectoryRequest
+            public typealias Input = Barkcloud_Files_MoveDirectoryRequest
             /// Response type for "MoveDirectory".
-            internal typealias Output = Barkcloud_Files_CloudEmpty
+            public typealias Output = Barkcloud_Files_CloudEmpty
             /// Descriptor for "MoveDirectory".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.CloudApi"),
                 method: "MoveDirectory",
                 type: .unary
             )
         }
         /// Namespace for "DeleteDirectory" metadata.
-        internal enum DeleteDirectory: Sendable {
+        public enum DeleteDirectory: Sendable {
             /// Request type for "DeleteDirectory".
-            internal typealias Input = Barkcloud_Files_DeleteDirectoryRequest
+            public typealias Input = Barkcloud_Files_DeleteDirectoryRequest
             /// Response type for "DeleteDirectory".
-            internal typealias Output = Barkcloud_Files_CloudEmpty
+            public typealias Output = Barkcloud_Files_CloudEmpty
             /// Descriptor for "DeleteDirectory".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.CloudApi"),
                 method: "DeleteDirectory",
                 type: .unary
             )
         }
         /// Namespace for "ListDirectory" metadata.
-        internal enum ListDirectory: Sendable {
+        public enum ListDirectory: Sendable {
             /// Request type for "ListDirectory".
-            internal typealias Input = Barkcloud_Files_ListDirectoryRequest
+            public typealias Input = Barkcloud_Files_ListDirectoryRequest
             /// Response type for "ListDirectory".
-            internal typealias Output = Barkcloud_Files_DirectoryListing
+            public typealias Output = Barkcloud_Files_DirectoryListing
             /// Descriptor for "ListDirectory".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.CloudApi"),
                 method: "ListDirectory",
                 type: .unary
             )
         }
         /// Namespace for "ListDirectoryDetailed" metadata.
-        internal enum ListDirectoryDetailed: Sendable {
+        public enum ListDirectoryDetailed: Sendable {
             /// Request type for "ListDirectoryDetailed".
-            internal typealias Input = Barkcloud_Files_ListDirectoryRequest
+            public typealias Input = Barkcloud_Files_ListDirectoryRequest
             /// Response type for "ListDirectoryDetailed".
-            internal typealias Output = Barkcloud_Files_DirectoryListingDetailed
+            public typealias Output = Barkcloud_Files_DirectoryListingDetailed
             /// Descriptor for "ListDirectoryDetailed".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.CloudApi"),
                 method: "ListDirectoryDetailed",
                 type: .unary
             )
         }
         /// Namespace for "AttachFile" metadata.
-        internal enum AttachFile: Sendable {
+        public enum AttachFile: Sendable {
             /// Request type for "AttachFile".
-            internal typealias Input = Barkcloud_Files_AttachFileRequest
+            public typealias Input = Barkcloud_Files_AttachFileRequest
             /// Response type for "AttachFile".
-            internal typealias Output = Barkcloud_Files_CloudEmpty
+            public typealias Output = Barkcloud_Files_CloudEmpty
             /// Descriptor for "AttachFile".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.CloudApi"),
                 method: "AttachFile",
                 type: .unary
             )
         }
         /// Namespace for "RenameFileEntry" metadata.
-        internal enum RenameFileEntry: Sendable {
+        public enum RenameFileEntry: Sendable {
             /// Request type for "RenameFileEntry".
-            internal typealias Input = Barkcloud_Files_RenameFileEntryRequest
+            public typealias Input = Barkcloud_Files_RenameFileEntryRequest
             /// Response type for "RenameFileEntry".
-            internal typealias Output = Barkcloud_Files_CloudEmpty
+            public typealias Output = Barkcloud_Files_CloudEmpty
             /// Descriptor for "RenameFileEntry".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.CloudApi"),
                 method: "RenameFileEntry",
                 type: .unary
             )
         }
         /// Namespace for "MoveFileEntry" metadata.
-        internal enum MoveFileEntry: Sendable {
+        public enum MoveFileEntry: Sendable {
             /// Request type for "MoveFileEntry".
-            internal typealias Input = Barkcloud_Files_MoveFileEntryRequest
+            public typealias Input = Barkcloud_Files_MoveFileEntryRequest
             /// Response type for "MoveFileEntry".
-            internal typealias Output = Barkcloud_Files_CloudEmpty
+            public typealias Output = Barkcloud_Files_CloudEmpty
             /// Descriptor for "MoveFileEntry".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.CloudApi"),
                 method: "MoveFileEntry",
                 type: .unary
             )
         }
         /// Namespace for "DeleteFileEntry" metadata.
-        internal enum DeleteFileEntry: Sendable {
+        public enum DeleteFileEntry: Sendable {
             /// Request type for "DeleteFileEntry".
-            internal typealias Input = Barkcloud_Files_DeleteFileEntryRequest
+            public typealias Input = Barkcloud_Files_DeleteFileEntryRequest
             /// Response type for "DeleteFileEntry".
-            internal typealias Output = Barkcloud_Files_CloudEmpty
+            public typealias Output = Barkcloud_Files_CloudEmpty
             /// Descriptor for "DeleteFileEntry".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.CloudApi"),
                 method: "DeleteFileEntry",
                 type: .unary
             )
         }
         /// Namespace for "DeleteFileEntries" metadata.
-        internal enum DeleteFileEntries: Sendable {
+        public enum DeleteFileEntries: Sendable {
             /// Request type for "DeleteFileEntries".
-            internal typealias Input = Barkcloud_Files_DeleteFileEntriesRequest
+            public typealias Input = Barkcloud_Files_DeleteFileEntriesRequest
             /// Response type for "DeleteFileEntries".
-            internal typealias Output = Barkcloud_Files_DeleteFileEntriesResponse
+            public typealias Output = Barkcloud_Files_DeleteFileEntriesResponse
             /// Descriptor for "DeleteFileEntries".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.CloudApi"),
                 method: "DeleteFileEntries",
                 type: .unary
             )
         }
         /// Namespace for "ListUserImages" metadata.
-        internal enum ListUserImages: Sendable {
+        public enum ListUserImages: Sendable {
             /// Request type for "ListUserImages".
-            internal typealias Input = Barkcloud_Files_ListUserImagesRequest
+            public typealias Input = Barkcloud_Files_ListUserImagesRequest
             /// Response type for "ListUserImages".
-            internal typealias Output = Barkcloud_Files_ListUserImagesResponse
+            public typealias Output = Barkcloud_Files_ListUserImagesResponse
             /// Descriptor for "ListUserImages".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.CloudApi"),
                 method: "ListUserImages",
                 type: .unary
             )
         }
         /// Namespace for "ListUserMedia" metadata.
-        internal enum ListUserMedia: Sendable {
+        public enum ListUserMedia: Sendable {
             /// Request type for "ListUserMedia".
-            internal typealias Input = Barkcloud_Files_ListUserMediaRequest
+            public typealias Input = Barkcloud_Files_ListUserMediaRequest
             /// Response type for "ListUserMedia".
-            internal typealias Output = Barkcloud_Files_ListUserMediaResponse
+            public typealias Output = Barkcloud_Files_ListUserMediaResponse
             /// Descriptor for "ListUserMedia".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.CloudApi"),
                 method: "ListUserMedia",
                 type: .unary
             )
         }
         /// Namespace for "DeleteUserMedia" metadata.
-        internal enum DeleteUserMedia: Sendable {
+        public enum DeleteUserMedia: Sendable {
             /// Request type for "DeleteUserMedia".
-            internal typealias Input = Barkcloud_Files_DeleteUserMediaRequest
+            public typealias Input = Barkcloud_Files_DeleteUserMediaRequest
             /// Response type for "DeleteUserMedia".
-            internal typealias Output = Barkcloud_Files_CloudEmpty
+            public typealias Output = Barkcloud_Files_CloudEmpty
             /// Descriptor for "DeleteUserMedia".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.CloudApi"),
                 method: "DeleteUserMedia",
                 type: .unary
             )
         }
         /// Namespace for "GetPath" metadata.
-        internal enum GetPath: Sendable {
+        public enum GetPath: Sendable {
             /// Request type for "GetPath".
-            internal typealias Input = Barkcloud_Files_GetPathRequest
+            public typealias Input = Barkcloud_Files_GetPathRequest
             /// Response type for "GetPath".
-            internal typealias Output = Barkcloud_Files_PathResponse
+            public typealias Output = Barkcloud_Files_PathResponse
             /// Descriptor for "GetPath".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.CloudApi"),
                 method: "GetPath",
                 type: .unary
             )
         }
         /// Namespace for "SetVideoThumbnail" metadata.
-        internal enum SetVideoThumbnail: Sendable {
+        public enum SetVideoThumbnail: Sendable {
             /// Request type for "SetVideoThumbnail".
-            internal typealias Input = Barkcloud_Files_SetVideoThumbnailRequest
+            public typealias Input = Barkcloud_Files_SetVideoThumbnailRequest
             /// Response type for "SetVideoThumbnail".
-            internal typealias Output = Barkcloud_Files_CloudEmpty
+            public typealias Output = Barkcloud_Files_CloudEmpty
             /// Descriptor for "SetVideoThumbnail".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.CloudApi"),
                 method: "SetVideoThumbnail",
                 type: .unary
             )
         }
         /// Namespace for "ListTrash" metadata.
-        internal enum ListTrash: Sendable {
+        public enum ListTrash: Sendable {
             /// Request type for "ListTrash".
-            internal typealias Input = Barkcloud_Files_ListTrashRequest
+            public typealias Input = Barkcloud_Files_ListTrashRequest
             /// Response type for "ListTrash".
-            internal typealias Output = Barkcloud_Files_ListTrashResponse
+            public typealias Output = Barkcloud_Files_ListTrashResponse
             /// Descriptor for "ListTrash".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.CloudApi"),
                 method: "ListTrash",
                 type: .unary
             )
         }
         /// Namespace for "RestoreFromTrash" metadata.
-        internal enum RestoreFromTrash: Sendable {
+        public enum RestoreFromTrash: Sendable {
             /// Request type for "RestoreFromTrash".
-            internal typealias Input = Barkcloud_Files_RestoreFromTrashRequest
+            public typealias Input = Barkcloud_Files_RestoreFromTrashRequest
             /// Response type for "RestoreFromTrash".
-            internal typealias Output = Barkcloud_Files_CloudEmpty
+            public typealias Output = Barkcloud_Files_CloudEmpty
             /// Descriptor for "RestoreFromTrash".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.CloudApi"),
                 method: "RestoreFromTrash",
                 type: .unary
             )
         }
         /// Namespace for "DeleteFromTrash" metadata.
-        internal enum DeleteFromTrash: Sendable {
+        public enum DeleteFromTrash: Sendable {
             /// Request type for "DeleteFromTrash".
-            internal typealias Input = Barkcloud_Files_DeleteFromTrashRequest
+            public typealias Input = Barkcloud_Files_DeleteFromTrashRequest
             /// Response type for "DeleteFromTrash".
-            internal typealias Output = Barkcloud_Files_CloudEmpty
+            public typealias Output = Barkcloud_Files_CloudEmpty
             /// Descriptor for "DeleteFromTrash".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.CloudApi"),
                 method: "DeleteFromTrash",
                 type: .unary
             )
         }
         /// Namespace for "EmptyTrash" metadata.
-        internal enum EmptyTrash: Sendable {
+        public enum EmptyTrash: Sendable {
             /// Request type for "EmptyTrash".
-            internal typealias Input = Barkcloud_Files_EmptyTrashRequest
+            public typealias Input = Barkcloud_Files_EmptyTrashRequest
             /// Response type for "EmptyTrash".
-            internal typealias Output = Barkcloud_Files_CloudEmpty
+            public typealias Output = Barkcloud_Files_CloudEmpty
             /// Descriptor for "EmptyTrash".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.CloudApi"),
                 method: "EmptyTrash",
                 type: .unary
             )
         }
         /// Namespace for "AddFavorite" metadata.
-        internal enum AddFavorite: Sendable {
+        public enum AddFavorite: Sendable {
             /// Request type for "AddFavorite".
-            internal typealias Input = Barkcloud_Files_AddFavoriteRequest
+            public typealias Input = Barkcloud_Files_AddFavoriteRequest
             /// Response type for "AddFavorite".
-            internal typealias Output = Barkcloud_Files_CloudEmpty
+            public typealias Output = Barkcloud_Files_CloudEmpty
             /// Descriptor for "AddFavorite".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.CloudApi"),
                 method: "AddFavorite",
                 type: .unary
             )
         }
         /// Namespace for "RemoveFavorite" metadata.
-        internal enum RemoveFavorite: Sendable {
+        public enum RemoveFavorite: Sendable {
             /// Request type for "RemoveFavorite".
-            internal typealias Input = Barkcloud_Files_RemoveFavoriteRequest
+            public typealias Input = Barkcloud_Files_RemoveFavoriteRequest
             /// Response type for "RemoveFavorite".
-            internal typealias Output = Barkcloud_Files_CloudEmpty
+            public typealias Output = Barkcloud_Files_CloudEmpty
             /// Descriptor for "RemoveFavorite".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.CloudApi"),
                 method: "RemoveFavorite",
                 type: .unary
             )
         }
         /// Namespace for "ListFavorites" metadata.
-        internal enum ListFavorites: Sendable {
+        public enum ListFavorites: Sendable {
             /// Request type for "ListFavorites".
-            internal typealias Input = Barkcloud_Files_ListFavoritesRequest
+            public typealias Input = Barkcloud_Files_ListFavoritesRequest
             /// Response type for "ListFavorites".
-            internal typealias Output = Barkcloud_Files_ListFavoritesResponse
+            public typealias Output = Barkcloud_Files_ListFavoritesResponse
             /// Descriptor for "ListFavorites".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.CloudApi"),
                 method: "ListFavorites",
                 type: .unary
             )
         }
         /// Namespace for "CreateShare" metadata.
-        internal enum CreateShare: Sendable {
+        public enum CreateShare: Sendable {
             /// Request type for "CreateShare".
-            internal typealias Input = Barkcloud_Files_CreateShareRequest
+            public typealias Input = Barkcloud_Files_CreateShareRequest
             /// Response type for "CreateShare".
-            internal typealias Output = Barkcloud_Files_ShareInfo
+            public typealias Output = Barkcloud_Files_ShareInfo
             /// Descriptor for "CreateShare".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.CloudApi"),
                 method: "CreateShare",
                 type: .unary
             )
         }
         /// Namespace for "ListMyShares" metadata.
-        internal enum ListMyShares: Sendable {
+        public enum ListMyShares: Sendable {
             /// Request type for "ListMyShares".
-            internal typealias Input = Barkcloud_Files_ListMySharesRequest
+            public typealias Input = Barkcloud_Files_ListMySharesRequest
             /// Response type for "ListMyShares".
-            internal typealias Output = Barkcloud_Files_ListMySharesResponse
+            public typealias Output = Barkcloud_Files_ListMySharesResponse
             /// Descriptor for "ListMyShares".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.CloudApi"),
                 method: "ListMyShares",
                 type: .unary
             )
         }
         /// Namespace for "RevokeShare" metadata.
-        internal enum RevokeShare: Sendable {
+        public enum RevokeShare: Sendable {
             /// Request type for "RevokeShare".
-            internal typealias Input = Barkcloud_Files_RevokeShareRequest
+            public typealias Input = Barkcloud_Files_RevokeShareRequest
             /// Response type for "RevokeShare".
-            internal typealias Output = Barkcloud_Files_CloudEmpty
+            public typealias Output = Barkcloud_Files_CloudEmpty
             /// Descriptor for "RevokeShare".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.CloudApi"),
                 method: "RevokeShare",
                 type: .unary
             )
         }
         /// Namespace for "CreateFolderShare" metadata.
-        internal enum CreateFolderShare: Sendable {
+        public enum CreateFolderShare: Sendable {
             /// Request type for "CreateFolderShare".
-            internal typealias Input = Barkcloud_Files_CreateFolderShareRequest
+            public typealias Input = Barkcloud_Files_CreateFolderShareRequest
             /// Response type for "CreateFolderShare".
-            internal typealias Output = Barkcloud_Files_FolderShareInfo
+            public typealias Output = Barkcloud_Files_FolderShareInfo
             /// Descriptor for "CreateFolderShare".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.CloudApi"),
                 method: "CreateFolderShare",
                 type: .unary
             )
         }
         /// Namespace for "ListMyFolderShares" metadata.
-        internal enum ListMyFolderShares: Sendable {
+        public enum ListMyFolderShares: Sendable {
             /// Request type for "ListMyFolderShares".
-            internal typealias Input = Barkcloud_Files_ListMyFolderSharesRequest
+            public typealias Input = Barkcloud_Files_ListMyFolderSharesRequest
             /// Response type for "ListMyFolderShares".
-            internal typealias Output = Barkcloud_Files_ListMyFolderSharesResponse
+            public typealias Output = Barkcloud_Files_ListMyFolderSharesResponse
             /// Descriptor for "ListMyFolderShares".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.CloudApi"),
                 method: "ListMyFolderShares",
                 type: .unary
             )
         }
         /// Namespace for "RevokeFolderShare" metadata.
-        internal enum RevokeFolderShare: Sendable {
+        public enum RevokeFolderShare: Sendable {
             /// Request type for "RevokeFolderShare".
-            internal typealias Input = Barkcloud_Files_RevokeFolderShareRequest
+            public typealias Input = Barkcloud_Files_RevokeFolderShareRequest
             /// Response type for "RevokeFolderShare".
-            internal typealias Output = Barkcloud_Files_CloudEmpty
+            public typealias Output = Barkcloud_Files_CloudEmpty
             /// Descriptor for "RevokeFolderShare".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.CloudApi"),
                 method: "RevokeFolderShare",
                 type: .unary
             )
         }
         /// Namespace for "ShareFileWithUser" metadata.
-        internal enum ShareFileWithUser: Sendable {
+        public enum ShareFileWithUser: Sendable {
             /// Request type for "ShareFileWithUser".
-            internal typealias Input = Barkcloud_Files_ShareFileWithUserRequest
+            public typealias Input = Barkcloud_Files_ShareFileWithUserRequest
             /// Response type for "ShareFileWithUser".
-            internal typealias Output = Barkcloud_Files_CloudEmpty
+            public typealias Output = Barkcloud_Files_CloudEmpty
             /// Descriptor for "ShareFileWithUser".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.CloudApi"),
                 method: "ShareFileWithUser",
                 type: .unary
             )
         }
         /// Namespace for "RevokeUserShare" metadata.
-        internal enum RevokeUserShare: Sendable {
+        public enum RevokeUserShare: Sendable {
             /// Request type for "RevokeUserShare".
-            internal typealias Input = Barkcloud_Files_RevokeUserShareRequest
+            public typealias Input = Barkcloud_Files_RevokeUserShareRequest
             /// Response type for "RevokeUserShare".
-            internal typealias Output = Barkcloud_Files_CloudEmpty
+            public typealias Output = Barkcloud_Files_CloudEmpty
             /// Descriptor for "RevokeUserShare".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.CloudApi"),
                 method: "RevokeUserShare",
                 type: .unary
             )
         }
         /// Namespace for "ListMyOutgoingShares" metadata.
-        internal enum ListMyOutgoingShares: Sendable {
+        public enum ListMyOutgoingShares: Sendable {
             /// Request type for "ListMyOutgoingShares".
-            internal typealias Input = Barkcloud_Files_ListMyOutgoingSharesRequest
+            public typealias Input = Barkcloud_Files_ListMyOutgoingSharesRequest
             /// Response type for "ListMyOutgoingShares".
-            internal typealias Output = Barkcloud_Files_ListMyOutgoingSharesResponse
+            public typealias Output = Barkcloud_Files_ListMyOutgoingSharesResponse
             /// Descriptor for "ListMyOutgoingShares".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.CloudApi"),
                 method: "ListMyOutgoingShares",
                 type: .unary
             )
         }
         /// Namespace for "ListMyOutgoingSharesAll" metadata.
-        internal enum ListMyOutgoingSharesAll: Sendable {
+        public enum ListMyOutgoingSharesAll: Sendable {
             /// Request type for "ListMyOutgoingSharesAll".
-            internal typealias Input = Barkcloud_Files_ListMyOutgoingSharesAllRequest
+            public typealias Input = Barkcloud_Files_ListMyOutgoingSharesAllRequest
             /// Response type for "ListMyOutgoingSharesAll".
-            internal typealias Output = Barkcloud_Files_ListMyOutgoingSharesAllResponse
+            public typealias Output = Barkcloud_Files_ListMyOutgoingSharesAllResponse
             /// Descriptor for "ListMyOutgoingSharesAll".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.CloudApi"),
                 method: "ListMyOutgoingSharesAll",
                 type: .unary
             )
         }
         /// Namespace for "ListSharedWithMe" metadata.
-        internal enum ListSharedWithMe: Sendable {
+        public enum ListSharedWithMe: Sendable {
             /// Request type for "ListSharedWithMe".
-            internal typealias Input = Barkcloud_Files_ListSharedWithMeRequest
+            public typealias Input = Barkcloud_Files_ListSharedWithMeRequest
             /// Response type for "ListSharedWithMe".
-            internal typealias Output = Barkcloud_Files_ListSharedWithMeResponse
+            public typealias Output = Barkcloud_Files_ListSharedWithMeResponse
             /// Descriptor for "ListSharedWithMe".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.CloudApi"),
                 method: "ListSharedWithMe",
                 type: .unary
             )
         }
         /// Namespace for "GetSharedFileDownloadUrl" metadata.
-        internal enum GetSharedFileDownloadUrl: Sendable {
+        public enum GetSharedFileDownloadUrl: Sendable {
             /// Request type for "GetSharedFileDownloadUrl".
-            internal typealias Input = Barkcloud_Files_GetSharedFileDownloadUrlRequest
+            public typealias Input = Barkcloud_Files_GetSharedFileDownloadUrlRequest
             /// Response type for "GetSharedFileDownloadUrl".
-            internal typealias Output = Barkcloud_Files_GetSharedFileDownloadUrlResponse
+            public typealias Output = Barkcloud_Files_GetSharedFileDownloadUrlResponse
             /// Descriptor for "GetSharedFileDownloadUrl".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.CloudApi"),
                 method: "GetSharedFileDownloadUrl",
                 type: .unary
             )
         }
         /// Namespace for "ShareFolderWithUser" metadata.
-        internal enum ShareFolderWithUser: Sendable {
+        public enum ShareFolderWithUser: Sendable {
             /// Request type for "ShareFolderWithUser".
-            internal typealias Input = Barkcloud_Files_ShareFolderWithUserRequest
+            public typealias Input = Barkcloud_Files_ShareFolderWithUserRequest
             /// Response type for "ShareFolderWithUser".
-            internal typealias Output = Barkcloud_Files_CloudEmpty
+            public typealias Output = Barkcloud_Files_CloudEmpty
             /// Descriptor for "ShareFolderWithUser".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.CloudApi"),
                 method: "ShareFolderWithUser",
                 type: .unary
             )
         }
         /// Namespace for "RevokeFolderUserShare" metadata.
-        internal enum RevokeFolderUserShare: Sendable {
+        public enum RevokeFolderUserShare: Sendable {
             /// Request type for "RevokeFolderUserShare".
-            internal typealias Input = Barkcloud_Files_RevokeFolderUserShareRequest
+            public typealias Input = Barkcloud_Files_RevokeFolderUserShareRequest
             /// Response type for "RevokeFolderUserShare".
-            internal typealias Output = Barkcloud_Files_CloudEmpty
+            public typealias Output = Barkcloud_Files_CloudEmpty
             /// Descriptor for "RevokeFolderUserShare".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.CloudApi"),
                 method: "RevokeFolderUserShare",
                 type: .unary
             )
         }
         /// Namespace for "ListMyOutgoingFolderShares" metadata.
-        internal enum ListMyOutgoingFolderShares: Sendable {
+        public enum ListMyOutgoingFolderShares: Sendable {
             /// Request type for "ListMyOutgoingFolderShares".
-            internal typealias Input = Barkcloud_Files_ListMyOutgoingFolderSharesRequest
+            public typealias Input = Barkcloud_Files_ListMyOutgoingFolderSharesRequest
             /// Response type for "ListMyOutgoingFolderShares".
-            internal typealias Output = Barkcloud_Files_ListMyOutgoingFolderSharesResponse
+            public typealias Output = Barkcloud_Files_ListMyOutgoingFolderSharesResponse
             /// Descriptor for "ListMyOutgoingFolderShares".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.CloudApi"),
                 method: "ListMyOutgoingFolderShares",
                 type: .unary
             )
         }
         /// Namespace for "ListSharedFoldersWithMe" metadata.
-        internal enum ListSharedFoldersWithMe: Sendable {
+        public enum ListSharedFoldersWithMe: Sendable {
             /// Request type for "ListSharedFoldersWithMe".
-            internal typealias Input = Barkcloud_Files_ListSharedFoldersWithMeRequest
+            public typealias Input = Barkcloud_Files_ListSharedFoldersWithMeRequest
             /// Response type for "ListSharedFoldersWithMe".
-            internal typealias Output = Barkcloud_Files_ListSharedFoldersWithMeResponse
+            public typealias Output = Barkcloud_Files_ListSharedFoldersWithMeResponse
             /// Descriptor for "ListSharedFoldersWithMe".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.CloudApi"),
                 method: "ListSharedFoldersWithMe",
                 type: .unary
             )
         }
         /// Namespace for "ListSharedDirectory" metadata.
-        internal enum ListSharedDirectory: Sendable {
+        public enum ListSharedDirectory: Sendable {
             /// Request type for "ListSharedDirectory".
-            internal typealias Input = Barkcloud_Files_ListSharedDirectoryRequest
+            public typealias Input = Barkcloud_Files_ListSharedDirectoryRequest
             /// Response type for "ListSharedDirectory".
-            internal typealias Output = Barkcloud_Files_ListSharedDirectoryResponse
+            public typealias Output = Barkcloud_Files_ListSharedDirectoryResponse
             /// Descriptor for "ListSharedDirectory".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.CloudApi"),
                 method: "ListSharedDirectory",
                 type: .unary
             )
         }
         /// Descriptors for all methods in the "barkcloud.files.CloudApi" service.
-        internal static let descriptors: [GRPCCore.MethodDescriptor] = [
+        public static let descriptors: [GRPCCore.MethodDescriptor] = [
             CreateDirectory.descriptor,
             RenameDirectory.descriptor,
             MoveDirectory.descriptor,
@@ -2026,7 +2026,7 @@ internal enum Barkcloud_Files_CloudApi: Sendable {
 @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
 extension GRPCCore.ServiceDescriptor {
     /// Service descriptor for the "barkcloud.files.CloudApi" service.
-    internal static let barkcloud_files_CloudApi = GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.CloudApi")
+    public static let barkcloud_files_CloudApi = GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.CloudApi")
 }
 
 // MARK: barkcloud.files.CloudApi (server)
@@ -2043,7 +2043,7 @@ extension Barkcloud_Files_CloudApi {
     ///
     /// Where possible, prefer using the stricter, less-verbose ``ServiceProtocol``
     /// or ``SimpleServiceProtocol`` instead.
-    internal protocol StreamingServiceProtocol: GRPCCore.RegistrableRPCService {
+    public protocol StreamingServiceProtocol: GRPCCore.RegistrableRPCService {
         /// Handle the "CreateDirectory" method.
         ///
         /// > Source IDL Documentation:
@@ -2772,7 +2772,7 @@ extension Barkcloud_Files_CloudApi {
     /// trailing response metadata. If you don't need these then consider using
     /// the ``SimpleServiceProtocol``. If you need fine grained control over your RPCs then
     /// use ``StreamingServiceProtocol``.
-    internal protocol ServiceProtocol: Barkcloud_Files_CloudApi.StreamingServiceProtocol {
+    public protocol ServiceProtocol: Barkcloud_Files_CloudApi.StreamingServiceProtocol {
         /// Handle the "CreateDirectory" method.
         ///
         /// > Source IDL Documentation:
@@ -3499,7 +3499,7 @@ extension Barkcloud_Files_CloudApi {
     /// This is the highest level protocol for the service. The API is the easiest to use but
     /// doesn't provide access to request or response metadata. If you need access to these
     /// then use ``ServiceProtocol`` instead.
-    internal protocol SimpleServiceProtocol: Barkcloud_Files_CloudApi.ServiceProtocol {
+    public protocol SimpleServiceProtocol: Barkcloud_Files_CloudApi.ServiceProtocol {
         /// Handle the "CreateDirectory" method.
         ///
         /// > Source IDL Documentation:
@@ -4225,7 +4225,7 @@ extension Barkcloud_Files_CloudApi {
 // Default implementation of 'registerMethods(with:)'.
 @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
 extension Barkcloud_Files_CloudApi.StreamingServiceProtocol {
-    internal func registerMethods<Transport>(with router: inout GRPCCore.RPCRouter<Transport>) where Transport: GRPCCore.ServerTransport {
+    public func registerMethods<Transport>(with router: inout GRPCCore.RPCRouter<Transport>) where Transport: GRPCCore.ServerTransport {
         router.registerHandler(
             forMethod: Barkcloud_Files_CloudApi.Method.CreateDirectory.descriptor,
             deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_CreateDirectoryRequest>(),
@@ -4672,7 +4672,7 @@ extension Barkcloud_Files_CloudApi.StreamingServiceProtocol {
 // Default implementation of streaming methods from 'StreamingServiceProtocol'.
 @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
 extension Barkcloud_Files_CloudApi.ServiceProtocol {
-    internal func createDirectory(
+    public func createDirectory(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Files_CreateDirectoryRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_DirectoryInfo> {
@@ -4683,7 +4683,7 @@ extension Barkcloud_Files_CloudApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func renameDirectory(
+    public func renameDirectory(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Files_RenameDirectoryRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty> {
@@ -4694,7 +4694,7 @@ extension Barkcloud_Files_CloudApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func moveDirectory(
+    public func moveDirectory(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Files_MoveDirectoryRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty> {
@@ -4705,7 +4705,7 @@ extension Barkcloud_Files_CloudApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func deleteDirectory(
+    public func deleteDirectory(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Files_DeleteDirectoryRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty> {
@@ -4716,7 +4716,7 @@ extension Barkcloud_Files_CloudApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func listDirectory(
+    public func listDirectory(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ListDirectoryRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_DirectoryListing> {
@@ -4727,7 +4727,7 @@ extension Barkcloud_Files_CloudApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func listDirectoryDetailed(
+    public func listDirectoryDetailed(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ListDirectoryRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_DirectoryListingDetailed> {
@@ -4738,7 +4738,7 @@ extension Barkcloud_Files_CloudApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func attachFile(
+    public func attachFile(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Files_AttachFileRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty> {
@@ -4749,7 +4749,7 @@ extension Barkcloud_Files_CloudApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func renameFileEntry(
+    public func renameFileEntry(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Files_RenameFileEntryRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty> {
@@ -4760,7 +4760,7 @@ extension Barkcloud_Files_CloudApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func moveFileEntry(
+    public func moveFileEntry(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Files_MoveFileEntryRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty> {
@@ -4771,7 +4771,7 @@ extension Barkcloud_Files_CloudApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func deleteFileEntry(
+    public func deleteFileEntry(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Files_DeleteFileEntryRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty> {
@@ -4782,7 +4782,7 @@ extension Barkcloud_Files_CloudApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func deleteFileEntries(
+    public func deleteFileEntries(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Files_DeleteFileEntriesRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_DeleteFileEntriesResponse> {
@@ -4793,7 +4793,7 @@ extension Barkcloud_Files_CloudApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func listUserImages(
+    public func listUserImages(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ListUserImagesRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_ListUserImagesResponse> {
@@ -4804,7 +4804,7 @@ extension Barkcloud_Files_CloudApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func listUserMedia(
+    public func listUserMedia(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ListUserMediaRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_ListUserMediaResponse> {
@@ -4815,7 +4815,7 @@ extension Barkcloud_Files_CloudApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func deleteUserMedia(
+    public func deleteUserMedia(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Files_DeleteUserMediaRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty> {
@@ -4826,7 +4826,7 @@ extension Barkcloud_Files_CloudApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func getPath(
+    public func getPath(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Files_GetPathRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_PathResponse> {
@@ -4837,7 +4837,7 @@ extension Barkcloud_Files_CloudApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func setVideoThumbnail(
+    public func setVideoThumbnail(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Files_SetVideoThumbnailRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty> {
@@ -4848,7 +4848,7 @@ extension Barkcloud_Files_CloudApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func listTrash(
+    public func listTrash(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ListTrashRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_ListTrashResponse> {
@@ -4859,7 +4859,7 @@ extension Barkcloud_Files_CloudApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func restoreFromTrash(
+    public func restoreFromTrash(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Files_RestoreFromTrashRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty> {
@@ -4870,7 +4870,7 @@ extension Barkcloud_Files_CloudApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func deleteFromTrash(
+    public func deleteFromTrash(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Files_DeleteFromTrashRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty> {
@@ -4881,7 +4881,7 @@ extension Barkcloud_Files_CloudApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func emptyTrash(
+    public func emptyTrash(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Files_EmptyTrashRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty> {
@@ -4892,7 +4892,7 @@ extension Barkcloud_Files_CloudApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func addFavorite(
+    public func addFavorite(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Files_AddFavoriteRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty> {
@@ -4903,7 +4903,7 @@ extension Barkcloud_Files_CloudApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func removeFavorite(
+    public func removeFavorite(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Files_RemoveFavoriteRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty> {
@@ -4914,7 +4914,7 @@ extension Barkcloud_Files_CloudApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func listFavorites(
+    public func listFavorites(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ListFavoritesRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_ListFavoritesResponse> {
@@ -4925,7 +4925,7 @@ extension Barkcloud_Files_CloudApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func createShare(
+    public func createShare(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Files_CreateShareRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_ShareInfo> {
@@ -4936,7 +4936,7 @@ extension Barkcloud_Files_CloudApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func listMyShares(
+    public func listMyShares(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ListMySharesRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_ListMySharesResponse> {
@@ -4947,7 +4947,7 @@ extension Barkcloud_Files_CloudApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func revokeShare(
+    public func revokeShare(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Files_RevokeShareRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty> {
@@ -4958,7 +4958,7 @@ extension Barkcloud_Files_CloudApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func createFolderShare(
+    public func createFolderShare(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Files_CreateFolderShareRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_FolderShareInfo> {
@@ -4969,7 +4969,7 @@ extension Barkcloud_Files_CloudApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func listMyFolderShares(
+    public func listMyFolderShares(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ListMyFolderSharesRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_ListMyFolderSharesResponse> {
@@ -4980,7 +4980,7 @@ extension Barkcloud_Files_CloudApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func revokeFolderShare(
+    public func revokeFolderShare(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Files_RevokeFolderShareRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty> {
@@ -4991,7 +4991,7 @@ extension Barkcloud_Files_CloudApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func shareFileWithUser(
+    public func shareFileWithUser(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ShareFileWithUserRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty> {
@@ -5002,7 +5002,7 @@ extension Barkcloud_Files_CloudApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func revokeUserShare(
+    public func revokeUserShare(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Files_RevokeUserShareRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty> {
@@ -5013,7 +5013,7 @@ extension Barkcloud_Files_CloudApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func listMyOutgoingShares(
+    public func listMyOutgoingShares(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ListMyOutgoingSharesRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_ListMyOutgoingSharesResponse> {
@@ -5024,7 +5024,7 @@ extension Barkcloud_Files_CloudApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func listMyOutgoingSharesAll(
+    public func listMyOutgoingSharesAll(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ListMyOutgoingSharesAllRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_ListMyOutgoingSharesAllResponse> {
@@ -5035,7 +5035,7 @@ extension Barkcloud_Files_CloudApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func listSharedWithMe(
+    public func listSharedWithMe(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ListSharedWithMeRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_ListSharedWithMeResponse> {
@@ -5046,7 +5046,7 @@ extension Barkcloud_Files_CloudApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func getSharedFileDownloadUrl(
+    public func getSharedFileDownloadUrl(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Files_GetSharedFileDownloadUrlRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_GetSharedFileDownloadUrlResponse> {
@@ -5057,7 +5057,7 @@ extension Barkcloud_Files_CloudApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func shareFolderWithUser(
+    public func shareFolderWithUser(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ShareFolderWithUserRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty> {
@@ -5068,7 +5068,7 @@ extension Barkcloud_Files_CloudApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func revokeFolderUserShare(
+    public func revokeFolderUserShare(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Files_RevokeFolderUserShareRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty> {
@@ -5079,7 +5079,7 @@ extension Barkcloud_Files_CloudApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func listMyOutgoingFolderShares(
+    public func listMyOutgoingFolderShares(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ListMyOutgoingFolderSharesRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_ListMyOutgoingFolderSharesResponse> {
@@ -5090,7 +5090,7 @@ extension Barkcloud_Files_CloudApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func listSharedFoldersWithMe(
+    public func listSharedFoldersWithMe(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ListSharedFoldersWithMeRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_ListSharedFoldersWithMeResponse> {
@@ -5101,7 +5101,7 @@ extension Barkcloud_Files_CloudApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func listSharedDirectory(
+    public func listSharedDirectory(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ListSharedDirectoryRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_ListSharedDirectoryResponse> {
@@ -5116,7 +5116,7 @@ extension Barkcloud_Files_CloudApi.ServiceProtocol {
 // Default implementation of methods from 'ServiceProtocol'.
 @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
 extension Barkcloud_Files_CloudApi.SimpleServiceProtocol {
-    internal func createDirectory(
+    public func createDirectory(
         request: GRPCCore.ServerRequest<Barkcloud_Files_CreateDirectoryRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_DirectoryInfo> {
@@ -5129,7 +5129,7 @@ extension Barkcloud_Files_CloudApi.SimpleServiceProtocol {
         )
     }
 
-    internal func renameDirectory(
+    public func renameDirectory(
         request: GRPCCore.ServerRequest<Barkcloud_Files_RenameDirectoryRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty> {
@@ -5142,7 +5142,7 @@ extension Barkcloud_Files_CloudApi.SimpleServiceProtocol {
         )
     }
 
-    internal func moveDirectory(
+    public func moveDirectory(
         request: GRPCCore.ServerRequest<Barkcloud_Files_MoveDirectoryRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty> {
@@ -5155,7 +5155,7 @@ extension Barkcloud_Files_CloudApi.SimpleServiceProtocol {
         )
     }
 
-    internal func deleteDirectory(
+    public func deleteDirectory(
         request: GRPCCore.ServerRequest<Barkcloud_Files_DeleteDirectoryRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty> {
@@ -5168,7 +5168,7 @@ extension Barkcloud_Files_CloudApi.SimpleServiceProtocol {
         )
     }
 
-    internal func listDirectory(
+    public func listDirectory(
         request: GRPCCore.ServerRequest<Barkcloud_Files_ListDirectoryRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_DirectoryListing> {
@@ -5181,7 +5181,7 @@ extension Barkcloud_Files_CloudApi.SimpleServiceProtocol {
         )
     }
 
-    internal func listDirectoryDetailed(
+    public func listDirectoryDetailed(
         request: GRPCCore.ServerRequest<Barkcloud_Files_ListDirectoryRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_DirectoryListingDetailed> {
@@ -5194,7 +5194,7 @@ extension Barkcloud_Files_CloudApi.SimpleServiceProtocol {
         )
     }
 
-    internal func attachFile(
+    public func attachFile(
         request: GRPCCore.ServerRequest<Barkcloud_Files_AttachFileRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty> {
@@ -5207,7 +5207,7 @@ extension Barkcloud_Files_CloudApi.SimpleServiceProtocol {
         )
     }
 
-    internal func renameFileEntry(
+    public func renameFileEntry(
         request: GRPCCore.ServerRequest<Barkcloud_Files_RenameFileEntryRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty> {
@@ -5220,7 +5220,7 @@ extension Barkcloud_Files_CloudApi.SimpleServiceProtocol {
         )
     }
 
-    internal func moveFileEntry(
+    public func moveFileEntry(
         request: GRPCCore.ServerRequest<Barkcloud_Files_MoveFileEntryRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty> {
@@ -5233,7 +5233,7 @@ extension Barkcloud_Files_CloudApi.SimpleServiceProtocol {
         )
     }
 
-    internal func deleteFileEntry(
+    public func deleteFileEntry(
         request: GRPCCore.ServerRequest<Barkcloud_Files_DeleteFileEntryRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty> {
@@ -5246,7 +5246,7 @@ extension Barkcloud_Files_CloudApi.SimpleServiceProtocol {
         )
     }
 
-    internal func deleteFileEntries(
+    public func deleteFileEntries(
         request: GRPCCore.ServerRequest<Barkcloud_Files_DeleteFileEntriesRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_DeleteFileEntriesResponse> {
@@ -5259,7 +5259,7 @@ extension Barkcloud_Files_CloudApi.SimpleServiceProtocol {
         )
     }
 
-    internal func listUserImages(
+    public func listUserImages(
         request: GRPCCore.ServerRequest<Barkcloud_Files_ListUserImagesRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_ListUserImagesResponse> {
@@ -5272,7 +5272,7 @@ extension Barkcloud_Files_CloudApi.SimpleServiceProtocol {
         )
     }
 
-    internal func listUserMedia(
+    public func listUserMedia(
         request: GRPCCore.ServerRequest<Barkcloud_Files_ListUserMediaRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_ListUserMediaResponse> {
@@ -5285,7 +5285,7 @@ extension Barkcloud_Files_CloudApi.SimpleServiceProtocol {
         )
     }
 
-    internal func deleteUserMedia(
+    public func deleteUserMedia(
         request: GRPCCore.ServerRequest<Barkcloud_Files_DeleteUserMediaRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty> {
@@ -5298,7 +5298,7 @@ extension Barkcloud_Files_CloudApi.SimpleServiceProtocol {
         )
     }
 
-    internal func getPath(
+    public func getPath(
         request: GRPCCore.ServerRequest<Barkcloud_Files_GetPathRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_PathResponse> {
@@ -5311,7 +5311,7 @@ extension Barkcloud_Files_CloudApi.SimpleServiceProtocol {
         )
     }
 
-    internal func setVideoThumbnail(
+    public func setVideoThumbnail(
         request: GRPCCore.ServerRequest<Barkcloud_Files_SetVideoThumbnailRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty> {
@@ -5324,7 +5324,7 @@ extension Barkcloud_Files_CloudApi.SimpleServiceProtocol {
         )
     }
 
-    internal func listTrash(
+    public func listTrash(
         request: GRPCCore.ServerRequest<Barkcloud_Files_ListTrashRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_ListTrashResponse> {
@@ -5337,7 +5337,7 @@ extension Barkcloud_Files_CloudApi.SimpleServiceProtocol {
         )
     }
 
-    internal func restoreFromTrash(
+    public func restoreFromTrash(
         request: GRPCCore.ServerRequest<Barkcloud_Files_RestoreFromTrashRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty> {
@@ -5350,7 +5350,7 @@ extension Barkcloud_Files_CloudApi.SimpleServiceProtocol {
         )
     }
 
-    internal func deleteFromTrash(
+    public func deleteFromTrash(
         request: GRPCCore.ServerRequest<Barkcloud_Files_DeleteFromTrashRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty> {
@@ -5363,7 +5363,7 @@ extension Barkcloud_Files_CloudApi.SimpleServiceProtocol {
         )
     }
 
-    internal func emptyTrash(
+    public func emptyTrash(
         request: GRPCCore.ServerRequest<Barkcloud_Files_EmptyTrashRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty> {
@@ -5376,7 +5376,7 @@ extension Barkcloud_Files_CloudApi.SimpleServiceProtocol {
         )
     }
 
-    internal func addFavorite(
+    public func addFavorite(
         request: GRPCCore.ServerRequest<Barkcloud_Files_AddFavoriteRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty> {
@@ -5389,7 +5389,7 @@ extension Barkcloud_Files_CloudApi.SimpleServiceProtocol {
         )
     }
 
-    internal func removeFavorite(
+    public func removeFavorite(
         request: GRPCCore.ServerRequest<Barkcloud_Files_RemoveFavoriteRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty> {
@@ -5402,7 +5402,7 @@ extension Barkcloud_Files_CloudApi.SimpleServiceProtocol {
         )
     }
 
-    internal func listFavorites(
+    public func listFavorites(
         request: GRPCCore.ServerRequest<Barkcloud_Files_ListFavoritesRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_ListFavoritesResponse> {
@@ -5415,7 +5415,7 @@ extension Barkcloud_Files_CloudApi.SimpleServiceProtocol {
         )
     }
 
-    internal func createShare(
+    public func createShare(
         request: GRPCCore.ServerRequest<Barkcloud_Files_CreateShareRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_ShareInfo> {
@@ -5428,7 +5428,7 @@ extension Barkcloud_Files_CloudApi.SimpleServiceProtocol {
         )
     }
 
-    internal func listMyShares(
+    public func listMyShares(
         request: GRPCCore.ServerRequest<Barkcloud_Files_ListMySharesRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_ListMySharesResponse> {
@@ -5441,7 +5441,7 @@ extension Barkcloud_Files_CloudApi.SimpleServiceProtocol {
         )
     }
 
-    internal func revokeShare(
+    public func revokeShare(
         request: GRPCCore.ServerRequest<Barkcloud_Files_RevokeShareRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty> {
@@ -5454,7 +5454,7 @@ extension Barkcloud_Files_CloudApi.SimpleServiceProtocol {
         )
     }
 
-    internal func createFolderShare(
+    public func createFolderShare(
         request: GRPCCore.ServerRequest<Barkcloud_Files_CreateFolderShareRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_FolderShareInfo> {
@@ -5467,7 +5467,7 @@ extension Barkcloud_Files_CloudApi.SimpleServiceProtocol {
         )
     }
 
-    internal func listMyFolderShares(
+    public func listMyFolderShares(
         request: GRPCCore.ServerRequest<Barkcloud_Files_ListMyFolderSharesRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_ListMyFolderSharesResponse> {
@@ -5480,7 +5480,7 @@ extension Barkcloud_Files_CloudApi.SimpleServiceProtocol {
         )
     }
 
-    internal func revokeFolderShare(
+    public func revokeFolderShare(
         request: GRPCCore.ServerRequest<Barkcloud_Files_RevokeFolderShareRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty> {
@@ -5493,7 +5493,7 @@ extension Barkcloud_Files_CloudApi.SimpleServiceProtocol {
         )
     }
 
-    internal func shareFileWithUser(
+    public func shareFileWithUser(
         request: GRPCCore.ServerRequest<Barkcloud_Files_ShareFileWithUserRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty> {
@@ -5506,7 +5506,7 @@ extension Barkcloud_Files_CloudApi.SimpleServiceProtocol {
         )
     }
 
-    internal func revokeUserShare(
+    public func revokeUserShare(
         request: GRPCCore.ServerRequest<Barkcloud_Files_RevokeUserShareRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty> {
@@ -5519,7 +5519,7 @@ extension Barkcloud_Files_CloudApi.SimpleServiceProtocol {
         )
     }
 
-    internal func listMyOutgoingShares(
+    public func listMyOutgoingShares(
         request: GRPCCore.ServerRequest<Barkcloud_Files_ListMyOutgoingSharesRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_ListMyOutgoingSharesResponse> {
@@ -5532,7 +5532,7 @@ extension Barkcloud_Files_CloudApi.SimpleServiceProtocol {
         )
     }
 
-    internal func listMyOutgoingSharesAll(
+    public func listMyOutgoingSharesAll(
         request: GRPCCore.ServerRequest<Barkcloud_Files_ListMyOutgoingSharesAllRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_ListMyOutgoingSharesAllResponse> {
@@ -5545,7 +5545,7 @@ extension Barkcloud_Files_CloudApi.SimpleServiceProtocol {
         )
     }
 
-    internal func listSharedWithMe(
+    public func listSharedWithMe(
         request: GRPCCore.ServerRequest<Barkcloud_Files_ListSharedWithMeRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_ListSharedWithMeResponse> {
@@ -5558,7 +5558,7 @@ extension Barkcloud_Files_CloudApi.SimpleServiceProtocol {
         )
     }
 
-    internal func getSharedFileDownloadUrl(
+    public func getSharedFileDownloadUrl(
         request: GRPCCore.ServerRequest<Barkcloud_Files_GetSharedFileDownloadUrlRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_GetSharedFileDownloadUrlResponse> {
@@ -5571,7 +5571,7 @@ extension Barkcloud_Files_CloudApi.SimpleServiceProtocol {
         )
     }
 
-    internal func shareFolderWithUser(
+    public func shareFolderWithUser(
         request: GRPCCore.ServerRequest<Barkcloud_Files_ShareFolderWithUserRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty> {
@@ -5584,7 +5584,7 @@ extension Barkcloud_Files_CloudApi.SimpleServiceProtocol {
         )
     }
 
-    internal func revokeFolderUserShare(
+    public func revokeFolderUserShare(
         request: GRPCCore.ServerRequest<Barkcloud_Files_RevokeFolderUserShareRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty> {
@@ -5597,7 +5597,7 @@ extension Barkcloud_Files_CloudApi.SimpleServiceProtocol {
         )
     }
 
-    internal func listMyOutgoingFolderShares(
+    public func listMyOutgoingFolderShares(
         request: GRPCCore.ServerRequest<Barkcloud_Files_ListMyOutgoingFolderSharesRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_ListMyOutgoingFolderSharesResponse> {
@@ -5610,7 +5610,7 @@ extension Barkcloud_Files_CloudApi.SimpleServiceProtocol {
         )
     }
 
-    internal func listSharedFoldersWithMe(
+    public func listSharedFoldersWithMe(
         request: GRPCCore.ServerRequest<Barkcloud_Files_ListSharedFoldersWithMeRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_ListSharedFoldersWithMeResponse> {
@@ -5623,7 +5623,7 @@ extension Barkcloud_Files_CloudApi.SimpleServiceProtocol {
         )
     }
 
-    internal func listSharedDirectory(
+    public func listSharedDirectory(
         request: GRPCCore.ServerRequest<Barkcloud_Files_ListSharedDirectoryRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_ListSharedDirectoryResponse> {
@@ -5645,7 +5645,7 @@ extension Barkcloud_Files_CloudApi {
     ///
     /// You don't need to implement this protocol directly, use the generated
     /// implementation, ``Client``.
-    internal protocol ClientProtocol: Sendable {
+    public protocol ClientProtocol: Sendable {
         /// Call the "CreateDirectory" method.
         ///
         /// > Source IDL Documentation:
@@ -6572,14 +6572,14 @@ extension Barkcloud_Files_CloudApi {
     /// The ``Client`` provides an implementation of ``ClientProtocol`` which wraps
     /// a `GRPCCore.GRPCCClient`. The underlying `GRPCClient` provides the long-lived
     /// means of communication with the remote peer.
-    internal struct Client<Transport>: ClientProtocol where Transport: GRPCCore.ClientTransport {
+    public struct Client<Transport>: ClientProtocol where Transport: GRPCCore.ClientTransport {
         private let client: GRPCCore.GRPCClient<Transport>
 
         /// Creates a new client wrapping the provided `GRPCCore.GRPCClient`.
         ///
         /// - Parameters:
         ///   - client: A `GRPCCore.GRPCClient` providing a communication channel to the service.
-        internal init(wrapping client: GRPCCore.GRPCClient<Transport>) {
+        public init(wrapping client: GRPCCore.GRPCClient<Transport>) {
             self.client = client
         }
 
@@ -6598,7 +6598,7 @@ extension Barkcloud_Files_CloudApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func createDirectory<Result>(
+        public func createDirectory<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Files_CreateDirectoryRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_CreateDirectoryRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_DirectoryInfo>,
@@ -6632,7 +6632,7 @@ extension Barkcloud_Files_CloudApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func renameDirectory<Result>(
+        public func renameDirectory<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Files_RenameDirectoryRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_RenameDirectoryRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CloudEmpty>,
@@ -6666,7 +6666,7 @@ extension Barkcloud_Files_CloudApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func moveDirectory<Result>(
+        public func moveDirectory<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Files_MoveDirectoryRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_MoveDirectoryRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CloudEmpty>,
@@ -6700,7 +6700,7 @@ extension Barkcloud_Files_CloudApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func deleteDirectory<Result>(
+        public func deleteDirectory<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Files_DeleteDirectoryRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_DeleteDirectoryRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CloudEmpty>,
@@ -6734,7 +6734,7 @@ extension Barkcloud_Files_CloudApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func listDirectory<Result>(
+        public func listDirectory<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Files_ListDirectoryRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_ListDirectoryRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_DirectoryListing>,
@@ -6768,7 +6768,7 @@ extension Barkcloud_Files_CloudApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func listDirectoryDetailed<Result>(
+        public func listDirectoryDetailed<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Files_ListDirectoryRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_ListDirectoryRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_DirectoryListingDetailed>,
@@ -6802,7 +6802,7 @@ extension Barkcloud_Files_CloudApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func attachFile<Result>(
+        public func attachFile<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Files_AttachFileRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_AttachFileRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CloudEmpty>,
@@ -6836,7 +6836,7 @@ extension Barkcloud_Files_CloudApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func renameFileEntry<Result>(
+        public func renameFileEntry<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Files_RenameFileEntryRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_RenameFileEntryRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CloudEmpty>,
@@ -6870,7 +6870,7 @@ extension Barkcloud_Files_CloudApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func moveFileEntry<Result>(
+        public func moveFileEntry<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Files_MoveFileEntryRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_MoveFileEntryRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CloudEmpty>,
@@ -6904,7 +6904,7 @@ extension Barkcloud_Files_CloudApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func deleteFileEntry<Result>(
+        public func deleteFileEntry<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Files_DeleteFileEntryRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_DeleteFileEntryRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CloudEmpty>,
@@ -6938,7 +6938,7 @@ extension Barkcloud_Files_CloudApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func deleteFileEntries<Result>(
+        public func deleteFileEntries<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Files_DeleteFileEntriesRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_DeleteFileEntriesRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_DeleteFileEntriesResponse>,
@@ -6972,7 +6972,7 @@ extension Barkcloud_Files_CloudApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func listUserImages<Result>(
+        public func listUserImages<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Files_ListUserImagesRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_ListUserImagesRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_ListUserImagesResponse>,
@@ -7006,7 +7006,7 @@ extension Barkcloud_Files_CloudApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func listUserMedia<Result>(
+        public func listUserMedia<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Files_ListUserMediaRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_ListUserMediaRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_ListUserMediaResponse>,
@@ -7040,7 +7040,7 @@ extension Barkcloud_Files_CloudApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func deleteUserMedia<Result>(
+        public func deleteUserMedia<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Files_DeleteUserMediaRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_DeleteUserMediaRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CloudEmpty>,
@@ -7074,7 +7074,7 @@ extension Barkcloud_Files_CloudApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func getPath<Result>(
+        public func getPath<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Files_GetPathRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_GetPathRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_PathResponse>,
@@ -7108,7 +7108,7 @@ extension Barkcloud_Files_CloudApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func setVideoThumbnail<Result>(
+        public func setVideoThumbnail<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Files_SetVideoThumbnailRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_SetVideoThumbnailRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CloudEmpty>,
@@ -7142,7 +7142,7 @@ extension Barkcloud_Files_CloudApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func listTrash<Result>(
+        public func listTrash<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Files_ListTrashRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_ListTrashRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_ListTrashResponse>,
@@ -7176,7 +7176,7 @@ extension Barkcloud_Files_CloudApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func restoreFromTrash<Result>(
+        public func restoreFromTrash<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Files_RestoreFromTrashRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_RestoreFromTrashRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CloudEmpty>,
@@ -7210,7 +7210,7 @@ extension Barkcloud_Files_CloudApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func deleteFromTrash<Result>(
+        public func deleteFromTrash<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Files_DeleteFromTrashRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_DeleteFromTrashRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CloudEmpty>,
@@ -7244,7 +7244,7 @@ extension Barkcloud_Files_CloudApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func emptyTrash<Result>(
+        public func emptyTrash<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Files_EmptyTrashRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_EmptyTrashRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CloudEmpty>,
@@ -7278,7 +7278,7 @@ extension Barkcloud_Files_CloudApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func addFavorite<Result>(
+        public func addFavorite<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Files_AddFavoriteRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_AddFavoriteRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CloudEmpty>,
@@ -7312,7 +7312,7 @@ extension Barkcloud_Files_CloudApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func removeFavorite<Result>(
+        public func removeFavorite<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Files_RemoveFavoriteRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_RemoveFavoriteRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CloudEmpty>,
@@ -7346,7 +7346,7 @@ extension Barkcloud_Files_CloudApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func listFavorites<Result>(
+        public func listFavorites<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Files_ListFavoritesRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_ListFavoritesRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_ListFavoritesResponse>,
@@ -7380,7 +7380,7 @@ extension Barkcloud_Files_CloudApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func createShare<Result>(
+        public func createShare<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Files_CreateShareRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_CreateShareRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_ShareInfo>,
@@ -7414,7 +7414,7 @@ extension Barkcloud_Files_CloudApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func listMyShares<Result>(
+        public func listMyShares<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Files_ListMySharesRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_ListMySharesRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_ListMySharesResponse>,
@@ -7448,7 +7448,7 @@ extension Barkcloud_Files_CloudApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func revokeShare<Result>(
+        public func revokeShare<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Files_RevokeShareRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_RevokeShareRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CloudEmpty>,
@@ -7482,7 +7482,7 @@ extension Barkcloud_Files_CloudApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func createFolderShare<Result>(
+        public func createFolderShare<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Files_CreateFolderShareRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_CreateFolderShareRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_FolderShareInfo>,
@@ -7516,7 +7516,7 @@ extension Barkcloud_Files_CloudApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func listMyFolderShares<Result>(
+        public func listMyFolderShares<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Files_ListMyFolderSharesRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_ListMyFolderSharesRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_ListMyFolderSharesResponse>,
@@ -7550,7 +7550,7 @@ extension Barkcloud_Files_CloudApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func revokeFolderShare<Result>(
+        public func revokeFolderShare<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Files_RevokeFolderShareRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_RevokeFolderShareRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CloudEmpty>,
@@ -7584,7 +7584,7 @@ extension Barkcloud_Files_CloudApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func shareFileWithUser<Result>(
+        public func shareFileWithUser<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Files_ShareFileWithUserRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_ShareFileWithUserRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CloudEmpty>,
@@ -7618,7 +7618,7 @@ extension Barkcloud_Files_CloudApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func revokeUserShare<Result>(
+        public func revokeUserShare<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Files_RevokeUserShareRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_RevokeUserShareRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CloudEmpty>,
@@ -7652,7 +7652,7 @@ extension Barkcloud_Files_CloudApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func listMyOutgoingShares<Result>(
+        public func listMyOutgoingShares<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Files_ListMyOutgoingSharesRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_ListMyOutgoingSharesRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_ListMyOutgoingSharesResponse>,
@@ -7686,7 +7686,7 @@ extension Barkcloud_Files_CloudApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func listMyOutgoingSharesAll<Result>(
+        public func listMyOutgoingSharesAll<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Files_ListMyOutgoingSharesAllRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_ListMyOutgoingSharesAllRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_ListMyOutgoingSharesAllResponse>,
@@ -7720,7 +7720,7 @@ extension Barkcloud_Files_CloudApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func listSharedWithMe<Result>(
+        public func listSharedWithMe<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Files_ListSharedWithMeRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_ListSharedWithMeRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_ListSharedWithMeResponse>,
@@ -7754,7 +7754,7 @@ extension Barkcloud_Files_CloudApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func getSharedFileDownloadUrl<Result>(
+        public func getSharedFileDownloadUrl<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Files_GetSharedFileDownloadUrlRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_GetSharedFileDownloadUrlRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_GetSharedFileDownloadUrlResponse>,
@@ -7788,7 +7788,7 @@ extension Barkcloud_Files_CloudApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func shareFolderWithUser<Result>(
+        public func shareFolderWithUser<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Files_ShareFolderWithUserRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_ShareFolderWithUserRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CloudEmpty>,
@@ -7822,7 +7822,7 @@ extension Barkcloud_Files_CloudApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func revokeFolderUserShare<Result>(
+        public func revokeFolderUserShare<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Files_RevokeFolderUserShareRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_RevokeFolderUserShareRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CloudEmpty>,
@@ -7856,7 +7856,7 @@ extension Barkcloud_Files_CloudApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func listMyOutgoingFolderShares<Result>(
+        public func listMyOutgoingFolderShares<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Files_ListMyOutgoingFolderSharesRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_ListMyOutgoingFolderSharesRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_ListMyOutgoingFolderSharesResponse>,
@@ -7890,7 +7890,7 @@ extension Barkcloud_Files_CloudApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func listSharedFoldersWithMe<Result>(
+        public func listSharedFoldersWithMe<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Files_ListSharedFoldersWithMeRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_ListSharedFoldersWithMeRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_ListSharedFoldersWithMeResponse>,
@@ -7924,7 +7924,7 @@ extension Barkcloud_Files_CloudApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func listSharedDirectory<Result>(
+        public func listSharedDirectory<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Files_ListSharedDirectoryRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_ListSharedDirectoryRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_ListSharedDirectoryResponse>,
@@ -7961,7 +7961,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func createDirectory<Result>(
+    public func createDirectory<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Files_CreateDirectoryRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_DirectoryInfo>) async throws -> Result = { response in
@@ -7990,7 +7990,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func renameDirectory<Result>(
+    public func renameDirectory<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Files_RenameDirectoryRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
@@ -8019,7 +8019,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func moveDirectory<Result>(
+    public func moveDirectory<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Files_MoveDirectoryRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
@@ -8048,7 +8048,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func deleteDirectory<Result>(
+    public func deleteDirectory<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Files_DeleteDirectoryRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
@@ -8077,7 +8077,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func listDirectory<Result>(
+    public func listDirectory<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Files_ListDirectoryRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_DirectoryListing>) async throws -> Result = { response in
@@ -8106,7 +8106,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func listDirectoryDetailed<Result>(
+    public func listDirectoryDetailed<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Files_ListDirectoryRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_DirectoryListingDetailed>) async throws -> Result = { response in
@@ -8135,7 +8135,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func attachFile<Result>(
+    public func attachFile<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Files_AttachFileRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
@@ -8164,7 +8164,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func renameFileEntry<Result>(
+    public func renameFileEntry<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Files_RenameFileEntryRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
@@ -8193,7 +8193,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func moveFileEntry<Result>(
+    public func moveFileEntry<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Files_MoveFileEntryRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
@@ -8222,7 +8222,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func deleteFileEntry<Result>(
+    public func deleteFileEntry<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Files_DeleteFileEntryRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
@@ -8251,7 +8251,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func deleteFileEntries<Result>(
+    public func deleteFileEntries<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Files_DeleteFileEntriesRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_DeleteFileEntriesResponse>) async throws -> Result = { response in
@@ -8280,7 +8280,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func listUserImages<Result>(
+    public func listUserImages<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Files_ListUserImagesRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListUserImagesResponse>) async throws -> Result = { response in
@@ -8309,7 +8309,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func listUserMedia<Result>(
+    public func listUserMedia<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Files_ListUserMediaRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListUserMediaResponse>) async throws -> Result = { response in
@@ -8338,7 +8338,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func deleteUserMedia<Result>(
+    public func deleteUserMedia<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Files_DeleteUserMediaRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
@@ -8367,7 +8367,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func getPath<Result>(
+    public func getPath<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Files_GetPathRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_PathResponse>) async throws -> Result = { response in
@@ -8396,7 +8396,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func setVideoThumbnail<Result>(
+    public func setVideoThumbnail<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Files_SetVideoThumbnailRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
@@ -8425,7 +8425,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func listTrash<Result>(
+    public func listTrash<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Files_ListTrashRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListTrashResponse>) async throws -> Result = { response in
@@ -8454,7 +8454,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func restoreFromTrash<Result>(
+    public func restoreFromTrash<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Files_RestoreFromTrashRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
@@ -8483,7 +8483,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func deleteFromTrash<Result>(
+    public func deleteFromTrash<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Files_DeleteFromTrashRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
@@ -8512,7 +8512,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func emptyTrash<Result>(
+    public func emptyTrash<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Files_EmptyTrashRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
@@ -8541,7 +8541,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func addFavorite<Result>(
+    public func addFavorite<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Files_AddFavoriteRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
@@ -8570,7 +8570,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func removeFavorite<Result>(
+    public func removeFavorite<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Files_RemoveFavoriteRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
@@ -8599,7 +8599,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func listFavorites<Result>(
+    public func listFavorites<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Files_ListFavoritesRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListFavoritesResponse>) async throws -> Result = { response in
@@ -8628,7 +8628,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func createShare<Result>(
+    public func createShare<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Files_CreateShareRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ShareInfo>) async throws -> Result = { response in
@@ -8657,7 +8657,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func listMyShares<Result>(
+    public func listMyShares<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Files_ListMySharesRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListMySharesResponse>) async throws -> Result = { response in
@@ -8686,7 +8686,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func revokeShare<Result>(
+    public func revokeShare<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Files_RevokeShareRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
@@ -8715,7 +8715,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func createFolderShare<Result>(
+    public func createFolderShare<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Files_CreateFolderShareRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_FolderShareInfo>) async throws -> Result = { response in
@@ -8744,7 +8744,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func listMyFolderShares<Result>(
+    public func listMyFolderShares<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Files_ListMyFolderSharesRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListMyFolderSharesResponse>) async throws -> Result = { response in
@@ -8773,7 +8773,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func revokeFolderShare<Result>(
+    public func revokeFolderShare<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Files_RevokeFolderShareRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
@@ -8802,7 +8802,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func shareFileWithUser<Result>(
+    public func shareFileWithUser<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Files_ShareFileWithUserRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
@@ -8831,7 +8831,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func revokeUserShare<Result>(
+    public func revokeUserShare<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Files_RevokeUserShareRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
@@ -8860,7 +8860,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func listMyOutgoingShares<Result>(
+    public func listMyOutgoingShares<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Files_ListMyOutgoingSharesRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListMyOutgoingSharesResponse>) async throws -> Result = { response in
@@ -8889,7 +8889,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func listMyOutgoingSharesAll<Result>(
+    public func listMyOutgoingSharesAll<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Files_ListMyOutgoingSharesAllRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListMyOutgoingSharesAllResponse>) async throws -> Result = { response in
@@ -8918,7 +8918,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func listSharedWithMe<Result>(
+    public func listSharedWithMe<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Files_ListSharedWithMeRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListSharedWithMeResponse>) async throws -> Result = { response in
@@ -8947,7 +8947,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func getSharedFileDownloadUrl<Result>(
+    public func getSharedFileDownloadUrl<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Files_GetSharedFileDownloadUrlRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_GetSharedFileDownloadUrlResponse>) async throws -> Result = { response in
@@ -8976,7 +8976,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func shareFolderWithUser<Result>(
+    public func shareFolderWithUser<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Files_ShareFolderWithUserRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
@@ -9005,7 +9005,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func revokeFolderUserShare<Result>(
+    public func revokeFolderUserShare<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Files_RevokeFolderUserShareRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
@@ -9034,7 +9034,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func listMyOutgoingFolderShares<Result>(
+    public func listMyOutgoingFolderShares<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Files_ListMyOutgoingFolderSharesRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListMyOutgoingFolderSharesResponse>) async throws -> Result = { response in
@@ -9063,7 +9063,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func listSharedFoldersWithMe<Result>(
+    public func listSharedFoldersWithMe<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Files_ListSharedFoldersWithMeRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListSharedFoldersWithMeResponse>) async throws -> Result = { response in
@@ -9092,7 +9092,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func listSharedDirectory<Result>(
+    public func listSharedDirectory<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Files_ListSharedDirectoryRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListSharedDirectoryResponse>) async throws -> Result = { response in
@@ -9126,7 +9126,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func createDirectory<Result>(
+    public func createDirectory<Result>(
         _ message: Barkcloud_Files_CreateDirectoryRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -9159,7 +9159,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func renameDirectory<Result>(
+    public func renameDirectory<Result>(
         _ message: Barkcloud_Files_RenameDirectoryRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -9192,7 +9192,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func moveDirectory<Result>(
+    public func moveDirectory<Result>(
         _ message: Barkcloud_Files_MoveDirectoryRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -9225,7 +9225,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func deleteDirectory<Result>(
+    public func deleteDirectory<Result>(
         _ message: Barkcloud_Files_DeleteDirectoryRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -9258,7 +9258,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func listDirectory<Result>(
+    public func listDirectory<Result>(
         _ message: Barkcloud_Files_ListDirectoryRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -9291,7 +9291,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func listDirectoryDetailed<Result>(
+    public func listDirectoryDetailed<Result>(
         _ message: Barkcloud_Files_ListDirectoryRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -9324,7 +9324,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func attachFile<Result>(
+    public func attachFile<Result>(
         _ message: Barkcloud_Files_AttachFileRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -9357,7 +9357,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func renameFileEntry<Result>(
+    public func renameFileEntry<Result>(
         _ message: Barkcloud_Files_RenameFileEntryRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -9390,7 +9390,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func moveFileEntry<Result>(
+    public func moveFileEntry<Result>(
         _ message: Barkcloud_Files_MoveFileEntryRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -9423,7 +9423,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func deleteFileEntry<Result>(
+    public func deleteFileEntry<Result>(
         _ message: Barkcloud_Files_DeleteFileEntryRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -9456,7 +9456,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func deleteFileEntries<Result>(
+    public func deleteFileEntries<Result>(
         _ message: Barkcloud_Files_DeleteFileEntriesRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -9489,7 +9489,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func listUserImages<Result>(
+    public func listUserImages<Result>(
         _ message: Barkcloud_Files_ListUserImagesRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -9522,7 +9522,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func listUserMedia<Result>(
+    public func listUserMedia<Result>(
         _ message: Barkcloud_Files_ListUserMediaRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -9555,7 +9555,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func deleteUserMedia<Result>(
+    public func deleteUserMedia<Result>(
         _ message: Barkcloud_Files_DeleteUserMediaRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -9588,7 +9588,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func getPath<Result>(
+    public func getPath<Result>(
         _ message: Barkcloud_Files_GetPathRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -9621,7 +9621,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func setVideoThumbnail<Result>(
+    public func setVideoThumbnail<Result>(
         _ message: Barkcloud_Files_SetVideoThumbnailRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -9654,7 +9654,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func listTrash<Result>(
+    public func listTrash<Result>(
         _ message: Barkcloud_Files_ListTrashRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -9687,7 +9687,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func restoreFromTrash<Result>(
+    public func restoreFromTrash<Result>(
         _ message: Barkcloud_Files_RestoreFromTrashRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -9720,7 +9720,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func deleteFromTrash<Result>(
+    public func deleteFromTrash<Result>(
         _ message: Barkcloud_Files_DeleteFromTrashRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -9753,7 +9753,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func emptyTrash<Result>(
+    public func emptyTrash<Result>(
         _ message: Barkcloud_Files_EmptyTrashRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -9786,7 +9786,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func addFavorite<Result>(
+    public func addFavorite<Result>(
         _ message: Barkcloud_Files_AddFavoriteRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -9819,7 +9819,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func removeFavorite<Result>(
+    public func removeFavorite<Result>(
         _ message: Barkcloud_Files_RemoveFavoriteRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -9852,7 +9852,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func listFavorites<Result>(
+    public func listFavorites<Result>(
         _ message: Barkcloud_Files_ListFavoritesRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -9885,7 +9885,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func createShare<Result>(
+    public func createShare<Result>(
         _ message: Barkcloud_Files_CreateShareRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -9918,7 +9918,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func listMyShares<Result>(
+    public func listMyShares<Result>(
         _ message: Barkcloud_Files_ListMySharesRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -9951,7 +9951,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func revokeShare<Result>(
+    public func revokeShare<Result>(
         _ message: Barkcloud_Files_RevokeShareRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -9984,7 +9984,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func createFolderShare<Result>(
+    public func createFolderShare<Result>(
         _ message: Barkcloud_Files_CreateFolderShareRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -10017,7 +10017,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func listMyFolderShares<Result>(
+    public func listMyFolderShares<Result>(
         _ message: Barkcloud_Files_ListMyFolderSharesRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -10050,7 +10050,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func revokeFolderShare<Result>(
+    public func revokeFolderShare<Result>(
         _ message: Barkcloud_Files_RevokeFolderShareRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -10083,7 +10083,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func shareFileWithUser<Result>(
+    public func shareFileWithUser<Result>(
         _ message: Barkcloud_Files_ShareFileWithUserRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -10116,7 +10116,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func revokeUserShare<Result>(
+    public func revokeUserShare<Result>(
         _ message: Barkcloud_Files_RevokeUserShareRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -10149,7 +10149,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func listMyOutgoingShares<Result>(
+    public func listMyOutgoingShares<Result>(
         _ message: Barkcloud_Files_ListMyOutgoingSharesRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -10182,7 +10182,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func listMyOutgoingSharesAll<Result>(
+    public func listMyOutgoingSharesAll<Result>(
         _ message: Barkcloud_Files_ListMyOutgoingSharesAllRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -10215,7 +10215,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func listSharedWithMe<Result>(
+    public func listSharedWithMe<Result>(
         _ message: Barkcloud_Files_ListSharedWithMeRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -10248,7 +10248,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func getSharedFileDownloadUrl<Result>(
+    public func getSharedFileDownloadUrl<Result>(
         _ message: Barkcloud_Files_GetSharedFileDownloadUrlRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -10281,7 +10281,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func shareFolderWithUser<Result>(
+    public func shareFolderWithUser<Result>(
         _ message: Barkcloud_Files_ShareFolderWithUserRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -10314,7 +10314,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func revokeFolderUserShare<Result>(
+    public func revokeFolderUserShare<Result>(
         _ message: Barkcloud_Files_RevokeFolderUserShareRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -10347,7 +10347,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func listMyOutgoingFolderShares<Result>(
+    public func listMyOutgoingFolderShares<Result>(
         _ message: Barkcloud_Files_ListMyOutgoingFolderSharesRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -10380,7 +10380,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func listSharedFoldersWithMe<Result>(
+    public func listSharedFoldersWithMe<Result>(
         _ message: Barkcloud_Files_ListSharedFoldersWithMeRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -10413,7 +10413,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func listSharedDirectory<Result>(
+    public func listSharedDirectory<Result>(
         _ message: Barkcloud_Files_ListSharedDirectoryRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -10437,91 +10437,91 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
 
 /// Namespace containing generated types for the "barkcloud.files.FilesServerApi" service.
 @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
-internal enum Barkcloud_Files_FilesServerApi: Sendable {
+public enum Barkcloud_Files_FilesServerApi: Sendable {
     /// Service descriptor for the "barkcloud.files.FilesServerApi" service.
-    internal static let descriptor = GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.FilesServerApi")
+    public static let descriptor = GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.FilesServerApi")
     /// Namespace for method metadata.
-    internal enum Method: Sendable {
+    public enum Method: Sendable {
         /// Namespace for "GetFileData" metadata.
-        internal enum GetFileData: Sendable {
+        public enum GetFileData: Sendable {
             /// Request type for "GetFileData".
-            internal typealias Input = Barkcloud_Files_GetFileDataRequest
+            public typealias Input = Barkcloud_Files_GetFileDataRequest
             /// Response type for "GetFileData".
-            internal typealias Output = Barkcloud_Files_GetFileDataResponse
+            public typealias Output = Barkcloud_Files_GetFileDataResponse
             /// Descriptor for "GetFileData".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.FilesServerApi"),
                 method: "GetFileData",
                 type: .unary
             )
         }
         /// Namespace for "GetFilesData" metadata.
-        internal enum GetFilesData: Sendable {
+        public enum GetFilesData: Sendable {
             /// Request type for "GetFilesData".
-            internal typealias Input = Barkcloud_Files_GetFilesDataRequest
+            public typealias Input = Barkcloud_Files_GetFilesDataRequest
             /// Response type for "GetFilesData".
-            internal typealias Output = Barkcloud_Files_GetFilesDataResponse
+            public typealias Output = Barkcloud_Files_GetFilesDataResponse
             /// Descriptor for "GetFilesData".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.FilesServerApi"),
                 method: "GetFilesData",
                 type: .unary
             )
         }
         /// Namespace for "GetUserStorageInfoServer" metadata.
-        internal enum GetUserStorageInfoServer: Sendable {
+        public enum GetUserStorageInfoServer: Sendable {
             /// Request type for "GetUserStorageInfoServer".
-            internal typealias Input = Barkcloud_Files_GetUserStorageInfoServerRequest
+            public typealias Input = Barkcloud_Files_GetUserStorageInfoServerRequest
             /// Response type for "GetUserStorageInfoServer".
-            internal typealias Output = Barkcloud_Files_GetUserStorageInfoResponse
+            public typealias Output = Barkcloud_Files_GetUserStorageInfoResponse
             /// Descriptor for "GetUserStorageInfoServer".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.FilesServerApi"),
                 method: "GetUserStorageInfoServer",
                 type: .unary
             )
         }
         /// Namespace for "UploadAvatarServer" metadata.
-        internal enum UploadAvatarServer: Sendable {
+        public enum UploadAvatarServer: Sendable {
             /// Request type for "UploadAvatarServer".
-            internal typealias Input = Barkcloud_Files_UploadAvatarServerRequest
+            public typealias Input = Barkcloud_Files_UploadAvatarServerRequest
             /// Response type for "UploadAvatarServer".
-            internal typealias Output = Barkcloud_Files_UploadAvatarServerResponse
+            public typealias Output = Barkcloud_Files_UploadAvatarServerResponse
             /// Descriptor for "UploadAvatarServer".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.FilesServerApi"),
                 method: "UploadAvatarServer",
                 type: .unary
             )
         }
         /// Namespace for "ResolveShare" metadata.
-        internal enum ResolveShare: Sendable {
+        public enum ResolveShare: Sendable {
             /// Request type for "ResolveShare".
-            internal typealias Input = Barkcloud_Files_ResolveShareRequest
+            public typealias Input = Barkcloud_Files_ResolveShareRequest
             /// Response type for "ResolveShare".
-            internal typealias Output = Barkcloud_Files_ResolveShareResponse
+            public typealias Output = Barkcloud_Files_ResolveShareResponse
             /// Descriptor for "ResolveShare".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.FilesServerApi"),
                 method: "ResolveShare",
                 type: .unary
             )
         }
         /// Namespace for "ResolveFolderShare" metadata.
-        internal enum ResolveFolderShare: Sendable {
+        public enum ResolveFolderShare: Sendable {
             /// Request type for "ResolveFolderShare".
-            internal typealias Input = Barkcloud_Files_ResolveFolderShareRequest
+            public typealias Input = Barkcloud_Files_ResolveFolderShareRequest
             /// Response type for "ResolveFolderShare".
-            internal typealias Output = Barkcloud_Files_ResolveFolderShareResponse
+            public typealias Output = Barkcloud_Files_ResolveFolderShareResponse
             /// Descriptor for "ResolveFolderShare".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.FilesServerApi"),
                 method: "ResolveFolderShare",
                 type: .unary
             )
         }
         /// Descriptors for all methods in the "barkcloud.files.FilesServerApi" service.
-        internal static let descriptors: [GRPCCore.MethodDescriptor] = [
+        public static let descriptors: [GRPCCore.MethodDescriptor] = [
             GetFileData.descriptor,
             GetFilesData.descriptor,
             GetUserStorageInfoServer.descriptor,
@@ -10535,7 +10535,7 @@ internal enum Barkcloud_Files_FilesServerApi: Sendable {
 @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
 extension GRPCCore.ServiceDescriptor {
     /// Service descriptor for the "barkcloud.files.FilesServerApi" service.
-    internal static let barkcloud_files_FilesServerApi = GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.FilesServerApi")
+    public static let barkcloud_files_FilesServerApi = GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.FilesServerApi")
 }
 
 // MARK: barkcloud.files.FilesServerApi (server)
@@ -10552,7 +10552,7 @@ extension Barkcloud_Files_FilesServerApi {
     ///
     /// Where possible, prefer using the stricter, less-verbose ``ServiceProtocol``
     /// or ``SimpleServiceProtocol`` instead.
-    internal protocol StreamingServiceProtocol: GRPCCore.RegistrableRPCService {
+    public protocol StreamingServiceProtocol: GRPCCore.RegistrableRPCService {
         /// Handle the "GetFileData" method.
         ///
         /// > Source IDL Documentation:
@@ -10669,7 +10669,7 @@ extension Barkcloud_Files_FilesServerApi {
     /// trailing response metadata. If you don't need these then consider using
     /// the ``SimpleServiceProtocol``. If you need fine grained control over your RPCs then
     /// use ``StreamingServiceProtocol``.
-    internal protocol ServiceProtocol: Barkcloud_Files_FilesServerApi.StreamingServiceProtocol {
+    public protocol ServiceProtocol: Barkcloud_Files_FilesServerApi.StreamingServiceProtocol {
         /// Handle the "GetFileData" method.
         ///
         /// > Source IDL Documentation:
@@ -10784,7 +10784,7 @@ extension Barkcloud_Files_FilesServerApi {
     /// This is the highest level protocol for the service. The API is the easiest to use but
     /// doesn't provide access to request or response metadata. If you need access to these
     /// then use ``ServiceProtocol`` instead.
-    internal protocol SimpleServiceProtocol: Barkcloud_Files_FilesServerApi.ServiceProtocol {
+    public protocol SimpleServiceProtocol: Barkcloud_Files_FilesServerApi.ServiceProtocol {
         /// Handle the "GetFileData" method.
         ///
         /// > Source IDL Documentation:
@@ -10898,7 +10898,7 @@ extension Barkcloud_Files_FilesServerApi {
 // Default implementation of 'registerMethods(with:)'.
 @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
 extension Barkcloud_Files_FilesServerApi.StreamingServiceProtocol {
-    internal func registerMethods<Transport>(with router: inout GRPCCore.RPCRouter<Transport>) where Transport: GRPCCore.ServerTransport {
+    public func registerMethods<Transport>(with router: inout GRPCCore.RPCRouter<Transport>) where Transport: GRPCCore.ServerTransport {
         router.registerHandler(
             forMethod: Barkcloud_Files_FilesServerApi.Method.GetFileData.descriptor,
             deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_GetFileDataRequest>(),
@@ -10971,7 +10971,7 @@ extension Barkcloud_Files_FilesServerApi.StreamingServiceProtocol {
 // Default implementation of streaming methods from 'StreamingServiceProtocol'.
 @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
 extension Barkcloud_Files_FilesServerApi.ServiceProtocol {
-    internal func getFileData(
+    public func getFileData(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Files_GetFileDataRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_GetFileDataResponse> {
@@ -10982,7 +10982,7 @@ extension Barkcloud_Files_FilesServerApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func getFilesData(
+    public func getFilesData(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Files_GetFilesDataRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_GetFilesDataResponse> {
@@ -10993,7 +10993,7 @@ extension Barkcloud_Files_FilesServerApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func getUserStorageInfoServer(
+    public func getUserStorageInfoServer(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Files_GetUserStorageInfoServerRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_GetUserStorageInfoResponse> {
@@ -11004,7 +11004,7 @@ extension Barkcloud_Files_FilesServerApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func uploadAvatarServer(
+    public func uploadAvatarServer(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Files_UploadAvatarServerRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_UploadAvatarServerResponse> {
@@ -11015,7 +11015,7 @@ extension Barkcloud_Files_FilesServerApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func resolveShare(
+    public func resolveShare(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ResolveShareRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_ResolveShareResponse> {
@@ -11026,7 +11026,7 @@ extension Barkcloud_Files_FilesServerApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func resolveFolderShare(
+    public func resolveFolderShare(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ResolveFolderShareRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_ResolveFolderShareResponse> {
@@ -11041,7 +11041,7 @@ extension Barkcloud_Files_FilesServerApi.ServiceProtocol {
 // Default implementation of methods from 'ServiceProtocol'.
 @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
 extension Barkcloud_Files_FilesServerApi.SimpleServiceProtocol {
-    internal func getFileData(
+    public func getFileData(
         request: GRPCCore.ServerRequest<Barkcloud_Files_GetFileDataRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_GetFileDataResponse> {
@@ -11054,7 +11054,7 @@ extension Barkcloud_Files_FilesServerApi.SimpleServiceProtocol {
         )
     }
 
-    internal func getFilesData(
+    public func getFilesData(
         request: GRPCCore.ServerRequest<Barkcloud_Files_GetFilesDataRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_GetFilesDataResponse> {
@@ -11067,7 +11067,7 @@ extension Barkcloud_Files_FilesServerApi.SimpleServiceProtocol {
         )
     }
 
-    internal func getUserStorageInfoServer(
+    public func getUserStorageInfoServer(
         request: GRPCCore.ServerRequest<Barkcloud_Files_GetUserStorageInfoServerRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_GetUserStorageInfoResponse> {
@@ -11080,7 +11080,7 @@ extension Barkcloud_Files_FilesServerApi.SimpleServiceProtocol {
         )
     }
 
-    internal func uploadAvatarServer(
+    public func uploadAvatarServer(
         request: GRPCCore.ServerRequest<Barkcloud_Files_UploadAvatarServerRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_UploadAvatarServerResponse> {
@@ -11093,7 +11093,7 @@ extension Barkcloud_Files_FilesServerApi.SimpleServiceProtocol {
         )
     }
 
-    internal func resolveShare(
+    public func resolveShare(
         request: GRPCCore.ServerRequest<Barkcloud_Files_ResolveShareRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_ResolveShareResponse> {
@@ -11106,7 +11106,7 @@ extension Barkcloud_Files_FilesServerApi.SimpleServiceProtocol {
         )
     }
 
-    internal func resolveFolderShare(
+    public func resolveFolderShare(
         request: GRPCCore.ServerRequest<Barkcloud_Files_ResolveFolderShareRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_ResolveFolderShareResponse> {
@@ -11128,7 +11128,7 @@ extension Barkcloud_Files_FilesServerApi {
     ///
     /// You don't need to implement this protocol directly, use the generated
     /// implementation, ``Client``.
-    internal protocol ClientProtocol: Sendable {
+    public protocol ClientProtocol: Sendable {
         /// Call the "GetFileData" method.
         ///
         /// > Source IDL Documentation:
@@ -11273,14 +11273,14 @@ extension Barkcloud_Files_FilesServerApi {
     /// The ``Client`` provides an implementation of ``ClientProtocol`` which wraps
     /// a `GRPCCore.GRPCCClient`. The underlying `GRPCClient` provides the long-lived
     /// means of communication with the remote peer.
-    internal struct Client<Transport>: ClientProtocol where Transport: GRPCCore.ClientTransport {
+    public struct Client<Transport>: ClientProtocol where Transport: GRPCCore.ClientTransport {
         private let client: GRPCCore.GRPCClient<Transport>
 
         /// Creates a new client wrapping the provided `GRPCCore.GRPCClient`.
         ///
         /// - Parameters:
         ///   - client: A `GRPCCore.GRPCClient` providing a communication channel to the service.
-        internal init(wrapping client: GRPCCore.GRPCClient<Transport>) {
+        public init(wrapping client: GRPCCore.GRPCClient<Transport>) {
             self.client = client
         }
 
@@ -11299,7 +11299,7 @@ extension Barkcloud_Files_FilesServerApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func getFileData<Result>(
+        public func getFileData<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Files_GetFileDataRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_GetFileDataRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_GetFileDataResponse>,
@@ -11333,7 +11333,7 @@ extension Barkcloud_Files_FilesServerApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func getFilesData<Result>(
+        public func getFilesData<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Files_GetFilesDataRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_GetFilesDataRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_GetFilesDataResponse>,
@@ -11367,7 +11367,7 @@ extension Barkcloud_Files_FilesServerApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func getUserStorageInfoServer<Result>(
+        public func getUserStorageInfoServer<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Files_GetUserStorageInfoServerRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_GetUserStorageInfoServerRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_GetUserStorageInfoResponse>,
@@ -11401,7 +11401,7 @@ extension Barkcloud_Files_FilesServerApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func uploadAvatarServer<Result>(
+        public func uploadAvatarServer<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Files_UploadAvatarServerRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_UploadAvatarServerRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_UploadAvatarServerResponse>,
@@ -11435,7 +11435,7 @@ extension Barkcloud_Files_FilesServerApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func resolveShare<Result>(
+        public func resolveShare<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Files_ResolveShareRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_ResolveShareRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_ResolveShareResponse>,
@@ -11469,7 +11469,7 @@ extension Barkcloud_Files_FilesServerApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func resolveFolderShare<Result>(
+        public func resolveFolderShare<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Files_ResolveFolderShareRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_ResolveFolderShareRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_ResolveFolderShareResponse>,
@@ -11506,7 +11506,7 @@ extension Barkcloud_Files_FilesServerApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func getFileData<Result>(
+    public func getFileData<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Files_GetFileDataRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_GetFileDataResponse>) async throws -> Result = { response in
@@ -11535,7 +11535,7 @@ extension Barkcloud_Files_FilesServerApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func getFilesData<Result>(
+    public func getFilesData<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Files_GetFilesDataRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_GetFilesDataResponse>) async throws -> Result = { response in
@@ -11564,7 +11564,7 @@ extension Barkcloud_Files_FilesServerApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func getUserStorageInfoServer<Result>(
+    public func getUserStorageInfoServer<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Files_GetUserStorageInfoServerRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_GetUserStorageInfoResponse>) async throws -> Result = { response in
@@ -11593,7 +11593,7 @@ extension Barkcloud_Files_FilesServerApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func uploadAvatarServer<Result>(
+    public func uploadAvatarServer<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Files_UploadAvatarServerRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_UploadAvatarServerResponse>) async throws -> Result = { response in
@@ -11622,7 +11622,7 @@ extension Barkcloud_Files_FilesServerApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func resolveShare<Result>(
+    public func resolveShare<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Files_ResolveShareRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ResolveShareResponse>) async throws -> Result = { response in
@@ -11651,7 +11651,7 @@ extension Barkcloud_Files_FilesServerApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func resolveFolderShare<Result>(
+    public func resolveFolderShare<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Files_ResolveFolderShareRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ResolveFolderShareResponse>) async throws -> Result = { response in
@@ -11685,7 +11685,7 @@ extension Barkcloud_Files_FilesServerApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func getFileData<Result>(
+    public func getFileData<Result>(
         _ message: Barkcloud_Files_GetFileDataRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -11718,7 +11718,7 @@ extension Barkcloud_Files_FilesServerApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func getFilesData<Result>(
+    public func getFilesData<Result>(
         _ message: Barkcloud_Files_GetFilesDataRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -11751,7 +11751,7 @@ extension Barkcloud_Files_FilesServerApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func getUserStorageInfoServer<Result>(
+    public func getUserStorageInfoServer<Result>(
         _ message: Barkcloud_Files_GetUserStorageInfoServerRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -11784,7 +11784,7 @@ extension Barkcloud_Files_FilesServerApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func uploadAvatarServer<Result>(
+    public func uploadAvatarServer<Result>(
         _ message: Barkcloud_Files_UploadAvatarServerRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -11817,7 +11817,7 @@ extension Barkcloud_Files_FilesServerApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func resolveShare<Result>(
+    public func resolveShare<Result>(
         _ message: Barkcloud_Files_ResolveShareRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -11850,7 +11850,7 @@ extension Barkcloud_Files_FilesServerApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func resolveFolderShare<Result>(
+    public func resolveFolderShare<Result>(
         _ message: Barkcloud_Files_ResolveFolderShareRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -11874,104 +11874,104 @@ extension Barkcloud_Files_FilesServerApi.ClientProtocol {
 
 /// Namespace containing generated types for the "barkcloud.files.AlbumApi" service.
 @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
-internal enum Barkcloud_Files_AlbumApi: Sendable {
+public enum Barkcloud_Files_AlbumApi: Sendable {
     /// Service descriptor for the "barkcloud.files.AlbumApi" service.
-    internal static let descriptor = GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.AlbumApi")
+    public static let descriptor = GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.AlbumApi")
     /// Namespace for method metadata.
-    internal enum Method: Sendable {
+    public enum Method: Sendable {
         /// Namespace for "CreateAlbum" metadata.
-        internal enum CreateAlbum: Sendable {
+        public enum CreateAlbum: Sendable {
             /// Request type for "CreateAlbum".
-            internal typealias Input = Barkcloud_Files_CreateAlbumRequest
+            public typealias Input = Barkcloud_Files_CreateAlbumRequest
             /// Response type for "CreateAlbum".
-            internal typealias Output = Barkcloud_Files_AlbumInfo
+            public typealias Output = Barkcloud_Files_AlbumInfo
             /// Descriptor for "CreateAlbum".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.AlbumApi"),
                 method: "CreateAlbum",
                 type: .unary
             )
         }
         /// Namespace for "UpdateAlbum" metadata.
-        internal enum UpdateAlbum: Sendable {
+        public enum UpdateAlbum: Sendable {
             /// Request type for "UpdateAlbum".
-            internal typealias Input = Barkcloud_Files_UpdateAlbumRequest
+            public typealias Input = Barkcloud_Files_UpdateAlbumRequest
             /// Response type for "UpdateAlbum".
-            internal typealias Output = Barkcloud_Files_AlbumInfo
+            public typealias Output = Barkcloud_Files_AlbumInfo
             /// Descriptor for "UpdateAlbum".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.AlbumApi"),
                 method: "UpdateAlbum",
                 type: .unary
             )
         }
         /// Namespace for "DeleteAlbum" metadata.
-        internal enum DeleteAlbum: Sendable {
+        public enum DeleteAlbum: Sendable {
             /// Request type for "DeleteAlbum".
-            internal typealias Input = Barkcloud_Files_DeleteAlbumRequest
+            public typealias Input = Barkcloud_Files_DeleteAlbumRequest
             /// Response type for "DeleteAlbum".
-            internal typealias Output = Barkcloud_Files_CloudEmpty
+            public typealias Output = Barkcloud_Files_CloudEmpty
             /// Descriptor for "DeleteAlbum".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.AlbumApi"),
                 method: "DeleteAlbum",
                 type: .unary
             )
         }
         /// Namespace for "AddItemsToAlbum" metadata.
-        internal enum AddItemsToAlbum: Sendable {
+        public enum AddItemsToAlbum: Sendable {
             /// Request type for "AddItemsToAlbum".
-            internal typealias Input = Barkcloud_Files_AddItemsToAlbumRequest
+            public typealias Input = Barkcloud_Files_AddItemsToAlbumRequest
             /// Response type for "AddItemsToAlbum".
-            internal typealias Output = Barkcloud_Files_CloudEmpty
+            public typealias Output = Barkcloud_Files_CloudEmpty
             /// Descriptor for "AddItemsToAlbum".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.AlbumApi"),
                 method: "AddItemsToAlbum",
                 type: .unary
             )
         }
         /// Namespace for "RemoveItemsFromAlbum" metadata.
-        internal enum RemoveItemsFromAlbum: Sendable {
+        public enum RemoveItemsFromAlbum: Sendable {
             /// Request type for "RemoveItemsFromAlbum".
-            internal typealias Input = Barkcloud_Files_RemoveItemsFromAlbumRequest
+            public typealias Input = Barkcloud_Files_RemoveItemsFromAlbumRequest
             /// Response type for "RemoveItemsFromAlbum".
-            internal typealias Output = Barkcloud_Files_CloudEmpty
+            public typealias Output = Barkcloud_Files_CloudEmpty
             /// Descriptor for "RemoveItemsFromAlbum".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.AlbumApi"),
                 method: "RemoveItemsFromAlbum",
                 type: .unary
             )
         }
         /// Namespace for "ListAlbums" metadata.
-        internal enum ListAlbums: Sendable {
+        public enum ListAlbums: Sendable {
             /// Request type for "ListAlbums".
-            internal typealias Input = Barkcloud_Files_ListAlbumsRequest
+            public typealias Input = Barkcloud_Files_ListAlbumsRequest
             /// Response type for "ListAlbums".
-            internal typealias Output = Barkcloud_Files_ListAlbumsResponse
+            public typealias Output = Barkcloud_Files_ListAlbumsResponse
             /// Descriptor for "ListAlbums".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.AlbumApi"),
                 method: "ListAlbums",
                 type: .unary
             )
         }
         /// Namespace for "ListAlbumItems" metadata.
-        internal enum ListAlbumItems: Sendable {
+        public enum ListAlbumItems: Sendable {
             /// Request type for "ListAlbumItems".
-            internal typealias Input = Barkcloud_Files_ListAlbumItemsRequest
+            public typealias Input = Barkcloud_Files_ListAlbumItemsRequest
             /// Response type for "ListAlbumItems".
-            internal typealias Output = Barkcloud_Files_ListAlbumItemsResponse
+            public typealias Output = Barkcloud_Files_ListAlbumItemsResponse
             /// Descriptor for "ListAlbumItems".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.AlbumApi"),
                 method: "ListAlbumItems",
                 type: .unary
             )
         }
         /// Descriptors for all methods in the "barkcloud.files.AlbumApi" service.
-        internal static let descriptors: [GRPCCore.MethodDescriptor] = [
+        public static let descriptors: [GRPCCore.MethodDescriptor] = [
             CreateAlbum.descriptor,
             UpdateAlbum.descriptor,
             DeleteAlbum.descriptor,
@@ -11986,7 +11986,7 @@ internal enum Barkcloud_Files_AlbumApi: Sendable {
 @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
 extension GRPCCore.ServiceDescriptor {
     /// Service descriptor for the "barkcloud.files.AlbumApi" service.
-    internal static let barkcloud_files_AlbumApi = GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.AlbumApi")
+    public static let barkcloud_files_AlbumApi = GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.AlbumApi")
 }
 
 // MARK: barkcloud.files.AlbumApi (server)
@@ -12003,7 +12003,7 @@ extension Barkcloud_Files_AlbumApi {
     ///
     /// Where possible, prefer using the stricter, less-verbose ``ServiceProtocol``
     /// or ``SimpleServiceProtocol`` instead.
-    internal protocol StreamingServiceProtocol: GRPCCore.RegistrableRPCService {
+    public protocol StreamingServiceProtocol: GRPCCore.RegistrableRPCService {
         /// Handle the "CreateAlbum" method.
         ///
         /// > Source IDL Documentation:
@@ -12138,7 +12138,7 @@ extension Barkcloud_Files_AlbumApi {
     /// trailing response metadata. If you don't need these then consider using
     /// the ``SimpleServiceProtocol``. If you need fine grained control over your RPCs then
     /// use ``StreamingServiceProtocol``.
-    internal protocol ServiceProtocol: Barkcloud_Files_AlbumApi.StreamingServiceProtocol {
+    public protocol ServiceProtocol: Barkcloud_Files_AlbumApi.StreamingServiceProtocol {
         /// Handle the "CreateAlbum" method.
         ///
         /// > Source IDL Documentation:
@@ -12271,7 +12271,7 @@ extension Barkcloud_Files_AlbumApi {
     /// This is the highest level protocol for the service. The API is the easiest to use but
     /// doesn't provide access to request or response metadata. If you need access to these
     /// then use ``ServiceProtocol`` instead.
-    internal protocol SimpleServiceProtocol: Barkcloud_Files_AlbumApi.ServiceProtocol {
+    public protocol SimpleServiceProtocol: Barkcloud_Files_AlbumApi.ServiceProtocol {
         /// Handle the "CreateAlbum" method.
         ///
         /// > Source IDL Documentation:
@@ -12403,7 +12403,7 @@ extension Barkcloud_Files_AlbumApi {
 // Default implementation of 'registerMethods(with:)'.
 @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
 extension Barkcloud_Files_AlbumApi.StreamingServiceProtocol {
-    internal func registerMethods<Transport>(with router: inout GRPCCore.RPCRouter<Transport>) where Transport: GRPCCore.ServerTransport {
+    public func registerMethods<Transport>(with router: inout GRPCCore.RPCRouter<Transport>) where Transport: GRPCCore.ServerTransport {
         router.registerHandler(
             forMethod: Barkcloud_Files_AlbumApi.Method.CreateAlbum.descriptor,
             deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_CreateAlbumRequest>(),
@@ -12487,7 +12487,7 @@ extension Barkcloud_Files_AlbumApi.StreamingServiceProtocol {
 // Default implementation of streaming methods from 'StreamingServiceProtocol'.
 @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
 extension Barkcloud_Files_AlbumApi.ServiceProtocol {
-    internal func createAlbum(
+    public func createAlbum(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Files_CreateAlbumRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_AlbumInfo> {
@@ -12498,7 +12498,7 @@ extension Barkcloud_Files_AlbumApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func updateAlbum(
+    public func updateAlbum(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Files_UpdateAlbumRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_AlbumInfo> {
@@ -12509,7 +12509,7 @@ extension Barkcloud_Files_AlbumApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func deleteAlbum(
+    public func deleteAlbum(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Files_DeleteAlbumRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty> {
@@ -12520,7 +12520,7 @@ extension Barkcloud_Files_AlbumApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func addItemsToAlbum(
+    public func addItemsToAlbum(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Files_AddItemsToAlbumRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty> {
@@ -12531,7 +12531,7 @@ extension Barkcloud_Files_AlbumApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func removeItemsFromAlbum(
+    public func removeItemsFromAlbum(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Files_RemoveItemsFromAlbumRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty> {
@@ -12542,7 +12542,7 @@ extension Barkcloud_Files_AlbumApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func listAlbums(
+    public func listAlbums(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ListAlbumsRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_ListAlbumsResponse> {
@@ -12553,7 +12553,7 @@ extension Barkcloud_Files_AlbumApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func listAlbumItems(
+    public func listAlbumItems(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ListAlbumItemsRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_ListAlbumItemsResponse> {
@@ -12568,7 +12568,7 @@ extension Barkcloud_Files_AlbumApi.ServiceProtocol {
 // Default implementation of methods from 'ServiceProtocol'.
 @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
 extension Barkcloud_Files_AlbumApi.SimpleServiceProtocol {
-    internal func createAlbum(
+    public func createAlbum(
         request: GRPCCore.ServerRequest<Barkcloud_Files_CreateAlbumRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_AlbumInfo> {
@@ -12581,7 +12581,7 @@ extension Barkcloud_Files_AlbumApi.SimpleServiceProtocol {
         )
     }
 
-    internal func updateAlbum(
+    public func updateAlbum(
         request: GRPCCore.ServerRequest<Barkcloud_Files_UpdateAlbumRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_AlbumInfo> {
@@ -12594,7 +12594,7 @@ extension Barkcloud_Files_AlbumApi.SimpleServiceProtocol {
         )
     }
 
-    internal func deleteAlbum(
+    public func deleteAlbum(
         request: GRPCCore.ServerRequest<Barkcloud_Files_DeleteAlbumRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty> {
@@ -12607,7 +12607,7 @@ extension Barkcloud_Files_AlbumApi.SimpleServiceProtocol {
         )
     }
 
-    internal func addItemsToAlbum(
+    public func addItemsToAlbum(
         request: GRPCCore.ServerRequest<Barkcloud_Files_AddItemsToAlbumRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty> {
@@ -12620,7 +12620,7 @@ extension Barkcloud_Files_AlbumApi.SimpleServiceProtocol {
         )
     }
 
-    internal func removeItemsFromAlbum(
+    public func removeItemsFromAlbum(
         request: GRPCCore.ServerRequest<Barkcloud_Files_RemoveItemsFromAlbumRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty> {
@@ -12633,7 +12633,7 @@ extension Barkcloud_Files_AlbumApi.SimpleServiceProtocol {
         )
     }
 
-    internal func listAlbums(
+    public func listAlbums(
         request: GRPCCore.ServerRequest<Barkcloud_Files_ListAlbumsRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_ListAlbumsResponse> {
@@ -12646,7 +12646,7 @@ extension Barkcloud_Files_AlbumApi.SimpleServiceProtocol {
         )
     }
 
-    internal func listAlbumItems(
+    public func listAlbumItems(
         request: GRPCCore.ServerRequest<Barkcloud_Files_ListAlbumItemsRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_ListAlbumItemsResponse> {
@@ -12668,7 +12668,7 @@ extension Barkcloud_Files_AlbumApi {
     ///
     /// You don't need to implement this protocol directly, use the generated
     /// implementation, ``Client``.
-    internal protocol ClientProtocol: Sendable {
+    public protocol ClientProtocol: Sendable {
         /// Call the "CreateAlbum" method.
         ///
         /// > Source IDL Documentation:
@@ -12836,14 +12836,14 @@ extension Barkcloud_Files_AlbumApi {
     /// The ``Client`` provides an implementation of ``ClientProtocol`` which wraps
     /// a `GRPCCore.GRPCCClient`. The underlying `GRPCClient` provides the long-lived
     /// means of communication with the remote peer.
-    internal struct Client<Transport>: ClientProtocol where Transport: GRPCCore.ClientTransport {
+    public struct Client<Transport>: ClientProtocol where Transport: GRPCCore.ClientTransport {
         private let client: GRPCCore.GRPCClient<Transport>
 
         /// Creates a new client wrapping the provided `GRPCCore.GRPCClient`.
         ///
         /// - Parameters:
         ///   - client: A `GRPCCore.GRPCClient` providing a communication channel to the service.
-        internal init(wrapping client: GRPCCore.GRPCClient<Transport>) {
+        public init(wrapping client: GRPCCore.GRPCClient<Transport>) {
             self.client = client
         }
 
@@ -12862,7 +12862,7 @@ extension Barkcloud_Files_AlbumApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func createAlbum<Result>(
+        public func createAlbum<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Files_CreateAlbumRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_CreateAlbumRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_AlbumInfo>,
@@ -12896,7 +12896,7 @@ extension Barkcloud_Files_AlbumApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func updateAlbum<Result>(
+        public func updateAlbum<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Files_UpdateAlbumRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_UpdateAlbumRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_AlbumInfo>,
@@ -12930,7 +12930,7 @@ extension Barkcloud_Files_AlbumApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func deleteAlbum<Result>(
+        public func deleteAlbum<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Files_DeleteAlbumRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_DeleteAlbumRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CloudEmpty>,
@@ -12964,7 +12964,7 @@ extension Barkcloud_Files_AlbumApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func addItemsToAlbum<Result>(
+        public func addItemsToAlbum<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Files_AddItemsToAlbumRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_AddItemsToAlbumRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CloudEmpty>,
@@ -12998,7 +12998,7 @@ extension Barkcloud_Files_AlbumApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func removeItemsFromAlbum<Result>(
+        public func removeItemsFromAlbum<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Files_RemoveItemsFromAlbumRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_RemoveItemsFromAlbumRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CloudEmpty>,
@@ -13032,7 +13032,7 @@ extension Barkcloud_Files_AlbumApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func listAlbums<Result>(
+        public func listAlbums<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Files_ListAlbumsRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_ListAlbumsRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_ListAlbumsResponse>,
@@ -13066,7 +13066,7 @@ extension Barkcloud_Files_AlbumApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func listAlbumItems<Result>(
+        public func listAlbumItems<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Files_ListAlbumItemsRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_ListAlbumItemsRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_ListAlbumItemsResponse>,
@@ -13103,7 +13103,7 @@ extension Barkcloud_Files_AlbumApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func createAlbum<Result>(
+    public func createAlbum<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Files_CreateAlbumRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_AlbumInfo>) async throws -> Result = { response in
@@ -13132,7 +13132,7 @@ extension Barkcloud_Files_AlbumApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func updateAlbum<Result>(
+    public func updateAlbum<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Files_UpdateAlbumRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_AlbumInfo>) async throws -> Result = { response in
@@ -13161,7 +13161,7 @@ extension Barkcloud_Files_AlbumApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func deleteAlbum<Result>(
+    public func deleteAlbum<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Files_DeleteAlbumRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
@@ -13190,7 +13190,7 @@ extension Barkcloud_Files_AlbumApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func addItemsToAlbum<Result>(
+    public func addItemsToAlbum<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Files_AddItemsToAlbumRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
@@ -13219,7 +13219,7 @@ extension Barkcloud_Files_AlbumApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func removeItemsFromAlbum<Result>(
+    public func removeItemsFromAlbum<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Files_RemoveItemsFromAlbumRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
@@ -13248,7 +13248,7 @@ extension Barkcloud_Files_AlbumApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func listAlbums<Result>(
+    public func listAlbums<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Files_ListAlbumsRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListAlbumsResponse>) async throws -> Result = { response in
@@ -13277,7 +13277,7 @@ extension Barkcloud_Files_AlbumApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func listAlbumItems<Result>(
+    public func listAlbumItems<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Files_ListAlbumItemsRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListAlbumItemsResponse>) async throws -> Result = { response in
@@ -13311,7 +13311,7 @@ extension Barkcloud_Files_AlbumApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func createAlbum<Result>(
+    public func createAlbum<Result>(
         _ message: Barkcloud_Files_CreateAlbumRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -13344,7 +13344,7 @@ extension Barkcloud_Files_AlbumApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func updateAlbum<Result>(
+    public func updateAlbum<Result>(
         _ message: Barkcloud_Files_UpdateAlbumRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -13377,7 +13377,7 @@ extension Barkcloud_Files_AlbumApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func deleteAlbum<Result>(
+    public func deleteAlbum<Result>(
         _ message: Barkcloud_Files_DeleteAlbumRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -13410,7 +13410,7 @@ extension Barkcloud_Files_AlbumApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func addItemsToAlbum<Result>(
+    public func addItemsToAlbum<Result>(
         _ message: Barkcloud_Files_AddItemsToAlbumRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -13443,7 +13443,7 @@ extension Barkcloud_Files_AlbumApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func removeItemsFromAlbum<Result>(
+    public func removeItemsFromAlbum<Result>(
         _ message: Barkcloud_Files_RemoveItemsFromAlbumRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -13476,7 +13476,7 @@ extension Barkcloud_Files_AlbumApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func listAlbums<Result>(
+    public func listAlbums<Result>(
         _ message: Barkcloud_Files_ListAlbumsRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -13509,7 +13509,7 @@ extension Barkcloud_Files_AlbumApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func listAlbumItems<Result>(
+    public func listAlbumItems<Result>(
         _ message: Barkcloud_Files_ListAlbumItemsRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,

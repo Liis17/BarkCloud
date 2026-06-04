@@ -1,5 +1,6 @@
 import SwiftUI
 import Observation
+import BarkCloudKit
 
 /// Контекст «что расшариваем». Передаётся в `.sheet(item:)` из вызывающего
 /// экрана. Identifiable, чтобы биндить по fileID.

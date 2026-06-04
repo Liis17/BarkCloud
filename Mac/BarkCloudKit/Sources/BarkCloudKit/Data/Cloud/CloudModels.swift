@@ -2,16 +2,16 @@ import Foundation
 import SwiftProtobuf
 
 extension SwiftProtobuf.Google_Protobuf_Timestamp {
-    var date: Date {
+    public var date: Date {
         Date(timeIntervalSince1970: TimeInterval(seconds) + TimeInterval(nanos) / 1_000_000_000)
     }
 }
 
 /// Категория медиа (зеркалит `Barkcloud_Files_MediaKind`).
-enum CloudMediaKind: Sendable {
+public enum CloudMediaKind: Sendable {
     case other, photo, video, document, audio
 
-    init(_ proto: Barkcloud_Files_MediaKind) {
+    public init(_ proto: Barkcloud_Files_MediaKind) {
         switch proto {
         case .photo: self = .photo
         case .video: self = .video
@@ -21,33 +21,33 @@ enum CloudMediaKind: Sendable {
         }
     }
 
-    var isVideo: Bool { self == .video }
+    public var isVideo: Bool { self == .video }
 }
 
 /// Превью определённой ширины.
-struct MediaPreview: Hashable, Sendable {
-    let url: URL
-    let width: Int
+public struct MediaPreview: Hashable, Sendable {
+    public let url: URL
+    public let width: Int
 }
 
 /// Медиа-файл облака (фото/видео/документ) с превью и метаданными.
 /// `id` — это `file_id` блоба.
-struct MediaAsset: Identifiable, Hashable, Sendable {
-    let id: String
-    let fileName: String
-    let fileSize: Int64
-    let kind: CloudMediaKind
-    let previews: [MediaPreview]
-    let createdAt: Date
-    let imageWidth: Int
-    let imageHeight: Int
-    let uploadedAt: Date?
-    let etag: String
+public struct MediaAsset: Identifiable, Hashable, Sendable {
+    public let id: String
+    public let fileName: String
+    public let fileSize: Int64
+    public let kind: CloudMediaKind
+    public let previews: [MediaPreview]
+    public let createdAt: Date
+    public let imageWidth: Int
+    public let imageHeight: Int
+    public let uploadedAt: Date?
+    public let etag: String
     /// Имя устройства, с которого блоб был загружен в первый раз (сохраняется при дедупликации).
     /// Пусто, если бэкенд не передал значение (легаси-файлы до миграции `AddUploadDeviceName`).
-    let uploadDeviceName: String?
+    public let uploadDeviceName: String?
 
-    init(_ info: Barkcloud_Files_UploadFileInfo) {
+    public init(_ info: Barkcloud_Files_UploadFileInfo) {
         self.id = info.id
         self.fileName = info.fileName
         self.fileSize = info.fileSize
@@ -64,62 +64,62 @@ struct MediaAsset: Identifiable, Hashable, Sendable {
         }
     }
 
-    var isVideo: Bool { kind.isVideo }
+    public var isVideo: Bool { kind.isVideo }
 
     /// Превью ближайшее к нужной ширине (или максимальное доступное) — вместе с его
     /// фактической шириной. Ширина нужна, чтобы один и тот же файл превью получал
     /// один ключ дискового кеша независимо от запрошенной ширины.
-    func preview(preferredWidth: Int) -> MediaPreview? {
+    public func preview(preferredWidth: Int) -> MediaPreview? {
         guard !previews.isEmpty else { return nil }
         let sorted = previews.sorted { $0.width < $1.width }
         return sorted.first { $0.width >= preferredWidth } ?? sorted.last
     }
 
     /// Превью ближайшее к нужной ширине (или максимальное доступное).
-    func previewURL(preferredWidth: Int) -> URL? {
+    public func previewURL(preferredWidth: Int) -> URL? {
         preview(preferredWidth: preferredWidth)?.url
     }
 }
 
 /// Расширенные метаданные файла (зеркалит `FileMetadataInfo`). Все поля
 /// опциональны — отображаются только те, что заполнены сервером.
-struct CloudFileMetadata: Sendable {
+public struct CloudFileMetadata: Sendable {
     // Общие
-    let takenAt: Date?
-    let creatorTool: String?
+    public let takenAt: Date?
+    public let creatorTool: String?
 
     // GPS
-    let latitude: Double?
-    let longitude: Double?
-    let altitude: Double?
+    public let latitude: Double?
+    public let longitude: Double?
+    public let altitude: Double?
 
     // Камера
-    let cameraMake: String?
-    let cameraModel: String?
-    let lensModel: String?
+    public let cameraMake: String?
+    public let cameraModel: String?
+    public let lensModel: String?
 
     // Параметры съёмки
-    let focalLengthMm: Double?
-    let fNumber: Double?
-    let exposureTimeSeconds: Double?
-    let iso: Int?
-    let orientation: Int?
-    let flash: Bool?
+    public let focalLengthMm: Double?
+    public let fNumber: Double?
+    public let exposureTimeSeconds: Double?
+    public let iso: Int?
+    public let orientation: Int?
+    public let flash: Bool?
 
     // Видео
-    let durationSeconds: Double?
-    let videoCodec: String?
-    let audioCodec: String?
-    let bitrate: Int64?
-    let frameRate: Double?
+    public let durationSeconds: Double?
+    public let videoCodec: String?
+    public let audioCodec: String?
+    public let bitrate: Int64?
+    public let frameRate: Double?
 
     // Документ
-    let documentAuthor: String?
-    let documentTitle: String?
-    let documentSubject: String?
-    let documentPageCount: Int?
+    public let documentAuthor: String?
+    public let documentTitle: String?
+    public let documentSubject: String?
+    public let documentPageCount: Int?
 
-    init(_ m: Barkcloud_Files_FileMetadataInfo) {
+    public init(_ m: Barkcloud_Files_FileMetadataInfo) {
         takenAt = m.hasTakenAt ? m.takenAt.date : nil
         creatorTool = m.hasCreatorTool ? m.creatorTool : nil
         latitude = m.hasLatitude ? m.latitude : nil
@@ -145,21 +145,21 @@ struct CloudFileMetadata: Sendable {
         documentPageCount = m.hasDocumentPageCount ? Int(m.documentPageCount) : nil
     }
 
-    var hasCoordinates: Bool { latitude != nil && longitude != nil }
+    public var hasCoordinates: Bool { latitude != nil && longitude != nil }
 }
 
 /// Публичная share-ссылка на файл (зеркалит `ShareInfo`). `url` собирается на
 /// клиенте: `{webHost}/s/{token}` (бэкенд готовый URL не отдаёт).
-struct ShareLink: Identifiable, Hashable, Sendable {
-    let id: String
-    let token: String
-    let fileID: String
-    let name: String
-    let url: URL?
-    let clickCount: Int
-    let createdAt: Date
+public struct ShareLink: Identifiable, Hashable, Sendable {
+    public let id: String
+    public let token: String
+    public let fileID: String
+    public let name: String
+    public let url: URL?
+    public let clickCount: Int
+    public let createdAt: Date
 
-    init(_ info: Barkcloud_Files_ShareInfo) {
+    public init(_ info: Barkcloud_Files_ShareInfo) {
         self.id = info.id
         self.token = info.token
         self.fileID = info.fileID
@@ -172,24 +172,24 @@ struct ShareLink: Identifiable, Hashable, Sendable {
 
 /// Страница списка моих публичных ссылок с курсором пагинации.
 /// `nextCursorCreatedAt == nil` → больше страниц нет.
-struct ShareLinksPage: Sendable {
-    let items: [ShareLink]
-    let nextCursorCreatedAt: Date?
-    let nextCursorShareID: String
-    var hasMore: Bool { nextCursorCreatedAt != nil }
+public struct ShareLinksPage: Sendable {
+    public let items: [ShareLink]
+    public let nextCursorCreatedAt: Date?
+    public let nextCursorShareID: String
+    public var hasMore: Bool { nextCursorCreatedAt != nil }
 }
 
 /// Получатель шара / результат поиска пользователей. Зеркалит
 /// `Barkcloud_Users_User` в минимальном объёме, нужном для UI выбора (поиск,
 /// карточка получателя, отображение «от кого» в Мне доступны).
-struct CloudUser: Identifiable, Hashable, Sendable {
-    let id: Int64
-    let username: String
-    let firstName: String
-    let lastName: String
-    let avatarURL: URL?
+public struct CloudUser: Identifiable, Hashable, Sendable {
+    public let id: Int64
+    public let username: String
+    public let firstName: String
+    public let lastName: String
+    public let avatarURL: URL?
 
-    init(_ u: Barkcloud_Users_User) {
+    public init(_ u: Barkcloud_Users_User) {
         self.id = u.id
         self.username = u.username
         self.firstName = u.firstName
@@ -198,7 +198,7 @@ struct CloudUser: Identifiable, Hashable, Sendable {
     }
 
     /// «Имя Фамилия» если есть, иначе `@username`, иначе `id N`.
-    var displayName: String {
+    public var displayName: String {
         let full = [firstName, lastName].filter { !$0.isEmpty }.joined(separator: " ")
         if !full.isEmpty { return full }
         if !username.isEmpty { return "@\(username)" }
@@ -210,13 +210,13 @@ struct CloudUser: Identifiable, Hashable, Sendable {
 /// `file.id` — это `fileID`, по которому через `getSharedFileDownloadUrl`
 /// получают временный URL для скачивания. `ownerUserID` потом резолвится в
 /// `CloudUser` через `UserRepository.getUser(userID:)`.
-struct SharedFileEntry: Identifiable, Hashable, Sendable {
-    let grantID: String
-    let file: MediaAsset
-    let ownerUserID: Int64
-    let sharedAt: Date
+public struct SharedFileEntry: Identifiable, Hashable, Sendable {
+    public let grantID: String
+    public let file: MediaAsset
+    public let ownerUserID: Int64
+    public let sharedAt: Date
 
-    init(_ e: Barkcloud_Files_SharedWithMeEntry) {
+    public init(_ e: Barkcloud_Files_SharedWithMeEntry) {
         self.grantID = e.grantID
         self.file = MediaAsset(e.file)
         self.ownerUserID = e.ownerUserID
@@ -224,76 +224,76 @@ struct SharedFileEntry: Identifiable, Hashable, Sendable {
     }
 
     /// `grantID` уникален среди активных грантов и нужен в роли `Identifiable`.
-    var id: String { grantID }
+    public var id: String { grantID }
 }
 
 /// Страница списка входящих шаров с курсором пагинации.
-struct SharedWithMePage: Sendable {
-    let items: [SharedFileEntry]
-    let nextCursorSharedAt: Date?
-    let nextCursorGrantID: String
-    var hasMore: Bool { nextCursorSharedAt != nil }
+public struct SharedWithMePage: Sendable {
+    public let items: [SharedFileEntry]
+    public let nextCursorSharedAt: Date?
+    public let nextCursorGrantID: String
+    public var hasMore: Bool { nextCursorSharedAt != nil }
 }
 
 /// Один исходящий грант — кому конкретно расшарен мой файл. `grantID` — id для
 /// `revokeUserShare`. `recipientUserID` резолвится в `CloudUser` через
 /// `UserRepository.getUser(userID:)` для отображения имени/аватара.
-struct OutgoingShare: Identifiable, Hashable, Sendable {
-    let grantID: String
-    let recipientUserID: Int64
-    let sharedAt: Date
+public struct OutgoingShare: Identifiable, Hashable, Sendable {
+    public let grantID: String
+    public let recipientUserID: Int64
+    public let sharedAt: Date
 
-    init(_ e: Barkcloud_Files_OutgoingShareEntry) {
+    public init(_ e: Barkcloud_Files_OutgoingShareEntry) {
         self.grantID = e.grantID
         self.recipientUserID = e.recipientUserID
         self.sharedAt = e.hasSharedAt ? e.sharedAt.date : Date(timeIntervalSince1970: 0)
     }
 
-    var id: String { grantID }
+    public var id: String { grantID }
 }
 
 /// Один исходящий грант с полной инфой о файле (зеркалит `OutgoingShareFull`).
 /// Бэкенд отдаёт плоский список по всем моим файлам; группировку по файлу для
 /// таба «Я поделился» делает клиент. `recipientUserID` резолвится в `CloudUser`.
-struct OutgoingShareFull: Identifiable, Hashable, Sendable {
-    let grantID: String
-    let file: MediaAsset
-    let recipientUserID: Int64
-    let sharedAt: Date
+public struct OutgoingShareFull: Identifiable, Hashable, Sendable {
+    public let grantID: String
+    public let file: MediaAsset
+    public let recipientUserID: Int64
+    public let sharedAt: Date
 
-    init(_ e: Barkcloud_Files_OutgoingShareFull) {
+    public init(_ e: Barkcloud_Files_OutgoingShareFull) {
         self.grantID = e.grantID
         self.file = MediaAsset(e.file)
         self.recipientUserID = e.recipientUserID
         self.sharedAt = e.hasSharedAt ? e.sharedAt.date : Date(timeIntervalSince1970: 0)
     }
 
-    var id: String { grantID }
+    public var id: String { grantID }
 }
 
 /// Страница плоского списка исходящих грантов с курсором пагинации.
-struct OutgoingSharesAllPage: Sendable {
-    let items: [OutgoingShareFull]
-    let nextCursorSharedAt: Date?
-    let nextCursorGrantID: String
-    var hasMore: Bool { nextCursorSharedAt != nil }
+public struct OutgoingSharesAllPage: Sendable {
+    public let items: [OutgoingShareFull]
+    public let nextCursorSharedAt: Date?
+    public let nextCursorGrantID: String
+    public var hasMore: Bool { nextCursorSharedAt != nil }
 }
 
 /// Страница медиа-галереи с курсором пагинации.
-struct MediaPage: Sendable {
-    let items: [MediaAsset]
-    let nextCursorCreatedAt: Date?
-    let nextCursorFileID: String
-    var hasMore: Bool { nextCursorCreatedAt != nil }
+public struct MediaPage: Sendable {
+    public let items: [MediaAsset]
+    public let nextCursorCreatedAt: Date?
+    public let nextCursorFileID: String
+    public var hasMore: Bool { nextCursorCreatedAt != nil }
 }
 
 /// Папка облака (зеркалит `DirectoryInfo`).
-struct CloudDirectory: Identifiable, Hashable, Sendable {
-    let id: String
-    let parentID: String
-    let name: String
+public struct CloudDirectory: Identifiable, Hashable, Sendable {
+    public let id: String
+    public let parentID: String
+    public let name: String
 
-    init(_ d: Barkcloud_Files_DirectoryInfo) {
+    public init(_ d: Barkcloud_Files_DirectoryInfo) {
         self.id = d.id
         self.parentID = d.parentID
         self.name = d.name
@@ -301,13 +301,13 @@ struct CloudDirectory: Identifiable, Hashable, Sendable {
 }
 
 /// Запись о файле в папке (зеркалит `FileEntryDetailed`).
-struct CloudFileEntry: Identifiable, Hashable, Sendable {
-    let id: String        // entry_id (ID записи в иерархии)
-    let fileID: String    // ID блоба
-    let name: String
-    let asset: MediaAsset
+public struct CloudFileEntry: Identifiable, Hashable, Sendable {
+    public let id: String        // entry_id (ID записи в иерархии)
+    public let fileID: String    // ID блоба
+    public let name: String
+    public let asset: MediaAsset
 
-    init(_ d: Barkcloud_Files_FileEntryDetailed) {
+    public init(_ d: Barkcloud_Files_FileEntryDetailed) {
         self.id = d.entry.id
         self.fileID = d.entry.fileID
         self.name = d.entry.name
@@ -316,27 +316,27 @@ struct CloudFileEntry: Identifiable, Hashable, Sendable {
 }
 
 /// Содержимое папки.
-struct CloudListing: Sendable {
-    let subdirs: [CloudDirectory]
-    let files: [CloudFileEntry]
+public struct CloudListing: Sendable {
+    public let subdirs: [CloudDirectory]
+    public let files: [CloudFileEntry]
 }
 
 /// Сегмент хлебных крошек.
-struct PathCrumb: Identifiable, Hashable, Sendable {
-    let id: String
-    let name: String
+public struct PathCrumb: Identifiable, Hashable, Sendable {
+    public let id: String
+    public let name: String
 }
 
 /// Запись в корзине (зеркалит `TrashEntry`). `id` — entry_id записи.
-struct TrashItem: Identifiable, Hashable, Sendable {
-    let id: String        // entry_id
-    let fileID: String    // ID блоба
-    let name: String
-    let asset: MediaAsset
-    let deletedAt: Date
-    let purgeAt: Date
+public struct TrashItem: Identifiable, Hashable, Sendable {
+    public let id: String        // entry_id
+    public let fileID: String    // ID блоба
+    public let name: String
+    public let asset: MediaAsset
+    public let deletedAt: Date
+    public let purgeAt: Date
 
-    init(_ t: Barkcloud_Files_TrashEntry) {
+    public init(_ t: Barkcloud_Files_TrashEntry) {
         self.id = t.entry.id
         self.fileID = t.entry.fileID
         self.name = t.entry.name
@@ -347,24 +347,24 @@ struct TrashItem: Identifiable, Hashable, Sendable {
 }
 
 /// Страница корзины с курсором пагинации.
-struct TrashPage: Sendable {
-    let items: [TrashItem]
-    let nextCursorDeletedAt: Date?
-    let nextCursorEntryID: String
-    var hasMore: Bool { nextCursorDeletedAt != nil }
+public struct TrashPage: Sendable {
+    public let items: [TrashItem]
+    public let nextCursorDeletedAt: Date?
+    public let nextCursorEntryID: String
+    public var hasMore: Bool { nextCursorDeletedAt != nil }
 }
 
 /// Карточка альбома (зеркалит `AlbumInfo`).
-struct AlbumCard: Identifiable, Hashable, Sendable {
-    let id: String
-    let name: String
-    let description: String
-    let coverPreviewURL: URL?
-    let coverFileID: String
-    let itemsCount: Int
-    let updatedAt: Date
+public struct AlbumCard: Identifiable, Hashable, Sendable {
+    public let id: String
+    public let name: String
+    public let description: String
+    public let coverPreviewURL: URL?
+    public let coverFileID: String
+    public let itemsCount: Int
+    public let updatedAt: Date
 
-    init(_ a: Barkcloud_Files_AlbumInfo) {
+    public init(_ a: Barkcloud_Files_AlbumInfo) {
         self.id = a.id
         self.name = a.name
         self.description = a.description_p
@@ -376,9 +376,9 @@ struct AlbumCard: Identifiable, Hashable, Sendable {
 }
 
 /// Страница списка альбомов с курсором пагинации.
-struct AlbumPage: Sendable {
-    let albums: [AlbumCard]
-    let nextCursorUpdatedAt: Date?
-    let nextCursorAlbumID: String
-    var hasMore: Bool { nextCursorUpdatedAt != nil }
+public struct AlbumPage: Sendable {
+    public let albums: [AlbumCard]
+    public let nextCursorUpdatedAt: Date?
+    public let nextCursorAlbumID: String
+    public var hasMore: Bool { nextCursorUpdatedAt != nil }
 }

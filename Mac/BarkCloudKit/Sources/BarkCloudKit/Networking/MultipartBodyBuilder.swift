@@ -1,6 +1,6 @@
 import Foundation
 
-enum MultipartBodyBuilderError: Error {
+public enum MultipartBodyBuilderError: Error {
     case sourceFileMissing
     case destinationDirectoryFailed
     case destinationFileFailed
@@ -10,11 +10,11 @@ enum MultipartBodyBuilderError: Error {
 /// принимает только файл (`uploadTask(with:fromFile:)`), а Data-вариант недоступен —
 /// поэтому тело собирается стримом: header → байты оригинала чанками → footer.
 /// Это позволяет грузить большие видео без раздувания RAM.
-enum MultipartBodyBuilder {
+public enum MultipartBodyBuilder {
     /// Записать multipart body в `destination`. Возвращает суммарный размер
     /// результирующего файла (header + payload + footer) для статистики прогресса.
     @discardableResult
-    static func writeMultipartFile(
+    public static func writeMultipartFile(
         boundary: String,
         fieldName: String = "file",
         fileName: String,

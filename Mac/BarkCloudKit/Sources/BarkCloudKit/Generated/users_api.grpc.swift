@@ -15,221 +15,221 @@ import GRPCProtobuf
 
 /// Namespace containing generated types for the "barkcloud.users.UsersApi" service.
 @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
-internal enum Barkcloud_Users_UsersApi: Sendable {
+public enum Barkcloud_Users_UsersApi: Sendable {
     /// Service descriptor for the "barkcloud.users.UsersApi" service.
-    internal static let descriptor = GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.users.UsersApi")
+    public static let descriptor = GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.users.UsersApi")
     /// Namespace for method metadata.
-    internal enum Method: Sendable {
+    public enum Method: Sendable {
         /// Namespace for "GetUser" metadata.
-        internal enum GetUser: Sendable {
+        public enum GetUser: Sendable {
             /// Request type for "GetUser".
-            internal typealias Input = Barkcloud_Users_GetUserRequest
+            public typealias Input = Barkcloud_Users_GetUserRequest
             /// Response type for "GetUser".
-            internal typealias Output = Barkcloud_Users_GetUserResponse
+            public typealias Output = Barkcloud_Users_GetUserResponse
             /// Descriptor for "GetUser".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.users.UsersApi"),
                 method: "GetUser",
                 type: .unary
             )
         }
         /// Namespace for "SetProfilePicture" metadata.
-        internal enum SetProfilePicture: Sendable {
+        public enum SetProfilePicture: Sendable {
             /// Request type for "SetProfilePicture".
-            internal typealias Input = Barkcloud_Users_SetProfilePictureRequest
+            public typealias Input = Barkcloud_Users_SetProfilePictureRequest
             /// Response type for "SetProfilePicture".
-            internal typealias Output = Barkcloud_Users_SetProfilePictureResponse
+            public typealias Output = Barkcloud_Users_SetProfilePictureResponse
             /// Descriptor for "SetProfilePicture".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.users.UsersApi"),
                 method: "SetProfilePicture",
                 type: .unary
             )
         }
         /// Namespace for "CheckExistUsername" metadata.
-        internal enum CheckExistUsername: Sendable {
+        public enum CheckExistUsername: Sendable {
             /// Request type for "CheckExistUsername".
-            internal typealias Input = Barkcloud_Users_CheckExistUsernameRequest
+            public typealias Input = Barkcloud_Users_CheckExistUsernameRequest
             /// Response type for "CheckExistUsername".
-            internal typealias Output = Barkcloud_Users_CheckExistResponse
+            public typealias Output = Barkcloud_Users_CheckExistResponse
             /// Descriptor for "CheckExistUsername".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.users.UsersApi"),
                 method: "CheckExistUsername",
                 type: .unary
             )
         }
         /// Namespace for "CheckExistEmail" metadata.
-        internal enum CheckExistEmail: Sendable {
+        public enum CheckExistEmail: Sendable {
             /// Request type for "CheckExistEmail".
-            internal typealias Input = Barkcloud_Users_CheckExistEmailRequest
+            public typealias Input = Barkcloud_Users_CheckExistEmailRequest
             /// Response type for "CheckExistEmail".
-            internal typealias Output = Barkcloud_Users_CheckExistResponse
+            public typealias Output = Barkcloud_Users_CheckExistResponse
             /// Descriptor for "CheckExistEmail".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.users.UsersApi"),
                 method: "CheckExistEmail",
                 type: .unary
             )
         }
         /// Namespace for "ChangeName" metadata.
-        internal enum ChangeName: Sendable {
+        public enum ChangeName: Sendable {
             /// Request type for "ChangeName".
-            internal typealias Input = Barkcloud_Users_ChangeNameRequest
+            public typealias Input = Barkcloud_Users_ChangeNameRequest
             /// Response type for "ChangeName".
-            internal typealias Output = Barkcloud_Users_ChangeNameResponse
+            public typealias Output = Barkcloud_Users_ChangeNameResponse
             /// Descriptor for "ChangeName".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.users.UsersApi"),
                 method: "ChangeName",
                 type: .unary
             )
         }
         /// Namespace for "ChangeUsername" metadata.
-        internal enum ChangeUsername: Sendable {
+        public enum ChangeUsername: Sendable {
             /// Request type for "ChangeUsername".
-            internal typealias Input = Barkcloud_Users_ChangeUsernameRequest
+            public typealias Input = Barkcloud_Users_ChangeUsernameRequest
             /// Response type for "ChangeUsername".
-            internal typealias Output = Barkcloud_Users_ChangeUsernameResponse
+            public typealias Output = Barkcloud_Users_ChangeUsernameResponse
             /// Descriptor for "ChangeUsername".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.users.UsersApi"),
                 method: "ChangeUsername",
                 type: .unary
             )
         }
         /// Namespace for "ChangeBio" metadata.
-        internal enum ChangeBio: Sendable {
+        public enum ChangeBio: Sendable {
             /// Request type for "ChangeBio".
-            internal typealias Input = Barkcloud_Users_ChangeBioRequest
+            public typealias Input = Barkcloud_Users_ChangeBioRequest
             /// Response type for "ChangeBio".
-            internal typealias Output = Barkcloud_Users_ChangeBioResponse
+            public typealias Output = Barkcloud_Users_ChangeBioResponse
             /// Descriptor for "ChangeBio".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.users.UsersApi"),
                 method: "ChangeBio",
                 type: .unary
             )
         }
         /// Namespace for "SearchUsers" metadata.
-        internal enum SearchUsers: Sendable {
+        public enum SearchUsers: Sendable {
             /// Request type for "SearchUsers".
-            internal typealias Input = Barkcloud_Users_SearchUsersRequest
+            public typealias Input = Barkcloud_Users_SearchUsersRequest
             /// Response type for "SearchUsers".
-            internal typealias Output = Barkcloud_Users_SearchUsersResponse
+            public typealias Output = Barkcloud_Users_SearchUsersResponse
             /// Descriptor for "SearchUsers".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.users.UsersApi"),
                 method: "SearchUsers",
                 type: .unary
             )
         }
         /// Namespace for "DeleteAccount" metadata.
-        internal enum DeleteAccount: Sendable {
+        public enum DeleteAccount: Sendable {
             /// Request type for "DeleteAccount".
-            internal typealias Input = Barkcloud_Users_DeleteAccountRequest
+            public typealias Input = Barkcloud_Users_DeleteAccountRequest
             /// Response type for "DeleteAccount".
-            internal typealias Output = Barkcloud_Users_DeleteAccountResponse
+            public typealias Output = Barkcloud_Users_DeleteAccountResponse
             /// Descriptor for "DeleteAccount".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.users.UsersApi"),
                 method: "DeleteAccount",
                 type: .unary
             )
         }
         /// Namespace for "GetPrivacySettings" metadata.
-        internal enum GetPrivacySettings: Sendable {
+        public enum GetPrivacySettings: Sendable {
             /// Request type for "GetPrivacySettings".
-            internal typealias Input = Barkcloud_Users_GetPrivacySettingsRequest
+            public typealias Input = Barkcloud_Users_GetPrivacySettingsRequest
             /// Response type for "GetPrivacySettings".
-            internal typealias Output = Barkcloud_Users_GetPrivacySettingsResponse
+            public typealias Output = Barkcloud_Users_GetPrivacySettingsResponse
             /// Descriptor for "GetPrivacySettings".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.users.UsersApi"),
                 method: "GetPrivacySettings",
                 type: .unary
             )
         }
         /// Namespace for "UpdatePrivacySettings" metadata.
-        internal enum UpdatePrivacySettings: Sendable {
+        public enum UpdatePrivacySettings: Sendable {
             /// Request type for "UpdatePrivacySettings".
-            internal typealias Input = Barkcloud_Users_UpdatePrivacySettingsRequest
+            public typealias Input = Barkcloud_Users_UpdatePrivacySettingsRequest
             /// Response type for "UpdatePrivacySettings".
-            internal typealias Output = Barkcloud_Users_UpdatePrivacySettingsResponse
+            public typealias Output = Barkcloud_Users_UpdatePrivacySettingsResponse
             /// Descriptor for "UpdatePrivacySettings".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.users.UsersApi"),
                 method: "UpdatePrivacySettings",
                 type: .unary
             )
         }
         /// Namespace for "GetDevices" metadata.
-        internal enum GetDevices: Sendable {
+        public enum GetDevices: Sendable {
             /// Request type for "GetDevices".
-            internal typealias Input = Barkcloud_Users_GetDevicesRequest
+            public typealias Input = Barkcloud_Users_GetDevicesRequest
             /// Response type for "GetDevices".
-            internal typealias Output = Barkcloud_Users_GetDevicesResponse
+            public typealias Output = Barkcloud_Users_GetDevicesResponse
             /// Descriptor for "GetDevices".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.users.UsersApi"),
                 method: "GetDevices",
                 type: .unary
             )
         }
         /// Namespace for "GetCurrentDevice" metadata.
-        internal enum GetCurrentDevice: Sendable {
+        public enum GetCurrentDevice: Sendable {
             /// Request type for "GetCurrentDevice".
-            internal typealias Input = Barkcloud_Users_GetCurrentDeviceRequest
+            public typealias Input = Barkcloud_Users_GetCurrentDeviceRequest
             /// Response type for "GetCurrentDevice".
-            internal typealias Output = Barkcloud_Users_GetCurrentDeviceResponse
+            public typealias Output = Barkcloud_Users_GetCurrentDeviceResponse
             /// Descriptor for "GetCurrentDevice".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.users.UsersApi"),
                 method: "GetCurrentDevice",
                 type: .unary
             )
         }
         /// Namespace for "RenameDevice" metadata.
-        internal enum RenameDevice: Sendable {
+        public enum RenameDevice: Sendable {
             /// Request type for "RenameDevice".
-            internal typealias Input = Barkcloud_Users_RenameDeviceRequest
+            public typealias Input = Barkcloud_Users_RenameDeviceRequest
             /// Response type for "RenameDevice".
-            internal typealias Output = Barkcloud_Users_RenameDeviceResponse
+            public typealias Output = Barkcloud_Users_RenameDeviceResponse
             /// Descriptor for "RenameDevice".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.users.UsersApi"),
                 method: "RenameDevice",
                 type: .unary
             )
         }
         /// Namespace for "DeleteDevice" metadata.
-        internal enum DeleteDevice: Sendable {
+        public enum DeleteDevice: Sendable {
             /// Request type for "DeleteDevice".
-            internal typealias Input = Barkcloud_Users_DeleteDeviceRequest
+            public typealias Input = Barkcloud_Users_DeleteDeviceRequest
             /// Response type for "DeleteDevice".
-            internal typealias Output = Barkcloud_Users_DeleteDeviceResponse
+            public typealias Output = Barkcloud_Users_DeleteDeviceResponse
             /// Descriptor for "DeleteDevice".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.users.UsersApi"),
                 method: "DeleteDevice",
                 type: .unary
             )
         }
         /// Namespace for "SetFirebaseToken" metadata.
-        internal enum SetFirebaseToken: Sendable {
+        public enum SetFirebaseToken: Sendable {
             /// Request type for "SetFirebaseToken".
-            internal typealias Input = Barkcloud_Users_SetFirebaseTokenRequest
+            public typealias Input = Barkcloud_Users_SetFirebaseTokenRequest
             /// Response type for "SetFirebaseToken".
-            internal typealias Output = Barkcloud_Users_SetFirebaseTokenResponse
+            public typealias Output = Barkcloud_Users_SetFirebaseTokenResponse
             /// Descriptor for "SetFirebaseToken".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.users.UsersApi"),
                 method: "SetFirebaseToken",
                 type: .unary
             )
         }
         /// Descriptors for all methods in the "barkcloud.users.UsersApi" service.
-        internal static let descriptors: [GRPCCore.MethodDescriptor] = [
+        public static let descriptors: [GRPCCore.MethodDescriptor] = [
             GetUser.descriptor,
             SetProfilePicture.descriptor,
             CheckExistUsername.descriptor,
@@ -253,7 +253,7 @@ internal enum Barkcloud_Users_UsersApi: Sendable {
 @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
 extension GRPCCore.ServiceDescriptor {
     /// Service descriptor for the "barkcloud.users.UsersApi" service.
-    internal static let barkcloud_users_UsersApi = GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.users.UsersApi")
+    public static let barkcloud_users_UsersApi = GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.users.UsersApi")
 }
 
 // MARK: barkcloud.users.UsersApi (server)
@@ -274,7 +274,7 @@ extension Barkcloud_Users_UsersApi {
     /// > Source IDL Documentation:
     /// >
     /// > Client-facing API
-    internal protocol StreamingServiceProtocol: GRPCCore.RegistrableRPCService {
+    public protocol StreamingServiceProtocol: GRPCCore.RegistrableRPCService {
         /// Handle the "GetUser" method.
         ///
         /// > Source IDL Documentation:
@@ -575,7 +575,7 @@ extension Barkcloud_Users_UsersApi {
     /// > Source IDL Documentation:
     /// >
     /// > Client-facing API
-    internal protocol ServiceProtocol: Barkcloud_Users_UsersApi.StreamingServiceProtocol {
+    public protocol ServiceProtocol: Barkcloud_Users_UsersApi.StreamingServiceProtocol {
         /// Handle the "GetUser" method.
         ///
         /// > Source IDL Documentation:
@@ -874,7 +874,7 @@ extension Barkcloud_Users_UsersApi {
     /// > Source IDL Documentation:
     /// >
     /// > Client-facing API
-    internal protocol SimpleServiceProtocol: Barkcloud_Users_UsersApi.ServiceProtocol {
+    public protocol SimpleServiceProtocol: Barkcloud_Users_UsersApi.ServiceProtocol {
         /// Handle the "GetUser" method.
         ///
         /// > Source IDL Documentation:
@@ -1168,7 +1168,7 @@ extension Barkcloud_Users_UsersApi {
 // Default implementation of 'registerMethods(with:)'.
 @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
 extension Barkcloud_Users_UsersApi.StreamingServiceProtocol {
-    internal func registerMethods<Transport>(with router: inout GRPCCore.RPCRouter<Transport>) where Transport: GRPCCore.ServerTransport {
+    public func registerMethods<Transport>(with router: inout GRPCCore.RPCRouter<Transport>) where Transport: GRPCCore.ServerTransport {
         router.registerHandler(
             forMethod: Barkcloud_Users_UsersApi.Method.GetUser.descriptor,
             deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Users_GetUserRequest>(),
@@ -1351,7 +1351,7 @@ extension Barkcloud_Users_UsersApi.StreamingServiceProtocol {
 // Default implementation of streaming methods from 'StreamingServiceProtocol'.
 @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
 extension Barkcloud_Users_UsersApi.ServiceProtocol {
-    internal func getUser(
+    public func getUser(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Users_GetUserRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Users_GetUserResponse> {
@@ -1362,7 +1362,7 @@ extension Barkcloud_Users_UsersApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func setProfilePicture(
+    public func setProfilePicture(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Users_SetProfilePictureRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Users_SetProfilePictureResponse> {
@@ -1373,7 +1373,7 @@ extension Barkcloud_Users_UsersApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func checkExistUsername(
+    public func checkExistUsername(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Users_CheckExistUsernameRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Users_CheckExistResponse> {
@@ -1384,7 +1384,7 @@ extension Barkcloud_Users_UsersApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func checkExistEmail(
+    public func checkExistEmail(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Users_CheckExistEmailRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Users_CheckExistResponse> {
@@ -1395,7 +1395,7 @@ extension Barkcloud_Users_UsersApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func changeName(
+    public func changeName(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Users_ChangeNameRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Users_ChangeNameResponse> {
@@ -1406,7 +1406,7 @@ extension Barkcloud_Users_UsersApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func changeUsername(
+    public func changeUsername(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Users_ChangeUsernameRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Users_ChangeUsernameResponse> {
@@ -1417,7 +1417,7 @@ extension Barkcloud_Users_UsersApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func changeBio(
+    public func changeBio(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Users_ChangeBioRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Users_ChangeBioResponse> {
@@ -1428,7 +1428,7 @@ extension Barkcloud_Users_UsersApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func searchUsers(
+    public func searchUsers(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Users_SearchUsersRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Users_SearchUsersResponse> {
@@ -1439,7 +1439,7 @@ extension Barkcloud_Users_UsersApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func deleteAccount(
+    public func deleteAccount(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Users_DeleteAccountRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Users_DeleteAccountResponse> {
@@ -1450,7 +1450,7 @@ extension Barkcloud_Users_UsersApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func getPrivacySettings(
+    public func getPrivacySettings(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Users_GetPrivacySettingsRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Users_GetPrivacySettingsResponse> {
@@ -1461,7 +1461,7 @@ extension Barkcloud_Users_UsersApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func updatePrivacySettings(
+    public func updatePrivacySettings(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Users_UpdatePrivacySettingsRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Users_UpdatePrivacySettingsResponse> {
@@ -1472,7 +1472,7 @@ extension Barkcloud_Users_UsersApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func getDevices(
+    public func getDevices(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Users_GetDevicesRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Users_GetDevicesResponse> {
@@ -1483,7 +1483,7 @@ extension Barkcloud_Users_UsersApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func getCurrentDevice(
+    public func getCurrentDevice(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Users_GetCurrentDeviceRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Users_GetCurrentDeviceResponse> {
@@ -1494,7 +1494,7 @@ extension Barkcloud_Users_UsersApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func renameDevice(
+    public func renameDevice(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Users_RenameDeviceRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Users_RenameDeviceResponse> {
@@ -1505,7 +1505,7 @@ extension Barkcloud_Users_UsersApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func deleteDevice(
+    public func deleteDevice(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Users_DeleteDeviceRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Users_DeleteDeviceResponse> {
@@ -1516,7 +1516,7 @@ extension Barkcloud_Users_UsersApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func setFirebaseToken(
+    public func setFirebaseToken(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Users_SetFirebaseTokenRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Users_SetFirebaseTokenResponse> {
@@ -1531,7 +1531,7 @@ extension Barkcloud_Users_UsersApi.ServiceProtocol {
 // Default implementation of methods from 'ServiceProtocol'.
 @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
 extension Barkcloud_Users_UsersApi.SimpleServiceProtocol {
-    internal func getUser(
+    public func getUser(
         request: GRPCCore.ServerRequest<Barkcloud_Users_GetUserRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Users_GetUserResponse> {
@@ -1544,7 +1544,7 @@ extension Barkcloud_Users_UsersApi.SimpleServiceProtocol {
         )
     }
 
-    internal func setProfilePicture(
+    public func setProfilePicture(
         request: GRPCCore.ServerRequest<Barkcloud_Users_SetProfilePictureRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Users_SetProfilePictureResponse> {
@@ -1557,7 +1557,7 @@ extension Barkcloud_Users_UsersApi.SimpleServiceProtocol {
         )
     }
 
-    internal func checkExistUsername(
+    public func checkExistUsername(
         request: GRPCCore.ServerRequest<Barkcloud_Users_CheckExistUsernameRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Users_CheckExistResponse> {
@@ -1570,7 +1570,7 @@ extension Barkcloud_Users_UsersApi.SimpleServiceProtocol {
         )
     }
 
-    internal func checkExistEmail(
+    public func checkExistEmail(
         request: GRPCCore.ServerRequest<Barkcloud_Users_CheckExistEmailRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Users_CheckExistResponse> {
@@ -1583,7 +1583,7 @@ extension Barkcloud_Users_UsersApi.SimpleServiceProtocol {
         )
     }
 
-    internal func changeName(
+    public func changeName(
         request: GRPCCore.ServerRequest<Barkcloud_Users_ChangeNameRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Users_ChangeNameResponse> {
@@ -1596,7 +1596,7 @@ extension Barkcloud_Users_UsersApi.SimpleServiceProtocol {
         )
     }
 
-    internal func changeUsername(
+    public func changeUsername(
         request: GRPCCore.ServerRequest<Barkcloud_Users_ChangeUsernameRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Users_ChangeUsernameResponse> {
@@ -1609,7 +1609,7 @@ extension Barkcloud_Users_UsersApi.SimpleServiceProtocol {
         )
     }
 
-    internal func changeBio(
+    public func changeBio(
         request: GRPCCore.ServerRequest<Barkcloud_Users_ChangeBioRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Users_ChangeBioResponse> {
@@ -1622,7 +1622,7 @@ extension Barkcloud_Users_UsersApi.SimpleServiceProtocol {
         )
     }
 
-    internal func searchUsers(
+    public func searchUsers(
         request: GRPCCore.ServerRequest<Barkcloud_Users_SearchUsersRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Users_SearchUsersResponse> {
@@ -1635,7 +1635,7 @@ extension Barkcloud_Users_UsersApi.SimpleServiceProtocol {
         )
     }
 
-    internal func deleteAccount(
+    public func deleteAccount(
         request: GRPCCore.ServerRequest<Barkcloud_Users_DeleteAccountRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Users_DeleteAccountResponse> {
@@ -1648,7 +1648,7 @@ extension Barkcloud_Users_UsersApi.SimpleServiceProtocol {
         )
     }
 
-    internal func getPrivacySettings(
+    public func getPrivacySettings(
         request: GRPCCore.ServerRequest<Barkcloud_Users_GetPrivacySettingsRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Users_GetPrivacySettingsResponse> {
@@ -1661,7 +1661,7 @@ extension Barkcloud_Users_UsersApi.SimpleServiceProtocol {
         )
     }
 
-    internal func updatePrivacySettings(
+    public func updatePrivacySettings(
         request: GRPCCore.ServerRequest<Barkcloud_Users_UpdatePrivacySettingsRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Users_UpdatePrivacySettingsResponse> {
@@ -1674,7 +1674,7 @@ extension Barkcloud_Users_UsersApi.SimpleServiceProtocol {
         )
     }
 
-    internal func getDevices(
+    public func getDevices(
         request: GRPCCore.ServerRequest<Barkcloud_Users_GetDevicesRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Users_GetDevicesResponse> {
@@ -1687,7 +1687,7 @@ extension Barkcloud_Users_UsersApi.SimpleServiceProtocol {
         )
     }
 
-    internal func getCurrentDevice(
+    public func getCurrentDevice(
         request: GRPCCore.ServerRequest<Barkcloud_Users_GetCurrentDeviceRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Users_GetCurrentDeviceResponse> {
@@ -1700,7 +1700,7 @@ extension Barkcloud_Users_UsersApi.SimpleServiceProtocol {
         )
     }
 
-    internal func renameDevice(
+    public func renameDevice(
         request: GRPCCore.ServerRequest<Barkcloud_Users_RenameDeviceRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Users_RenameDeviceResponse> {
@@ -1713,7 +1713,7 @@ extension Barkcloud_Users_UsersApi.SimpleServiceProtocol {
         )
     }
 
-    internal func deleteDevice(
+    public func deleteDevice(
         request: GRPCCore.ServerRequest<Barkcloud_Users_DeleteDeviceRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Users_DeleteDeviceResponse> {
@@ -1726,7 +1726,7 @@ extension Barkcloud_Users_UsersApi.SimpleServiceProtocol {
         )
     }
 
-    internal func setFirebaseToken(
+    public func setFirebaseToken(
         request: GRPCCore.ServerRequest<Barkcloud_Users_SetFirebaseTokenRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Users_SetFirebaseTokenResponse> {
@@ -1752,7 +1752,7 @@ extension Barkcloud_Users_UsersApi {
     /// > Source IDL Documentation:
     /// >
     /// > Client-facing API
-    internal protocol ClientProtocol: Sendable {
+    public protocol ClientProtocol: Sendable {
         /// Call the "GetUser" method.
         ///
         /// > Source IDL Documentation:
@@ -2131,14 +2131,14 @@ extension Barkcloud_Users_UsersApi {
     /// > Source IDL Documentation:
     /// >
     /// > Client-facing API
-    internal struct Client<Transport>: ClientProtocol where Transport: GRPCCore.ClientTransport {
+    public struct Client<Transport>: ClientProtocol where Transport: GRPCCore.ClientTransport {
         private let client: GRPCCore.GRPCClient<Transport>
 
         /// Creates a new client wrapping the provided `GRPCCore.GRPCClient`.
         ///
         /// - Parameters:
         ///   - client: A `GRPCCore.GRPCClient` providing a communication channel to the service.
-        internal init(wrapping client: GRPCCore.GRPCClient<Transport>) {
+        public init(wrapping client: GRPCCore.GRPCClient<Transport>) {
             self.client = client
         }
 
@@ -2157,7 +2157,7 @@ extension Barkcloud_Users_UsersApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func getUser<Result>(
+        public func getUser<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Users_GetUserRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Users_GetUserRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Users_GetUserResponse>,
@@ -2191,7 +2191,7 @@ extension Barkcloud_Users_UsersApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func setProfilePicture<Result>(
+        public func setProfilePicture<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Users_SetProfilePictureRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Users_SetProfilePictureRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Users_SetProfilePictureResponse>,
@@ -2225,7 +2225,7 @@ extension Barkcloud_Users_UsersApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func checkExistUsername<Result>(
+        public func checkExistUsername<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Users_CheckExistUsernameRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Users_CheckExistUsernameRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Users_CheckExistResponse>,
@@ -2259,7 +2259,7 @@ extension Barkcloud_Users_UsersApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func checkExistEmail<Result>(
+        public func checkExistEmail<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Users_CheckExistEmailRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Users_CheckExistEmailRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Users_CheckExistResponse>,
@@ -2293,7 +2293,7 @@ extension Barkcloud_Users_UsersApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func changeName<Result>(
+        public func changeName<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Users_ChangeNameRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Users_ChangeNameRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Users_ChangeNameResponse>,
@@ -2327,7 +2327,7 @@ extension Barkcloud_Users_UsersApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func changeUsername<Result>(
+        public func changeUsername<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Users_ChangeUsernameRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Users_ChangeUsernameRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Users_ChangeUsernameResponse>,
@@ -2361,7 +2361,7 @@ extension Barkcloud_Users_UsersApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func changeBio<Result>(
+        public func changeBio<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Users_ChangeBioRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Users_ChangeBioRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Users_ChangeBioResponse>,
@@ -2395,7 +2395,7 @@ extension Barkcloud_Users_UsersApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func searchUsers<Result>(
+        public func searchUsers<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Users_SearchUsersRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Users_SearchUsersRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Users_SearchUsersResponse>,
@@ -2429,7 +2429,7 @@ extension Barkcloud_Users_UsersApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func deleteAccount<Result>(
+        public func deleteAccount<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Users_DeleteAccountRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Users_DeleteAccountRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Users_DeleteAccountResponse>,
@@ -2463,7 +2463,7 @@ extension Barkcloud_Users_UsersApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func getPrivacySettings<Result>(
+        public func getPrivacySettings<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Users_GetPrivacySettingsRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Users_GetPrivacySettingsRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Users_GetPrivacySettingsResponse>,
@@ -2497,7 +2497,7 @@ extension Barkcloud_Users_UsersApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func updatePrivacySettings<Result>(
+        public func updatePrivacySettings<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Users_UpdatePrivacySettingsRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Users_UpdatePrivacySettingsRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Users_UpdatePrivacySettingsResponse>,
@@ -2531,7 +2531,7 @@ extension Barkcloud_Users_UsersApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func getDevices<Result>(
+        public func getDevices<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Users_GetDevicesRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Users_GetDevicesRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Users_GetDevicesResponse>,
@@ -2565,7 +2565,7 @@ extension Barkcloud_Users_UsersApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func getCurrentDevice<Result>(
+        public func getCurrentDevice<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Users_GetCurrentDeviceRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Users_GetCurrentDeviceRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Users_GetCurrentDeviceResponse>,
@@ -2599,7 +2599,7 @@ extension Barkcloud_Users_UsersApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func renameDevice<Result>(
+        public func renameDevice<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Users_RenameDeviceRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Users_RenameDeviceRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Users_RenameDeviceResponse>,
@@ -2633,7 +2633,7 @@ extension Barkcloud_Users_UsersApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func deleteDevice<Result>(
+        public func deleteDevice<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Users_DeleteDeviceRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Users_DeleteDeviceRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Users_DeleteDeviceResponse>,
@@ -2667,7 +2667,7 @@ extension Barkcloud_Users_UsersApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func setFirebaseToken<Result>(
+        public func setFirebaseToken<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Users_SetFirebaseTokenRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Users_SetFirebaseTokenRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Users_SetFirebaseTokenResponse>,
@@ -2704,7 +2704,7 @@ extension Barkcloud_Users_UsersApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func getUser<Result>(
+    public func getUser<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Users_GetUserRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Users_GetUserResponse>) async throws -> Result = { response in
@@ -2733,7 +2733,7 @@ extension Barkcloud_Users_UsersApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func setProfilePicture<Result>(
+    public func setProfilePicture<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Users_SetProfilePictureRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Users_SetProfilePictureResponse>) async throws -> Result = { response in
@@ -2762,7 +2762,7 @@ extension Barkcloud_Users_UsersApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func checkExistUsername<Result>(
+    public func checkExistUsername<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Users_CheckExistUsernameRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Users_CheckExistResponse>) async throws -> Result = { response in
@@ -2791,7 +2791,7 @@ extension Barkcloud_Users_UsersApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func checkExistEmail<Result>(
+    public func checkExistEmail<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Users_CheckExistEmailRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Users_CheckExistResponse>) async throws -> Result = { response in
@@ -2820,7 +2820,7 @@ extension Barkcloud_Users_UsersApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func changeName<Result>(
+    public func changeName<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Users_ChangeNameRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Users_ChangeNameResponse>) async throws -> Result = { response in
@@ -2849,7 +2849,7 @@ extension Barkcloud_Users_UsersApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func changeUsername<Result>(
+    public func changeUsername<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Users_ChangeUsernameRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Users_ChangeUsernameResponse>) async throws -> Result = { response in
@@ -2878,7 +2878,7 @@ extension Barkcloud_Users_UsersApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func changeBio<Result>(
+    public func changeBio<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Users_ChangeBioRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Users_ChangeBioResponse>) async throws -> Result = { response in
@@ -2907,7 +2907,7 @@ extension Barkcloud_Users_UsersApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func searchUsers<Result>(
+    public func searchUsers<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Users_SearchUsersRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Users_SearchUsersResponse>) async throws -> Result = { response in
@@ -2936,7 +2936,7 @@ extension Barkcloud_Users_UsersApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func deleteAccount<Result>(
+    public func deleteAccount<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Users_DeleteAccountRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Users_DeleteAccountResponse>) async throws -> Result = { response in
@@ -2965,7 +2965,7 @@ extension Barkcloud_Users_UsersApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func getPrivacySettings<Result>(
+    public func getPrivacySettings<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Users_GetPrivacySettingsRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Users_GetPrivacySettingsResponse>) async throws -> Result = { response in
@@ -2994,7 +2994,7 @@ extension Barkcloud_Users_UsersApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func updatePrivacySettings<Result>(
+    public func updatePrivacySettings<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Users_UpdatePrivacySettingsRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Users_UpdatePrivacySettingsResponse>) async throws -> Result = { response in
@@ -3023,7 +3023,7 @@ extension Barkcloud_Users_UsersApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func getDevices<Result>(
+    public func getDevices<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Users_GetDevicesRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Users_GetDevicesResponse>) async throws -> Result = { response in
@@ -3052,7 +3052,7 @@ extension Barkcloud_Users_UsersApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func getCurrentDevice<Result>(
+    public func getCurrentDevice<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Users_GetCurrentDeviceRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Users_GetCurrentDeviceResponse>) async throws -> Result = { response in
@@ -3081,7 +3081,7 @@ extension Barkcloud_Users_UsersApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func renameDevice<Result>(
+    public func renameDevice<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Users_RenameDeviceRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Users_RenameDeviceResponse>) async throws -> Result = { response in
@@ -3110,7 +3110,7 @@ extension Barkcloud_Users_UsersApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func deleteDevice<Result>(
+    public func deleteDevice<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Users_DeleteDeviceRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Users_DeleteDeviceResponse>) async throws -> Result = { response in
@@ -3139,7 +3139,7 @@ extension Barkcloud_Users_UsersApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func setFirebaseToken<Result>(
+    public func setFirebaseToken<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Users_SetFirebaseTokenRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Users_SetFirebaseTokenResponse>) async throws -> Result = { response in
@@ -3173,7 +3173,7 @@ extension Barkcloud_Users_UsersApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func getUser<Result>(
+    public func getUser<Result>(
         _ message: Barkcloud_Users_GetUserRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -3206,7 +3206,7 @@ extension Barkcloud_Users_UsersApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func setProfilePicture<Result>(
+    public func setProfilePicture<Result>(
         _ message: Barkcloud_Users_SetProfilePictureRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -3239,7 +3239,7 @@ extension Barkcloud_Users_UsersApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func checkExistUsername<Result>(
+    public func checkExistUsername<Result>(
         _ message: Barkcloud_Users_CheckExistUsernameRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -3272,7 +3272,7 @@ extension Barkcloud_Users_UsersApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func checkExistEmail<Result>(
+    public func checkExistEmail<Result>(
         _ message: Barkcloud_Users_CheckExistEmailRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -3305,7 +3305,7 @@ extension Barkcloud_Users_UsersApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func changeName<Result>(
+    public func changeName<Result>(
         _ message: Barkcloud_Users_ChangeNameRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -3338,7 +3338,7 @@ extension Barkcloud_Users_UsersApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func changeUsername<Result>(
+    public func changeUsername<Result>(
         _ message: Barkcloud_Users_ChangeUsernameRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -3371,7 +3371,7 @@ extension Barkcloud_Users_UsersApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func changeBio<Result>(
+    public func changeBio<Result>(
         _ message: Barkcloud_Users_ChangeBioRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -3404,7 +3404,7 @@ extension Barkcloud_Users_UsersApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func searchUsers<Result>(
+    public func searchUsers<Result>(
         _ message: Barkcloud_Users_SearchUsersRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -3437,7 +3437,7 @@ extension Barkcloud_Users_UsersApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func deleteAccount<Result>(
+    public func deleteAccount<Result>(
         _ message: Barkcloud_Users_DeleteAccountRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -3470,7 +3470,7 @@ extension Barkcloud_Users_UsersApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func getPrivacySettings<Result>(
+    public func getPrivacySettings<Result>(
         _ message: Barkcloud_Users_GetPrivacySettingsRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -3503,7 +3503,7 @@ extension Barkcloud_Users_UsersApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func updatePrivacySettings<Result>(
+    public func updatePrivacySettings<Result>(
         _ message: Barkcloud_Users_UpdatePrivacySettingsRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -3536,7 +3536,7 @@ extension Barkcloud_Users_UsersApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func getDevices<Result>(
+    public func getDevices<Result>(
         _ message: Barkcloud_Users_GetDevicesRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -3569,7 +3569,7 @@ extension Barkcloud_Users_UsersApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func getCurrentDevice<Result>(
+    public func getCurrentDevice<Result>(
         _ message: Barkcloud_Users_GetCurrentDeviceRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -3602,7 +3602,7 @@ extension Barkcloud_Users_UsersApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func renameDevice<Result>(
+    public func renameDevice<Result>(
         _ message: Barkcloud_Users_RenameDeviceRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -3635,7 +3635,7 @@ extension Barkcloud_Users_UsersApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func deleteDevice<Result>(
+    public func deleteDevice<Result>(
         _ message: Barkcloud_Users_DeleteDeviceRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -3668,7 +3668,7 @@ extension Barkcloud_Users_UsersApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func setFirebaseToken<Result>(
+    public func setFirebaseToken<Result>(
         _ message: Barkcloud_Users_SetFirebaseTokenRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -3692,208 +3692,208 @@ extension Barkcloud_Users_UsersApi.ClientProtocol {
 
 /// Namespace containing generated types for the "barkcloud.users.UsersServerApi" service.
 @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
-internal enum Barkcloud_Users_UsersServerApi: Sendable {
+public enum Barkcloud_Users_UsersServerApi: Sendable {
     /// Service descriptor for the "barkcloud.users.UsersServerApi" service.
-    internal static let descriptor = GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.users.UsersServerApi")
+    public static let descriptor = GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.users.UsersServerApi")
     /// Namespace for method metadata.
-    internal enum Method: Sendable {
+    public enum Method: Sendable {
         /// Namespace for "FindByLogin" metadata.
-        internal enum FindByLogin: Sendable {
+        public enum FindByLogin: Sendable {
             /// Request type for "FindByLogin".
-            internal typealias Input = Barkcloud_Users_FindByLoginRequest
+            public typealias Input = Barkcloud_Users_FindByLoginRequest
             /// Response type for "FindByLogin".
-            internal typealias Output = Barkcloud_Users_FindByLoginResponse
+            public typealias Output = Barkcloud_Users_FindByLoginResponse
             /// Descriptor for "FindByLogin".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.users.UsersServerApi"),
                 method: "FindByLogin",
                 type: .unary
             )
         }
         /// Namespace for "CheckExistUsername" metadata.
-        internal enum CheckExistUsername: Sendable {
+        public enum CheckExistUsername: Sendable {
             /// Request type for "CheckExistUsername".
-            internal typealias Input = Barkcloud_Users_CheckExistUsernameRequest
+            public typealias Input = Barkcloud_Users_CheckExistUsernameRequest
             /// Response type for "CheckExistUsername".
-            internal typealias Output = Barkcloud_Users_CheckExistResponse
+            public typealias Output = Barkcloud_Users_CheckExistResponse
             /// Descriptor for "CheckExistUsername".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.users.UsersServerApi"),
                 method: "CheckExistUsername",
                 type: .unary
             )
         }
         /// Namespace for "CheckExistEmail" metadata.
-        internal enum CheckExistEmail: Sendable {
+        public enum CheckExistEmail: Sendable {
             /// Request type for "CheckExistEmail".
-            internal typealias Input = Barkcloud_Users_CheckExistEmailRequest
+            public typealias Input = Barkcloud_Users_CheckExistEmailRequest
             /// Response type for "CheckExistEmail".
-            internal typealias Output = Barkcloud_Users_CheckExistResponse
+            public typealias Output = Barkcloud_Users_CheckExistResponse
             /// Descriptor for "CheckExistEmail".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.users.UsersServerApi"),
                 method: "CheckExistEmail",
                 type: .unary
             )
         }
         /// Namespace for "AddDraftUser" metadata.
-        internal enum AddDraftUser: Sendable {
+        public enum AddDraftUser: Sendable {
             /// Request type for "AddDraftUser".
-            internal typealias Input = Barkcloud_Users_AddDraftUserRequest
+            public typealias Input = Barkcloud_Users_AddDraftUserRequest
             /// Response type for "AddDraftUser".
-            internal typealias Output = Barkcloud_Users_AddDraftUserResponse
+            public typealias Output = Barkcloud_Users_AddDraftUserResponse
             /// Descriptor for "AddDraftUser".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.users.UsersServerApi"),
                 method: "AddDraftUser",
                 type: .unary
             )
         }
         /// Namespace for "OverrideDraftUser" metadata.
-        internal enum OverrideDraftUser: Sendable {
+        public enum OverrideDraftUser: Sendable {
             /// Request type for "OverrideDraftUser".
-            internal typealias Input = Barkcloud_Users_AddDraftUserRequest
+            public typealias Input = Barkcloud_Users_AddDraftUserRequest
             /// Response type for "OverrideDraftUser".
-            internal typealias Output = Barkcloud_Users_AddDraftUserResponse
+            public typealias Output = Barkcloud_Users_AddDraftUserResponse
             /// Descriptor for "OverrideDraftUser".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.users.UsersServerApi"),
                 method: "OverrideDraftUser",
                 type: .unary
             )
         }
         /// Namespace for "ConfirmUser" metadata.
-        internal enum ConfirmUser: Sendable {
+        public enum ConfirmUser: Sendable {
             /// Request type for "ConfirmUser".
-            internal typealias Input = Barkcloud_Users_ConfirmUserRequest
+            public typealias Input = Barkcloud_Users_ConfirmUserRequest
             /// Response type for "ConfirmUser".
-            internal typealias Output = Barkcloud_Users_ConfirmUserResponse
+            public typealias Output = Barkcloud_Users_ConfirmUserResponse
             /// Descriptor for "ConfirmUser".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.users.UsersServerApi"),
                 method: "ConfirmUser",
                 type: .unary
             )
         }
         /// Namespace for "GetById" metadata.
-        internal enum GetById: Sendable {
+        public enum GetById: Sendable {
             /// Request type for "GetById".
-            internal typealias Input = Barkcloud_Users_GetByIdRequest
+            public typealias Input = Barkcloud_Users_GetByIdRequest
             /// Response type for "GetById".
-            internal typealias Output = Barkcloud_Users_GetByIdResponse
+            public typealias Output = Barkcloud_Users_GetByIdResponse
             /// Descriptor for "GetById".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.users.UsersServerApi"),
                 method: "GetById",
                 type: .unary
             )
         }
         /// Namespace for "GetUserContacts" metadata.
-        internal enum GetUserContacts: Sendable {
+        public enum GetUserContacts: Sendable {
             /// Request type for "GetUserContacts".
-            internal typealias Input = Barkcloud_Users_GetUserContactsRequest
+            public typealias Input = Barkcloud_Users_GetUserContactsRequest
             /// Response type for "GetUserContacts".
-            internal typealias Output = Barkcloud_Users_GetUserContactsResponse
+            public typealias Output = Barkcloud_Users_GetUserContactsResponse
             /// Descriptor for "GetUserContacts".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.users.UsersServerApi"),
                 method: "GetUserContacts",
                 type: .unary
             )
         }
         /// Namespace for "ListByIds" metadata.
-        internal enum ListByIds: Sendable {
+        public enum ListByIds: Sendable {
             /// Request type for "ListByIds".
-            internal typealias Input = Barkcloud_Users_ListByIdsRequest
+            public typealias Input = Barkcloud_Users_ListByIdsRequest
             /// Response type for "ListByIds".
-            internal typealias Output = Barkcloud_Users_ListByIdsResponse
+            public typealias Output = Barkcloud_Users_ListByIdsResponse
             /// Descriptor for "ListByIds".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.users.UsersServerApi"),
                 method: "ListByIds",
                 type: .unary
             )
         }
         /// Namespace for "RegisterDevice" metadata.
-        internal enum RegisterDevice: Sendable {
+        public enum RegisterDevice: Sendable {
             /// Request type for "RegisterDevice".
-            internal typealias Input = Barkcloud_Users_RegisterDeviceRequest
+            public typealias Input = Barkcloud_Users_RegisterDeviceRequest
             /// Response type for "RegisterDevice".
-            internal typealias Output = Barkcloud_Users_RegisterDeviceResponse
+            public typealias Output = Barkcloud_Users_RegisterDeviceResponse
             /// Descriptor for "RegisterDevice".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.users.UsersServerApi"),
                 method: "RegisterDevice",
                 type: .unary
             )
         }
         /// Namespace for "GetUserDevices" metadata.
-        internal enum GetUserDevices: Sendable {
+        public enum GetUserDevices: Sendable {
             /// Request type for "GetUserDevices".
-            internal typealias Input = Barkcloud_Users_GetUserDevicesRequest
+            public typealias Input = Barkcloud_Users_GetUserDevicesRequest
             /// Response type for "GetUserDevices".
-            internal typealias Output = Barkcloud_Users_GetUserDevicesResponse
+            public typealias Output = Barkcloud_Users_GetUserDevicesResponse
             /// Descriptor for "GetUserDevices".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.users.UsersServerApi"),
                 method: "GetUserDevices",
                 type: .unary
             )
         }
         /// Namespace for "DeleteUserDevice" metadata.
-        internal enum DeleteUserDevice: Sendable {
+        public enum DeleteUserDevice: Sendable {
             /// Request type for "DeleteUserDevice".
-            internal typealias Input = Barkcloud_Users_DeleteUserDeviceRequest
+            public typealias Input = Barkcloud_Users_DeleteUserDeviceRequest
             /// Response type for "DeleteUserDevice".
-            internal typealias Output = Barkcloud_Users_DeleteUserDeviceResponse
+            public typealias Output = Barkcloud_Users_DeleteUserDeviceResponse
             /// Descriptor for "DeleteUserDevice".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.users.UsersServerApi"),
                 method: "DeleteUserDevice",
                 type: .unary
             )
         }
         /// Namespace for "UpdateStorageLimit" metadata.
-        internal enum UpdateStorageLimit: Sendable {
+        public enum UpdateStorageLimit: Sendable {
             /// Request type for "UpdateStorageLimit".
-            internal typealias Input = Barkcloud_Users_UpdateStorageLimitRequest
+            public typealias Input = Barkcloud_Users_UpdateStorageLimitRequest
             /// Response type for "UpdateStorageLimit".
-            internal typealias Output = Barkcloud_Users_UpdateStorageLimitResponse
+            public typealias Output = Barkcloud_Users_UpdateStorageLimitResponse
             /// Descriptor for "UpdateStorageLimit".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.users.UsersServerApi"),
                 method: "UpdateStorageLimit",
                 type: .unary
             )
         }
         /// Namespace for "SetProfilePictureServer" metadata.
-        internal enum SetProfilePictureServer: Sendable {
+        public enum SetProfilePictureServer: Sendable {
             /// Request type for "SetProfilePictureServer".
-            internal typealias Input = Barkcloud_Users_SetProfilePictureServerRequest
+            public typealias Input = Barkcloud_Users_SetProfilePictureServerRequest
             /// Response type for "SetProfilePictureServer".
-            internal typealias Output = Barkcloud_Users_SetProfilePictureServerResponse
+            public typealias Output = Barkcloud_Users_SetProfilePictureServerResponse
             /// Descriptor for "SetProfilePictureServer".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.users.UsersServerApi"),
                 method: "SetProfilePictureServer",
                 type: .unary
             )
         }
         /// Namespace for "UpdateProfileServer" metadata.
-        internal enum UpdateProfileServer: Sendable {
+        public enum UpdateProfileServer: Sendable {
             /// Request type for "UpdateProfileServer".
-            internal typealias Input = Barkcloud_Users_UpdateProfileServerRequest
+            public typealias Input = Barkcloud_Users_UpdateProfileServerRequest
             /// Response type for "UpdateProfileServer".
-            internal typealias Output = Barkcloud_Users_UpdateProfileServerResponse
+            public typealias Output = Barkcloud_Users_UpdateProfileServerResponse
             /// Descriptor for "UpdateProfileServer".
-            internal static let descriptor = GRPCCore.MethodDescriptor(
+            public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.users.UsersServerApi"),
                 method: "UpdateProfileServer",
                 type: .unary
             )
         }
         /// Descriptors for all methods in the "barkcloud.users.UsersServerApi" service.
-        internal static let descriptors: [GRPCCore.MethodDescriptor] = [
+        public static let descriptors: [GRPCCore.MethodDescriptor] = [
             FindByLogin.descriptor,
             CheckExistUsername.descriptor,
             CheckExistEmail.descriptor,
@@ -3916,7 +3916,7 @@ internal enum Barkcloud_Users_UsersServerApi: Sendable {
 @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
 extension GRPCCore.ServiceDescriptor {
     /// Service descriptor for the "barkcloud.users.UsersServerApi" service.
-    internal static let barkcloud_users_UsersServerApi = GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.users.UsersServerApi")
+    public static let barkcloud_users_UsersServerApi = GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.users.UsersServerApi")
 }
 
 // MARK: barkcloud.users.UsersServerApi (server)
@@ -3937,7 +3937,7 @@ extension Barkcloud_Users_UsersServerApi {
     /// > Source IDL Documentation:
     /// >
     /// > Inter-service API
-    internal protocol StreamingServiceProtocol: GRPCCore.RegistrableRPCService {
+    public protocol StreamingServiceProtocol: GRPCCore.RegistrableRPCService {
         /// Handle the "FindByLogin" method.
         ///
         /// > Source IDL Documentation:
@@ -4220,7 +4220,7 @@ extension Barkcloud_Users_UsersServerApi {
     /// > Source IDL Documentation:
     /// >
     /// > Inter-service API
-    internal protocol ServiceProtocol: Barkcloud_Users_UsersServerApi.StreamingServiceProtocol {
+    public protocol ServiceProtocol: Barkcloud_Users_UsersServerApi.StreamingServiceProtocol {
         /// Handle the "FindByLogin" method.
         ///
         /// > Source IDL Documentation:
@@ -4501,7 +4501,7 @@ extension Barkcloud_Users_UsersServerApi {
     /// > Source IDL Documentation:
     /// >
     /// > Inter-service API
-    internal protocol SimpleServiceProtocol: Barkcloud_Users_UsersServerApi.ServiceProtocol {
+    public protocol SimpleServiceProtocol: Barkcloud_Users_UsersServerApi.ServiceProtocol {
         /// Handle the "FindByLogin" method.
         ///
         /// > Source IDL Documentation:
@@ -4777,7 +4777,7 @@ extension Barkcloud_Users_UsersServerApi {
 // Default implementation of 'registerMethods(with:)'.
 @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
 extension Barkcloud_Users_UsersServerApi.StreamingServiceProtocol {
-    internal func registerMethods<Transport>(with router: inout GRPCCore.RPCRouter<Transport>) where Transport: GRPCCore.ServerTransport {
+    public func registerMethods<Transport>(with router: inout GRPCCore.RPCRouter<Transport>) where Transport: GRPCCore.ServerTransport {
         router.registerHandler(
             forMethod: Barkcloud_Users_UsersServerApi.Method.FindByLogin.descriptor,
             deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Users_FindByLoginRequest>(),
@@ -4949,7 +4949,7 @@ extension Barkcloud_Users_UsersServerApi.StreamingServiceProtocol {
 // Default implementation of streaming methods from 'StreamingServiceProtocol'.
 @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
 extension Barkcloud_Users_UsersServerApi.ServiceProtocol {
-    internal func findByLogin(
+    public func findByLogin(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Users_FindByLoginRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Users_FindByLoginResponse> {
@@ -4960,7 +4960,7 @@ extension Barkcloud_Users_UsersServerApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func checkExistUsername(
+    public func checkExistUsername(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Users_CheckExistUsernameRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Users_CheckExistResponse> {
@@ -4971,7 +4971,7 @@ extension Barkcloud_Users_UsersServerApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func checkExistEmail(
+    public func checkExistEmail(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Users_CheckExistEmailRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Users_CheckExistResponse> {
@@ -4982,7 +4982,7 @@ extension Barkcloud_Users_UsersServerApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func addDraftUser(
+    public func addDraftUser(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Users_AddDraftUserRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Users_AddDraftUserResponse> {
@@ -4993,7 +4993,7 @@ extension Barkcloud_Users_UsersServerApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func overrideDraftUser(
+    public func overrideDraftUser(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Users_AddDraftUserRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Users_AddDraftUserResponse> {
@@ -5004,7 +5004,7 @@ extension Barkcloud_Users_UsersServerApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func confirmUser(
+    public func confirmUser(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Users_ConfirmUserRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Users_ConfirmUserResponse> {
@@ -5015,7 +5015,7 @@ extension Barkcloud_Users_UsersServerApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func getById(
+    public func getById(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Users_GetByIdRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Users_GetByIdResponse> {
@@ -5026,7 +5026,7 @@ extension Barkcloud_Users_UsersServerApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func getUserContacts(
+    public func getUserContacts(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Users_GetUserContactsRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Users_GetUserContactsResponse> {
@@ -5037,7 +5037,7 @@ extension Barkcloud_Users_UsersServerApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func listByIds(
+    public func listByIds(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Users_ListByIdsRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Users_ListByIdsResponse> {
@@ -5048,7 +5048,7 @@ extension Barkcloud_Users_UsersServerApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func registerDevice(
+    public func registerDevice(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Users_RegisterDeviceRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Users_RegisterDeviceResponse> {
@@ -5059,7 +5059,7 @@ extension Barkcloud_Users_UsersServerApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func getUserDevices(
+    public func getUserDevices(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Users_GetUserDevicesRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Users_GetUserDevicesResponse> {
@@ -5070,7 +5070,7 @@ extension Barkcloud_Users_UsersServerApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func deleteUserDevice(
+    public func deleteUserDevice(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Users_DeleteUserDeviceRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Users_DeleteUserDeviceResponse> {
@@ -5081,7 +5081,7 @@ extension Barkcloud_Users_UsersServerApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func updateStorageLimit(
+    public func updateStorageLimit(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Users_UpdateStorageLimitRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Users_UpdateStorageLimitResponse> {
@@ -5092,7 +5092,7 @@ extension Barkcloud_Users_UsersServerApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func setProfilePictureServer(
+    public func setProfilePictureServer(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Users_SetProfilePictureServerRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Users_SetProfilePictureServerResponse> {
@@ -5103,7 +5103,7 @@ extension Barkcloud_Users_UsersServerApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
-    internal func updateProfileServer(
+    public func updateProfileServer(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Users_UpdateProfileServerRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Users_UpdateProfileServerResponse> {
@@ -5118,7 +5118,7 @@ extension Barkcloud_Users_UsersServerApi.ServiceProtocol {
 // Default implementation of methods from 'ServiceProtocol'.
 @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
 extension Barkcloud_Users_UsersServerApi.SimpleServiceProtocol {
-    internal func findByLogin(
+    public func findByLogin(
         request: GRPCCore.ServerRequest<Barkcloud_Users_FindByLoginRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Users_FindByLoginResponse> {
@@ -5131,7 +5131,7 @@ extension Barkcloud_Users_UsersServerApi.SimpleServiceProtocol {
         )
     }
 
-    internal func checkExistUsername(
+    public func checkExistUsername(
         request: GRPCCore.ServerRequest<Barkcloud_Users_CheckExistUsernameRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Users_CheckExistResponse> {
@@ -5144,7 +5144,7 @@ extension Barkcloud_Users_UsersServerApi.SimpleServiceProtocol {
         )
     }
 
-    internal func checkExistEmail(
+    public func checkExistEmail(
         request: GRPCCore.ServerRequest<Barkcloud_Users_CheckExistEmailRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Users_CheckExistResponse> {
@@ -5157,7 +5157,7 @@ extension Barkcloud_Users_UsersServerApi.SimpleServiceProtocol {
         )
     }
 
-    internal func addDraftUser(
+    public func addDraftUser(
         request: GRPCCore.ServerRequest<Barkcloud_Users_AddDraftUserRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Users_AddDraftUserResponse> {
@@ -5170,7 +5170,7 @@ extension Barkcloud_Users_UsersServerApi.SimpleServiceProtocol {
         )
     }
 
-    internal func overrideDraftUser(
+    public func overrideDraftUser(
         request: GRPCCore.ServerRequest<Barkcloud_Users_AddDraftUserRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Users_AddDraftUserResponse> {
@@ -5183,7 +5183,7 @@ extension Barkcloud_Users_UsersServerApi.SimpleServiceProtocol {
         )
     }
 
-    internal func confirmUser(
+    public func confirmUser(
         request: GRPCCore.ServerRequest<Barkcloud_Users_ConfirmUserRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Users_ConfirmUserResponse> {
@@ -5196,7 +5196,7 @@ extension Barkcloud_Users_UsersServerApi.SimpleServiceProtocol {
         )
     }
 
-    internal func getById(
+    public func getById(
         request: GRPCCore.ServerRequest<Barkcloud_Users_GetByIdRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Users_GetByIdResponse> {
@@ -5209,7 +5209,7 @@ extension Barkcloud_Users_UsersServerApi.SimpleServiceProtocol {
         )
     }
 
-    internal func getUserContacts(
+    public func getUserContacts(
         request: GRPCCore.ServerRequest<Barkcloud_Users_GetUserContactsRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Users_GetUserContactsResponse> {
@@ -5222,7 +5222,7 @@ extension Barkcloud_Users_UsersServerApi.SimpleServiceProtocol {
         )
     }
 
-    internal func listByIds(
+    public func listByIds(
         request: GRPCCore.ServerRequest<Barkcloud_Users_ListByIdsRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Users_ListByIdsResponse> {
@@ -5235,7 +5235,7 @@ extension Barkcloud_Users_UsersServerApi.SimpleServiceProtocol {
         )
     }
 
-    internal func registerDevice(
+    public func registerDevice(
         request: GRPCCore.ServerRequest<Barkcloud_Users_RegisterDeviceRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Users_RegisterDeviceResponse> {
@@ -5248,7 +5248,7 @@ extension Barkcloud_Users_UsersServerApi.SimpleServiceProtocol {
         )
     }
 
-    internal func getUserDevices(
+    public func getUserDevices(
         request: GRPCCore.ServerRequest<Barkcloud_Users_GetUserDevicesRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Users_GetUserDevicesResponse> {
@@ -5261,7 +5261,7 @@ extension Barkcloud_Users_UsersServerApi.SimpleServiceProtocol {
         )
     }
 
-    internal func deleteUserDevice(
+    public func deleteUserDevice(
         request: GRPCCore.ServerRequest<Barkcloud_Users_DeleteUserDeviceRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Users_DeleteUserDeviceResponse> {
@@ -5274,7 +5274,7 @@ extension Barkcloud_Users_UsersServerApi.SimpleServiceProtocol {
         )
     }
 
-    internal func updateStorageLimit(
+    public func updateStorageLimit(
         request: GRPCCore.ServerRequest<Barkcloud_Users_UpdateStorageLimitRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Users_UpdateStorageLimitResponse> {
@@ -5287,7 +5287,7 @@ extension Barkcloud_Users_UsersServerApi.SimpleServiceProtocol {
         )
     }
 
-    internal func setProfilePictureServer(
+    public func setProfilePictureServer(
         request: GRPCCore.ServerRequest<Barkcloud_Users_SetProfilePictureServerRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Users_SetProfilePictureServerResponse> {
@@ -5300,7 +5300,7 @@ extension Barkcloud_Users_UsersServerApi.SimpleServiceProtocol {
         )
     }
 
-    internal func updateProfileServer(
+    public func updateProfileServer(
         request: GRPCCore.ServerRequest<Barkcloud_Users_UpdateProfileServerRequest>,
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Users_UpdateProfileServerResponse> {
@@ -5326,7 +5326,7 @@ extension Barkcloud_Users_UsersServerApi {
     /// > Source IDL Documentation:
     /// >
     /// > Inter-service API
-    internal protocol ClientProtocol: Sendable {
+    public protocol ClientProtocol: Sendable {
         /// Call the "FindByLogin" method.
         ///
         /// > Source IDL Documentation:
@@ -5682,14 +5682,14 @@ extension Barkcloud_Users_UsersServerApi {
     /// > Source IDL Documentation:
     /// >
     /// > Inter-service API
-    internal struct Client<Transport>: ClientProtocol where Transport: GRPCCore.ClientTransport {
+    public struct Client<Transport>: ClientProtocol where Transport: GRPCCore.ClientTransport {
         private let client: GRPCCore.GRPCClient<Transport>
 
         /// Creates a new client wrapping the provided `GRPCCore.GRPCClient`.
         ///
         /// - Parameters:
         ///   - client: A `GRPCCore.GRPCClient` providing a communication channel to the service.
-        internal init(wrapping client: GRPCCore.GRPCClient<Transport>) {
+        public init(wrapping client: GRPCCore.GRPCClient<Transport>) {
             self.client = client
         }
 
@@ -5708,7 +5708,7 @@ extension Barkcloud_Users_UsersServerApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func findByLogin<Result>(
+        public func findByLogin<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Users_FindByLoginRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Users_FindByLoginRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Users_FindByLoginResponse>,
@@ -5742,7 +5742,7 @@ extension Barkcloud_Users_UsersServerApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func checkExistUsername<Result>(
+        public func checkExistUsername<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Users_CheckExistUsernameRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Users_CheckExistUsernameRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Users_CheckExistResponse>,
@@ -5776,7 +5776,7 @@ extension Barkcloud_Users_UsersServerApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func checkExistEmail<Result>(
+        public func checkExistEmail<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Users_CheckExistEmailRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Users_CheckExistEmailRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Users_CheckExistResponse>,
@@ -5810,7 +5810,7 @@ extension Barkcloud_Users_UsersServerApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func addDraftUser<Result>(
+        public func addDraftUser<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Users_AddDraftUserRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Users_AddDraftUserRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Users_AddDraftUserResponse>,
@@ -5844,7 +5844,7 @@ extension Barkcloud_Users_UsersServerApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func overrideDraftUser<Result>(
+        public func overrideDraftUser<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Users_AddDraftUserRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Users_AddDraftUserRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Users_AddDraftUserResponse>,
@@ -5878,7 +5878,7 @@ extension Barkcloud_Users_UsersServerApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func confirmUser<Result>(
+        public func confirmUser<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Users_ConfirmUserRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Users_ConfirmUserRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Users_ConfirmUserResponse>,
@@ -5912,7 +5912,7 @@ extension Barkcloud_Users_UsersServerApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func getById<Result>(
+        public func getById<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Users_GetByIdRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Users_GetByIdRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Users_GetByIdResponse>,
@@ -5946,7 +5946,7 @@ extension Barkcloud_Users_UsersServerApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func getUserContacts<Result>(
+        public func getUserContacts<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Users_GetUserContactsRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Users_GetUserContactsRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Users_GetUserContactsResponse>,
@@ -5980,7 +5980,7 @@ extension Barkcloud_Users_UsersServerApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func listByIds<Result>(
+        public func listByIds<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Users_ListByIdsRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Users_ListByIdsRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Users_ListByIdsResponse>,
@@ -6014,7 +6014,7 @@ extension Barkcloud_Users_UsersServerApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func registerDevice<Result>(
+        public func registerDevice<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Users_RegisterDeviceRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Users_RegisterDeviceRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Users_RegisterDeviceResponse>,
@@ -6048,7 +6048,7 @@ extension Barkcloud_Users_UsersServerApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func getUserDevices<Result>(
+        public func getUserDevices<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Users_GetUserDevicesRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Users_GetUserDevicesRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Users_GetUserDevicesResponse>,
@@ -6082,7 +6082,7 @@ extension Barkcloud_Users_UsersServerApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func deleteUserDevice<Result>(
+        public func deleteUserDevice<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Users_DeleteUserDeviceRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Users_DeleteUserDeviceRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Users_DeleteUserDeviceResponse>,
@@ -6116,7 +6116,7 @@ extension Barkcloud_Users_UsersServerApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func updateStorageLimit<Result>(
+        public func updateStorageLimit<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Users_UpdateStorageLimitRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Users_UpdateStorageLimitRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Users_UpdateStorageLimitResponse>,
@@ -6150,7 +6150,7 @@ extension Barkcloud_Users_UsersServerApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func setProfilePictureServer<Result>(
+        public func setProfilePictureServer<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Users_SetProfilePictureServerRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Users_SetProfilePictureServerRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Users_SetProfilePictureServerResponse>,
@@ -6184,7 +6184,7 @@ extension Barkcloud_Users_UsersServerApi {
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        internal func updateProfileServer<Result>(
+        public func updateProfileServer<Result>(
             request: GRPCCore.ClientRequest<Barkcloud_Users_UpdateProfileServerRequest>,
             serializer: some GRPCCore.MessageSerializer<Barkcloud_Users_UpdateProfileServerRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Users_UpdateProfileServerResponse>,
@@ -6221,7 +6221,7 @@ extension Barkcloud_Users_UsersServerApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func findByLogin<Result>(
+    public func findByLogin<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Users_FindByLoginRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Users_FindByLoginResponse>) async throws -> Result = { response in
@@ -6250,7 +6250,7 @@ extension Barkcloud_Users_UsersServerApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func checkExistUsername<Result>(
+    public func checkExistUsername<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Users_CheckExistUsernameRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Users_CheckExistResponse>) async throws -> Result = { response in
@@ -6279,7 +6279,7 @@ extension Barkcloud_Users_UsersServerApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func checkExistEmail<Result>(
+    public func checkExistEmail<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Users_CheckExistEmailRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Users_CheckExistResponse>) async throws -> Result = { response in
@@ -6308,7 +6308,7 @@ extension Barkcloud_Users_UsersServerApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func addDraftUser<Result>(
+    public func addDraftUser<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Users_AddDraftUserRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Users_AddDraftUserResponse>) async throws -> Result = { response in
@@ -6337,7 +6337,7 @@ extension Barkcloud_Users_UsersServerApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func overrideDraftUser<Result>(
+    public func overrideDraftUser<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Users_AddDraftUserRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Users_AddDraftUserResponse>) async throws -> Result = { response in
@@ -6366,7 +6366,7 @@ extension Barkcloud_Users_UsersServerApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func confirmUser<Result>(
+    public func confirmUser<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Users_ConfirmUserRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Users_ConfirmUserResponse>) async throws -> Result = { response in
@@ -6395,7 +6395,7 @@ extension Barkcloud_Users_UsersServerApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func getById<Result>(
+    public func getById<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Users_GetByIdRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Users_GetByIdResponse>) async throws -> Result = { response in
@@ -6424,7 +6424,7 @@ extension Barkcloud_Users_UsersServerApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func getUserContacts<Result>(
+    public func getUserContacts<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Users_GetUserContactsRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Users_GetUserContactsResponse>) async throws -> Result = { response in
@@ -6453,7 +6453,7 @@ extension Barkcloud_Users_UsersServerApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func listByIds<Result>(
+    public func listByIds<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Users_ListByIdsRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Users_ListByIdsResponse>) async throws -> Result = { response in
@@ -6482,7 +6482,7 @@ extension Barkcloud_Users_UsersServerApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func registerDevice<Result>(
+    public func registerDevice<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Users_RegisterDeviceRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Users_RegisterDeviceResponse>) async throws -> Result = { response in
@@ -6511,7 +6511,7 @@ extension Barkcloud_Users_UsersServerApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func getUserDevices<Result>(
+    public func getUserDevices<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Users_GetUserDevicesRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Users_GetUserDevicesResponse>) async throws -> Result = { response in
@@ -6540,7 +6540,7 @@ extension Barkcloud_Users_UsersServerApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func deleteUserDevice<Result>(
+    public func deleteUserDevice<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Users_DeleteUserDeviceRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Users_DeleteUserDeviceResponse>) async throws -> Result = { response in
@@ -6569,7 +6569,7 @@ extension Barkcloud_Users_UsersServerApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func updateStorageLimit<Result>(
+    public func updateStorageLimit<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Users_UpdateStorageLimitRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Users_UpdateStorageLimitResponse>) async throws -> Result = { response in
@@ -6598,7 +6598,7 @@ extension Barkcloud_Users_UsersServerApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func setProfilePictureServer<Result>(
+    public func setProfilePictureServer<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Users_SetProfilePictureServerRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Users_SetProfilePictureServerResponse>) async throws -> Result = { response in
@@ -6627,7 +6627,7 @@ extension Barkcloud_Users_UsersServerApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func updateProfileServer<Result>(
+    public func updateProfileServer<Result>(
         request: GRPCCore.ClientRequest<Barkcloud_Users_UpdateProfileServerRequest>,
         options: GRPCCore.CallOptions = .defaults,
         onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Users_UpdateProfileServerResponse>) async throws -> Result = { response in
@@ -6661,7 +6661,7 @@ extension Barkcloud_Users_UsersServerApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func findByLogin<Result>(
+    public func findByLogin<Result>(
         _ message: Barkcloud_Users_FindByLoginRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -6694,7 +6694,7 @@ extension Barkcloud_Users_UsersServerApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func checkExistUsername<Result>(
+    public func checkExistUsername<Result>(
         _ message: Barkcloud_Users_CheckExistUsernameRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -6727,7 +6727,7 @@ extension Barkcloud_Users_UsersServerApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func checkExistEmail<Result>(
+    public func checkExistEmail<Result>(
         _ message: Barkcloud_Users_CheckExistEmailRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -6760,7 +6760,7 @@ extension Barkcloud_Users_UsersServerApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func addDraftUser<Result>(
+    public func addDraftUser<Result>(
         _ message: Barkcloud_Users_AddDraftUserRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -6793,7 +6793,7 @@ extension Barkcloud_Users_UsersServerApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func overrideDraftUser<Result>(
+    public func overrideDraftUser<Result>(
         _ message: Barkcloud_Users_AddDraftUserRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -6826,7 +6826,7 @@ extension Barkcloud_Users_UsersServerApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func confirmUser<Result>(
+    public func confirmUser<Result>(
         _ message: Barkcloud_Users_ConfirmUserRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -6859,7 +6859,7 @@ extension Barkcloud_Users_UsersServerApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func getById<Result>(
+    public func getById<Result>(
         _ message: Barkcloud_Users_GetByIdRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -6892,7 +6892,7 @@ extension Barkcloud_Users_UsersServerApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func getUserContacts<Result>(
+    public func getUserContacts<Result>(
         _ message: Barkcloud_Users_GetUserContactsRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -6925,7 +6925,7 @@ extension Barkcloud_Users_UsersServerApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func listByIds<Result>(
+    public func listByIds<Result>(
         _ message: Barkcloud_Users_ListByIdsRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -6958,7 +6958,7 @@ extension Barkcloud_Users_UsersServerApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func registerDevice<Result>(
+    public func registerDevice<Result>(
         _ message: Barkcloud_Users_RegisterDeviceRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -6991,7 +6991,7 @@ extension Barkcloud_Users_UsersServerApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func getUserDevices<Result>(
+    public func getUserDevices<Result>(
         _ message: Barkcloud_Users_GetUserDevicesRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -7024,7 +7024,7 @@ extension Barkcloud_Users_UsersServerApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func deleteUserDevice<Result>(
+    public func deleteUserDevice<Result>(
         _ message: Barkcloud_Users_DeleteUserDeviceRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -7057,7 +7057,7 @@ extension Barkcloud_Users_UsersServerApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func updateStorageLimit<Result>(
+    public func updateStorageLimit<Result>(
         _ message: Barkcloud_Users_UpdateStorageLimitRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -7090,7 +7090,7 @@ extension Barkcloud_Users_UsersServerApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func setProfilePictureServer<Result>(
+    public func setProfilePictureServer<Result>(
         _ message: Barkcloud_Users_SetProfilePictureServerRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
@@ -7123,7 +7123,7 @@ extension Barkcloud_Users_UsersServerApi.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    internal func updateProfileServer<Result>(
+    public func updateProfileServer<Result>(
         _ message: Barkcloud_Users_UpdateProfileServerRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,

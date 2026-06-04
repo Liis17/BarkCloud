@@ -36,8 +36,13 @@
 
 ## Статус
 
-- **Этап 0 (общий пакет):** заготовка — `BarkCloudKit/` создан (новый код + манифест).
-  Перенос файлов из iOS, правка `.xcodeproj` и сборка — на Mac. См. `BarkCloudKit/README.md`.
+- **Этап 0 (общий пакет): ВЫПОЛНЕН.** Платформо-независимый сетевой слой (gRPC-клиенты,
+  токены, репозитории, proto) перенесён из iOS в `BarkCloudKit` — единый источник правды.
+  `swift build` пакета зелёный; iOS переведён на `import BarkCloudKit` (main app +
+  ShareExtension линкуют продукт), `xcodebuild` всех схем и `build-for-testing` — зелёные.
+  Осталось (нижний приоритет): `Tests/BarkCloudKitTests/RangeBlockReaderTests.swift` —
+  отложен, требует либо живого бэкенда, либо seam-инъекции `URLSession` в `RangeBlockReader`
+  (удобнее сделать на Этапе 1, когда появится реальный read-path FSKit).
 - **Этапы 1–3 (FSKit-расширение, app, упаковка):** требуют Xcode/macOS, ещё не начаты.
 
 > Всё в этом каталоге собирается и проверяется только на **Mac (Xcode 16+, macOS 15.4+)**.

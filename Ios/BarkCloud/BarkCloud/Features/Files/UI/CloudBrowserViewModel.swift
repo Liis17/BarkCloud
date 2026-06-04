@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import BarkCloudKit
 
 struct CloudBrowserUiState {
     var directoryID: String       // "" = корень

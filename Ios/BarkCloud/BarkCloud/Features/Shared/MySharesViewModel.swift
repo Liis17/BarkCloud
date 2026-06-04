@@ -1,11 +1,12 @@
 import Foundation
 import Observation
+import BarkCloudKit
 
 /// Состояние таба «Мои публичные» экрана `SharedHubScreen`. Пагинируется
 /// курсором: первая страница в `loadIfNeeded()`, далее `loadMoreIfNeeded`
 /// дёргается из `.onAppear` на последней карточке списка.
 struct MySharesUiState {
-    var items: [ShareLink] = []
+    var items: [BarkCloudKit.ShareLink] = []
     /// До первой удачной загрузки рисуем плейсхолдер (скелетоны).
     var isPlaceholder: Bool = true
     var isLoadingMore: Bool = false
@@ -56,7 +57,7 @@ final class MySharesViewModel {
         state.isPlaceholder = false
     }
 
-    func loadMoreIfNeeded(current item: ShareLink) async {
+    func loadMoreIfNeeded(current item: BarkCloudKit.ShareLink) async {
         guard state.canLoadMore, !state.isLoadingMore, !state.isPlaceholder,
               item.id == state.items.last?.id else { return }
         state.isLoadingMore = true
@@ -78,7 +79,7 @@ final class MySharesViewModel {
 
     /// Оптимистично удалить из списка и отозвать на бэкенде. При ошибке
     /// возвращаем элемент на то же место (по индексу).
-    func revoke(_ link: ShareLink) async {
+    func revoke(_ link: BarkCloudKit.ShareLink) async {
         guard let idx = state.items.firstIndex(where: { $0.id == link.id }) else { return }
         state.items.remove(at: idx)
         do {

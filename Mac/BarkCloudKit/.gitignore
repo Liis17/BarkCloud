@@ -1,0 +1,5 @@
+.build/
+.swiftpm/
+Package.resolved
+# Регенерируемые копии .proto (источник — Shared/BarkCloud.Proto, скрипт sync_proto.sh)
+Proto/

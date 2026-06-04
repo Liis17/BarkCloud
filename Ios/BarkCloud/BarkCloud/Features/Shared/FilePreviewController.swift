@@ -1,5 +1,6 @@
 import SwiftUI
 import QuickLook
+import BarkCloudKit
 
 /// Обёртка `QLPreviewController` для предпросмотра локального файла —
 /// единообразно для фото / видео / PDF / документов.
