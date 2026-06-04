@@ -29,6 +29,7 @@
 |---|---|---|
 | `BarkCloud.Drive.Engine` (Dokany ФС) | `BarkCloudFS.appex` (File Provider, `com.apple.fileprovider-nonui`) | Реализует папку облака |
 | `BarkCloud.Drive.App` (WPF + трей) | `BarkCloud Drive.app` (SwiftUI + menu-bar `MenuBarExtra`) | Настройка, логин, домен, дашборд |
+| — | `BarkCloudWidgets.appex` (WidgetKit, `com.apple.widgetkit-extension`) | Виджет квоты в Notification Center / на Desktop |
 | Contracts + named-pipe IPC | App Group + shared Keychain access-group | Передача конфига/токенов app↔extension |
 | DPAPI `refresh.bin` | Keychain (`SessionStore`) | Хранение refresh-токена |
 | Dokany driver | NSFileProvider (встроен) + `NSFileProviderManager.add(domain:)` | Драйвер папки |
@@ -107,6 +108,18 @@ SwiftUI app + menu-bar (`MenuBarExtra`), переиспользует `BarkCloud
   `RemoteAvatar` через `InsecureHTTP`.
 
 **Этап 3 (упаковка) — скрипт готов:** `Mac/BarkCloudDrive/scripts/build_release.sh`.
+
+**Этап 4 (виджет хранилища `BarkCloudWidgets`) — КОМПИЛИРУЕТСЯ + ВСТРОЕН**
+(`Mac/BarkCloudDrive/BarkCloudWidgets/`, добавлен 2026-06-04). Виджет читает
+квоту из App Group `UserDefaults` (ключи `storage_widget.used/limit/updatedAt`);
+контейнер-app пишет через `StorageWidgetBridge` после `loadProfile()`. Размеры
+`.systemSmall` и `.systemMedium`, та же визуальная палитра, что в iOS-виджете
+([[ios-app]] / `Ios/BarkCloud/BarkCloudWidgets/StorageWidget.swift`): акцент-
+оранжевый, переход в красный при ≥ 90 %, капсульный прогресс-бар. Bundle ID
+`com.barkfluff.BarkCloud.Drive.Widgets`, App Group ID c TeamID-префиксом через
+`INFOPLIST_KEY_BarkCloudAppGroupID`. Кнопка обновления — `RefreshStorageIntent`
+(AppIntent), поднимает gRPC прямо в процессе виджета (адрес/токены из shared
+storage), пишет свежий снимок и просит `WidgetCenter.reloadTimelines`.
 
 **Нужно от пользователя для рантайма** (компиляция не требует): любой Apple
 Developer Team ID (даже Personal — в отличие от FSKit). Эмпирически проверить

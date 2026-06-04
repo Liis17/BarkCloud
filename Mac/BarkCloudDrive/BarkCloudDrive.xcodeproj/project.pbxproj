@@ -16,6 +16,13 @@
 		3F0E0001000000000000000A /* BarkCloudFileProviderItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F0E0001000000000000000B /* BarkCloudFileProviderItem.swift */; };
 		3F0E0001000000000000000C /* BarkCloudItemCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F0E0001000000000000000D /* BarkCloudItemCache.swift */; };
 		3F0E0001000000000000000E /* BarkCloudEnumerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F0E0001000000000000000F /* BarkCloudEnumerator.swift */; };
+		4F0E0001000000000000B001 /* BarkCloudWidgetsBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F0E0001000000000000A001 /* BarkCloudWidgetsBundle.swift */; };
+		4F0E0001000000000000B002 /* StorageWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F0E0001000000000000A002 /* StorageWidget.swift */; };
+		4F0E0001000000000000B003 /* RefreshStorageIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F0E0001000000000000A003 /* RefreshStorageIntent.swift */; };
+		4F0E0001000000000000B006 /* StorageWidgetBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F0E0001000000000000A006 /* StorageWidgetBridge.swift */; };
+		4F0E0001000000000000C001 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 95C19A02855B5D8E85C031DA /* Cocoa.framework */; };
+		4F0E0001000000000000C002 /* BarkCloudKit in Frameworks */ = {isa = PBXBuildFile; productRef = 4F0E0001000000000000F009 /* BarkCloudKit */; };
+		4F0E0001000000000000D001 /* BarkCloudWidgets.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 4F0E0001000000000000A007 /* BarkCloudWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		45AECBB915482296E2B35262 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21ED27B11311898E7A24AB22 /* SettingsView.swift */; };
 		6C6FB8C1441C82B6DBEF1EAC /* MenuBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50B6130C2EAADE13E9A91EBC /* MenuBarView.swift */; };
 		6DED464EE03A3EB64D0F2C47 /* ServerSetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 766125E7C7420FAEC4EADAF8 /* ServerSetupView.swift */; };
@@ -35,6 +42,13 @@
 			remoteGlobalIDString = C7D8E72E76B76F243CD4246E;
 			remoteInfo = BarkCloudFS;
 		};
+		4F0E0001000000000000E002 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 5A57D23653683FEFF92785E3 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 4F0E0001000000000000F001;
+			remoteInfo = BarkCloudWidgets;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -45,6 +59,7 @@
 			dstSubfolderSpec = 13;
 			files = (
 				3EAA4923514778D78120DFF2 /* BarkCloudFS.appex in Embed App Extensions */,
+				4F0E0001000000000000D001 /* BarkCloudWidgets.appex in Embed App Extensions */,
 			);
 			name = "Embed App Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -59,6 +74,13 @@
 		3F0E0001000000000000000B /* BarkCloudFileProviderItem.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BarkCloudFileProviderItem.swift; sourceTree = "<group>"; };
 		3F0E0001000000000000000D /* BarkCloudItemCache.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BarkCloudItemCache.swift; sourceTree = "<group>"; };
 		3F0E0001000000000000000F /* BarkCloudEnumerator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BarkCloudEnumerator.swift; sourceTree = "<group>"; };
+		4F0E0001000000000000A001 /* BarkCloudWidgetsBundle.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BarkCloudWidgetsBundle.swift; sourceTree = "<group>"; };
+		4F0E0001000000000000A002 /* StorageWidget.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = StorageWidget.swift; sourceTree = "<group>"; };
+		4F0E0001000000000000A003 /* RefreshStorageIntent.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RefreshStorageIntent.swift; sourceTree = "<group>"; };
+		4F0E0001000000000000A004 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		4F0E0001000000000000A005 /* BarkCloudWidgets.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = BarkCloudWidgets.entitlements; sourceTree = "<group>"; };
+		4F0E0001000000000000A006 /* StorageWidgetBridge.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = StorageWidgetBridge.swift; sourceTree = "<group>"; };
+		4F0E0001000000000000A007 /* BarkCloudWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = BarkCloudWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		50B6130C2EAADE13E9A91EBC /* MenuBarView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MenuBarView.swift; sourceTree = "<group>"; };
 		523071DFD9CF395F2A8B51EC /* FileProviderDomainManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FileProviderDomainManager.swift; sourceTree = "<group>"; };
 		5F883AA7898F2181D7434162 /* BarkCloudFileProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BarkCloudFileProvider.swift; sourceTree = "<group>"; };
@@ -89,6 +111,15 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		4F0E0001000000000000F003 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4F0E0001000000000000C001 /* Cocoa.framework in Frameworks */,
+				4F0E0001000000000000C002 /* BarkCloudKit in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -99,6 +130,7 @@
 				A22A463CEA9D7B129AC64B23 /* Frameworks */,
 				CE251475F3A1686E5EF7FF2D /* BarkCloudDrive */,
 				C2DC8D7AF81D0C028157D135 /* BarkCloudFS */,
+				4F0E0001000000000000F008 /* BarkCloudWidgets */,
 			);
 			sourceTree = "<group>";
 		};
@@ -123,6 +155,7 @@
 			children = (
 				A1E20C125965A765D71B83EF /* BarkCloud Drive.app */,
 				1E50AFF8D3690B19132666D6 /* BarkCloudFS.appex */,
+				4F0E0001000000000000A007 /* BarkCloudWidgets.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -144,6 +177,7 @@
 				F1CF4D96395D3FA04F549C1A /* BarkCloudDriveApp.swift */,
 				148F920E9DFF103444D0F2B8 /* AppModel.swift */,
 				523071DFD9CF395F2A8B51EC /* FileProviderDomainManager.swift */,
+				4F0E0001000000000000A006 /* StorageWidgetBridge.swift */,
 				766125E7C7420FAEC4EADAF8 /* ServerSetupView.swift */,
 				387B7BB1925CB3E77BDF3291 /* LoginView.swift */,
 				C468E051320D94C908437B2A /* DashboardView.swift */,
@@ -152,6 +186,18 @@
 				90041203061702053BB45DF5 /* Localizable.xcstrings */,
 			);
 			path = BarkCloudDrive;
+			sourceTree = "<group>";
+		};
+		4F0E0001000000000000F008 /* BarkCloudWidgets */ = {
+			isa = PBXGroup;
+			children = (
+				4F0E0001000000000000A001 /* BarkCloudWidgetsBundle.swift */,
+				4F0E0001000000000000A002 /* StorageWidget.swift */,
+				4F0E0001000000000000A003 /* RefreshStorageIntent.swift */,
+				4F0E0001000000000000A004 /* Info.plist */,
+				4F0E0001000000000000A005 /* BarkCloudWidgets.entitlements */,
+			);
+			path = BarkCloudWidgets;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -170,6 +216,7 @@
 			);
 			dependencies = (
 				630FB8EAC0981444CE5F7FCF /* PBXTargetDependency */,
+				4F0E0001000000000000E001 /* PBXTargetDependency */,
 			);
 			name = BarkCloudDrive;
 			packageProductDependencies = (
@@ -197,6 +244,26 @@
 			);
 			productName = BarkCloudFS;
 			productReference = 1E50AFF8D3690B19132666D6 /* BarkCloudFS.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		4F0E0001000000000000F001 /* BarkCloudWidgets */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 4F0E0001000000000000F007 /* Build configuration list for PBXNativeTarget "BarkCloudWidgets" */;
+			buildPhases = (
+				4F0E0001000000000000F002 /* Sources */,
+				4F0E0001000000000000F003 /* Frameworks */,
+				4F0E0001000000000000F004 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = BarkCloudWidgets;
+			packageProductDependencies = (
+				4F0E0001000000000000F009 /* BarkCloudKit */,
+			);
+			productName = BarkCloudWidgets;
+			productReference = 4F0E0001000000000000A007 /* BarkCloudWidgets.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
@@ -228,6 +295,7 @@
 			targets = (
 				17CCC43F64DD423CF1E7CCE9 /* BarkCloudDrive */,
 				C7D8E72E76B76F243CD4246E /* BarkCloudFS */,
+				4F0E0001000000000000F001 /* BarkCloudWidgets */,
 			);
 		};
 /* End PBXProject section */
@@ -242,6 +310,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		D218A580FB483283E479BBDF /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4F0E0001000000000000F004 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -269,11 +344,22 @@
 				15344A41DC88EEAB2EAFB27F /* BarkCloudDriveApp.swift in Sources */,
 				E44FEAD9D5D7289DA8D3A43E /* AppModel.swift in Sources */,
 				7BB5870B92935467E8365ED6 /* FileProviderDomainManager.swift in Sources */,
+				4F0E0001000000000000B006 /* StorageWidgetBridge.swift in Sources */,
 				6DED464EE03A3EB64D0F2C47 /* ServerSetupView.swift in Sources */,
 				0435A7448EE6DA6E43AA6CB2 /* LoginView.swift in Sources */,
 				D2D8CF3356138A3EEBA86FC6 /* DashboardView.swift in Sources */,
 				45AECBB915482296E2B35262 /* SettingsView.swift in Sources */,
 				6C6FB8C1441C82B6DBEF1EAC /* MenuBarView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4F0E0001000000000000F002 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4F0E0001000000000000B001 /* BarkCloudWidgetsBundle.swift in Sources */,
+				4F0E0001000000000000B002 /* StorageWidget.swift in Sources */,
+				4F0E0001000000000000B003 /* RefreshStorageIntent.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -285,6 +371,12 @@
 			name = BarkCloudFS;
 			target = C7D8E72E76B76F243CD4246E /* BarkCloudFS */;
 			targetProxy = 41EB9EE0EA025FA031F85485 /* PBXContainerItemProxy */;
+		};
+		4F0E0001000000000000E001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = BarkCloudWidgets;
+			target = 4F0E0001000000000000F001 /* BarkCloudWidgets */;
+			targetProxy = 4F0E0001000000000000E002 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -424,6 +516,48 @@
 			};
 			name = Debug;
 		};
+		4F0E0001000000000000F005 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = BarkCloudWidgets/BarkCloudWidgets.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 9Y935NYUP9;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = BarkCloudWidgets/Info.plist;
+				MACOSX_DEPLOYMENT_TARGET = 15.4;
+				PRODUCT_BUNDLE_IDENTIFIER = com.barkfluff.BarkCloud.Drive.Widgets;
+				PRODUCT_NAME = BarkCloudWidgets;
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		4F0E0001000000000000F006 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = BarkCloudWidgets/BarkCloudWidgets.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 9Y935NYUP9;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = BarkCloudWidgets/Info.plist;
+				MACOSX_DEPLOYMENT_TARGET = 15.4;
+				PRODUCT_BUNDLE_IDENTIFIER = com.barkfluff.BarkCloud.Drive.Widgets;
+				PRODUCT_NAME = BarkCloudWidgets;
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
 		DC3CCFF435B19B3B08414EC4 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -554,6 +688,15 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		4F0E0001000000000000F007 /* Build configuration list for PBXNativeTarget "BarkCloudWidgets" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				4F0E0001000000000000F005 /* Debug */,
+				4F0E0001000000000000F006 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
@@ -570,6 +713,11 @@
 			productName = BarkCloudKit;
 		};
 		746E94F5EE782185AD663E94 /* BarkCloudKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 788FBE7760AAD28200A7F0C8 /* XCLocalSwiftPackageReference "../BarkCloudKit" */;
+			productName = BarkCloudKit;
+		};
+		4F0E0001000000000000F009 /* BarkCloudKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 788FBE7760AAD28200A7F0C8 /* XCLocalSwiftPackageReference "../BarkCloudKit" */;
 			productName = BarkCloudKit;
