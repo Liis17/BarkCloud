@@ -1665,6 +1665,32 @@ public enum Barkcloud_Files_CloudApi: Sendable {
                 type: .unary
             )
         }
+        /// Namespace for "GetMemories" metadata.
+        public enum GetMemories: Sendable {
+            /// Request type for "GetMemories".
+            public typealias Input = Barkcloud_Files_GetMemoriesRequest
+            /// Response type for "GetMemories".
+            public typealias Output = Barkcloud_Files_GetMemoriesResponse
+            /// Descriptor for "GetMemories".
+            public static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.CloudApi"),
+                method: "GetMemories",
+                type: .unary
+            )
+        }
+        /// Namespace for "ListMediaLocations" metadata.
+        public enum ListMediaLocations: Sendable {
+            /// Request type for "ListMediaLocations".
+            public typealias Input = Barkcloud_Files_ListMediaLocationsRequest
+            /// Response type for "ListMediaLocations".
+            public typealias Output = Barkcloud_Files_ListMediaLocationsResponse
+            /// Descriptor for "ListMediaLocations".
+            public static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.CloudApi"),
+                method: "ListMediaLocations",
+                type: .unary
+            )
+        }
         /// Namespace for "ListTrash" metadata.
         public enum ListTrash: Sendable {
             /// Request type for "ListTrash".
@@ -1995,6 +2021,8 @@ public enum Barkcloud_Files_CloudApi: Sendable {
             DeleteUserMedia.descriptor,
             GetPath.descriptor,
             SetVideoThumbnail.descriptor,
+            GetMemories.descriptor,
+            ListMediaLocations.descriptor,
             ListTrash.descriptor,
             RestoreFromTrash.descriptor,
             DeleteFromTrash.descriptor,
@@ -2331,6 +2359,42 @@ extension Barkcloud_Files_CloudApi {
             request: GRPCCore.StreamingServerRequest<Barkcloud_Files_SetVideoThumbnailRequest>,
             context: GRPCCore.ServerContext
         ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty>
+
+        /// Handle the "GetMemories" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > ───────── Воспоминания / Карта ─────────
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Files_GetMemoriesRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Files_GetMemoriesResponse` messages.
+        func getMemories(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Files_GetMemoriesRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_GetMemoriesResponse>
+
+        /// Handle the "ListMediaLocations" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Медиа с GPS-координатами (точки для карты, cursor pagination)
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Files_ListMediaLocationsRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Files_ListMediaLocationsResponse` messages.
+        func listMediaLocations(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ListMediaLocationsRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_ListMediaLocationsResponse>
 
         /// Handle the "ListTrash" method.
         ///
@@ -3061,6 +3125,42 @@ extension Barkcloud_Files_CloudApi {
             context: GRPCCore.ServerContext
         ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty>
 
+        /// Handle the "GetMemories" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > ───────── Воспоминания / Карта ─────────
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_GetMemoriesRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Files_GetMemoriesResponse` message.
+        func getMemories(
+            request: GRPCCore.ServerRequest<Barkcloud_Files_GetMemoriesRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_GetMemoriesResponse>
+
+        /// Handle the "ListMediaLocations" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Медиа с GPS-координатами (точки для карты, cursor pagination)
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_ListMediaLocationsRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Files_ListMediaLocationsResponse` message.
+        func listMediaLocations(
+            request: GRPCCore.ServerRequest<Barkcloud_Files_ListMediaLocationsRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_ListMediaLocationsResponse>
+
         /// Handle the "ListTrash" method.
         ///
         /// > Source IDL Documentation:
@@ -3788,6 +3888,42 @@ extension Barkcloud_Files_CloudApi {
             context: GRPCCore.ServerContext
         ) async throws -> Barkcloud_Files_CloudEmpty
 
+        /// Handle the "GetMemories" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > ───────── Воспоминания / Карта ─────────
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Files_GetMemoriesRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Files_GetMemoriesResponse` to respond with.
+        func getMemories(
+            request: Barkcloud_Files_GetMemoriesRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Files_GetMemoriesResponse
+
+        /// Handle the "ListMediaLocations" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Медиа с GPS-координатами (точки для карты, cursor pagination)
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Files_ListMediaLocationsRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Files_ListMediaLocationsResponse` to respond with.
+        func listMediaLocations(
+            request: Barkcloud_Files_ListMediaLocationsRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Files_ListMediaLocationsResponse
+
         /// Handle the "ListTrash" method.
         ///
         /// > Source IDL Documentation:
@@ -4403,6 +4539,28 @@ extension Barkcloud_Files_CloudApi.StreamingServiceProtocol {
             }
         )
         router.registerHandler(
+            forMethod: Barkcloud_Files_CloudApi.Method.GetMemories.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_GetMemoriesRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_GetMemoriesResponse>(),
+            handler: { request, context in
+                try await self.getMemories(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
+            forMethod: Barkcloud_Files_CloudApi.Method.ListMediaLocations.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_ListMediaLocationsRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_ListMediaLocationsResponse>(),
+            handler: { request, context in
+                try await self.listMediaLocations(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
             forMethod: Barkcloud_Files_CloudApi.Method.ListTrash.descriptor,
             deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_ListTrashRequest>(),
             serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_ListTrashResponse>(),
@@ -4842,6 +5000,28 @@ extension Barkcloud_Files_CloudApi.ServiceProtocol {
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty> {
         let response = try await self.setVideoThumbnail(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    public func getMemories(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Files_GetMemoriesRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_GetMemoriesResponse> {
+        let response = try await self.getMemories(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    public func listMediaLocations(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ListMediaLocationsRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_ListMediaLocationsResponse> {
+        let response = try await self.listMediaLocations(
             request: GRPCCore.ServerRequest(stream: request),
             context: context
         )
@@ -5317,6 +5497,32 @@ extension Barkcloud_Files_CloudApi.SimpleServiceProtocol {
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty> {
         return GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty>(
             message: try await self.setVideoThumbnail(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    public func getMemories(
+        request: GRPCCore.ServerRequest<Barkcloud_Files_GetMemoriesRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_GetMemoriesResponse> {
+        return GRPCCore.ServerResponse<Barkcloud_Files_GetMemoriesResponse>(
+            message: try await self.getMemories(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    public func listMediaLocations(
+        request: GRPCCore.ServerRequest<Barkcloud_Files_ListMediaLocationsRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_ListMediaLocationsResponse> {
+        return GRPCCore.ServerResponse<Barkcloud_Files_ListMediaLocationsResponse>(
+            message: try await self.listMediaLocations(
                 request: request.message,
                 context: context
             ),
@@ -6012,6 +6218,52 @@ extension Barkcloud_Files_CloudApi {
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CloudEmpty>,
             options: GRPCCore.CallOptions,
             onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "GetMemories" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > ───────── Воспоминания / Карта ─────────
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_GetMemoriesRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_GetMemoriesRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_GetMemoriesResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func getMemories<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_GetMemoriesRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_GetMemoriesRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_GetMemoriesResponse>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_GetMemoriesResponse>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "ListMediaLocations" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Медиа с GPS-координатами (точки для карты, cursor pagination)
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_ListMediaLocationsRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_ListMediaLocationsRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_ListMediaLocationsResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func listMediaLocations<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_ListMediaLocationsRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_ListMediaLocationsRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_ListMediaLocationsResponse>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListMediaLocationsResponse>) async throws -> Result
         ) async throws -> Result where Result: Sendable
 
         /// Call the "ListTrash" method.
@@ -7120,6 +7372,74 @@ extension Barkcloud_Files_CloudApi {
             try await self.client.unary(
                 request: request,
                 descriptor: Barkcloud_Files_CloudApi.Method.SetVideoThumbnail.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "GetMemories" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > ───────── Воспоминания / Карта ─────────
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_GetMemoriesRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_GetMemoriesRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_GetMemoriesResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        public func getMemories<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_GetMemoriesRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_GetMemoriesRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_GetMemoriesResponse>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_GetMemoriesResponse>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Files_CloudApi.Method.GetMemories.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "ListMediaLocations" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Медиа с GPS-координатами (точки для карты, cursor pagination)
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_ListMediaLocationsRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_ListMediaLocationsRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_ListMediaLocationsResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        public func listMediaLocations<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_ListMediaLocationsRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_ListMediaLocationsRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_ListMediaLocationsResponse>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListMediaLocationsResponse>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Files_CloudApi.Method.ListMediaLocations.descriptor,
                 serializer: serializer,
                 deserializer: deserializer,
                 options: options,
@@ -8412,6 +8732,64 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
         )
     }
 
+    /// Call the "GetMemories" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > ───────── Воспоминания / Карта ─────────
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Files_GetMemoriesRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func getMemories<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Files_GetMemoriesRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_GetMemoriesResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.getMemories(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_GetMemoriesRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_GetMemoriesResponse>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "ListMediaLocations" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Медиа с GPS-координатами (точки для карты, cursor pagination)
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Files_ListMediaLocationsRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func listMediaLocations<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Files_ListMediaLocationsRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListMediaLocationsResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.listMediaLocations(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_ListMediaLocationsRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_ListMediaLocationsResponse>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
     /// Call the "ListTrash" method.
     ///
     /// > Source IDL Documentation:
@@ -9634,6 +10012,72 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
             metadata: metadata
         )
         return try await self.setVideoThumbnail(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "GetMemories" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > ───────── Воспоминания / Карта ─────────
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func getMemories<Result>(
+        _ message: Barkcloud_Files_GetMemoriesRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_GetMemoriesResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Files_GetMemoriesRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.getMemories(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "ListMediaLocations" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Медиа с GPS-координатами (точки для карты, cursor pagination)
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func listMediaLocations<Result>(
+        _ message: Barkcloud_Files_ListMediaLocationsRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListMediaLocationsResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Files_ListMediaLocationsRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.listMediaLocations(
             request: request,
             options: options,
             onResponse: handleResponse
@@ -13522,6 +13966,1221 @@ extension Barkcloud_Files_AlbumApi.ClientProtocol {
             metadata: metadata
         )
         return try await self.listAlbumItems(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+}
+
+// MARK: - barkcloud.files.DynamicFolderApi
+
+/// Namespace containing generated types for the "barkcloud.files.DynamicFolderApi" service.
+@available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+public enum Barkcloud_Files_DynamicFolderApi: Sendable {
+    /// Service descriptor for the "barkcloud.files.DynamicFolderApi" service.
+    public static let descriptor = GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.DynamicFolderApi")
+    /// Namespace for method metadata.
+    public enum Method: Sendable {
+        /// Namespace for "CreateDynamicFolder" metadata.
+        public enum CreateDynamicFolder: Sendable {
+            /// Request type for "CreateDynamicFolder".
+            public typealias Input = Barkcloud_Files_CreateDynamicFolderRequest
+            /// Response type for "CreateDynamicFolder".
+            public typealias Output = Barkcloud_Files_DynamicFolderInfo
+            /// Descriptor for "CreateDynamicFolder".
+            public static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.DynamicFolderApi"),
+                method: "CreateDynamicFolder",
+                type: .unary
+            )
+        }
+        /// Namespace for "UpdateDynamicFolder" metadata.
+        public enum UpdateDynamicFolder: Sendable {
+            /// Request type for "UpdateDynamicFolder".
+            public typealias Input = Barkcloud_Files_UpdateDynamicFolderRequest
+            /// Response type for "UpdateDynamicFolder".
+            public typealias Output = Barkcloud_Files_DynamicFolderInfo
+            /// Descriptor for "UpdateDynamicFolder".
+            public static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.DynamicFolderApi"),
+                method: "UpdateDynamicFolder",
+                type: .unary
+            )
+        }
+        /// Namespace for "DeleteDynamicFolder" metadata.
+        public enum DeleteDynamicFolder: Sendable {
+            /// Request type for "DeleteDynamicFolder".
+            public typealias Input = Barkcloud_Files_DeleteDynamicFolderRequest
+            /// Response type for "DeleteDynamicFolder".
+            public typealias Output = Barkcloud_Files_CloudEmpty
+            /// Descriptor for "DeleteDynamicFolder".
+            public static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.DynamicFolderApi"),
+                method: "DeleteDynamicFolder",
+                type: .unary
+            )
+        }
+        /// Namespace for "ListDynamicFolders" metadata.
+        public enum ListDynamicFolders: Sendable {
+            /// Request type for "ListDynamicFolders".
+            public typealias Input = Barkcloud_Files_ListDynamicFoldersRequest
+            /// Response type for "ListDynamicFolders".
+            public typealias Output = Barkcloud_Files_ListDynamicFoldersResponse
+            /// Descriptor for "ListDynamicFolders".
+            public static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.DynamicFolderApi"),
+                method: "ListDynamicFolders",
+                type: .unary
+            )
+        }
+        /// Namespace for "ListDynamicFolderItems" metadata.
+        public enum ListDynamicFolderItems: Sendable {
+            /// Request type for "ListDynamicFolderItems".
+            public typealias Input = Barkcloud_Files_ListDynamicFolderItemsRequest
+            /// Response type for "ListDynamicFolderItems".
+            public typealias Output = Barkcloud_Files_ListDynamicFolderItemsResponse
+            /// Descriptor for "ListDynamicFolderItems".
+            public static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.DynamicFolderApi"),
+                method: "ListDynamicFolderItems",
+                type: .unary
+            )
+        }
+        /// Descriptors for all methods in the "barkcloud.files.DynamicFolderApi" service.
+        public static let descriptors: [GRPCCore.MethodDescriptor] = [
+            CreateDynamicFolder.descriptor,
+            UpdateDynamicFolder.descriptor,
+            DeleteDynamicFolder.descriptor,
+            ListDynamicFolders.descriptor,
+            ListDynamicFolderItems.descriptor
+        ]
+    }
+}
+
+@available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+extension GRPCCore.ServiceDescriptor {
+    /// Service descriptor for the "barkcloud.files.DynamicFolderApi" service.
+    public static let barkcloud_files_DynamicFolderApi = GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.DynamicFolderApi")
+}
+
+// MARK: barkcloud.files.DynamicFolderApi (server)
+
+@available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+extension Barkcloud_Files_DynamicFolderApi {
+    /// Streaming variant of the service protocol for the "barkcloud.files.DynamicFolderApi" service.
+    ///
+    /// This protocol is the lowest-level of the service protocols generated for this service
+    /// giving you the most flexibility over the implementation of your service. This comes at
+    /// the cost of more verbose and less strict APIs. Each RPC requires you to implement it in
+    /// terms of a request stream and response stream. Where only a single request or response
+    /// message is expected, you are responsible for enforcing this invariant is maintained.
+    ///
+    /// Where possible, prefer using the stricter, less-verbose ``ServiceProtocol``
+    /// or ``SimpleServiceProtocol`` instead.
+    public protocol StreamingServiceProtocol: GRPCCore.RegistrableRPCService {
+        /// Handle the "CreateDynamicFolder" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Создать умную папку
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Files_CreateDynamicFolderRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Files_DynamicFolderInfo` messages.
+        func createDynamicFolder(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Files_CreateDynamicFolderRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_DynamicFolderInfo>
+
+        /// Handle the "UpdateDynamicFolder" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Изменить имя / критерии / иконку
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Files_UpdateDynamicFolderRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Files_DynamicFolderInfo` messages.
+        func updateDynamicFolder(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Files_UpdateDynamicFolderRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_DynamicFolderInfo>
+
+        /// Handle the "DeleteDynamicFolder" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Удалить умную папку
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Files_DeleteDynamicFolderRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Files_CloudEmpty` messages.
+        func deleteDynamicFolder(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Files_DeleteDynamicFolderRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty>
+
+        /// Handle the "ListDynamicFolders" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Системные + пользовательские (обложка / счётчик)
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Files_ListDynamicFoldersRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Files_ListDynamicFoldersResponse` messages.
+        func listDynamicFolders(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ListDynamicFoldersRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_ListDynamicFoldersResponse>
+
+        /// Handle the "ListDynamicFolderItems" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Содержимое папки (файлы по критериям)
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Files_ListDynamicFolderItemsRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Files_ListDynamicFolderItemsResponse` messages.
+        func listDynamicFolderItems(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ListDynamicFolderItemsRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_ListDynamicFolderItemsResponse>
+    }
+
+    /// Service protocol for the "barkcloud.files.DynamicFolderApi" service.
+    ///
+    /// This protocol is higher level than ``StreamingServiceProtocol`` but lower level than
+    /// the ``SimpleServiceProtocol``, it provides access to request and response metadata and
+    /// trailing response metadata. If you don't need these then consider using
+    /// the ``SimpleServiceProtocol``. If you need fine grained control over your RPCs then
+    /// use ``StreamingServiceProtocol``.
+    public protocol ServiceProtocol: Barkcloud_Files_DynamicFolderApi.StreamingServiceProtocol {
+        /// Handle the "CreateDynamicFolder" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Создать умную папку
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_CreateDynamicFolderRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Files_DynamicFolderInfo` message.
+        func createDynamicFolder(
+            request: GRPCCore.ServerRequest<Barkcloud_Files_CreateDynamicFolderRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_DynamicFolderInfo>
+
+        /// Handle the "UpdateDynamicFolder" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Изменить имя / критерии / иконку
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_UpdateDynamicFolderRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Files_DynamicFolderInfo` message.
+        func updateDynamicFolder(
+            request: GRPCCore.ServerRequest<Barkcloud_Files_UpdateDynamicFolderRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_DynamicFolderInfo>
+
+        /// Handle the "DeleteDynamicFolder" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Удалить умную папку
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_DeleteDynamicFolderRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Files_CloudEmpty` message.
+        func deleteDynamicFolder(
+            request: GRPCCore.ServerRequest<Barkcloud_Files_DeleteDynamicFolderRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty>
+
+        /// Handle the "ListDynamicFolders" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Системные + пользовательские (обложка / счётчик)
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_ListDynamicFoldersRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Files_ListDynamicFoldersResponse` message.
+        func listDynamicFolders(
+            request: GRPCCore.ServerRequest<Barkcloud_Files_ListDynamicFoldersRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_ListDynamicFoldersResponse>
+
+        /// Handle the "ListDynamicFolderItems" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Содержимое папки (файлы по критериям)
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_ListDynamicFolderItemsRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Files_ListDynamicFolderItemsResponse` message.
+        func listDynamicFolderItems(
+            request: GRPCCore.ServerRequest<Barkcloud_Files_ListDynamicFolderItemsRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_ListDynamicFolderItemsResponse>
+    }
+
+    /// Simple service protocol for the "barkcloud.files.DynamicFolderApi" service.
+    ///
+    /// This is the highest level protocol for the service. The API is the easiest to use but
+    /// doesn't provide access to request or response metadata. If you need access to these
+    /// then use ``ServiceProtocol`` instead.
+    public protocol SimpleServiceProtocol: Barkcloud_Files_DynamicFolderApi.ServiceProtocol {
+        /// Handle the "CreateDynamicFolder" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Создать умную папку
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Files_CreateDynamicFolderRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Files_DynamicFolderInfo` to respond with.
+        func createDynamicFolder(
+            request: Barkcloud_Files_CreateDynamicFolderRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Files_DynamicFolderInfo
+
+        /// Handle the "UpdateDynamicFolder" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Изменить имя / критерии / иконку
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Files_UpdateDynamicFolderRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Files_DynamicFolderInfo` to respond with.
+        func updateDynamicFolder(
+            request: Barkcloud_Files_UpdateDynamicFolderRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Files_DynamicFolderInfo
+
+        /// Handle the "DeleteDynamicFolder" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Удалить умную папку
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Files_DeleteDynamicFolderRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Files_CloudEmpty` to respond with.
+        func deleteDynamicFolder(
+            request: Barkcloud_Files_DeleteDynamicFolderRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Files_CloudEmpty
+
+        /// Handle the "ListDynamicFolders" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Системные + пользовательские (обложка / счётчик)
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Files_ListDynamicFoldersRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Files_ListDynamicFoldersResponse` to respond with.
+        func listDynamicFolders(
+            request: Barkcloud_Files_ListDynamicFoldersRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Files_ListDynamicFoldersResponse
+
+        /// Handle the "ListDynamicFolderItems" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Содержимое папки (файлы по критериям)
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Files_ListDynamicFolderItemsRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Files_ListDynamicFolderItemsResponse` to respond with.
+        func listDynamicFolderItems(
+            request: Barkcloud_Files_ListDynamicFolderItemsRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Files_ListDynamicFolderItemsResponse
+    }
+}
+
+// Default implementation of 'registerMethods(with:)'.
+@available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+extension Barkcloud_Files_DynamicFolderApi.StreamingServiceProtocol {
+    public func registerMethods<Transport>(with router: inout GRPCCore.RPCRouter<Transport>) where Transport: GRPCCore.ServerTransport {
+        router.registerHandler(
+            forMethod: Barkcloud_Files_DynamicFolderApi.Method.CreateDynamicFolder.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_CreateDynamicFolderRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_DynamicFolderInfo>(),
+            handler: { request, context in
+                try await self.createDynamicFolder(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
+            forMethod: Barkcloud_Files_DynamicFolderApi.Method.UpdateDynamicFolder.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_UpdateDynamicFolderRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_DynamicFolderInfo>(),
+            handler: { request, context in
+                try await self.updateDynamicFolder(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
+            forMethod: Barkcloud_Files_DynamicFolderApi.Method.DeleteDynamicFolder.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_DeleteDynamicFolderRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_CloudEmpty>(),
+            handler: { request, context in
+                try await self.deleteDynamicFolder(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
+            forMethod: Barkcloud_Files_DynamicFolderApi.Method.ListDynamicFolders.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_ListDynamicFoldersRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_ListDynamicFoldersResponse>(),
+            handler: { request, context in
+                try await self.listDynamicFolders(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
+            forMethod: Barkcloud_Files_DynamicFolderApi.Method.ListDynamicFolderItems.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_ListDynamicFolderItemsRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_ListDynamicFolderItemsResponse>(),
+            handler: { request, context in
+                try await self.listDynamicFolderItems(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+    }
+}
+
+// Default implementation of streaming methods from 'StreamingServiceProtocol'.
+@available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+extension Barkcloud_Files_DynamicFolderApi.ServiceProtocol {
+    public func createDynamicFolder(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Files_CreateDynamicFolderRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_DynamicFolderInfo> {
+        let response = try await self.createDynamicFolder(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    public func updateDynamicFolder(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Files_UpdateDynamicFolderRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_DynamicFolderInfo> {
+        let response = try await self.updateDynamicFolder(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    public func deleteDynamicFolder(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Files_DeleteDynamicFolderRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty> {
+        let response = try await self.deleteDynamicFolder(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    public func listDynamicFolders(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ListDynamicFoldersRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_ListDynamicFoldersResponse> {
+        let response = try await self.listDynamicFolders(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    public func listDynamicFolderItems(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ListDynamicFolderItemsRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_ListDynamicFolderItemsResponse> {
+        let response = try await self.listDynamicFolderItems(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+}
+
+// Default implementation of methods from 'ServiceProtocol'.
+@available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+extension Barkcloud_Files_DynamicFolderApi.SimpleServiceProtocol {
+    public func createDynamicFolder(
+        request: GRPCCore.ServerRequest<Barkcloud_Files_CreateDynamicFolderRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_DynamicFolderInfo> {
+        return GRPCCore.ServerResponse<Barkcloud_Files_DynamicFolderInfo>(
+            message: try await self.createDynamicFolder(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    public func updateDynamicFolder(
+        request: GRPCCore.ServerRequest<Barkcloud_Files_UpdateDynamicFolderRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_DynamicFolderInfo> {
+        return GRPCCore.ServerResponse<Barkcloud_Files_DynamicFolderInfo>(
+            message: try await self.updateDynamicFolder(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    public func deleteDynamicFolder(
+        request: GRPCCore.ServerRequest<Barkcloud_Files_DeleteDynamicFolderRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty> {
+        return GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty>(
+            message: try await self.deleteDynamicFolder(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    public func listDynamicFolders(
+        request: GRPCCore.ServerRequest<Barkcloud_Files_ListDynamicFoldersRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_ListDynamicFoldersResponse> {
+        return GRPCCore.ServerResponse<Barkcloud_Files_ListDynamicFoldersResponse>(
+            message: try await self.listDynamicFolders(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    public func listDynamicFolderItems(
+        request: GRPCCore.ServerRequest<Barkcloud_Files_ListDynamicFolderItemsRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_ListDynamicFolderItemsResponse> {
+        return GRPCCore.ServerResponse<Barkcloud_Files_ListDynamicFolderItemsResponse>(
+            message: try await self.listDynamicFolderItems(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+}
+
+// MARK: barkcloud.files.DynamicFolderApi (client)
+
+@available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+extension Barkcloud_Files_DynamicFolderApi {
+    /// Generated client protocol for the "barkcloud.files.DynamicFolderApi" service.
+    ///
+    /// You don't need to implement this protocol directly, use the generated
+    /// implementation, ``Client``.
+    public protocol ClientProtocol: Sendable {
+        /// Call the "CreateDynamicFolder" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Создать умную папку
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_CreateDynamicFolderRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_CreateDynamicFolderRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_DynamicFolderInfo` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func createDynamicFolder<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_CreateDynamicFolderRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_CreateDynamicFolderRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_DynamicFolderInfo>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_DynamicFolderInfo>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "UpdateDynamicFolder" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Изменить имя / критерии / иконку
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_UpdateDynamicFolderRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_UpdateDynamicFolderRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_DynamicFolderInfo` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func updateDynamicFolder<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_UpdateDynamicFolderRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_UpdateDynamicFolderRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_DynamicFolderInfo>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_DynamicFolderInfo>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "DeleteDynamicFolder" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Удалить умную папку
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_DeleteDynamicFolderRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_DeleteDynamicFolderRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_CloudEmpty` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func deleteDynamicFolder<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_DeleteDynamicFolderRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_DeleteDynamicFolderRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CloudEmpty>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "ListDynamicFolders" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Системные + пользовательские (обложка / счётчик)
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_ListDynamicFoldersRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_ListDynamicFoldersRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_ListDynamicFoldersResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func listDynamicFolders<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_ListDynamicFoldersRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_ListDynamicFoldersRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_ListDynamicFoldersResponse>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListDynamicFoldersResponse>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "ListDynamicFolderItems" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Содержимое папки (файлы по критериям)
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_ListDynamicFolderItemsRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_ListDynamicFolderItemsRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_ListDynamicFolderItemsResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func listDynamicFolderItems<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_ListDynamicFolderItemsRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_ListDynamicFolderItemsRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_ListDynamicFolderItemsResponse>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListDynamicFolderItemsResponse>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+    }
+
+    /// Generated client for the "barkcloud.files.DynamicFolderApi" service.
+    ///
+    /// The ``Client`` provides an implementation of ``ClientProtocol`` which wraps
+    /// a `GRPCCore.GRPCCClient`. The underlying `GRPCClient` provides the long-lived
+    /// means of communication with the remote peer.
+    public struct Client<Transport>: ClientProtocol where Transport: GRPCCore.ClientTransport {
+        private let client: GRPCCore.GRPCClient<Transport>
+
+        /// Creates a new client wrapping the provided `GRPCCore.GRPCClient`.
+        ///
+        /// - Parameters:
+        ///   - client: A `GRPCCore.GRPCClient` providing a communication channel to the service.
+        public init(wrapping client: GRPCCore.GRPCClient<Transport>) {
+            self.client = client
+        }
+
+        /// Call the "CreateDynamicFolder" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Создать умную папку
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_CreateDynamicFolderRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_CreateDynamicFolderRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_DynamicFolderInfo` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        public func createDynamicFolder<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_CreateDynamicFolderRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_CreateDynamicFolderRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_DynamicFolderInfo>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_DynamicFolderInfo>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Files_DynamicFolderApi.Method.CreateDynamicFolder.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "UpdateDynamicFolder" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Изменить имя / критерии / иконку
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_UpdateDynamicFolderRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_UpdateDynamicFolderRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_DynamicFolderInfo` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        public func updateDynamicFolder<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_UpdateDynamicFolderRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_UpdateDynamicFolderRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_DynamicFolderInfo>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_DynamicFolderInfo>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Files_DynamicFolderApi.Method.UpdateDynamicFolder.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "DeleteDynamicFolder" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Удалить умную папку
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_DeleteDynamicFolderRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_DeleteDynamicFolderRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_CloudEmpty` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        public func deleteDynamicFolder<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_DeleteDynamicFolderRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_DeleteDynamicFolderRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CloudEmpty>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Files_DynamicFolderApi.Method.DeleteDynamicFolder.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "ListDynamicFolders" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Системные + пользовательские (обложка / счётчик)
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_ListDynamicFoldersRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_ListDynamicFoldersRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_ListDynamicFoldersResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        public func listDynamicFolders<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_ListDynamicFoldersRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_ListDynamicFoldersRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_ListDynamicFoldersResponse>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListDynamicFoldersResponse>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Files_DynamicFolderApi.Method.ListDynamicFolders.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "ListDynamicFolderItems" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Содержимое папки (файлы по критериям)
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_ListDynamicFolderItemsRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_ListDynamicFolderItemsRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_ListDynamicFolderItemsResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        public func listDynamicFolderItems<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_ListDynamicFolderItemsRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_ListDynamicFolderItemsRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_ListDynamicFolderItemsResponse>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListDynamicFolderItemsResponse>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Files_DynamicFolderApi.Method.ListDynamicFolderItems.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+    }
+}
+
+// Helpers providing default arguments to 'ClientProtocol' methods.
+@available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+extension Barkcloud_Files_DynamicFolderApi.ClientProtocol {
+    /// Call the "CreateDynamicFolder" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Создать умную папку
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Files_CreateDynamicFolderRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func createDynamicFolder<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Files_CreateDynamicFolderRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_DynamicFolderInfo>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.createDynamicFolder(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_CreateDynamicFolderRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_DynamicFolderInfo>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "UpdateDynamicFolder" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Изменить имя / критерии / иконку
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Files_UpdateDynamicFolderRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func updateDynamicFolder<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Files_UpdateDynamicFolderRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_DynamicFolderInfo>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.updateDynamicFolder(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_UpdateDynamicFolderRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_DynamicFolderInfo>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "DeleteDynamicFolder" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Удалить умную папку
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Files_DeleteDynamicFolderRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func deleteDynamicFolder<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Files_DeleteDynamicFolderRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.deleteDynamicFolder(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_DeleteDynamicFolderRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_CloudEmpty>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "ListDynamicFolders" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Системные + пользовательские (обложка / счётчик)
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Files_ListDynamicFoldersRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func listDynamicFolders<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Files_ListDynamicFoldersRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListDynamicFoldersResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.listDynamicFolders(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_ListDynamicFoldersRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_ListDynamicFoldersResponse>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "ListDynamicFolderItems" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Содержимое папки (файлы по критериям)
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Files_ListDynamicFolderItemsRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func listDynamicFolderItems<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Files_ListDynamicFolderItemsRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListDynamicFolderItemsResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.listDynamicFolderItems(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_ListDynamicFolderItemsRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_ListDynamicFolderItemsResponse>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+}
+
+// Helpers providing sugared APIs for 'ClientProtocol' methods.
+@available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+extension Barkcloud_Files_DynamicFolderApi.ClientProtocol {
+    /// Call the "CreateDynamicFolder" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Создать умную папку
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func createDynamicFolder<Result>(
+        _ message: Barkcloud_Files_CreateDynamicFolderRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_DynamicFolderInfo>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Files_CreateDynamicFolderRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.createDynamicFolder(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "UpdateDynamicFolder" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Изменить имя / критерии / иконку
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func updateDynamicFolder<Result>(
+        _ message: Barkcloud_Files_UpdateDynamicFolderRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_DynamicFolderInfo>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Files_UpdateDynamicFolderRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.updateDynamicFolder(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "DeleteDynamicFolder" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Удалить умную папку
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func deleteDynamicFolder<Result>(
+        _ message: Barkcloud_Files_DeleteDynamicFolderRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Files_DeleteDynamicFolderRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.deleteDynamicFolder(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "ListDynamicFolders" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Системные + пользовательские (обложка / счётчик)
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func listDynamicFolders<Result>(
+        _ message: Barkcloud_Files_ListDynamicFoldersRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListDynamicFoldersResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Files_ListDynamicFoldersRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.listDynamicFolders(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "ListDynamicFolderItems" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Содержимое папки (файлы по критериям)
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func listDynamicFolderItems<Result>(
+        _ message: Barkcloud_Files_ListDynamicFolderItemsRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListDynamicFolderItemsResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Files_ListDynamicFolderItemsRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.listDynamicFolderItems(
             request: request,
             options: options,
             onResponse: handleResponse
