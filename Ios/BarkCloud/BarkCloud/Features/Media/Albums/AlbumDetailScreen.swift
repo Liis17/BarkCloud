@@ -97,6 +97,8 @@ final class AlbumDetailViewModel {
             if let pair = try? await DeviceAssetResource.originalData(for: asset),
                let id = try? await cloud.uploadFile(data: pair.0, fileName: pair.1) {
                 fileIDs.append(id)
+                // Связь облако↔устройство для синхронного удаления.
+                await CloudDeviceLinkStore.shared.link(fileID: id, localIdentifier: asset.localIdentifier)
             }
         }
         do {
@@ -163,8 +165,10 @@ final class AlbumDetailViewModel {
         pendingDelete.schedule(
             label: item.fileName,
             action: { [weak self, cloud] in
-                do { try await cloud.deleteUserMedia(fileID: item.id) }
-                catch {
+                do {
+                    try await cloud.deleteUserMedia(fileID: item.id)
+                    await DeviceCopyCleaner.deleteDeviceCopy(forCloudFileID: item.id)
+                } catch {
                     self?.state.snackbar = domainErrorMessage(error)
                     await self?.reload()
                 }

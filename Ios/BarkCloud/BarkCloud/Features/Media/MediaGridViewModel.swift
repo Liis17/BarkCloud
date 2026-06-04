@@ -118,7 +118,9 @@ final class MediaGridViewModel {
                 let (data, name) = try await DeviceAssetResource.originalData(for: asset)
                 // Без явной папки: сервер раскладывает по системным «Фото»/«Видео»/
                 // «Другие документы» по типу медиа (route_by_media_kind).
-                _ = try await cloud.uploadFile(data: data, fileName: name, routeByMediaKind: true)
+                let fileID = try await cloud.uploadFile(data: data, fileName: name, routeByMediaKind: true)
+                // Связь облако↔устройство для синхронного удаления.
+                await CloudDeviceLinkStore.shared.link(fileID: fileID, localIdentifier: asset.localIdentifier)
             } catch {
                 anyFailed = true
             }
@@ -165,8 +167,9 @@ final class MediaGridViewModel {
         state.deleteTotal = items.count
         state.deleteDone = 0
         var anyFailed = false
+        var deletedIDs: [String] = []
         for item in items {
-            do { try await cloud.deleteUserMedia(fileID: item.id) }
+            do { try await cloud.deleteUserMedia(fileID: item.id); deletedIDs.append(item.id) }
             catch { anyFailed = true }
             state.deleteDone += 1
         }
@@ -174,6 +177,8 @@ final class MediaGridViewModel {
         state.deleteTotal = 0
         state.deleteDone = 0
         exitSelection()
+        // Убираем копии удалённых файлов и с устройства (один системный диалог).
+        await DeviceCopyCleaner.deleteDeviceCopies(forCloudFileIDs: deletedIDs)
         if anyFailed { state.snackbar = String(localized: "media_delete_failed") }
         await reload()
     }
@@ -272,8 +277,10 @@ final class MediaGridViewModel {
         pendingDelete.schedule(
             label: item.fileName,
             action: { [weak self, cloud] in
-                do { try await cloud.deleteUserMedia(fileID: item.id) }
-                catch {
+                do {
+                    try await cloud.deleteUserMedia(fileID: item.id)
+                    await DeviceCopyCleaner.deleteDeviceCopy(forCloudFileID: item.id)
+                } catch {
                     self?.state.snackbar = domainErrorMessage(error)
                     await self?.reload()
                 }

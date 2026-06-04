@@ -97,8 +97,10 @@ final class TrashViewModel {
         pendingDelete.schedule(
             label: item.name,
             action: { [weak self, cloud] in
-                do { try await cloud.deleteFromTrash(entryID: item.id) }
-                catch {
+                do {
+                    try await cloud.deleteFromTrash(entryID: item.id)
+                    await DeviceCopyCleaner.deleteDeviceCopy(forCloudFileID: item.fileID)
+                } catch {
                     // Сервер не дал — возвращаем элемент через reload и сообщаем.
                     self?.state.snackbar = domainErrorMessage(error)
                     await self?.reload()
