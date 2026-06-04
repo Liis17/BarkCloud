@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>BarkCloud File System</string>
+	<string>BarkCloud File Provider</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -18,28 +18,14 @@
 	<string>1.0</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
-	<key>EXAppExtensionAttributes</key>
+	<key>NSExtension</key>
 	<dict>
-		<key>EXExtensionPointIdentifier</key>
-		<string>com.apple.fskit.fsmodule</string>
-		<key>FSName</key>
-		<string>BarkCloud</string>
-		<key>FSShortName</key>
-		<string>BarkCloud</string>
-		<key>FSSupportsBlockResources</key>
-		<false/>
-		<key>FSSupportedSchemes</key>
-		<array>
-			<string>barkcloud</string>
-		</array>
-		<key>FSPersonalities</key>
-		<dict>
-			<key>BarkCloud</key>
-			<dict>
-				<key>FSShortName</key>
-				<string>BarkCloud</string>
-			</dict>
-		</dict>
+		<key>NSExtensionPointIdentifier</key>
+		<string>com.apple.fileprovider-nonui</string>
+		<key>NSExtensionPrincipalClass</key>
+		<string>$(PRODUCT_MODULE_NAME).BarkCloudFileProvider</string>
 	</dict>
+	<key>NSExtensionFileProviderSupportsEnumeration</key>
+	<true/>
 </dict>
 </plist>
