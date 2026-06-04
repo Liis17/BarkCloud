@@ -161,6 +161,7 @@ final class BarkCloudFileProvider: NSObject, NSFileProviderReplicatedExtension {
                 if isFolder {
                     let d = try await services.cloud.createDirectory(parentID: parentDirID, name: name)
                     await cache.put(directory: d, parent: parent)
+                    await noteLocalChange(parent: parent)
                     let item = BarkCloudFileProviderItem.directory(d, parent: parent)
                     completionHandler(item, [], false, nil)
                 } else {
@@ -181,6 +182,7 @@ final class BarkCloudFileProvider: NSObject, NSFileProviderReplicatedExtension {
                         return
                     }
                     await cache.put(file: entry, parentDirID: parentDirID, parent: parent)
+                    await noteLocalChange(parent: parent)
                     completionHandler(BarkCloudFileProviderItem.file(entry, parent: parent), [], false, nil)
                 }
             } catch {
@@ -214,6 +216,7 @@ final class BarkCloudFileProvider: NSObject, NSFileProviderReplicatedExtension {
                         try await services.cloud.renameDirectory(dir.dirID, newName: newName)
                     }
                     await cache.putDirectory(dirID: dir.dirID, parent: newParent, name: newName, modified: Date())
+                    await noteLocalChange(parent: dir.parentIdentifier, also: newParent)
                     let updated = BarkCloudFileProviderItem.directory(id: dir.dirID, name: newName,
                                                                      parent: newParent, modified: Date())
                     completionHandler(updated, [], false, nil)
@@ -238,6 +241,7 @@ final class BarkCloudFileProvider: NSObject, NSFileProviderReplicatedExtension {
                             return
                         }
                         await cache.put(file: entry, parentDirID: newParentDirID, parent: newParent)
+                        await noteLocalChange(parent: file.parentIdentifier, also: newParent)
                         completionHandler(BarkCloudFileProviderItem.file(entry, parent: newParent), [], false, nil)
                         return
                     }
@@ -254,6 +258,7 @@ final class BarkCloudFileProvider: NSObject, NSFileProviderReplicatedExtension {
                     await cache.putFile(entryID: file.entryID, fileID: file.fileID,
                                         parentDirID: newParentDirID, parent: newParent,
                                         name: newName, size: file.size, modified: Date())
+                    await noteLocalChange(parent: file.parentIdentifier, also: newParent)
                     let updated = BarkCloudFileProviderItem.file(entryID: file.entryID, fileID: file.fileID,
                                                                  name: newName, size: file.size,
                                                                  modified: Date(), parent: newParent)
@@ -280,12 +285,14 @@ final class BarkCloudFileProvider: NSObject, NSFileProviderReplicatedExtension {
                 if let dir = await cache.directory(for: identifier) {
                     try await services.cloud.deleteDirectory(dir.dirID)
                     await cache.forget(identifier)
+                    await noteLocalChange(parent: dir.parentIdentifier)
                     completionHandler(nil)
                     return
                 }
                 if let file = await cache.file(for: identifier) {
                     try await services.cloud.deleteFileEntry(file.entryID)
                     await cache.forget(identifier)
+                    await noteLocalChange(parent: file.parentIdentifier)
                     completionHandler(nil)
                     return
                 }
@@ -302,6 +309,21 @@ final class BarkCloudFileProvider: NSObject, NSFileProviderReplicatedExtension {
     private func parentDirID(for parent: NSFileProviderItemIdentifier) async -> String? {
         if parent == .rootContainer { return "" }
         return await cache.directory(for: parent)?.dirID
+    }
+
+    /// Локальная мутация прошла успешно — bump cache anchor и просигналить
+    /// fileproviderd о затронутых контейнерах (может быть до двух — старый и
+    /// новый родитель при move). Игнорируем ошибки сигнала: incremental sync
+    /// — оптимизация, без неё система всё равно увидит изменения при следующем
+    /// `enumerateItems`.
+    func noteLocalChange(parent: NSFileProviderItemIdentifier,
+                         also otherParent: NSFileProviderItemIdentifier? = nil) async {
+        await cache.bumpAnchorAndPersist()
+        guard let manager = NSFileProviderManager(for: domain) else { return }
+        try? await manager.signalEnumerator(for: parent)
+        if let other = otherParent, other != parent {
+            try? await manager.signalEnumerator(for: other)
+        }
     }
 
     /// Найти `CloudFileEntry` в листинге директории по имени и (опционально) fileID
@@ -349,6 +371,27 @@ final class BarkCloudPendingEnumerator: NSObject, NSFileProviderEnumerator {
 
     func enumerateChanges(for observer: NSFileProviderChangeObserver,
                           from syncAnchor: NSFileProviderSyncAnchor) {
-        observer.finishEnumeratingChanges(upTo: syncAnchor, moreComing: false)
+        guard let provider else {
+            observer.finishEnumeratingWithError(NSFileProviderError(.providerNotFound))
+            return
+        }
+        Task {
+            if await provider.cache.isAnchorCurrent(syncAnchor.rawValue) {
+                observer.finishEnumeratingChanges(upTo: syncAnchor, moreComing: false)
+            } else {
+                observer.finishEnumeratingWithError(NSFileProviderError(.syncAnchorExpired))
+            }
+        }
+    }
+
+    func currentSyncAnchor(completionHandler: @escaping (NSFileProviderSyncAnchor?) -> Void) {
+        guard let provider else {
+            completionHandler(nil)
+            return
+        }
+        Task {
+            let data = await provider.cache.currentAnchorData()
+            completionHandler(NSFileProviderSyncAnchor(data))
+        }
     }
 }
