@@ -1,5 +1,6 @@
 import SwiftUI
 import GRPCCore
+import BarkCloudKit
 
 @MainActor
 @Observable

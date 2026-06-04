@@ -14,6 +14,14 @@
 
 ## Этап 0 — Общий пакет `BarkCloudKit` + миграция iOS
 
+> **СТАТУС: ВЫПОЛНЕН** (ветка `claude/mac-virtual-disk-display-S8lTc`). Сетевой слой перенесён
+> в пакет, API сделан `public`, добавлены macOS-ветки (`XDeviceInterceptor`/`XOsInterceptor`,
+> `BarkCloudAppGroup`), iOS переведён на `import BarkCloudKit`. `swift build` + `xcodebuild`
+> (app/ShareExtension/Widgets) + `build-for-testing` — зелёные. Фоновая загрузка iOS-only
+> вынесена в `Ios/.../Data/Cloud/CloudRepository+BackgroundUpload.swift`. iOS-фаза «Sync Shared
+> Proto» удалена (proto теперь из пакета). Не сделано: `RangeBlockReaderTests` (см. 0.6) —
+> отложен до Этапа 1.
+
 Цель: единый источник правды для сетевого слоя. Сейчас в `Mac/BarkCloudKit/` лежит только
 новый код (Range-ридер, батч-удаление) и манифест — пакет **не собирается**, пока не перенесены
 файлы из iOS.
@@ -73,6 +81,15 @@ Mac/BarkCloudKit/scripts/sync_proto.sh    # → Sources/BarkCloudKit/Generated/,
 
 ## Этап 1 — FSKit-расширение `BarkCloudFS.appex`
 
+> **СТАТУС: read+write код КОМПИЛИРУЕТСЯ** (`Mac/BarkCloudDrive/`). Проект app+appex создан,
+> оба таргета линкуют `BarkCloudKit`, `xcodebuild` зелёный (CODE_SIGNING_ALLOWED=NO). Реализованы
+> mount/activate/enumerate/attributes/lookup/reclaim/read (`RangeBlockReader`) + volumeStatistics
+> (read-path) и create/write/remove/rename/mkdir + upload-на-close (write-path 1.5). Авторефреш (1.6)
+> покрыт проактивным рефрешем `GrpcManager` (на каждом FS-запросе). Карта FSKit API —
+> `Obsidian/BarkCloudVault/modules/macos-fskit-api.md`.
+> **Осталось:** рантайм-маунт и эмпирическая проверка семантики (нужен Team ID + включение
+> расширения в System Settings — на стороне пользователя); опциональный фоновый таймер рефреша.
+
 Цель: реализовать том, маппящий FS-операции на облако через `BarkCloudKit`.
 
 ### 1.1 Создать Xcode-проект `Mac/BarkCloudDrive/`
@@ -128,6 +145,12 @@ File System Extensions), смонтировать том → появляетс�
 
 SwiftUI + menu-bar (`NSStatusItem`), паритет с Windows-`App` (трей + 3 окна).
 
+> **СТАТУС: код контейнер-app КОМПИЛИРУЕТСЯ** (`Mac/BarkCloudDrive/BarkCloudDrive/`). `AppModel`
+> (@Observable, фазы serverSetup→login→dashboard) + экраны ServerSetup/Login/Dashboard/Settings/
+> MenuBar + `MountManager`. `xcodebuild` схемы BarkCloudDrive зелёный. Осталось: локализация
+> RU/EN/DE (строки RU инлайн), загрузка аватара через `InsecureHTTP`, реальный механизм монтирования
+> (рантайм-риск — `FSClient` без mount-API; обёртка над `mount`/`umount` непроверяема сборкой).
+
 - **Первый запуск:** экран адреса сервера (host + порты Identity/Users/Files + self-signed) →
   `ServerConfig.persist()` → логин (`AuthRepository`, OTP) → токены в Keychain → имя тома →
   монтирование.
@@ -149,6 +172,12 @@ SwiftUI + menu-bar (`NSStatusItem`), паритет с Windows-`App` (трей +
 ---
 
 ## Этап 3 — Упаковка и автозапуск
+
+> **СТАТУС: скрипт готов** — `Mac/BarkCloudDrive/scripts/build_release.sh` (archive → export →
+> .dmg/.pkg → подпись Developer ID → `notarytool` → staple). Параметризован env-переменными
+> (`TEAM_ID`/`SIGN_APP`/`SIGN_PKG`/`NOTARY_PROFILE`). Фактический запуск — на стороне пользователя
+> (нужны платный Apple Developer аккаунт + сертификаты Developer ID в Keychain). Автозапуск —
+> `SMAppService.mainApp` уже в `SettingsView`. Синтаксис скрипта проверен (`bash -n`).
 
 - `.pkg`/`.dmg` (`productbuild`/`create-dmg`), подпись **Developer ID** + **нотаризация** (`notarytool`),
   staple. Бандл расширения — внутри `.app`.

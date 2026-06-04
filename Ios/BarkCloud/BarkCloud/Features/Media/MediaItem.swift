@@ -1,4 +1,5 @@
 import Foundation
+import BarkCloudKit
 
 /// Элемент медиа-сетки (фото/видео). Заполняется из `MediaAsset` (`UploadFileInfo`).
 struct MediaItem: Identifiable, Hashable {

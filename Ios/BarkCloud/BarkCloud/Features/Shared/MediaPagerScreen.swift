@@ -1,6 +1,7 @@
 import SwiftUI
 import QuickLook
 import UIKit
+import BarkCloudKit
 
 /// Полноэкранный просмотрщик с листанием влево/вправо между файлами коллекции.
 ///

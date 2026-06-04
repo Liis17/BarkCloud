@@ -1,5 +1,6 @@
 import SwiftUI
 import Photos
+import BarkCloudKit
 
 /// Что показываем в свойствах: облачный файл (`MediaAsset`) или ассет устройства
 /// (`PHAsset`). Identifiable — чтобы открывать через `.sheet(item:)`.

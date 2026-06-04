@@ -1,5 +1,6 @@
 import SwiftUI
 import Observation
+import BarkCloudKit
 
 /// Sheet «Кто видит этот файл»: список получателей, которым уже выдан грант, с
 /// возможностью отозвать каждый. Открывается из `ShareWithUserSheet` (когда

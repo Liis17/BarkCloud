@@ -1,4 +1,5 @@
 import SwiftUI
+import BarkCloudKit
 
 /// Ввод адресов микросервисов self-hosted сервера. Показывается на первом запуске
 /// (через `RootView`, пока `ServerConfig` не настроен) и доступен с экрана логина

@@ -1,4 +1,5 @@
 import SwiftUI
+import BarkCloudKit
 
 struct RootView: View {
     @Environment(AppEnvironment.self) private var env
