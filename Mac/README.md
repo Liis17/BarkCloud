@@ -43,6 +43,14 @@
   Осталось (нижний приоритет): `Tests/BarkCloudKitTests/RangeBlockReaderTests.swift` —
   отложен, требует либо живого бэкенда, либо seam-инъекции `URLSession` в `RangeBlockReader`
   (удобнее сделать на Этапе 1, когда появится реальный read-path FSKit).
-- **Этапы 1–3 (FSKit-расширение, app, упаковка):** требуют Xcode/macOS, ещё не начаты.
+- **Этап 1 (FSKit-расширение `BarkCloudFS`): код КОМПИЛИРУЕТСЯ.** `Mac/BarkCloudDrive/` —
+  ExtensionKit-расширение `com.apple.fskit.fsmodule`: `FSVolume` с read-path (enumerate/attributes/
+  lookup/read через `RangeBlockReader`) и write-path (create/write/remove/rename + upload на close).
+- **Этап 2 (контейнер-app): код КОМПИЛИРУЕТСЯ.** SwiftUI + menu-bar: server setup, логин (+OTP),
+  дашборд (профиль, хранилище, монтаж), настройки (logout/автозапуск). Локализация RU/EN/DE.
+- **Этап 3 (упаковка): скрипт готов** — `BarkCloudDrive/scripts/build_release.sh`.
+- **Осталось — только рантайм/устройство:** Team ID + подпись, включить расширение в System
+  Settings, примонтировать и эмпирически проверить read/write; запуск нотаризации. См.
+  `BarkCloudDrive/README.md`. Главный риск — механизм монтирования URL-based FSKit-ФС.
 
 > Всё в этом каталоге собирается и проверяется только на **Mac (Xcode 16+, macOS 15.4+)**.
