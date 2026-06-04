@@ -18,6 +18,7 @@ const DATE_OPS: Op[] = [
 const NUM_OPS: Op[] = [
   { v: 4, label: 'больше' },
   { v: 5, label: 'меньше' },
+  { v: 7, label: 'равно' },
 ];
 const NAME_OPS: Op[] = [
   { v: 6, label: 'содержит' },
