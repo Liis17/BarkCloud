@@ -65,7 +65,7 @@
 		766125E7C7420FAEC4EADAF8 /* ServerSetupView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ServerSetupView.swift; sourceTree = "<group>"; };
 		90041203061702053BB45DF5 /* Localizable.xcstrings */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		95C19A02855B5D8E85C031DA /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.0.sdk/System/Library/Frameworks/Cocoa.framework; sourceTree = DEVELOPER_DIR; };
-		A1E20C125965A765D71B83EF /* BarkCloudDrive.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; name = BarkCloudDrive.app; path = "BarkCloud Drive.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		A1E20C125965A765D71B83EF /* BarkCloud Drive.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "BarkCloud Drive.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		C468E051320D94C908437B2A /* DashboardView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
 		F1CF4D96395D3FA04F549C1A /* BarkCloudDriveApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BarkCloudDriveApp.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -121,7 +121,7 @@
 		B678625D4EC92652935EF3E8 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				A1E20C125965A765D71B83EF /* BarkCloudDrive.app */,
+				A1E20C125965A765D71B83EF /* BarkCloud Drive.app */,
 				1E50AFF8D3690B19132666D6 /* BarkCloudFS.appex */,
 			);
 			name = Products;
@@ -164,7 +164,7 @@
 				814ADD5EBA9ECC4891105FE7 /* Sources */,
 				3B8414EF62651ECEC53F55AD /* Frameworks */,
 				A2DA0D07C0C58D2682AD848A /* Resources */,
-				578DFD52D965640A87507A62 /* Embed ExtensionKit Extensions */,
+				578DFD52D965640A87507A62 /* Embed App Extensions */,
 			);
 			buildRules = (
 			);
@@ -176,7 +176,7 @@
 				746E94F5EE782185AD663E94 /* BarkCloudKit */,
 			);
 			productName = BarkCloudDrive;
-			productReference = A1E20C125965A765D71B83EF /* BarkCloudDrive.app */;
+			productReference = A1E20C125965A765D71B83EF /* BarkCloud Drive.app */;
 			productType = "com.apple.product-type.application";
 		};
 		C7D8E72E76B76F243CD4246E /* BarkCloudFS */ = {
@@ -351,7 +351,20 @@
 				CODE_SIGN_ENTITLEMENTS = BarkCloudDrive/BarkCloudDrive.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = 9Y935NYUP9;
+				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_INCOMING_NETWORK_CONNECTIONS = NO;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = NO;
+				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = NO;
+				ENABLE_RESOURCE_ACCESS_BLUETOOTH = NO;
+				ENABLE_RESOURCE_ACCESS_CALENDARS = NO;
+				ENABLE_RESOURCE_ACCESS_CAMERA = NO;
+				ENABLE_RESOURCE_ACCESS_CONTACTS = NO;
+				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
+				ENABLE_RESOURCE_ACCESS_PRINTING = NO;
+				ENABLE_RESOURCE_ACCESS_USB = NO;
+				ENABLE_USER_SELECTED_FILES = readwrite;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -478,7 +491,20 @@
 				CODE_SIGN_ENTITLEMENTS = BarkCloudDrive/BarkCloudDrive.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = 9Y935NYUP9;
+				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_INCOMING_NETWORK_CONNECTIONS = NO;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = NO;
+				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = NO;
+				ENABLE_RESOURCE_ACCESS_BLUETOOTH = NO;
+				ENABLE_RESOURCE_ACCESS_CALENDARS = NO;
+				ENABLE_RESOURCE_ACCESS_CAMERA = NO;
+				ENABLE_RESOURCE_ACCESS_CONTACTS = NO;
+				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
+				ENABLE_RESOURCE_ACCESS_PRINTING = NO;
+				ENABLE_RESOURCE_ACCESS_USB = NO;
+				ENABLE_USER_SELECTED_FILES = readwrite;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
