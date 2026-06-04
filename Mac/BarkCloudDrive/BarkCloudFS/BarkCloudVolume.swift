@@ -4,14 +4,16 @@ import BarkCloudKit
 
 /// Том BarkCloud: маппит операции FSKit на облако через `BarkCloudKit`.
 ///
-/// Этап 1 — **read-path**: монтирование, листинг каталога (`enumerateDirectory`),
-/// атрибуты, lookup и поблочное чтение (`RangeBlockReader`). Запись/создание/
-/// удаление/переименование пока возвращают `EROFS`/`ENOTSUP` (доделывается на 1.5).
+/// Read-path: монтирование, листинг (`enumerateDirectory`), атрибуты, lookup,
+/// поблочное чтение (`RangeBlockReader`). Write-path: create/write/remove/rename/
+/// mkdir; байты записи копятся в рабочей копии на диске, реальный upload — на
+/// `closeItem` (блобы иммутабельны). Символические/жёсткие ссылки — `ENOTSUP`.
+/// ⚠️ Write-семантика не проверена в рантайме (нужен смонтированный том).
 ///
 /// FSKit оперирует нодами (`FSItem`), а не путями — узлы кэшируются в реестре по
 /// стабильному `FSItem.Identifier` (инодоподобный id), чтобы lookup/getattr/reclaim
 /// ссылались на один и тот же объект.
-final class BarkCloudVolume: FSVolume, FSVolume.Operations, FSVolume.PathConfOperations, FSVolume.ReadWriteOperations {
+final class BarkCloudVolume: FSVolume, FSVolume.Operations, FSVolume.PathConfOperations, FSVolume.ReadWriteOperations, FSVolume.OpenCloseOperations {
 
     private let cloud: CloudRepository
     private let reader: RangeBlockReader
@@ -49,17 +51,17 @@ final class BarkCloudVolume: FSVolume, FSVolume.Operations, FSVolume.PathConfOpe
     /// Узел каталога по записи листинга — стабильный id по ключу "d:<dirID>".
     private func dirNode(_ d: CloudDirectory, parent: BarkCloudItem) -> BarkCloudItem {
         node(key: "d:\(d.id)", parent: parent) { id in
-            BarkCloudItem(kind: .directory(id: d.id), name: d.name, size: 0,
-                          modified: Date(), itemID: id, parentID: parent.itemID)
+            BarkCloudItem.makeDirectory(id: d.id, name: d.name, modified: Date(),
+                                        itemID: id, parentID: parent.itemID)
         }
     }
 
     /// Узел файла по записи листинга — стабильный id по ключу "f:<entryID>".
     private func fileNode(_ f: CloudFileEntry, parent: BarkCloudItem) -> BarkCloudItem {
         node(key: "f:\(f.id)", parent: parent) { id in
-            BarkCloudItem(kind: .file(entryID: f.id, fileID: f.fileID), name: f.name,
-                          size: f.asset.fileSize, modified: f.asset.uploadedAt ?? f.asset.createdAt,
-                          itemID: id, parentID: parent.itemID)
+            BarkCloudItem.makeFile(entryID: f.id, fileID: f.fileID, name: f.name,
+                                   size: f.asset.fileSize, modified: f.asset.uploadedAt ?? f.asset.createdAt,
+                                   itemID: id, parentID: parent.itemID, parentDirID: parent.directoryID ?? "")
         }
     }
 
@@ -72,6 +74,40 @@ final class BarkCloudVolume: FSVolume, FSVolume.Operations, FSVolume.PathConfOpe
         idByKey[key] = id.rawValue
         nodesByID[id.rawValue] = item
         return item
+    }
+
+    /// Выдать новый стабильный id (для свежесозданных, ещё не привязанных файлов).
+    private func allocID() -> FSItem.Identifier {
+        lock.lock(); defer { lock.unlock() }
+        let id = FSItem.Identifier(rawValue: nextID)!
+        nextID += 1
+        return id
+    }
+
+    private func registerKeyed(_ item: BarkCloudItem, key: String) {
+        lock.lock(); defer { lock.unlock() }
+        idByKey[key] = item.itemID.rawValue
+        nodesByID[item.itemID.rawValue] = item
+    }
+
+    // MARK: - Рабочие копии записи
+
+    private lazy var workDir: URL = {
+        let dir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("BarkCloud.Drive/work", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
+    }()
+
+    /// Рабочая копия файла на диске (создаётся пустой при первом обращении).
+    private func workingFileURL(for node: BarkCloudItem) throws -> URL {
+        if let url = node.workingURL { return url }
+        let url = workDir.appendingPathComponent("\(node.itemID.rawValue).tmp")
+        if !FileManager.default.fileExists(atPath: url.path) {
+            FileManager.default.createFile(atPath: url.path, contents: nil)
+        }
+        node.workingURL = url
+        return url
     }
 
     // MARK: - Жизненный цикл тома
@@ -188,9 +224,24 @@ final class BarkCloudVolume: FSVolume, FSVolume.Operations, FSVolume.PathConfOpe
     // MARK: - Чтение
 
     func read(from item: FSItem, at offset: off_t, length: size_t, into buffer: FSMutableFileDataBuffer) async throws -> size_t {
-        guard let node = item as? BarkCloudItem, let ref = node.fileRef else { throw Self.posix(EINVAL) }
-        let data = try await reader.read(fileID: ref.fileID, fileLength: node.size,
+        guard let node = item as? BarkCloudItem, !node.isDirectory else { throw Self.posix(EINVAL) }
+
+        // Несохранённая рабочая копия (новый/редактируемый файл) — читаем с диска.
+        if let wurl = node.workingURL {
+            let handle = try FileHandle(forReadingFrom: wurl)
+            defer { try? handle.close() }
+            try handle.seek(toOffset: UInt64(offset))
+            let data = try handle.read(upToCount: Int(length)) ?? Data()
+            return copy(data, into: buffer)
+        }
+
+        guard let fid = node.fileID, !fid.isEmpty else { return 0 }
+        let data = try await reader.read(fileID: fid, fileLength: node.size,
                                          offset: Int64(offset), length: Int(length))
+        return copy(data, into: buffer)
+    }
+
+    private func copy(_ data: Data, into buffer: FSMutableFileDataBuffer) -> size_t {
         guard !data.isEmpty else { return 0 }
         let n = min(data.count, buffer.length)
         buffer.withUnsafeMutableBytes { raw in
@@ -199,25 +250,88 @@ final class BarkCloudVolume: FSVolume, FSVolume.Operations, FSVolume.PathConfOpe
         return size_t(n)
     }
 
-    // MARK: - Запись/мутации (read-only на этом этапе)
+    // MARK: - Запись/мутации (write-path 1.5)
+    //
+    // Семантика наследуется от Windows-движка: блобы иммутабельны → реальный upload
+    // на ЗАКРЫТИИ item (`closeItem`), а не на каждом `write`; до этого байты копятся
+    // в рабочей копии на диске. ⚠️ Не проверено в рантайме (нужен смонтированный том).
 
     func write(contents: Data, to item: FSItem, at offset: off_t) async throws -> size_t {
-        throw Self.posix(EROFS)
+        guard let node = item as? BarkCloudItem, !node.isDirectory else { throw Self.posix(EINVAL) }
+        let url = try workingFileURL(for: node)
+        let handle = try FileHandle(forWritingTo: url)
+        defer { try? handle.close() }
+        try handle.seek(toOffset: UInt64(offset))
+        handle.write(contents)
+        node.isDirty = true
+        node.size = max(node.size, offset + Int64(contents.count))
+        return size_t(contents.count)
     }
 
     func createItem(named name: FSFileName, type: FSItem.ItemType, inDirectory directory: FSItem,
                     attributes newAttributes: FSItem.SetAttributesRequest) async throws -> (FSItem, FSFileName) {
-        throw Self.posix(EROFS)
+        guard let dir = directory as? BarkCloudItem, let dirID = dir.directoryID else { throw Self.posix(ENOTDIR) }
+        let nm = name.string ?? ""
+        switch type {
+        case .directory:
+            let d = try await cloud.createDirectory(parentID: dirID, name: nm)
+            let n = dirNode(d, parent: dir)
+            return (n, FSFileName(string: n.name))
+        case .file:
+            // Новый пустой файл: рабочая копия + отложенный upload на закрытии.
+            let n = BarkCloudItem.makeFile(entryID: "", fileID: "", name: nm, size: 0,
+                                           modified: Date(), itemID: allocID(),
+                                           parentID: dir.itemID, parentDirID: dirID)
+            _ = try workingFileURL(for: n)
+            registerKeyed(n, key: "new:\(dirID)/\(nm)")
+            return (n, FSFileName(string: nm))
+        default:
+            throw Self.posix(ENOTSUP)
+        }
     }
 
     func removeItem(_ item: FSItem, named name: FSFileName, fromDirectory directory: FSItem) async throws {
-        throw Self.posix(EROFS)
+        guard let node = item as? BarkCloudItem else { throw Self.posix(EINVAL) }
+        if let dirID = node.directoryID {
+            try await cloud.deleteDirectory(dirID)
+        } else if let eid = node.entryID, !eid.isEmpty {
+            try await cloud.deleteFileEntry(eid)
+        }
+        if let w = node.workingURL { try? FileManager.default.removeItem(at: w); node.workingURL = nil }
     }
 
     func renameItem(_ item: FSItem, inDirectory sourceDirectory: FSItem, named sourceName: FSFileName,
                     to destinationName: FSFileName, inDirectory destinationDirectory: FSItem,
                     overItem: FSItem?) async throws -> FSFileName {
-        throw Self.posix(EROFS)
+        guard let node = item as? BarkCloudItem,
+              let dstDir = destinationDirectory as? BarkCloudItem,
+              let dstDirID = dstDir.directoryID else { throw Self.posix(EINVAL) }
+        let newName = destinationName.string ?? node.name
+        let sameParent = (sourceDirectory as? BarkCloudItem)?.directoryID == dstDirID
+        if let dirID = node.directoryID {
+            if !sameParent { try await cloud.moveDirectory(dirID, newParentID: dstDirID) }
+            if newName != node.name { try await cloud.renameDirectory(dirID, newName: newName) }
+        } else if let eid = node.entryID, !eid.isEmpty {
+            if !sameParent { try await cloud.moveFileEntry(eid, newDirectoryID: dstDirID) }
+            if newName != node.name { try await cloud.renameFileEntry(eid, newName: newName) }
+        }
+        node.name = newName
+        node.parentDirID = dstDirID
+        return FSFileName(string: newName)
+    }
+
+    // MARK: - Open/Close (триггер upload на закрытии)
+
+    func openItem(_ item: FSItem, modes: FSVolume.OpenModes) async throws {}
+
+    func closeItem(_ item: FSItem, modes: FSVolume.OpenModes) async throws {
+        guard let node = item as? BarkCloudItem, !node.isDirectory,
+              node.isDirty, let wurl = node.workingURL else { return }
+        let data = (try? Data(contentsOf: wurl)) ?? Data()
+        // Блоб иммутабелен → перезаливаем целиком и привязываем к родителю.
+        let fid = try await cloud.uploadFile(data: data, fileName: node.name, toDirectory: node.parentDirID)
+        node.fileID = fid
+        node.isDirty = false
     }
 
     func createSymbolicLink(named name: FSFileName, inDirectory directory: FSItem,
