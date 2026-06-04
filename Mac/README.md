@@ -1,56 +1,70 @@
-# BarkCloud для macOS — виртуальный диск (FSKit)
+# BarkCloud для macOS — клиент облака (File Provider)
 
-Нативный macOS-клиент: монтирует облако BarkCloud как **том в Finder** (боковая панель +
-рабочий стол) с подкачкой содержимого по запросу. Аналог Windows-клиента `Drive/`
-(`X:` через Dokany), см. [Drive/README.md](../Drive/README.md) и заметку памяти
-`Obsidian/BarkCloudVault/modules/macos-drive.md`.
+Нативный macOS-клиент: монтирует облако BarkCloud как **папку в Finder**
+(боковая панель Locations + `~/Library/CloudStorage/BarkCloud`) с подкачкой
+содержимого по запросу. Реализован через **NSFileProviderReplicatedExtension** —
+тот же механизм, что у iCloud Drive, Dropbox, Google Drive (новый клиент),
+OneDrive.
 
-➡️ **Пошаговый план для выполнения на Mac: [PLAN.md](PLAN.md)** (этапы 0→3 с проверками).
+➡️ **Пошаговый план для выполнения на Mac: [PLAN.md](PLAN.md)**.
 
 ## Решения
 
-- **ФС: FSKit** (`FSUnaryFileSystem`, macOS 15.4+) — нативно, без kext, нотаризуется.
-- **Язык: Swift**, переиспользование сетевого слоя iOS через пакет `BarkCloudKit`.
-- **Полный паритет** с Windows: read-write, Range-чтение, батч-удаление, mkdir/move/rename,
-  автозапуск, инсталлятор.
+- **API: NSFileProviderReplicatedExtension** (macOS 11+) — нативно, не требует
+  специальных entitlements, доступно Personal Apple Developer team, нотаризуется
+  как обычное приложение, App-Store-совместимо.
+- **Язык: Swift**, переиспользование сетевого слоя iOS через пакет
+  `BarkCloudKit`.
+
+> **Почему не FSKit:** капабилити `com.apple.developer.fskit.fsmodule` не
+> поддерживается Personal team Apple Developer (нужен платный аккаунт).
+> File Provider даёт ту же UX (папка облака в Finder с on-demand-материализацией)
+> без специальных entitlements. См. `Obsidian/BarkCloudVault/modules/macos-drive.md`.
+
+> **Почему не macFUSE / FUSE-T:** kext / system extension с непривычной
+> установкой, не App-Store-совместимо, риски при обновлениях macOS.
 
 ## Соответствие Windows → macOS
 
 | Windows (`Drive/`) | macOS (`Mac/`) |
 |---|---|
-| `BarkCloud.Drive.Engine` (Dokany ФС) | `BarkCloudFS.appex` — FSKit-расширение |
+| `BarkCloud.Drive.Engine` (Dokany ФС) | `BarkCloudFS.appex` — NSFileProvider-расширение |
 | `BarkCloud.Drive.App` (WPF + трей) | `BarkCloud Drive.app` — SwiftUI + menu-bar |
 | Contracts + named-pipe IPC | App Group + shared Keychain access-group |
 | DPAPI `refresh.bin` | Keychain (`SessionStore`) |
-| Dokany driver | FSKit (встроен) + включение расширения в System Settings |
+| Dokany driver | NSFileProvider (встроен) + `NSFileProviderManager.add(domain:)` |
 | Registry `Run` | `SMAppService` (Login Item) |
 
-На macOS отдельного «движка-процесса» нет: **FSKit сам поднимает процесс расширения**.
-Контейнер-app пишет конфиг/токены в общее хранилище и инициирует mount/unmount; refresh-токеном
-и авторефрешем владеет расширение (живёт, пока том примонтирован).
+На macOS отдельного «движка-процесса» нет: **системный демон `fileproviderd`
+сам поднимает процесс расширения** по запросу. Контейнер-app пишет конфиг/токены
+в общее хранилище и регистрирует домен; refresh-токеном и авторефрешем владеет
+расширение (живёт, пока fileproviderd удерживает домен).
 
-## Структура (план)
+## Структура
 
-- `BarkCloudKit/` — общий SwiftPM-пакет (сеть + proto + Range-ридер + батч-удаление). **← Этап 0 начат**
-- `BarkCloudDrive/` — Xcode-проект: контейнер-app + таргет расширения `BarkCloudFS`. *(Этапы 1–3)*
+- `BarkCloudKit/` — общий SwiftPM-пакет (сеть + proto). Платформо-независимый
+  сетевой слой iOS перенесён сюда — единый источник правды.
+- `BarkCloudDrive/` — Xcode-проект:
+  - `BarkCloudDrive` (контейнер-app) — SwiftUI + menu-bar, регистрирует домен.
+  - `BarkCloudFS` (расширение) — `NSFileProviderReplicatedExtension`, маппит
+    операции File Provider на облако через `BarkCloudKit`.
 
 ## Статус
 
-- **Этап 0 (общий пакет): ВЫПОЛНЕН.** Платформо-независимый сетевой слой (gRPC-клиенты,
-  токены, репозитории, proto) перенесён из iOS в `BarkCloudKit` — единый источник правды.
-  `swift build` пакета зелёный; iOS переведён на `import BarkCloudKit` (main app +
-  ShareExtension линкуют продукт), `xcodebuild` всех схем и `build-for-testing` — зелёные.
-  Осталось (нижний приоритет): `Tests/BarkCloudKitTests/RangeBlockReaderTests.swift` —
-  отложен, требует либо живого бэкенда, либо seam-инъекции `URLSession` в `RangeBlockReader`
-  (удобнее сделать на Этапе 1, когда появится реальный read-path FSKit).
-- **Этап 1 (FSKit-расширение `BarkCloudFS`): код КОМПИЛИРУЕТСЯ.** `Mac/BarkCloudDrive/` —
-  ExtensionKit-расширение `com.apple.fskit.fsmodule`: `FSVolume` с read-path (enumerate/attributes/
-  lookup/read через `RangeBlockReader`) и write-path (create/write/remove/rename + upload на close).
-- **Этап 2 (контейнер-app): код КОМПИЛИРУЕТСЯ.** SwiftUI + menu-bar: server setup, логин (+OTP),
-  дашборд (профиль, хранилище, монтаж), настройки (logout/автозапуск). Локализация RU/EN/DE.
-- **Этап 3 (упаковка): скрипт готов** — `BarkCloudDrive/scripts/build_release.sh`.
-- **Осталось — только рантайм/устройство:** Team ID + подпись, включить расширение в System
-  Settings, примонтировать и эмпирически проверить read/write; запуск нотаризации. См.
-  `BarkCloudDrive/README.md`. Главный риск — механизм монтирования URL-based FSKit-ФС.
+- **Стадия A (каркас File Provider):** код компилируется. Тип таргета
+  `app-extension` (`com.apple.fileprovider-nonui`), новый Info.plist + entitlements
+  без FSKit-капабилити.
+- **Стадия B (read-path):** код компилируется. `BarkCloudFileProviderItem`,
+  `BarkCloudItemCache`, `BarkCloudEnumerator`, `fetchContents` через
+  `tempDownloadURLs` + `download`.
+- **Стадия C (write-path):** код компилируется. `createItem` (mkdir / upload+attach),
+  `modifyItem` (rename/move; contents — delete+upload, блобы иммутабельны),
+  `deleteItem`.
+- **Стадия D (контейнер-app):** код компилируется. `MountManager` →
+  `FileProviderDomainManager` (`NSFileProviderManager.add(_:)`), Dashboard/MenuBar/
+  Settings обновлены.
+- **Осталось — только рантайм/устройство:** включить домен из дашборда, эмпирически
+  проверить листинг/чтение/запись в Finder, проверить корректность `cache` после
+  рестарта расширения. См. `BarkCloudDrive/README.md`.
 
 > Всё в этом каталоге собирается и проверяется только на **Mac (Xcode 16+, macOS 15.4+)**.

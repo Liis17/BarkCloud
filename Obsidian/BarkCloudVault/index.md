@@ -45,7 +45,7 @@
 - [[modules/windows-drive]] — Виртуальный диск `X:` поверх облака (Dokany, .NET). Текущее: read-only PoC фазы 2
 
 ### 💻 Модули — macOS (Desktop)
-- [[modules/macos-drive]] — Виртуальный том в Finder поверх облака (FSKit, Swift). Каталог `Mac/`. Текущее: заготовка Этапа 0 (общий пакет `BarkCloudKit`)
+- [[modules/macos-drive]] — Папка облака в Finder (NSFileProviderReplicatedExtension, Swift). Каталог `Mac/`. Текущее: код read+write+контейнер компилируется, осталась рантайм-проверка
 
 ### 🛡 Аудит
 - `Docs/SECURITY_PERFORMANCE_AUDIT.md` — Пошаговый план аудита безопасности и производительности (Backend + Web + инфраструктура): сквозные этапы E1–E10, проверки по каждому микросервису, нагрузочное тестирование, шаблон отчёта и приложение с известными горячими точками (file:line).

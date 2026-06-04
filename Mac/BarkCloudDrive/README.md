@@ -1,14 +1,16 @@
-# BarkCloud Drive (macOS) — контейнер-app + FSKit-расширение
+# BarkCloud Drive (macOS) — контейнер-app + File Provider-расширение
 
-Нативный macOS-клиент: монтирует облако BarkCloud как том в Finder через **FSKit**.
-Состоит из двух таргетов в `BarkCloudDrive.xcodeproj`:
+Нативный macOS-клиент: облако BarkCloud как **папка в Finder** через
+**NSFileProviderReplicatedExtension**. Состоит из двух таргетов в
+`BarkCloudDrive.xcodeproj`:
 
-- **`BarkCloudDrive`** — контейнер-приложение (SwiftUI + menu-bar): server setup, логин,
-  дашборд, настройки, монтаж/размонтаж.
-- **`BarkCloudFS`** — FSKit-расширение (`com.apple.fskit.fsmodule`): реализует том
-  (`FSVolume`), маппит FS-операции на облако через пакет `BarkCloudKit`.
+- **`BarkCloudDrive`** — контейнер-приложение (SwiftUI + menu-bar): server
+  setup, логин, дашборд, настройки, подключение/отключение домена.
+- **`BarkCloudFS`** — File Provider-расширение (`com.apple.fileprovider-nonui`):
+  реализует `NSFileProviderReplicatedExtension`, маппит операции File Provider
+  на облако через пакет `BarkCloudKit`.
 
-Карта реализации — `Obsidian/BarkCloudVault/modules/macos-drive.md` и `macos-fskit-api.md`.
+Карта реализации — `Obsidian/BarkCloudVault/modules/macos-drive.md`.
 Пошаговый план — `Mac/PLAN.md`.
 
 ## Сборка (компиляция)
@@ -19,48 +21,60 @@ xcodebuild build -scheme BarkCloudFS    -configuration Debug CODE_SIGNING_ALLOWE
 xcodebuild build -scheme BarkCloudDrive -configuration Debug CODE_SIGNING_ALLOWED=NO
 ```
 
-Обе схемы должны собираться зелёными. `BarkCloudKit` подтягивается как локальный SwiftPM-пакет
-(`../BarkCloudKit`).
+Обе схемы должны собираться зелёными. `BarkCloudKit` подтягивается как
+локальный SwiftPM-пакет (`../BarkCloudKit`).
 
-## Настройка для запуска (нужен Apple Developer аккаунт)
+## Настройка для запуска
 
-Компиляция подписи не требует, но **монтирование и работа расширения требуют подписи + entitlements**:
+В отличие от FSKit, File Provider **не требует платного Apple Developer**
+— достаточно Personal team (бесплатной). Но подпись нужна:
 
-1. **Team ID.** В Xcode выбрать команду подписи для обоих таргетов (Signing & Capabilities →
-   Automatically manage signing). Entitlements уже используют `$(TeamIdentifierPrefix)` /
-   `$(AppIdentifierPrefix)` для App Group `group.<TeamID>.com.barkfluff.BarkCloud` и
-   keychain-access-group — отдельно прописывать Team ID не нужно.
-   - ⚠️ **Сверить App Group id с пакетом:** `BarkCloudKit/Sources/.../Networking/BarkCloudAppGroup.swift`
-     (macOS-ветка) сейчас `group.com.barkfluff.BarkCloud` — заменить на реальный
-     `group.<TeamID>.com.barkfluff.BarkCloud`, чтобы расширение и app читали один App Group.
-2. **Entitlement `com.apple.developer.fskit.fsmodule`** требует профиля (платный аккаунт).
-3. Запустить контейнер-app, ввести адрес сервера и залогиниться (токены → Keychain, общий с расширением).
+1. **Team ID.** В Xcode выбрать команду подписи для обоих таргетов (Signing
+   & Capabilities → Automatically manage signing). Entitlements уже используют
+   `$(TeamIdentifierPrefix)` / `$(AppIdentifierPrefix)` для App Group
+   `group.<TeamID>.com.barkfluff.BarkCloud` и keychain-access-group.
+   - ⚠️ **Сверить App Group id** в `BarkCloudKit/Sources/.../Networking/BarkCloudAppGroup.swift`
+     (macOS-ветка) — заменить на `group.<TeamID>.com.barkfluff.BarkCloud`,
+     чтобы расширение и app читали один App Group.
+2. Запустить контейнер-app, ввести адрес сервера и залогиниться (токены →
+   Keychain, общий с расширением).
 
-## Включение и монтирование (рантайм — не проверено сборкой)
+## Подключение домена
 
-1. **Включить расширение:** System Settings → General → Login Items & Extensions →
-   **File System Extensions** → включить «BarkCloud». FSKit требует явного согласия пользователя.
-2. **Примонтировать:** кнопка «Примонтировать» в дашборде (или меню в строке состояния).
+В отличие от FSKit (где нужно было включать расширение в System Settings →
+File System Extensions и монтировать через `mount`), File Provider не
+требует ручного включения системой:
 
-> ⚠️ **Главный технический риск (см. `MountManager.swift`).** Точный механизм монтирования
-> URL-based унарной FSKit-ФС публично не задокументирован: `FSClient` отдаёт только список
-> установленных модулей, без mount-API. `MountManager` — best-effort обёртка над `mount`/`umount`
-> с типом `BarkCloud` и ресурсом-URL `barkcloud://`. На устройстве, вероятно, потребуется уточнить
-> фактическую команду монтирования (и, возможно, непесочный helper, т.к. контейнер-app в App Sandbox).
+1. Запустить **BarkCloud Drive.app**, залогиниться.
+2. В дашборде нажать **«Подключить»** — `NSFileProviderManager.add(domain:)`
+   регистрирует домен в системе.
+3. Папка **BarkCloud** появляется:
+   - в боковой панели **Locations** в Finder;
+   - в `~/Library/CloudStorage/BarkCloud/`.
+4. Кнопка **«Открыть в Finder»** — `NSWorkspace.activateFileViewerSelecting`
+   по `NSFileProviderManager.getUserVisibleURL(.rootContainer)`.
 
-## Что проверить при первом маунте
+## Что проверить при первом подключении
 
-- Листинг корня и подпапок в Finder (в логе — `enumerateDirectory`).
-- Открытие большого файла → чтение **Range-блоками** (не целиком), см. `RangeBlockReader`.
-- Запись/копирование файла → upload на закрытии (`closeItem`), виден после ремаунта.
-- Удаление (`deleteFileEntry`/`deleteDirectory`), mkdir, rename/move.
-- **Риск к проверке:** `FSItem.Identifier(rawValue:)` для произвольных inode-id — если это
-  закрытый enum `{0,1,2}`, узлам нужен другой носитель id.
+- Листинг корня и подпапок в Finder.
+- Открытие файла → системный демон `fileproviderd` вызывает
+  `fetchContents`, расширение качает блоб через `tempDownloadURLs` →
+  `transfer.download`, файл материализуется и открывается ассоциированным
+  приложением.
+- Создание папки / копирование файла в папку BarkCloud → `createItem`
+  (mkdir / uploadFile + attachFile).
+- Переименование / перемещение → `modifyItem` (rename/move).
+- Удаление → `deleteItem` (`deleteFileEntry` / `deleteDirectory`).
+- Перезапись содержимого файла → `modifyItem` с `.contents`: блоб
+  удаляется (`deleteFileEntry`) и загружается новый
+  (`uploadFile` + `attachFile`), `entryID`/identifier меняется,
+  fileproviderd подменяет.
 
 ## Релиз (Этап 3)
 
-Сборка дистрибутива — `scripts/build_release.sh` (archive → .dmg/.pkg → подпись Developer ID →
-нотаризация → staple). Нужен платный Apple Developer аккаунт и сертификаты Developer ID в Keychain:
+Сборка дистрибутива — `scripts/build_release.sh` (archive → .dmg/.pkg →
+подпись Developer ID → нотаризация → staple). Нужен платный Apple Developer
+аккаунт и сертификаты Developer ID в Keychain:
 
 ```bash
 TEAM_ID=ABCDE12345 \
@@ -72,7 +86,11 @@ scripts/build_release.sh
 
 ## Осталось (рантайм, после проверки на устройстве)
 
-- Реальный механизм монтирования FSKit-тома (см. раздел про `MountManager` выше).
-- Эмпирическая проверка read/write семантики и `FSItem.Identifier`.
+- Эмпирическая проверка read/write семантики (включая cache hit/miss после
+  рестарта расширения).
+- Persistent cache в `BarkCloudItemCache` (если cache-miss в пин/recents
+  окажется проблемой — см. `Mac/PLAN.md` «Риски»).
+- Incremental sync (`enumerateChanges` + бэкенд-стрим изменений) — для пуш-
+  обновлений с других клиентов.
 
 Локализация RU/EN/DE и аватар профиля — **готовы**.
