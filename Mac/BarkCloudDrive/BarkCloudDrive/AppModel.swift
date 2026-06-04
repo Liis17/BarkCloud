@@ -15,7 +15,7 @@ final class AppModel {
     let transfer: FileTransferService
     let auth: AuthRepository
     let users: UserRepository
-    let mount = MountManager()
+    let domain = FileProviderDomainManager()
 
     var phase: Phase
     var user: Barkcloud_Users_User?
