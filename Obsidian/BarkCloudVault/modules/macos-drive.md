@@ -8,6 +8,7 @@
 
 ## Ключевые решения
 
+- **Карта FSKit API (реальные сигнатуры из SDK 26.5): [[macos-fskit-api]]** — читать перед кодом расширения.
 - **Движок ФС: FSKit** (`FSUnaryFileSystem`, macOS 15.4+) — нативный Apple-фреймворк, даёт
   настоящий том **без kext**, нотаризуется, App-Store-совместим. Отвергнуты: macFUSE (kext +
   снижение безопасности на Apple Silicon, не App Store) и File Provider (не «том», а облачная
@@ -75,7 +76,30 @@ upload — на закрытии item (не на каждом write); ошибк
   1 МиБ блоки, дисковый кэш, дедуп, TTL temp-URL 50 мин, откат на whole при ≠206) и
   `CloudRepository+BatchDelete.swift` (`batchDeleteFileEntries`, чанки по 100).
 
-**Этапы 1–3 (FSKit-расширение, контейнер-app, инсталлятор) — не начаты**, требуют Xcode 16+/macOS 15.4+.
+**Этап 1 (FSKit-расширение `BarkCloudFS`) — read-path скаффолд, КОМПИЛИРУЕТСЯ** (`Mac/BarkCloudDrive/`,
+2026-06-04). Проект `BarkCloudDrive.xcodeproj`: app-контейнер `BarkCloudDrive` (SwiftUI-заглушка) +
+ExtensionKit-расширение `BarkCloudFS` (`com.apple.fskit.fsmodule`), оба линкуют `BarkCloudKit`,
+deployment 15.4. `xcodebuild` обеих схем зелёный (CODE_SIGNING_ALLOWED=NO).
+- `BarkCloudFSExtension.swift` — `@main UnaryFileSystemExtension`.
+- `BarkCloudUnaryFileSystem.swift` — `probe`/`load`/`unload` (load поднимает `BarkCloudSession`).
+- `BarkCloudVolume.swift` — `FSVolume.Operations`+`PathConfOperations`+`ReadWriteOperations`:
+  activate/deactivate/mount/unmount/sync, attributes, lookup, reclaim, **enumerateDirectory**
+  (через `CloudRepository.listDirectory` + packer), **read** (через `RangeBlockReader`),
+  volumeStatistics (`storageInfo`). Write/create/remove/rename — стабы `EROFS`/`ENOTSUP` (1.5).
+- `BarkCloudItem.swift` — узел `FSItem` (directory/file, стабильный id-реестр).
+- `BarkCloudSession.swift` — ленивый `GrpcManager`/`FileTransferService`/`CloudRepository`/
+  `RangeBlockReader` из App Group + Keychain.
+- Info.plist расширения: `EXAppExtensionAttributes` (`com.apple.fskit.fsmodule`, `FSShortName`,
+  `FSPersonalities`, `FSSupportedSchemes=[barkcloud]`). Entitlements: fskit, app-sandbox, network,
+  App Group + keychain (Team ID через `$(TeamIdentifierPrefix)`/`$(AppIdentifierPrefix)`).
+
+**Нужно от пользователя для рантайма** (компиляция не требует): Apple Developer **Team ID** для
+подписи + App Group; включить расширение в System Settings → File System Extensions; примонтировать
+из контейнер-app (Этап 2) или вручную. **Риск проверить на устройстве:** `FSItem.Identifier(rawValue:)`
+для произвольных inode-id (компилируется; если это закрытый enum {0,1,2} — нужен другой носитель id).
+
+**Осталось по Этапу 1:** write-path (1.5 — create/write/remove/rename/mkdir + upload на close),
+авто-рефреш токена в расширении (1.6). **Этапы 2–3 (контейнер-app UI, инсталлятор) — не начаты.**
 
 ## Переиспользуемый код iOS ([[ios-app]])
 
@@ -89,6 +113,6 @@ upload — на закрытии item (не на каждом write); ошибк
 ## План фаз
 
 0. Общий пакет `BarkCloudKit` + миграция iOS ← **ВЫПОЛНЕН** (сборки зелёные)
-1. FSKit-расширение `BarkCloudFS` (FSVolume-операции → облако) ← **следующий**
+1. FSKit-расширение `BarkCloudFS` (FSVolume-операции → облако) ← **read-path компилируется; осталось write-path (1.5) + авторефреш (1.6)**
 2. Контейнер-app (server setup, логин, монтаж, дашборд, настройки, автозапуск)
 3. Упаковка `.pkg`/`.dmg` + нотаризация + онбординг включения расширения
