@@ -1,4 +1,5 @@
 using BarkCloud.Files.Persistence;
+using BarkCloud.GrpcServer.XAuth;
 using BarkCloud.Proto.Files;
 
 using MediatR;
@@ -15,6 +16,7 @@ namespace BarkCloud.Files.Features.CheckFileHashes;
 public partial class CheckFileHashesCommandHandler : IRequestHandler<CheckFileHashesCommand, CheckFileHashesResponse>
 {
     private readonly IFileHashesStorage _hashesStorage;
+    private readonly UserContext _userContext;
     private readonly ILogger<CheckFileHashesCommandHandler> _logger;
 
     // Ограничение на размер пакета, чтобы один запрос не разрастался.
@@ -25,9 +27,11 @@ public partial class CheckFileHashesCommandHandler : IRequestHandler<CheckFileHa
 
     public CheckFileHashesCommandHandler(
         IFileHashesStorage hashesStorage,
+        UserContext userContext,
         ILogger<CheckFileHashesCommandHandler> logger)
     {
         _hashesStorage = hashesStorage;
+        _userContext = userContext;
         _logger = logger;
     }
 
@@ -52,7 +56,8 @@ public partial class CheckFileHashesCommandHandler : IRequestHandler<CheckFileHa
         _logger.LogInformation("Пакетная проверка хешей: получено {Total}, валидных уникальных {Valid}",
             request.FileHashes.Count, normalized.Count);
 
-        var existing = await _hashesStorage.GetExistingHashes(normalized);
+        // Только хеши, файлы которых есть у текущего пользователя — иначе раскрыли бы наличие чужих файлов.
+        var existing = await _hashesStorage.GetExistingHashesForOwner(_userContext.UserId, normalized, cancellationToken);
 
         var response = new CheckFileHashesResponse();
         foreach (var hash in normalized)

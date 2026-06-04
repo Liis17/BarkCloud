@@ -57,6 +57,7 @@ builder.Services.AddGrpcClient<UsersApi.UsersApiClient>(o => o.Address = new Uri
 builder.Services.AddGrpcClient<FilesApi.FilesApiClient>(o => o.Address = new Uri(filesAddress));
 builder.Services.AddGrpcClient<CloudApi.CloudApiClient>(o => o.Address = new Uri(filesAddress));
 builder.Services.AddGrpcClient<AlbumApi.AlbumApiClient>(o => o.Address = new Uri(filesAddress));
+builder.Services.AddGrpcClient<DynamicFolderApi.DynamicFolderApiClient>(o => o.Address = new Uri(filesAddress));
 
 // HttpClient для прокси-загрузки байтов в Files (на внутренний HTTP1-эндпоинт).
 builder.Services.AddHttpClient("files-upload");

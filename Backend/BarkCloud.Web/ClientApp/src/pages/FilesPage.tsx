@@ -17,9 +17,12 @@ import { useFileDrop } from '../hooks/useFileDrop';
 import { useDuplicatePrompt } from '../hooks/useDuplicatePrompt';
 import { useSelection } from '../hooks/useSelection';
 import { usePageHeader } from '../hooks/usePageHeader';
+import { DynamicFoldersStrip } from '../components/dynamic-folders/DynamicFoldersStrip';
+import { DynamicFolderDetail } from '../components/dynamic-folders/DynamicFolderDetail';
+import { DynamicFolderFormModal } from '../components/dynamic-folders/DynamicFolderFormModal';
 import { apiGet, apiPost, pickFiles, uploadFile, checkDuplicate } from '../lib/api';
 import { createShare, createFolderShare } from '../lib/share';
-import type { Album, CardFile, DirInfo, Entry, Listing } from '../lib/types';
+import type { Album, CardFile, DirInfo, DynamicFolder, Entry, Listing } from '../lib/types';
 
 const ruDate = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' });
 function fmtDate(iso: string | null): string {
@@ -225,6 +228,9 @@ export function FilesPage() {
   const [confirmDel, setConfirmDel] = React.useState<RenameTarget | null>(null);
   const [bulkConfirm, setBulkConfirm] = React.useState(false);
   const [bulkMoving, setBulkMoving] = React.useState(false);
+  const [smartFolders, setSmartFolders] = React.useState<DynamicFolder[]>([]);
+  const [openSmart, setOpenSmart] = React.useState<DynamicFolder | null>(null);
+  const [creatingSmart, setCreatingSmart] = React.useState(false);
   const [toastNode, toast] = useToast();
   const dup = useDuplicatePrompt();
   const { menu, openAt } = useContextMenu();
@@ -262,6 +268,15 @@ export function FilesPage() {
   React.useEffect(() => {
     loadAlbums();
   }, [loadAlbums]);
+
+  const loadSmartFolders = React.useCallback(() => {
+    apiGet<{ folders: DynamicFolder[] }>('/api/dynamic-folders')
+      .then((d) => setSmartFolders(d.folders || []))
+      .catch(() => {});
+  }, []);
+  React.useEffect(() => {
+    loadSmartFolders();
+  }, [loadSmartFolders]);
   React.useEffect(() => {
     membership.ensureLoaded();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -553,6 +568,20 @@ export function FilesPage() {
             </div>
           )}
 
+          {!openSmart && smartFolders.length > 0 && (
+            <DynamicFoldersStrip folders={smartFolders} onOpen={setOpenSmart} onCreate={() => setCreatingSmart(true)} />
+          )}
+
+          {openSmart ? (
+            <div className="files-list">
+              <DynamicFolderDetail
+                folder={openSmart}
+                onBack={() => setOpenSmart(null)}
+                onChanged={loadSmartFolders}
+                toast={toast}
+              />
+            </div>
+          ) : (
           <div className="files-list">
             {listing === null ? (
               <Loading />
@@ -614,12 +643,25 @@ export function FilesPage() {
               </table>
             )}
           </div>
+          )}
         </div>
 
         <aside className="files-inspector">
           <Inspector entry={sel} onOpen={setLightbox} onDownload={download} onRename={(t) => startRename(t, false)} onDelete={(t) => requestDelete(t, false)} />
         </aside>
       </div>
+
+      {creatingSmart && (
+        <DynamicFolderFormModal
+          onClose={() => setCreatingSmart(false)}
+          onSaved={() => {
+            setCreatingSmart(false);
+            loadSmartFolders();
+            toast('Умная папка создана');
+          }}
+          toast={toast}
+        />
+      )}
 
       {creating && (
         <Modal

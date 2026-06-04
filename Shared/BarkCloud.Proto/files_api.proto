@@ -103,6 +103,14 @@ service AlbumApi {
   rpc ListAlbumItems      (ListAlbumItemsRequest)      returns (ListAlbumItemsResponse); // Содержимое альбома (фото/видео с превью)
 }
 
+service DynamicFolderApi {
+  rpc CreateDynamicFolder    (CreateDynamicFolderRequest)    returns (DynamicFolderInfo);            // Создать умную папку
+  rpc UpdateDynamicFolder    (UpdateDynamicFolderRequest)    returns (DynamicFolderInfo);            // Изменить имя / критерии / иконку
+  rpc DeleteDynamicFolder    (DeleteDynamicFolderRequest)    returns (CloudEmpty);                   // Удалить умную папку
+  rpc ListDynamicFolders     (ListDynamicFoldersRequest)     returns (ListDynamicFoldersResponse);   // Системные + пользовательские (обложка / счётчик)
+  rpc ListDynamicFolderItems (ListDynamicFolderItemsRequest) returns (ListDynamicFolderItemsResponse); // Содержимое папки (файлы по критериям)
+}
+
 message GetTempDownloadUrlRequest {
   repeated string file_ids = 1; // Идентификаторы файлов
 }
@@ -571,6 +579,103 @@ message AlbumItemEntry {
 message ListAlbumItemsResponse {
   repeated AlbumItemEntry items = 1;
   google.protobuf.Timestamp next_cursor_added_at = 2; // пусто = больше нет страниц
+  string next_cursor_file_id = 3;
+}
+
+// ============ DynamicFolderApi messages ============
+// Умная папка — виртуальная коллекция файлов, собираемая автоматически по критериям.
+// Содержимое не хранится: вычисляется на лету. Один файл может попадать в несколько папок.
+
+enum DfField {
+  DF_FIELD_NONE = 0;
+  DF_DATE = 1;        // Дата загрузки (CreatedAt)
+  DF_TAKEN_AT = 2;    // Дата съёмки (FileMetadata.TakenAt)
+  DF_SIZE = 3;        // Размер в байтах
+  DF_NAME = 4;        // Имя файла
+  DF_MEDIA_KIND = 5;  // Категория медиа
+  DF_EXTENSION = 6;   // Расширение
+  DF_IMG_WIDTH = 7;   // Ширина изображения
+  DF_IMG_HEIGHT = 8;  // Высота изображения
+  DF_DEVICE = 9;      // Имя устройства загрузки
+}
+
+enum DfOperator {
+  DF_OP_NONE = 0;
+  DF_WITHIN_LAST_DAYS = 1; // только для дат: за последние N дней
+  DF_BEFORE = 2;           // дата раньше значения (ISO/число дней)
+  DF_AFTER = 3;            // дата позже значения
+  DF_GT = 4;               // больше (число)
+  DF_LT = 5;               // меньше (число)
+  DF_CONTAINS = 6;         // строка содержит
+  DF_EQUALS = 7;           // равно
+  DF_ENDS_WITH = 8;        // строка заканчивается на
+  DF_STARTS_WITH = 9;      // строка начинается с
+}
+
+enum DfCombinator {
+  DF_ALL = 0; // все правила (И)
+  DF_ANY = 1; // любое правило (ИЛИ)
+}
+
+message DfRule {
+  DfField field = 1;
+  DfOperator operator = 2;
+  string value = 3; // значение унифицировано строкой; парсится по типу поля
+}
+
+message DynamicFolderInfo {
+  string id = 1;                  // "sys-recent" | guid пользовательской
+  string name = 2;
+  bool is_system = 3;             // системную нельзя редактировать/удалять
+  DfCombinator combinator = 4;
+  repeated DfRule rules = 5;
+  string icon_key = 6;            // подсказка иконки для UI (clock / hdd / camera / …)
+  string cover_color = 7;         // hex tint плитки, если нет обложки-файла
+  string cover_preview_url = 8;   // URL превью первого файла (пусто = нет)
+  int32 items_count = 9;
+  int32 sort_order = 10;
+  google.protobuf.Timestamp created_at = 11;
+  google.protobuf.Timestamp updated_at = 12;
+}
+
+message CreateDynamicFolderRequest {
+  string name = 1;
+  DfCombinator combinator = 2;
+  repeated DfRule rules = 3;
+  string icon_key = 4;
+  string cover_color = 5;
+}
+
+message UpdateDynamicFolderRequest {
+  string folder_id = 1;
+  optional string name = 2;       // не задано = не менять
+  DfCombinator combinator = 3;    // правила/комбинатор заменяются целиком
+  repeated DfRule rules = 4;
+  optional string icon_key = 5;
+  optional string cover_color = 6;
+}
+
+message DeleteDynamicFolderRequest {
+  string folder_id = 1;
+}
+
+message ListDynamicFoldersRequest {}
+
+message ListDynamicFoldersResponse {
+  repeated DynamicFolderInfo folders = 1; // системные первыми, затем пользовательские
+}
+
+message ListDynamicFolderItemsRequest {
+  string folder_id = 1;
+  int32 limit = 2;                                  // 1..200, default 50
+  google.protobuf.Timestamp cursor_created_at = 3;  // exclusive; пусто = с самых свежих
+  string cursor_file_id = 4;                        // tie-breaker
+  optional MediaKind kind_filter = 5;               // не задано = все типы
+}
+
+message ListDynamicFolderItemsResponse {
+  repeated UploadFileInfo items = 1;
+  google.protobuf.Timestamp next_cursor_created_at = 2; // пусто = больше нет страниц
   string next_cursor_file_id = 3;
 }
 
