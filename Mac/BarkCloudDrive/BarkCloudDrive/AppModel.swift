@@ -92,7 +92,7 @@ final class AppModel {
         session.clearSession()
         InsecureHTTP.clearCaches()
         await grpc.shutdown()
-        await domain.disable()
+        await domain.purge()
         AppModel.clearProviderCache()
         user = nil
         storageUsed = 0
