@@ -998,6 +998,24 @@ img.avatar { object-fit: cover; }
 .df-rule input { min-width: 0; flex: 1; }
 .df-rule .df-suffix { display: flex; align-items: center; gap: 6px; flex: 1; font-size: 12px; color: var(--md-on-surface-variant); }
 
+/* Списочный вид содержимого умной папки (folder.viewMode === 1) */
+.df-list { display: flex; flex-direction: column; }
+.df-list-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  border-radius: var(--r-md);
+  cursor: pointer;
+}
+.df-list-row:hover { background: var(--md-surface-container-high); }
+.df-list-main { flex: 1; min-width: 0; }
+.df-list-main .fn { font-size: 14px; color: var(--md-on-surface); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.df-list-main .meta { font-size: 12px; color: var(--md-on-surface-variant); margin-top: 2px; }
+.df-list-size { flex: 0 0 auto; width: 90px; text-align: right; font-size: 13px; color: var(--md-on-surface-variant); }
+.df-list-date { flex: 0 0 auto; width: 160px; text-align: right; font-size: 13px; color: var(--md-on-surface-variant); }
+@media (max-width: 700px) { .df-list-date { display: none; } }
+
 /* Сетка медиа (фото/видео/элементы альбома) — общая для страниц Фото и Видео */
 .photo-grid {
   display: grid;

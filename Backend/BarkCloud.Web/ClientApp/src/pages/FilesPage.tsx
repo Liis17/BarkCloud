@@ -579,6 +579,8 @@ export function FilesPage() {
                 onBack={() => setOpenSmart(null)}
                 onChanged={loadSmartFolders}
                 toast={toast}
+                albums={albums}
+                reloadAlbums={loadAlbums}
               />
             </div>
           ) : (

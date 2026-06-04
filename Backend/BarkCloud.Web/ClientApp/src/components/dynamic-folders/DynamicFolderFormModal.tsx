@@ -66,6 +66,7 @@ interface Props {
 export function DynamicFolderFormModal({ folder, onClose, onSaved, toast }: Props) {
   const [name, setName] = React.useState(folder ? folder.name : '');
   const [combinator, setCombinator] = React.useState<number>(folder ? folder.combinator : 0);
+  const [viewMode, setViewMode] = React.useState<number>(folder ? folder.viewMode : 0);
   const [rules, setRules] = React.useState<DynamicFolderRule[]>(
     folder && folder.rules.length ? folder.rules.map((r) => ({ ...r })) : [{ field: 4, op: 6, value: '' }],
   );
@@ -101,7 +102,7 @@ export function DynamicFolderFormModal({ folder, onClose, onSaved, toast }: Prop
     }
     setBusy(true);
     try {
-      const payload = { name: name.trim(), combinator, rules: clean };
+      const payload = { name: name.trim(), combinator, rules: clean, viewMode };
       if (folder) await apiPost('/api/dynamic-folders/update', { folder: folder.id, ...payload });
       else await apiPost('/api/dynamic-folders', payload);
       onSaved();
@@ -171,6 +172,16 @@ export function DynamicFolderFormModal({ folder, onClose, onSaved, toast }: Prop
       <button className="btn text" onClick={addRule}>
         <Icon.plus size={15} /> Добавить условие
       </button>
+
+      <label className="field-label" style={{ marginTop: 14 }}>Отображение содержимого</label>
+      <div className="df-comb">
+        <button type="button" className={'seg' + (viewMode === 0 ? ' on' : '')} onClick={() => setViewMode(0)}>
+          сеткой
+        </button>
+        <button type="button" className={'seg' + (viewMode === 1 ? ' on' : '')} onClick={() => setViewMode(1)}>
+          списком
+        </button>
+      </div>
     </Modal>
   );
 }

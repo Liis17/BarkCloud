@@ -4,9 +4,10 @@ import { MediaThumb } from '../media/MediaThumb';
 import { Lightbox } from '../media/Lightbox';
 import { Loading, EmptyState } from '../ui/EmptyState';
 import { DynamicFolderFormModal } from './DynamicFolderFormModal';
+import { useMediaActions } from '../../hooks/useMediaActions';
 import { apiGet, apiPost } from '../../lib/api';
-import { GRID_SIZES } from '../../lib/format';
-import type { CardFile, DynamicFolder, Page } from '../../lib/types';
+import { GRID_SIZES, kindRu, fmtFull } from '../../lib/format';
+import type { Album, DynamicFolder, MediaItem, Page } from '../../lib/types';
 import type { ToastPush } from '../../hooks/useToast';
 
 interface Props {
@@ -14,17 +15,19 @@ interface Props {
   onBack: () => void;
   onChanged: () => void;
   toast: ToastPush;
+  albums?: Album[];
+  reloadAlbums?: () => void;
 }
 
-/** Просмотр содержимого умной папки: сетка файлов, собранных по критериям. Изменить/удалить — только у пользовательских. */
-export function DynamicFolderDetail({ folder, onBack, onChanged, toast }: Props) {
-  const [items, setItems] = React.useState<CardFile[] | null>(null);
+/** Просмотр содержимого умной папки: сетка превью или список (по folder.viewMode), собранные по критериям. */
+export function DynamicFolderDetail({ folder, onBack, onChanged, toast, albums, reloadAlbums }: Props) {
+  const [items, setItems] = React.useState<MediaItem[] | null>(null);
   const [lightbox, setLightbox] = React.useState<number | null>(null);
   const [editing, setEditing] = React.useState(false);
 
   const load = React.useCallback(() => {
     setItems(null);
-    apiGet<Page<CardFile>>('/api/dynamic-folders/items?folder=' + encodeURIComponent(folder.id))
+    apiGet<Page<MediaItem>>('/api/dynamic-folders/items?folder=' + encodeURIComponent(folder.id))
       .then((d) => setItems(d.items || []))
       .catch((e) => {
         toast((e as Error).message, 'err');
@@ -33,6 +36,20 @@ export function DynamicFolderDetail({ folder, onBack, onChanged, toast }: Props)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [folder.id]);
   React.useEffect(load, [load]);
+
+  const actions = useMediaActions({
+    albums,
+    toast,
+    reloadAlbums,
+    onRenamed: () => {
+      load();
+      onChanged();
+    },
+    onRemoved: () => {
+      load();
+      onChanged();
+    },
+  });
 
   // Lightbox умеет только фото/видео; документы/аудио открываем скачиванием.
   const media = React.useMemo(() => (items || []).filter((m) => m.kind === 'photo' || m.kind === 'video'), [items]);
@@ -46,7 +63,7 @@ export function DynamicFolderDetail({ folder, onBack, onChanged, toast }: Props)
       toast((e as Error).message, 'err');
     }
   }
-  function openItem(m: CardFile) {
+  function openItem(m: MediaItem) {
     if (m.kind === 'photo' || m.kind === 'video') setLightbox(media.findIndex((x) => x.id === m.id));
     else download(m.id);
   }
@@ -86,10 +103,29 @@ export function DynamicFolderDetail({ folder, onBack, onChanged, toast }: Props)
         <Loading />
       ) : items.length === 0 ? (
         <EmptyState icon="folder" title="Пока пусто" hint="Сюда автоматически попадут файлы, подходящие под условия." />
+      ) : folder.viewMode === 1 ? (
+        <div className="df-list">
+          {items.map((m) => (
+            <div
+              key={m.id}
+              className="df-list-row"
+              onClick={() => openItem(m)}
+              onContextMenu={(e) => actions.openMenu(e, m)}
+            >
+              <div className={'file-icon ' + (m.iconKind || 'doc')}>{m.ext || 'FILE'}</div>
+              <div className="df-list-main">
+                <div className="fn">{m.name}</div>
+                <div className="meta">{kindRu(m.kind)}</div>
+              </div>
+              <div className="df-list-size">{m.sizeLabel || '—'}</div>
+              <div className="df-list-date">{fmtFull(m.createdAt)}</div>
+            </div>
+          ))}
+        </div>
       ) : (
         <div className="photo-grid">
           {items.map((m) => (
-            <div key={m.id} className="photo" onClick={() => openItem(m)}>
+            <div key={m.id} className="photo" onClick={() => openItem(m)} onContextMenu={(e) => actions.openMenu(e, m)}>
               <MediaThumb media={m} sizes={GRID_SIZES} />
               {m.kind === 'video' && (
                 <div className="vbadge">
@@ -115,6 +151,7 @@ export function DynamicFolderDetail({ folder, onBack, onChanged, toast }: Props)
         />
       )}
       {lightbox !== null && <Lightbox items={media} index={lightbox} onClose={() => setLightbox(null)} />}
+      {actions.overlay}
     </div>
   );
 }
