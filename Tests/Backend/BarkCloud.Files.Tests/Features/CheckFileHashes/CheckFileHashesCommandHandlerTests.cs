@@ -1,5 +1,6 @@
 using BarkCloud.Files.Features.CheckFileHashes;
 using BarkCloud.Files.Persistence;
+using BarkCloud.Files.Tests._Helpers;
 
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -9,14 +10,15 @@ public class CheckFileHashesCommandHandlerTests
 {
     private readonly Mock<IFileHashesStorage> _hashes = new();
 
-    private CheckFileHashesCommandHandler CreateSut() => new(
+    private CheckFileHashesCommandHandler CreateSut(long userId = 42) => new(
         _hashes.Object,
+        UserContextFactory.Create(userId),
         NullLogger<CheckFileHashesCommandHandler>.Instance);
 
     [Fact]
     public async Task Handle_EmptyInput_ReturnsEmptyResults()
     {
-        _hashes.Setup(s => s.GetExistingHashes(It.IsAny<IReadOnlyCollection<string>>()))
+        _hashes.Setup(s => s.GetExistingHashesForOwner(It.IsAny<long>(), It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new HashSet<string>());
 
         var response = await CreateSut().Handle(new CheckFileHashesCommand { FileHashes = [] }, default);
@@ -28,7 +30,7 @@ public class CheckFileHashesCommandHandlerTests
     public async Task Handle_FiltersInvalidHashes()
     {
         var valid = new string('a', 64);
-        _hashes.Setup(s => s.GetExistingHashes(It.IsAny<IReadOnlyCollection<string>>()))
+        _hashes.Setup(s => s.GetExistingHashesForOwner(It.IsAny<long>(), It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new HashSet<string>());
 
         var response = await CreateSut().Handle(
@@ -42,7 +44,7 @@ public class CheckFileHashesCommandHandlerTests
     public async Task Handle_DeduplicatesValidHashes()
     {
         var hash = new string('b', 64);
-        _hashes.Setup(s => s.GetExistingHashes(It.IsAny<IReadOnlyCollection<string>>()))
+        _hashes.Setup(s => s.GetExistingHashesForOwner(It.IsAny<long>(), It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new HashSet<string>());
 
         var response = await CreateSut().Handle(
@@ -56,7 +58,7 @@ public class CheckFileHashesCommandHandlerTests
     {
         var hashA = new string('a', 64);
         var hashB = new string('b', 64);
-        _hashes.Setup(s => s.GetExistingHashes(It.IsAny<IReadOnlyCollection<string>>()))
+        _hashes.Setup(s => s.GetExistingHashesForOwner(It.IsAny<long>(), It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new HashSet<string> { hashA });
 
         var response = await CreateSut().Handle(
@@ -73,7 +75,7 @@ public class CheckFileHashesCommandHandlerTests
         var input = Enumerable.Range(0, 600)
             .Select(i => i.ToString("x").PadLeft(64, '0'))
             .ToList();
-        _hashes.Setup(s => s.GetExistingHashes(It.IsAny<IReadOnlyCollection<string>>()))
+        _hashes.Setup(s => s.GetExistingHashesForOwner(It.IsAny<long>(), It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new HashSet<string>());
 
         var response = await CreateSut().Handle(new CheckFileHashesCommand { FileHashes = input }, default);
