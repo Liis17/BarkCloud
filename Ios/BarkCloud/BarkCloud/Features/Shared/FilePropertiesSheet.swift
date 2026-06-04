@@ -1,5 +1,6 @@
 import SwiftUI
 import Photos
+import MapKit
 import BarkCloudKit
 
 /// Что показываем в свойствах: облачный файл (`MediaAsset`) или ассет устройства
@@ -130,6 +131,9 @@ struct FilePropertiesSheet: View {
                 if let alt = m.altitude {
                     row("props_altitude", "\(formatDecimal(alt, fractionDigits: 0)) \(String(localized: "unit_meters"))")
                 }
+                if let lat = m.latitude, let lon = m.longitude {
+                    locationMap(latitude: lat, longitude: lon, title: asset.fileName)
+                }
             }
         }
 
@@ -161,6 +165,12 @@ struct FilePropertiesSheet: View {
         if let created = asset.creationDate {
             row("props_created", dateTime(created))
         }
+        if let loc = asset.location {
+            Section(String(localized: "props_section_gps")) {
+                row("props_coordinates", "\(formatDecimal(loc.coordinate.latitude, fractionDigits: 6)), \(formatDecimal(loc.coordinate.longitude, fractionDigits: 6))")
+                locationMap(latitude: loc.coordinate.latitude, longitude: loc.coordinate.longitude, title: deviceFileName(asset))
+            }
+        }
     }
 
     // MARK: - Строка
@@ -177,6 +187,34 @@ struct FilePropertiesSheet: View {
                 .multilineTextAlignment(.trailing)
                 .textSelection(.enabled)
         }
+    }
+
+    // MARK: - Карта места съёмки
+
+    /// Статичная мини-карта с маркером в точке съёмки (нативный MapKit, без
+    /// взаимодействия — чтобы не конфликтовать со скроллом списка). Тап открывает
+    /// полноценный Apple Maps на этой точке.
+    @ViewBuilder
+    private func locationMap(latitude: Double, longitude: Double, title: String) -> some View {
+        let coordinate = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+        Map(initialPosition: .region(MKCoordinateRegion(
+            center: coordinate,
+            span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
+        )), interactionModes: []) {
+            Marker("", coordinate: coordinate)
+                .tint(AppColors.accent)
+        }
+        .frame(height: 180)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .onTapGesture { openInMaps(coordinate: coordinate, name: title) }
+        .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 8, trailing: 16))
+    }
+
+    private func openInMaps(coordinate: CLLocationCoordinate2D, name: String) {
+        let item = MKMapItem(placemark: MKPlacemark(coordinate: coordinate))
+        item.name = name
+        item.openInMaps()
     }
 
     // MARK: - Подгрузка метаданных
