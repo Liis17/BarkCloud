@@ -3,10 +3,18 @@ import SwiftUI
 struct FilesRootScreen: View {
     @Environment(AppEnvironment.self) private var env
     @State private var vm = FilesRootViewModel()
+    @State private var smartVM = SmartFoldersViewModel()
+    @State private var showCreateSmart = false
+
+    private static let smartColumns = Array(repeating: GridItem(.flexible(), spacing: 12), count: 2)
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
+                if smartVM.isLoading || !smartVM.folders.isEmpty {
+                    smartFoldersSection
+                }
+
                 section(titleKey: "files_section_on_device") {
                     NavigationLink {
                         LocalBrowserScreen(
@@ -36,6 +44,44 @@ struct FilesRootScreen: View {
         }
         .navigationTitle(String(localized: "files_root_title"))
         .task { await vm.loadSummary(cloud: env.cloudRepository) }
+        .task { await smartVM.load(repo: env.dynamicFolderRepository) }
+        .sheet(isPresented: $showCreateSmart) {
+            SmartFolderFormScreen(repo: env.dynamicFolderRepository, existing: nil) { _ in
+                Task { await smartVM.reload() }
+            }
+        }
+    }
+
+    /// Сетка умных папок (2 в ширину) над основными секциями таба.
+    @ViewBuilder
+    private var smartFoldersSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("smart_folders_section")
+                    .font(AppTypography.titleSmall)
+                    .foregroundStyle(AppColors.onSurfaceVariant)
+                    .textCase(.uppercase)
+                Spacer()
+                Button {
+                    showCreateSmart = true
+                } label: {
+                    Image(systemName: "plus")
+                        .foregroundStyle(AppColors.accent)
+                }
+            }
+            LazyVGrid(columns: Self.smartColumns, spacing: 12) {
+                ForEach(smartVM.folders) { folder in
+                    NavigationLink {
+                        SmartFolderDetailScreen(folder: folder, repo: env.dynamicFolderRepository) {
+                            Task { await smartVM.reload() }
+                        }
+                    } label: {
+                        SmartFolderCardView(folder: folder)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
     }
 
     @ViewBuilder
