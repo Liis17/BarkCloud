@@ -81,6 +81,7 @@ public class Program
         builder.Services.AddHostedService<OrphanBlobCleanupService>();
         builder.Services.AddHostedService<LegacyPreviewBackfillService>();
         builder.Services.AddHostedService<LegacyMetadataBackfillService>();
+        builder.Services.AddHostedService<LegacyJpegViewBackfillService>();
 
         // Путь к бинарям ffmpeg/ffprobe в образе (см. Dockerfile). По умолчанию — /usr/local/bin.
         FFMpegCore.GlobalFFOptions.Configure(o =>
