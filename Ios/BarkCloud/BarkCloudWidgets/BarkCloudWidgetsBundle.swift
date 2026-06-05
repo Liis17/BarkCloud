@@ -6,5 +6,6 @@ struct BarkCloudWidgetsBundle: WidgetBundle {
     var body: some Widget {
         StorageWidget()
         UploadLiveActivity()
+        StorageControl()
     }
 }
