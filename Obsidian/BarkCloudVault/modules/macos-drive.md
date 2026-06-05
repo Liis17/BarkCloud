@@ -101,9 +101,11 @@ SwiftUI app + menu-bar (`MenuBarExtra`), переиспользует `BarkCloud
 - `AppModel` — @Observable сервис-контейнер + фазы serverSetup→login→dashboard.
 - `ServerSetupView`, `LoginView`, `DashboardView`, `SettingsView`, `MenuBarView`.
 - **`FileProviderDomainManager`** (вместо FSKit `MountManager`): refreshState,
-  enable (`NSFileProviderManager.add(domain:)`), disable (`remove`),
-  revealInFinder (через `getUserVisibleURL(.rootContainer)` +
-  `NSWorkspace.activateFileViewerSelecting`).
+  enable (`add` для новой регистрации, `reconnect` если уже зарегистрирован
+  и был приостановлен), disable (`disconnect(.temporary)` — sync паузируется,
+  materialized файлы остаются на диске), purge (`remove` — жёсткое удаление
+  с очисткой replica, для logout/смены сервера), revealInFinder (через
+  `getUserVisibleURL(.rootContainer)` + `NSWorkspace.activateFileViewerSelecting`).
 - Локализация RU/EN/DE — `Localizable.xcstrings` (29 ключей), аватар —
   `RemoteAvatar` через `InsecureHTTP`.
 
