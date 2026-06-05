@@ -149,7 +149,8 @@ AppEnvironment подписывает системный хук attachFile, Uplo
    корня; ищет/создаёт «Недавно загруженные» как default.
 3. Показывает stack: иконка/заголовок, имя файла(ов), чип-кнопка «Папка: …»
    с `UIMenu` (через `showsMenuAsPrimaryAction = true`), кнопки «Загрузить»
-   и «Отмена». Без сети fallback: список папок пустой, default = «Без папки».
+   и «Отмена». Без сети fallback: список папок пустой, выбранная папка сбрасывается в nil
+   (отображается как «Без папки», файл уходит в корень).
 4. По «Загрузить» — `enqueue` для каждого: getUploadURL, multipart body в App
    Group, UploadJob с `directoryID = selectedFolder?.id`, submit.
 5. main app позже (после восстановления через `handleEventsForBackgroundURLSession`)
