@@ -88,6 +88,13 @@ NextCloud-подобная иерархия папок и файловых за�
 ### Навигация
 - `GetPath` — построить путь до объекта (директории/записи) в иерархии
 
+### Поиск
+- `SearchFiles` (`Features/Cloud/SearchFiles/`) — поиск живых записей файлов владельца по подстроке имени (по всему облаку, независимо от папок). Хранилище: `ICloudHierarchyStorage.SearchFileEntriesPage` (`Name.ToLower().Contains`, `!IsDeleted`, сортировка `(CreatedAt desc, Id desc)`, cursor-пагинация). Обогащение `FileEntryDetailed` как в `ListDirectoryDetailed`. Host — `CloudApiService.SearchFiles`.
+
+### Публичные альбомы (`/al/{token}`)
+- Зеркало публичных папок ([[modules/backend-files]] · `FolderShareLink`): сущность `Domain/AlbumShareLink` (Owner/AlbumId/Token/Name/CreatedAt/ClickCount), хранилище `IAlbumShareStorage`/`AlbumShareStorage` (миграция `AddAlbumShareLinks`), фичи `Features/Cloud/{CreateAlbumShare,ListMyAlbumShares,RevokeAlbumShare,ResolveAlbumShare}`.
+- `CreateAlbumShare` идемпотентен (один шар на альбом, индекс `(OwnerId, AlbumId)` unique). `ResolveAlbumShare` — анонимный (`FilesServerApiService`, политика Service): листинг элементов альбома с temp-URL/превью (как `ResolveFolderShare`), cursor-пагинация, исключает «эффективно удалённые» файлы. `DeleteAlbum` снимает публичность (`RemoveByAlbum`).
+
 ## gRPC API
 
 См. отдельный раздел в [[api/files-api]] · `CloudApi`.

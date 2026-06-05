@@ -247,3 +247,5 @@ CLOUD_FILE = 2;   // обычный файл пользовательского 
 - **Создать/наполнить альбом**: `CreateAlbum` → `AddItemsToAlbum`.
 - **Файловый менеджер**: `ListDirectoryDetailed(directory_id)`; навигация — `GetPath`.
 - **Загрузить новый файл**: `GetUploadUrl(CLOUD_FILE)` → `POST {url}` (form-field `file`) → (опц.) `AttachFile` / `AddItemsToAlbum`.
+- **Поиск по имени**: `CloudApi.SearchFiles({ query, limit, cursor_created_at, cursor_entry_id })` → `SearchFilesResponse { files[FileEntryDetailed], next_cursor_* }`. Ищет живые записи владельца по подстроке имени (регистронезависимо, по всему облаку), сортировка от новых к старым, cursor-пагинация. Пустой `query` → пустой ответ.
+- **Сделать альбом публичным**: `CloudApi.CreateAlbumShare({ album_id, name })` → `AlbumShareInfo { token, ... }`; публичная страница — `{web}/al/{token}`. Список — `ListMyAlbumShares`, отзыв — `RevokeAlbumShare`. Анонимный резолв (для веб-страницы) — `FilesServerApi.ResolveAlbumShare({ token, cursor })` → `{ found, album_name, description, items[PublicFileEntry], next_cursor_* }`. Удаление альбома снимает публичность. Идемпотентно: повторный `CreateAlbumShare` вернёт существующую ссылку.
