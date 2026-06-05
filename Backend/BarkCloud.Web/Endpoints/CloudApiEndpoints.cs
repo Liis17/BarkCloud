@@ -85,6 +85,30 @@ public static class CloudApiEndpoints
                 }, Json);
             }));
 
+        // Поиск файлов пользователя по имени (по всему облаку), cursor-пагинация.
+        api.MapGet("/cloud/search", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud,
+            string? q, int? limit, string? cursorAt, string? cursorId) =>
+            await Guarded(http, auth, async token =>
+            {
+                var query = (q ?? "").Trim();
+                if (query.Length == 0)
+                    return Results.Json(new { files = Array.Empty<object>(), nextCursorAt = (DateTimeOffset?)null, nextCursorId = "" }, Json);
+
+                var req = new SearchFilesRequest { Query = query, Limit = limit is > 0 and <= 200 ? limit.Value : 50 };
+                if (DateTimeOffset.TryParse(cursorAt, out var dt))
+                    req.CursorCreatedAt = Timestamp.FromDateTimeOffset(dt.ToUniversalTime());
+                if (!string.IsNullOrEmpty(cursorId))
+                    req.CursorEntryId = cursorId;
+
+                var resp = await cloud.SearchFilesAsync(req, token);
+                return Results.Json(new
+                {
+                    files = resp.Files.Select(CloudJson.Entry).ToArray(),
+                    nextCursorAt = resp.NextCursorCreatedAt?.ToDateTimeOffset(),
+                    nextCursorId = resp.NextCursorEntryId
+                }, Json);
+            }));
+
         api.MapPost("/cloud/dir", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud, DirCreate body) =>
             await Guarded(http, auth, async token =>
             {
@@ -357,6 +381,42 @@ public static class CloudApiEndpoints
             await Guarded(http, auth, async token =>
             {
                 await cloud.RevokeFolderShareAsync(new RevokeFolderShareRequest { FolderShareId = body.FolderShareId }, token);
+                return Results.Json(new { ok = true }, Json);
+            }));
+
+        // ───────────────────────── Публичные альбомы (динамическая страница /al/{token}) ─────────────────────────
+
+        api.MapGet("/album-shares", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud,
+            int? limit, string? cursorAt, string? cursorId) =>
+            await Guarded(http, auth, async token =>
+            {
+                var req = new ListMyAlbumSharesRequest { Limit = limit is > 0 and <= 200 ? limit.Value : 60 };
+                if (DateTimeOffset.TryParse(cursorAt, out var dt))
+                    req.CursorCreatedAt = Timestamp.FromDateTimeOffset(dt.ToUniversalTime());
+                if (!string.IsNullOrEmpty(cursorId))
+                    req.CursorAlbumShareId = cursorId;
+
+                var resp = await cloud.ListMyAlbumSharesAsync(req, token);
+                return Results.Json(new
+                {
+                    items = resp.Shares.Select(s => AlbumShareJson(http, s)).ToArray(),
+                    nextCursorAt = resp.NextCursorCreatedAt?.ToDateTimeOffset(),
+                    nextCursorId = resp.NextCursorAlbumShareId
+                }, Json);
+            }));
+
+        api.MapPost("/album-shares", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud, AlbumShareCreateReq body) =>
+            await Guarded(http, auth, async token =>
+            {
+                var info = await cloud.CreateAlbumShareAsync(
+                    new CreateAlbumShareRequest { AlbumId = body.AlbumId, Name = body.Name ?? "" }, token);
+                return Results.Json(AlbumShareJson(http, info), Json);
+            }));
+
+        api.MapPost("/album-shares/revoke", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud, AlbumShareIdReq body) =>
+            await Guarded(http, auth, async token =>
+            {
+                await cloud.RevokeAlbumShareAsync(new RevokeAlbumShareRequest { AlbumShareId = body.AlbumShareId }, token);
                 return Results.Json(new { ok = true }, Json);
             }));
 
@@ -923,6 +983,23 @@ public static class CloudApiEndpoints
         };
     }
 
+    /// <summary>JSON-представление публичного альбома. Дружелюбный URL `/al/{token}` собирается из хоста запроса.</summary>
+    private static object AlbumShareJson(HttpContext http, AlbumShareInfo s)
+    {
+        var origin = $"{http.Request.Scheme}://{http.Request.Host}";
+        return new
+        {
+            id = s.Id,
+            token = s.Token,
+            kind = "album",
+            url = $"{origin}/al/{s.Token}",
+            albumId = s.AlbumId,
+            name = s.Name,
+            createdAt = s.CreatedAt?.ToDateTimeOffset(),
+            clickCount = s.ClickCount
+        };
+    }
+
     private static object UserJson(User u) => new
     {
         id = u.Id,
@@ -1052,4 +1129,6 @@ public static class CloudApiEndpoints
     private sealed record ShareIdReq(string ShareId);
     private sealed record FolderShareCreateReq(string DirectoryId, string? Name);
     private sealed record FolderShareIdReq(string FolderShareId);
+    private sealed record AlbumShareCreateReq(string AlbumId, string? Name);
+    private sealed record AlbumShareIdReq(string AlbumShareId);
 }

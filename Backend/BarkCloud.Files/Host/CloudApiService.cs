@@ -12,11 +12,16 @@ using BarkCloud.Files.Features.Cloud.CreateShare;
 using BarkCloud.Files.Features.Cloud.CreateFolderShare;
 using BarkCloud.Files.Features.Cloud.ListMyFolderShares;
 using BarkCloud.Files.Features.Cloud.RevokeFolderShare;
+using BarkCloud.Files.Features.Cloud.CreateAlbumShare;
+using BarkCloud.Files.Features.Cloud.ListMyAlbumShares;
+using BarkCloud.Files.Features.Cloud.RevokeAlbumShare;
 using BarkCloud.Files.Features.Cloud.ListFavorites;
 using BarkCloud.Files.Features.Cloud.ListMyShares;
+using BarkCloud.Files.Features.Cloud.GetTrashSummary;
 using BarkCloud.Files.Features.Cloud.ListTrash;
 using BarkCloud.Files.Features.Cloud.ListDirectory;
 using BarkCloud.Files.Features.Cloud.ListDirectoryDetailed;
+using BarkCloud.Files.Features.Cloud.SearchFiles;
 using BarkCloud.Files.Features.Cloud.ListUserImages;
 using BarkCloud.Files.Features.Cloud.ListUserMedia;
 using BarkCloud.Files.Features.Cloud.MoveDirectory;
@@ -128,6 +133,25 @@ public class CloudApiService : CloudApi.CloudApiBase
         };
 
         return _mediator.Send(command);
+    }
+
+    public override Task<SearchFilesResponse> SearchFiles(SearchFilesRequest request, ServerCallContext context)
+    {
+        DateTime? cursorCreatedAt = null;
+        Guid? cursorEntryId = null;
+        if (request.CursorCreatedAt is not null && !string.IsNullOrWhiteSpace(request.CursorEntryId))
+        {
+            cursorCreatedAt = request.CursorCreatedAt.ToDateTime();
+            cursorEntryId = Guid.Parse(request.CursorEntryId);
+        }
+
+        return _mediator.Send(new SearchFilesCommand
+        {
+            Query = request.Query,
+            Limit = request.Limit,
+            CursorCreatedAt = cursorCreatedAt,
+            CursorEntryId = cursorEntryId
+        });
     }
 
     public override Task<CloudEmpty> AttachFile(AttachFileRequest request, ServerCallContext context)
@@ -301,6 +325,11 @@ public class CloudApiService : CloudApi.CloudApiBase
         return _mediator.Send(command);
     }
 
+    public override Task<GetTrashSummaryResponse> GetTrashSummary(GetTrashSummaryRequest request, ServerCallContext context)
+    {
+        return _mediator.Send(new GetTrashSummaryCommand());
+    }
+
     public override Task<CloudEmpty> RestoreFromTrash(RestoreFromTrashRequest request, ServerCallContext context)
     {
         var command = new RestoreFromTrashCommand
@@ -422,6 +451,38 @@ public class CloudApiService : CloudApi.CloudApiBase
     public override Task<CloudEmpty> RevokeFolderShare(RevokeFolderShareRequest request, ServerCallContext context)
     {
         return _mediator.Send(new RevokeFolderShareCommand { FolderShareId = Guid.Parse(request.FolderShareId) });
+    }
+
+    public override Task<AlbumShareInfo> CreateAlbumShare(CreateAlbumShareRequest request, ServerCallContext context)
+    {
+        return _mediator.Send(new CreateAlbumShareCommand
+        {
+            AlbumId = Guid.Parse(request.AlbumId),
+            Name = request.Name
+        });
+    }
+
+    public override Task<ListMyAlbumSharesResponse> ListMyAlbumShares(ListMyAlbumSharesRequest request, ServerCallContext context)
+    {
+        DateTime? cursorCreatedAt = null;
+        Guid? cursorId = null;
+        if (request.CursorCreatedAt is not null && !string.IsNullOrWhiteSpace(request.CursorAlbumShareId))
+        {
+            cursorCreatedAt = request.CursorCreatedAt.ToDateTime();
+            cursorId = Guid.Parse(request.CursorAlbumShareId);
+        }
+
+        return _mediator.Send(new ListMyAlbumSharesCommand
+        {
+            Limit = request.Limit,
+            CursorCreatedAt = cursorCreatedAt,
+            CursorAlbumShareId = cursorId
+        });
+    }
+
+    public override Task<CloudEmpty> RevokeAlbumShare(RevokeAlbumShareRequest request, ServerCallContext context)
+    {
+        return _mediator.Send(new RevokeAlbumShareCommand { AlbumShareId = Guid.Parse(request.AlbumShareId) });
     }
 
     public override Task<CloudEmpty> ShareFileWithUser(ShareFileWithUserRequest request, ServerCallContext context)

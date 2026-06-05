@@ -73,7 +73,7 @@ BarkCloud/
 │   │   ├── MediaGridViewModel.swift @Observable: ListUserMedia + cursor-пагинация + загрузка + мультивыбор (selection/isSelecting/isProcessing/deleteDone/deleteTotal): deleteSelected (последовательно DeleteUserMedia(file_id) с прогрессом), addSelectedToAlbum, createAlbumAndAddSelected
 │   │   ├── MediaGridScreen.swift   LazyVGrid 3 кол. (MediaThumb), загрузка через кастомный DeviceAssetPickerScreen (бейджи «уже в облаке»), полноэкранный просмотр; кнопка «Выбрать» → мультивыбор + нижняя панель без фона (Удалить — подтверждение поповером над кнопкой / В альбом)
 │   │   └── Albums/                 AlbumsViewModel, AlbumsGridScreen (kind: MediaKind? — nil=без фильтра), AlbumDetailScreen+VM (items, обложка, add/remove), AlbumPickerSheet (выбор альбома + «создать новый»)
-│   └── Files/                      файл-браузер (локальный + облачный + «Общие файлы»→ComingSoonScreen)
+│   └── Files/                      файл-браузер (локальный + облачный + «Общий доступ»→SharedHubScreen)
 │       ├── Domain/                 FsEntry, FsSort
 │       ├── Data/                   LocalFileRepository (actor), FileShareHelper, MimeIcon, StoragePermission
 │       └── UI/                     FilesRootScreen/ViewModel (вход в облако), CloudBrowserScreen/ViewModel/UiState (навигация+CRUD+upload), LocalBrowserScreen/ViewModel, FsRowItem, FormatUtils, PickFolderDialog, ThumbnailLoader
@@ -194,11 +194,10 @@ BarkCloud/
   URL файла медиатеки (`DeviceMediaImageLoader.videoFileURL` → `requestAVAsset`/`AVURLAsset.url`, без
   копии на диск; ранее — `VideoPlayer`, теперь единый просмотрщик ради свайпа).
   Режим выбора → загрузка выбранных в облако (`DeviceAssetResource.originalData` → `CloudRepository.uploadFile`).
-  **Медиа привязывается к авто-папке «Недавно загруженные»** (`CloudRepository.ensureRecentUploadsFolder()`:
-  листает корень, ищет папку с именем `recentUploadsFolderName`="Недавно загруженные", создаёт при отсутствии →
-  `uploadFile(toDirectory:)`; best-effort — без папки файл всё равно в галерее по uploader'у). Повторяет
-  `ensureRecentFolder()` веб-клиента (`ClientApp/.../PhotosPage.tsx`), чтобы у медиа была запись каталога
-  (работают корзина/переименование) и оно попадало в эту папку. То же делает вкладка Медиа Фото/Видео.
+  **Медиа загружается без явной папки с `routeByMediaKind: true`** — сервер сам раскладывает файл по
+  системным папкам «Фото»/«Видео»/«Другие документы» по типу медиа (`uploadFile`/`attachFile` шлют
+  `AttachFileRequest.route_by_media_kind`). У медиа при этом есть запись каталога (работают
+  корзина/переименование). То же делает вкладка Медиа Фото/Видео.
   Чтение оригинала и потоковый SHA256 вынесены в общий `DeviceAssetResource` (используют и Галерея, и
   кастомный пикер загрузки), а машинерия «уже в облаке» — в `CloudPresenceTracker` (`@Observable`).
   **Баг тапа по соседней строке в сетках** (`Features/Shared/MediaThumb.swift` → `SquareThumbClip`):
@@ -221,11 +220,13 @@ BarkCloud/
   **Авто-распределение по типу** (`route_by_media_kind`): передние загрузки через `CloudRepository.uploadFile`
   (`GalleryViewModel.uploadSelected`/`ensureCloudFileID`, `MediaGridViewModel.uploadAssets`) грузят **без явной
   папки** с `routeByMediaKind: true` — сервер сам кладёт в системные «Фото»/«Видео»/«Другие документы»
-  (`uploadFile`/`attachFile` принимают флаг и шлют `AttachFileRequest.route_by_media_kind`). Фоновые загрузки
-  (`BackupManager` автозагрузка, `ShareInboxUploader`/Share Extension) пока используют `ensureRecentUploadsFolder`:
-  их привязка отложена через персистентный `UploadJob` (+ отдельный таргет Share Extension), поэтому проброс
-  флага туда не сделан, а сам хелпер `ensureRecentUploadsFolder`/`recentUploadsFolderName` оставлен. Сборка на
-  macOS не выполнялась (хост недоступен) — правки верифицированы анализом кода.
+  (`uploadFile`/`attachFile` принимают флаг и шлют `AttachFileRequest.route_by_media_kind`). Автозагрузка
+  (`BackupManager`) и шаринг без выбранной папки тоже идут через `route_by_media_kind` — привязку делает
+  completion-observer `AppEnvironment` (`source == .backup` или `.share` с пустым `directoryID` →
+  `attachFile(routeByMediaKind: true)`). Хелпер `ensureRecentUploadsFolder`/`recentUploadsFolderName`
+  **удалён** из `CloudRepository`; «Недавно загруженные» создаёт только Share Extension
+  (`ShareViewController`) — как пользовательский выбор папки, через прямые `listDirectoryDetailed`/
+  `createDirectory`. Сборка на macOS не выполнялась (хост недоступен) — правки верифицированы анализом кода.
   **Резервная копия / BarkCloud** (`Features/Gallery/Backup/`) — кнопка-облако (`icloud`) в тулбаре
   правее «Выбрать» открывает модалку `BackupSheet` (плавающая карточка с отступами: `fullScreenCover` +
   `.presentationBackground(.clear)` + затемнение + `.padding(20)` + `.regularMaterial`; заголовок
@@ -259,8 +260,9 @@ BarkCloud/
   смотрит в неё и считает тяжёлый потоковый хеш лишь раз — переиспользуется и `BackupManager` (скан не
   пере-хеширует всю медиатеку при каждом холодном старте), и `CloudPresenceTracker` (бейджи «уже в облаке»
   мгновенны после перезапуска). Очищается в `AppEnvironment.resetLocalState()` при выходе. **Автозагрузка** — только на переднем
-  плане (без BGTaskScheduler/фоновой URLSession): `uploadLoop` берёт следующий ассет → `originalData`
-  → `CloudRepository.uploadFile(toDirectory: ensureRecentUploadsFolder())`; тогл персистится в
+  плане (без BGTaskScheduler/фоновой URLSession): `uploadLoop` берёт следующий ассет → пишет оригинал
+  потоком в App Group → `CloudRepository.enqueueBackgroundUpload(toDirectory: nil, source: .backup)`,
+  а привязку по типу медиа (`route_by_media_kind`) делает completion-observer `AppEnvironment`; тогл персистится в
   **`AutoUploadSettings`** (обёртка над `UserDefaults`, ключ `BarkCloud.autoUpload.enabled`), при старте
   приложения `BackupManager.resumeIfEnabled()` (из `AppEnvironment.init`) докачивает остаток. **Новые
   фото/видео ловит свой `PHPhotoLibraryChangeObserver`** (`BackupPhotoLibraryObserver` → `refreshScanForNewAssets`)
@@ -288,7 +290,8 @@ BarkCloud/
   превью через `RemoteImage`, тап → полноэкранный QuickLook (`GetTempDownloadUrl` → download)
   **со свайпом влево/вправо** ([[#Свайп-просмотрщик]]),
   загрузка через кастомный `DeviceAssetPickerScreen` (сетка медиатеки устройства как в Галерее, бейджи
-  «уже в облаке» из `CloudPresenceTracker`; в Фото/Видео уже загруженные нельзя выбрать повторно)
+  «уже в облаке» из `CloudPresenceTracker`; уже загруженные **можно** выбрать повторно — при подтверждении
+  `confirmationDialog` «Загрузить всё / Только новые / Отмена»)
   → `DeviceAssetResource.originalData` → `GetUploadUrl(CLOUD_FILE)` → HTTP. **Мультивыбор** в Фото/Видео:
   кнопка «Выбрать» рядом с «+» включает режим выбора (галочки на `MediaThumb`); нижняя панель кнопок без фона
   появляется с анимацией (`safeAreaInset` + `transition(.move(edge:.bottom))`) — «Удалить» (подтверждение —
@@ -302,7 +305,8 @@ BarkCloud/
   каталога, поэтому `DeleteFileEntry`/`entry_ids` для него не работали.
   Альбомы (`AlbumApi`, `kind=nil` — без
   фильтра): карточки (`ListAlbums`), открытие (`ListAlbumItems`), создание, добавление файлов тем же
-  пикером (в альбом разрешено добавлять и уже загруженное — `uploadFile` дедуплицирует по хешу),
+  пикером (`AlbumDetailViewModel.uploadAndAddAssets` → `uploadFile` грузит оригинал и кладёт в альбом;
+  серверный дедуп снят, поэтому повторно выбранное добавляется новой копией),
   смена обложки, удаление элементов/альбома. Во всех трёх под-вкладках — pull-to-refresh
   (`.barkRefreshable` → `reload()`), работает и на пустом состоянии. **Важно (как в Корзине/Облаке):**
   у `AlbumsViewModel.reload(showSpinner:)` потягивание передаёт `showSpinner: false` — иначе ветка
@@ -386,7 +390,48 @@ BarkCloud/
   паритет, недоступный вебу). Бэкенд/прото не трогались — данные уже были (`CloudFileMetadata.latitude/longitude`).
   На Галерее устройства у `PHAsset` нет `file_id` — `GalleryViewModel.ensureCloudFileID(for:)` резолвит его
   по SHA256 (`cachedSHA256` → `CloudApi.CheckFileHash`, одиночный), а при отсутствии заливает оригинал
-  (дедуп по хешу) в авто-папку «Недавно загруженные»; на время резолва — оверлей `isUploading`.
+  с `routeByMediaKind: true` (системные «Фото»/«Видео»/«Другие документы»); на время резолва — оверлей `isUploading`.
+
+### Поиск по имени · Шаринг альбома
+
+- **Поиск** (`Features/Files/UI/CloudBrowserScreen` + `CloudBrowserViewModel`): `.searchable`
+  в навбаре облачного браузера; `searchTextChanged` — живой поиск с дебаунсом 300 мс через
+  `CloudRepository.searchFiles(query:)` (RPC `CloudApi.SearchFiles`, по всему облаку). Результаты —
+  отдельная ветка `searchResults` (файлы; тап → QuickLook; контекст-меню «Сделать публичной» /
+  «Поделиться с пользователем»). Модель `CloudSearchPage`, обёртка в `BarkCloudKit/CloudRepository`.
+- **Шаринг альбома** (`Features/Media/Albums/AlbumDetailScreen`): пункт меню «Поделиться альбомом»
+  (`albums_share`) → `AlbumDetailViewModel.shareAlbum` → `CloudRepository.createAlbumShare(albumID:)`
+  (RPC `CloudApi.CreateAlbumShare`) → `pendingShareURL` → системный Share Sheet. URL — `{webHost}/al/{token}`
+  (`GrpcEndpoint.publicAlbumShareURL`), модель `AlbumShareLink`. Публичная страница рендерится веб-клиентом.
+
+### Умные (динамические) папки — таб «Файлы»
+
+Паритет с вебом (см. [[modules/backend-files-dynamic-folders]]): виртуальные коллекции файлов по
+критериям-фильтрам. В `FilesRootScreen` — сетка карточек **2 в ширину** (`smartFoldersSection`) под
+заголовком таба, **над** секциями «На устройстве / Облачное хранилище / Общий доступ». Системные
+папки (`is_system`) только читаются; пользовательские — CRUD.
+
+- **Сеть** (пакет `BarkCloudKit`): `GrpcManager.dynamicFolderStub()` (`DynamicFolderApi`),
+  `Data/Cloud/DynamicFolderRepository.swift` (зеркало `AlbumRepository`: `listFolders / listItems /
+  create / update / delete`), модели `Data/Cloud/DynamicFolderModels.swift` (`DynamicFolderCard`,
+  `DynamicFolderRule` — поле/оператор переиспользуют proto-enum'ы `DfField`/`DfOperator`,
+  `DynamicFolderItemsPage`). Регистрация — `AppEnvironment.dynamicFolderRepository`.
+- **UI** (`Features/Files/SmartFolders/`): `SmartFoldersViewModel` (список), `SmartFolderCardView`
+  (обложка-превью первого файла либо акцентная плитка + SF-иконка по `iconKey`: clock/hdd→
+  externaldrive/camera→photo/screenshot, иначе folder; имя + счётчик), `SmartFolderDetailScreen`+VM
+  (содержимое по `viewMode`: сетка `MediaThumb` 3 кол. / список строк; пагинация; просмотр через
+  `MediaPagerScreen`; меню Изменить/Удалить у не-системных), `SmartFolderFormScreen`+VM
+  (конструктор: имя, И/ИЛИ `combinator`, сетка/список `viewMode`, строки правил поле→оператор→значение).
+- **Конструктор правил** — `DfFieldMeta` (зеркало веб-`DynamicFolderFormModal`): поля Дата
+  загрузки/съёмки (за N дней / до / после — число дней либо DatePicker→ISO `yyyy-MM-dd`), Размер
+  (МБ↔байты ×1048576), Имя/Устройство (текст), Формат (Picker MediaKind, код "0".."4"), Расширение
+  (ends-with), Ширина/Высота (px). Валидация: имя непустое + ≥1 правило со значением. `iconKey`/
+  `coverColor` на create/update **не шлём** (как веб).
+- **Важно:** сгенерированные стабы `BarkCloudKit/Generated/files_api.*` нужно **перегенерить**
+  (`Mac/BarkCloudKit/scripts/sync_proto.sh`, macOS) — закоммиченные стабы отставали от `Shared`-proto
+  (не было `DfViewMode`/`view_mode`, а `ListDynamicFolderItemsResponse.items` был `[UploadFileInfo]`
+  вместо `[UserImageItem]`). Новый код опирается на актуальный контракт.
+
 
 ### Свайп-просмотрщик
 
@@ -587,7 +632,7 @@ BarkCloud — self-hosted, поэтому адреса микросервисо�
 **Важно для превью/скачивания**: файловый сервис на `:7025` с self-signed TLS — превью и оригиналы
 грузятся через `InsecureHTTP.session` (`AsyncImage` их бы отверг), поэтому в сетках используется
 `RemoteImage`, а не `AsyncImage`. Загрузка байтов — `multipart/form-data`, поле формы `file`,
-`fileId` берётся из ответа (учёт дедупликации).
+`fileId` берётся из ответа (серверный дедуп снят — каждая загрузка создаёт свой блоб).
 
 **Стабы**: `sync_proto.sh` регенерирует Swift-стабы из `Shared/BarkCloud.Proto` на каждой сборке
 (нужны `protoc`, `protoc-gen-swift`, `protoc-gen-grpc-swift-2`) — после сборки доступны
@@ -754,3 +799,9 @@ Home Screen виджет «Хранилище BarkCloud» (`.systemSmall` + `.sy
   виджета (автоподпись подхватывает из entitlements).
 - Бэкенд/прото не трогались — `transfer.storageInfo()` уже существовал
   (`Files.GetUserStorageInfo`). App Group и так был в обоих entitlements.
+
+### Новые виджеты (#2/#4/#5/#6)
+
+Расширение набора виджетов: Storage на Lock Screen + Control Center, виджеты
+Корзины, Сейфа и Недавних фото, плюс deep-link слой (`barkcloud://`). Подробности,
+мосты данных и продуктовые решения (privacy сейфа) — в [[ios-widgets]].

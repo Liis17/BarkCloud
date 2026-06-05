@@ -27,6 +27,7 @@ service CloudApi {
   rpc DeleteDirectory      (DeleteDirectoryRequest)      returns (CloudEmpty);               // Удалить папку рекурсивно
   rpc ListDirectory        (ListDirectoryRequest)        returns (DirectoryListing);         // Листинг содержимого папки (только метаданные)
   rpc ListDirectoryDetailed(ListDirectoryRequest)        returns (DirectoryListingDetailed); // Листинг с полной информацией о каждом файле (URL, превью, размеры)
+  rpc SearchFiles          (SearchFilesRequest)          returns (SearchFilesResponse);       // Поиск файлов пользователя по имени (по всему облаку, cursor pagination)
 
   rpc AttachFile           (AttachFileRequest)           returns (CloudEmpty);               // Привязать загруженный файл к папке
   rpc RenameFileEntry      (RenameFileEntryRequest)      returns (CloudEmpty);               // Переименовать запись о файле
@@ -48,6 +49,7 @@ service CloudApi {
 
   // ───────── Корзина ─────────
   rpc ListTrash            (ListTrashRequest)            returns (ListTrashResponse);        // Список файлов в корзине (от новых к старым)
+  rpc GetTrashSummary      (GetTrashSummaryRequest)      returns (GetTrashSummaryResponse);   // Сводка: число записей и ближайшая дата авто-удаления (для бейджей/виджетов)
   rpc RestoreFromTrash     (RestoreFromTrashRequest)     returns (CloudEmpty);               // Восстановить файл из корзины
   rpc DeleteFromTrash      (DeleteFromTrashRequest)      returns (CloudEmpty);               // Удалить файл из корзины навсегда (немедленно)
   rpc EmptyTrash           (EmptyTrashRequest)           returns (CloudEmpty);               // Очистить корзину целиком
@@ -66,6 +68,11 @@ service CloudApi {
   rpc CreateFolderShare    (CreateFolderShareRequest)    returns (FolderShareInfo);          // Сделать папку публичной (идемпотентно — вернёт существующую)
   rpc ListMyFolderShares   (ListMyFolderSharesRequest)   returns (ListMyFolderSharesResponse); // Мои публичные папки (от новых к старым, cursor pagination)
   rpc RevokeFolderShare    (RevokeFolderShareRequest)    returns (CloudEmpty);               // Отозвать публичность папки (+ снять все публичные ссылки файлов поддерева)
+
+  // ───────── Публичные альбомы (динамическая страница /al/{token}) ─────────
+  rpc CreateAlbumShare     (CreateAlbumShareRequest)     returns (AlbumShareInfo);            // Сделать альбом публичным (идемпотентно — вернёт существующую ссылку)
+  rpc ListMyAlbumShares    (ListMyAlbumSharesRequest)    returns (ListMyAlbumSharesResponse); // Мои публичные альбомы (от новых к старым, cursor pagination)
+  rpc RevokeAlbumShare     (RevokeAlbumShareRequest)     returns (CloudEmpty);               // Отозвать публичность альбома
 
   // ───────── Шаринг между пользователями (приватные гранты) ─────────
   rpc ShareFileWithUser    (ShareFileWithUserRequest)    returns (CloudEmpty);                    // Поделиться файлом с конкретным пользователем
@@ -95,6 +102,8 @@ service FilesServerApi {
   rpc ResolveShare(ResolveShareRequest) returns(ResolveShareResponse); // Резолв публичного токена → файл + публичный URL скачивания
 
   rpc ResolveFolderShare(ResolveFolderShareRequest) returns(ResolveFolderShareResponse); // Резолв публичной папки → листинг (подпапки + файлы с публичными URL)
+
+  rpc ResolveAlbumShare(ResolveAlbumShareRequest) returns(ResolveAlbumShareResponse); // Резолв публичного альбома → элементы (фото/видео с публичными URL)
 }
 
 service AlbumApi {
@@ -449,6 +458,14 @@ message ListTrashResponse {
   string next_cursor_entry_id = 3;
 }
 
+message GetTrashSummaryRequest {
+}
+
+message GetTrashSummaryResponse {
+  int32 total_count = 1;                          // сколько записей в корзине у владельца
+  google.protobuf.Timestamp oldest_purge_at = 2;  // ближайшая дата авто-удаления (самый старый элемент); пусто = корзина пуста
+}
+
 message RestoreFromTrashRequest {
   string entry_id = 1;
 }
@@ -736,6 +753,21 @@ message ListMediaLocationsResponse {
   string next_cursor_file_id = 3;
 }
 
+// ============ Поиск файлов по имени ============
+
+message SearchFilesRequest {
+  string query = 1;                                 // подстрока имени (регистронезависимо); пустая — пустой ответ
+  int32 limit = 2;                                  // 1..200, default 50
+  google.protobuf.Timestamp cursor_created_at = 3;  // exclusive; пусто = с самых свежих
+  string cursor_entry_id = 4;                       // tie-breaker для стабильной cursor-пагинации
+}
+
+message SearchFilesResponse {
+  repeated FileEntryDetailed files = 1;                 // совпавшие записи (entry + файл с превью/URL)
+  google.protobuf.Timestamp next_cursor_created_at = 2; // пусто = больше нет страниц
+  string next_cursor_entry_id = 3;
+}
+
 // ============ Публичные ссылки ============
 
 message ShareInfo {
@@ -915,6 +947,54 @@ message ResolveFolderShareResponse {
   string current_name = 4;              // имя текущей папки
   repeated PublicDirEntry subdirs = 5;  // подпапки текущей папки
   repeated PublicFileEntry files = 6;   // файлы текущей папки
+}
+
+// ============ Публичные альбомы (динамическая страница /al/{token}) ============
+
+message AlbumShareInfo {
+  string id = 1;                            // Идентификатор публичного альбома
+  string token = 2;                         // URL-safe токен (для /al/{token})
+  string album_id = 3;                      // Идентификатор альбома
+  string name = 4;                          // Имя альбома на момент публикации
+  google.protobuf.Timestamp created_at = 5; // Когда опубликован
+  int64 click_count = 6;                    // Сколько раз открывали
+}
+
+message CreateAlbumShareRequest {
+  string album_id = 1;
+  string name = 2;
+}
+
+message ListMyAlbumSharesRequest {
+  int32 limit = 1;                                      // 1..200, default 50
+  google.protobuf.Timestamp cursor_created_at = 2;      // exclusive; пусто = с самых свежих
+  string cursor_album_share_id = 3;                     // tie-breaker
+}
+
+message ListMyAlbumSharesResponse {
+  repeated AlbumShareInfo shares = 1;
+  google.protobuf.Timestamp next_cursor_created_at = 2; // пусто = больше нет страниц
+  string next_cursor_album_share_id = 3;
+}
+
+message RevokeAlbumShareRequest {
+  string album_share_id = 1;
+}
+
+message ResolveAlbumShareRequest {
+  string token = 1;
+  int32 limit = 2;                                 // 1..200, default 100
+  google.protobuf.Timestamp cursor_added_at = 3;   // exclusive; пусто = с самых свежих
+  string cursor_file_id = 4;                       // tie-breaker
+}
+
+message ResolveAlbumShareResponse {
+  bool found = 1;                          // false = альбом не найден / отозван
+  string album_name = 2;                   // имя альбома
+  string description = 3;                   // описание альбома
+  repeated PublicFileEntry items = 4;      // элементы альбома (фото/видео с публичными URL)
+  google.protobuf.Timestamp next_cursor_added_at = 5; // пусто = больше нет страниц
+  string next_cursor_file_id = 6;
 }
 
 // ============ Шаринг папки между пользователями (приватные гранты) ============

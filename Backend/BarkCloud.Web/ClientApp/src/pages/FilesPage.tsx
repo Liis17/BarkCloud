@@ -1,5 +1,5 @@
 import React from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import { MediaThumb } from '../components/media/MediaThumb';
 import { Lightbox } from '../components/media/Lightbox';
@@ -211,7 +211,10 @@ interface UploadState {
 }
 
 export function FilesPage() {
-  const navState = (useLocation().state || {}) as { stack?: { id: string; name: string }[]; selectEntryId?: string };
+  const location = useLocation();
+  const navigate = useNavigate();
+  const navState = (location.state || {}) as { stack?: { id: string; name: string }[]; selectEntryId?: string };
+  const searchQuery = (new URLSearchParams(location.search).get('q') || '').trim();
   const [stack, setStack] = React.useState<{ id: string; name: string }[]>(navState.stack || []);
   const pendingSelect = React.useRef<string | null>(navState.selectEntryId || null);
   const [listing, setListing] = React.useState<Listing | null>(null);
@@ -244,6 +247,16 @@ export function FilesPage() {
     setListing(null);
     setSel(null);
     fsel.clear();
+    // Режим поиска: результаты по имени (по всему облаку), без подпапок.
+    if (searchQuery) {
+      apiGet<{ files: Entry[] }>('/api/cloud/search?q=' + encodeURIComponent(searchQuery))
+        .then((d) => setListing({ dirs: [], files: d.files || [] }))
+        .catch((e) => {
+          toast((e as Error).message, 'err');
+          setListing({ dirs: [], files: [] });
+        });
+      return;
+    }
     apiGet<Listing>('/api/cloud/list?dir=' + encodeURIComponent(currentDir))
       .then((d) => {
         setListing(d);
@@ -257,7 +270,7 @@ export function FilesPage() {
         toast((e as Error).message, 'err');
         setListing({ dirs: [], files: [] });
       });
-  }, [currentDir, toast, fsel.clear]);
+  }, [currentDir, searchQuery, toast, fsel.clear]);
   React.useEffect(load, [load]);
 
   const loadAlbums = React.useCallback(() => {
@@ -540,23 +553,33 @@ export function FilesPage() {
         )}
         <div className="files-main">
           <div className="files-bar">
-            <div className="breadcrumb">
-              <a onClick={() => gotoIndex(-1)} className={stack.length ? '' : 'cur'} style={{ cursor: 'pointer' }}>
-                <Icon.folder size={18} />
-              </a>
-              {stack.map((s, i) => (
-                <React.Fragment key={s.id}>
-                  <span className="sep">/</span>
-                  {i === stack.length - 1 ? (
-                    <span className="cur">{s.name}</span>
-                  ) : (
-                    <a onClick={() => gotoIndex(i)} style={{ cursor: 'pointer' }}>
-                      {s.name}
-                    </a>
-                  )}
-                </React.Fragment>
-              ))}
-            </div>
+            {searchQuery ? (
+              <div className="breadcrumb" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <Icon.search size={18} />
+                <span className="cur">Результаты поиска: «{searchQuery}»</span>
+                <a onClick={() => navigate('/files')} style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  <Icon.x size={14} /> Очистить
+                </a>
+              </div>
+            ) : (
+              <div className="breadcrumb">
+                <a onClick={() => gotoIndex(-1)} className={stack.length ? '' : 'cur'} style={{ cursor: 'pointer' }}>
+                  <Icon.folder size={18} />
+                </a>
+                {stack.map((s, i) => (
+                  <React.Fragment key={s.id}>
+                    <span className="sep">/</span>
+                    {i === stack.length - 1 ? (
+                      <span className="cur">{s.name}</span>
+                    ) : (
+                      <a onClick={() => gotoIndex(i)} style={{ cursor: 'pointer' }}>
+                        {s.name}
+                      </a>
+                    )}
+                  </React.Fragment>
+                ))}
+              </div>
+            )}
           </div>
 
           {upload && (
@@ -568,7 +591,7 @@ export function FilesPage() {
             </div>
           )}
 
-          {!openSmart && smartFolders.length > 0 && (
+          {!openSmart && !searchQuery && smartFolders.length > 0 && (
             <DynamicFoldersStrip folders={smartFolders} onOpen={setOpenSmart} onCreate={() => setCreatingSmart(true)} />
           )}
 
@@ -588,16 +611,24 @@ export function FilesPage() {
             {listing === null ? (
               <Loading />
             ) : isEmpty ? (
-              <EmptyState
-                icon="folder"
-                title="Папка пуста"
-                hint="Загрузите файлы или создайте подпапку."
-                action={
-                  <button className="btn primary" onClick={() => doUpload()}>
-                    <Icon.upload size={16} /> Загрузить
-                  </button>
-                }
-              />
+              searchQuery ? (
+                <EmptyState
+                  icon="search"
+                  title="Ничего не найдено"
+                  hint={`По запросу «${searchQuery}» файлов не нашлось.`}
+                />
+              ) : (
+                <EmptyState
+                  icon="folder"
+                  title="Папка пуста"
+                  hint="Загрузите файлы или создайте подпапку."
+                  action={
+                    <button className="btn primary" onClick={() => doUpload()}>
+                      <Icon.upload size={16} /> Загрузить
+                    </button>
+                  }
+                />
+              )
             ) : (
               <table className="ftable">
                 <thead>

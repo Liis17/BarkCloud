@@ -35,6 +35,8 @@ final class VaultStore {
         } else {
             self.items = []
         }
+        // Засеять счётчик виджета на старте (для уже существующего сейфа).
+        VaultWidgetBridge.update(count: items.count)
     }
 
     /// Идентификаторы защищённых файлов — для фильтрации обычных списков.
@@ -72,5 +74,7 @@ final class VaultStore {
         if let data = try? JSONEncoder().encode(items) {
             defaults.set(data, forKey: key)
         }
+        // Отдать счётчик виджету сейфа (он сам решит, показывать число или только замок).
+        VaultWidgetBridge.update(count: items.count)
     }
 }

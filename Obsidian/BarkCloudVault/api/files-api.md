@@ -43,6 +43,7 @@ Package: `barkcloud.files`
 | `ListMediaLocations(ListMediaLocationsRequest) → ListMediaLocationsResponse` | Точки для карты: медиа с GPS (`MediaLocationPoint { file_id; latitude; longitude; media_kind; preview_url; taken_at?; created_at }`), cursor-пагинация (`cursor_created_at`+`cursor_file_id`); клиент кластеризует |
 | `GetPath(GetPathRequest) → PathResponse` | Построить путь до объекта в иерархии |
 | `ListTrash(ListTrashRequest) → ListTrashResponse` | Список файлов в корзине (от свежеудалённых); cursor `(cursor_deleted_at + cursor_entry_id)`; `TrashEntry` содержит `entry`, `file`, `deleted_at`, `purge_at` |
+| `GetTrashSummary(GetTrashSummaryRequest) → GetTrashSummaryResponse` | Лёгкая сводка: `total_count` + `oldest_purge_at` (серверный `COUNT` + `MIN(PurgeAt)`). Для бейджей/виджета корзины — «самый истекающий» файл без выгрузки страниц |
 | `RestoreFromTrash(RestoreFromTrashRequest) → CloudEmpty` | Восстановить файл из корзины (в исходную папку либо в корень, если она удалена) |
 | `DeleteFromTrash(DeleteFromTrashRequest) → CloudEmpty` | Удалить файл из корзины навсегда (немедленно: БД + альбомы + осиротевший блоб из S3) |
 | `EmptyTrash(EmptyTrashRequest) → CloudEmpty` | Очистить корзину владельца целиком |
@@ -60,6 +61,10 @@ Package: `barkcloud.files`
 > **Инвариант «одна директория на файл»**: `CopyFileEntry` удалён, `AttachFile` отказывает (`FileAlreadyAttachedException`), если у владельца уже есть `CloudFileEntry` для этого `FileId`. Уникальный индекс `(OwnerId, FileId)`.
 
 > **Публичные папки (динамическая страница)**: сущность `FolderShareLink` (владелец→папка, уникальный `Token`, уникальность `(OwnerId, DirectoryId)`). RPC `CreateFolderShare` (идемпотентно), `ListMyFolderShares`, `RevokeFolderShare` (CloudApi, владелец) и `ResolveFolderShare(token, dir)` (FilesServerApi, анонимно). Резолв динамический: по токену отдаёт листинг текущей папки (`dir` валидируется принадлежностью к поддереву через `GetSubtree`) — подпапки + файлы с публичными temp-URL и URL превью; отдельные `ShareLink` на файлы НЕ создаются, добавленные позже файлы видны сразу. `RevokeFolderShare` каскадно снимает все отдельные `ShareLink` на файлы поддерева (`IShareStorage.RemoveByFiles`) — папка снова приватна (в т.ч. индивидуально опубликованные файлы).
+
+> **Публичные альбомы (динамическая страница)**: сущность `AlbumShareLink` (владелец→альбом, уникальный `Token`, уникальность `(OwnerId, AlbumId)`). RPC `CreateAlbumShare` (идемпотентно), `ListMyAlbumShares`, `RevokeAlbumShare` (CloudApi, владелец) и `ResolveAlbumShare(token, cursor)` (FilesServerApi, анонимно). Резолв динамический: по токену отдаёт элементы альбома (cursor-пагинация) с публичными temp-URL и URL превью, исключая «эффективно удалённые». Зеркало публичных папок; `DeleteAlbum` снимает публичность. Страница `/al/{token}`.
+
+> **Поиск по имени**: `SearchFiles(query, limit, cursor)` (CloudApi, владелец) → `SearchFilesResponse { files[FileEntryDetailed], next_cursor_created_at, next_cursor_entry_id }`. Подстрока имени по живым `CloudFileEntry` владельца (по всему облаку), `(CreatedAt desc, Id desc)`, обогащение как `ListDirectoryDetailed`.
 
 > **Шаринг между пользователями**: приватные гранты `FileGrant` (владелец→получатель→файл). RPC `ShareFileWithUser`/`RevokeUserShare`/`ListMyOutgoingShares` (с кем поделён один файл)/`ListMyOutgoingSharesAll` (все мои исходящие гранты — «я поделился», плоский список с `UploadFileInfo`+получателем, cursor-пагинация по `CreatedAt desc, Id desc`; группировку по файлу делает веб) и `ListSharedWithMe`/`GetSharedFileDownloadUrl` (получатель — доступ строго по гранту через `TempFile`, без обхода `DownloadFileCommandHandler`). Имена резолвит веб-слой через Users (`UsersServerApi.ListByIds`). Публичный `ResolveShare` дополнительно отдаёт `media_kind`/`preview_url`/размеры для страницы просмотра. Гранты чистятся в `UserDeleted`/`TrashPurge`.
 
@@ -109,7 +114,7 @@ Package: `barkcloud.files`
 | `UploadAvatarServer(UploadAvatarServerRequest) → UploadAvatarServerResponse` | Загрузка аватарки пользователя (служебно) |
 | `ResolveShare(ResolveShareRequest) → ResolveShareResponse` | Резолв публичного токена (без `UserContext`): `found` + `file_id`/`name`/`download_url`. Внутри создаёт `TempFile` для оригинала (прямой `/download/{fileId}` для `CloudFile` запрещён в `DownloadFileCommandHandler`) и инкрементит `click_count`. Зовётся из Web-роута `/s/{token}` сервисным токеном |
 
-Messages: `ResolveShareRequest { token; }` → `ResolveShareResponse { found; file_id; name; download_url; }`.
+Messages: `ResolveShareRequest { token; }` → `ResolveShareResponse { found; file_id; name; download_url; media_kind; preview_url; image_width; image_height; file_size; }`.
 
 ## Сервис: `AlbumApi` (клиентский, альбомы фото/видео)
 

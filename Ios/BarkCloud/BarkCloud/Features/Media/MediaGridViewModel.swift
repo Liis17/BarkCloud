@@ -76,6 +76,10 @@ final class MediaGridViewModel {
             state.cursorCreatedAt = page.nextCursorCreatedAt
             state.cursorFileID = page.nextCursorFileID
             state.canLoadMore = page.hasMore
+            // Освежить кэш «недавних» для одноимённого виджета (только лента фото).
+            if !kind.isVideo {
+                RecentMediaWidgetBridge.update(items: state.items)
+            }
         } catch {
             state.items = []
             state.snackbar = domainErrorMessage(error)

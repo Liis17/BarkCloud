@@ -161,17 +161,18 @@ export interface FileMetadata {
   documentPageCount?: number;
 }
 
-/** Публичная ссылка на файл (/api/shares) или папку (/api/folder-shares). */
+/** Публичная ссылка на файл (/api/shares), папку (/api/folder-shares) или альбом (/api/album-shares). */
 export interface ShareLink {
   id: string;
   token: string;
   url: string;
   fileId?: string;
   directoryId?: string;
+  albumId?: string;
   name: string;
   createdAt: string | null;
   clickCount: number;
-  kind?: 'file' | 'folder';
+  kind?: 'file' | 'folder' | 'album';
 }
 
 /** Ответ курсор-пагинации. */

@@ -15,6 +15,7 @@ final class AppEnvironment {
     let userRepository: UserRepository
     let cloudRepository: CloudRepository
     let albumRepository: AlbumRepository
+    let dynamicFolderRepository: DynamicFolderRepository
     let fileCache: FileCacheService
     let fileCacheSettings: FileCacheSettings
     let autoUploadSettings: AutoUploadSettings
@@ -30,6 +31,15 @@ final class AppEnvironment {
     /// Источник истины для глобального баннера прогресса над TabBar (см.
     /// [[GlobalUploadBanner]]). Подписан на координатор через `addObserver`.
     let uploadProgress: UploadProgressObserver
+
+    /// Ожидающая обработки глубокая ссылка (тап по виджету). `RootView` пишет сюда
+    /// в `onOpenURL`, `MainScreen` читает, переключает таб и обнуляет.
+    var pendingDeepLink: DeepLink?
+    /// Запрос показать `VaultScreen` поверх таба «Настройки» (для `barkcloud://vault`).
+    var presentVault = false
+    /// `file_id` фото, которое нужно открыть в пейджере на вкладке «Альбомы» (для
+    /// `barkcloud://media/<id>`). Сетка фото подхватывает и обнуляет (consume-once).
+    var pendingMediaID: String?
 
     init() {
         self.serverConfig = ServerConfigStore()
@@ -50,6 +60,7 @@ final class AppEnvironment {
         self.userRepository = UserRepository(grpc: grpc, transfer: transfer)
         self.cloudRepository = CloudRepository(grpc: grpc, transfer: transfer)
         self.albumRepository = AlbumRepository(grpc: grpc)
+        self.dynamicFolderRepository = DynamicFolderRepository(grpc: grpc)
 
         let cacheSettings = FileCacheSettings()
         let cache = FileCacheService(
@@ -188,6 +199,7 @@ final class AppEnvironment {
         fileCacheSettings.reset()
         appLockSettings.disable()
         vault.removeAll()
+        RecentMediaWidgetBridge.clear()
         language.reset()
         serverConfig.reset()
     }

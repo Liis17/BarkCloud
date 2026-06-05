@@ -21,6 +21,7 @@ public interface ICloudHierarchyStorage
     Task UpdateFileEntry(CloudFileEntry entry, CancellationToken cancellationToken = default);
     Task RemoveFileEntry(CloudFileEntry entry, CancellationToken cancellationToken = default);
     Task<List<CloudFileEntry>> ListFilesInDirectory(long ownerId, Guid directoryId, CancellationToken cancellationToken = default);
+    Task<List<CloudFileEntry>> SearchFileEntriesPage(long ownerId, string query, DateTime? cursorCreatedAt, Guid? cursorEntryId, int limit, CancellationToken cancellationToken = default);
     Task<List<CloudFileEntry>> GetFileEntriesInDirectories(long ownerId, IReadOnlyCollection<Guid> directoryIds, CancellationToken cancellationToken = default);
     Task<List<CloudFileEntry>> GetLiveEntriesForFile(long ownerId, Guid fileId, CancellationToken cancellationToken = default);
     Task<List<CloudFileEntry>> GetLiveEntriesForFiles(long ownerId, IReadOnlyCollection<Guid> fileIds, CancellationToken cancellationToken = default);
@@ -28,6 +29,7 @@ public interface ICloudHierarchyStorage
     void RemoveFileEntries(IEnumerable<CloudFileEntry> entries);
     Task<CloudFileEntry?> GetTrashedEntry(Guid id, CancellationToken cancellationToken = default);
     Task<List<CloudFileEntry>> ListTrashedPage(long ownerId, DateTime? cursorDeletedAt, Guid? cursorEntryId, int limit, CancellationToken cancellationToken = default);
+    Task<(int Count, DateTime? OldestPurgeAt)> GetTrashSummary(long ownerId, CancellationToken cancellationToken = default);
     Task<List<CloudFileEntry>> GetAllTrashedEntries(long ownerId, CancellationToken cancellationToken = default);
     Task<List<CloudFileEntry>> GetExpiredTrashedEntries(DateTime now, int batchSize, CancellationToken cancellationToken = default);
     Task<HashSet<Guid>> GetEffectivelyTrashedFileIds(long ownerId, IReadOnlyCollection<Guid> fileIds, CancellationToken cancellationToken = default);

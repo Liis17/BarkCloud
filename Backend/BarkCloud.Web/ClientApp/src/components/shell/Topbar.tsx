@@ -1,7 +1,18 @@
+import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Icon } from '../Icon';
 import type { PageHeader } from '../../hooks/usePageHeader';
 
 export function Topbar({ kicker, title, actions, search = true }: PageHeader) {
+  const navigate = useNavigate();
+  const [q, setQ] = React.useState('');
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    const query = q.trim();
+    if (query.length > 0) navigate(`/files?q=${encodeURIComponent(query)}`);
+  }
+
   return (
     <header className="topbar">
       <div className="tb-title">
@@ -9,13 +20,18 @@ export function Topbar({ kicker, title, actions, search = true }: PageHeader) {
         <div className="tb-h1">{title}</div>
       </div>
       {search && (
-        <div className="tb-search">
+        <form className="tb-search" onSubmit={submit}>
           <span className="si">
             <Icon.search size={20} />
           </span>
-          <input type="text" placeholder="Найти в облаке: файлы, люди, теги…" />
-          <span className="kbd">⌘ K</span>
-        </div>
+          <input
+            type="text"
+            placeholder="Найти файлы по имени…"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+          />
+          <span className="kbd">⏎</span>
+        </form>
       )}
       <div className="tb-actions">
         {actions}

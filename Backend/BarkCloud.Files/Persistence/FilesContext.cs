@@ -37,6 +37,8 @@ public class FilesContext : DbContext
 
     public DbSet<FolderShareLink> FolderShareLinks { get; set; }
 
+    public DbSet<AlbumShareLink> AlbumShareLinks { get; set; }
+
     public DbSet<FileGrant> FileGrants { get; set; }
 
     public DbSet<DirectoryGrant> DirectoryGrants { get; set; }
@@ -154,6 +156,16 @@ public class FilesContext : DbContext
             // Один публичный шар на папку владельца (идемпотентность CreateFolderShare).
             b.HasIndex(x => new { x.OwnerId, x.DirectoryId }).IsUnique();
             // Cursor-пагинация списка публичных папок владельца по дате создания.
+            b.HasIndex(x => new { x.OwnerId, x.CreatedAt });
+        });
+
+        modelBuilder.Entity<AlbumShareLink>(b =>
+        {
+            // Резолв публичного альбома по токену — токен уникален.
+            b.HasIndex(x => x.Token).IsUnique();
+            // Один публичный шар на альбом владельца (идемпотентность CreateAlbumShare).
+            b.HasIndex(x => new { x.OwnerId, x.AlbumId }).IsUnique();
+            // Cursor-пагинация списка публичных альбомов владельца по дате создания.
             b.HasIndex(x => new { x.OwnerId, x.CreatedAt });
         });
 
