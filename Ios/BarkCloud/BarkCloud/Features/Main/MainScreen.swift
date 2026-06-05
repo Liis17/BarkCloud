@@ -36,6 +36,8 @@ struct MainScreen: View {
                 .tag(MainDestination.settings)
         }
         .overlay(alignment: .bottom) { uploadBannerOverlay }
+        .onAppear { applyPendingDeepLink() }
+        .onChange(of: env.pendingDeepLink) { _, _ in applyPendingDeepLink() }
         .onChange(of: selection) { _, new in
             // При возврате на вкладку «Галерея»: re-scan медиатеки в BackupManager
             // (новые ассеты в pendingUpload), reload в GalleryViewModel (пересобрать
@@ -66,6 +68,16 @@ struct MainScreen: View {
             .animation(.spring(response: 0.4, dampingFraction: 0.85), value: env.uploadProgress.isActive)
             .transition(.move(edge: .bottom).combined(with: .opacity))
         }
+    }
+
+    /// Обработать тап по виджету (`barkcloud://…`): переключить таб, для сейфа —
+    /// попросить `SettingsScreen` запушить `VaultScreen`. Ссылку обнуляем, чтобы
+    /// повторный заход не срабатывал ещё раз.
+    private func applyPendingDeepLink() {
+        guard let link = env.pendingDeepLink else { return }
+        selection = link.tab
+        if link == .vault { env.presentVault = true }
+        env.pendingDeepLink = nil
     }
 
     private func tabLabel(_ destination: MainDestination) -> some View {

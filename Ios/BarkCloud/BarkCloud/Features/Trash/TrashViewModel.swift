@@ -53,6 +53,7 @@ final class TrashViewModel {
             state.cursorDeletedAt = page.nextCursorDeletedAt
             state.cursorEntryID = page.nextCursorEntryID
             state.canLoadMore = page.hasMore
+            TrashWidgetBridge.update(count: page.items.count, hasMore: page.hasMore)
         } catch {
             state.snackbar = domainErrorMessage(error)
         }

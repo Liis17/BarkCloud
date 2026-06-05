@@ -31,6 +31,12 @@ final class AppEnvironment {
     /// [[GlobalUploadBanner]]). Подписан на координатор через `addObserver`.
     let uploadProgress: UploadProgressObserver
 
+    /// Ожидающая обработки глубокая ссылка (тап по виджету). `RootView` пишет сюда
+    /// в `onOpenURL`, `MainScreen` читает, переключает таб и обнуляет.
+    var pendingDeepLink: DeepLink?
+    /// Запрос показать `VaultScreen` поверх таба «Настройки» (для `barkcloud://vault`).
+    var presentVault = false
+
     init() {
         self.serverConfig = ServerConfigStore()
 
