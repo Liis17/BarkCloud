@@ -40,6 +40,7 @@
 ### 📱 Модули — iOS
 - [[modules/ios-app]] — Нативный iOS-клиент (SwiftUI, Swift 5, iOS 18+), полный паритет с Android — реализован
   - [[modules/ios-background-upload]] — Фоновая загрузка через `URLSession.background` + Live Activity (Lock Screen + Dynamic Island), Share Extension сам грузит, BGTask retry
+  - [[modules/ios-widgets]] — Виджеты: Storage (Lock Screen + Control Center), Корзина, Сейф, Недавние фото; deep-link слой `barkcloud://`
 
 ### 💻 Модули — Windows (Desktop)
 - [[modules/windows-drive]] — Виртуальный диск `X:` поверх облака (Dokany, .NET). Текущее: read-only PoC фазы 2
@@ -48,8 +49,8 @@
 - [[modules/macos-drive]] — Папка облака в Finder (NSFileProviderReplicatedExtension, Swift). Каталог `Mac/`. Текущее: код read+write+контейнер компилируется, осталась рантайм-проверка
 
 ### 🛡 Аудит
-- `Docs/SECURITY_PERFORMANCE_AUDIT.md` — Пошаговый план аудита безопасности и производительности (Backend + Web + инфраструктура): сквозные этапы E1–E10, проверки по каждому микросервису, нагрузочное тестирование, шаблон отчёта и приложение с известными горячими точками (file:line).
-- `Docs/SECURITY_AUDIT_FINDINGS.md` — Отчёт по выполненному аудиту: находки с верификацией по коду (2 Critical, 6 High, 7 Medium, 6 Low), поправки к предварительным находкам, производительность, матрица покрытия и приоритеты ремедиации.
+- `Docs/audit/SECURITY_PERFORMANCE_AUDIT.md` — Пошаговый план аудита безопасности и производительности (Backend + Web + инфраструктура): сквозные этапы E1–E10, проверки по каждому микросервису, нагрузочное тестирование, шаблон отчёта и приложение с известными горячими точками (file:line).
+- `Docs/audit/SECURITY_AUDIT_FINDINGS.md` — Отчёт по выполненному аудиту: находки с верификацией по коду (2 Critical, 6 High, 7 Medium, 6 Low), поправки к предварительным находкам, производительность, матрица покрытия и приоритеты ремедиации.
 - `Docs/audit/WINDOWS_DRIVE_AUDIT.md` — План аудита Windows-клиента `BarkCloud.Drive` (Engine + App): безопасность (TLS/MITM, IPC named pipe, секреты, данные в `%TEMP%`), производительность (sync-over-async в колбэках Dokany, кэш, резолв путей) и качество кода. Сквозные этапы W1–W8, проверки по компонентам, нагрузочные сценарии, шаблон находок и приложение с горячими точками (file:line). Контекст — [[modules/windows-drive]].
 - `Docs/audit/WINDOWS_DRIVE_AUDIT_FINDINGS.md` — Отчёт по выполненному (статически) аудиту Windows-клиента: находки с верификацией по коду (1 Critical, 2 High, 4 Medium, 5 Low), поправки к предварительным находкам, проверенные-корректными места и приоритеты ремедиации. Динамические проверки (MITM, нагрузка, PipeList) помечены как требующие прогона на Windows.
 - `Docs/audit/IOS_SECURITY_PERFORMANCE_AUDIT.md` — Пошаговая методология проверки iOS-клиента (приложение + Share Extension + Widgets) по трём осям: безопасность, производительность, качество кода. Сквозные этапы И1–И5, проверки по областям (3.A/3.B/3.C) с якорями на файлы, стресс-сценарии, шаблон отчёта. Только методология (без перечня находок). См. [[modules/ios-app]].
@@ -85,7 +86,7 @@
 | `Shared/BarkCloud.Proto/*.proto` | gRPC-контракты между сервисами и клиентом |
 | `Android/BarkCloud.Android/build.gradle.kts` | Android-проект (Kotlin DSL) |
 | `Ios/BarkCloud/BarkCloud.xcodeproj` | iOS-проект (Xcode, SwiftUI) |
-| `Docs/` | Заметки по настройке (`IOS_SETUP.md`, гайдлайны Material 3) |
+| `Docs/` | Бриф продукта (`WEBSITE_BRIEF.md`), гайдлайны Material 3, аудиты (`Docs/audit/`) |
 
 ## Соглашения проекта
 

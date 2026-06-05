@@ -27,6 +27,13 @@ struct SettingsScreen: View {
             .navigationTitle(String(localized: "tab_settings"))
             .disabled(isProcessing)
             .overlay { if isProcessing { signOutOverlay } }
+            // Программный переход в сейф по deep link с виджета (`barkcloud://vault`).
+            .navigationDestination(isPresented: Binding(
+                get: { env.presentVault },
+                set: { env.presentVault = $0 }
+            )) {
+                VaultScreen()
+            }
         }
         .task {
             if vm == nil {

@@ -54,7 +54,7 @@ CLOUD_FILE = 2;   // обычный файл пользовательского 
 | `file_url` | string | Прямая ссылка `/download/{id}`. ⚠️ Работает только для аватаров и превью; для оригинала `CLOUD_FILE` — см. §3 (нужна временная ссылка) |
 | `created_at` / `uploaded_at` | Timestamp | Время создания/завершения загрузки |
 | `etag` | string | S3 ETag (служебное) |
-| `uploaders` | repeated int64 | Служебное (дедуп), клиенту не нужно |
+| `uploaders` | repeated int64 | Служебное, клиенту не нужно |
 
 ### `FilePreviewInfo`
 | Поле | Тип | Описание |
@@ -85,8 +85,7 @@ CLOUD_FILE = 2;   // обычный файл пользовательского 
 **Шаг 2 — залить байты** (HTTP, не gRPC)
 - `POST {url}` с `multipart/form-data`, поле формы **`file`** = содержимое файла (с корректным именем, например `clip.mp4` — по нему определяется content-type и `MediaKind`).
 - Лимит размера: 512 МБ.
-- Ответ: `200 OK` с JSON `{ "fileId": "<guid>" }`.
-- ⚠️ **Важно**: возвращённый `fileId` может **отличаться** от запрошенного `file_id` — при дедупликации (файл с таким содержимым уже есть) вернётся ID существующего блоба. Всегда используйте `fileId` из ответа.
+- Ответ: `200 OK` с JSON `{ "fileId": "<guid>" }` — тот же ID, что вернул `GetUploadUrl` (каждая загрузка = свой независимый блоб, серверной дедупликации по содержимому нет).
 
 **Что происходит на сервере автоматически:**
 - Фото → генерируются превью 128/512/1024.
@@ -212,10 +211,10 @@ CLOUD_FILE = 2;   // обычный файл пользовательского 
 
 Два эндпоинта, **не путать**:
 
-`FilesApi.CheckFileHash` (одиночный)
+`FilesApi.CheckFileHash` (одиночный, **без побочных эффектов**)
 - Передать: `CheckFileHashRequest { file_hash }` (SHA256 hex, 64 символа).
-- Вернётся: `CheckFileHashResponse { file_id }` (пусто, если нет).
-- ⚠️ **Побочный эффект**: добавляет текущего пользователя в uploaders найденного блоба. Предназначен для дедупликации **в процессе загрузки**, а не для пассивной проверки.
+- Вернётся: `CheckFileHashResponse { exists, file_id, existing_locations[] }`. Наличие считается по **живым записям текущего пользователя**: `exists=false` и пустой `file_id`, если такого контента у пользователя нет. `existing_locations[]` = `{ entry_id, name, directory_id, directory_name }` — существующие копии (имя + папка) для модалки «файл уже есть».
+- Чистая проверка: решение «грузить копию / открыть существующую» принимает клиент.
 
 `FilesApi.CheckFileHashes` (пакетный, **без побочных эффектов**)
 - Передать: `CheckFileHashesRequest { file_hashes: [ ... ] }` (до 500 валидных уникальных; сервер нормализует к lowercase, отбрасывает некорректные/дубли).
@@ -248,3 +247,5 @@ CLOUD_FILE = 2;   // обычный файл пользовательского 
 - **Создать/наполнить альбом**: `CreateAlbum` → `AddItemsToAlbum`.
 - **Файловый менеджер**: `ListDirectoryDetailed(directory_id)`; навигация — `GetPath`.
 - **Загрузить новый файл**: `GetUploadUrl(CLOUD_FILE)` → `POST {url}` (form-field `file`) → (опц.) `AttachFile` / `AddItemsToAlbum`.
+- **Поиск по имени**: `CloudApi.SearchFiles({ query, limit, cursor_created_at, cursor_entry_id })` → `SearchFilesResponse { files[FileEntryDetailed], next_cursor_* }`. Ищет живые записи владельца по подстроке имени (регистронезависимо, по всему облаку), сортировка от новых к старым, cursor-пагинация. Пустой `query` → пустой ответ.
+- **Сделать альбом публичным**: `CloudApi.CreateAlbumShare({ album_id, name })` → `AlbumShareInfo { token, ... }`; публичная страница — `{web}/al/{token}`. Список — `ListMyAlbumShares`, отзыв — `RevokeAlbumShare`. Анонимный резолв (для веб-страницы) — `FilesServerApi.ResolveAlbumShare({ token, cursor })` → `{ found, album_name, description, items[PublicFileEntry], next_cursor_* }`. Удаление альбома снимает публичность. Идемпотентно: повторный `CreateAlbumShare` вернёт существующую ссылку.

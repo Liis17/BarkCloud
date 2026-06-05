@@ -24,5 +24,8 @@ struct RootView: View {
         .animation(.default, value: env.serverConfig.isConfigured)
         .animation(.default, value: env.sessionStore.sessionExpired)
         .animation(.default, value: env.appLock.shouldShowLock)
+        .onOpenURL { url in
+            if let link = DeepLink(url: url) { env.pendingDeepLink = link }
+        }
     }
 }

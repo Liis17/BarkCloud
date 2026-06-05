@@ -44,6 +44,8 @@ final class PrivacySettingsViewModel {
 struct PrivacySettingsScreen: View {
     @Environment(AppEnvironment.self) private var env
     @State private var vm: PrivacySettingsViewModel?
+    /// Локальная (App Group) настройка: показывать ли число элементов сейфа на виджете.
+    @State private var vaultWidgetCountVisible = VaultWidgetBridge.isCountVisible
 
     private let visibilityOptions: [Barkcloud_Users_PrivacyVisibility] = [.everyone, .contacts, .nobody]
 
@@ -89,6 +91,21 @@ struct PrivacySettingsScreen: View {
                 }
             } footer: {
                 Text("privacy_searchable_hint")
+            }
+
+            Section {
+                Toggle(isOn: Binding(
+                    get: { vaultWidgetCountVisible },
+                    set: { newValue in
+                        vaultWidgetCountVisible = newValue
+                        VaultWidgetBridge.setCountVisible(newValue)
+                        VaultWidgetBridge.update(count: env.vault.items.count)
+                    }
+                )) {
+                    Text("privacy_vault_widget_count")
+                }
+            } footer: {
+                Text("privacy_vault_widget_count_hint")
             }
 
             if let snackbar = vm.state.snackbar {

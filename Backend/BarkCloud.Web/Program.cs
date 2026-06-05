@@ -117,8 +117,10 @@ app.MapFallback(async (HttpContext http, AuthGateway auth) =>
         return Results.NotFound();
 
     // Публичные страницы по шаринг-ссылке — доступны без авторизации:
-    // /v/{token} (просмотр файла) и /f/{token} (публичная папка).
-    var isPublicView = http.Request.Path.StartsWithSegments("/v") || http.Request.Path.StartsWithSegments("/f");
+    // /v/{token} (просмотр файла), /f/{token} (публичная папка), /al/{token} (публичный альбом).
+    var isPublicView = http.Request.Path.StartsWithSegments("/v")
+        || http.Request.Path.StartsWithSegments("/f")
+        || http.Request.Path.StartsWithSegments("/al");
     if (!isPublicView && await auth.AuthenticateAsync(http) is null)
         return Results.Redirect("/login");
 

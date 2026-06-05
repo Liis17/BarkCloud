@@ -63,6 +63,7 @@ public class Program
         builder.Services.AddScoped<IFavoriteFilesStorage, FavoriteFilesStorage>();
         builder.Services.AddScoped<IShareStorage, ShareStorage>();
         builder.Services.AddScoped<IFolderShareStorage, FolderShareStorage>();
+        builder.Services.AddScoped<IAlbumShareStorage, AlbumShareStorage>();
         builder.Services.AddScoped<IGrantStorage, GrantStorage>();
         builder.Services.AddScoped<IDirectoryGrantStorage, DirectoryGrantStorage>();
         builder.Services.AddScoped<FolderGrantAccessService>();

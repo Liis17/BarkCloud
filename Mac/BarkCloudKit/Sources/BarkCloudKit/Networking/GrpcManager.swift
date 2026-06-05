@@ -133,6 +133,12 @@ public enum GrpcEndpoint {
         return URL(string: "\(webHost)/s/\(token)")
     }
 
+    /// Публичный URL ссылки на альбом (`/al/{token}`). `token` — base64url (URL-safe).
+    public static func publicAlbumShareURL(token: String) -> URL? {
+        guard !token.isEmpty else { return nil }
+        return URL(string: "\(webHost)/al/\(token)")
+    }
+
     /// Перестраивает ссылку скачивания файла на актуальный эндпоинт Files.
     /// Часть ссылок (например, URL аватара) хранится в БД и была сгенерирована
     /// при прежней конфигурации `ExternalEndpoint:Host` — она может указывать на
@@ -161,6 +167,7 @@ public actor GrpcManager {
     public typealias FilesClient = Barkcloud_Files_FilesApi.Client<Transport>
     public typealias CloudClient = Barkcloud_Files_CloudApi.Client<Transport>
     public typealias AlbumClient = Barkcloud_Files_AlbumApi.Client<Transport>
+    public typealias DynamicFolderClient = Barkcloud_Files_DynamicFolderApi.Client<Transport>
 
     private let session: SessionStore
     private var clients: [String: GRPCClient<Transport>] = [:]
@@ -196,6 +203,10 @@ public actor GrpcManager {
 
     public func albumStub() async throws -> AlbumClient {
         AlbumClient(wrapping: try await client(host: GrpcEndpoint.filesHost, port: GrpcEndpoint.filesPort))
+    }
+
+    public func dynamicFolderStub() async throws -> DynamicFolderClient {
+        DynamicFolderClient(wrapping: try await client(host: GrpcEndpoint.filesHost, port: GrpcEndpoint.filesPort))
     }
 
     private func client(host: String, port: Int) async throws -> GRPCClient<Transport> {
