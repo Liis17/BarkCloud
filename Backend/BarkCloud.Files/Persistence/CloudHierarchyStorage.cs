@@ -225,6 +225,35 @@ public class CloudHierarchyStorage : ICloudHierarchyStorage
     }
 
     /// <summary>
+    /// Поиск живых записей файлов владельца по подстроке имени (регистронезависимо), по всему облаку.
+    /// Сортировка (CreatedAt desc, Id desc), cursor-пагинация; возвращает limit+1 для определения след. страницы.
+    /// </summary>
+    public async Task<List<CloudFileEntry>> SearchFileEntriesPage(
+        long ownerId, string query, DateTime? cursorCreatedAt, Guid? cursorEntryId, int limit, CancellationToken cancellationToken = default)
+    {
+        var pattern = query.Trim().ToLower();
+
+        var q = _context.CloudFileEntries
+            .AsNoTracking()
+            .Where(x => x.OwnerId == ownerId && !x.IsDeleted && x.Name.ToLower().Contains(pattern));
+
+        if (cursorCreatedAt.HasValue && cursorEntryId.HasValue)
+        {
+            var cursorAt = DateTime.SpecifyKind(cursorCreatedAt.Value, DateTimeKind.Utc);
+            var cid = cursorEntryId.Value;
+            q = q.Where(x =>
+                x.CreatedAt < cursorAt
+                || (x.CreatedAt == cursorAt && x.Id.ToString().CompareTo(cid.ToString()) < 0));
+        }
+
+        return await q
+            .OrderByDescending(x => x.CreatedAt)
+            .ThenByDescending(x => x.Id)
+            .Take(limit + 1)
+            .ToListAsync(cancellationToken);
+    }
+
+    /// <summary>
     /// Возвращает все живые CloudFileEntry, лежащие в любой из указанных директорий
     /// (записи в корзине исключаются — их не нужно перемещать в корзину повторно).
     /// </summary>

@@ -24,6 +24,12 @@ struct CloudBrowserUiState {
     var processDone = 0
     var processTotal = 0
 
+    // MARK: Поиск по имени (по всему облаку)
+    var searchText = ""
+    var searchResults: [CloudFileEntry] = []
+    var isSearchLoading = false
+    var isSearching: Bool { !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+
     var isEmpty: Bool { subdirs.isEmpty && files.isEmpty }
     var selectedCount: Int { selectedFiles.count + selectedDirs.count }
     var hasSelection: Bool { selectedCount > 0 }
@@ -179,6 +185,37 @@ final class CloudBrowserViewModel {
     }
 
     func snackbarShown() { state.snackbar = nil }
+
+    // MARK: - Поиск
+
+    private var searchTask: Task<Void, Never>?
+
+    /// Живой поиск файлов по имени с дебаунсом 300 мс. Пустой запрос очищает
+    /// результаты и возвращает обычный листинг папки.
+    func searchTextChanged(_ text: String) {
+        state.searchText = text
+        searchTask?.cancel()
+        let query = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else {
+            state.searchResults = []
+            state.isSearchLoading = false
+            return
+        }
+        state.isSearchLoading = true
+        searchTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            guard !Task.isCancelled, let self else { return }
+            do {
+                let page = try await self.cloud.searchFiles(query: query, limit: 60)
+                guard !Task.isCancelled else { return }
+                self.state.searchResults = page.files
+            } catch {
+                guard !Task.isCancelled else { return }
+                self.state.snackbar = domainErrorMessage(error)
+            }
+            self.state.isSearchLoading = false
+        }
+    }
 
     /// Создать публичную ссылку на файл и открыть системный Share Sheet.
     /// Зеркалит `GalleryViewModel.makePublic` / `MediaGridViewModel.makePublic`.
