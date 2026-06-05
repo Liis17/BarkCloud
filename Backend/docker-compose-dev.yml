@@ -119,7 +119,10 @@ services:
       MINIO_ROOT_USER: "${MINIO_ROOT_USER}"
       MINIO_ROOT_PASSWORD: "${MINIO_ROOT_PASSWORD}"
     volumes:
-      - minio_data:/data
+      # Источник данных MinIO. По умолчанию — named volume minio_data (внутри образа диска Docker).
+      # Чтобы вынести данные на отдельный физический диск (Windows/WSL2): смонтируй ext4-vhdx в WSL2
+      # и задай в .env MINIO_DATA_PATH=/mnt/wsl/minio. Ранбук: Obsidian/BarkCloudVault/structure/infrastructure.md
+      - "${MINIO_DATA_PATH:-minio_data}:/data"
     command: server /data --console-address ":${MINIO_WEBPORT}"
     networks:
       - barkcloud-network
