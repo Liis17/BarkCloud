@@ -53,6 +53,10 @@ final class TrashViewModel {
             state.cursorDeletedAt = page.nextCursorDeletedAt
             state.cursorEntryID = page.nextCursorEntryID
             state.canLoadMore = page.hasMore
+            // Освежить виджет точной сводкой (счётчик + ближайший дедлайн), best-effort.
+            if let summary = try? await cloud.trashSummary() {
+                TrashWidgetBridge.update(count: summary.count, oldestPurgeAt: summary.oldestPurgeAt)
+            }
         } catch {
             state.snackbar = domainErrorMessage(error)
         }

@@ -43,6 +43,7 @@ Package: `barkcloud.files`
 | `ListMediaLocations(ListMediaLocationsRequest) → ListMediaLocationsResponse` | Точки для карты: медиа с GPS (`MediaLocationPoint { file_id; latitude; longitude; media_kind; preview_url; taken_at?; created_at }`), cursor-пагинация (`cursor_created_at`+`cursor_file_id`); клиент кластеризует |
 | `GetPath(GetPathRequest) → PathResponse` | Построить путь до объекта в иерархии |
 | `ListTrash(ListTrashRequest) → ListTrashResponse` | Список файлов в корзине (от свежеудалённых); cursor `(cursor_deleted_at + cursor_entry_id)`; `TrashEntry` содержит `entry`, `file`, `deleted_at`, `purge_at` |
+| `GetTrashSummary(GetTrashSummaryRequest) → GetTrashSummaryResponse` | Лёгкая сводка: `total_count` + `oldest_purge_at` (серверный `COUNT` + `MIN(PurgeAt)`). Для бейджей/виджета корзины — «самый истекающий» файл без выгрузки страниц |
 | `RestoreFromTrash(RestoreFromTrashRequest) → CloudEmpty` | Восстановить файл из корзины (в исходную папку либо в корень, если она удалена) |
 | `DeleteFromTrash(DeleteFromTrashRequest) → CloudEmpty` | Удалить файл из корзины навсегда (немедленно: БД + альбомы + осиротевший блоб из S3) |
 | `EmptyTrash(EmptyTrashRequest) → CloudEmpty` | Очистить корзину владельца целиком |

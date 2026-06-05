@@ -342,6 +342,18 @@ public final class CloudRepository: Sendable {
         )
     }
 
+    /// Сводка по корзине: точное число записей и ближайшая дата авто-удаления
+    /// (самый старый элемент). Дёшево — один агрегатный запрос; используется виджетом
+    /// корзины, чтобы показать «самый истекающий» файл без выгрузки всех страниц.
+    public func trashSummary() async throws -> (count: Int, oldestPurgeAt: Date?) {
+        let stub = try await grpc.cloudStub()
+        let resp = try await stub.getTrashSummary(Barkcloud_Files_GetTrashSummaryRequest())
+        return (
+            count: Int(resp.totalCount),
+            oldestPurgeAt: resp.hasOldestPurgeAt ? resp.oldestPurgeAt.date : nil
+        )
+    }
+
     public func restoreFromTrash(entryID: String) async throws {
         let stub = try await grpc.cloudStub()
         var req = Barkcloud_Files_RestoreFromTrashRequest()
