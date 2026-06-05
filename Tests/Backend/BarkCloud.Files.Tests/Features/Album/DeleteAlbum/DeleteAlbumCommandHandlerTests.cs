@@ -13,9 +13,11 @@ public class DeleteAlbumCommandHandlerTests
 {
     private const long OwnerId = 42;
     private readonly Mock<IAlbumStorage> _storage = new();
+    private readonly Mock<IAlbumShareStorage> _albumShares = new();
 
     private DeleteAlbumCommandHandler CreateSut() => new(
         _storage.Object,
+        _albumShares.Object,
         UserContextFactory.Create(OwnerId),
         NullLogger<DeleteAlbumCommandHandler>.Instance);
 
