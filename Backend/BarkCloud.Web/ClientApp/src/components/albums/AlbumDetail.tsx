@@ -9,7 +9,7 @@ import { useContextMenu, type ContextItem } from '../ui/ContextMenu';
 import { PropertiesModal } from '../ui/PropertiesModal';
 import { ShareWithUserModal } from '../ui/ShareWithUserModal';
 import { apiGet, apiPost } from '../../lib/api';
-import { createShare } from '../../lib/share';
+import { createShare, createAlbumShare } from '../../lib/share';
 import { GRID_SIZES } from '../../lib/format';
 import type { Album, CardFile, Page } from '../../lib/types';
 import type { ToastPush } from '../../hooks/useToast';
@@ -117,6 +117,9 @@ export function AlbumDetail({ album, candidates, gridSizes = GRID_SIZES, onBack,
         <div className="right" style={{ gap: 8 }}>
           <button className="btn outlined" onClick={() => setPicking(true)}>
             <Icon.plus size={16} /> Добавить
+          </button>
+          <button className="btn outlined" onClick={() => createAlbumShare(album.id, album.name, toast)} title="Создать публичную ссылку на альбом">
+            <Icon.share size={16} /> Поделиться
           </button>
           <button className="btn outlined" onClick={() => setEditing(true)}>
             <Icon.pencil size={16} /> Изменить
