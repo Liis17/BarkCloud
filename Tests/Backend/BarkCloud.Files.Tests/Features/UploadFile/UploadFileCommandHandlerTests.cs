@@ -114,7 +114,7 @@ public class UploadFileCommandHandlerTests
     }
 
     [Fact]
-    public async Task Handle_HeicFile_ConvertsToJpegBeforeUpload()
+    public async Task Handle_HeicFile_KeepsOriginalAndGeneratesJpegView()
     {
         var id = Guid.NewGuid();
         _files.Setup(s => s.GetFile(id))
@@ -129,11 +129,13 @@ public class UploadFileCommandHandlerTests
             new UploadFileCommand { FileId = id, FileName = "photo.heic", FileStream = MakeStream() }, default);
 
         response.Should().Be(id.ToString());
+        // HEIC конвертируется в JPEG-представление (для превью/просмотра в вебе).
         _heicConverter.Verify(c => c.ConvertToJpegAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
-        // Оригинал заливается уже как JPEG, имя меняется на .jpg.
+        // Но оригинал заливается КАК ЕСТЬ (image/heic, имя без изменений) — чтобы его SHA256
+        // совпадал с клиентским и не ломались дедуп и индикатор «уже в облаке».
         _s3.Verify(
-            s => s.UploadAsync("test-bucket", id.ToString(), It.IsAny<Stream>(), "image/jpeg"),
+            s => s.UploadAsync("test-bucket", id.ToString(), It.IsAny<Stream>(), "image/heic"),
             Times.Once);
-        _files.Verify(s => s.UpdateFile(It.Is<UploadFileEntity>(f => f.Filename == "photo.jpg")), Times.Once);
+        _files.Verify(s => s.UpdateFile(It.Is<UploadFileEntity>(f => f.Filename == "photo.heic")), Times.Once);
     }
 }
