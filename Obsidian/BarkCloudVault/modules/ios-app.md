@@ -392,6 +392,18 @@ BarkCloud/
   по SHA256 (`cachedSHA256` → `CloudApi.CheckFileHash`, одиночный), а при отсутствии заливает оригинал
   с `routeByMediaKind: true` (системные «Фото»/«Видео»/«Другие документы»); на время резолва — оверлей `isUploading`.
 
+### Поиск по имени · Шаринг альбома
+
+- **Поиск** (`Features/Files/UI/CloudBrowserScreen` + `CloudBrowserViewModel`): `.searchable`
+  в навбаре облачного браузера; `searchTextChanged` — живой поиск с дебаунсом 300 мс через
+  `CloudRepository.searchFiles(query:)` (RPC `CloudApi.SearchFiles`, по всему облаку). Результаты —
+  отдельная ветка `searchResults` (файлы; тап → QuickLook; контекст-меню «Сделать публичной» /
+  «Поделиться с пользователем»). Модель `CloudSearchPage`, обёртка в `BarkCloudKit/CloudRepository`.
+- **Шаринг альбома** (`Features/Media/Albums/AlbumDetailScreen`): пункт меню «Поделиться альбомом»
+  (`albums_share`) → `AlbumDetailViewModel.shareAlbum` → `CloudRepository.createAlbumShare(albumID:)`
+  (RPC `CloudApi.CreateAlbumShare`) → `pendingShareURL` → системный Share Sheet. URL — `{webHost}/al/{token}`
+  (`GrpcEndpoint.publicAlbumShareURL`), модель `AlbumShareLink`. Публичная страница рендерится веб-клиентом.
+
 ### Умные (динамические) папки — таб «Файлы»
 
 Паритет с вебом (см. [[modules/backend-files-dynamic-folders]]): виртуальные коллекции файлов по
@@ -419,6 +431,7 @@ BarkCloud/
   (`Mac/BarkCloudKit/scripts/sync_proto.sh`, macOS) — закоммиченные стабы отставали от `Shared`-proto
   (не было `DfViewMode`/`view_mode`, а `ListDynamicFolderItemsResponse.items` был `[UploadFileInfo]`
   вместо `[UserImageItem]`). Новый код опирается на актуальный контракт.
+
 
 ### Свайп-просмотрщик
 
@@ -786,3 +799,9 @@ Home Screen виджет «Хранилище BarkCloud» (`.systemSmall` + `.sy
   виджета (автоподпись подхватывает из entitlements).
 - Бэкенд/прото не трогались — `transfer.storageInfo()` уже существовал
   (`Files.GetUserStorageInfo`). App Group и так был в обоих entitlements.
+
+### Новые виджеты (#2/#4/#5/#6)
+
+Расширение набора виджетов: Storage на Lock Screen + Control Center, виджеты
+Корзины, Сейфа и Недавних фото, плюс deep-link слой (`barkcloud://`). Подробности,
+мосты данных и продуктовые решения (privacy сейфа) — в [[ios-widgets]].

@@ -446,6 +446,45 @@ namespace BarkCloud.Files.Persistence.Migrations
                     b.ToTable("FilePreviews");
                 });
 
+            modelBuilder.Entity("BarkCloud.Files.Domain.AlbumShareLink", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AlbumId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("ClickCount")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<long>("OwnerId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Token")
+                        .IsUnique();
+
+                    b.HasIndex("OwnerId", "AlbumId")
+                        .IsUnique();
+
+                    b.HasIndex("OwnerId", "CreatedAt");
+
+                    b.ToTable("AlbumShareLinks");
+                });
+
             modelBuilder.Entity("BarkCloud.Files.Domain.FolderShareLink", b =>
                 {
                     b.Property<Guid>("Id")

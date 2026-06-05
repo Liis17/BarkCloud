@@ -156,6 +156,19 @@ final class AlbumDetailViewModel {
         }
     }
 
+    /// Сделать весь альбом публичным (`/al/{token}`) и открыть системный Share Sheet.
+    func shareAlbum() async {
+        do {
+            let link = try await cloud.createAlbumShare(albumID: state.album.id, name: state.album.name)
+            guard let url = link.url else {
+                state.snackbar = domainErrorMessage(CloudActionError.noLink); return
+            }
+            state.pendingShareURL = ShareableURL(url: url)
+        } catch {
+            state.snackbar = domainErrorMessage(error)
+        }
+    }
+
     /// Оптимистичное удаление файла из облака (в корзину) — не путать с «Убрать
     /// из альбома». Сразу убираем из сетки и кладём в очередь; реальный запрос
     /// уйдёт, когда snackbar отсчитает 5 секунд.
@@ -422,6 +435,11 @@ struct AlbumDetailScreen: View {
         }
         ToolbarItem(placement: .topBarTrailing) {
             Menu {
+                Button {
+                    Task { await vm?.shareAlbum() }
+                } label: {
+                    Label(String(localized: "albums_share"), systemImage: "square.and.arrow.up")
+                }
                 Button {
                     renameText = vm?.state.album.name ?? ""
                     showRename = true

@@ -96,11 +96,10 @@ function groupIFolders(items: IFolderShareItem[]): IFolderGroup[] {
 }
 
 function LinkCard({ link, onCopy, onRevoke }: { link: ShareLink; onCopy: (l: ShareLink) => void; onRevoke: (l: ShareLink) => void }) {
-  const isFolder = link.kind === 'folder';
   return (
     <div className="link-card">
       <div className="link-icon">
-        {isFolder ? <Icon.folder size={22} /> : <Icon.link size={22} />}
+        {link.kind === 'folder' ? <Icon.folder size={22} /> : link.kind === 'album' ? <Icon.photo size={22} /> : <Icon.link size={22} />}
       </div>
       <div>
         <div style={{ fontSize: 15, fontWeight: 500, color: 'var(--md-on-surface)', marginBottom: 8 }}>{link.name || 'Без имени'}</div>
@@ -280,9 +279,10 @@ export function SharedPage() {
     Promise.all([
       apiGet<Page<ShareLink>>('/api/shares').then((d) => (d.items || []).map((l) => ({ ...l, kind: 'file' as const }))),
       apiGet<Page<ShareLink>>('/api/folder-shares').then((d) => (d.items || []).map((l) => ({ ...l, kind: 'folder' as const }))),
+      apiGet<Page<ShareLink>>('/api/album-shares').then((d) => (d.items || []).map((l) => ({ ...l, kind: 'album' as const }))),
     ])
-      .then(([files, folders]) => {
-        const all = [...files, ...folders].sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+      .then(([files, folders, albums]) => {
+        const all = [...files, ...folders, ...albums].sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
         setLinks(all);
       })
       .catch((e) => {
@@ -339,14 +339,16 @@ export function SharedPage() {
   }
   async function revoke(link: ShareLink) {
     const isFolder = link.kind === 'folder';
-    const what = isFolder ? 'папку' : 'файл';
+    const isAlbum = link.kind === 'album';
+    const what = isFolder ? 'папку' : isAlbum ? 'альбом' : 'файл';
     const extra = isFolder ? ' Публичные ссылки на файлы внутри тоже будут сняты.' : '';
     if (!window.confirm(`Отозвать ссылку на «${link.name || what}»? Ссылка перестанет работать.${extra}`)) return;
     try {
       if (isFolder) await apiPost('/api/folder-shares/revoke', { folderShareId: link.id });
+      else if (isAlbum) await apiPost('/api/album-shares/revoke', { albumShareId: link.id });
       else await apiPost('/api/shares/revoke', { shareId: link.id });
       setLinks((prev) => (prev ? prev.filter((l) => l.id !== link.id) : prev));
-      toast(isFolder ? 'Папка снова приватна' : 'Ссылка отозвана');
+      toast(isFolder ? 'Папка снова приватна' : isAlbum ? 'Альбом снова приватный' : 'Ссылка отозвана');
     } catch (e) {
       toast((e as Error).message, 'err');
     }

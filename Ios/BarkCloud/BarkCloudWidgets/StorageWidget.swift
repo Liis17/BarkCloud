@@ -19,7 +19,10 @@ struct StorageWidget: Widget {
         }
         .configurationDisplayName("Хранилище BarkCloud")
         .description("Сколько места занято в облаке.")
-        .supportedFamilies([.systemSmall, .systemMedium])
+        .supportedFamilies([
+            .systemSmall, .systemMedium,
+            .accessoryCircular, .accessoryRectangular, .accessoryInline
+        ])
     }
 }
 
@@ -152,7 +155,62 @@ struct StorageWidgetEntryView: View {
     var body: some View {
         switch family {
         case .systemMedium: MediumStorageView(snapshot: snapshot)
+        case .accessoryCircular: AccessoryCircularStorageView(snapshot: snapshot)
+        case .accessoryRectangular: AccessoryRectangularStorageView(snapshot: snapshot)
+        case .accessoryInline: AccessoryInlineStorageView(snapshot: snapshot)
         default: SmallStorageView(snapshot: snapshot)
+        }
+    }
+}
+
+// MARK: - Lock Screen / accessory представления
+
+/// Круговой замочный аксессуар (Lock Screen): кольцо-`Gauge` с процентом внутри.
+/// Система сама применяет vibrant-тонирование, поэтому собственные цвета не задаём.
+private struct AccessoryCircularStorageView: View {
+    let snapshot: StorageSnapshot
+
+    var body: some View {
+        Gauge(value: snapshot.fraction) {
+            Image(systemName: "cloud.fill")
+        } currentValueLabel: {
+            Text(snapshot.hasData ? "\(snapshot.percent)" : "–")
+        }
+        .gaugeStyle(.accessoryCircularCapacity)
+    }
+}
+
+/// Прямоугольный аксессуар: заголовок + процент + полоса заполнения.
+private struct AccessoryRectangularStorageView: View {
+    let snapshot: StorageSnapshot
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Label("BarkCloud", systemImage: "cloud.fill")
+                .font(.caption2)
+                .widgetAccentable()
+            if snapshot.hasData {
+                Text("\(snapshot.percent)% занято")
+                    .font(.headline)
+                Gauge(value: snapshot.fraction) { EmptyView() }
+                    .gaugeStyle(.accessoryLinearCapacity)
+            } else {
+                Text("Откройте приложение")
+                    .font(.caption)
+            }
+        }
+    }
+}
+
+/// Строчный аксессуар (над часами): иконка + короткий процент.
+private struct AccessoryInlineStorageView: View {
+    let snapshot: StorageSnapshot
+
+    var body: some View {
+        if snapshot.hasData {
+            Label("BarkCloud \(snapshot.percent)%", systemImage: "cloud.fill")
+        } else {
+            Label("BarkCloud", systemImage: "cloud.fill")
         }
     }
 }

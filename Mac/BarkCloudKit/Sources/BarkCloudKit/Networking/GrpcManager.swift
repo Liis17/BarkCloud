@@ -133,6 +133,12 @@ public enum GrpcEndpoint {
         return URL(string: "\(webHost)/s/\(token)")
     }
 
+    /// Публичный URL ссылки на альбом (`/al/{token}`). `token` — base64url (URL-safe).
+    public static func publicAlbumShareURL(token: String) -> URL? {
+        guard !token.isEmpty else { return nil }
+        return URL(string: "\(webHost)/al/\(token)")
+    }
+
     /// Перестраивает ссылку скачивания файла на актуальный эндпоинт Files.
     /// Часть ссылок (например, URL аватара) хранится в БД и была сгенерирована
     /// при прежней конфигурации `ExternalEndpoint:Host` — она может указывать на

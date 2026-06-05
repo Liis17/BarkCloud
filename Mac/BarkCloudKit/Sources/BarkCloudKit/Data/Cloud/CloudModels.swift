@@ -183,6 +183,28 @@ public struct ShareLinksPage: Sendable {
     public var hasMore: Bool { nextCursorCreatedAt != nil }
 }
 
+/// Публичная ссылка на альбом (зеркалит `AlbumShareInfo`). `url` собирается на
+/// клиенте: `{webHost}/al/{token}`.
+public struct AlbumShareLink: Identifiable, Hashable, Sendable {
+    public let id: String
+    public let token: String
+    public let albumID: String
+    public let name: String
+    public let url: URL?
+    public let clickCount: Int
+    public let createdAt: Date
+
+    public init(_ info: Barkcloud_Files_AlbumShareInfo) {
+        self.id = info.id
+        self.token = info.token
+        self.albumID = info.albumID
+        self.name = info.name
+        self.url = GrpcEndpoint.publicAlbumShareURL(token: info.token)
+        self.clickCount = Int(info.clickCount)
+        self.createdAt = info.hasCreatedAt ? info.createdAt.date : Date()
+    }
+}
+
 /// Получатель шара / результат поиска пользователей. Зеркалит
 /// `Barkcloud_Users_User` в минимальном объёме, нужном для UI выбора (поиск,
 /// карточка получателя, отображение «от кого» в Мне доступны).
@@ -323,6 +345,15 @@ public struct CloudFileEntry: Identifiable, Hashable, Sendable {
 public struct CloudListing: Sendable {
     public let subdirs: [CloudDirectory]
     public let files: [CloudFileEntry]
+}
+
+/// Страница результатов поиска файлов по имени (зеркалит `SearchFilesResponse`).
+/// `nextCursorCreatedAt == nil` → больше страниц нет.
+public struct CloudSearchPage: Sendable {
+    public let files: [CloudFileEntry]
+    public let nextCursorCreatedAt: Date?
+    public let nextCursorEntryID: String
+    public var hasMore: Bool { nextCursorCreatedAt != nil }
 }
 
 /// Сегмент хлебных крошек.
