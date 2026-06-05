@@ -46,7 +46,7 @@ Parent: [[index]] · See also: [[api/files-api]] · [[modules/backend-files-clou
   - `ExtractFromVideo(VideoProbe)` — ffprobe + теги контейнера QuickTime/MP4: дата (`com.apple.quicktime.creationdate`/`creation_time`), GPS (`com.apple.quicktime.location.ISO6709`), устройство (`com.apple.quicktime.make/model/software`). Парсер ISO 6709 для координат
   - `ExtractFromPdf(Stream)` — **UglyToad.PdfPig** (`PdfDocument.Information`: Author/Title/Subject/Producer/Creator/CreationDate/NumberOfPages)
   - `ExtractFromOffice(Stream, contentType)` — **DocumentFormat.OpenXml** для DOCX/XLSX/PPTX: `PackageProperties.Creator/Title/Subject/Created` + `ExtendedFilePropertiesPart` для `Application` и счётчика страниц/слайдов
-- `HeicImageConverter.cs` — перекодирование HEIC/HEIF → JPEG через ffmpeg (FFMpegCore, `-frames:v 1 -q:v 2`). Нужен потому, что ImageSharp HEIC не читает, а браузеры HEIC не отображают. Используется в `UploadFile` (конвертация оригинала до хеширования) и в `LegacyPreviewBackfillService`
+- `HeicImageConverter.cs` — перекодирование HEIC/HEIF → JPEG через ffmpeg (FFMpegCore, `-frames:v 1 -q:v 2`). Нужен потому, что ImageSharp HEIC не читает, а браузеры HEIC не отображают. Используется в `UploadFile` (отдельное JPEG-представление для размеров/превью/`JpegView`; **оригинал HEIC при этом не трогается и хешируется как есть**) и в `LegacyPreviewBackfillService`
 - `PreviewPersistenceService.cs` — сохранение превью (дедуп по SHA256 + S3 + `FilePreview`); общий для загрузки и `SetVideoThumbnail`
 - `LegacyPreviewBackfillService.cs` — фоновый разовый бэкафилл при старте контейнера (BackgroundService): находит фото-оригиналы (`MediaKind.Photo`) без превью, перекодирует HEIC→JPEG (замена блоба в S3 под тем же ключом + обновление имени/размера/хеша) и генерирует превью 1024/512/128. Курсор по `Id` по возрастанию; дёшев на повторных стартах (файлы с превью выпадают из выборки). Видео не покрывает
 - `AlbumViewBuilder.cs` — сборка `AlbumInfo` (счётчик элементов + URL превью обложки) батчем
@@ -65,7 +65,7 @@ Parent: [[index]] · See also: [[api/files-api]] · [[modules/backend-files-clou
 - `BucketS3Options.cs` — настройки S3-бакета
 
 ### Persistence
-- `FilesContext.cs`, `FilesContextFactory.cs` — EF Core DbContext (содержит `UploadedFiles`, `FileHashes`, `TempFiles`, `CloudDirectories`, `CloudFileEntries`, `FilePreviews`, `Albums`, `AlbumItems`, `FavoriteFiles`, `ShareLinks`). Миграция `20260602120000_AddUploadedFilesUploadersIndex.cs` — raw-SQL GIN-индекс на массив `UploadedFiles."Uploaders"` (`array_ops`): галерея `ListUserMedia` и подсчёт квоты фильтруют `Uploaders.Contains(ownerId)` → `@>`, ранее seq-scan
+- `FilesContext.cs`, `FilesContextFactory.cs` — EF Core DbContext (содержит `UploadedFiles`, `FileHashes`, `TempFiles`, `CloudDirectories`, `CloudFileEntries`, `FilePreviews`, `Albums`, `AlbumItems`, `DynamicFolders`, `FavoriteFiles`, `ShareLinks`, `FolderShareLinks`, `FileGrants`, `DirectoryGrants`, `FileMetadata`). Миграция `20260602120000_AddUploadedFilesUploadersIndex.cs` — raw-SQL GIN-индекс на массив `UploadedFiles."Uploaders"` (`array_ops`): галерея `ListUserMedia` и подсчёт квоты фильтруют `Uploaders.Contains(ownerId)` → `@>`, ранее seq-scan
 - `UploadedFilesStorage.cs`
 - `FileHashesStorage.cs`
 - `TempFilesStorage.cs`
