@@ -392,6 +392,18 @@ BarkCloud/
   по SHA256 (`cachedSHA256` → `CloudApi.CheckFileHash`, одиночный), а при отсутствии заливает оригинал
   с `routeByMediaKind: true` (системные «Фото»/«Видео»/«Другие документы»); на время резолва — оверлей `isUploading`.
 
+### Поиск по имени · Шаринг альбома
+
+- **Поиск** (`Features/Files/UI/CloudBrowserScreen` + `CloudBrowserViewModel`): `.searchable`
+  в навбаре облачного браузера; `searchTextChanged` — живой поиск с дебаунсом 300 мс через
+  `CloudRepository.searchFiles(query:)` (RPC `CloudApi.SearchFiles`, по всему облаку). Результаты —
+  отдельная ветка `searchResults` (файлы; тап → QuickLook; контекст-меню «Сделать публичной» /
+  «Поделиться с пользователем»). Модель `CloudSearchPage`, обёртка в `BarkCloudKit/CloudRepository`.
+- **Шаринг альбома** (`Features/Media/Albums/AlbumDetailScreen`): пункт меню «Поделиться альбомом»
+  (`albums_share`) → `AlbumDetailViewModel.shareAlbum` → `CloudRepository.createAlbumShare(albumID:)`
+  (RPC `CloudApi.CreateAlbumShare`) → `pendingShareURL` → системный Share Sheet. URL — `{webHost}/al/{token}`
+  (`GrpcEndpoint.publicAlbumShareURL`), модель `AlbumShareLink`. Публичная страница рендерится веб-клиентом.
+
 ### Свайп-просмотрщик
 
 `Features/Shared/MediaPagerScreen.swift` — полноэкранный просмотрщик с листанием

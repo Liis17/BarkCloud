@@ -1,4 +1,6 @@
 using BarkCloud.Proto.Files;
+
+using Google.Protobuf.WellKnownTypes;
 using BarkCloud.Web.Auth;
 using BarkCloud.Web.Infrastructure;
 using BarkCloud.Web.Rendering;
@@ -239,6 +241,47 @@ public static class WebEndpoints
                         imageWidth = f.ImageWidth,
                         imageHeight = f.ImageHeight
                     }).ToArray()
+                });
+            }
+            catch (RpcException)
+            {
+                return Results.NotFound(new { found = false });
+            }
+        });
+
+        // Анонимный JSON для публичной страницы альбома (/al/{token}): элементы альбома, cursor-пагинация.
+        app.MapGet("/al/{token}/list", async (string token, string? cursorAt, string? cursorId, FilesServerApi.FilesServerApiClient filesServer) =>
+        {
+            try
+            {
+                var req = new ResolveAlbumShareRequest { Token = token };
+                if (DateTimeOffset.TryParse(cursorAt, out var dt))
+                    req.CursorAddedAt = Timestamp.FromDateTimeOffset(dt.ToUniversalTime());
+                if (!string.IsNullOrEmpty(cursorId))
+                    req.CursorFileId = cursorId;
+
+                var resp = await filesServer.ResolveAlbumShareAsync(req);
+                if (!resp.Found)
+                    return Results.NotFound(new { found = false });
+
+                return Results.Json(new
+                {
+                    found = true,
+                    albumName = resp.AlbumName,
+                    description = resp.Description,
+                    items = resp.Items.Select(f => new
+                    {
+                        fileId = f.FileId,
+                        name = f.Name,
+                        mediaKind = f.MediaKind.ToString().ToLowerInvariant(),
+                        downloadUrl = f.DownloadUrl,
+                        previewUrl = f.PreviewUrl,
+                        fileSize = f.FileSize,
+                        imageWidth = f.ImageWidth,
+                        imageHeight = f.ImageHeight
+                    }).ToArray(),
+                    nextCursorAt = resp.NextCursorAddedAt?.ToDateTimeOffset(),
+                    nextCursorId = resp.NextCursorFileId
                 });
             }
             catch (RpcException)

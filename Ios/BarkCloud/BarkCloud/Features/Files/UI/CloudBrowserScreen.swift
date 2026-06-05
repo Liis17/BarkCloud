@@ -34,6 +34,11 @@ struct CloudBrowserScreen: View {
         }
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
+        .searchable(
+            text: Binding(get: { vm?.state.searchText ?? "" }, set: { vm?.searchTextChanged($0) }),
+            placement: .navigationBarDrawer(displayMode: .automatic),
+            prompt: Text("cloud_search_prompt")
+        )
         .toolbar { toolbarContent }
         .task {
             if vm == nil {
@@ -99,7 +104,9 @@ struct CloudBrowserScreen: View {
 
     @ViewBuilder
     private func content(_ vm: CloudBrowserViewModel) -> some View {
-        if vm.state.isLoading {
+        if vm.state.isSearching {
+            searchResults(vm)
+        } else if vm.state.isLoading {
             ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if vm.state.isEmpty {
             ScrollView {
@@ -195,6 +202,51 @@ struct CloudBrowserScreen: View {
             // Потянуть вниз — перезагрузить содержимое папки.
             .barkRefreshable { await vm.reload(showSpinner: false) }
             .overlay(alignment: .bottom) { PendingDeleteSnackbar(store: vm.pendingDelete) }
+        }
+    }
+
+    /// Результаты поиска по имени (файлы со всего облака). Тап — открыть в QuickLook;
+    /// контекстное меню — публичная ссылка / поделиться с пользователем.
+    @ViewBuilder
+    private func searchResults(_ vm: CloudBrowserViewModel) -> some View {
+        if vm.state.searchResults.isEmpty {
+            ScrollView {
+                VStack(spacing: 16) {
+                    if vm.state.isSearchLoading {
+                        ProgressView()
+                    } else {
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 56))
+                            .foregroundStyle(AppColors.onSurfaceVariant)
+                        Text("cloud_search_empty")
+                            .font(AppTypography.titleMedium)
+                            .foregroundStyle(AppColors.onSurfaceVariant)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .containerRelativeFrame(.vertical)
+            }
+        } else {
+            List {
+                ForEach(vm.state.searchResults) { entry in
+                    fileRow(entry)
+                        .contentShape(Rectangle())
+                        .onTapGesture { openFile = entry }
+                        .contextMenu {
+                            Button {
+                                Task { await vm.makePublic(entry) }
+                            } label: {
+                                Label(String(localized: "ctx_make_public"), systemImage: "link")
+                            }
+                            Button {
+                                shareWithUserContext = ShareWithUserContext(fileID: entry.fileID, fileName: entry.name)
+                            } label: {
+                                Label(String(localized: "shared_with_user_action"), systemImage: "person.2")
+                            }
+                        }
+                }
+            }
+            .listStyle(.plain)
         }
     }
 

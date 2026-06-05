@@ -128,6 +128,49 @@ public final class CloudRepository: Sendable {
         _ = try await stub.revokeShare(req)
     }
 
+    /// Создать постоянную публичную ссылку на свой альбом (`/al/{token}`).
+    /// Идемпотентно: повторный вызов вернёт существующую ссылку.
+    public func createAlbumShare(albumID: String, name: String) async throws -> AlbumShareLink {
+        let stub = try await grpc.cloudStub()
+        var req = Barkcloud_Files_CreateAlbumShareRequest()
+        req.albumID = albumID
+        req.name = name
+        return AlbumShareLink(try await stub.createAlbumShare(req))
+    }
+
+    // MARK: - Поиск
+
+    /// Поиск файлов пользователя по подстроке имени (по всему облаку). Курсорная
+    /// пагинация: первый вызов — `cursorCreatedAt = nil`, далее `nextCursor*` из
+    /// ответа. Пустой `query` → пустой результат.
+    public func searchFiles(
+        query: String,
+        limit: Int = 50,
+        cursorCreatedAt: Date? = nil,
+        cursorEntryID: String = ""
+    ) async throws -> CloudSearchPage {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return CloudSearchPage(files: [], nextCursorCreatedAt: nil, nextCursorEntryID: "")
+        }
+        let stub = try await grpc.cloudStub()
+        var req = Barkcloud_Files_SearchFilesRequest()
+        req.query = trimmed
+        req.limit = Int32(max(1, min(200, limit)))
+        if let cursorCreatedAt {
+            req.cursorCreatedAt = Google_Protobuf_Timestamp(date: cursorCreatedAt)
+        }
+        if !cursorEntryID.isEmpty {
+            req.cursorEntryID = cursorEntryID
+        }
+        let resp = try await stub.searchFiles(req)
+        return CloudSearchPage(
+            files: resp.files.map(CloudFileEntry.init),
+            nextCursorCreatedAt: resp.hasNextCursorCreatedAt ? resp.nextCursorCreatedAt.date : nil,
+            nextCursorEntryID: resp.nextCursorEntryID
+        )
+    }
+
     // MARK: - Шаринг с конкретным пользователем
 
     /// Выдать пользователю доступ к одному файлу. Идемпотентно: повторный

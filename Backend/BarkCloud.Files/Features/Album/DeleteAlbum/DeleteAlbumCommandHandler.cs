@@ -10,15 +10,18 @@ namespace BarkCloud.Files.Features.Album.DeleteAlbum;
 public class DeleteAlbumCommandHandler : IRequestHandler<DeleteAlbumCommand, CloudEmpty>
 {
     private readonly IAlbumStorage _storage;
+    private readonly IAlbumShareStorage _albumShares;
     private readonly UserContext _userContext;
     private readonly ILogger<DeleteAlbumCommandHandler> _logger;
 
     public DeleteAlbumCommandHandler(
         IAlbumStorage storage,
+        IAlbumShareStorage albumShares,
         UserContext userContext,
         ILogger<DeleteAlbumCommandHandler> logger)
     {
         _storage = storage;
+        _albumShares = albumShares;
         _userContext = userContext;
         _logger = logger;
     }
@@ -32,6 +35,9 @@ public class DeleteAlbumCommandHandler : IRequestHandler<DeleteAlbumCommand, Clo
             throw new AlbumNotFoundException();
         if (album.OwnerId != ownerId)
             throw new CloudAccessDeniedException();
+
+        // Снять публичность альбома (если была) — публичная страница /al/{token} перестаёт работать.
+        await _albumShares.RemoveByAlbum(ownerId, album.Id, cancellationToken);
 
         // Удаляем альбом и его элементы. Сами файлы (блобы) остаются в облаке.
         await _storage.RemoveAlbum(album, cancellationToken);

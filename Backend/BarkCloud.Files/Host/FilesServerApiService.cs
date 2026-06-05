@@ -1,5 +1,6 @@
 using BarkCloud.Files.Features.Cloud.ResolveShare;
 using BarkCloud.Files.Features.Cloud.ResolveFolderShare;
+using BarkCloud.Files.Features.Cloud.ResolveAlbumShare;
 using BarkCloud.Files.Features.GetFileData;
 using BarkCloud.Files.Features.GetFilesData;
 using BarkCloud.Files.Features.GetUserStorageInfoServer;
@@ -75,5 +76,24 @@ public class FilesServerApiService : FilesServerApi.FilesServerApiBase
     public override Task<ResolveFolderShareResponse> ResolveFolderShare(ResolveFolderShareRequest request, ServerCallContext context)
     {
         return _mediator.Send(new ResolveFolderShareCommand { Token = request.Token, Dir = request.Dir });
+    }
+
+    public override Task<ResolveAlbumShareResponse> ResolveAlbumShare(ResolveAlbumShareRequest request, ServerCallContext context)
+    {
+        DateTime? cursorAddedAt = null;
+        Guid? cursorFileId = null;
+        if (request.CursorAddedAt is not null && !string.IsNullOrWhiteSpace(request.CursorFileId))
+        {
+            cursorAddedAt = request.CursorAddedAt.ToDateTime();
+            cursorFileId = Guid.Parse(request.CursorFileId);
+        }
+
+        return _mediator.Send(new ResolveAlbumShareCommand
+        {
+            Token = request.Token,
+            Limit = request.Limit,
+            CursorAddedAt = cursorAddedAt,
+            CursorFileId = cursorFileId
+        });
     }
 }
