@@ -321,6 +321,23 @@ public class CloudHierarchyStorage : ICloudHierarchyStorage
     }
 
     /// <summary>
+    /// Сводка по корзине владельца: число записей и ближайшая дата авто-удаления
+    /// (минимальный PurgeAt). Дёшево — два агрегата, без выгрузки страниц.
+    /// </summary>
+    public async Task<(int Count, DateTime? OldestPurgeAt)> GetTrashSummary(long ownerId, CancellationToken cancellationToken = default)
+    {
+        var query = _context.CloudFileEntries
+            .AsNoTracking()
+            .Where(x => x.OwnerId == ownerId && x.IsDeleted);
+
+        var count = await query.CountAsync(cancellationToken);
+        DateTime? oldestPurgeAt = count == 0
+            ? null
+            : await query.MinAsync(x => x.PurgeAt, cancellationToken);
+        return (count, oldestPurgeAt);
+    }
+
+    /// <summary>
     /// Все записи владельца в корзине (для «Очистить корзину»).
     /// </summary>
     public async Task<List<CloudFileEntry>> GetAllTrashedEntries(long ownerId, CancellationToken cancellationToken = default)

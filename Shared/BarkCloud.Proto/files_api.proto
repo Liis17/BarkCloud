@@ -48,6 +48,7 @@ service CloudApi {
 
   // ───────── Корзина ─────────
   rpc ListTrash            (ListTrashRequest)            returns (ListTrashResponse);        // Список файлов в корзине (от новых к старым)
+  rpc GetTrashSummary      (GetTrashSummaryRequest)      returns (GetTrashSummaryResponse);   // Сводка: число записей и ближайшая дата авто-удаления (для бейджей/виджетов)
   rpc RestoreFromTrash     (RestoreFromTrashRequest)     returns (CloudEmpty);               // Восстановить файл из корзины
   rpc DeleteFromTrash      (DeleteFromTrashRequest)      returns (CloudEmpty);               // Удалить файл из корзины навсегда (немедленно)
   rpc EmptyTrash           (EmptyTrashRequest)           returns (CloudEmpty);               // Очистить корзину целиком
@@ -447,6 +448,14 @@ message ListTrashResponse {
   repeated TrashEntry items = 1;
   google.protobuf.Timestamp next_cursor_deleted_at = 2; // пусто = больше нет страниц
   string next_cursor_entry_id = 3;
+}
+
+message GetTrashSummaryRequest {
+}
+
+message GetTrashSummaryResponse {
+  int32 total_count = 1;                          // сколько записей в корзине у владельца
+  google.protobuf.Timestamp oldest_purge_at = 2;  // ближайшая дата авто-удаления (самый старый элемент); пусто = корзина пуста
 }
 
 message RestoreFromTrashRequest {

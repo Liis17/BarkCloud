@@ -35,15 +35,16 @@ Parent: [[ios-app]]
   `RefreshStorageIntent`. Данных новых не требует.
 
 ### #5 — Корзина
-- `TrashWidgetBridge.update(count:, hasMore:, nearestPurgeAt:)` из `TrashViewModel.reload()`.
-- Дедлайн авто-удаления берётся из `TrashItem.purgeAt` (уже приходит с бэкенда). Список —
-  `DeletedAt desc`, поэтому точный `min(purgeAt)` известен, только когда корзина уместилась
-  в один лист (`hasMore == false`); иначе `nil` и виджет показывает статичную подсказку
-  про 14 дней (`TrashPurgeService.Retention`). **Без новых API** — для подавляющего
-  большинства (корзина ≤ 50) отсчёт точный.
-- `RefreshTrashIntent` (`cloud.listTrash`) для самостоятельного обновления.
-- `TrashWidget` — `.systemSmall` + `.accessoryRectangular` + `.accessoryCircular`,
-  тап → `barkcloud://trash`.
+- Данные виджета — из нового лёгкого RPC **`CloudApi.GetTrashSummary`** (`COUNT` +
+  `MIN(PurgeAt)` по `IsDeleted`): точный счётчик и точная ближайшая дата авто-удаления.
+  Список корзины остаётся `DeletedAt desc` (UX не меняли), веб не трогали.
+  Клиент: `CloudRepository.trashSummary() -> (count, oldestPurgeAt)`.
+- `TrashWidgetBridge.update(count:, oldestPurgeAt:)` из `TrashViewModel.reload()` (best-effort).
+- `RefreshTrashIntent` тоже зовёт `trashSummary()`.
+- `TrashWidget` — `.systemSmall` + `.accessoryRectangular` + `.accessoryCircular`;
+  показывает «Удалятся через N дн.», тап → `barkcloud://trash`.
+- Бэкенд: `Features/Cloud/GetTrashSummary/` (command+handler), host —
+  `CloudApiService.GetTrashSummary`, storage — `ICloudHierarchyStorage.GetTrashSummary`.
 
 ### #4 — Сейф (privacy-sensitive)
 - `VaultWidgetBridge.update(count:)` из `VaultStore.persist()`.

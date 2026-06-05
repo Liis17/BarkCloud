@@ -6,26 +6,22 @@ import WidgetKit
 /// `UserDefaults`, а виджет читает его в `TimelineProvider`. Ключи продублированы
 /// строками в `TrashSnapshot` виджета — это единственный контракт между таргетами.
 ///
-/// Передаём количество (`hasMore` — был ли усечён первый лист в 50 записей) и
-/// ближайшую дату авто-удаления. Список отдаётся в порядке `DeletedAt desc`, поэтому
-/// ближайший к удалению (самый старый) элемент лежит на последней странице: точный
-/// `min(purgeAt)` известен, только когда корзина помещается в один лист (`hasMore == false`).
-/// Тогда передаём его; иначе `nil`, и виджет показывает статичную подсказку про
-/// фиксированный 14-дневный срок хранения (`TrashPurgeService.Retention`).
+/// Передаём точное число записей и ближайшую дату авто-удаления (самый старый
+/// элемент). Оба значения берутся из лёгкого агрегата `CloudApi.GetTrashSummary`
+/// (`CloudRepository.trashSummary()`) — серверный `COUNT` + `MIN(PurgeAt)`, поэтому
+/// счётчик точный (без «50+»), а дедлайн всегда соответствует самому истекающему файлу.
 enum TrashWidgetBridge {
     private static let countKey = "trash_widget.count"
-    private static let hasMoreKey = "trash_widget.hasMore"
     private static let purgeAtKey = "trash_widget.purgeAt"
 
     private static var defaults: UserDefaults? {
         UserDefaults(suiteName: UploadConstants.appGroupID)
     }
 
-    static func update(count: Int, hasMore: Bool, nearestPurgeAt: Date?) {
+    static func update(count: Int, oldestPurgeAt: Date?) {
         guard let defaults else { return }
         defaults.set(count, forKey: countKey)
-        defaults.set(hasMore, forKey: hasMoreKey)
-        defaults.set(nearestPurgeAt?.timeIntervalSince1970 ?? 0, forKey: purgeAtKey)
+        defaults.set(oldestPurgeAt?.timeIntervalSince1970 ?? 0, forKey: purgeAtKey)
         WidgetCenter.shared.reloadTimelines(ofKind: "TrashWidget")
     }
 }
