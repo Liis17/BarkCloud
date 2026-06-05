@@ -8,6 +8,7 @@ struct BarkCloudWidgetsBundle: WidgetBundle {
         UploadLiveActivity()
         TrashWidget()
         VaultWidget()
+        RecentMediaWidget()
         StorageControl()
     }
 }

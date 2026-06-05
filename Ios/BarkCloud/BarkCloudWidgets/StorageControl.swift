@@ -10,8 +10,7 @@ struct StorageControl: ControlWidget {
     var body: some ControlWidgetConfiguration {
         StaticControlConfiguration(kind: "StorageControl", provider: Provider()) { value in
             ControlWidgetButton(action: RefreshStorageIntent()) {
-                Label(value.hasData ? "\(value.percent)%" : "—", systemImage: "cloud.fill")
-                Text("Квота BarkCloud")
+                Label(value.hasData ? "Облако \(value.percent)%" : "Облако BarkCloud", systemImage: "cloud.fill")
             }
         }
         .displayName("Квота BarkCloud")

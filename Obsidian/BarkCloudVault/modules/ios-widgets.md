@@ -2,7 +2,8 @@ Parent: [[ios-app]]
 
 # iOS — Widgets (план расширения)
 
-> Статус: **в работе** (ветка `claude/ios-widget-options-duYcN`). Создано 2026-06-05.
+> Статус: **реализовано** (ветка `claude/ios-widget-options-duYcN`, #2/#4/#5/#6).
+> Создано 2026-06-05. ⚠️ Требует сборки/прогона на Mac — в CI-окружении нет Xcode.
 > Расположение кода виджетов: `Ios/BarkCloud/BarkCloud/BarkCloudWidgets/`,
 > мосты данных: `Ios/BarkCloud/BarkCloud/BarkCloud/Networking/*WidgetBridge.swift`.
 

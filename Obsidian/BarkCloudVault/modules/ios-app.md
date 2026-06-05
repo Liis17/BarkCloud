@@ -754,3 +754,9 @@ Home Screen виджет «Хранилище BarkCloud» (`.systemSmall` + `.sy
   виджета (автоподпись подхватывает из entitlements).
 - Бэкенд/прото не трогались — `transfer.storageInfo()` уже существовал
   (`Files.GetUserStorageInfo`). App Group и так был в обоих entitlements.
+
+### Новые виджеты (#2/#4/#5/#6)
+
+Расширение набора виджетов: Storage на Lock Screen + Control Center, виджеты
+Корзины, Сейфа и Недавних фото, плюс deep-link слой (`barkcloud://`). Подробности,
+мосты данных и продуктовые решения (privacy сейфа) — в [[ios-widgets]].

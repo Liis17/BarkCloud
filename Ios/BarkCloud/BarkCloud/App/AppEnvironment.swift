@@ -194,6 +194,7 @@ final class AppEnvironment {
         fileCacheSettings.reset()
         appLockSettings.disable()
         vault.removeAll()
+        RecentMediaWidgetBridge.clear()
         language.reset()
         serverConfig.reset()
     }
