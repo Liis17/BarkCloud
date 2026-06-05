@@ -28,6 +28,7 @@ public interface ICloudHierarchyStorage
     void RemoveFileEntries(IEnumerable<CloudFileEntry> entries);
     Task<CloudFileEntry?> GetTrashedEntry(Guid id, CancellationToken cancellationToken = default);
     Task<List<CloudFileEntry>> ListTrashedPage(long ownerId, DateTime? cursorDeletedAt, Guid? cursorEntryId, int limit, CancellationToken cancellationToken = default);
+    Task<(int Count, DateTime? OldestPurgeAt)> GetTrashSummary(long ownerId, CancellationToken cancellationToken = default);
     Task<List<CloudFileEntry>> GetAllTrashedEntries(long ownerId, CancellationToken cancellationToken = default);
     Task<List<CloudFileEntry>> GetExpiredTrashedEntries(DateTime now, int batchSize, CancellationToken cancellationToken = default);
     Task<HashSet<Guid>> GetEffectivelyTrashedFileIds(long ownerId, IReadOnlyCollection<Guid> fileIds, CancellationToken cancellationToken = default);

@@ -14,6 +14,7 @@ using BarkCloud.Files.Features.Cloud.ListMyFolderShares;
 using BarkCloud.Files.Features.Cloud.RevokeFolderShare;
 using BarkCloud.Files.Features.Cloud.ListFavorites;
 using BarkCloud.Files.Features.Cloud.ListMyShares;
+using BarkCloud.Files.Features.Cloud.GetTrashSummary;
 using BarkCloud.Files.Features.Cloud.ListTrash;
 using BarkCloud.Files.Features.Cloud.ListDirectory;
 using BarkCloud.Files.Features.Cloud.ListDirectoryDetailed;
@@ -299,6 +300,11 @@ public class CloudApiService : CloudApi.CloudApiBase
         };
 
         return _mediator.Send(command);
+    }
+
+    public override Task<GetTrashSummaryResponse> GetTrashSummary(GetTrashSummaryRequest request, ServerCallContext context)
+    {
+        return _mediator.Send(new GetTrashSummaryCommand());
     }
 
     public override Task<CloudEmpty> RestoreFromTrash(RestoreFromTrashRequest request, ServerCallContext context)

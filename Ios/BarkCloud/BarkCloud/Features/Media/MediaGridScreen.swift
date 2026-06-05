@@ -52,7 +52,10 @@ struct MediaGridScreen: View {
                 vm = MediaGridViewModel(kind: kind, cloud: env.cloudRepository, albums: env.albumRepository, vault: env.vault)
             }
             await vm?.loadIfNeeded()
+            openPendingMediaIfNeeded()
         }
+        // Открыть конкретное фото по deep link с виджета «Недавние» (`barkcloud://media/<id>`).
+        .onChange(of: env.pendingMediaID) { _, _ in openPendingMediaIfNeeded() }
         // Автозагрузка медиатеки завершилась (баннер прогресса погас) — подтянуть
         // свежезагруженные медиа в сетку, пока вкладка открыта, без ручного refresh.
         .onChange(of: env.uploadProgress.isActive) { wasActive, isActive in
@@ -111,6 +114,18 @@ struct MediaGridScreen: View {
                 onPickExisting: { albumID in Task { await vm?.addToAlbum(fileID: item.id, albumID: albumID) } },
                 onCreateNew: { Task { await vm?.createAlbumAndAdd(fileID: item.id) } }
             )
+        }
+    }
+
+    /// Открыть пейджер на фото из deep link, если его id есть в загруженной сетке.
+    /// Реагирует только сетка фото; consume-once — id обнуляется при попытке, чтобы
+    /// он не «выстрелил» позже. Если фото не найдено (не загружено/видео) — мягкий
+    /// фолбэк: остаётся обычная сетка.
+    private func openPendingMediaIfNeeded() {
+        guard !kind.isVideo, let id = env.pendingMediaID else { return }
+        env.pendingMediaID = nil
+        if let item = vm?.state.items.first(where: { $0.id == id }) {
+            selected = item
         }
     }
 
