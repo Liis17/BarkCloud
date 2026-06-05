@@ -109,7 +109,7 @@ Package: `barkcloud.files`
 | `UploadAvatarServer(UploadAvatarServerRequest) → UploadAvatarServerResponse` | Загрузка аватарки пользователя (служебно) |
 | `ResolveShare(ResolveShareRequest) → ResolveShareResponse` | Резолв публичного токена (без `UserContext`): `found` + `file_id`/`name`/`download_url`. Внутри создаёт `TempFile` для оригинала (прямой `/download/{fileId}` для `CloudFile` запрещён в `DownloadFileCommandHandler`) и инкрементит `click_count`. Зовётся из Web-роута `/s/{token}` сервисным токеном |
 
-Messages: `ResolveShareRequest { token; }` → `ResolveShareResponse { found; file_id; name; download_url; }`.
+Messages: `ResolveShareRequest { token; }` → `ResolveShareResponse { found; file_id; name; download_url; media_kind; preview_url; image_width; image_height; file_size; }`.
 
 ## Сервис: `AlbumApi` (клиентский, альбомы фото/видео)
 
