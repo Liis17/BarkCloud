@@ -53,7 +53,12 @@ final class TrashViewModel {
             state.cursorDeletedAt = page.nextCursorDeletedAt
             state.cursorEntryID = page.nextCursorEntryID
             state.canLoadMore = page.hasMore
-            TrashWidgetBridge.update(count: page.items.count, hasMore: page.hasMore)
+            // Точный ближайший дедлайн известен, только если корзина уместилась в один
+            // лист (иначе самый старый элемент — на недозагруженных страницах).
+            let nearestPurge = page.hasMore
+                ? nil
+                : page.items.map(\.purgeAt).filter { $0.timeIntervalSince1970 > 0 }.min()
+            TrashWidgetBridge.update(count: page.items.count, hasMore: page.hasMore, nearestPurgeAt: nearestPurge)
         } catch {
             state.snackbar = domainErrorMessage(error)
         }

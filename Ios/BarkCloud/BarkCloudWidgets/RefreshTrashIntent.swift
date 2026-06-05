@@ -20,6 +20,10 @@ struct RefreshTrashIntent: AppIntent {
             let d = UserDefaults(suiteName: "group.com.barkfluff.BarkCloud")
             d?.set(page.items.count, forKey: "trash_widget.count")
             d?.set(page.hasMore, forKey: "trash_widget.hasMore")
+            let nearest = page.hasMore
+                ? nil
+                : page.items.map(\.purgeAt).filter { $0.timeIntervalSince1970 > 0 }.min()
+            d?.set(nearest?.timeIntervalSince1970 ?? 0, forKey: "trash_widget.purgeAt")
         }
         await grpc.shutdown()
         WidgetCenter.shared.reloadTimelines(ofKind: "TrashWidget")

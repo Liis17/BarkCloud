@@ -6,7 +6,9 @@ import WidgetKit
 /// `.systemSmall`, `.accessoryRectangular`, `.accessoryCircular`. Данные кладёт
 /// main app через `TrashWidgetBridge` (или `RefreshTrashIntent`) в App Group
 /// `UserDefaults`; виджет в gRPC не ходит. Тап открывает таб «Корзина»
-/// (`barkcloud://trash`). Срок хранения фиксирован — 14 дней (`TrashPurgeService.Retention`).
+/// (`barkcloud://trash`). Если корзина помещается в одну страницу, показываем
+/// реальный отсчёт до ближайшего удаления (`min(purgeAt)`); иначе — статичную
+/// подсказку про 14-дневный срок хранения (`TrashPurgeService.Retention`).
 struct TrashWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: "TrashWidget", provider: TrashProvider()) { entry in
@@ -28,25 +30,40 @@ struct TrashWidget: Widget {
 
 // MARK: - Снимок
 
-/// Контракт с main app (`TrashWidgetBridge`): два ключа в App Group UserDefaults.
+/// Контракт с main app (`TrashWidgetBridge`): три ключа в App Group UserDefaults.
 struct TrashSnapshot {
     let count: Int
     /// Был ли усечён первый лист (записей больше, чем влезло в страницу).
     let hasMore: Bool
+    /// Ближайшая дата авто-удаления (самый старый элемент). `nil`, если корзина
+    /// больше одной страницы — тогда точный минимум без дочитывания неизвестен.
+    let nearestPurgeAt: Date?
 
     var isEmpty: Bool { count == 0 }
     /// «50+», когда точное число не известно из-за пагинации.
     var countLabel: String { hasMore ? "\(count)+" : "\(count)" }
 
-    static let sample = TrashSnapshot(count: 7, hasMore: false)
+    /// Отсчёт до ближайшего удаления, если известен (иначе вьюха покажет статичную
+    /// подсказку про 14 дней). Считается при рендере таймлайна.
+    var deadlineText: String? {
+        guard let purge = nearestPurgeAt else { return nil }
+        let secs = purge.timeIntervalSinceNow
+        guard secs > 0 else { return "Удаляются сейчас" }
+        let days = max(1, Int(ceil(secs / 86_400)))
+        return "Удалятся через \(days) дн."
+    }
+
+    static let sample = TrashSnapshot(count: 7, hasMore: false, nearestPurgeAt: Date().addingTimeInterval(3 * 86_400))
 
     static func current() -> TrashSnapshot {
         guard let d = UserDefaults(suiteName: "group.com.barkfluff.BarkCloud") else {
-            return TrashSnapshot(count: 0, hasMore: false)
+            return TrashSnapshot(count: 0, hasMore: false, nearestPurgeAt: nil)
         }
+        let ts = d.double(forKey: "trash_widget.purgeAt")
         return TrashSnapshot(
             count: d.integer(forKey: "trash_widget.count"),
-            hasMore: d.bool(forKey: "trash_widget.hasMore")
+            hasMore: d.bool(forKey: "trash_widget.hasMore"),
+            nearestPurgeAt: ts > 0 ? Date(timeIntervalSince1970: ts) : nil
         )
     }
 }
@@ -131,7 +148,7 @@ private struct SmallTrashView: View {
                     .font(.system(size: 13))
                     .foregroundStyle(.secondary)
                 Spacer(minLength: 8)
-                Text("Удаляются через 14 дней")
+                Text(snapshot.deadlineText ?? "Удаляются через 14 дней")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
@@ -168,7 +185,7 @@ private struct AccessoryRectangularTrashView: View {
             } else {
                 Text("\(snapshot.countLabel) файлов")
                     .font(.headline)
-                Text("Удаляются через 14 дней")
+                Text(snapshot.deadlineText ?? "Удаляются через 14 дней")
                     .font(.caption2)
             }
         }
@@ -179,5 +196,5 @@ private struct AccessoryRectangularTrashView: View {
     TrashWidget()
 } timeline: {
     TrashEntry(date: .now, snapshot: .sample)
-    TrashEntry(date: .now, snapshot: TrashSnapshot(count: 0, hasMore: false))
+    TrashEntry(date: .now, snapshot: TrashSnapshot(count: 0, hasMore: false, nearestPurgeAt: nil))
 }

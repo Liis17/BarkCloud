@@ -35,10 +35,15 @@ Parent: [[ios-app]]
   `RefreshStorageIntent`. Данных новых не требует.
 
 ### #5 — Корзина
-- `TrashWidgetBridge.update(count:, nearestPurgeAt:)` из `TrashViewModel.reload()`.
-  Дедлайн авто-удаления берётся из `TrashItem.purgeAt` (уже приходит с бэкенда).
+- `TrashWidgetBridge.update(count:, hasMore:, nearestPurgeAt:)` из `TrashViewModel.reload()`.
+- Дедлайн авто-удаления берётся из `TrashItem.purgeAt` (уже приходит с бэкенда). Список —
+  `DeletedAt desc`, поэтому точный `min(purgeAt)` известен, только когда корзина уместилась
+  в один лист (`hasMore == false`); иначе `nil` и виджет показывает статичную подсказку
+  про 14 дней (`TrashPurgeService.Retention`). **Без новых API** — для подавляющего
+  большинства (корзина ≤ 50) отсчёт точный.
 - `RefreshTrashIntent` (`cloud.listTrash`) для самостоятельного обновления.
-- `TrashWidget` — `.accessoryRectangular` + `.systemSmall`, тап → `barkcloud://trash`.
+- `TrashWidget` — `.systemSmall` + `.accessoryRectangular` + `.accessoryCircular`,
+  тап → `barkcloud://trash`.
 
 ### #4 — Сейф (privacy-sensitive)
 - `VaultWidgetBridge.update(count:)` из `VaultStore.persist()`.
