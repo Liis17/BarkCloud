@@ -36,6 +36,9 @@ final class AppEnvironment {
     var pendingDeepLink: DeepLink?
     /// Запрос показать `VaultScreen` поверх таба «Настройки» (для `barkcloud://vault`).
     var presentVault = false
+    /// `file_id` фото, которое нужно открыть в пейджере на вкладке «Альбомы» (для
+    /// `barkcloud://media/<id>`). Сетка фото подхватывает и обнуляет (consume-once).
+    var pendingMediaID: String?
 
     init() {
         self.serverConfig = ServerConfigStore()

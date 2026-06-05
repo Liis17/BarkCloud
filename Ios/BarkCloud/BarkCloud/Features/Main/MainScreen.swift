@@ -76,7 +76,11 @@ struct MainScreen: View {
     private func applyPendingDeepLink() {
         guard let link = env.pendingDeepLink else { return }
         selection = link.tab
-        if link == .vault { env.presentVault = true }
+        switch link {
+        case .vault: env.presentVault = true
+        case .media(let id): env.pendingMediaID = id
+        case .albums, .trash: break
+        }
         env.pendingDeepLink = nil
     }
 

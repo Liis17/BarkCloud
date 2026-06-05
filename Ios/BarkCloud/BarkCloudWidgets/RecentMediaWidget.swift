@@ -83,8 +83,9 @@ struct RecentMediaWidgetEntryView: View {
     @Environment(\.widgetFamily) private var family
     let entries: [RecentMediaEntry]
 
-    private var columns: Int { family == .systemLarge ? 4 : 4 }
+    private var columns: Int { 4 }
     private var maxCount: Int { family == .systemLarge ? 8 : 4 }
+    private let fallbackURL = URL(string: "barkcloud://albums")!
 
     var body: some View {
         if entries.isEmpty {
@@ -93,7 +94,9 @@ struct RecentMediaWidgetEntryView: View {
             let shown = Array(entries.prefix(maxCount))
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: columns), spacing: 4) {
                 ForEach(shown, id: \.id) { entry in
-                    cell(entry)
+                    Link(destination: URL(string: "barkcloud://media/\(entry.id)") ?? fallbackURL) {
+                        cell(entry)
+                    }
                 }
             }
         }

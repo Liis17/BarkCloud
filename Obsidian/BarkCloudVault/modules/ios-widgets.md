@@ -50,8 +50,11 @@ Parent: [[ios-app]]
 - `RecentMediaWidgetBridge` — даунскейлит превью последних ~8 облачных медиа в
   shared-контейнер (`recent_widget/*.jpg`) + манифест в App Group. Чистится в
   `resetLocalState()`.
-- `RefreshRecentIntent` для обновления виджетом.
-- `RecentMediaWidget` — `.systemMedium`/`.systemLarge`, тап по фото → `barkcloud://media/<id>`.
+- `RecentMediaWidget` — `.systemMedium`/`.systemLarge`. Каждая ячейка — `Link` на
+  `barkcloud://media/<id>`; фон виджета — `barkcloud://albums`.
+- Per-photo навигация: `DeepLink.media(id)` → `MainScreen` ставит `AppEnvironment.pendingMediaID`
+  → сетка фото (`MediaGridScreen`, kind .photo) открывает пейджер по id (consume-once,
+  мягкий фолбэк — если id не в загруженной странице, остаётся обычная сетка).
 
 ## Открытые продуктовые вопросы
 1. #4: показывать ли счётчик сейфа по умолчанию (решено: **скрывать**, opt-in).
