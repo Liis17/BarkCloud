@@ -1,0 +1,67 @@
+name: "🧪 Backend Tests (ручной запуск)"
+
+# Полный прогон backend-тестов вручную с GitHub (вкладка Actions → Run workflow).
+# Только бэкенд: микросервисы + Shared. Без клиентов (Android/iOS/Mac/Windows).
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # ═══════════════════════════════════════════════════════════════
+  #  Backend — все микросервисы (без условий, гоняем целиком)
+  # ═══════════════════════════════════════════════════════════════
+  test-backend:
+    name: "Backend (${{ matrix.name }})"
+    runs-on: [self-hosted, linux]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: configuration
+            project: Tests/Backend/BarkCloud.Configuration.Tests/BarkCloud.Configuration.Tests.csproj
+          - name: files
+            project: Tests/Backend/BarkCloud.Files.Tests/BarkCloud.Files.Tests.csproj
+          - name: grpcserver
+            project: Tests/Backend/BarkCloud.GrpcServer.Tests/BarkCloud.GrpcServer.Tests.csproj
+          - name: identity
+            project: Tests/Backend/BarkCloud.Identity.Tests/BarkCloud.Identity.Tests.csproj
+          - name: notification
+            project: Tests/Backend/BarkCloud.Notification.Tests/BarkCloud.Notification.Tests.csproj
+          - name: users
+            project: Tests/Backend/BarkCloud.Users.Tests/BarkCloud.Users.Tests.csproj
+          - name: web
+            project: Tests/Backend/BarkCloud.Web.Tests/BarkCloud.Web.Tests.csproj
+    steps:
+      - uses: actions/checkout@v4
+      - name: "Test"
+        run: dotnet test ${{ matrix.project }} -c Release --logger "trx;LogFileName=${{ matrix.name }}.trx" --results-directory TestResults
+      - name: "Upload test results"
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.name }}
+          path: TestResults/**
+
+  # ═══════════════════════════════════════════════════════════════
+  #  Shared — все Shared.*.Tests одним прогоном
+  # ═══════════════════════════════════════════════════════════════
+  test-shared:
+    name: "Shared"
+    runs-on: [self-hosted, linux]
+    steps:
+      - uses: actions/checkout@v4
+      - name: "Test"
+        run: |
+          for proj in Tests/Shared/*/*.csproj; do
+            dotnet test "$proj" -c Release \
+              --logger "trx;LogFileName=$(basename "$proj" .csproj).trx" \
+              --results-directory TestResults
+          done
+      - name: "Upload test results"
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-shared
+          path: TestResults/**
