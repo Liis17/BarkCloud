@@ -15,6 +15,7 @@ final class AppEnvironment {
     let userRepository: UserRepository
     let cloudRepository: CloudRepository
     let albumRepository: AlbumRepository
+    let dynamicFolderRepository: DynamicFolderRepository
     let fileCache: FileCacheService
     let fileCacheSettings: FileCacheSettings
     let autoUploadSettings: AutoUploadSettings
@@ -50,6 +51,7 @@ final class AppEnvironment {
         self.userRepository = UserRepository(grpc: grpc, transfer: transfer)
         self.cloudRepository = CloudRepository(grpc: grpc, transfer: transfer)
         self.albumRepository = AlbumRepository(grpc: grpc)
+        self.dynamicFolderRepository = DynamicFolderRepository(grpc: grpc)
 
         let cacheSettings = FileCacheSettings()
         let cache = FileCacheService(

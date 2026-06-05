@@ -161,6 +161,7 @@ public actor GrpcManager {
     public typealias FilesClient = Barkcloud_Files_FilesApi.Client<Transport>
     public typealias CloudClient = Barkcloud_Files_CloudApi.Client<Transport>
     public typealias AlbumClient = Barkcloud_Files_AlbumApi.Client<Transport>
+    public typealias DynamicFolderClient = Barkcloud_Files_DynamicFolderApi.Client<Transport>
 
     private let session: SessionStore
     private var clients: [String: GRPCClient<Transport>] = [:]
@@ -196,6 +197,10 @@ public actor GrpcManager {
 
     public func albumStub() async throws -> AlbumClient {
         AlbumClient(wrapping: try await client(host: GrpcEndpoint.filesHost, port: GrpcEndpoint.filesPort))
+    }
+
+    public func dynamicFolderStub() async throws -> DynamicFolderClient {
+        DynamicFolderClient(wrapping: try await client(host: GrpcEndpoint.filesHost, port: GrpcEndpoint.filesPort))
     }
 
     private func client(host: String, port: Int) async throws -> GRPCClient<Transport> {

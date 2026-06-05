@@ -392,6 +392,34 @@ BarkCloud/
   по SHA256 (`cachedSHA256` → `CloudApi.CheckFileHash`, одиночный), а при отсутствии заливает оригинал
   с `routeByMediaKind: true` (системные «Фото»/«Видео»/«Другие документы»); на время резолва — оверлей `isUploading`.
 
+### Умные (динамические) папки — таб «Файлы»
+
+Паритет с вебом (см. [[modules/backend-files-dynamic-folders]]): виртуальные коллекции файлов по
+критериям-фильтрам. В `FilesRootScreen` — сетка карточек **2 в ширину** (`smartFoldersSection`) под
+заголовком таба, **над** секциями «На устройстве / Облачное хранилище / Общий доступ». Системные
+папки (`is_system`) только читаются; пользовательские — CRUD.
+
+- **Сеть** (пакет `BarkCloudKit`): `GrpcManager.dynamicFolderStub()` (`DynamicFolderApi`),
+  `Data/Cloud/DynamicFolderRepository.swift` (зеркало `AlbumRepository`: `listFolders / listItems /
+  create / update / delete`), модели `Data/Cloud/DynamicFolderModels.swift` (`DynamicFolderCard`,
+  `DynamicFolderRule` — поле/оператор переиспользуют proto-enum'ы `DfField`/`DfOperator`,
+  `DynamicFolderItemsPage`). Регистрация — `AppEnvironment.dynamicFolderRepository`.
+- **UI** (`Features/Files/SmartFolders/`): `SmartFoldersViewModel` (список), `SmartFolderCardView`
+  (обложка-превью первого файла либо акцентная плитка + SF-иконка по `iconKey`: clock/hdd→
+  externaldrive/camera→photo/screenshot, иначе folder; имя + счётчик), `SmartFolderDetailScreen`+VM
+  (содержимое по `viewMode`: сетка `MediaThumb` 3 кол. / список строк; пагинация; просмотр через
+  `MediaPagerScreen`; меню Изменить/Удалить у не-системных), `SmartFolderFormScreen`+VM
+  (конструктор: имя, И/ИЛИ `combinator`, сетка/список `viewMode`, строки правил поле→оператор→значение).
+- **Конструктор правил** — `DfFieldMeta` (зеркало веб-`DynamicFolderFormModal`): поля Дата
+  загрузки/съёмки (за N дней / до / после — число дней либо DatePicker→ISO `yyyy-MM-dd`), Размер
+  (МБ↔байты ×1048576), Имя/Устройство (текст), Формат (Picker MediaKind, код "0".."4"), Расширение
+  (ends-with), Ширина/Высота (px). Валидация: имя непустое + ≥1 правило со значением. `iconKey`/
+  `coverColor` на create/update **не шлём** (как веб).
+- **Важно:** сгенерированные стабы `BarkCloudKit/Generated/files_api.*` нужно **перегенерить**
+  (`Mac/BarkCloudKit/scripts/sync_proto.sh`, macOS) — закоммиченные стабы отставали от `Shared`-proto
+  (не было `DfViewMode`/`view_mode`, а `ListDynamicFolderItemsResponse.items` был `[UploadFileInfo]`
+  вместо `[UserImageItem]`). Новый код опирается на актуальный контракт.
+
 ### Свайп-просмотрщик
 
 `Features/Shared/MediaPagerScreen.swift` — полноэкранный просмотрщик с листанием
