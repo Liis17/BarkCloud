@@ -340,22 +340,31 @@ BarkCloud/
   Нижняя панель (`safeAreaInset`, фон `.bar`): «Переместить» (`CloudMovePicker` → `moveSelected`)
   и «Удалить» (подтверждение поповером → `deleteSelected`, батч последовательно с прогрессом
   done/total, без undo — зеркалит `MediaGridViewModel`).
-- **Общий доступ** (`Features/Shared/SharedHubScreen.swift`) — хаб с **тремя** сегментами:
-  - **Мои публичные** (`MySharesListView`/`MySharesViewModel`) — постоянные публичные ссылки
-    (`CloudApi.ListMyShares`, копировать/отозвать). См. [[share-links-client-guide]].
-  - **Я поделился** (`MyOutgoingSharesListView`/`MyOutgoingSharesViewModel`) — файлы, которыми я
-    поделился с конкретными пользователями (приватные гранты), и с кем. Источник —
-    `CloudApi.ListMyOutgoingSharesAll` (плоский список грантов с `UploadFileInfo`, курсор-пагинация);
-    VM **группирует по файлу** (`SharedByMeGroup` — порядок по первому появлению, raw отсортирован от
-    свежих) и резолвит получателей через `UserRepository.getUser`. Карточка: превью + имя файла +
-    чипсы получателей (`FlowLayout`) с крестиком — отзыв гранта `revokeUserShare` (оптимистично).
-    Зеркалит веб-таб `SharedPage.tsx` (`/api/shared/i-shared`).
-  - **Мне доступны** (`SharedWithMeListView`/`SharedWithMeViewModel`) — входящие гранты
-    (`ListSharedWithMe`, скачивание через `GetSharedFileDownloadUrl` → `UIDocumentPicker`).
-  VM каждого таба создаётся/грузится лениво при первом переключении. Выдача гранта на файл —
-  `ShareWithUserSheet` (поиск пользователя), управление одним файлом — `OutgoingSharesSheet`;
-  обе вызываются из контекстного меню (`CloudBrowserScreen`/сетки). Бэкенд: новый RPC
-  `ListMyOutgoingSharesAll` + фича `Features/Cloud/ListMyOutgoingSharesAll` в сервисе Files.
+- **Общий доступ** (`Features/Shared/SharedHubScreen.swift`) — хаб с **тремя** сегментами. Паритет с
+  веб-табом `SharedPage.tsx`: публичные ссылки и приватные гранты **трёх типов — файлы, папки, альбомы**
+  (альбомы — только публичные, RPC шаринга альбома с пользователем нет).
+  - **Мои публичные** (`MySharesListView`/`MySharesViewModel`) — постоянные публичные ссылки. VM грузит
+    **три типа** (`ListMyShares` + `ListMyFolderShares` + `ListMyAlbumShares`, по 200) и сводит в один
+    список `[PublicShareItem]` (enum `Kind` file/folder/album) от свежих к старым; пагинации нет (как на
+    вебе). Карточка с иконкой по типу; отзыв маршрутизируется по типу (`revokeShare`/`revokeFolderShare`/
+    `revokeAlbumShare`). См. [[share-links-client-guide]].
+  - **Я поделился** (`MyOutgoingSharesListView`/`MyOutgoingSharesViewModel`) — приватные гранты, и с кем.
+    **Файлы:** `CloudApi.ListMyOutgoingSharesAll` (плоский список с `UploadFileInfo`, курсор-пагинация),
+    VM группирует по файлу (`SharedByMeGroup`). **Папки** (секция «Папки, которыми я поделился»):
+    `ListMyOutgoingFolderShares` (без пагинации), группировка по папке (`SharedByMeFolderGroup`,
+    `FolderGroupRow`). Получатели резолвятся через `UserRepository.getUser`; чипсы (`FlowLayout`) с
+    крестиком — отзыв `revokeUserShare` / `revokeFolderUserShare` (оптимистично, маршрут по `isFolder`).
+  - **Мне доступны** (`SharedWithMeListView`/`SharedWithMeViewModel`) — входящие гранты. **Файлы:**
+    `ListSharedWithMe` (скачивание `GetSharedFileDownloadUrl` → `UIDocumentPicker`). **Папки** (секция
+    «Доступные мне папки»): `ListSharedFoldersWithMe`; тап → `SharedFolderBrowserScreen` — навигация по
+    поддереву (`ListSharedDirectory`, рекурсивно), тап по файлу качает его по готовой временной ссылке
+    (`PublicFileEntry.download_url`) во временный файл и открывает в QuickLook (`FilePreviewController`).
+  VM каждого таба создаётся/грузится лениво при первом переключении. **Выдача гранта** (`ShareWithUserSheet`,
+  поиск пользователя) и **управление получателями** (`OutgoingSharesSheet`) обобщены на файл/папку:
+  `ShareWithUserContext` несёт `entityID` + `isFolder` (инициализаторы `init(fileID:)`/`init(folderID:)`);
+  вызовы — из контекстного меню файла (сетки/CloudBrowser) и папки (CloudBrowser). Бэкенд-RPC уже были в
+  proto — на iOS добавлены лишь обёртки в `CloudRepository` и модели (`FolderShareLink`,
+  `OutgoingFolderShareItem`, `SharedFolderItem`, `SharedDirectoryListing`).
 - **Контекстное меню по удержанию на сетках** (`Features/Shared/ShakeContextMenu.swift`) — кастомный
   `ViewModifier` `.shakeContextMenu(isActive:menu:)` вместо нативного `.contextMenu`: по
   `.onLongPressGesture(minimumDuration:0.4)` ячейка увеличивается (`scaleEffect 1.09`), «трясётся»
@@ -368,7 +377,10 @@ BarkCloud/
   (`FileTransferService.tempDownloadURLs` → `UIPasteboard.general.url`), **Сделать публичной**
   (`CloudApi.CreateShare` → клиент сам собирает `{GrpcEndpoint.webHost}/s/{token}` через
   `publicShareURL(token:)`, см. [[share-links-client-guide]] — URL ведёт на веб-UI :443, бэкенд готовый
-  URL не отдаёт; см. ограничение revoke в гайде), **Добавить в альбом** (`AlbumPickerSheet` на один файл),
+  URL не отдаёт; см. ограничение revoke в гайде; **после создания любой публичной ссылки — единый
+  диалог `SharePresenter`** (`.sharePresenter(url:)`): «Скопировать ссылку» в буфер или «Поделиться…»
+  через системный `UIActivityViewController`; применён в Gallery/MediaGrid/AlbumDetail/CloudBrowser/
+  MyShares), **Добавить в альбом** (`AlbumPickerSheet` на один файл),
   **Удалить** (галерея/альбом → `DeleteUserMedia` в корзину **оптимистично через [[#PendingDelete]]** —
   файл сразу пропадает из сетки, внизу snackbar 5 с с «Отменить»; устройство → «Удалить с устройства»
   `PHAssetChangeRequest.deleteAssets`). **Экран свойств** (`Features/Shared/FilePropertiesSheet.swift`,
@@ -392,7 +404,7 @@ BarkCloud/
   по SHA256 (`cachedSHA256` → `CloudApi.CheckFileHash`, одиночный), а при отсутствии заливает оригинал
   с `routeByMediaKind: true` (системные «Фото»/«Видео»/«Другие документы»); на время резолва — оверлей `isUploading`.
 
-### Поиск по имени · Шаринг альбома
+### Поиск по имени · Шаринг альбома · Шаринг папок
 
 - **Поиск** (`Features/Files/UI/CloudBrowserScreen` + `CloudBrowserViewModel`): `.searchable`
   в навбаре облачного браузера; `searchTextChanged` — живой поиск с дебаунсом 300 мс через
@@ -401,8 +413,15 @@ BarkCloud/
   «Поделиться с пользователем»). Модель `CloudSearchPage`, обёртка в `BarkCloudKit/CloudRepository`.
 - **Шаринг альбома** (`Features/Media/Albums/AlbumDetailScreen`): пункт меню «Поделиться альбомом»
   (`albums_share`) → `AlbumDetailViewModel.shareAlbum` → `CloudRepository.createAlbumShare(albumID:)`
-  (RPC `CloudApi.CreateAlbumShare`) → `pendingShareURL` → системный Share Sheet. URL — `{webHost}/al/{token}`
-  (`GrpcEndpoint.publicAlbumShareURL`), модель `AlbumShareLink`. Публичная страница рендерится веб-клиентом.
+  (RPC `CloudApi.CreateAlbumShare`) → `pendingShareURL` → диалог `SharePresenter` (копировать/поделиться).
+  URL — `{webHost}/al/{token}` (`GrpcEndpoint.publicAlbumShareURL`), модель `AlbumShareLink`. Публичная
+  страница рендерится веб-клиентом.
+- **Шаринг папки** (`Features/Files/UI/CloudBrowserScreen`, контекстное меню строки папки): «Сделать
+  публичной» (`CloudBrowserViewModel.makeFolderPublic` → `CloudRepository.createFolderShare` →
+  `{webHost}/f/{token}`, модель `FolderShareLink`, идемпотентно) и «Поделиться с пользователем»
+  (`ShareWithUserContext(folderID:)` → `ShareWithUserSheet` → `shareFolderWithUser`). Публичная страница
+  папки `/f/{token}` рендерится веб-клиентом; приватный грант виден получателю во вкладке «Мне доступны»
+  (`SharedFolderBrowserScreen`).
 
 ### Умные (динамические) папки — таб «Файлы»
 
