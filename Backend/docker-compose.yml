@@ -67,6 +67,9 @@ services:
       - configuration
 
   # Сервис уведомлений (consumer RabbitMQ → SMTP). Внешнего API нет — в nginx не маршрутизируется.
+  # Опционален: если в Configuration не заданы Email:* (Host/Port/SenderEmail/SenderPassword),
+  # сервер работает в режиме «без почты» (Features:EmailEnabled=false) и задачи в очередь не шлёт —
+  # этот сервис можно остановить или удалить из compose. Никто на него не depends_on.
   notification:
     image: docker.barkfluff.com:5000/barkcloud-notification:latest
     container_name: cloud-notification

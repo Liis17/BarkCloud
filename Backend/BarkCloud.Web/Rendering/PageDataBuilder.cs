@@ -1,5 +1,6 @@
 using System.Text.Json;
 
+using BarkCloud.GrpcServer;
 using BarkCloud.Proto.Files;
 using BarkCloud.Proto.Identity;
 using BarkCloud.Proto.Users;
@@ -209,7 +210,8 @@ public sealed class PageDataBuilder
             system = new
             {
                 version = _config.Value("App:Version", "v1.0.0"),
-                edition = _config.Value("App:Edition", "self-host")
+                edition = _config.Value("App:Edition", "self-host"),
+                emailEnabled = _config.EmailEnabled()
             }
         };
 

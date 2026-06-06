@@ -1,3 +1,4 @@
+using BarkCloud.GrpcServer;
 using BarkCloud.Proto.Identity;
 using BarkCloud.Proto.Users;
 using BarkCloud.Web.Infrastructure;
@@ -26,6 +27,7 @@ public sealed class RegistrationGateway
     private readonly AuthGateway _auth;
     private readonly string _appName;
     private readonly string _appVersion;
+    private readonly bool _emailEnabled;
     private readonly ILogger<RegistrationGateway> _logger;
 
     public RegistrationGateway(
@@ -40,6 +42,7 @@ public sealed class RegistrationGateway
         _auth = auth;
         _appName = configuration.Value("App:AppName", "BarkCloud Web");
         _appVersion = configuration.Value("App:Version", "v1.0.0");
+        _emailEnabled = configuration.EmailEnabled();
         _logger = logger;
     }
 
@@ -75,6 +78,14 @@ public sealed class RegistrationGateway
                 Email = email
             }, device.ToMetadata());
 
+            // Режим без почты: Identity сразу создаёт аккаунт и возвращает refresh —
+            // подтверждать код не нужно, открываем сессию и ставим пароль сразу.
+            if (!_emailEnabled)
+            {
+                _logger.LogInformation("Почта отключена — мгновенная регистрация {Username}", username);
+                return await CompleteAsync(http, response.RefreshToken, password);
+            }
+
             _logger.LogInformation(
                 "Код подтверждения отправлен для регистрации {Username}, CodeId {CodeId}", username, response.CodeId);
 
@@ -103,29 +114,8 @@ public sealed class RegistrationGateway
                 CodeValue = code.Trim()
             }, device.ToMetadata());
 
-            // ConfirmAccount возвращает только refresh — получаем access для SetPassword.
-            var tokenResponse = await _identity.CreateTokenAsync(new CreateTokenRequest
-            {
-                RefreshToken = confirmed.RefreshToken.Value
-            });
-            var access = tokenResponse.AccessToken;
-
-            try
-            {
-                await _identity.SetPasswordAsync(new SetPasswordRequest { Password = password, OldPassword = "" },
-                    BrowserContext.UserToken(access.Value));
-            }
-            catch (RpcException ex)
-            {
-                // Пользователь уже зарегистрирован и залогинен; пароль можно задать позже в настройках.
-                _logger.LogWarning(
-                    "Не удалось установить пароль при регистрации: {Status} {Detail}", ex.StatusCode, ex.Status.Detail);
-            }
-
-            _auth.IssueSession(http, access, confirmed.RefreshToken, persistent: true);
-
             _logger.LogInformation("Регистрация подтверждена, сессия открыта (CodeId {CodeId})", codeId);
-            return new RegistrationResult(RegistrationOutcome.Success);
+            return await CompleteAsync(http, confirmed.RefreshToken, password);
         }
         catch (RpcException ex)
         {
@@ -138,6 +128,33 @@ public sealed class RegistrationGateway
             _logger.LogWarning("Подтверждение регистрации не выполнено: {Status} {Detail}", ex.StatusCode, ex.Status.Detail);
             return new RegistrationResult(outcome, Friendly(ex, "Не удалось подтвердить код."), CodeId: codeId);
         }
+    }
+
+    /// <summary>Открывает сессию по refresh-токену и устанавливает пароль (общий хвост для обоих режимов).</summary>
+    private async Task<RegistrationResult> CompleteAsync(HttpContext http, Token refreshToken, string password)
+    {
+        // refresh выдан Identity; получаем access для SetPassword.
+        var tokenResponse = await _identity.CreateTokenAsync(new CreateTokenRequest
+        {
+            RefreshToken = refreshToken.Value
+        });
+        var access = tokenResponse.AccessToken;
+
+        try
+        {
+            await _identity.SetPasswordAsync(new SetPasswordRequest { Password = password, OldPassword = "" },
+                BrowserContext.UserToken(access.Value));
+        }
+        catch (RpcException ex)
+        {
+            // Пользователь уже зарегистрирован и залогинен; пароль можно задать позже в настройках.
+            _logger.LogWarning(
+                "Не удалось установить пароль при регистрации: {Status} {Detail}", ex.StatusCode, ex.Status.Detail);
+        }
+
+        _auth.IssueSession(http, access, refreshToken, persistent: true);
+
+        return new RegistrationResult(RegistrationOutcome.Success);
     }
 
     private static string Friendly(RpcException ex, string fallback)
