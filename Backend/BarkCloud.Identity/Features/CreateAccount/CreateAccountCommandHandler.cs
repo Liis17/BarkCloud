@@ -8,10 +8,15 @@ using BarkCloud.Proto.Identity;
 using BarkCloud.Proto.Users;
 using BarkCloud.Shared.Exceptions.Identity;
 using BarkCloud.Shared.Exceptions.Users;
+using BarkCloud.GrpcServer;
 using BarkCloud.Shared.Identity;
 using BarkCloud.Shared.Queue.Notifications;
 
+using Google.Protobuf.WellKnownTypes;
+
 using MediatR;
+
+using Microsoft.Extensions.Configuration;
 
 
 namespace BarkCloud.Identity.Features.CreateAccount;
@@ -19,9 +24,12 @@ namespace BarkCloud.Identity.Features.CreateAccount;
 public class CreateAccountCommandHandler(UsersServerApi.UsersServerApiClient usersClient,
     IConfirmationCodesStorage confirationCodesStorage, NotificationQueueSender notificationQueueSender,
     RequestContext requestContext, LocationClient locationClient, MetricsCollector metrics,
+    IRefreshTokensStorage refreshTokensStorage, IConfiguration configuration,
     ILogger<CreateAccountCommandHandler> logger)
     : IRequestHandler<CreateAccountCommand, CreateAccountResponse>
 {
+    private const int ExpDaysRefreshToken = 9999;
+
     public async Task<CreateAccountResponse> Handle(CreateAccountCommand request, CancellationToken cancellationToken)
     {
         logger.LogInformation(
@@ -72,6 +80,36 @@ public class CreateAccountCommandHandler(UsersServerApi.UsersServerApiClient use
             metrics.Increment("accounts_draft_overridden");
             logger.LogDebug("Пользователь уже существует как черновик, переопределение данных");
             responseUser = await usersClient.OverrideDraftUserAsync(createAccountRequest);
+        }
+
+        // Режим без почты: код подтверждения отправить некуда — создаём аккаунт сразу.
+        // Подтверждаем черновик и выдаём refresh-токен, минуя ConfirmAccount. Письмо не шлём.
+        if (!configuration.EmailEnabled())
+        {
+            logger.LogInformation(
+                "Почта отключена — мгновенное создание аккаунта без подтверждения. UserId: {UserId}",
+                responseUser.UserId);
+
+            await usersClient.ConfirmUserAsync(new ConfirmUserRequest { UserId = responseUser.UserId });
+
+            var instantRefreshToken = RefreshTokenGenerator.GenerateRefreshToken();
+            await refreshTokensStorage.CreateNewRefreshToken(
+                instantRefreshToken,
+                responseUser.UserId,
+                requestContext.DeviceId ?? requestContext.DeviceName,
+                ExpDaysRefreshToken);
+
+            metrics.Increment("accounts_confirmed");
+            metrics.Increment("sessions_created");
+
+            return new CreateAccountResponse
+            {
+                RefreshToken = new Token
+                {
+                    Value = instantRefreshToken,
+                    ExpirationDate = Timestamp.FromDateTime(DateTime.UtcNow.AddDays(ExpDaysRefreshToken))
+                }
+            };
         }
 
         var code = CodeGenerator.GenerateDigitalCode(6);
