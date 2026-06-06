@@ -24,9 +24,7 @@ struct MySharesListView: View {
             }
         }
         .overlay(alignment: .bottom) { snackbar }
-        .sheet(item: $vm.state.pendingShareURL) { item in
-            ActivityViewController(activityItems: [item.url])
-        }
+        .sharePresenter(url: $vm.state.pendingShareURL)
         .confirmationDialog(
             String(localized: "shared_revoke_confirm"),
             isPresented: Binding(

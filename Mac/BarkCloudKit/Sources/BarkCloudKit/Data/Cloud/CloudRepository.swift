@@ -138,6 +138,79 @@ public final class CloudRepository: Sendable {
         return AlbumShareLink(try await stub.createAlbumShare(req))
     }
 
+    /// Список моих публичных ссылок на альбомы (от свежих к старым, курсор).
+    public func listMyAlbumShares(
+        limit: Int = 200,
+        cursorCreatedAt: Date? = nil,
+        cursorAlbumShareID: String = ""
+    ) async throws -> AlbumShareLinksPage {
+        let stub = try await grpc.cloudStub()
+        var req = Barkcloud_Files_ListMyAlbumSharesRequest()
+        req.limit = Int32(max(1, min(200, limit)))
+        if let cursorCreatedAt {
+            req.cursorCreatedAt = Google_Protobuf_Timestamp(date: cursorCreatedAt)
+        }
+        if !cursorAlbumShareID.isEmpty {
+            req.cursorAlbumShareID = cursorAlbumShareID
+        }
+        let resp = try await stub.listMyAlbumShares(req)
+        return AlbumShareLinksPage(
+            items: resp.shares.map(AlbumShareLink.init),
+            nextCursorCreatedAt: resp.hasNextCursorCreatedAt ? resp.nextCursorCreatedAt.date : nil,
+            nextCursorAlbumShareID: resp.nextCursorAlbumShareID
+        )
+    }
+
+    /// Отозвать публичность альбома. Идемпотентно. После — `/al/{token}` → 404.
+    public func revokeAlbumShare(id: String) async throws {
+        let stub = try await grpc.cloudStub()
+        var req = Barkcloud_Files_RevokeAlbumShareRequest()
+        req.albumShareID = id
+        _ = try await stub.revokeAlbumShare(req)
+    }
+
+    /// Сделать папку публичной (`/f/{token}`). Идемпотентно: повторный вызов
+    /// вернёт существующую ссылку. URL собирается на клиенте из `token`.
+    public func createFolderShare(directoryID: String, name: String) async throws -> FolderShareLink {
+        let stub = try await grpc.cloudStub()
+        var req = Barkcloud_Files_CreateFolderShareRequest()
+        req.directoryID = directoryID
+        req.name = name
+        return FolderShareLink(try await stub.createFolderShare(req))
+    }
+
+    /// Список моих публичных папок (от свежих к старым, курсор).
+    public func listMyFolderShares(
+        limit: Int = 200,
+        cursorCreatedAt: Date? = nil,
+        cursorFolderShareID: String = ""
+    ) async throws -> FolderShareLinksPage {
+        let stub = try await grpc.cloudStub()
+        var req = Barkcloud_Files_ListMyFolderSharesRequest()
+        req.limit = Int32(max(1, min(200, limit)))
+        if let cursorCreatedAt {
+            req.cursorCreatedAt = Google_Protobuf_Timestamp(date: cursorCreatedAt)
+        }
+        if !cursorFolderShareID.isEmpty {
+            req.cursorFolderShareID = cursorFolderShareID
+        }
+        let resp = try await stub.listMyFolderShares(req)
+        return FolderShareLinksPage(
+            items: resp.shares.map(FolderShareLink.init),
+            nextCursorCreatedAt: resp.hasNextCursorCreatedAt ? resp.nextCursorCreatedAt.date : nil,
+            nextCursorFolderShareID: resp.nextCursorFolderShareID
+        )
+    }
+
+    /// Отозвать публичность папки. Снимает и публичные ссылки файлов поддерева.
+    /// Идемпотентно. После — `/f/{token}` → 404.
+    public func revokeFolderShare(id: String) async throws {
+        let stub = try await grpc.cloudStub()
+        var req = Barkcloud_Files_RevokeFolderShareRequest()
+        req.folderShareID = id
+        _ = try await stub.revokeFolderShare(req)
+    }
+
     // MARK: - Поиск
 
     /// Поиск файлов пользователя по подстроке имени (по всему облаку). Курсорная
@@ -261,6 +334,57 @@ public final class CloudRepository: Sendable {
             items: resp.items.map(OutgoingShareFull.init),
             nextCursorSharedAt: resp.hasNextCursorSharedAt ? resp.nextCursorSharedAt.date : nil,
             nextCursorGrantID: resp.nextCursorGrantID
+        )
+    }
+
+    // MARK: - Шаринг папки с конкретным пользователем
+
+    /// Выдать пользователю доступ к папке (рекурсивно). Идемпотентно: повторный
+    /// вызов для уже расшаренной папки проходит без ошибки.
+    public func shareFolderWithUser(directoryID: String, recipientUserID: Int64) async throws {
+        let stub = try await grpc.cloudStub()
+        var req = Barkcloud_Files_ShareFolderWithUserRequest()
+        req.directoryID = directoryID
+        req.recipientUserID = recipientUserID
+        _ = try await stub.shareFolderWithUser(req)
+    }
+
+    /// Отозвать грант доступа к папке. Идемпотентно.
+    public func revokeFolderUserShare(grantID: String) async throws {
+        let stub = try await grpc.cloudStub()
+        var req = Barkcloud_Files_RevokeFolderUserShareRequest()
+        req.grantID = grantID
+        _ = try await stub.revokeFolderUserShare(req)
+    }
+
+    /// Все мои исходящие гранты на папки — кому я раздал доступ к папкам.
+    /// Плоский список грант-за-грантом (бэкенд не пагинирует), от свежих к старым.
+    public func listMyOutgoingFolderShares() async throws -> [OutgoingFolderShareItem] {
+        let stub = try await grpc.cloudStub()
+        let resp = try await stub.listMyOutgoingFolderShares(Barkcloud_Files_ListMyOutgoingFolderSharesRequest())
+        return resp.items.map(OutgoingFolderShareItem.init)
+    }
+
+    /// Папки, которыми со мной поделились другие пользователи (без пагинации).
+    public func listSharedFoldersWithMe() async throws -> [SharedFolderItem] {
+        let stub = try await grpc.cloudStub()
+        let resp = try await stub.listSharedFoldersWithMe(Barkcloud_Files_ListSharedFoldersWithMeRequest())
+        return resp.items.map(SharedFolderItem.init)
+    }
+
+    /// Листинг доступной мне папки (навигация по поддереву). `directoryID` —
+    /// папка внутри расшаренного поддерева; доступ валидируется грантом на бэке.
+    public func listSharedDirectory(directoryID: String) async throws -> SharedDirectoryListing {
+        let stub = try await grpc.cloudStub()
+        var req = Barkcloud_Files_ListSharedDirectoryRequest()
+        req.directoryID = directoryID
+        let resp = try await stub.listSharedDirectory(req)
+        return SharedDirectoryListing(
+            found: resp.found,
+            directoryID: resp.directoryID,
+            name: resp.name,
+            subdirs: resp.subdirs.map(SharedSubdir.init),
+            files: resp.files.map(SharedDirFile.init)
         )
     }
 
