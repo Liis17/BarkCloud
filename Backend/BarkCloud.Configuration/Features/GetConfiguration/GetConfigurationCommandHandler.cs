@@ -37,7 +37,7 @@ public class GetConfigurationCommandHandler : IRequestHandler<GetConfigurationCo
             filteredConfigurations.Count
         );
 
-        return new GetConfigurationResponse()
+        var response = new GetConfigurationResponse()
         {
             Configurations = { filteredConfigurations.Select(c => new ConfigurationItem()
             {
@@ -50,5 +50,21 @@ public class GetConfigurationCommandHandler : IRequestHandler<GetConfigurationCo
                 Section = c.Section
             }) }
         };
+
+        // Вычисляемый общий флаг режима без почты — отдаётся ВСЕМ сервисам (как ServiceId.Unknown).
+        // Не хранится в БД: всегда вычисляется из текущих Email-полей, поэтому свежий на старте сервиса.
+        var emailEnabled = await _configurationStorage.IsEmailConfiguredAsync();
+        response.Configurations.Add(new ConfigurationItem()
+        {
+            Section = "Features",
+            Key = "EmailEnabled",
+            Value = emailEnabled ? "true" : "false",
+            ServiceId = (int) BarkCloud.Shared.Identity.ServiceId.Unknown,
+            EditedAt = Timestamp.FromDateTime(DateTime.UtcNow),
+            EditedBy = "system",
+            EditedFrom = "computed"
+        });
+
+        return response;
     }
 }

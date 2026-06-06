@@ -27,6 +27,20 @@ public class ConfigurationStorage : IConfigurationStorage
         return configurations;
     }
 
+    // Режим без почты: почта считается настроенной, только если ВСЕ 4 SMTP-поля
+    // (Section="Email" под ServiceId.Notification) присутствуют и непусты.
+    // Хоть одно пустое → false. Используется для вычисляемого флага Features:EmailEnabled.
+    public async Task<bool> IsEmailConfiguredAsync()
+    {
+        var values = await _context.Configurations
+            .AsNoTracking()
+            .Where(x => x.Section == "Email" && x.ServiceId == ServiceId.Notification)
+            .ToDictionaryAsync(x => x.Key, x => x.Value);
+
+        string[] required = ["Host", "Port", "SenderEmail", "SenderPassword"];
+        return required.All(key => values.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value));
+    }
+
     public async Task UpdateConfigurationAsync(string section, string key, string value, ServiceId serviceId, string editedBy, string editedFrom)
     {
         var existing = await _context.Configurations
