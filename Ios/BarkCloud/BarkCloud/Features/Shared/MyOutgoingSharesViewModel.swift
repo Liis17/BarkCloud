@@ -18,18 +18,32 @@ struct SharedByMeGroup: Identifiable, Hashable, Sendable {
     var id: String { file.id }
 }
 
+/// Группа папочных грантов: одна папка и все, с кем ею поделились.
+struct SharedByMeFolderGroup: Identifiable, Hashable, Sendable {
+    let directoryID: String
+    let name: String
+    var recipients: [SharedByMeRecipient]
+    var id: String { directoryID }
+}
+
 /// Состояние таба «Я поделился» в `SharedHubScreen`.
 struct MyOutgoingSharesUiState {
     /// Сырые гранты (плоско, как с бэкенда), сортировка от свежих к старым.
     var raw: [OutgoingShareFull] = []
     /// Сгруппированные по файлу для отображения (порядок — по первому появлению файла).
     var groups: [SharedByMeGroup] = []
+    /// Сырые папочные гранты (бэкенд не пагинирует) + сгруппированные по папке.
+    var folderRaw: [OutgoingFolderShareItem] = []
+    var folderGroups: [SharedByMeFolderGroup] = []
     /// recipientUserID → CloudUser. Нет в словаре → рендер показывает «id N».
     var users: [Int64: CloudUser] = [:]
     var isPlaceholder: Bool = true
     var isLoadingMore: Bool = false
     var canLoadMore: Bool = false
     var snackbar: String?
+
+    /// Пусто, когда нет ни файловых, ни папочных грантов.
+    var isEmpty: Bool { groups.isEmpty && folderGroups.isEmpty }
 
     fileprivate var cursorSharedAt: Date?
     fileprivate var cursorGrantID: String = ""
@@ -68,11 +82,17 @@ final class MyOutgoingSharesViewModel {
             state.cursorGrantID = page.nextCursorGrantID
             state.canLoadMore = page.hasMore
             regroup()
-            await resolveRecipients(for: page.items)
+            await resolveUsers(Set(page.items.map(\.recipientUserID)))
         } catch {
             state.raw = []
             state.groups = []
             state.snackbar = String(localized: "shared_load_failed")
+        }
+        // Папочные гранты — best-effort: их ошибка не должна рушить файловую часть.
+        if let folderGrants = try? await cloud.listMyOutgoingFolderShares() {
+            state.folderRaw = folderGrants
+            regroupFolders()
+            await resolveUsers(Set(folderGrants.map(\.recipientUserID)))
         }
         state.isPlaceholder = false
     }
@@ -92,7 +112,7 @@ final class MyOutgoingSharesViewModel {
             state.cursorGrantID = page.nextCursorGrantID
             state.canLoadMore = page.hasMore
             regroup()
-            await resolveRecipients(for: page.items)
+            await resolveUsers(Set(page.items.map(\.recipientUserID)))
         } catch {
             state.snackbar = String(localized: "shared_load_failed")
         }
@@ -111,6 +131,21 @@ final class MyOutgoingSharesViewModel {
         } catch {
             state.raw.append(removed)
             regroup()
+            state.snackbar = String(localized: "shared_revoke_failed")
+        }
+    }
+
+    /// Оптимистично отозвать один папочный грант (зеркало `revoke`).
+    func revokeFolder(grantID: String) async {
+        guard let removed = state.folderRaw.first(where: { $0.grantID == grantID }) else { return }
+        state.folderRaw.removeAll { $0.grantID == grantID }
+        regroupFolders()
+        do {
+            try await cloud.revokeFolderUserShare(grantID: grantID)
+            state.snackbar = String(localized: "shared_grant_revoked")
+        } catch {
+            state.folderRaw.append(removed)
+            regroupFolders()
             state.snackbar = String(localized: "shared_revoke_failed")
         }
     }
@@ -136,10 +171,29 @@ final class MyOutgoingSharesViewModel {
         state.groups = order.compactMap { map[$0] }
     }
 
+    /// Сгруппировать `folderRaw` по папке, сохраняя порядок первого появления.
+    private func regroupFolders() {
+        var order: [String] = []
+        var map: [String: SharedByMeFolderGroup] = [:]
+        for item in state.folderRaw {
+            let recipient = SharedByMeRecipient(
+                grantID: item.grantID, userID: item.recipientUserID, sharedAt: item.sharedAt)
+            if var group = map[item.directoryID] {
+                group.recipients.append(recipient)
+                map[item.directoryID] = group
+            } else {
+                order.append(item.directoryID)
+                map[item.directoryID] = SharedByMeFolderGroup(
+                    directoryID: item.directoryID, name: item.name, recipients: [recipient])
+            }
+        }
+        state.folderGroups = order.compactMap { map[$0] }
+    }
+
     /// Резолв карточек получателей для новых recipientUserID. Ошибки одного
     /// пользователя проглатываем — UI отрисует фоллбек «id N».
-    private func resolveRecipients(for entries: [OutgoingShareFull]) async {
-        let ids = Set(entries.map(\.recipientUserID)).subtracting(state.users.keys)
+    private func resolveUsers(_ requested: Set<Int64>) async {
+        let ids = requested.subtracting(state.users.keys)
         guard !ids.isEmpty else { return }
         await withTaskGroup(of: (Int64, CloudUser?).self) { group in
             for id in ids {

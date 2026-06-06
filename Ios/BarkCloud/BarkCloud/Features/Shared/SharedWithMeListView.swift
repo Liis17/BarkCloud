@@ -13,7 +13,7 @@ struct SharedWithMeListView: View {
         Group {
             if vm.state.isPlaceholder {
                 ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if vm.state.items.isEmpty {
+            } else if vm.state.isEmpty {
                 ScrollView { emptyState.containerRelativeFrame(.vertical) }
                     .barkRefreshable { await vm.reload() }
             } else {
@@ -32,6 +32,17 @@ struct SharedWithMeListView: View {
 
     private var list: some View {
         List {
+            if !vm.state.folders.isEmpty {
+                Section(String(localized: "shared_folders_with_me")) {
+                    ForEach(vm.state.folders) { folder in
+                        NavigationLink {
+                            SharedFolderBrowserScreen(directoryID: folder.directoryID, title: folder.name)
+                        } label: {
+                            SharedFolderRow(folder: folder, owner: vm.state.owners[folder.ownerUserID])
+                        }
+                    }
+                }
+            }
             ForEach(vm.state.items) { entry in
                 SharedRow(
                     entry: entry,
@@ -170,6 +181,48 @@ private struct SharedRow: View {
             .buttonStyle(.plain)
             .accessibilityLabel(String(localized: "shared_download"))
         }
+    }
+}
+
+/// Строка доступной мне папки: иконка папки + имя + «от кого». Тап ведёт в
+/// `SharedFolderBrowserScreen` (навигация по поддереву).
+private struct SharedFolderRow: View {
+    let folder: SharedFolderItem
+    let owner: CloudUser?
+
+    var body: some View {
+        HStack(spacing: 12) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(AppColors.accent.opacity(0.12))
+                    .frame(width: 48, height: 48)
+                Image(systemName: "folder.fill")
+                    .font(.system(size: 20))
+                    .foregroundStyle(AppColors.accent)
+            }
+            VStack(alignment: .leading, spacing: 4) {
+                Text(verbatim: folder.name.isEmpty ? String(localized: "shared_unnamed") : folder.name)
+                    .font(AppTypography.bodyMedium)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .foregroundStyle(AppColors.onSurface)
+                HStack(spacing: 6) {
+                    Image(systemName: "person.fill")
+                        .font(.system(size: 11))
+                        .foregroundStyle(AppColors.onSurfaceVariant)
+                    Text(verbatim: ownerName)
+                        .font(.system(size: 12))
+                        .foregroundStyle(AppColors.onSurfaceVariant)
+                        .lineLimit(1)
+                }
+            }
+            Spacer(minLength: 8)
+        }
+        .padding(.vertical, 4)
+    }
+
+    private var ownerName: String {
+        owner?.displayName ?? String(format: String(localized: "shared_owner_fallback"), String(folder.ownerUserID))
     }
 }
 

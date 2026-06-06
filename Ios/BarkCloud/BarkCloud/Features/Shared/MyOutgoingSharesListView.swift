@@ -13,7 +13,7 @@ struct MyOutgoingSharesListView: View {
         Group {
             if vm.state.isPlaceholder {
                 ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if vm.state.groups.isEmpty {
+            } else if vm.state.isEmpty {
                 ScrollView { emptyState.containerRelativeFrame(.vertical) }
                     .barkRefreshable { await vm.reload() }
             } else {
@@ -31,7 +31,10 @@ struct MyOutgoingSharesListView: View {
         ) {
             Button(String(localized: "shared_revoke"), role: .destructive) {
                 if let p = pendingRevoke {
-                    Task { await vm.revoke(grantID: p.grantID) }
+                    Task {
+                        if p.isFolder { await vm.revokeFolder(grantID: p.grantID) }
+                        else { await vm.revoke(grantID: p.grantID) }
+                    }
                 }
                 pendingRevoke = nil
             }
@@ -45,12 +48,23 @@ struct MyOutgoingSharesListView: View {
                 GroupRow(
                     group: group,
                     users: vm.state.users,
-                    onRevoke: { grantID, name in pendingRevoke = PendingRevoke(grantID: grantID, name: name) }
+                    onRevoke: { grantID, name in pendingRevoke = PendingRevoke(grantID: grantID, name: name, isFolder: false) }
                 )
                 .onAppear { Task { await vm.loadMoreIfNeeded(current: group) } }
             }
             if vm.state.isLoadingMore {
                 HStack { Spacer(); ProgressView(); Spacer() }
+            }
+            if !vm.state.folderGroups.isEmpty {
+                Section(String(localized: "shared_section_folders")) {
+                    ForEach(vm.state.folderGroups) { group in
+                        FolderGroupRow(
+                            group: group,
+                            users: vm.state.users,
+                            onRevoke: { grantID, name in pendingRevoke = PendingRevoke(grantID: grantID, name: name, isFolder: true) }
+                        )
+                    }
+                }
             }
         }
         .listStyle(.plain)
@@ -98,7 +112,54 @@ struct MyOutgoingSharesListView: View {
     private struct PendingRevoke: Identifiable {
         let grantID: String
         let name: String
+        let isFolder: Bool
         var id: String { grantID }
+    }
+}
+
+/// Строка папочного гранта: иконка папки + имя + чипсы получателей с отзывом.
+private struct FolderGroupRow: View {
+    let group: SharedByMeFolderGroup
+    let users: [Int64: CloudUser]
+    let onRevoke: (_ grantID: String, _ recipientName: String) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 12) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(AppColors.accent.opacity(0.12))
+                        .frame(width: 48, height: 48)
+                    Image(systemName: "folder.fill")
+                        .font(.system(size: 20))
+                        .foregroundStyle(AppColors.accent)
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(verbatim: group.name.isEmpty ? String(localized: "shared_unnamed") : group.name)
+                        .font(AppTypography.bodyMedium)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .foregroundStyle(AppColors.onSurface)
+                    Text(String(localized: "shared_ishared_recipients"))
+                        .font(.system(size: 12))
+                        .foregroundStyle(AppColors.onSurfaceVariant)
+                }
+                Spacer(minLength: 0)
+            }
+            FlowLayout(spacing: 6) {
+                ForEach(group.recipients) { recipient in
+                    RecipientChip(
+                        name: name(for: recipient.userID),
+                        onRevoke: { onRevoke(recipient.grantID, name(for: recipient.userID)) }
+                    )
+                }
+            }
+        }
+        .padding(.vertical, 4)
+    }
+
+    private func name(for userID: Int64) -> String {
+        users[userID]?.displayName ?? String(format: String(localized: "shared_owner_fallback"), String(userID))
     }
 }
 

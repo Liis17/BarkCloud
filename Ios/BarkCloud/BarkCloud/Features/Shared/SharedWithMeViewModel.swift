@@ -6,6 +6,9 @@ import BarkCloudKit
 /// Состояние таба «Мне доступны» в `SharedHubScreen`.
 struct SharedWithMeUiState {
     var items: [SharedFileEntry] = []
+    /// Папки, которыми со мной поделились (бэкенд не пагинирует). Навигация по
+    /// поддереву — отдельным экраном `SharedFolderBrowserScreen`.
+    var folders: [SharedFolderItem] = []
     /// Резолв имён владельцев: ownerUserID → CloudUser. Если в словаре нет —
     /// рендер показывает `id N` (фоллбек `CloudUser` с пустыми полями).
     var owners: [Int64: CloudUser] = [:]
@@ -18,6 +21,9 @@ struct SharedWithMeUiState {
     /// Когда установлено — Screen открывает системный `UIDocumentPickerViewController`
     /// для сохранения скачанного файла в Files / iCloud / куда угодно.
     var pendingExportFile: URL?
+
+    /// Пусто, когда нет ни файлов, ни папок.
+    var isEmpty: Bool { items.isEmpty && folders.isEmpty }
 
     fileprivate var cursorSharedAt: Date?
     fileprivate var cursorGrantID: String = ""
@@ -55,10 +61,15 @@ final class SharedWithMeViewModel {
             state.cursorSharedAt = page.nextCursorSharedAt
             state.cursorGrantID = page.nextCursorGrantID
             state.canLoadMore = page.hasMore
-            await resolveOwners(for: page.items)
+            await resolveUsers(Set(page.items.map(\.ownerUserID)))
         } catch {
             state.items = []
             state.snackbar = String(localized: "shared_load_failed")
+        }
+        // Доступные папки — best-effort, отдельным запросом без пагинации.
+        if let folders = try? await cloud.listSharedFoldersWithMe() {
+            state.folders = folders
+            await resolveUsers(Set(folders.map(\.ownerUserID)))
         }
         state.isPlaceholder = false
     }
@@ -77,7 +88,7 @@ final class SharedWithMeViewModel {
             state.cursorSharedAt = page.nextCursorSharedAt
             state.cursorGrantID = page.nextCursorGrantID
             state.canLoadMore = page.hasMore
-            await resolveOwners(for: page.items)
+            await resolveUsers(Set(page.items.map(\.ownerUserID)))
         } catch {
             state.snackbar = String(localized: "shared_load_failed")
         }
@@ -113,13 +124,13 @@ final class SharedWithMeViewModel {
 
     func snackbarShown() { state.snackbar = nil }
 
-    /// Подтянуть карточки владельцев для всех новых ownerUserID в `entries`,
+    /// Подтянуть карточки владельцев для всех новых `ownerUserID` (файлов и папок),
     /// которых ещё нет в `state.owners`. Дёргаем `UserRepository.getUser` —
     /// сервер вернёт `User { firstName, lastName, username, profilePicture* }`,
     /// заворачиваем в `CloudUser`. Ошибки одного user'a проглатываем — UI всё
     /// равно отрисует фоллбек «id N».
-    private func resolveOwners(for entries: [SharedFileEntry]) async {
-        let ids = Set(entries.map(\.ownerUserID)).subtracting(state.owners.keys)
+    private func resolveUsers(_ requested: Set<Int64>) async {
+        let ids = requested.subtracting(state.owners.keys)
         guard !ids.isEmpty else { return }
         await withTaskGroup(of: (Int64, CloudUser?).self) { group in
             for id in ids {
