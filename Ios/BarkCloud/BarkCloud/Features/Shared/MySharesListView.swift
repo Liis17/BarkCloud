@@ -2,13 +2,13 @@ import SwiftUI
 import UIKit
 import BarkCloudKit
 
-/// Список «Мои публичные ссылки»: имя файла, обрезанный URL, переходы и дата
-/// создания. Действия: «Скопировать» — кладёт URL в буфер; «Отозвать» —
-/// `confirmationDialog` → `MySharesViewModel.revoke`. Подгружается по курсору
-/// при появлении последней карточки.
+/// Список «Мои публичные ссылки»: файлы, папки и альбомы вперемешку (иконка по
+/// типу). Имя, обрезанный URL, переходы и дата создания. Действия: «Поделиться»
+/// — открывает диалог «Скопировать / Поделиться…»; «Отозвать» —
+/// `confirmationDialog` → `MySharesViewModel.revoke`.
 struct MySharesListView: View {
     @Bindable var vm: MySharesViewModel
-    @State private var pendingRevoke: BarkCloudKit.ShareLink?
+    @State private var pendingRevoke: PublicShareItem?
 
     var body: some View {
         Group {
@@ -34,8 +34,8 @@ struct MySharesListView: View {
             titleVisibility: .visible
         ) {
             Button(String(localized: "shared_revoke"), role: .destructive) {
-                if let link = pendingRevoke {
-                    Task { await vm.revoke(link) }
+                if let item = pendingRevoke {
+                    Task { await vm.revoke(item) }
                 }
                 pendingRevoke = nil
             }
@@ -43,20 +43,16 @@ struct MySharesListView: View {
                 pendingRevoke = nil
             }
         } message: {
-            if let link = pendingRevoke {
-                Text(String(format: String(localized: "shared_revoke_message"), link.name.isEmpty ? String(localized: "shared_unnamed") : link.name))
+            if let item = pendingRevoke {
+                Text(String(format: String(localized: "shared_revoke_message"), item.name.isEmpty ? String(localized: "shared_unnamed") : item.name))
             }
         }
     }
 
     private var list: some View {
         List {
-            ForEach(vm.state.items) { link in
-                ShareLinkRow(link: link, onCopy: { copy(link) }, onRevoke: { pendingRevoke = link })
-                    .onAppear { Task { await vm.loadMoreIfNeeded(current: link) } }
-            }
-            if vm.state.isLoadingMore {
-                HStack { Spacer(); ProgressView(); Spacer() }
+            ForEach(vm.state.items) { item in
+                ShareLinkRow(item: item, onCopy: { copy(item) }, onRevoke: { pendingRevoke = item })
             }
         }
         .listStyle(.plain)
@@ -101,16 +97,24 @@ struct MySharesListView: View {
         .padding(.vertical, 60)
     }
 
-    private func copy(_ link: BarkCloudKit.ShareLink) {
-        guard let url = link.url else { return }
+    private func copy(_ item: PublicShareItem) {
+        guard let url = item.url else { return }
         vm.state.pendingShareURL = ShareableURL(url: url)
     }
 }
 
 private struct ShareLinkRow: View {
-    let link: BarkCloudKit.ShareLink
+    let item: PublicShareItem
     let onCopy: () -> Void
     let onRevoke: () -> Void
+
+    private var icon: String {
+        switch item.kind {
+        case .file:   return "link"
+        case .folder: return "folder.fill"
+        case .album:  return "photo.on.rectangle.angled"
+        }
+    }
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
@@ -118,17 +122,17 @@ private struct ShareLinkRow: View {
                 Circle()
                     .fill(AppColors.accent.opacity(0.18))
                     .frame(width: 40, height: 40)
-                Image(systemName: "link")
+                Image(systemName: icon)
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(AppColors.accent)
             }
             VStack(alignment: .leading, spacing: 4) {
-                Text(link.name.isEmpty ? String(localized: "shared_unnamed") : link.name)
+                Text(item.name.isEmpty ? String(localized: "shared_unnamed") : item.name)
                     .font(AppTypography.bodyMedium)
                     .lineLimit(1)
                     .truncationMode(.middle)
                     .foregroundStyle(AppColors.onSurface)
-                if let url = link.url {
+                if let url = item.url {
                     Text(verbatim: url.absoluteString)
                         .font(.system(size: 12))
                         .lineLimit(1)
@@ -136,10 +140,10 @@ private struct ShareLinkRow: View {
                         .foregroundStyle(AppColors.onSurfaceVariant)
                 }
                 HStack(spacing: 12) {
-                    Label("\(link.clickCount)", systemImage: "arrow.up.right.square")
+                    Label("\(item.clickCount)", systemImage: "arrow.up.right.square")
                         .font(.system(size: 12))
                         .foregroundStyle(AppColors.onSurfaceVariant)
-                    Text(link.createdAt, format: .dateTime.day().month().year())
+                    Text(item.createdAt, format: .dateTime.day().month().year())
                         .font(.system(size: 12))
                         .foregroundStyle(AppColors.onSurfaceVariant)
                 }
