@@ -2,9 +2,18 @@ import SwiftUI
 import Observation
 import BarkCloudKit
 
-/// Sheet «Кто видит этот файл»: список получателей, которым уже выдан грант, с
-/// возможностью отозвать каждый. Открывается из `ShareWithUserSheet` (когда
-/// `outgoingCount > 0`) или напрямую при долгом удержании в будущих UI.
+/// Унифицированная строка исходящего гранта (на файл или папку) для списка
+/// получателей — общий вид независимо от типа сущности.
+private struct GrantRow: Identifiable, Hashable {
+    let grantID: String
+    let recipientUserID: Int64
+    let sharedAt: Date
+    var id: String { grantID }
+}
+
+/// Sheet «Кто видит этот файл/папку»: список получателей, которым уже выдан
+/// грант, с возможностью отозвать каждый. Открывается из `ShareWithUserSheet`
+/// (когда `outgoingCount > 0`).
 ///
 /// Оптимистичный revoke: убираем из списка сразу, при ошибке возвращаем.
 struct OutgoingSharesSheet: View {
@@ -12,16 +21,16 @@ struct OutgoingSharesSheet: View {
     let onClose: () -> Void
 
     @Environment(AppEnvironment.self) private var env
-    @State private var items: [OutgoingShare] = []
+    @State private var items: [GrantRow] = []
     @State private var owners: [Int64: CloudUser] = [:]
     @State private var isLoading = true
     @State private var snackbar: String?
-    @State private var pendingRevoke: OutgoingShare?
+    @State private var pendingRevoke: GrantRow?
 
     var body: some View {
         NavigationStack {
             content
-                .navigationTitle(String(format: String(localized: "shared_outgoing_title"), context.fileName))
+                .navigationTitle(String(format: String(localized: "shared_outgoing_title"), context.name))
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .topBarTrailing) {
@@ -73,11 +82,11 @@ struct OutgoingSharesSheet: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             List {
-                ForEach(items) { share in
+                ForEach(items) { grant in
                     OutgoingRow(
-                        share: share,
-                        user: owners[share.recipientUserID],
-                        onRevoke: { pendingRevoke = share }
+                        grant: grant,
+                        user: owners[grant.recipientUserID],
+                        onRevoke: { pendingRevoke = grant }
                     )
                 }
             }
@@ -108,15 +117,23 @@ struct OutgoingSharesSheet: View {
         isLoading = true
         defer { isLoading = false }
         do {
-            let result = try await env.cloudRepository.listMyOutgoingShares(fileID: context.fileID)
-            items = result
-            await resolveOwners(for: result)
+            let rows: [GrantRow]
+            if context.isFolder {
+                rows = try await env.cloudRepository.listMyOutgoingFolderShares()
+                    .filter { $0.directoryID == context.entityID }
+                    .map { GrantRow(grantID: $0.grantID, recipientUserID: $0.recipientUserID, sharedAt: $0.sharedAt) }
+            } else {
+                rows = try await env.cloudRepository.listMyOutgoingShares(fileID: context.entityID)
+                    .map { GrantRow(grantID: $0.grantID, recipientUserID: $0.recipientUserID, sharedAt: $0.sharedAt) }
+            }
+            items = rows
+            await resolveOwners(for: rows)
         } catch {
             snackbar = String(localized: "shared_load_failed")
         }
     }
 
-    private func resolveOwners(for shares: [OutgoingShare]) async {
+    private func resolveOwners(for shares: [GrantRow]) async {
         let ids = Set(shares.map(\.recipientUserID)).subtracting(owners.keys)
         guard !ids.isEmpty else { return }
         await withTaskGroup(of: (Int64, CloudUser?).self) { group in
@@ -132,21 +149,25 @@ struct OutgoingSharesSheet: View {
         }
     }
 
-    private func revoke(_ share: OutgoingShare) async {
-        guard let idx = items.firstIndex(where: { $0.id == share.id }) else { return }
+    private func revoke(_ grant: GrantRow) async {
+        guard let idx = items.firstIndex(where: { $0.id == grant.id }) else { return }
         items.remove(at: idx)
         do {
-            try await env.cloudRepository.revokeUserShare(grantID: share.grantID)
+            if context.isFolder {
+                try await env.cloudRepository.revokeFolderUserShare(grantID: grant.grantID)
+            } else {
+                try await env.cloudRepository.revokeUserShare(grantID: grant.grantID)
+            }
             snackbar = String(localized: "shared_grant_revoked")
         } catch {
-            items.insert(share, at: min(idx, items.count))
+            items.insert(grant, at: min(idx, items.count))
             snackbar = String(localized: "shared_revoke_failed")
         }
     }
 }
 
 private struct OutgoingRow: View {
-    let share: OutgoingShare
+    let grant: GrantRow
     let user: CloudUser?
     let onRevoke: () -> Void
 
@@ -162,7 +183,7 @@ private struct OutgoingRow: View {
                         .font(.system(size: 12))
                         .foregroundStyle(AppColors.onSurfaceVariant)
                 }
-                Text(share.sharedAt, format: .dateTime.day().month().year())
+                Text(grant.sharedAt, format: .dateTime.day().month().year())
                     .font(.system(size: 12))
                     .foregroundStyle(AppColors.onSurfaceVariant)
             }
@@ -180,7 +201,7 @@ private struct OutgoingRow: View {
     }
 
     private var displayName: String {
-        user?.displayName ?? String(format: String(localized: "shared_owner_fallback"), String(share.recipientUserID))
+        user?.displayName ?? String(format: String(localized: "shared_owner_fallback"), String(grant.recipientUserID))
     }
 
     @ViewBuilder

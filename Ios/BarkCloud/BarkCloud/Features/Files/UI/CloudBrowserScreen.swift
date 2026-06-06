@@ -83,12 +83,10 @@ struct CloudBrowserScreen: View {
         .sheet(item: $shareWithUserContext) { context in
             ShareWithUserSheet(context: context) { shareWithUserContext = nil }
         }
-        .sheet(item: Binding(
+        .sharePresenter(url: Binding(
             get: { vm?.state.pendingShareURL },
             set: { vm?.state.pendingShareURL = $0 }
-        )) { item in
-            ActivityViewController(activityItems: [item.url])
-        }
+        ))
         .overlay(alignment: .bottom) { if let vm { snackbarView(vm) } }
         .fullScreenCover(item: $openFile) { entry in
             NavigationStack {
@@ -144,6 +142,34 @@ struct CloudBrowserScreen: View {
                             renameButton {
                                 renameText = dir.name
                                 renameSubject = .directory(dir)
+                            }
+                        }
+                        .contextMenu {
+                            Button {
+                                Task { await vm.makeFolderPublic(dir) }
+                            } label: {
+                                Label(String(localized: "ctx_make_public"), systemImage: "link")
+                            }
+                            Button {
+                                shareWithUserContext = ShareWithUserContext(folderID: dir.id, folderName: dir.name)
+                            } label: {
+                                Label(String(localized: "shared_with_user_action"), systemImage: "person.2")
+                            }
+                            Button {
+                                renameText = dir.name
+                                renameSubject = .directory(dir)
+                            } label: {
+                                Label(String(localized: "action_rename"), systemImage: "pencil")
+                            }
+                            Button {
+                                moveSubject = .directory(dir)
+                            } label: {
+                                Label(String(localized: "action_move"), systemImage: "folder")
+                            }
+                            Button(role: .destructive) {
+                                vm.deleteDirectory(dir)
+                            } label: {
+                                Label(String(localized: "action_delete"), systemImage: "trash")
                             }
                         }
                     }

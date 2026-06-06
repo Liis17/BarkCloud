@@ -217,11 +217,26 @@ final class CloudBrowserViewModel {
         }
     }
 
-    /// Создать публичную ссылку на файл и открыть системный Share Sheet.
+    /// Создать публичную ссылку на файл → диалог «Скопировать / Поделиться…».
     /// Зеркалит `GalleryViewModel.makePublic` / `MediaGridViewModel.makePublic`.
     func makePublic(_ entry: CloudFileEntry) async {
         do {
             let link = try await cloud.createShare(fileID: entry.fileID, name: entry.name)
+            guard let url = link.url else {
+                state.snackbar = String(localized: "shared_load_failed")
+                return
+            }
+            state.pendingShareURL = ShareableURL(url: url)
+        } catch {
+            state.snackbar = domainErrorMessage(error)
+        }
+    }
+
+    /// Сделать папку публичной (`/f/{token}`) → диалог «Скопировать / Поделиться…».
+    /// Идемпотентно на бэке: повторный вызов вернёт ту же ссылку.
+    func makeFolderPublic(_ dir: CloudDirectory) async {
+        do {
+            let link = try await cloud.createFolderShare(directoryID: dir.id, name: dir.name)
             guard let url = link.url else {
                 state.snackbar = String(localized: "shared_load_failed")
                 return

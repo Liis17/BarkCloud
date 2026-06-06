@@ -205,6 +205,128 @@ public struct AlbumShareLink: Identifiable, Hashable, Sendable {
     }
 }
 
+/// Страница списка моих публичных ссылок на альбомы с курсором пагинации.
+public struct AlbumShareLinksPage: Sendable {
+    public let items: [AlbumShareLink]
+    public let nextCursorCreatedAt: Date?
+    public let nextCursorAlbumShareID: String
+    public var hasMore: Bool { nextCursorCreatedAt != nil }
+}
+
+/// Публичная ссылка на папку (зеркалит `FolderShareInfo`). `url` собирается на
+/// клиенте: `{webHost}/f/{token}`. Публичную страницу папки рендерит веб-клиент.
+public struct FolderShareLink: Identifiable, Hashable, Sendable {
+    public let id: String
+    public let token: String
+    public let directoryID: String
+    public let name: String
+    public let url: URL?
+    public let clickCount: Int
+    public let createdAt: Date
+
+    public init(_ info: Barkcloud_Files_FolderShareInfo) {
+        self.id = info.id
+        self.token = info.token
+        self.directoryID = info.directoryID
+        self.name = info.name
+        self.url = GrpcEndpoint.publicFolderShareURL(token: info.token)
+        self.clickCount = Int(info.clickCount)
+        self.createdAt = info.hasCreatedAt ? info.createdAt.date : Date()
+    }
+}
+
+/// Страница списка моих публичных ссылок на папки с курсором пагинации.
+public struct FolderShareLinksPage: Sendable {
+    public let items: [FolderShareLink]
+    public let nextCursorCreatedAt: Date?
+    public let nextCursorFolderShareID: String
+    public var hasMore: Bool { nextCursorCreatedAt != nil }
+}
+
+/// Один исходящий грант на папку — кому конкретно расшарена моя папка
+/// (зеркалит `OutgoingFolderShare`). `grantID` — id для `revokeFolderUserShare`.
+public struct OutgoingFolderShareItem: Identifiable, Hashable, Sendable {
+    public let grantID: String
+    public let directoryID: String
+    public let name: String
+    public let recipientUserID: Int64
+    public let sharedAt: Date
+
+    public init(_ e: Barkcloud_Files_OutgoingFolderShare) {
+        self.grantID = e.grantID
+        self.directoryID = e.directoryID
+        self.name = e.name
+        self.recipientUserID = e.recipientUserID
+        self.sharedAt = e.hasSharedAt ? e.sharedAt.date : Date(timeIntervalSince1970: 0)
+    }
+
+    public var id: String { grantID }
+}
+
+/// Папка, которой со мной поделился другой пользователь (зеркалит
+/// `SharedFolderEntry`). `ownerUserID` резолвится в `CloudUser` через
+/// `UserRepository.getUser`. Навигация по поддереву — `listSharedDirectory`.
+public struct SharedFolderItem: Identifiable, Hashable, Sendable {
+    public let grantID: String
+    public let directoryID: String
+    public let name: String
+    public let ownerUserID: Int64
+    public let sharedAt: Date
+
+    public init(_ e: Barkcloud_Files_SharedFolderEntry) {
+        self.grantID = e.grantID
+        self.directoryID = e.directoryID
+        self.name = e.name
+        self.ownerUserID = e.ownerUserID
+        self.sharedAt = e.hasSharedAt ? e.sharedAt.date : Date(timeIntervalSince1970: 0)
+    }
+
+    public var id: String { grantID }
+}
+
+/// Подпапка в листинге доступной мне папки (зеркалит `PublicDirEntry`).
+public struct SharedSubdir: Identifiable, Hashable, Sendable {
+    public let id: String
+    public let name: String
+
+    public init(_ e: Barkcloud_Files_PublicDirEntry) {
+        self.id = e.id
+        self.name = e.name
+    }
+}
+
+/// Файл в листинге доступной мне папки (зеркалит `PublicFileEntry`).
+/// `downloadURL` — готовая временная публичная ссылка (TTL на бэкенде).
+public struct SharedDirFile: Identifiable, Hashable, Sendable {
+    public let fileID: String
+    public let name: String
+    public let isVideo: Bool
+    public let downloadURL: URL?
+    public let previewURL: URL?
+    public let fileSize: Int64
+
+    public init(_ e: Barkcloud_Files_PublicFileEntry) {
+        self.fileID = e.fileID
+        self.name = e.name
+        self.isVideo = e.mediaKind == .video
+        self.downloadURL = URL(string: e.downloadURL)
+        self.previewURL = e.previewURL.isEmpty ? nil : URL(string: e.previewURL)
+        self.fileSize = e.fileSize
+    }
+
+    public var id: String { fileID }
+}
+
+/// Листинг доступной мне папки: подпапки + файлы (зеркалит
+/// `ListSharedDirectoryResponse`). `found == false` — нет доступа / не найдено.
+public struct SharedDirectoryListing: Sendable {
+    public let found: Bool
+    public let directoryID: String
+    public let name: String
+    public let subdirs: [SharedSubdir]
+    public let files: [SharedDirFile]
+}
+
 /// Получатель шара / результат поиска пользователей. Зеркалит
 /// `Barkcloud_Users_User` в минимальном объёме, нужном для UI выбора (поиск,
 /// карточка получателя, отображение «от кого» в Мне доступны).
