@@ -85,8 +85,7 @@ public static bool EmailEnabled(this IConfiguration cfg)
 - Добавить типизированное исключение, напр. `EmailServiceDisabledException` в `Shared/BarkCloud.Shared.Exceptions/Identity/` (с x-error-code, как прочие).
 - `ResetPassword`: при `!EmailEnabled` → бросить `EmailServiceDisabledException` (по почте код доставить нельзя).
 - `EnableOtpVerification`: при `!EmailEnabled` **и** запросе типа **Email** → бросить исключение. **TOTP/Authenticator не трогаем.**
-- `Auth`: при `!EmailEnabled` не считать **email-OTP** обязательным фактором (не слать код). TOTP-вход не затрагивается.
-  В свежем email-less деплое включить email-OTP нельзя (см. выше), так что это защита от граничных случаев.
+- `Auth`: **сознательно НЕ менялся.** Менять enforcement 2FA (фактически обход email-OTP) — чувствительное к безопасности решение; в свежем email-less деплое email-OTP включить нельзя, а пилёж задач в очередь уже закрыт центральным guard'ом. Пограничный случай (аккаунт с email-OTP, у которого почту отключили задним числом) остаётся залогиненным-заблокированным — это корректная защита, а не утечка.
 
 **Проверка:** `dotnet build` Identity; юнит-тесты: (а) `EmailEnabled=true` — старый двухшаговый путь не изменился; (б) `EmailEnabled=false` — `CreateAccount` возвращает refresh, ничего не публикуется; (в) guard `NotificationQueueSender` не публикует при выключенной почте; (г) `ResetPassword`/`EnableOtp(Email)` бросают исключение.
 

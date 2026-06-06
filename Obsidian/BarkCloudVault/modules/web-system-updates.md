@@ -38,6 +38,7 @@ Parent: [[modules/backend-web]] · See also: [[index]] · [[structure/infrastruc
 
 `Pages/Settings.html` — раздел «Обслуживание» (компонент `SystemSection`, M3-стиль `shared.css`):
 - не настроен пароль → заглушка; не разблокировано → поле пароля; разблокировано → список сервисов (статус-pill, тег образа, кнопки обновить/перезапустить/стоп-старт), «Обновить всё», «Заблокировать».
+- **Режим без почты:** при `system.emailEnabled=false` (из `PageDataBuilder`, см. [[modules/backend-configuration]]) у строки сервиса `notification` показывается пометка, что он не используется и его можно остановить/убрать из docker-compose. `DockerService` умеет только stop/start/restart контейнеров — сам compose-файл не редактирует (удаление сервиса — ручной шаг администратора).
 - progress-модалка для «Обновить всё» (последовательные вызовы с прогресс-баром).
 - full-screen overlay при self-update/-restart веба: опрашивает `/healthz` каждые 3с, после 2 успехов перезагружает страницу.
 - Иконки `refresh`/`power` добавлены в `shared.jsx`.
