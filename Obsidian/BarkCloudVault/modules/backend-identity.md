@@ -90,3 +90,11 @@ Parent: [[index]] · See also: [[api/identity-api]] · [[modules/shared-identity
 ## Окружение
 
 `ASPNETCORE_ENVIRONMENT`, `CONFIGURATION_SERVICE_URL`. БД/JWT-настройки берутся из [[modules/backend-configuration]] при старте.
+
+## Режим без почты (email-less)
+
+Читает `Features:EmailEnabled` (вычисляет [[modules/backend-configuration]]) через `IConfiguration.EmailEnabled()` ([[modules/backend-grpcserver]]). При `false`:
+- `NotificationQueueSender.SendNotification` **ничего не публикует** — глушит все 12 точек отправки `EmailNotification` разом (очередь не копится, сервис Notification можно остановить).
+- `CreateAccountCommandHandler`: после создания черновика **сразу** `ConfirmUser` + выдаёт refresh (`CreateAccountResponse.refresh_token`), минуя код подтверждения. Письмо не шлётся. В режиме с почтой — прежний двухшаговый путь.
+- `ResetPasswordCommandHandler` (email-OTP) и `EnableOtpVerificationCommandHandler` (тип Email) бросают `EmailServiceDisabledException`. Сценарии на **Authenticator/TOTP** не затронуты.
+- `AuthCommandHandler` намеренно не меняли (enforcement 2FA не трогаем; в свежем email-less деплое email-OTP включить нельзя).

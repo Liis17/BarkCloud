@@ -13,6 +13,7 @@ using BarkCloud.TestKit;
 
 using MassTransit;
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -22,6 +23,7 @@ public class CreateAccountCommandHandlerTests
 {
     private readonly Mock<UsersServerApi.UsersServerApiClient> _usersClient = new();
     private readonly Mock<IConfirmationCodesStorage> _codes = new();
+    private readonly Mock<IRefreshTokensStorage> _refreshTokens = new();
     private readonly Mock<NotificationQueueSender> _notifications;
     private readonly Mock<LocationClient> _location;
     private readonly MetricsCollector _metrics = new();
@@ -29,16 +31,20 @@ public class CreateAccountCommandHandlerTests
 
     public CreateAccountCommandHandlerTests()
     {
-        _notifications = new Mock<NotificationQueueSender>(Mock.Of<IPublishEndpoint>());
+        _notifications = new Mock<NotificationQueueSender>(Mock.Of<IPublishEndpoint>(), new ConfigurationBuilder().Build());
         _notifications.Setup(n => n.SendNotification(It.IsAny<Notification>())).Returns(Task.CompletedTask);
 
         _location = new Mock<LocationClient>(new HttpClient(), new MetricsCollector(), NullLogger<LocationClient>.Instance);
         _location.Setup(c => c.GetLocation(It.IsAny<string>())).ReturnsAsync((IpLocation?)null);
     }
 
-    private CreateAccountCommandHandler CreateSut(RequestContext? ctx = null) => new(
+    private static IConfiguration EmailConfig(bool enabled) => new ConfigurationBuilder()
+        .AddInMemoryCollection(new Dictionary<string, string?> { ["Features:EmailEnabled"] = enabled ? "true" : "false" })
+        .Build();
+
+    private CreateAccountCommandHandler CreateSut(RequestContext? ctx = null, bool emailEnabled = true) => new(
         _usersClient.Object, _codes.Object, _notifications.Object,
-        ctx ?? FullContext(), _location.Object, _metrics, _logger);
+        ctx ?? FullContext(), _location.Object, _metrics, _refreshTokens.Object, EmailConfig(emailEnabled), _logger);
 
     private static RequestContext FullContext() => new()
     {
@@ -139,5 +145,29 @@ public class CreateAccountCommandHandlerTests
 
         _usersClient.Verify(c => c.OverrideDraftUserAsync(It.IsAny<AddDraftUserRequest>(), null, null, default), Times.Once);
         _metrics.SnapshotAndReset().Should().ContainKey("accounts_draft_overridden");
+    }
+
+    [Fact]
+    public async Task Handle_EmailDisabled_ConfirmsImmediately_ReturnsRefresh_NoCode_NoEmail()
+    {
+        _usersClient
+            .Setup(c => c.AddDraftUserAsync(It.IsAny<AddDraftUserRequest>(), null, null, default))
+            .Returns(GrpcCallHelpers.AsyncUnary(new AddDraftUserResponse { UserId = 7 }));
+        _usersClient
+            .Setup(c => c.ConfirmUserAsync(It.IsAny<ConfirmUserRequest>(), null, null, default))
+            .Returns(GrpcCallHelpers.AsyncUnary(new ConfirmUserResponse()));
+
+        var response = await CreateSut(emailEnabled: false).Handle(ValidCommand(), default);
+
+        // Аккаунт подтверждён сразу, выдан refresh; код не создаётся, письмо не публикуется.
+        response.RefreshToken.Value.Should().NotBeNullOrWhiteSpace();
+        response.CodeId.Should().BeNullOrEmpty();
+        _usersClient.Verify(c => c.ConfirmUserAsync(It.Is<ConfirmUserRequest>(r => r.UserId == 7), null, null, default), Times.Once);
+        _refreshTokens.Verify(s => s.CreateNewRefreshToken(It.IsAny<string>(), 7, It.IsAny<string>(), It.IsAny<int>()), Times.Once);
+        _codes.Verify(s => s.AddCode(It.IsAny<ConfirmationCode>()), Times.Never);
+        _notifications.Verify(n => n.SendNotification(It.IsAny<Notification>()), Times.Never);
+        var snap = _metrics.SnapshotAndReset();
+        snap.Should().ContainKey("accounts_confirmed");
+        snap.Should().ContainKey("sessions_created");
     }
 }

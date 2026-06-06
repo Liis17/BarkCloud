@@ -282,6 +282,12 @@ function SystemSection({ admin, system }: { admin: SettingsState['admin']; syste
                 {s.image}
               </div>
             )}
+            {s.service === 'notification' && !system.emailEnabled && (
+              <div className="svc-note" style={{ fontSize: 12, color: 'var(--md-on-surface-variant)', marginTop: 4 }}>
+                Не используется — почта на сервере не настроена. Сервис можно остановить, а чтобы убрать совсем —
+                удалить <code>notification</code> из <code>docker-compose.yml</code> и его переменные из <code>.env</code>.
+              </div>
+            )}
           </div>
         </div>
         <div className="svc-actions">{busy[s.service] ? <span className="spin" style={{ margin: '0 11px' }} /> : actions(s.state === 'running')}</div>

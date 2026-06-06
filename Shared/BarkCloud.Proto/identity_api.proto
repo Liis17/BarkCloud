@@ -237,8 +237,9 @@ message CreateAccountRequest {
   string email = 4; // Почта
 }
 
-message CreateAccountResponse { 
-  string code_id = 1; // Идентификатор кода подтверждения
+message CreateAccountResponse {
+  string code_id = 1; // Идентификатор кода подтверждения (режим с почтой)
+  Token refresh_token = 2; // Токен обновления — заполнен в режиме без почты (аккаунт создан сразу, без кода)
 }
 
 message ConfirmAccountRequest {

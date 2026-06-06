@@ -1,3 +1,4 @@
+using BarkCloud.GrpcServer;
 using BarkCloud.GrpcServer.Metrics;
 using BarkCloud.GrpcServer.Tracker;
 using BarkCloud.GrpcServer.XAuth;
@@ -11,6 +12,8 @@ using BarkCloud.Shared.Identity;
 using BarkCloud.Shared.Queue.Notifications;
 
 using MediatR;
+
+using Microsoft.Extensions.Configuration;
 
 using OtpNet;
 
@@ -28,12 +31,13 @@ public class EnableOtpVerificationCommandHandler : IRequestHandler<EnableOtpVeri
     private readonly RequestContext _requestContext;
     private readonly LocationClient _locationClient;
     private readonly MetricsCollector _metrics;
+    private readonly IConfiguration _configuration;
     private readonly ILogger<EnableOtpVerificationCommandHandler> _logger;
 
     public EnableOtpVerificationCommandHandler(UserContext userContext, IAuthPropertiesStorage authPropertiesStorage,
         UsersServerApi.UsersServerApiClient usersClient, NotificationQueueSender notificationQueueSender,
         RequestContext requestContext, LocationClient locationClient, MetricsCollector metrics,
-        ILogger<EnableOtpVerificationCommandHandler> logger)
+        IConfiguration configuration, ILogger<EnableOtpVerificationCommandHandler> logger)
     {
         _userContext = userContext;
         _authPropertiesStorage = authPropertiesStorage;
@@ -42,6 +46,7 @@ public class EnableOtpVerificationCommandHandler : IRequestHandler<EnableOtpVeri
         _requestContext = requestContext;
         _locationClient = locationClient;
         _metrics = metrics;
+        _configuration = configuration;
         _logger = logger;
     }
 
@@ -120,6 +125,13 @@ public class EnableOtpVerificationCommandHandler : IRequestHandler<EnableOtpVeri
 
         if (request.OptType == OtpTypeId.Email)
         {
+            // Режим без почты: включить email-2FA нельзя — код доставить некуда.
+            if (!_configuration.EmailEnabled())
+            {
+                _logger.LogWarning("Включение Email 2FA отклонено — почта на сервере не настроена");
+                throw new EmailServiceDisabledException();
+            }
+
             _logger.LogDebug("Настройка Email 2FA для пользователя {UserId}", _userContext.UserId);
             // Получаем старый метод 2FA
             var oldOptOptions = await _authPropertiesStorage.GetUserAuthProperties(_userContext.UserId);

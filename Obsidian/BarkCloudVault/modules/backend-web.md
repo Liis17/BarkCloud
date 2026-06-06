@@ -25,6 +25,8 @@ Parent: [[index]] · See also: [[api/identity-api]] · [[api/users-api]] · [[ap
 
 ## Регистрация (с подтверждением кодом по почте)
 
+> **Режим без почты** (`Features:EmailEnabled=false`, см. [[modules/backend-configuration]]): Web читает флаг через `IConfiguration.EmailEnabled()`. Тогда `RegistrationGateway.BeginAsync` после `CreateAccount` (Identity сразу отдаёт `refresh_token`) выполняет общий хвост `CompleteAsync` (`CreateToken → SetPassword → IssueSession`) и возвращает `Success` — **без экрана ввода кода**. Маршруты `/forgot` и `/forgot/confirm` редиректят на `/login`. В страницу логина и в `/api/settings/full` (`system.emailEnabled`) прокинуты флаги `email.enabled`/`emailEnabled`: на логине скрыта ссылка «Забыли?», в «Обслуживании» — пометка по Notification.
+
 В BarkCloud **есть** сервис уведомлений [[modules/backend-notification]] (паритет с BarkFluff), поэтому Web использует штатный клиентский email-флоу `IdentityApi` — тот же, что и мобильные клиенты. Двухшаговый процесс (`Auth/RegistrationGateway.cs`):
 
 **Шаг 1 — `BeginAsync` (POST `/register`):**

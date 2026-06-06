@@ -38,6 +38,8 @@ Parent: [[index]] · See also: [[modules/backend-identity]] · [[modules/shared-
 
 Publisher — [[modules/backend-identity]] (`NotificationQueueSender` → `IPublishEndpoint.Publish(EmailNotification)`). Email-адрес получателя передаётся **прямо в сообщении** (`EmailNotification.Address`), поэтому Notification не обращается к Users. Контракты — в [[modules/shared-queue]] (`Notifications/`).
 
+> **Режим без почты:** при пустых `Email:*` в [[modules/backend-configuration]] сервер выставляет `Features:EmailEnabled=false`; Identity тогда **не публикует** `EmailNotification` (guard в `NotificationQueueSender`), очередь не наполняется. Сервис Notification в этом случае **опционален** — его можно остановить или убрать из docker-compose (никто не `depends_on`). В разделе «Обслуживание» веба показывается соответствующая пометка ([[modules/web-system-updates]]).
+
 ## Зависимости
 
 - Использует: `BarkCloud.GrpcServer`, `BarkCloud.Shared.Queue`, `MassTransit.RabbitMQ`

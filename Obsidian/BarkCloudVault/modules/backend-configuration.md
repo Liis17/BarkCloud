@@ -44,3 +44,13 @@ Parent: [[index]] · See also: [[api/configuration-api]]
 ## Окружение (compose)
 
 ENV переменные: `CONFIGURATION_HOST`, `CONFIGURATION_DATABASE`, `CONFIGURATION_USERNAME`, `CONFIGURATION_PASSWORD`, `CONFIGURATION_PORT` (см. [[structure/infrastructure]]).
+
+## Режим без почты (Features:EmailEnabled)
+
+`GetConfigurationCommandHandler` подмешивает в ответ **всем** сервисам вычисляемый ключ
+`Features:EmailEnabled` (под `ServiceId.Unknown`, поэтому доезжает до Identity/Web/всех через их `LoadConfiguration`).
+Значение считается `ConfigurationStorage.IsEmailConfiguredAsync()`: `true`, только если **все 4** поля
+`Email:Host/Port/SenderEmail/SenderPassword` (под `ServiceId.Notification`) непусты; иначе `false`.
+Ключ **не хранится** в БД — всегда свежий на старте сервиса (смена SMTP требует рестарта Identity/Web).
+Так как `ConfigurationDefaultsPopulator` не заполняет секцию `Email`, по умолчанию свежий деплой работает
+в режиме без почты. Потребители флага — [[modules/backend-identity]] и [[modules/backend-web]].

@@ -58,6 +58,8 @@ services:
       - configuration
 
   # Сервис уведомлений (consumer RabbitMQ → SMTP). Внешнего API нет, портов наружу не открывает.
+  # Опционален: при пустых Email:* в Configuration сервер в режиме «без почты»
+  # (Features:EmailEnabled=false) задачи в очередь не публикует — сервис можно не запускать.
   notification:
     image: barkcloud-notification-dev:latest
     container_name: cloud-notification

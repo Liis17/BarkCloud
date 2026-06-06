@@ -447,6 +447,9 @@
 <div id="root"></div>
 
 <script type="text/babel">
+// Режим без почты: сервер подставляет email.enabled. Если false — прячем «Забыли пароль?»
+// и экраны сброса/подтверждения кода (на бэкенде они и так заблокированы).
+const EMAIL_ENABLED = '{{ email.enabled | default("true") }}' === 'true';
 const CloudIcon = ({ size = 22 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
     <path d="M17.5 19a4.5 4.5 0 0 0 0-9 .5.5 0 0 1-.5-.5 5 5 0 0 0-9.9-1 4 4 0 0 0-3.6 4 4 4 0 0 0 4 4.5h10z"/>
@@ -569,7 +572,7 @@ function LoginCard({ state, showSSO }) {
         <div className="field">
           <div className="field-label">
             <span>Пароль</span>
-            <a className="hint" href="/forgot">Забыли?</a>
+            {EMAIL_ENABLED && <a className="hint" href="/forgot">Забыли?</a>}
           </div>
           <div className="input-wrap has-icon">
             <input

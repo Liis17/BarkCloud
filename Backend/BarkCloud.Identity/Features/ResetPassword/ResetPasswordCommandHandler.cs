@@ -1,3 +1,4 @@
+using BarkCloud.GrpcServer;
 using BarkCloud.GrpcServer.Metrics;
 using BarkCloud.GrpcServer.Tracker;
 using BarkCloud.Identity.Domain;
@@ -12,6 +13,8 @@ using BarkCloud.Shared.Queue.Notifications;
 
 using MediatR;
 
+using Microsoft.Extensions.Configuration;
+
 
 namespace BarkCloud.Identity.Features.ResetPassword;
 
@@ -24,12 +27,13 @@ public class ResetPasswordCommandHandler : IRequestHandler<ResetPasswordCommand,
     private readonly NotificationQueueSender _notificationQueueSender;
     private readonly LocationClient _locationClient;
     private readonly MetricsCollector _metrics;
+    private readonly IConfiguration _configuration;
     private readonly ILogger<ResetPasswordCommandHandler> _logger;
 
     public ResetPasswordCommandHandler(IResetPasswordsStorage resetPasswordsStorage,
         IAuthPropertiesStorage authPropertiesStorage, UsersServerApi.UsersServerApiClient usersApiClient,
         RequestContext requestContext, NotificationQueueSender notificationQueueSender, LocationClient locationClient,
-        MetricsCollector metrics, ILogger<ResetPasswordCommandHandler> logger)
+        MetricsCollector metrics, IConfiguration configuration, ILogger<ResetPasswordCommandHandler> logger)
     {
         _resetPasswordsStorage = resetPasswordsStorage;
         _authPropertiesStorage = authPropertiesStorage;
@@ -38,6 +42,7 @@ public class ResetPasswordCommandHandler : IRequestHandler<ResetPasswordCommand,
         _notificationQueueSender = notificationQueueSender;
         _locationClient = locationClient;
         _metrics = metrics;
+        _configuration = configuration;
         _logger = logger;
     }
 
@@ -70,6 +75,14 @@ public class ResetPasswordCommandHandler : IRequestHandler<ResetPasswordCommand,
         if (string.IsNullOrEmpty(_requestContext.AppName) || string.IsNullOrEmpty(_requestContext.AppVersion))
         {
             throw new XAppInfoIsRequiedException();
+        }
+
+        // Режим без почты: сброс пароля по email-коду невозможен (доставить некуда).
+        // Сброс через Authenticator (TOTP) не зависит от почты — его не блокируем.
+        if (request.OtpType != OtpType.Authenticator && !_configuration.EmailEnabled())
+        {
+            _logger.LogWarning("Сброс пароля по email отклонён — почта на сервере не настроена");
+            throw new EmailServiceDisabledException();
         }
 
         var usersRequest = new FindByLoginRequest();
