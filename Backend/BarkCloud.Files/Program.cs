@@ -76,6 +76,7 @@ public class Program
         builder.Services.AddScoped<AlbumViewBuilder>();
         builder.Services.AddScoped<DynamicFolderViewBuilder>();
         builder.Services.AddScoped<ITrashPurgeService, TrashPurgeService>();
+        builder.Services.AddSingleton<IPhysicalStorageStatsProvider, PhysicalStorageStatsProvider>();
         builder.Services.AddHostedService<TempFileCleanupService>();
         builder.Services.AddHostedService<TrashCleanupService>();
         builder.Services.AddHostedService<OrphanBlobCleanupService>();

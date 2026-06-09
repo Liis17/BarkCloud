@@ -58,7 +58,7 @@ Parent: [[index]] · See also: [[api/users-api]] · [[modules/shared-queue]]
 - `DeleteAccount` — удаление своего аккаунта (каскад + событие `UserDeleted`)
 - `CheckExistUsername`, `CheckExistEmail` (query-handlers)
 - `FindByLogin`, `ListByIds`
-- `UpdateProfileServer`, `UpdateStorageLimit`
+- `UpdateProfileServer`, `UpdateStorageLimit` (`StorageLimitGb = 0` означает лимит по физическому размеру диска MinIO)
 
 ### Privacy/ (вложенная папка)
 - `GetPrivacySettings`, `UpdatePrivacySettings` (дефолтная запись создаётся при первом обращении)

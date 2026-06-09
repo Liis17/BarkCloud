@@ -33,4 +33,22 @@ public class UpdateStorageLimitCommandHandlerTests
         response.User.Id.Should().Be(7);
         response.User.StorageLimitGb.Should().Be(50);
     }
+
+    [Fact]
+    public async Task Handle_AllowsZeroLimit()
+    {
+        _users.Setup(s => s.GetById(7)).ReturnsAsync(new User
+        {
+            Id = 7, FirstName = "Bark", LastName = "Dog", Username = "barker",
+            StorageLimitGb = 0, RegistrationDate = DateTime.UtcNow
+        });
+
+        var response = await CreateSut().Handle(new UpdateStorageLimitCommand
+        {
+            UserId = 7, StorageLimitGb = 0
+        }, default);
+
+        _users.Verify(s => s.UpdateStorageLimitGb(7, 0), Times.Once);
+        response.User.StorageLimitGb.Should().Be(0);
+    }
 }

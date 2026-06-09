@@ -46,7 +46,7 @@ Package: `barkcloud.users`
 | `RegisterDevice(RegisterDeviceRequest) → RegisterDeviceResponse` | ✅ |
 | `GetUserDevices(GetUserDevicesRequest) → GetUserDevicesResponse` | ✅ |
 | `DeleteUserDevice(DeleteUserDeviceRequest) → DeleteUserDeviceResponse` | ✅ |
-| `UpdateStorageLimit(UpdateStorageLimitRequest) → UpdateStorageLimitResponse` | ✅ |
+| `UpdateStorageLimit(UpdateStorageLimitRequest) → UpdateStorageLimitResponse` | ✅ (`storage_limit_gb = 0` означает лимит по физическому размеру диска MinIO) |
 | `SetProfilePictureServer(SetProfilePictureServerRequest) → SetProfilePictureServerResponse` | ✅ |
 | `UpdateProfileServer(UpdateProfileServerRequest) → UpdateProfileServerResponse` | ✅ |
 

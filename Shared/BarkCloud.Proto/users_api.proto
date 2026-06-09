@@ -130,7 +130,7 @@ message UpdateProfileServerResponse { }
 // Обновление лимита хранилища
 message UpdateStorageLimitRequest {
   int64 user_id = 1;
-  int32 storage_limit_gb = 2; // 1-250
+  int32 storage_limit_gb = 2; // 0 = весь диск, иначе лимит в ГБ
 }
 
 message UpdateStorageLimitResponse {
@@ -300,7 +300,7 @@ message User {
   google.protobuf.Timestamp registration_date = 5; // дата регистрации
   string profile_picture = 6; // ссылка на аватарку пользователя
   string profile_picture_preview = 7; // ссылка на превью аватарки
-  int32 storage_limit_gb = 8; // лимит хранилища в гигабайтах
+  int32 storage_limit_gb = 8; // лимит хранилища в гигабайтах; 0 = весь диск
   string bio = 9; // описание профиля (о себе)
 }
 

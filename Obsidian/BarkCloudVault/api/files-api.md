@@ -17,7 +17,7 @@ Package: `barkcloud.files`
 | `GetUploadUrl(GetUploadUrlRequest) → GetUploadUrlResponse` | Получить presigned URL для загрузки |
 | `GetTempDownloadUrl(GetTempDownloadUrlRequest) → GetTempDownloadUrlResponse` | Ссылки на скачивание + превью (`file_id`, `url`, `preview_url`) |
 | `CheckFileHash(CheckFileHashRequest) → CheckFileHashResponse` | Проверка наличия по хешу (без побочных эффектов): `exists` + `existing_locations` (имя+папка) для модалки «файл уже есть» |
-| `GetUserStorageInfo(GetUserStorageInfoRequest) → GetUserStorageInfoResponse` | Инфо о квоте/использовании |
+| `GetUserStorageInfo(GetUserStorageInfoRequest) → GetUserStorageInfoResponse` | Инфо о квоте/использовании + физический snapshot диска |
 | `GetFileMetadata(GetFileMetadataRequest) → GetFileMetadataResponse` | Метаданные файла (EXIF/ffprobe/PDF/Office) для диалога «Свойства». Только для собственных файлов (по `Uploaders`). Поля nullable (`optional`), клиент показывает только заданные. `has_metadata=false` если для блоба не извлечено ни одного поля |
 
 ## Сервис: `CloudApi` (клиентский, облачная иерархия)
@@ -110,7 +110,7 @@ Package: `barkcloud.files`
 |-----|-----------|
 | `GetFileData(GetFileDataRequest) → GetFileDataResponse` | Информация о загруженном файле |
 | `GetFilesData(GetFilesDataRequest) → GetFilesDataResponse` | Информация о нескольких файлах |
-| `GetUserStorageInfoServer(GetUserStorageInfoServerRequest) → GetUserStorageInfoResponse` | Storage info (админка) |
+| `GetUserStorageInfoServer(GetUserStorageInfoServerRequest) → GetUserStorageInfoResponse` | Storage info (админка) + физический snapshot диска |
 | `UploadAvatarServer(UploadAvatarServerRequest) → UploadAvatarServerResponse` | Загрузка аватарки пользователя (служебно) |
 | `ResolveShare(ResolveShareRequest) → ResolveShareResponse` | Резолв публичного токена (без `UserContext`): `found` + `file_id`/`name`/`download_url`. Внутри создаёт `TempFile` для оригинала (прямой `/download/{fileId}` для `CloudFile` запрещён в `DownloadFileCommandHandler`) и инкрементит `click_count`. Зовётся из Web-роута `/s/{token}` сервисным токеном |
 
@@ -160,5 +160,10 @@ Messages: `ResolveShareRequest { token; }` → `ResolveShareResponse { found; fi
 - `Infrastructure/S3BucketInitializer.cs`
 - `Infrastructure/S3BucketRegistry.cs`
 - `Configurations/BucketS3Options.cs`
+
+`GetUserStorageInfoResponse` дополнительно отдаёт физические показатели mount'а MinIO:
+`total_available_storage` (общий размер диска), `disk_used_storage` (занято на диске без S3-данных),
+`s3_used_storage` (размер данных S3 на диске). Snapshot считает `PhysicalStorageStatsProvider`,
+кеширует результат на 5 минут и обновляет его только при запросе storage-info endpoint'ов.
 
 Сжатие изображений — `Services/ImageCompressor.cs`. Превью видео (кадр на 5 с) — `Services/VideoThumbnailExtractor.cs` (FFMpegCore; бинарь ffmpeg/ffprobe копируется в образ из `mwader/static-ffmpeg`, путь через `Ffmpeg:BinaryFolder`, по умолчанию `/usr/local/bin`). Сохранение превью (дедуп+S3+`FilePreview`) — `Services/PreviewPersistenceService.cs`. Очистка временных — `Services/TempFileCleanupService.cs` (background).

@@ -30,6 +30,10 @@ public class UsersContext : DbContext
             .HasForeignKey<UserPrivacy>(p => p.UserId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        modelBuilder.Entity<User>()
+            .Property(u => u.StorageLimitGb)
+            .HasDefaultValue(0);
+
         // Настройка связей для UserDevice
         modelBuilder.Entity<UserDevice>()
             .HasOne(ud => ud.User)
