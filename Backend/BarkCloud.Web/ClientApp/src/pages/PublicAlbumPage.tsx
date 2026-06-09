@@ -1,6 +1,7 @@
 import React from 'react';
 import { useParams } from 'react-router-dom';
 import { Icon } from '../components/Icon';
+import { useDocumentHead } from '../hooks/useDocumentHead';
 
 interface PubFile {
   fileId: string;
@@ -45,6 +46,14 @@ export function PublicAlbumPage() {
   const [state, setState] = React.useState<'loading' | 'notfound' | 'ok'>('loading');
   const [loadingMore, setLoadingMore] = React.useState(false);
   const [viewer, setViewer] = React.useState<PubFile | null>(null);
+  const firstPreview = items.find((f) => (f.mediaKind === 'photo' || f.mediaKind === 'video') && f.previewUrl)?.previewUrl || null;
+  const headTitle = viewer?.name || album?.name || (state === 'notfound' ? 'Альбом недоступен' : 'Публичный альбом');
+  const headIconUrl = viewer?.previewUrl || firstPreview;
+
+  useDocumentHead(
+    () => ({ title: headTitle, iconUrl: headIconUrl }),
+    [headTitle, headIconUrl],
+  );
 
   const load = React.useCallback(
     async (more: boolean) => {

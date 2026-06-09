@@ -17,6 +17,7 @@ import { useFileDrop } from '../hooks/useFileDrop';
 import { useDuplicatePrompt } from '../hooks/useDuplicatePrompt';
 import { useSelection } from '../hooks/useSelection';
 import { usePageHeader } from '../hooks/usePageHeader';
+import { pickDocumentIcon } from '../hooks/useDocumentHead';
 import { DynamicFoldersStrip } from '../components/dynamic-folders/DynamicFoldersStrip';
 import { DynamicFolderDetail } from '../components/dynamic-folders/DynamicFolderDetail';
 import { DynamicFolderFormModal } from '../components/dynamic-folders/DynamicFolderFormModal';
@@ -242,6 +243,17 @@ export function FilesPage() {
   const fsel = useSelection();
 
   const currentDir = stack.length ? stack[stack.length - 1].id : '';
+  const selectedIconUrl = pickDocumentIcon(sel?.media);
+  const documentTitle = sel
+    ? sel.name
+    : openSmart
+      ? openSmart.name
+      : searchQuery
+        ? `Поиск: ${searchQuery}`
+        : stack.length
+          ? stack[stack.length - 1].name
+          : 'Файлы';
+  const documentIconUrl = sel ? selectedIconUrl : openSmart?.coverUrl || null;
 
   const load = React.useCallback(() => {
     setListing(null);
@@ -504,6 +516,8 @@ export function FilesPage() {
   usePageHeader(
     () => ({
       title: 'Файлы',
+      documentTitle,
+      documentIconUrl,
       kicker: (
         <>
           <span>Библиотека</span>
@@ -523,7 +537,7 @@ export function FilesPage() {
         </>
       ),
     }),
-    [currentDir],
+    [currentDir, documentTitle, documentIconUrl],
   );
 
   const dirs = listing ? listing.dirs : [];

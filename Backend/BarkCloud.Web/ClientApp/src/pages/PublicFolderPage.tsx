@@ -1,6 +1,7 @@
 import React from 'react';
 import { useParams } from 'react-router-dom';
 import { Icon } from '../components/Icon';
+import { useDocumentHead } from '../hooks/useDocumentHead';
 
 interface PubDir {
   id: string;
@@ -50,6 +51,14 @@ export function PublicFolderPage() {
   const [viewer, setViewer] = React.useState<PubFile | null>(null);
 
   const here = stack[stack.length - 1];
+  const folderTitle = data?.currentName || here.name || data?.folderName || 'Публичная папка';
+  const headTitle = viewer?.name || (state === 'notfound' ? 'Папка недоступна' : folderTitle);
+  const headIconUrl = viewer?.previewUrl || null;
+
+  useDocumentHead(
+    () => ({ title: headTitle, iconUrl: headIconUrl }),
+    [headTitle, headIconUrl],
+  );
 
   React.useEffect(() => {
     let alive = true;

@@ -5,6 +5,7 @@ import { Topbar } from './Topbar';
 import { Footbar } from './Footbar';
 import { ShellContext } from '../../hooks/useShell';
 import { PageHeaderContext, type PageHeader } from '../../hooks/usePageHeader';
+import { useDocumentHead } from '../../hooks/useDocumentHead';
 import { apiGet } from '../../lib/api';
 import type { Shell } from '../../lib/types';
 
@@ -22,6 +23,13 @@ export function AppShell() {
   }, []);
 
   const headerCtx = React.useMemo(() => ({ header, setHeader }), [header]);
+  const documentTitle = header.documentTitle ?? (typeof header.title === 'string' ? header.title : '');
+  const documentIconUrl = header.documentIconUrl ?? null;
+
+  useDocumentHead(
+    () => ({ title: documentTitle, iconUrl: documentIconUrl }),
+    [documentTitle, documentIconUrl],
+  );
 
   return (
     <ShellContext.Provider value={shell}>

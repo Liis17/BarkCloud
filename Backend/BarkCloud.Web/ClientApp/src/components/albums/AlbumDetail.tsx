@@ -11,6 +11,7 @@ import { ShareWithUserModal } from '../ui/ShareWithUserModal';
 import { apiGet, apiPost } from '../../lib/api';
 import { createShare, createAlbumShare } from '../../lib/share';
 import { GRID_SIZES } from '../../lib/format';
+import { useDocumentHead } from '../../hooks/useDocumentHead';
 import type { Album, CardFile, Page } from '../../lib/types';
 import type { ToastPush } from '../../hooks/useToast';
 
@@ -32,6 +33,12 @@ export function AlbumDetail({ album, candidates, gridSizes = GRID_SIZES, onBack,
   const [props, setProps] = React.useState<CardFile | null>(null);
   const [shareWith, setShareWith] = React.useState<CardFile | null>(null);
   const { menu, openAt } = useContextMenu();
+
+  useDocumentHead(
+    () => ({ title: album.name, iconUrl: album.coverUrl || null }),
+    [album.name, album.coverUrl],
+    10,
+  );
 
   const load = React.useCallback(() => {
     setItems(null);

@@ -1,6 +1,7 @@
 import React from 'react';
 import { useParams } from 'react-router-dom';
 import { Icon } from '../components/Icon';
+import { useDocumentHead } from '../hooks/useDocumentHead';
 
 interface ShareInfo {
   found: boolean;
@@ -47,6 +48,14 @@ const card: React.CSSProperties = {
 export function PublicViewPage() {
   const { token } = useParams<{ token: string }>();
   const [state, setState] = React.useState<'loading' | 'notfound' | ShareInfo>('loading');
+  const headInfo = typeof state === 'object' ? state : null;
+  const headTitle = headInfo ? headInfo.name : state === 'notfound' ? 'Ссылка недоступна' : 'Публичный файл';
+  const headIconUrl = headInfo?.previewUrl || null;
+
+  useDocumentHead(
+    () => ({ title: headTitle, iconUrl: headIconUrl }),
+    [headTitle, headIconUrl],
+  );
 
   React.useEffect(() => {
     let alive = true;

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Icon } from '../Icon';
 import { apiGet } from '../../lib/api';
+import { pickDocumentIcon, useDocumentHead } from '../../hooks/useDocumentHead';
 import type { CardFile } from '../../lib/types';
 
 interface DownloadResponse {
@@ -30,6 +31,12 @@ export function Lightbox({ items, index = 0, media, onClose }: LightboxProps) {
   const cur = list[i] || null;
   const fileId = cur && cur.id;
   const isVideo = !!cur && cur.kind === 'video';
+
+  useDocumentHead(
+    () => ({ title: cur?.name || null, iconUrl: pickDocumentIcon(cur) }),
+    [cur?.id, cur?.name, cur?.jpegViewUrl, cur?.previews],
+    20,
+  );
 
   React.useEffect(() => {
     let alive = true;
