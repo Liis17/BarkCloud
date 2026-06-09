@@ -14,7 +14,7 @@ import { SelectionBar } from '../components/ui/SelectionBar';
 import { useToast } from '../hooks/useToast';
 import { useAlbumMembership } from '../hooks/useAlbumMembership';
 import { useFileDrop } from '../hooks/useFileDrop';
-import { useDuplicatePrompt } from '../hooks/useDuplicatePrompt';
+import { useDuplicatePrompt, type DuplicateDecision } from '../hooks/useDuplicatePrompt';
 import { useSelection } from '../hooks/useSelection';
 import { usePageHeader } from '../hooks/usePageHeader';
 import { pickDocumentIcon } from '../hooks/useDocumentHead';
@@ -442,13 +442,18 @@ export function FilesPage() {
     if (!files.length) return;
     let processed = 0;
     let uploaded = 0;
+    let duplicateBatchDecision: DuplicateDecision | null = null;
     for (const f of files) {
       setUpload({ current: processed + 1, total: files.length, pct: 0 });
       try {
         const d = await checkDuplicate(f);
-        if (d.exists && !(await dup.ask(f.name, d.locations))) {
-          processed++;
-          continue;
+        if (d.exists) {
+          const decision: DuplicateDecision = duplicateBatchDecision ?? (await dup.ask(f.name, d.locations));
+          if (decision === 'skip-all' || decision === 'upload-all') duplicateBatchDecision = decision;
+          if (decision === 'skip' || decision === 'skip-all') {
+            processed++;
+            continue;
+          }
         }
         const res = await uploadFile(f, (p) => setUpload({ current: processed + 1, total: files.length, pct: Math.round(p * 100) }));
         // Загрузка в открытую папку — кладём именно в неё (без авто-распределения по типу).
