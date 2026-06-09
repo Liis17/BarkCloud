@@ -159,6 +159,8 @@ export function VideosPage() {
   usePageHeader(
     () => ({
       title: 'Видео',
+      documentTitle: openAlbum ? openAlbum.name : tab === 'albums' ? 'Альбомы' : 'Видео',
+      documentIconUrl: openAlbum?.coverUrl || null,
       kicker: (
         <>
           <span>Библиотека</span>
@@ -179,7 +181,7 @@ export function VideosPage() {
         </>
       ),
     }),
-    [tab],
+    [tab, openAlbum?.name, openAlbum?.coverUrl],
   );
 
   return (

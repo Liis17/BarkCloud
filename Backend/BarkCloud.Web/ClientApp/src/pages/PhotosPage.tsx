@@ -122,6 +122,8 @@ export function PhotosPage() {
   usePageHeader(
     () => ({
       title: 'Фотогалерея',
+      documentTitle: openAlbum ? openAlbum.name : tab === 'albums' ? 'Альбомы' : 'Фото',
+      documentIconUrl: openAlbum?.coverUrl || null,
       kicker: (
         <>
           <span>Библиотека</span>
@@ -142,7 +144,7 @@ export function PhotosPage() {
         </>
       ),
     }),
-    [tab],
+    [tab, openAlbum?.name, openAlbum?.coverUrl],
   );
 
   return (

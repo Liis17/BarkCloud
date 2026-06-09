@@ -7,6 +7,7 @@ import { DynamicFolderFormModal } from './DynamicFolderFormModal';
 import { useMediaActions } from '../../hooks/useMediaActions';
 import { apiGet, apiPost } from '../../lib/api';
 import { GRID_SIZES, kindRu, fmtFull } from '../../lib/format';
+import { useDocumentHead } from '../../hooks/useDocumentHead';
 import type { Album, DynamicFolder, MediaItem, Page } from '../../lib/types';
 import type { ToastPush } from '../../hooks/useToast';
 
@@ -24,6 +25,12 @@ export function DynamicFolderDetail({ folder, onBack, onChanged, toast, albums, 
   const [items, setItems] = React.useState<MediaItem[] | null>(null);
   const [lightbox, setLightbox] = React.useState<number | null>(null);
   const [editing, setEditing] = React.useState(false);
+
+  useDocumentHead(
+    () => ({ title: folder.name, iconUrl: folder.coverUrl || null }),
+    [folder.name, folder.coverUrl],
+    10,
+  );
 
   const load = React.useCallback(() => {
     setItems(null);

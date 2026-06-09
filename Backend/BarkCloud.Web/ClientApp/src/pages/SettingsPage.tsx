@@ -1150,9 +1150,13 @@ export function SettingsPage() {
     window.location.hash = key;
   };
 
+  const active = navKeys.includes(section) ? section : 'account';
+  const activeLabel = nav.find((n) => n.key === active)?.label || 'Аккаунт';
+
   usePageHeader(
     () => ({
       title: 'Настройки',
+      documentTitle: `Настройки: ${activeLabel}`,
       kicker: (
         <>
           <span>Прочее</span>
@@ -1162,13 +1166,12 @@ export function SettingsPage() {
       ),
       search: false,
     }),
-    [],
+    [activeLabel],
   );
 
   if (err) return <div style={{ color: 'var(--md-error)', padding: 24 }}>{err}</div>;
   if (!data) return <Loading label="Загрузка настроек…" />;
 
-  const active = navKeys.includes(section) ? section : 'account';
   let content: React.ReactNode;
   switch (active) {
     case 'security':

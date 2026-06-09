@@ -382,9 +382,12 @@ export function SharedPage() {
     }
   }
 
+  const tabTitle = tab === 'ishared' ? 'Я поделился' : tab === 'mine' ? 'Мне доступны' : 'Мои публичные';
+
   usePageHeader(
     () => ({
       title: 'Общий доступ',
+      documentTitle: `Общий доступ: ${tabTitle}`,
       kicker: (
         <>
           <span>Совместное</span>
@@ -393,7 +396,7 @@ export function SharedPage() {
         </>
       ),
     }),
-    [],
+    [tabTitle],
   );
 
   return (
