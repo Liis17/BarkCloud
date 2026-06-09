@@ -52,6 +52,9 @@ services:
     restart: always
     environment:
       <<: *common-variables
+      StorageProbe__Path: "/mnt/minio-data"
+    volumes:
+      - ${MINIO_DATA_PATH:-minio_data}:/mnt/minio-data:ro
     networks:
       - barkcloud-network
     depends_on:
@@ -121,7 +124,7 @@ services:
       MINIO_ROOT_USER: "${MINIO_ROOT_USER}"
       MINIO_ROOT_PASSWORD: "${MINIO_ROOT_PASSWORD}"
     volumes:
-      - minio_data:/data
+      - ${MINIO_DATA_PATH:-minio_data}:/data
     command: server /data --console-address ":${MINIO_WEBPORT}"
     networks:
       - barkcloud-network

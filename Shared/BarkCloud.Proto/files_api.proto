@@ -533,6 +533,9 @@ message GetUserStorageInfoResponse {
   int64 total_used_storage = 1; // Общее занятое пространство в байтах
   int64 storage_limit = 2; // Лимит хранилища в байтах
   repeated StorageByType storage_by_types = 3; // Использованное пространство по типам файлов
+  int64 total_available_storage = 4; // Общий доступный размер диска/хранилища в байтах
+  int64 disk_used_storage = 5; // Занято на диске без учета S3-данных в байтах
+  int64 s3_used_storage = 6; // Занято S3-данными в байтах
 }
 
 // ============ AlbumApi messages ============

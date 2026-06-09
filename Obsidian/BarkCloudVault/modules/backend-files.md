@@ -61,6 +61,7 @@ Parent: [[index]] · See also: [[api/files-api]] · [[modules/backend-files-clou
 - `S3BucketInitializer.cs` — создание/проверка бакетов MinIO при старте
 - `S3BucketRegistry.cs` — реестр бакетов
 - `S3Uploader.cs` — обёртка над S3/MinIO: `UploadAsync`, `DownloadAsync`, `DeleteAsync` (удаление объекта, идемпотентно — используется зачисткой корзины)
+- `PhysicalStorageStatsProvider.cs` — ленивый snapshot диска MinIO: общий размер, занято не-S3, занято S3; кеш 5 минут, обновляется только при запросах storage-info
 
 ### Configurations
 - `BucketS3Options.cs` — настройки S3-бакета
@@ -116,7 +117,7 @@ Parent: [[index]] · See also: [[api/files-api]] · [[modules/backend-files-clou
 | `CheckFileHashes` | Пакетная проверка наличия по списку SHA256-хешей (без побочных эффектов; для пассивной индикации «в облаке») |
 | `GetFileData` / `GetFilesData` | Метаданные файла(ов) |
 | `GetFileMetadata` | EXIF/ffprobe/PDF/Office метаданные блоба (для диалога «Свойства»). Только собственные файлы (по `Uploaders`). Возвращает `HasMetadata=false`, если ничего не извлекалось |
-| `GetUserStorageInfo` / `GetUserStorageInfoServer` | Информация о квоте |
+| `GetUserStorageInfo` / `GetUserStorageInfoServer` | Информация о квоте + физический snapshot диска MinIO |
 | `UploadAvatarServer` | Загрузка аватара пользователя (служебный) |
 
 ### Облачная иерархия + галерея (вложенно в `Features/Cloud/`)

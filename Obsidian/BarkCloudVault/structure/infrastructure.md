@@ -58,7 +58,7 @@ Parent: [[index]] · See also: [[structure/overview]] · [[structure/entrypoints
 
 - `pgdata` — данные PostgreSQL
 - `rabbitmq_data` — данные RabbitMQ
-- `minio_data` — данные MinIO
+- `minio_data` — данные MinIO по умолчанию. В `docker-compose*.yml` источник можно заменить через `MINIO_DATA_PATH` (например `/d/barkcloud/minio`); тот же источник монтируется в `cloud-files` read-only как `/mnt/minio-data` для расчёта физического объёма диска.
 - `backup_volume` — бэкапы (монтируется в Postgres-контейнер на `/backup`)
 - `seq_data` — данные Seq
 

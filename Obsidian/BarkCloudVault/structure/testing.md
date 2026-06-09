@@ -60,9 +60,9 @@ Tests/
 | Проект | Тестов | Покрытые компоненты |
 |--------|-------:|---------------------|
 | `BarkCloud.Identity.Tests` | 119 | 20/20 хендлеров (client + 6 `*Server` admin-вариантов), `Services/` (`JwtService`, `PasswordHasher`, `CodeGenerator`, `RefreshTokenGenerator`), консьюмеры |
-| `BarkCloud.Users.Tests` | 69 | Все хендлеры (Devices×7, Privacy×2, Search/ListByIds/Contacts, ProfilePicture×2, ProfileServer, StorageLimit и пр.) + `SessionRevokedConsumer` |
+| `BarkCloud.Users.Tests` | 70 | Все хендлеры (Devices×7, Privacy×2, Search/ListByIds/Contacts, ProfilePicture×2, ProfileServer, StorageLimit и пр.) + `SessionRevokedConsumer` |
 | `BarkCloud.Web.Tests` | 49 | Rendering (`Format`, `FileKind`, `CloudJson`), `AuthGateway` (маппинг x-error-code → `LoginOutcome`) |
-| `BarkCloud.Files.Tests` | 164 | 43/44 хендлеров (Album×7, Cloud×26 — директории/корзина/шеринг/избранное/медиа, `GetFileData`/`GetFilesData`, `UploadFile` и др.), сервисы `ImageCompressor`/`AlbumViewBuilder`, `SessionRevokedConsumer`. Пропущены: `UploadAvatarServer` (линейный S3/image-IO, `ImageCompressor` не `virtual`), `UserDeletedConsumer` (прямые `ExecuteDeleteAsync` по `FilesContext`), `VideoThumbnailExtractor`/`PreviewPersistenceService`/`*CleanupService` (IO/таймеры) |
+| `BarkCloud.Files.Tests` | 167 | 43/44 хендлеров (Album×7, Cloud×26 — директории/корзина/шеринг/избранное/медиа, `GetFileData`/`GetFilesData`, `UploadFile` и др.), сервисы `ImageCompressor`/`AlbumViewBuilder`/`PhysicalStorageStatsProvider`, `SessionRevokedConsumer`. Пропущены: `UploadAvatarServer` (линейный S3/image-IO, `ImageCompressor` не `virtual`), `UserDeletedConsumer` (прямые `ExecuteDeleteAsync` по `FilesContext`), `VideoThumbnailExtractor`/`PreviewPersistenceService`/`*CleanupService` (IO/таймеры) |
 | `BarkCloud.Shared.SecurityUtilities.Tests` | 23 | `SecurityUtilities.EvaluatePasswordStrength`, `GetPasswordStrengthMessage` |
 | `BarkCloud.GrpcServer.Tests` | 17 | `TokenRevocationCache`, `MetricsCollector`, `ServerExceptionInterceptor` |
 | `BarkCloud.Notification.Tests` | 9 | `EmailMasker`, `HtmlEmailTemplateParser`, `EmailQueueConsumer` |
