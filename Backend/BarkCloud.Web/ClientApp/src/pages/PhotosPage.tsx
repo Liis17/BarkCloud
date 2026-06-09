@@ -10,7 +10,7 @@ import { MemoriesStrip } from '../components/memories/MemoriesStrip';
 import { useToast } from '../hooks/useToast';
 import { useInfiniteMedia } from '../hooks/useInfiniteMedia';
 import { useMediaActions } from '../hooks/useMediaActions';
-import { useDuplicatePrompt } from '../hooks/useDuplicatePrompt';
+import { useDuplicatePrompt, type DuplicateDecision } from '../hooks/useDuplicatePrompt';
 import { useFileDrop } from '../hooks/useFileDrop';
 import { useBulkMedia } from '../hooks/useBulkMedia';
 import { usePageHeader } from '../hooks/usePageHeader';
@@ -86,13 +86,18 @@ export function PhotosPage() {
     if (!files.length) return;
     let processed = 0;
     let uploaded = 0;
+    let duplicateBatchDecision: DuplicateDecision | null = null;
     for (const f of files) {
       setUpload({ current: processed + 1, total: files.length, pct: 0 });
       try {
         const d = await checkDuplicate(f);
-        if (d.exists && !(await dup.ask(f.name, d.locations))) {
-          processed++;
-          continue;
+        if (d.exists) {
+          const decision: DuplicateDecision = duplicateBatchDecision ?? (await dup.ask(f.name, d.locations));
+          if (decision === 'skip-all' || decision === 'upload-all') duplicateBatchDecision = decision;
+          if (decision === 'skip' || decision === 'skip-all') {
+            processed++;
+            continue;
+          }
         }
         const res = await uploadFile(f, (p) => setUpload({ current: processed + 1, total: files.length, pct: Math.round(p * 100) }));
         if (res?.fileId) {
