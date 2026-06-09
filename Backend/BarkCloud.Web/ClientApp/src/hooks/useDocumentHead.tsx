@@ -2,8 +2,11 @@ import React from 'react';
 import type { CardFile } from '../lib/types';
 
 const APP_NAME = 'BarkCloud';
-const DEFAULT_ICON_URL = '/favicon.svg';
+const DEFAULT_ICON_URL = '/barkcloud-icon-brand-b.png';
 const DYNAMIC_ICON_ATTR = 'data-barkcloud-dynamic-icon';
+const ICON_SIZE = 64;
+const ICON_RADIUS = 14;
+const roundedIconCache = new Map<string, string>();
 
 export interface DocumentHeadDescriptor {
   title?: string | null;
@@ -53,21 +56,82 @@ function ensureIconLink(): HTMLLinkElement {
   return link;
 }
 
-function applyDocumentHead(head: DocumentHeadDescriptor | null): void {
+function setIconLink(href: string, type = 'image/png'): void {
+  const link = ensureIconLink();
+  link.href = href;
+  link.type = type;
+  link.removeAttribute('sizes');
+}
+
+function roundedRect(ctx: CanvasRenderingContext2D, size: number, radius: number): void {
+  const r = Math.min(radius, size / 2);
+  ctx.beginPath();
+  ctx.moveTo(r, 0);
+  ctx.lineTo(size - r, 0);
+  ctx.quadraticCurveTo(size, 0, size, r);
+  ctx.lineTo(size, size - r);
+  ctx.quadraticCurveTo(size, size, size - r, size);
+  ctx.lineTo(r, size);
+  ctx.quadraticCurveTo(0, size, 0, size - r);
+  ctx.lineTo(0, r);
+  ctx.quadraticCurveTo(0, 0, r, 0);
+  ctx.closePath();
+}
+
+function loadIconImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    try {
+      if (new URL(src, window.location.href).origin !== window.location.origin) {
+        img.crossOrigin = 'anonymous';
+      }
+    } catch {
+      // Некорректный URL дальше отработает через onerror.
+    }
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error('icon load failed'));
+    img.src = src;
+  });
+}
+
+async function makeRoundedIcon(src: string): Promise<string> {
+  const cached = roundedIconCache.get(src);
+  if (cached) return cached;
+
+  const img = await loadIconImage(src);
+  const canvas = document.createElement('canvas');
+  canvas.width = ICON_SIZE;
+  canvas.height = ICON_SIZE;
+
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return src;
+
+  const scale = Math.max(ICON_SIZE / img.naturalWidth, ICON_SIZE / img.naturalHeight);
+  const width = img.naturalWidth * scale;
+  const height = img.naturalHeight * scale;
+  const x = (ICON_SIZE - width) / 2;
+  const y = (ICON_SIZE - height) / 2;
+
+  ctx.clearRect(0, 0, ICON_SIZE, ICON_SIZE);
+  roundedRect(ctx, ICON_SIZE, ICON_RADIUS);
+  ctx.clip();
+  ctx.drawImage(img, x, y, width, height);
+
+  const dataUrl = canvas.toDataURL('image/png');
+  roundedIconCache.set(src, dataUrl);
+  return dataUrl;
+}
+
+async function applyDocumentHead(head: DocumentHeadDescriptor | null, cancelled: () => boolean): Promise<void> {
   document.title = formatTitle(head?.title);
 
-  const iconUrl = (head?.iconUrl || '').trim();
-  const link = ensureIconLink();
-  if (iconUrl) {
-    link.href = iconUrl;
-    link.type = 'image/jpeg';
-    link.removeAttribute('sizes');
-    return;
+  const iconUrl = (head?.iconUrl || DEFAULT_ICON_URL).trim();
+  try {
+    const rounded = await makeRoundedIcon(iconUrl);
+    if (!cancelled()) setIconLink(rounded);
+  } catch {
+    if (!cancelled()) setIconLink(iconUrl, iconUrl === DEFAULT_ICON_URL ? 'image/png' : 'image/jpeg');
   }
-
-  link.href = DEFAULT_ICON_URL;
-  link.type = 'image/svg+xml';
-  link.setAttribute('sizes', 'any');
 }
 
 export function pickDocumentIcon(media: Pick<CardFile, 'previews' | 'jpegViewUrl'> | null | undefined): string | null {
@@ -106,7 +170,11 @@ export function DocumentHeadProvider({ children }: { children: React.ReactNode }
   const head = React.useMemo(() => activeEntry(entries), [entries]);
 
   React.useEffect(() => {
-    applyDocumentHead(head);
+    let cancelled = false;
+    applyDocumentHead(head, () => cancelled);
+    return () => {
+      cancelled = true;
+    };
   }, [head]);
 
   const value = React.useMemo(() => ({ setHead, clearHead }), [setHead, clearHead]);
