@@ -12,6 +12,8 @@ public static class SystemDynamicFolders
     public const string KeyRecentDocs = "sys-recent-docs";
     public const string KeyLarge = "sys-large";
     public const string KeyScreenshots = "sys-screenshots";
+    public const string KeyDuplicateMedia = "sys-duplicate-media";
+    public const string KeyDuplicateFiles = "sys-duplicate-files";
 
     /// <summary>«Недавно загруженные» — за последние N дней.</summary>
     public const int RecentDays = 3;
@@ -50,6 +52,10 @@ public static class SystemDynamicFolders
 
             Build(KeyScreenshots, "Скриншоты", "camera", "#7E57C2", 3, DfViewMode.Grid,
                 new DynamicFolderRule { Field = DfField.Name, Operator = DfOperator.Contains, Value = ScreenshotToken }),
+
+            Build(KeyDuplicateMedia, "Дубликаты фото и видео", "photo", "#2F8F83", 4, DfViewMode.Grid),
+
+            Build(KeyDuplicateFiles, "Дубликаты файлов", "doc", "#8A6BBE", 5, DfViewMode.List),
         };
     }
 
@@ -63,6 +69,10 @@ public static class SystemDynamicFolders
     }
 
     public static bool IsSystemKey(string? id) => id is not null && id.StartsWith("sys-", StringComparison.Ordinal);
+
+    public static bool IsDuplicateKey(string? id) => id is KeyDuplicateMedia or KeyDuplicateFiles;
+
+    public static bool IsDuplicateMediaKey(string? id) => id == KeyDuplicateMedia;
 
     private static DynamicFolder Build(string key, string name, string icon, string color, int order, DfViewMode viewMode, params DynamicFolderRule[] rules)
     {

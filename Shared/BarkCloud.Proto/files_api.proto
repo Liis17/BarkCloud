@@ -37,7 +37,7 @@ service CloudApi {
 
   rpc ListUserImages       (ListUserImagesRequest)       returns (ListUserImagesResponse);   // [DEPRECATED] Все изображения пользователя; используйте ListUserMedia(PHOTO)
   rpc ListUserMedia        (ListUserMediaRequest)        returns (ListUserMediaResponse);     // Медиа пользователя по типу (фото / видео) от новых к старым (cursor pagination)
-  rpc DeleteUserMedia      (DeleteUserMediaRequest)      returns (CloudEmpty);                // Удалить медиа из галереи по file_id: живые записи каталога → в корзину; если записей нет — снять владельца (жёстко)
+  rpc DeleteUserMedia      (DeleteUserMediaRequest)      returns (CloudEmpty);                // Удалить медиа из галереи по file_id: живые записи каталога → в корзину; если записей нет — создать запись корзины
 
   rpc GetPath              (GetPathRequest)              returns (PathResponse);             // Построить путь до объекта в иерархии
 
@@ -411,6 +411,7 @@ message UserImageItem {
   int32 entries_count = 2;          // сколько копий записи у владельца
   repeated string entry_names = 3;  // имена в папках, до 5 шт.
   repeated string entry_ids = 4;    // id записей каталога владельца (для rename/delete из галереи)
+  string duplicate_group_key = 5;   // SHA256-группа для системных папок дубликатов; пусто для обычных листингов
 }
 
 message ListUserImagesResponse {

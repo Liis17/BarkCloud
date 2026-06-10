@@ -26,6 +26,7 @@ public static class CloudJson
         card["entriesCount"] = i.EntriesCount;
         card["entryNames"] = i.EntryNames.ToArray();
         card["entryIds"] = i.EntryIds.ToArray();
+        card["duplicateGroupKey"] = i.DuplicateGroupKey;
         return card;
     }
 

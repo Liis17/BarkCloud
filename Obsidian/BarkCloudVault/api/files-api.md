@@ -6,7 +6,7 @@ Parent: [[index]] · Module: [[modules/backend-files]] · Cloud: [[modules/backe
 Namespace C#: `BarkCloud.Proto.Files`
 Package: `barkcloud.files`
 
-В proto-файле определены **четыре сервиса**: `FilesApi` (клиент), `CloudApi` (клиент, облачная иерархия + галерея), `FilesServerApi` (служебный), `AlbumApi` (клиент, альбомы фото/видео).
+В proto-файле определены сервисы: `FilesApi` (клиент), `CloudApi` (клиент, облачная иерархия + галерея), `DynamicFolderApi` (клиент, умные папки), `FilesServerApi` (служебный), `AlbumApi` (клиент, альбомы фото/видео).
 
 ## Сервис: `FilesApi` (клиентский)
 
@@ -35,9 +35,10 @@ Package: `barkcloud.files`
 | `AttachFile(AttachFileRequest) → CloudEmpty` | Привязать загруженный `UploadFile` к папке (создаёт `CloudFileEntry`); коллизия имени → суффикс ` (1)`. `route_by_media_kind=true` → `directory_id` игнорируется, файл кладётся по типу в системную папку Фото/Видео/Другие документы |
 | `RenameFileEntry(RenameFileEntryRequest) → CloudEmpty` | Переименовать запись (не меняет `UploadFile.Filename`) |
 | `MoveFileEntry(MoveFileEntryRequest) → CloudEmpty` | Переместить запись (`new_directory_id` пуст = корень) |
-| `DeleteFileEntry(DeleteFileEntryRequest) → CloudEmpty` | Удалить запись (`UploadFile` не трогается, декремент `Uploaders` если это была последняя копия владельца) |
+| `DeleteFileEntry(DeleteFileEntryRequest) → CloudEmpty` | Удалить запись в корзину (`UploadFile`/`Uploaders` не трогает; blob удаляется только при очистке корзины) |
 | `ListUserImages(ListUserImagesRequest) → ListUserImagesResponse` | **[DEPRECATED]** Все изображения пользователя; используйте `ListUserMedia(PHOTO)`. Исключает превью-блобы |
 | `ListUserMedia(ListUserMediaRequest) → ListUserMediaResponse` | Медиа пользователя по типу (`kind` = PHOTO/VIDEO) от новых к старым; cursor-пагинация (`cursor_created_at` + `cursor_file_id`); фильтр по `MediaKind`, исключает превью-блобы |
+| `DeleteUserMedia(DeleteUserMediaRequest) → CloudEmpty` | Удалить медиа из галереи по `file_id`: живые записи каталога перемещает в корзину; если записей нет — создаёт запись корзины в системной папке по типу медиа |
 | `SetVideoThumbnail(SetVideoThumbnailRequest) → CloudEmpty` | Заменить превью видео загруженной картинкой (`video_file_id`, `source_image_file_id`); пересоздаёт `FilePreview` из источника |
 | `GetMemories(GetMemoriesRequest) → GetMemoriesResponse` | «Воспоминания — В этот день»: фото/видео за указанный (или сегодняшний UTC) месяц+день прошлых лет по `FileMetadata.TakenAt`, группы-годы (`MemoryGroup { year; years_ago; total_count; items }`) от свежего к старому; ≤`per_year_limit` превью на год |
 | `ListMediaLocations(ListMediaLocationsRequest) → ListMediaLocationsResponse` | Точки для карты: медиа с GPS (`MediaLocationPoint { file_id; latitude; longitude; media_kind; preview_url; taken_at?; created_at }`), cursor-пагинация (`cursor_created_at`+`cursor_file_id`); клиент кластеризует |
@@ -54,7 +55,7 @@ Package: `barkcloud.files`
 | `ListMyShares(ListMySharesRequest) → ListMySharesResponse` | Публичные ссылки владельца от новых к старым; cursor `(cursor_created_at + cursor_share_id)` |
 | `RevokeShare(RevokeShareRequest) → CloudEmpty` | Отозвать ссылку (идемпотентно, scoped по владельцу) |
 
-> **Корзина**: `DeleteFileEntry`/`DeleteDirectory` теперь не удаляют сразу, а помечают записи как удалённые (`IsDeleted`, `DeletedAt`, `PurgeAt = DeletedAt + 14 дней`). Файлы в корзине скрыты из иерархии, галереи и альбомов, но сохраняют квоту. Окончательная зачистка — по `DeleteFromTrash`/`EmptyTrash` или фоновым `TrashCleanupService` (раз в 6 ч). Подробнее — [[modules/backend-files-cloud]].
+> **Корзина**: `DeleteFileEntry`/`DeleteDirectory`/`DeleteUserMedia` не удаляют blob сразу, а помечают или создают записи как удалённые (`IsDeleted`, `DeletedAt`, `PurgeAt = DeletedAt + 14 дней`). Файлы в корзине скрыты из иерархии, галереи и альбомов, но сохраняют квоту. Окончательная зачистка — по `DeleteFromTrash`/`EmptyTrash` или фоновым `TrashCleanupService` (раз в 6 ч). Подробнее — [[modules/backend-files-cloud]].
 
 > **Избранное**: отметка на уровне пользователя в таблице `FavoriteFile` (`OwnerId`+`FileId`, уникальна) — привязка к блобу, а не к записи иерархии, поэтому покрывает и фото/видео из галереи (без `CloudFileEntry`), и файлы/документы из папок. `ListFavorites` отдаёт карточки по `UploadFile` (как галерея). Чистится при удалении из корзины навсегда и при удалении аккаунта.
 
@@ -80,7 +81,7 @@ Package: `barkcloud.files`
 - `DirectoryListingDetailed { repeated DirectoryInfo subdirs; repeated FileEntryDetailed files; }`
 - `ListUserImagesRequest { limit; cursor_created_at; cursor_file_id; }` — `limit` clamp 1..200, default 50; курсор exclusive
 - `ListUserMediaRequest { MediaKind kind; limit; cursor_created_at; cursor_file_id; }` — `kind` = PHOTO/VIDEO
-- `UserImageItem { UploadFileInfo file; entries_count; repeated entry_names; repeated entry_ids; }` — карточка по `UploadFile`; `entries_count` — сколько **живых** записей у владельца, `entry_names` — до 5 имён, `entry_ids` — id живых записей (для rename/delete элемента галереи без листинга каталога)
+- `UserImageItem { UploadFileInfo file; entries_count; repeated entry_names; repeated entry_ids; duplicate_group_key; }` — карточка по `UploadFile`; `entries_count` — сколько **живых** записей у владельца, `entry_names` — до 5 имён, `entry_ids` — id живых записей (для rename/перехода к элементу галереи без листинга каталога; удаление галереи идёт через `DeleteUserMedia(file_id)`), `duplicate_group_key` — SHA-256 группы для системных папок дубликатов
 - `ListUserImagesResponse` / `ListUserMediaResponse { items; next_cursor_created_at; next_cursor_file_id; }` — `next_cursor_*` пуст = страниц больше нет
 - `SetVideoThumbnailRequest { video_file_id; source_image_file_id; }`
 - `AddFavoriteRequest` / `RemoveFavoriteRequest { file_id; }`
@@ -90,7 +91,7 @@ Package: `barkcloud.files`
 - `CreateShareRequest { file_id; name; }`
 - `ListMySharesRequest { limit; cursor_created_at; cursor_share_id; }` → `ListMySharesResponse { repeated ShareInfo shares; next_cursor_created_at; next_cursor_share_id; }`
 - `RevokeShareRequest { share_id; }`
-- Запросы: `Create/Rename/Move/Delete/ListDirectoryRequest`, `Attach/Rename/Move/DeleteFileEntryRequest`, `GetPathRequest`, `ListUserImagesRequest`, `ListUserMediaRequest`
+- Запросы: `Create/Rename/Move/Delete/ListDirectoryRequest`, `Attach/Rename/Move/DeleteFileEntryRequest`, `DeleteUserMediaRequest`, `GetPathRequest`, `ListUserImagesRequest`, `ListUserMediaRequest`
 - `ListDirectoryRequest.directory_id` — `optional string`, пустая/неуказанная = корень
 - `PathResponse` — путь до объекта
 
@@ -101,6 +102,18 @@ Package: `barkcloud.files`
 ### MediaKind (proto enum)
 
 `MEDIA_KIND_OTHER=0`, `MEDIA_KIND_PHOTO=1`, `MEDIA_KIND_VIDEO=2`, `MEDIA_KIND_DOCUMENT=3`, `MEDIA_KIND_AUDIO=4`. Заполняется при загрузке по content-type, доступно в `UploadFileInfo.media_kind`. Для видео сервер генерирует превью (кадр на 5-й секунде через FFmpeg) тем же пайплайном, что и для изображений (128/512/1024).
+
+## Сервис: `DynamicFolderApi` (клиентский, умные папки)
+
+Хост — `DynamicFolderApiService` с пользовательской авторизацией. Системные папки виртуальные и приходят первыми в `ListDynamicFolders`. `sys-duplicate-media` и `sys-duplicate-files` вычисляются отдельно от JSON-критериев: сервер группирует живые файлы владельца по `FileHashes.Hash`, берёт только группы с количеством больше одного и отдаёт `UserImageItem.duplicate_group_key`. `sys-duplicate-media` включает только фото/видео, `sys-duplicate-files` — документы/аудио/прочие файлы.
+
+| RPC | Назначение |
+|-----|-----------|
+| `CreateDynamicFolder(CreateDynamicFolderRequest) → DynamicFolderInfo` | Создать пользовательскую умную папку |
+| `UpdateDynamicFolder(UpdateDynamicFolderRequest) → DynamicFolderInfo` | Обновить пользовательскую умную папку |
+| `DeleteDynamicFolder(DeleteDynamicFolderRequest) → CloudEmpty` | Удалить пользовательскую умную папку |
+| `ListDynamicFolders(ListDynamicFoldersRequest) → ListDynamicFoldersResponse` | Системные + пользовательские папки с count/cover |
+| `ListDynamicFolderItems(ListDynamicFolderItemsRequest) → ListDynamicFolderItemsResponse` | Содержимое папки, cursor `(cursor_created_at + cursor_file_id)`, опциональный `kind_filter` |
 
 ## Сервис: `FilesServerApi` (служебный)
 
