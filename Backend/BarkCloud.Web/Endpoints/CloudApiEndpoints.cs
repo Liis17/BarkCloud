@@ -253,6 +253,13 @@ public static class CloudApiEndpoints
                 }, Json);
             }));
 
+        api.MapPost("/cloud/media/delete", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud, FileIdReq body) =>
+            await Guarded(http, auth, async token =>
+            {
+                await cloud.DeleteUserMediaAsync(new DeleteUserMediaRequest { FileId = body.FileId }, token);
+                return Results.Json(new { ok = true }, Json);
+            }));
+
         // «Воспоминания — В этот день»: фото/видео за сегодняшнюю дату прошлых лет, по группам-годам.
         api.MapGet("/cloud/memories", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud,
             int? month, int? day, int? perYear) =>

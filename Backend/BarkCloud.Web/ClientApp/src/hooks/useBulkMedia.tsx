@@ -34,9 +34,8 @@ export function useBulkMedia({ items, albums, toast, onRemoved, onReloadAlbums }
     const list = chosen();
     let ok = 0;
     for (const m of list) {
-      const ids = m.entryIds || [];
       try {
-        for (const eid of ids) await apiPost('/api/cloud/entry/delete', { entryId: eid });
+        await apiPost('/api/cloud/media/delete', { fileId: m.id });
         onRemoved(m.id);
         ok++;
       } catch (e) {
