@@ -3,8 +3,11 @@ import { Icon } from '../Icon';
 import { MediaThumb } from '../media/MediaThumb';
 import { Lightbox } from '../media/Lightbox';
 import { Loading, EmptyState } from '../ui/EmptyState';
+import { SelectionBar } from '../ui/SelectionBar';
+import { ConfirmModal } from '../ui/ConfirmModal';
 import { DynamicFolderFormModal } from './DynamicFolderFormModal';
 import { useMediaActions } from '../../hooks/useMediaActions';
+import { useSelection } from '../../hooks/useSelection';
 import { apiGet, apiPost } from '../../lib/api';
 import { GRID_SIZES, kindRu, fmtFull, plural } from '../../lib/format';
 import { useDocumentHead } from '../../hooks/useDocumentHead';
@@ -25,6 +28,8 @@ export function DynamicFolderDetail({ folder, onBack, onChanged, toast, albums, 
   const [items, setItems] = React.useState<MediaItem[] | null>(null);
   const [lightbox, setLightbox] = React.useState<number | null>(null);
   const [editing, setEditing] = React.useState(false);
+  const [bulkConfirm, setBulkConfirm] = React.useState(false);
+  const fsel = useSelection();
   const isDuplicateFolder = folder.id === 'sys-duplicate-media' || folder.id === 'sys-duplicate-files';
 
   useDocumentHead(
@@ -35,6 +40,7 @@ export function DynamicFolderDetail({ folder, onBack, onChanged, toast, albums, 
 
   const load = React.useCallback(() => {
     setItems(null);
+    fsel.clear();
     loadFolderItems(folder.id, isDuplicateFolder)
       .then((loaded) => setItems(loaded))
       .catch((e) => {
@@ -42,7 +48,7 @@ export function DynamicFolderDetail({ folder, onBack, onChanged, toast, albums, 
         setItems([]);
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [folder.id, isDuplicateFolder]);
+  }, [folder.id, isDuplicateFolder, fsel.clear]);
   React.useEffect(load, [load]);
 
   const actions = useMediaActions({
@@ -62,6 +68,10 @@ export function DynamicFolderDetail({ folder, onBack, onChanged, toast, albums, 
   // Lightbox умеет только фото/видео; документы/аудио открываем скачиванием.
   const media = React.useMemo(() => (items || []).filter((m) => m.kind === 'photo' || m.kind === 'video'), [items]);
   const duplicateGroups = React.useMemo(() => groupDuplicates(items || []), [items]);
+  const orderedIds = React.useMemo(
+    () => (isDuplicateFolder ? duplicateGroups.flatMap((g) => g.items) : items || []).map((m) => m.id),
+    [duplicateGroups, isDuplicateFolder, items],
+  );
 
   async function download(id: string) {
     try {
@@ -76,6 +86,41 @@ export function DynamicFolderDetail({ folder, onBack, onChanged, toast, albums, 
     if (m.kind === 'photo' || m.kind === 'video') setLightbox(media.findIndex((x) => x.id === m.id));
     else download(m.id);
   }
+  function toggleItem(m: MediaItem, shift: boolean) {
+    fsel.select(m.id, orderedIds, shift);
+  }
+  function clickItem(m: MediaItem, shift: boolean) {
+    if (fsel.active) toggleItem(m, shift);
+    else openItem(m);
+  }
+  async function bulkDelete() {
+    const selected = (items || []).filter((m) => fsel.has(m.id));
+    let ok = 0;
+
+    for (const m of selected) {
+      try {
+        if (m.entryIds && m.entryIds.length > 0) {
+          for (const entryId of m.entryIds)
+            await apiPost('/api/cloud/entry/delete', { entryId });
+        } else if (m.kind === 'photo' || m.kind === 'video') {
+          await apiPost('/api/cloud/media/delete', { fileId: m.id });
+        } else {
+          throw new Error('нет записи файла в папке');
+        }
+        ok++;
+      } catch (e) {
+        toast(`«${m.entryNames?.[0] || m.name}»: ${(e as Error).message}`, 'err');
+      }
+    }
+
+    setBulkConfirm(false);
+    fsel.clear();
+    if (ok) {
+      toast(`Перемещено в корзину: ${ok}`);
+      load();
+      onChanged();
+    }
+  }
   async function removeFolder() {
     if (!window.confirm('Удалить умную папку? Файлы останутся в облаке.')) return;
     try {
@@ -87,8 +132,72 @@ export function DynamicFolderDetail({ folder, onBack, onChanged, toast, albums, 
     }
   }
 
+  function renderListRow(m: MediaItem) {
+    const checked = fsel.has(m.id);
+    return (
+      <div
+        key={m.id}
+        className={'df-list-row' + (checked ? ' checked' : '')}
+        onClick={(e) => clickItem(m, e.shiftKey)}
+        onContextMenu={(e) => actions.openMenu(e, m)}
+      >
+        <button
+          className="df-selbox"
+          onClick={(e) => {
+            e.stopPropagation();
+            toggleItem(m, e.shiftKey);
+          }}
+          title="Выбрать"
+        >
+          {checked ? <Icon.check size={14} /> : null}
+        </button>
+        <div className={'file-icon ' + (m.iconKind || 'doc')}>{m.ext || 'FILE'}</div>
+        <div className="df-list-main">
+          <div className="fn">{m.name}</div>
+          <div className="meta">{kindRu(m.kind)}</div>
+        </div>
+        <div className="df-list-size">{m.sizeLabel || '—'}</div>
+        <div className="df-list-date">{fmtFull(m.createdAt)}</div>
+      </div>
+    );
+  }
+
+  function renderMediaTile(m: MediaItem, extraClass = '') {
+    const checked = fsel.has(m.id);
+    return (
+      <div
+        key={m.id}
+        className={'photo' + (extraClass ? ' ' + extraClass : '') + (checked ? ' checked' : '')}
+        onClick={(e) => clickItem(m, e.shiftKey)}
+        onContextMenu={(e) => actions.openMenu(e, m)}
+      >
+        <MediaThumb media={m} sizes={GRID_SIZES} />
+        <button
+          className="selbox"
+          onClick={(e) => {
+            e.stopPropagation();
+            toggleItem(m, e.shiftKey);
+          }}
+          title="Выбрать"
+        >
+          {checked ? <Icon.check size={14} /> : null}
+        </button>
+        {m.kind === 'video' && (
+          <div className="vbadge">
+            <Icon.play size={10} /> видео
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div>
+      <SelectionBar
+        count={fsel.count}
+        onClear={fsel.clear}
+        actions={[{ label: 'Удалить', icon: 'trash', danger: true, onClick: () => setBulkConfirm(true) }]}
+      />
       <div className="date-head" style={{ marginBottom: 18 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <button className="icon-btn" onClick={onBack} title="Назад">
@@ -130,35 +239,11 @@ export function DynamicFolderDetail({ folder, onBack, onChanged, toast, albums, 
               </div>
               {folder.viewMode === 1 ? (
                 <div className="df-list df-dup-list">
-                  {g.items.map((m) => (
-                    <div
-                      key={m.id}
-                      className="df-list-row"
-                      onClick={() => openItem(m)}
-                      onContextMenu={(e) => actions.openMenu(e, m)}
-                    >
-                      <div className={'file-icon ' + (m.iconKind || 'doc')}>{m.ext || 'FILE'}</div>
-                      <div className="df-list-main">
-                        <div className="fn">{m.name}</div>
-                        <div className="meta">{kindRu(m.kind)}</div>
-                      </div>
-                      <div className="df-list-size">{m.sizeLabel || '—'}</div>
-                      <div className="df-list-date">{fmtFull(m.createdAt)}</div>
-                    </div>
-                  ))}
+                  {g.items.map((m) => renderListRow(m))}
                 </div>
               ) : (
                 <div className="df-dup-media-items">
-                  {g.items.map((m) => (
-                    <div key={m.id} className="photo df-dup-photo" onClick={() => openItem(m)} onContextMenu={(e) => actions.openMenu(e, m)}>
-                      <MediaThumb media={m} sizes={GRID_SIZES} />
-                      {m.kind === 'video' && (
-                        <div className="vbadge">
-                          <Icon.play size={10} /> видео
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                  {g.items.map((m) => renderMediaTile(m, 'df-dup-photo'))}
                 </div>
               )}
             </section>
@@ -166,35 +251,11 @@ export function DynamicFolderDetail({ folder, onBack, onChanged, toast, albums, 
         </div>
       ) : folder.viewMode === 1 ? (
         <div className="df-list">
-          {items.map((m) => (
-            <div
-              key={m.id}
-              className="df-list-row"
-              onClick={() => openItem(m)}
-              onContextMenu={(e) => actions.openMenu(e, m)}
-            >
-              <div className={'file-icon ' + (m.iconKind || 'doc')}>{m.ext || 'FILE'}</div>
-              <div className="df-list-main">
-                <div className="fn">{m.name}</div>
-                <div className="meta">{kindRu(m.kind)}</div>
-              </div>
-              <div className="df-list-size">{m.sizeLabel || '—'}</div>
-              <div className="df-list-date">{fmtFull(m.createdAt)}</div>
-            </div>
-          ))}
+          {items.map((m) => renderListRow(m))}
         </div>
       ) : (
         <div className="photo-grid">
-          {items.map((m) => (
-            <div key={m.id} className="photo" onClick={() => openItem(m)} onContextMenu={(e) => actions.openMenu(e, m)}>
-              <MediaThumb media={m} sizes={GRID_SIZES} />
-              {m.kind === 'video' && (
-                <div className="vbadge">
-                  <Icon.play size={10} /> видео
-                </div>
-              )}
-            </div>
-          ))}
+          {items.map((m) => renderMediaTile(m))}
         </div>
       )}
 
@@ -209,6 +270,16 @@ export function DynamicFolderDetail({ folder, onBack, onChanged, toast, albums, 
             toast('Сохранено');
           }}
           toast={toast}
+        />
+      )}
+      {bulkConfirm && (
+        <ConfirmModal
+          title="Удалить в корзину?"
+          danger
+          confirmLabel="Удалить"
+          message={`Выбранные элементы (${fsel.count}) будут перемещены в корзину.`}
+          onClose={() => setBulkConfirm(false)}
+          onConfirm={bulkDelete}
         />
       )}
       {lightbox !== null && <Lightbox items={media} index={lightbox} onClose={() => setLightbox(null)} />}
