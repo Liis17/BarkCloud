@@ -109,28 +109,38 @@ struct GalleryScreen: View {
     private func grid(_ vm: GalleryViewModel) -> some View {
         ScrollView {
             LazyVGrid(columns: columns, spacing: Self.spacing) {
-                ForEach(vm.assets, id: \.localIdentifier) { asset in
-                    DeviceMediaThumb(
-                        asset: asset,
-                        isSelecting: vm.isSelecting,
-                        isSelected: vm.isSelected(asset),
-                        isInCloud: vm.cloudPresence[asset.localIdentifier] == true
-                    )
-                    .onTapGesture {
-                        if vm.isSelecting {
-                            vm.toggle(asset)
-                        } else {
-                            viewer = ViewerItem(id: asset.localIdentifier, asset: asset)
+                ForEach(MediaDateSections.make(from: vm.assets, date: gallerySectionDate)) { section in
+                    Section {
+                        ForEach(section.items, id: \.localIdentifier) { asset in
+                            DeviceMediaThumb(
+                                asset: asset,
+                                isSelecting: vm.isSelecting,
+                                isSelected: vm.isSelected(asset),
+                                isInCloud: vm.cloudPresence[asset.localIdentifier] == true
+                            )
+                            .onTapGesture {
+                                if vm.isSelecting {
+                                    vm.toggle(asset)
+                                } else {
+                                    viewer = ViewerItem(id: asset.localIdentifier, asset: asset)
+                                }
+                            }
+                            .shakeContextMenu(isActive: !vm.isSelecting) { itemMenu(vm, asset) }
+                            .onAppear { vm.observeCloudPresence(for: asset) }
                         }
+                    } header: {
+                        MediaDateSectionHeader(title: section.title)
                     }
-                    .shakeContextMenu(isActive: !vm.isSelecting) { itemMenu(vm, asset) }
-                    .onAppear { vm.observeCloudPresence(for: asset) }
                 }
             }
         }
         .barkRefreshable { await vm.refresh() }
         .safeAreaInset(edge: .bottom) { selectionBar(vm) }
         .overlay(alignment: .bottom) { snackbar(vm) }
+    }
+
+    private func gallerySectionDate(_ asset: PHAsset) -> Date {
+        asset.creationDate ?? asset.modificationDate ?? Date(timeIntervalSince1970: 0)
     }
 
     @ViewBuilder

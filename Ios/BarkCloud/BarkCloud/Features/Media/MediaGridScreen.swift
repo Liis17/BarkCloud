@@ -158,27 +158,19 @@ struct MediaGridScreen: View {
                     .containerRelativeFrame(.vertical)
             } else {
                 LazyVGrid(columns: columns, spacing: Self.spacing) {
-                    ForEach(vm.state.items) { item in
-                        MediaThumb(
-                            fileId: item.id,
-                            previewWidth: item.previewWidth,
-                            thumbnailURL: item.thumbnailURL,
-                            isVideo: item.isVideo,
-                            isSelecting: vm.state.isSelecting,
-                            isSelected: vm.state.selection.contains(item.id)
-                        )
-                        .onTapGesture {
-                            if vm.state.isSelecting {
-                                vm.toggleSelection(item)
-                            } else if !vm.state.isPlaceholder {
-                                selected = item
+                    if vm.state.isPlaceholder {
+                        ForEach(vm.state.items) { item in
+                            mediaCell(vm, item)
+                        }
+                    } else {
+                        ForEach(MediaDateSections.make(from: vm.state.items, date: mediaSectionDate)) { section in
+                            Section {
+                                ForEach(section.items) { item in
+                                    mediaCell(vm, item)
+                                }
+                            } header: {
+                                MediaDateSectionHeader(title: section.title)
                             }
-                        }
-                        .shakeContextMenu(isActive: !vm.state.isSelecting && !vm.state.isPlaceholder) {
-                            itemMenu(vm, item)
-                        }
-                        .onAppear {
-                            Task { await vm.loadMoreIfNeeded(current: item) }
                         }
                     }
                 }
@@ -191,6 +183,34 @@ struct MediaGridScreen: View {
         }
         // Потянуть вниз — перезагрузить список (фото/видео).
         .barkRefreshable { await vm.reload() }
+    }
+
+    private func mediaCell(_ vm: MediaGridViewModel, _ item: MediaItem) -> some View {
+        MediaThumb(
+            fileId: item.id,
+            previewWidth: item.previewWidth,
+            thumbnailURL: item.thumbnailURL,
+            isVideo: item.isVideo,
+            isSelecting: vm.state.isSelecting,
+            isSelected: vm.state.selection.contains(item.id)
+        )
+        .onTapGesture {
+            if vm.state.isSelecting {
+                vm.toggleSelection(item)
+            } else if !vm.state.isPlaceholder {
+                selected = item
+            }
+        }
+        .shakeContextMenu(isActive: !vm.state.isSelecting && !vm.state.isPlaceholder) {
+            itemMenu(vm, item)
+        }
+        .onAppear {
+            Task { await vm.loadMoreIfNeeded(current: item) }
+        }
+    }
+
+    private func mediaSectionDate(_ item: MediaItem) -> Date {
+        item.date
     }
 
     private var emptyState: some View {
