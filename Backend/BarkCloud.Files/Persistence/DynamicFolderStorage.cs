@@ -105,4 +105,71 @@ public class DynamicFolderStorage : IDynamicFolderStorage
             .ThenByDescending(f => f.Id)
             .FirstOrDefaultAsync(cancellationToken);
     }
+
+    public async Task<int> CountDuplicateItems(long ownerId, bool mediaOnly, CancellationToken cancellationToken = default)
+    {
+        var query = BuildDuplicateItemsQuery(ownerId, mediaOnly);
+        return await query.CountAsync(cancellationToken);
+    }
+
+    public async Task<List<DuplicateFileItem>> ListDuplicateItemsPage(
+        long ownerId, bool mediaOnly,
+        DateTime? cursorCreatedAt, Guid? cursorFileId, int limit, CancellationToken cancellationToken = default)
+    {
+        var query = BuildDuplicateItemsQuery(ownerId, mediaOnly);
+
+        if (cursorCreatedAt.HasValue && cursorFileId.HasValue)
+        {
+            var cursorAt = DateTime.SpecifyKind(cursorCreatedAt.Value, DateTimeKind.Utc);
+            var cursorId = cursorFileId.Value;
+            query = query.Where(x =>
+                x.File.CreatedAt < cursorAt
+                || (x.File.CreatedAt == cursorAt && x.File.Id.ToString().CompareTo(cursorId.ToString()) < 0));
+        }
+
+        var rows = await query
+            .OrderByDescending(x => x.File.CreatedAt)
+            .ThenByDescending(x => x.File.Id)
+            .Take(limit + 1)
+            .ToListAsync(cancellationToken);
+
+        return rows.Select(x => new DuplicateFileItem(x.File, x.Hash)).ToList();
+    }
+
+    public async Task<UploadFile?> GetFirstDuplicateItem(long ownerId, bool mediaOnly, CancellationToken cancellationToken = default)
+    {
+        return await BuildDuplicateItemsQuery(ownerId, mediaOnly)
+            .OrderByDescending(x => x.File.CreatedAt)
+            .ThenByDescending(x => x.File.Id)
+            .Select(x => x.File)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    private IQueryable<DuplicateFileRow> BuildDuplicateItemsQuery(long ownerId, bool mediaOnly)
+    {
+        var baseQuery = DynamicFolderQueryBuilder.BuildBaseQuery(_context, ownerId);
+        if (mediaOnly)
+            baseQuery = baseQuery.Where(f => f.MediaKind == MediaKind.Photo || f.MediaKind == MediaKind.Video);
+        else
+            baseQuery = baseQuery.Where(f => f.MediaKind != MediaKind.Photo && f.MediaKind != MediaKind.Video);
+
+        var duplicateHashes =
+            from h in _context.FileHashes.AsNoTracking()
+            join f in baseQuery on h.FileId equals f.Id
+            group h by h.Hash into g
+            where g.Count() > 1
+            select g.Key;
+
+        return
+            from f in baseQuery
+            join h in _context.FileHashes.AsNoTracking() on f.Id equals h.FileId
+            where duplicateHashes.Contains(h.Hash)
+            select new DuplicateFileRow { File = f, Hash = h.Hash };
+    }
+
+    private sealed class DuplicateFileRow
+    {
+        public UploadFile File { get; init; } = null!;
+        public string Hash { get; init; } = string.Empty;
+    }
 }

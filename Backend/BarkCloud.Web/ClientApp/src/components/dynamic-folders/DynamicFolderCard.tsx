@@ -8,6 +8,8 @@ const ICONS: Record<string, (p?: { size?: number }) => React.ReactNode> = {
   clock: Icon.clock,
   hdd: Icon.server,
   camera: Icon.photo,
+  photo: Icon.photo,
+  doc: Icon.file,
 };
 
 interface Props {

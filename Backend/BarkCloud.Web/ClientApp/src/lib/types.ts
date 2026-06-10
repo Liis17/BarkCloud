@@ -31,6 +31,7 @@ export interface MediaItem extends CardFile {
   entriesCount: number;
   entryNames: string[];
   entryIds: string[];
+  duplicateGroupKey?: string;
 }
 
 /** Группа «Воспоминаний» за один год (CloudJson.MemoryGroup). */

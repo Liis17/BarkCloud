@@ -50,6 +50,9 @@ public class ListDynamicFolderItemsCommandHandler : IRequestHandler<ListDynamicF
         var ownerId = _userContext.UserId;
         var limit = request.Limit <= 0 ? DefaultLimit : Math.Min(request.Limit, MaxLimit);
 
+        var duplicateSystemFolder = SystemDynamicFolders.IsDuplicateKey(request.FolderId);
+        var duplicateMediaOnly = SystemDynamicFolders.IsDuplicateMediaKey(request.FolderId);
+
         // Резолвим критерии: системная папка (по well-known ключу) или пользовательская (по Guid с проверкой владельца).
         DynamicFolderCriteria criteria;
         if (SystemDynamicFolders.IsSystemKey(request.FolderId))
@@ -70,7 +73,12 @@ public class ListDynamicFolderItemsCommandHandler : IRequestHandler<ListDynamicF
         }
 
         var now = DateTime.UtcNow;
-        var page = await _storage.ListItemsPage(ownerId, criteria, now, request.CursorCreatedAt, request.CursorFileId, limit, cancellationToken);
+        var duplicatePage = duplicateSystemFolder
+            ? await _storage.ListDuplicateItemsPage(ownerId, duplicateMediaOnly, request.CursorCreatedAt, request.CursorFileId, limit, cancellationToken)
+            : null;
+        var page = duplicatePage?.Select(x => x.File).ToList()
+                   ?? await _storage.ListItemsPage(ownerId, criteria, now, request.CursorCreatedAt, request.CursorFileId, limit, cancellationToken);
+        var duplicateGroupByFileId = duplicatePage?.ToDictionary(x => x.File.Id, x => x.GroupKey);
 
         var hasMore = page.Count > limit;
         if (hasMore)
@@ -105,6 +113,8 @@ public class ListDynamicFolderItemsCommandHandler : IRequestHandler<ListDynamicF
 
             previewsByFile.TryGetValue(file.Id, out var previews);
             var item = new UserImageItem { File = file.ToGrpc(baseUrl, previews) };
+            if (duplicateGroupByFileId is not null && duplicateGroupByFileId.TryGetValue(file.Id, out var groupKey))
+                item.DuplicateGroupKey = groupKey;
             if (entriesByFileId.TryGetValue(file.Id, out var meta))
             {
                 item.EntriesCount = meta.Count;

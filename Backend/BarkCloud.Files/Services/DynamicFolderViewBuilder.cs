@@ -44,10 +44,16 @@ public class DynamicFolderViewBuilder
 
         foreach (var folder in folders)
         {
-            var count = await _storage.CountByCriteria(ownerId, folder.Criteria, now, cancellationToken);
+            var isDuplicateFolder = SystemDynamicFolders.IsDuplicateKey(folder.SystemKey);
+            var mediaOnly = SystemDynamicFolders.IsDuplicateMediaKey(folder.SystemKey);
+            var count = isDuplicateFolder
+                ? await _storage.CountDuplicateItems(ownerId, mediaOnly, cancellationToken)
+                : await _storage.CountByCriteria(ownerId, folder.Criteria, now, cancellationToken);
 
             string? coverUrl = null;
-            var first = await _storage.GetFirstItem(ownerId, folder.Criteria, now, cancellationToken);
+            var first = isDuplicateFolder
+                ? await _storage.GetFirstDuplicateItem(ownerId, mediaOnly, cancellationToken)
+                : await _storage.GetFirstItem(ownerId, folder.Criteria, now, cancellationToken);
             if (first is not null)
             {
                 var previews = await _filesStorage.GetPreviewsForFile(first.Id, cancellationToken);

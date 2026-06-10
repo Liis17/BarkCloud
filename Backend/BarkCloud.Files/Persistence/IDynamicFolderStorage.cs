@@ -2,6 +2,8 @@ using BarkCloud.Files.Domain;
 
 namespace BarkCloud.Files.Persistence;
 
+public sealed record DuplicateFileItem(UploadFile File, string GroupKey);
+
 public interface IDynamicFolderStorage
 {
     Task<DynamicFolder?> GetFolder(Guid id, CancellationToken cancellationToken = default);
@@ -26,4 +28,15 @@ public interface IDynamicFolderStorage
 
     /// <summary>Самый свежий файл по критериям — кандидат на обложку.</summary>
     Task<UploadFile?> GetFirstItem(long ownerId, DynamicFolderCriteria criteria, DateTime now, CancellationToken cancellationToken = default);
+
+    /// <summary>Количество живых файлов владельца, входящих в duplicate-группы по SHA256 (mediaOnly: фото/видео, иначе документы/аудио/прочее).</summary>
+    Task<int> CountDuplicateItems(long ownerId, bool mediaOnly, CancellationToken cancellationToken = default);
+
+    /// <summary>Страница живых файлов владельца, входящих в duplicate-группы по SHA256 (mediaOnly: фото/видео, иначе документы/аудио/прочее).</summary>
+    Task<List<DuplicateFileItem>> ListDuplicateItemsPage(
+        long ownerId, bool mediaOnly,
+        DateTime? cursorCreatedAt, Guid? cursorFileId, int limit, CancellationToken cancellationToken = default);
+
+    /// <summary>Самый свежий файл из duplicate-групп — кандидат на обложку (mediaOnly: фото/видео, иначе документы/аудио/прочее).</summary>
+    Task<UploadFile?> GetFirstDuplicateItem(long ownerId, bool mediaOnly, CancellationToken cancellationToken = default);
 }

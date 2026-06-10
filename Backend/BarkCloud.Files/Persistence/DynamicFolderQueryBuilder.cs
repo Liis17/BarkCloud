@@ -23,13 +23,7 @@ public static class DynamicFolderQueryBuilder
     {
         // Базовый фильтр идентичен ListUserMediaPage: файлы владельца, реальные блобы (не превью),
         // не «эффективно удалённые» (есть запись в корзине и нет живой записи).
-        var query = ctx.UploadedFiles
-            .AsNoTracking()
-            .Where(f => f.Uploaders.Contains(ownerId)
-                        && f.Type == UploadFileType.CloudFile
-                        && !ctx.FilePreviews.Any(p => p.PreviewFileId == f.Id)
-                        && !(ctx.CloudFileEntries.Any(e => e.OwnerId == ownerId && e.FileId == f.Id && e.IsDeleted)
-                             && !ctx.CloudFileEntries.Any(e => e.OwnerId == ownerId && e.FileId == f.Id && !e.IsDeleted)));
+        var query = BuildBaseQuery(ctx, ownerId);
 
         var predicates = new List<Expression<Func<UploadFile, bool>>>();
         foreach (var rule in criteria.Rules)
@@ -46,6 +40,17 @@ public static class DynamicFolderQueryBuilder
                 : combined.And(predicates[i]);
 
         return query.Where(combined);
+    }
+
+    public static IQueryable<UploadFile> BuildBaseQuery(FilesContext ctx, long ownerId)
+    {
+        return ctx.UploadedFiles
+            .AsNoTracking()
+            .Where(f => f.Uploaders.Contains(ownerId)
+                        && f.Type == UploadFileType.CloudFile
+                        && !ctx.FilePreviews.Any(p => p.PreviewFileId == f.Id)
+                        && !(ctx.CloudFileEntries.Any(e => e.OwnerId == ownerId && e.FileId == f.Id && e.IsDeleted)
+                             && !ctx.CloudFileEntries.Any(e => e.OwnerId == ownerId && e.FileId == f.Id && !e.IsDeleted)));
     }
 
     /// <summary>

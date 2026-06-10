@@ -6,7 +6,7 @@ import { Loading, EmptyState } from '../ui/EmptyState';
 import { DynamicFolderFormModal } from './DynamicFolderFormModal';
 import { useMediaActions } from '../../hooks/useMediaActions';
 import { apiGet, apiPost } from '../../lib/api';
-import { GRID_SIZES, kindRu, fmtFull } from '../../lib/format';
+import { GRID_SIZES, kindRu, fmtFull, plural } from '../../lib/format';
 import { useDocumentHead } from '../../hooks/useDocumentHead';
 import type { Album, DynamicFolder, MediaItem, Page } from '../../lib/types';
 import type { ToastPush } from '../../hooks/useToast';
@@ -25,6 +25,7 @@ export function DynamicFolderDetail({ folder, onBack, onChanged, toast, albums, 
   const [items, setItems] = React.useState<MediaItem[] | null>(null);
   const [lightbox, setLightbox] = React.useState<number | null>(null);
   const [editing, setEditing] = React.useState(false);
+  const isDuplicateFolder = folder.id === 'sys-duplicate-media' || folder.id === 'sys-duplicate-files';
 
   useDocumentHead(
     () => ({ title: folder.name, iconUrl: folder.coverUrl || null }),
@@ -34,14 +35,14 @@ export function DynamicFolderDetail({ folder, onBack, onChanged, toast, albums, 
 
   const load = React.useCallback(() => {
     setItems(null);
-    apiGet<Page<MediaItem>>('/api/dynamic-folders/items?folder=' + encodeURIComponent(folder.id))
-      .then((d) => setItems(d.items || []))
+    loadFolderItems(folder.id, isDuplicateFolder)
+      .then((loaded) => setItems(loaded))
       .catch((e) => {
         toast((e as Error).message, 'err');
         setItems([]);
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [folder.id]);
+  }, [folder.id, isDuplicateFolder]);
   React.useEffect(load, [load]);
 
   const actions = useMediaActions({
@@ -60,6 +61,7 @@ export function DynamicFolderDetail({ folder, onBack, onChanged, toast, albums, 
 
   // Lightbox умеет только фото/видео; документы/аудио открываем скачиванием.
   const media = React.useMemo(() => (items || []).filter((m) => m.kind === 'photo' || m.kind === 'video'), [items]);
+  const duplicateGroups = React.useMemo(() => groupDuplicates(items || []), [items]);
 
   async function download(id: string) {
     try {
@@ -108,8 +110,56 @@ export function DynamicFolderDetail({ folder, onBack, onChanged, toast, albums, 
 
       {items === null ? (
         <Loading />
-      ) : items.length === 0 ? (
+      ) : items.length === 0 || (isDuplicateFolder && duplicateGroups.length === 0) ? (
         <EmptyState icon="folder" title="Пока пусто" hint="Сюда автоматически попадут файлы, подходящие под условия." />
+      ) : isDuplicateFolder ? (
+        <div className="df-dup-groups">
+          {duplicateGroups.map((g, index) => (
+            <section className="df-dup-group" key={g.key}>
+              <div className="df-dup-head">
+                <div>
+                  <div className="df-dup-title">Группа {index + 1}</div>
+                  <div className="df-dup-meta">
+                    {g.items.length} {plural(g.items.length, 'файл', 'файла', 'файлов')} · {g.key.slice(0, 12)}
+                  </div>
+                </div>
+              </div>
+              {folder.viewMode === 1 ? (
+                <div className="df-list">
+                  {g.items.map((m) => (
+                    <div
+                      key={m.id}
+                      className="df-list-row"
+                      onClick={() => openItem(m)}
+                      onContextMenu={(e) => actions.openMenu(e, m)}
+                    >
+                      <div className={'file-icon ' + (m.iconKind || 'doc')}>{m.ext || 'FILE'}</div>
+                      <div className="df-list-main">
+                        <div className="fn">{m.name}</div>
+                        <div className="meta">{kindRu(m.kind)}</div>
+                      </div>
+                      <div className="df-list-size">{m.sizeLabel || '—'}</div>
+                      <div className="df-list-date">{fmtFull(m.createdAt)}</div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="photo-grid">
+                  {g.items.map((m) => (
+                    <div key={m.id} className="photo" onClick={() => openItem(m)} onContextMenu={(e) => actions.openMenu(e, m)}>
+                      <MediaThumb media={m} sizes={GRID_SIZES} />
+                      {m.kind === 'video' && (
+                        <div className="vbadge">
+                          <Icon.play size={10} /> видео
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          ))}
+        </div>
       ) : folder.viewMode === 1 ? (
         <div className="df-list">
           {items.map((m) => (
@@ -161,4 +211,41 @@ export function DynamicFolderDetail({ folder, onBack, onChanged, toast, albums, 
       {actions.overlay}
     </div>
   );
+}
+
+async function loadFolderItems(folderId: string, loadAllPages: boolean): Promise<MediaItem[]> {
+  const items: MediaItem[] = [];
+  let cursorAt: string | null = null;
+  let cursorId: string | null = null;
+
+  do {
+    const params = new URLSearchParams({ folder: folderId, limit: loadAllPages ? '200' : '100' });
+    if (cursorAt) params.set('cursorAt', cursorAt);
+    if (cursorId) params.set('cursorId', cursorId);
+
+    const page = await apiGet<Page<MediaItem>>('/api/dynamic-folders/items?' + params.toString());
+    items.push(...(page.items || []));
+    cursorAt = loadAllPages ? page.nextCursorAt : null;
+    cursorId = loadAllPages ? page.nextCursorId : null;
+  } while (loadAllPages && cursorAt && cursorId);
+
+  return items;
+}
+
+function groupDuplicates(items: MediaItem[]) {
+  const groups: { key: string; items: MediaItem[] }[] = [];
+  const byKey = new Map<string, { key: string; items: MediaItem[] }>();
+
+  for (const item of items) {
+    const key = item.duplicateGroupKey || item.id;
+    let group = byKey.get(key);
+    if (!group) {
+      group = { key, items: [] };
+      byKey.set(key, group);
+      groups.push(group);
+    }
+    group.items.push(item);
+  }
+
+  return groups.filter((g) => g.items.length > 1);
 }
