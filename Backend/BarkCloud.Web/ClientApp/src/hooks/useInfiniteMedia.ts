@@ -3,15 +3,27 @@ import { apiGet } from '../lib/api';
 import type { MediaItem, Page } from '../lib/types';
 import type { ToastPush } from './useToast';
 
+interface CacheEntry { items: MediaItem[]; cursor: { at: string; id: string } | null }
+const _cache = new Map<string, CacheEntry>();
+
 /** Бесконечная прокрутка галереи: cursor-пагинация /api/cloud/media + IntersectionObserver. */
 export function useInfiniteMedia(kind: 'photo' | 'video', toast?: ToastPush) {
-  const [items, setItems] = React.useState<MediaItem[]>([]);
-  const [loading, setLoading] = React.useState(true);
+  const init = React.useRef(_cache.get(kind) || null);
+  const [items, setItems] = React.useState<MediaItem[]>(init.current ? init.current.items : []);
+  const [loading, setLoading] = React.useState(!init.current);
   const [done, setDone] = React.useState(false);
   const cursorRef = React.useRef<{ at: string; id: string } | null>(null);
   const busyRef = React.useRef(false);
   const doneRef = React.useRef(false);
   const observerRef = React.useRef<IntersectionObserver | null>(null);
+  const itemsRef = React.useRef(items);
+  itemsRef.current = items;
+
+  React.useEffect(() => {
+    return () => {
+      _cache.set(kind, { items: itemsRef.current, cursor: cursorRef.current });
+    };
+  }, [kind]);
 
   const loadMore = React.useCallback(async () => {
     if (busyRef.current || doneRef.current) return;
@@ -44,19 +56,17 @@ export function useInfiniteMedia(kind: 'photo' | 'video', toast?: ToastPush) {
     cursorRef.current = null;
     busyRef.current = false;
     doneRef.current = false;
-    setItems([]);
     setDone(false);
     setLoading(true);
+    if (!init.current) setItems([]);
     loadMore();
+    init.current = null;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kind]);
 
-  // loadMore стабилен, но держим в ref, чтобы callback-ref не пересоздавал observer.
   const loadMoreRef = React.useRef(loadMore);
   loadMoreRef.current = loadMore;
 
-  // Callback-ref: подключаем IntersectionObserver, как только сентинель появляется в DOM,
-  // и переподключаем при его повторном монтировании (например, после переключения вкладок).
   const sentinelRef = React.useCallback((node: HTMLDivElement | null) => {
     observerRef.current?.disconnect();
     if (!node) return;
@@ -85,5 +95,14 @@ export function useInfiniteMedia(kind: 'photo' | 'video', toast?: ToastPush) {
     loadMore();
   }, [loadMore]);
 
-  return { items, loading, done, sentinelRef, removeItem, updateItem, reload };
+  const prependItems = React.useCallback((fresh: MediaItem[]) => {
+    setItems((prev) => {
+      const existing = new Set(prev.map((x) => x.id));
+      const newItems = fresh.filter((x) => !existing.has(x.id));
+      if (!newItems.length) return prev;
+      return [...newItems, ...prev];
+    });
+  }, []);
+
+  return { items, loading, done, sentinelRef, removeItem, updateItem, reload, prependItems };
 }
