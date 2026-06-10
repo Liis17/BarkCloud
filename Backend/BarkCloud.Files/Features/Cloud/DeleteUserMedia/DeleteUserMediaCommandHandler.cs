@@ -1,9 +1,14 @@
+using BarkCloud.Files.Domain;
 using BarkCloud.Files.Persistence;
 using BarkCloud.Files.Services;
 using BarkCloud.GrpcServer.XAuth;
 using BarkCloud.Proto.Files;
+using BarkCloud.Shared.Exceptions.Files;
 
 using MediatR;
+
+using DomainMediaKind = BarkCloud.Files.Domain.MediaKind;
+using FileNotFoundException = BarkCloud.Shared.Exceptions.Files.FileNotFoundException;
 
 namespace BarkCloud.Files.Features.Cloud.DeleteUserMedia;
 
@@ -15,29 +20,26 @@ namespace BarkCloud.Files.Features.Cloud.DeleteUserMedia;
 ///   как <see cref="DeleteFileEntry.DeleteFileEntryCommandHandler"/>, но по file_id.
 /// </para>
 /// <para>
-/// • Если записей нет (медиа загружено без привязки к папке) — снимает владельца
-///   с блоба (<see cref="IUploadedFilesStorage.RemoveUploaderFromFile"/>): жёсткое
-///   удаление из галереи, освобождает квоту, без возможности восстановления.
+/// • Если записей нет (медиа загружено без привязки к папке) — создаёт запись
+///   сразу в корзине, чтобы удаление оставалось восстановимым и физическая
+///   зачистка blob выполнялась только через корзину.
 /// </para>
 /// </summary>
 public class DeleteUserMediaCommandHandler : IRequestHandler<DeleteUserMediaCommand, CloudEmpty>
 {
     private readonly ICloudHierarchyStorage _cloudHierarchy;
     private readonly IUploadedFilesStorage _uploadedFiles;
-    private readonly IAlbumStorage _albumStorage;
     private readonly UserContext _userContext;
     private readonly ILogger<DeleteUserMediaCommandHandler> _logger;
 
     public DeleteUserMediaCommandHandler(
         ICloudHierarchyStorage cloudHierarchy,
         IUploadedFilesStorage uploadedFiles,
-        IAlbumStorage albumStorage,
         UserContext userContext,
         ILogger<DeleteUserMediaCommandHandler> logger)
     {
         _cloudHierarchy = cloudHierarchy;
         _uploadedFiles = uploadedFiles;
-        _albumStorage = albumStorage;
         _userContext = userContext;
         _logger = logger;
     }
@@ -66,17 +68,47 @@ public class DeleteUserMediaCommandHandler : IRequestHandler<DeleteUserMediaComm
         }
         else
         {
-            // Жёсткое удаление (нет записей каталога): помимо снятия владельца с блоба чистим
-            // членство файла во всех альбомах владельца и переустанавливаем обложки — иначе
-            // остаётся осиротевшая запись AlbumItem (раздувает счётчик, ломает обложку альбома).
-            var removedFromAlbums = await _albumStorage.RemoveFileFromAllAlbums(ownerId, request.FileId, cancellationToken);
-            await _uploadedFiles.RemoveUploaderFromFile(request.FileId, ownerId, cancellationToken);
+            var existingEntries = await _cloudHierarchy.GetEntriesForFiles(
+                ownerId, new[] { request.FileId }, cancellationToken);
+            if (existingEntries.Count > 0)
+                return new CloudEmpty();
+
+            var file = await _uploadedFiles.GetFile(request.FileId);
+            if (file is null)
+                throw new FileNotFoundException();
+            if (!file.Uploaders.Contains(ownerId))
+                throw new CloudAccessDeniedException();
+
+            var (systemKind, folderName) = MapMediaKindToSystemFolder(file.MediaKind);
+            var directoryId = await _cloudHierarchy.EnsureSystemDirectory(ownerId, systemKind, folderName, cancellationToken);
+            var now = DateTime.UtcNow;
+            var entry = new CloudFileEntry
+            {
+                Id = Guid.NewGuid(),
+                OwnerId = ownerId,
+                DirectoryId = directoryId,
+                FileId = request.FileId,
+                Name = string.IsNullOrWhiteSpace(file.Filename) ? request.FileId.ToString() : file.Filename,
+                CreatedAt = now,
+                IsDeleted = true,
+                DeletedAt = now,
+                PurgeAt = now + TrashPurgeService.Retention
+            };
+
+            await _cloudHierarchy.AddFileEntry(entry, cancellationToken);
 
             _logger.LogInformation(
-                "DeleteUserMedia: владелец {OwnerId} снят с файла {FileId} (нет записей каталога); удалён из {AlbumCount} альбом(ов)",
-                ownerId, request.FileId, removedFromAlbums);
+                "DeleteUserMedia: для файла {FileId} (Owner: {OwnerId}) создана запись корзины {EntryId}",
+                request.FileId, ownerId, entry.Id);
         }
 
         return new CloudEmpty();
     }
+
+    private static (CloudDirectorySystemKind kind, string name) MapMediaKindToSystemFolder(DomainMediaKind mediaKind) => mediaKind switch
+    {
+        DomainMediaKind.Photo => (CloudDirectorySystemKind.Photos, "Фото"),
+        DomainMediaKind.Video => (CloudDirectorySystemKind.Videos, "Видео"),
+        _ => (CloudDirectorySystemKind.OtherDocuments, "Другие документы"),
+    };
 }

@@ -77,13 +77,8 @@ export function useMediaActions({ albums, toast, onRenamed, onRemoved, onItemPat
     }
   }
   async function doDelete(m: MediaItem) {
-    const ids = (m.entryIds || []).slice();
-    if (!ids.length) {
-      toast('Файл не привязан к папке', 'err');
-      return;
-    }
     try {
-      for (const eid of ids) await apiPost('/api/cloud/entry/delete', { entryId: eid });
+      await apiPost('/api/cloud/media/delete', { fileId: m.id });
       setConfirm(null);
       onRemoved && onRemoved(m);
       toast('Перемещено в корзину');
@@ -177,7 +172,7 @@ export function useMediaActions({ albums, toast, onRenamed, onRemoved, onItemPat
     out.push({ label: 'Добавить в избранное', icon: 'star', onClick: () => addToFavorites(m) });
     out.push({ label: 'Свойства', icon: 'info', onClick: () => setProps(m) });
     out.push({ divider: true });
-    out.push({ label: 'Удалить', icon: 'trash', danger: true, disabled: !hasEntry, onClick: () => setConfirm(m) });
+    out.push({ label: 'Удалить', icon: 'trash', danger: true, onClick: () => setConfirm(m) });
     return out;
   }
 
