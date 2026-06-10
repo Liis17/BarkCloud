@@ -14,14 +14,14 @@ import { SelectionBar } from '../components/ui/SelectionBar';
 import { useToast } from '../hooks/useToast';
 import { useAlbumMembership } from '../hooks/useAlbumMembership';
 import { useFileDrop } from '../hooks/useFileDrop';
-import { useDuplicatePrompt, type DuplicateDecision } from '../hooks/useDuplicatePrompt';
 import { useSelection } from '../hooks/useSelection';
 import { usePageHeader } from '../hooks/usePageHeader';
 import { pickDocumentIcon } from '../hooks/useDocumentHead';
+import { useUploadActions } from '../hooks/useUploadManager';
 import { DynamicFoldersStrip } from '../components/dynamic-folders/DynamicFoldersStrip';
 import { DynamicFolderDetail } from '../components/dynamic-folders/DynamicFolderDetail';
 import { DynamicFolderFormModal } from '../components/dynamic-folders/DynamicFolderFormModal';
-import { apiGet, apiPost, pickFiles, uploadFile, checkDuplicate } from '../lib/api';
+import { apiGet, apiPost, pickFiles } from '../lib/api';
 import { createShare, createFolderShare } from '../lib/share';
 import type { Album, CardFile, DirInfo, DynamicFolder, Entry, Listing } from '../lib/types';
 
@@ -205,12 +205,6 @@ function Inspector({ entry, onOpen, onRename, onDelete, onDownload }: {
   );
 }
 
-interface UploadState {
-  pct: number;
-  current: number;
-  total: number;
-}
-
 export function FilesPage() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -221,7 +215,6 @@ export function FilesPage() {
   const [listing, setListing] = React.useState<Listing | null>(null);
   const [sel, setSel] = React.useState<Entry | null>(null);
   const [lightbox, setLightbox] = React.useState<CardFile | null>(null);
-  const [upload, setUpload] = React.useState<UploadState | null>(null);
   const [creating, setCreating] = React.useState(false);
   const [renaming, setRenaming] = React.useState<RenameTarget | null>(null);
   const [name, setName] = React.useState('');
@@ -236,7 +229,7 @@ export function FilesPage() {
   const [openSmart, setOpenSmart] = React.useState<DynamicFolder | null>(null);
   const [creatingSmart, setCreatingSmart] = React.useState(false);
   const [toastNode, toast] = useToast();
-  const dup = useDuplicatePrompt();
+  const { enqueue, attachVersion } = useUploadActions();
   const { menu, openAt } = useContextMenu();
   const membership = useAlbumMembership(albums);
   const { over, dropHandlers } = useFileDrop((f) => doUpload(f));
@@ -284,6 +277,9 @@ export function FilesPage() {
       });
   }, [currentDir, searchQuery, toast, fsel.clear]);
   React.useEffect(load, [load]);
+  const loadRef = React.useRef(load);
+  loadRef.current = load;
+  React.useEffect(() => { loadRef.current(); }, [attachVersion]);
 
   const loadAlbums = React.useCallback(() => {
     apiGet<{ albums: Album[] }>('/api/albums')
@@ -440,33 +436,7 @@ export function FilesPage() {
   async function doUpload(dropped?: File[]) {
     const files = dropped && dropped.length ? dropped : await pickFiles({});
     if (!files.length) return;
-    let processed = 0;
-    let uploaded = 0;
-    let duplicateBatchDecision: DuplicateDecision | null = null;
-    for (const f of files) {
-      setUpload({ current: processed + 1, total: files.length, pct: 0 });
-      try {
-        const d = await checkDuplicate(f);
-        if (d.exists) {
-          const decision: DuplicateDecision = duplicateBatchDecision ?? (await dup.ask(f.name, d.locations));
-          if (decision === 'skip-all' || decision === 'upload-all') duplicateBatchDecision = decision;
-          if (decision === 'skip' || decision === 'skip-all') {
-            processed++;
-            continue;
-          }
-        }
-        const res = await uploadFile(f, (p) => setUpload({ current: processed + 1, total: files.length, pct: Math.round(p * 100) }));
-        // Загрузка в открытую папку — кладём именно в неё (без авто-распределения по типу).
-        await apiPost('/api/cloud/attach', { dir: currentDir, fileId: res.fileId, name: f.name });
-        uploaded++;
-      } catch (e) {
-        toast(`«${f.name}»: ${(e as Error).message}`, 'err');
-      }
-      processed++;
-    }
-    setUpload(null);
-    if (uploaded > 0) toast(`Загружено: ${uploaded}`);
-    load();
+    enqueue(files, { dir: currentDir });
   }
 
   async function bulkDelete() {
@@ -553,7 +523,6 @@ export function FilesPage() {
   return (
     <>
       {toastNode}
-      {dup.overlay}
       <SelectionBar
         count={fsel.count}
         onClear={fsel.clear}
@@ -600,15 +569,6 @@ export function FilesPage() {
               </div>
             )}
           </div>
-
-          {upload && (
-            <div className="upload-banner" style={{ margin: '0 24px 12px' }}>
-              <span className="spinner" /> Загрузка {upload.current}/{upload.total}…
-              <div className="bar">
-                <div className="bar-fill" style={{ width: upload.pct + '%' }} />
-              </div>
-            </div>
-          )}
 
           {!openSmart && !searchQuery && smartFolders.length > 0 && (
             <DynamicFoldersStrip folders={smartFolders} onOpen={setOpenSmart} onCreate={() => setCreatingSmart(true)} />

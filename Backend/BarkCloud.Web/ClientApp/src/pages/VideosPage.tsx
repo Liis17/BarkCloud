@@ -9,11 +9,11 @@ import { AlbumDetail } from '../components/albums/AlbumDetail';
 import { useToast } from '../hooks/useToast';
 import { useInfiniteMedia } from '../hooks/useInfiniteMedia';
 import { useMediaActions } from '../hooks/useMediaActions';
-import { useDuplicatePrompt, type DuplicateDecision } from '../hooks/useDuplicatePrompt';
 import { useFileDrop } from '../hooks/useFileDrop';
 import { useBulkMedia } from '../hooks/useBulkMedia';
 import { usePageHeader } from '../hooks/usePageHeader';
-import { apiGet, apiPost, pickFiles, uploadFile, checkDuplicate } from '../lib/api';
+import { useUploadActions } from '../hooks/useUploadManager';
+import { apiGet, pickFiles } from '../lib/api';
 import { plural, dateLabel } from '../lib/format';
 import type { Album, MediaItem } from '../lib/types';
 
@@ -72,21 +72,14 @@ function VideoCard({ m, selecting, checked, onToggle, onOpen, onMenu }: {
   );
 }
 
-interface UploadState {
-  pct: number;
-  current: number;
-  total: number;
-}
-
 export function VideosPage() {
   const [tab, setTab] = React.useState<'videos' | 'albums'>('videos');
   const [albums, setAlbums] = React.useState<Album[] | null>(null);
   const [openAlbum, setOpenAlbum] = React.useState<Album | null>(null);
   const [lightbox, setLightbox] = React.useState<number | null>(null);
   const [creating, setCreating] = React.useState(false);
-  const [upload, setUpload] = React.useState<UploadState | null>(null);
   const [toastNode, toast] = useToast();
-  const dup = useDuplicatePrompt();
+  const { enqueue, attachVersion } = useUploadActions();
 
   const { items: videos, loading, done, sentinelRef, removeItem, updateItem, reload } = useInfiniteMedia('video', toast);
 
@@ -115,39 +108,7 @@ export function VideosPage() {
   async function doUpload(dropped?: File[]) {
     const files = dropped && dropped.length ? dropped : await pickFiles({ accept: 'video/*' });
     if (!files.length) return;
-    let processed = 0;
-    let uploaded = 0;
-    let duplicateBatchDecision: DuplicateDecision | null = null;
-    for (const f of files) {
-      setUpload({ current: processed + 1, total: files.length, pct: 0 });
-      try {
-        const d = await checkDuplicate(f);
-        if (d.exists) {
-          const decision: DuplicateDecision = duplicateBatchDecision ?? (await dup.ask(f.name, d.locations));
-          if (decision === 'skip-all' || decision === 'upload-all') duplicateBatchDecision = decision;
-          if (decision === 'skip' || decision === 'skip-all') {
-            processed++;
-            continue;
-          }
-        }
-        const res = await uploadFile(f, (p) => setUpload({ current: processed + 1, total: files.length, pct: Math.round(p * 100) }));
-        if (res?.fileId) {
-          // Загрузка с вкладки «Видео» → авто-распределение по типу в системную папку.
-          try {
-            await apiPost('/api/cloud/attach', { fileId: res.fileId, name: res.name || f.name, routeByMediaKind: true });
-          } catch {
-            /* attach best-effort */
-          }
-        }
-        uploaded++;
-      } catch (e) {
-        toast(`«${f.name}»: ${(e as Error).message}`, 'err');
-      }
-      processed++;
-    }
-    setUpload(null);
-    if (uploaded > 0) toast(`Загружено: ${uploaded} ${plural(uploaded, 'видео', 'видео', 'видео')}`);
-    reload();
+    enqueue(files, { routeByMediaKind: true });
   }
 
   const { over, dropHandlers } = useFileDrop((f) => doUpload(f));
@@ -155,6 +116,10 @@ export function VideosPage() {
 
   const featured = videos.length ? videos[0] : null;
   const totalSize = videos.reduce((s, v) => s + (v.size || 0), 0);
+
+  const reloadRef = React.useRef(reload);
+  reloadRef.current = reload;
+  React.useEffect(() => { reloadRef.current(); }, [attachVersion]);
   const stats = [
     { k: 'Всего видео', v: videos.length ? videos.length + (done ? '' : '+') : '—' },
     { k: 'Занято видео', v: fmtSize(totalSize) },
@@ -193,7 +158,6 @@ export function VideosPage() {
     <>
       {toastNode}
       {actionsCtx.overlay}
-      {dup.overlay}
       {bulk.bar}
       {bulk.overlay}
 
@@ -229,16 +193,6 @@ export function VideosPage() {
           </button>
         </div>
       </div>
-
-      {upload && (
-        <div className="upload-banner">
-          <span className="spinner" />
-          Загрузка {upload.current}/{upload.total}…
-          <div className="bar">
-            <div className="bar-fill" style={{ width: upload.pct + '%' }} />
-          </div>
-        </div>
-      )}
 
       {tab === 'albums' &&
         (openAlbum ? (

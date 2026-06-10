@@ -3,8 +3,10 @@ import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 import { Footbar } from './Footbar';
+import { UploadBanner } from '../upload/UploadBanner';
 import { ShellContext } from '../../hooks/useShell';
 import { PageHeaderContext, type PageHeader } from '../../hooks/usePageHeader';
+import { UploadManagerProvider } from '../../hooks/useUploadManager';
 import { useDocumentHead } from '../../hooks/useDocumentHead';
 import { apiGet } from '../../lib/api';
 import type { Shell } from '../../lib/types';
@@ -33,18 +35,21 @@ export function AppShell() {
 
   return (
     <ShellContext.Provider value={shell}>
-      <PageHeaderContext.Provider value={headerCtx}>
-        <div className="app">
-          <Sidebar />
-          <div className="main">
-            <Topbar {...header} />
-            <div className={'content' + (header.contentClass ? ' ' + header.contentClass : '')}>
-              <Outlet />
+      <UploadManagerProvider>
+        <PageHeaderContext.Provider value={headerCtx}>
+          <div className="app">
+            <Sidebar />
+            <div className="main">
+              <Topbar {...header} />
+              <div className={'content' + (header.contentClass ? ' ' + header.contentClass : '')}>
+                <UploadBanner />
+                <Outlet />
+              </div>
+              <Footbar />
             </div>
-            <Footbar />
           </div>
-        </div>
-      </PageHeaderContext.Provider>
+        </PageHeaderContext.Provider>
+      </UploadManagerProvider>
     </ShellContext.Provider>
   );
 }
