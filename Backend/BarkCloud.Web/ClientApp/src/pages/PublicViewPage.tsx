@@ -27,10 +27,11 @@ function fmtSize(bytes: number): string {
 }
 
 const wrap: React.CSSProperties = {
-  minHeight: '100vh',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
+  height: '100vh',
+  display: 'grid',
+  alignItems: 'safe center',
+  justifyItems: 'center',
+  overflowY: 'auto',
   padding: 24,
   background: 'var(--md-surface, #101014)',
 };

@@ -34,7 +34,12 @@ function fmtSize(bytes: number): string {
   return (i === 0 ? v.toFixed(0) : v.toFixed(v < 10 ? 1 : 0)).replace('.', ',') + ' ' + u[i];
 }
 
-const wrap: React.CSSProperties = { minHeight: '100vh', background: 'var(--md-surface, #101014)', color: 'var(--md-on-surface, #e6e6ea)' };
+const wrap: React.CSSProperties = {
+  height: '100vh',
+  overflowY: 'auto',
+  background: 'var(--md-surface, #101014)',
+  color: 'var(--md-on-surface, #e6e6ea)',
+};
 const inner: React.CSSProperties = { maxWidth: 1100, margin: '0 auto', padding: '24px 20px 64px' };
 
 /** Публичная страница альбома по шаринг-ссылке (/al/:token). Без авторизации; контент динамический. */
@@ -193,7 +198,7 @@ export function PublicAlbumPage() {
       {viewer && (
         <div
           onClick={() => setViewer(null)}
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, zIndex: 50 }}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflowY: 'auto', padding: 24, zIndex: 50 }}
         >
           <div onClick={(e) => e.stopPropagation()} style={{ maxWidth: '92vw', maxHeight: '92vh', textAlign: 'center' }}>
             {viewer.mediaKind === 'video' ? (
