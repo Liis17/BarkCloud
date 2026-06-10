@@ -13,6 +13,14 @@ public static class BrowserContext
     public static Metadata UserToken(string accessToken)
         => new() { { MetadataKeys.Token, accessToken } };
 
+    /// <summary>Метаданные с пользовательским access-токеном и сведениями о браузере/устройстве.</summary>
+    public static Metadata UserTokenWithDevice(string accessToken, DeviceInfo device)
+    {
+        var metadata = device.ToMetadata();
+        metadata.Add(MetadataKeys.Token, accessToken);
+        return metadata;
+    }
+
     public static DeviceInfo BuildDeviceInfo(HttpContext http, string deviceId, string appName, string appVersion)
     {
         var ua = http.Request.Headers.UserAgent.ToString();
