@@ -286,7 +286,7 @@ public class ConfigurationDefaultsPopulator
         {
             if (config.Section == section && config.ServiceId == sId)
             {
-                return $"Host={_postgresHost};Database={dbName};Username={_postgresUsername};Password={_postgresPassword}";
+                return $"Host={_postgresHost};Database={dbName};Username={_postgresUsername};Password={_postgresPassword};Maximum Pool Size=20;Connection Idle Lifetime=60;Connection Pruning Interval=10";
             }
         }
 
