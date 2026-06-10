@@ -876,22 +876,156 @@ img.avatar { object-fit: cover; }
 /* Сентинел бесконечной прокрутки */
 .infinite-sentinel { min-height: 1px; padding: 8px 0 28px; display: flex; justify-content: center; }
 
-/* Upload progress (для тулбара/баннера) */
-.upload-banner {
-  display: flex; align-items: center; gap: 12px;
-  padding: 12px 16px;
+/* Upload progress — global banner + panel */
+.upload-area {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  margin: -12px -28px 12px;
+  padding: 0 28px;
+}
+
+.upload-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 16px;
   background: var(--md-primary-container);
   color: var(--md-on-primary-container);
+  border: none;
   border-radius: var(--r-md);
-  margin-bottom: 16px;
-  font-size: 14px; font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  text-align: left;
+  transition: background var(--d-short);
 }
-.upload-banner .bar {
-  flex: 1; height: 6px; border-radius: var(--r-full);
+.upload-bar:hover { background: color-mix(in srgb, var(--md-primary-container) 90%, var(--md-primary)); }
+.upload-bar-icon { display: flex; align-items: center; flex-shrink: 0; }
+.upload-bar-text { flex-shrink: 0; }
+.upload-bar-progress {
+  flex: 1;
+  height: 6px;
+  border-radius: var(--r-full);
   background: color-mix(in srgb, var(--md-on-primary-container) 20%, transparent);
   overflow: hidden;
 }
-.upload-banner .bar-fill { height: 100%; background: var(--md-primary); transition: width var(--d-short); }
+.upload-bar-progress .bar-fill {
+  height: 100%;
+  background: var(--md-primary);
+  border-radius: var(--r-full);
+  transition: width 200ms ease;
+}
+.upload-bar-chev {
+  display: flex;
+  align-items: center;
+  color: var(--md-on-primary-container);
+  transition: transform var(--d-short);
+}
+.upload-bar-chev.open { transform: rotate(180deg); }
+
+.upload-panel {
+  background: var(--md-surface-container-low);
+  border: 1px solid var(--md-outline-variant);
+  border-top: none;
+  border-radius: 0 0 var(--r-md) var(--r-md);
+  max-height: 360px;
+  overflow-y: auto;
+  animation: bc-slide-panel var(--d-short) var(--m-emph);
+}
+@keyframes bc-slide-panel { from { opacity: 0; max-height: 0; } to { opacity: 1; max-height: 360px; } }
+
+.upload-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px 4px;
+  position: sticky;
+  top: 0;
+  background: var(--md-surface-container-low);
+  z-index: 1;
+}
+.upload-panel-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--md-on-surface-variant);
+  text-transform: uppercase;
+  letter-spacing: .5px;
+}
+
+.upload-panel-list {
+  display: flex;
+  flex-direction: column;
+  padding: 0 8px 8px;
+}
+
+.upload-task {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px;
+  border-radius: var(--r-sm);
+  transition: background var(--d-short);
+}
+.upload-task:hover { background: var(--md-surface-container-high); }
+.upload-task-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+  flex-shrink: 0;
+}
+.upload-status.done { color: var(--md-success); }
+.upload-status.err { color: var(--md-error); }
+.upload-status.skip { color: var(--md-on-surface-variant); opacity: .5; }
+
+.upload-task-body { flex: 1; min-width: 0; }
+.upload-task-name {
+  font-size: 14px;
+  color: var(--md-on-surface);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.upload-task-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--md-on-surface-variant);
+  margin-top: 2px;
+}
+.upload-task-bar {
+  height: 4px;
+  background: var(--md-surface-container-highest);
+  border-radius: var(--r-full);
+  overflow: hidden;
+  margin-top: 6px;
+}
+.upload-task-bar .bar-fill {
+  height: 100%;
+  background: var(--md-primary);
+  border-radius: var(--r-full);
+  transition: width 200ms ease;
+}
+.upload-task-error {
+  font-size: 12px;
+  color: var(--md-error);
+  margin-top: 4px;
+}
+.upload-task-actions {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity var(--d-short);
+}
+.upload-task:hover .upload-task-actions,
+.upload-task.has-error .upload-task-actions { opacity: 1; }
 
 /* Album cards (Фото / Видео) */
 .album-grid {
