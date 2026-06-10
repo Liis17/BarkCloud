@@ -817,14 +817,20 @@ public static class CloudApiEndpoints
         // Прокси-загрузка: получаем upload-URL у Files и стримим туда байты (same-origin, без CORS).
         // Байты льём на ВНУТРЕННИЙ HTTP1-эндпоинт Files (минуя nginx/TLS); публичный upload.Url — fallback.
         api.MapPost("/files/upload", async (HttpContext http, AuthGateway auth, FilesApi.FilesApiClient files, IHttpClientFactory httpFactory, IConfiguration config) =>
-            await Guarded(http, auth, async token =>
+            await Guarded(http, auth, async (user, _) =>
             {
                 var form = await http.Request.ReadFormAsync();
                 var file = form.Files["file"];
                 if (file is null || file.Length == 0)
                     return Results.BadRequest(new { error = "Файл не выбран или пустой." });
 
-                var upload = await files.GetUploadUrlAsync(new GetUploadUrlRequest { FileType = UploadFileType.CloudFile }, token);
+                var device = BrowserContext.BuildDeviceInfo(
+                    http,
+                    user.DeviceId ?? auth.GetOrCreateDeviceId(http),
+                    config.Value("App:AppName", "BarkCloud Web"),
+                    config.Value("App:Version", "v1.0.0"));
+                var uploadToken = BrowserContext.UserTokenWithDevice(user.AccessToken, device);
+                var upload = await files.GetUploadUrlAsync(new GetUploadUrlRequest { FileType = UploadFileType.CloudFile }, uploadToken);
 
                 var http1Base = config["FilesService:Http1Base"];
                 var uploadUrl = string.IsNullOrEmpty(http1Base) ? upload.Url : $"{http1Base}/upload/{upload.FileId}";
@@ -1084,6 +1090,10 @@ public static class CloudApiEndpoints
 
     /// <summary>Авторизация по cookie + единая обработка gRPC-ошибок.</summary>
     private static async Task<IResult> Guarded(HttpContext http, AuthGateway auth, Func<Metadata, Task<IResult>> action)
+        => await Guarded(http, auth, async (_, token) => await action(token));
+
+    /// <summary>Авторизация по cookie + единая обработка gRPC-ошибок.</summary>
+    private static async Task<IResult> Guarded(HttpContext http, AuthGateway auth, Func<WebUser, Metadata, Task<IResult>> action)
     {
         var user = await auth.AuthenticateAsync(http);
         if (user is null)
@@ -1091,7 +1101,7 @@ public static class CloudApiEndpoints
 
         try
         {
-            return await action(BrowserContext.UserToken(user.AccessToken));
+            return await action(user, BrowserContext.UserToken(user.AccessToken));
         }
         catch (RpcException ex) when (ex.StatusCode == StatusCode.FailedPrecondition)
         {
