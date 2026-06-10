@@ -112,7 +112,7 @@ Parent: [[index]] · See also: [[api/files-api]] · [[modules/backend-files-clou
 | `GetUploadUrl` | Выдать presigned URL для загрузки |
 | `UploadFile` | Серверная загрузка файла |
 | `GetTempDownloadUrl` | Временные ссылки на скачивание + превью |
-| `DownloadFile` | Скачивание (через контроллер) |
+| `DownloadFile` | Скачивание (через контроллер); для `TempFile`-ссылок отдаёт оригинальный `UploadFile.Filename` в `Content-Disposition`, а не `{fileId}.{ext}` |
 | `CheckFileHash` | Проверка наличия по хешу (без побочных эффектов); возвращает `exists` + локации копий пользователя (имя+папка) для модалки «файл уже есть» |
 | `CheckFileHashes` | Пакетная проверка наличия по списку SHA256-хешей (без побочных эффектов; для пассивной индикации «в облаке») |
 | `GetFileData` / `GetFilesData` | Метаданные файла(ов) |
