@@ -10,14 +10,23 @@ import coil3.video.VideoFrameDecoder
 import com.barkfluff.BarkCloud.data.AuthRepository
 import com.barkfluff.BarkCloud.data.GlobalParam
 import com.barkfluff.BarkCloud.data.SessionManager
+import com.barkfluff.BarkCloud.data.cache.FileCacheService
+import com.barkfluff.BarkCloud.data.cache.FileCacheSettings
 import com.barkfluff.BarkCloud.data.cloud.AlbumRepository
 import com.barkfluff.BarkCloud.data.cloud.CloudRepository
+import com.barkfluff.BarkCloud.data.cloud.DynamicFolderRepository
+import com.barkfluff.BarkCloud.data.gallery.AutoUploadScheduler
+import com.barkfluff.BarkCloud.data.gallery.AutoUploadSettings
+import com.barkfluff.BarkCloud.data.upload.UploadQueueStore
 import com.barkfluff.BarkCloud.data.users.UserRepository
 import com.barkfluff.BarkCloud.files.data.LocalFileRepository
 import com.barkfluff.BarkCloud.grpc.ClientMetadataInterceptor
 import com.barkfluff.BarkCloud.grpc.GrpcManager
 import com.barkfluff.BarkCloud.net.FileTransferService
 import com.barkfluff.BarkCloud.net.InsecureHttp
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 class BarkCloudApplication : Application(), SingletonImageLoader.Factory {
 
@@ -42,10 +51,25 @@ class BarkCloudApplication : Application(), SingletonImageLoader.Factory {
     lateinit var albumRepository: AlbumRepository
         private set
 
+    lateinit var dynamicFolderRepository: DynamicFolderRepository
+        private set
+
     lateinit var userRepository: UserRepository
         private set
 
     lateinit var sessionManager: SessionManager
+        private set
+
+    lateinit var fileCacheSettings: FileCacheSettings
+        private set
+
+    lateinit var fileCache: FileCacheService
+        private set
+
+    lateinit var autoUploadSettings: AutoUploadSettings
+        private set
+
+    lateinit var uploadQueue: UploadQueueStore
         private set
 
     override fun onCreate() {
@@ -57,8 +81,19 @@ class BarkCloudApplication : Application(), SingletonImageLoader.Factory {
         fileTransfer = FileTransferService(this, grpcManager, globalParam, InsecureHttp.client)
         cloudRepository = CloudRepository(grpcManager, fileTransfer)
         albumRepository = AlbumRepository(grpcManager)
+        dynamicFolderRepository = DynamicFolderRepository(grpcManager)
         userRepository = UserRepository(grpcManager, fileTransfer)
-        sessionManager = SessionManager(this, authRepository, globalParam, grpcManager)
+        fileCacheSettings = FileCacheSettings(this)
+        fileCache = FileCacheService(this, fileTransfer, fileCacheSettings)
+        autoUploadSettings = AutoUploadSettings(this)
+        uploadQueue = UploadQueueStore(this)
+        sessionManager = SessionManager(this, authRepository, globalParam, grpcManager, fileCache, uploadQueue)
+        CoroutineScope(Dispatchers.IO).launch {
+            fileCache.runStartupSweepIfNeeded()
+        }
+        if (autoUploadSettings.enabled) {
+            AutoUploadScheduler.enable(this)
+        }
     }
 
     override fun newImageLoader(context: PlatformContext): ImageLoader =

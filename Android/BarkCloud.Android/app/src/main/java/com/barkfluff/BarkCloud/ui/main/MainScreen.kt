@@ -4,6 +4,7 @@ import android.net.Uri
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.navigation.NavType
@@ -23,9 +24,11 @@ import com.barkfluff.BarkCloud.ui.gallery.GalleryScreen
 import com.barkfluff.BarkCloud.ui.media.MediaTabScreen
 import com.barkfluff.BarkCloud.ui.settings.DevicesScreen
 import com.barkfluff.BarkCloud.ui.trash.TrashScreen
+import com.barkfluff.BarkCloud.ui.settings.CacheSettingsScreen
 import com.barkfluff.BarkCloud.ui.settings.EditProfileScreen
 import com.barkfluff.BarkCloud.ui.settings.PrivacySettingsScreen
 import com.barkfluff.BarkCloud.ui.settings.SettingsScreen
+import com.barkfluff.BarkCloud.ui.smartfolders.SmartFolderDetailScreen
 
 /**
  * Главный экран с нижней навигацией из 5 вкладок (как в iOS). Каждая вкладка — свой
@@ -33,9 +36,28 @@ import com.barkfluff.BarkCloud.ui.settings.SettingsScreen
  * экраны вкладок Галерея/Альбомы/Корзина/Настройки добавляются в фазе 4; пока — заглушки.
  */
 @Composable
-fun MainScreen(onSignOut: () -> Unit) {
+fun MainScreen(
+    deepLink: Uri? = null,
+    onSignOut: () -> Unit,
+) {
     val navController = rememberNavController()
     val rootCloudTitle = stringResource(R.string.cloud_storage_title)
+
+    LaunchedEffect(deepLink) {
+        val target = deepLink?.host ?: return@LaunchedEffect
+        val route = when (target) {
+            "gallery" -> MainDestination.Gallery.route
+            "files" -> MainDestination.Files.route
+            "albums", "media" -> MainDestination.Albums.route
+            "trash" -> MainDestination.Trash.route
+            "settings" -> MainDestination.Settings.route
+            else -> return@LaunchedEffect
+        }
+        navController.navigate(route) {
+            launchSingleTop = true
+            restoreState = true
+        }
+    }
 
     Scaffold(
         bottomBar = { MainBottomBar(navController) },
@@ -62,6 +84,9 @@ fun MainScreen(onSignOut: () -> Unit) {
                             navController.navigate("files/cloud?dir=&title=$title")
                         },
                         onOpenShared = { navController.navigate("files/shared") },
+                        onOpenSmartFolder = { id, name ->
+                            navController.navigate("files/smart/$id?title=${Uri.encode(name)}")
+                        },
                     )
                 }
                 composable(
@@ -91,6 +116,19 @@ fun MainScreen(onSignOut: () -> Unit) {
                 }
                 composable("files/shared") {
                     ComingSoonScreen(title = stringResource(R.string.files_shared_title))
+                }
+                composable(
+                    route = "files/smart/{folderId}?title={title}",
+                    arguments = listOf(
+                        navArgument("folderId") { type = NavType.StringType },
+                        navArgument("title") { type = NavType.StringType; defaultValue = "" },
+                    ),
+                ) { entry ->
+                    SmartFolderDetailScreen(
+                        folderId = entry.arguments?.getString("folderId").orEmpty(),
+                        title = entry.arguments?.getString("title").orEmpty(),
+                        onNavigateUp = { navController.popBackStack() },
+                    )
                 }
             }
 
@@ -133,6 +171,7 @@ fun MainScreen(onSignOut: () -> Unit) {
                         onEditProfile = { navController.navigate("settings/editProfile") },
                         onPrivacy = { navController.navigate("settings/privacy") },
                         onDevices = { navController.navigate("settings/devices") },
+                        onCache = { navController.navigate("settings/cache") },
                         onSignedOut = onSignOut,
                     )
                 }
@@ -144,6 +183,9 @@ fun MainScreen(onSignOut: () -> Unit) {
                 }
                 composable("settings/devices") {
                     DevicesScreen(onNavigateUp = { navController.popBackStack() })
+                }
+                composable("settings/cache") {
+                    CacheSettingsScreen(onNavigateUp = { navController.popBackStack() })
                 }
             }
         }

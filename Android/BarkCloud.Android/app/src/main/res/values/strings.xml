@@ -44,6 +44,44 @@
     <string name="cloud_upload_media">Загрузить медиа</string>
     <string name="cloud_upload_document">Загрузить документ</string>
 
+    <!-- Smart folders -->
+    <string name="smart_folders_section">Умные разделы</string>
+    <string name="smart_folder_new">Новая</string>
+    <string name="smart_folder_create_title">Новый раздел</string>
+    <string name="smart_folder_edit_title">Редактировать раздел</string>
+    <string name="smart_folder_name">Название</string>
+    <string name="smart_folder_add_rule">Добавить условие</string>
+    <string name="smart_folder_validation">Укажите название и хотя бы одно условие.</string>
+    <string name="smart_folder_empty">В этом разделе пока нет файлов</string>
+    <string name="smart_folder_items_count">Файлов: %1$d</string>
+    <string name="smart_folder_match_all">Все условия</string>
+    <string name="smart_folder_match_any">Любое условие</string>
+    <string name="smart_folder_view_grid">Сетка</string>
+    <string name="smart_folder_view_list">Список</string>
+    <string name="smart_folder_field_date">Дата загрузки</string>
+    <string name="smart_folder_field_taken">Дата съёмки</string>
+    <string name="smart_folder_field_size">Размер</string>
+    <string name="smart_folder_field_name">Имя</string>
+    <string name="smart_folder_field_kind">Тип</string>
+    <string name="smart_folder_field_ext">Расширение</string>
+    <string name="smart_folder_field_width">Ширина</string>
+    <string name="smart_folder_field_height">Высота</string>
+    <string name="smart_folder_field_device">Устройство</string>
+    <string name="smart_folder_op_days">За N дней</string>
+    <string name="smart_folder_op_before">До</string>
+    <string name="smart_folder_op_after">После</string>
+    <string name="smart_folder_op_gt">Больше</string>
+    <string name="smart_folder_op_lt">Меньше</string>
+    <string name="smart_folder_op_contains">Содержит</string>
+    <string name="smart_folder_op_equals">Равно</string>
+    <string name="smart_folder_op_ends">Заканчивается</string>
+    <string name="smart_folder_op_starts">Начинается</string>
+    <string name="smart_folder_value_date_hint">Число дней или дата YYYY-MM-DD</string>
+    <string name="smart_folder_value_size_hint">Байты</string>
+    <string name="smart_folder_value_kind_hint">1 фото, 2 видео, 3 документ, 4 аудио, 0 другое</string>
+    <string name="smart_folder_value_ext_hint">Например .jpg</string>
+    <string name="smart_folder_value_text_hint">Значение</string>
+
     <!-- Tabs extra -->
     <string name="tab_favorites">Избранное</string>
     <string name="favorites_empty">В избранном пусто</string>
@@ -64,6 +102,9 @@
 
     <!-- Gallery -->
     <string name="gallery_upload_selected">Загрузить (%1$d)</string>
+    <string name="gallery_auto_upload">Автозагрузка</string>
+    <string name="gallery_free_device_space">Удалить копии с устройства (%1$d)</string>
+    <string name="gallery_device_copies_deleted">Удалено с устройства: %1$d</string>
     <string name="gallery_permission_message">Чтобы показать вашу медиатеку, разрешите доступ к фото и видео.</string>
     <string name="gallery_permission_grant">Разрешить доступ</string>
 
@@ -71,8 +112,30 @@
     <string name="common_cancel">Отмена</string>
     <string name="common_save">Сохранить</string>
     <string name="common_delete">Удалить</string>
+    <string name="common_done">Готово</string>
     <string name="common_error_generic">Что-то пошло не так</string>
     <string name="common_retry">Повторить</string>
+
+    <!-- Share target -->
+    <string name="share_no_files">Нет файлов для загрузки</string>
+    <string name="share_login_required">Войдите в BarkCloud, чтобы делиться файлами</string>
+    <string name="share_uploading">Загружаем файлы</string>
+    <string name="share_staging">Готовим файлы к фоновой загрузке</string>
+    <string name="share_queued">Загрузка поставлена в очередь</string>
+    <string name="share_upload_done">Загрузка завершена</string>
+    <string name="share_upload_failed">Не загрузилось файлов: %1$d</string>
+
+    <!-- Upload notification -->
+    <string name="upload_notification_channel">Загрузки BarkCloud</string>
+    <string name="upload_notification_title">Загрузка в BarkCloud</string>
+    <string name="upload_notification_progress">%1$d из %2$d</string>
+    <string name="upload_notification_done">Загрузка завершена</string>
+    <plurals name="upload_notification_done_count">
+        <item quantity="one">%1$d файл загружен</item>
+        <item quantity="few">%1$d файла загружено</item>
+        <item quantity="many">%1$d файлов загружено</item>
+        <item quantity="other">%1$d файлов загружено</item>
+    </plurals>
 
     <!-- Settings -->
     <string name="settings_title">Настройки</string>
@@ -89,6 +152,29 @@
     <string name="settings_delete_account">Удалить аккаунт</string>
     <string name="settings_delete_account_title">Удалить аккаунт?</string>
     <string name="settings_delete_account_message">Все данные будут удалены безвозвратно.</string>
+
+    <!-- Cache -->
+    <string name="cache_title">Кеш</string>
+    <string name="cache_size">Размер кеша</string>
+    <string name="cache_size_summary">%1$s из %2$s · записей: %3$d</string>
+    <string name="cache_limit">Лимит кеша</string>
+    <string name="cache_auto_clean">Автоочистка</string>
+    <string name="cache_auto_clean_1d">1 день</string>
+    <string name="cache_auto_clean_7d">7 дней</string>
+    <string name="cache_auto_clean_30d">30 дней</string>
+    <string name="cache_auto_clean_never">Никогда</string>
+    <string name="cache_clear_stale">Очистить устаревшее</string>
+    <string name="cache_clear_all">Очистить весь кеш</string>
+    <string name="cache_clear_confirm_title">Очистить кеш?</string>
+    <string name="cache_clear_confirm_message">Файлы и превью будут скачаны заново при следующем открытии.</string>
+    <string name="cache_removed_count">Удалено файлов: %1$d</string>
+    <string name="cache_cleared">Кеш очищен</string>
+
+    <!-- Widgets -->
+    <string name="widget_storage_title">BarkCloud</string>
+    <string name="widget_storage_summary">%1$s из %2$s</string>
+    <string name="widget_storage_no_data">Откройте приложение</string>
+    <string name="widget_storage_description">Заполнение облачного хранилища BarkCloud</string>
 
     <!-- Edit profile -->
     <string name="edit_profile_title">Профиль</string>

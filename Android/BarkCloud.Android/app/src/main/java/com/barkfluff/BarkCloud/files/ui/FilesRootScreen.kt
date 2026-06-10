@@ -15,26 +15,40 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Cloud
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.LockOpen
+import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Storage
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -43,9 +57,12 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.barkfluff.BarkCloud.R
+import com.barkfluff.BarkCloud.data.cloud.DynamicFolderCard
 import com.barkfluff.BarkCloud.files.data.StoragePermission
+import com.barkfluff.BarkCloud.ui.smartfolders.SmartFolderFormDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -53,10 +70,14 @@ fun FilesRootScreen(
     onOpenLocal: (String) -> Unit,
     onOpenCloud: () -> Unit,
     onOpenShared: () -> Unit,
+    onOpenSmartFolder: (id: String, name: String) -> Unit,
 ) {
     val context = LocalContext.current
-    val viewModel: FilesRootViewModel = viewModel()
-    val state by viewModel.state.collectAsState()
+    val viewModel: FilesRootViewModel = viewModel(factory = FilesRootViewModel.factory())
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
+    var editingFolder by remember { mutableStateOf<DynamicFolderCard?>(null) }
+    var showCreateSmartFolder by remember { mutableStateOf(false) }
 
     // Перечитываем permission на каждом возобновлении.
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -69,6 +90,15 @@ fun FilesRootScreen(
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
+    LaunchedEffect(Unit) {
+        viewModel.refreshPermission()
+        viewModel.loadSmartFolders()
+    }
+    LaunchedEffect(state.snackbar) {
+        val msg = state.snackbar ?: return@LaunchedEffect
+        snackbarHostState.showSnackbar(msg)
+        viewModel.snackbarShown()
+    }
 
     Scaffold(
         topBar = {
@@ -76,6 +106,7 @@ fun FilesRootScreen(
                 title = { Text(stringResource(R.string.files_root_title)) },
             )
         },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { padding ->
         LazyColumn(
             modifier = Modifier
@@ -120,7 +151,48 @@ fun FilesRootScreen(
                     onClick = onOpenShared,
                 )
             }
+            item { Spacer(modifier = Modifier.height(24.dp)) }
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    SectionHeader(stringResource(R.string.smart_folders_section), Modifier.weight(1f))
+                    TextButton(onClick = { showCreateSmartFolder = true }) {
+                        Icon(Icons.Outlined.Add, contentDescription = null)
+                        Text(stringResource(R.string.smart_folder_new), modifier = Modifier.padding(start = 6.dp))
+                    }
+                }
+            }
+            items(state.smartFolders, key = { it.id }) { folder ->
+                SmartFolderCard(
+                    folder = folder,
+                    onOpen = { onOpenSmartFolder(folder.id, folder.name) },
+                    onEdit = { editingFolder = folder },
+                    onDelete = { viewModel.deleteSmartFolder(folder) },
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
         }
+    }
+
+    if (showCreateSmartFolder) {
+        SmartFolderFormDialog(
+            folder = null,
+            onSave = { name, combinator, rules, viewMode ->
+                viewModel.saveSmartFolder(null, name, combinator, rules, viewMode)
+            },
+            onDismiss = { showCreateSmartFolder = false },
+        )
+    }
+    editingFolder?.let { folder ->
+        SmartFolderFormDialog(
+            folder = folder,
+            onSave = { name, combinator, rules, viewMode ->
+                viewModel.saveSmartFolder(folder, name, combinator, rules, viewMode)
+            },
+            onDismiss = { editingFolder = null },
+        )
     }
 }
 
@@ -150,13 +222,64 @@ private fun NavCard(
 }
 
 @Composable
-private fun SectionHeader(text: String) {
+private fun SectionHeader(text: String, modifier: Modifier = Modifier) {
     Text(
         text = text,
         style = MaterialTheme.typography.titleSmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(start = 4.dp, top = 4.dp, bottom = 8.dp),
+        modifier = modifier.padding(start = 4.dp, top = 4.dp, bottom = 8.dp),
     )
+}
+
+@Composable
+private fun SmartFolderCard(
+    folder: DynamicFolderCard,
+    onOpen: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    var menuOpen by remember { mutableStateOf(false) }
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onOpen),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(16.dp)) {
+            Icon(
+                imageVector = Icons.Outlined.AutoAwesome,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(28.dp),
+            )
+            Spacer(Modifier.width(16.dp))
+            Column(Modifier.weight(1f)) {
+                Text(folder.name, style = MaterialTheme.typography.titleMedium)
+                Text(
+                    text = stringResource(R.string.smart_folder_items_count, folder.itemsCount),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (!folder.isSystem) {
+                Box {
+                    IconButton(onClick = { menuOpen = true }) {
+                        Icon(Icons.Outlined.MoreVert, contentDescription = null)
+                    }
+                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.files_action_rename)) },
+                            leadingIcon = { Icon(Icons.Outlined.Edit, contentDescription = null) },
+                            onClick = { menuOpen = false; onEdit() },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.common_delete)) },
+                            leadingIcon = { Icon(Icons.Outlined.Delete, contentDescription = null) },
+                            onClick = { menuOpen = false; onDelete() },
+                        )
+                    }
+                }
+            }
+        }
+    }
 }
 
 @Composable
@@ -230,5 +353,3 @@ private fun OnDeviceCard(
         }
     }
 }
-
-
