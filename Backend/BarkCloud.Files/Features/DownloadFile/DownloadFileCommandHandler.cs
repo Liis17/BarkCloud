@@ -79,8 +79,9 @@ public class DownloadFileCommandHandler : IRequestHandler<DownloadFileCommand, D
             throw new FileNotUploadedException("Файл ещё не был загружен");
         }
 
-        var contentType = file.Filename.GetContentType();
-        var extension = Path.GetExtension(file.Filename).ToLowerInvariant();
+        var storedFileName = file.Filename ?? string.Empty;
+        var contentType = storedFileName.GetContentType();
+        var extension = Path.GetExtension(storedFileName).ToLowerInvariant();
         var bucketName = _bucketRegistry.GetBucketName(file.Type);
 
         _logger.LogDebug(
@@ -90,7 +91,9 @@ public class DownloadFileCommandHandler : IRequestHandler<DownloadFileCommand, D
             file.Size
         );
 
-        var fileName = $"{file.Id}{extension}";
+        var fileName = Path.GetFileName(storedFileName);
+        if (string.IsNullOrWhiteSpace(fileName))
+            fileName = $"{file.Id}{extension}";
         var totalSize = file.Size;
 
         // Частичный запрос (HTTP Range): тянем из S3 только нужный диапазон.

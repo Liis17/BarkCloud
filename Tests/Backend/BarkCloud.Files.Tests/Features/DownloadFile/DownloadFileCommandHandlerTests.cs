@@ -65,7 +65,7 @@ public class DownloadFileCommandHandlerTests
 
         var result = await CreateSut().Handle(new DownloadFileCommand { FileId = id }, default);
 
-        result.FileName.Should().Be($"{id}.png");
+        result.FileName.Should().Be("a.png");
         result.ContentType.Should().Be("image/png");
     }
 
@@ -80,7 +80,7 @@ public class DownloadFileCommandHandlerTests
 
         var result = await CreateSut().Handle(new DownloadFileCommand { FileId = id }, default);
 
-        result.FileName.Should().Be($"{id}.jpg");
+        result.FileName.Should().Be("p.jpg");
     }
 
     [Fact]
@@ -92,12 +92,12 @@ public class DownloadFileCommandHandlerTests
         _temp.Setup(s => s.GetTempFile(tempId))
             .ReturnsAsync(new TempFile { Id = tempId, OriginalFileId = originalId });
         _files.Setup(s => s.GetFile(originalId))
-            .ReturnsAsync(new UploadFileEntity { Id = originalId, Type = UploadFileType.CloudFile, Etag = "e", Filename = "file.txt" });
+            .ReturnsAsync(new UploadFileEntity { Id = originalId, Type = UploadFileType.CloudFile, Etag = "e", Filename = "Мой файл.txt" });
         _s3.Setup(s => s.DownloadAsync("test-bucket", originalId.ToString())).ReturnsAsync(new MemoryStream());
 
         var result = await CreateSut().Handle(new DownloadFileCommand { FileId = tempId }, default);
 
-        result.FileName.Should().Be($"{originalId}.txt");
+        result.FileName.Should().Be("Мой файл.txt");
     }
 
     [Fact]
