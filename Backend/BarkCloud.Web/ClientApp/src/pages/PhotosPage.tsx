@@ -50,7 +50,7 @@ export function PhotosPage() {
   const [toastNode, toast] = useToast();
   const { enqueue, attachVersion } = useUploadActions();
 
-  const { items: photos, loading, done, sentinelRef, removeItem, updateItem, reload } = useInfiniteMedia('photo', toast);
+  const { items: photos, loading, done, sentinelRef, removeItem, updateItem, prependItems } = useInfiniteMedia('photo', toast);
 
   const loadAlbums = React.useCallback(() => {
     apiGet<{ albums: Album[] }>('/api/albums')
@@ -83,12 +83,16 @@ export function PhotosPage() {
   const { over, dropHandlers } = useFileDrop((f) => doUpload(f));
   const bulk = useBulkMedia({ items: photos, albums: albums || [], toast, onRemoved: removeItem, onReloadAlbums: loadAlbums });
 
-  const reloadRef = React.useRef(reload);
-  reloadRef.current = reload;
+  const prependRef = React.useRef(prependItems);
+  prependRef.current = prependItems;
 
   const groups = React.useMemo(() => groupByDate(photos), [photos]);
 
-  React.useEffect(() => { reloadRef.current(); }, [attachVersion]);
+  React.useEffect(() => {
+    apiGet<{ items: MediaItem[] }>('/api/cloud/media?kind=photo&limit=60')
+      .then((d) => prependRef.current(d.items || []))
+      .catch(() => {});
+  }, [attachVersion]);
 
   usePageHeader(
     () => ({

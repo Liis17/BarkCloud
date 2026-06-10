@@ -81,7 +81,7 @@ export function VideosPage() {
   const [toastNode, toast] = useToast();
   const { enqueue, attachVersion } = useUploadActions();
 
-  const { items: videos, loading, done, sentinelRef, removeItem, updateItem, reload } = useInfiniteMedia('video', toast);
+  const { items: videos, loading, done, sentinelRef, removeItem, updateItem, prependItems } = useInfiniteMedia('video', toast);
 
   const loadAlbums = React.useCallback(() => {
     apiGet<{ albums: Album[] }>('/api/albums')
@@ -114,12 +114,17 @@ export function VideosPage() {
   const { over, dropHandlers } = useFileDrop((f) => doUpload(f));
   const bulk = useBulkMedia({ items: videos, albums: albums || [], toast, onRemoved: removeItem, onReloadAlbums: loadAlbums });
 
+  const prependRef = React.useRef(prependItems);
+  prependRef.current = prependItems;
+
   const featured = videos.length ? videos[0] : null;
   const totalSize = videos.reduce((s, v) => s + (v.size || 0), 0);
 
-  const reloadRef = React.useRef(reload);
-  reloadRef.current = reload;
-  React.useEffect(() => { reloadRef.current(); }, [attachVersion]);
+  React.useEffect(() => {
+    apiGet<{ items: MediaItem[] }>('/api/cloud/media?kind=video&limit=60')
+      .then((d) => prependRef.current(d.items || []))
+      .catch(() => {});
+  }, [attachVersion]);
   const stats = [
     { k: 'Всего видео', v: videos.length ? videos.length + (done ? '' : '+') : '—' },
     { k: 'Занято видео', v: fmtSize(totalSize) },
