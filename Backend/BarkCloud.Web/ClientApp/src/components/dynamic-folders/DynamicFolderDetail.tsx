@@ -113,9 +113,13 @@ export function DynamicFolderDetail({ folder, onBack, onChanged, toast, albums, 
       ) : items.length === 0 || (isDuplicateFolder && duplicateGroups.length === 0) ? (
         <EmptyState icon="folder" title="Пока пусто" hint="Сюда автоматически попадут файлы, подходящие под условия." />
       ) : isDuplicateFolder ? (
-        <div className="df-dup-groups">
+        <div className={'df-dup-groups ' + (folder.viewMode === 1 ? 'list' : 'media')}>
           {duplicateGroups.map((g, index) => (
-            <section className="df-dup-group" key={g.key}>
+            <section
+              className={'df-dup-group ' + (folder.viewMode === 1 ? 'list' : 'media')}
+              key={g.key}
+              style={{ '--dup-cols': Math.min(g.items.length, 4) } as React.CSSProperties}
+            >
               <div className="df-dup-head">
                 <div>
                   <div className="df-dup-title">Группа {index + 1}</div>
@@ -125,7 +129,7 @@ export function DynamicFolderDetail({ folder, onBack, onChanged, toast, albums, 
                 </div>
               </div>
               {folder.viewMode === 1 ? (
-                <div className="df-list">
+                <div className="df-list df-dup-list">
                   {g.items.map((m) => (
                     <div
                       key={m.id}
@@ -144,9 +148,9 @@ export function DynamicFolderDetail({ folder, onBack, onChanged, toast, albums, 
                   ))}
                 </div>
               ) : (
-                <div className="photo-grid">
+                <div className="df-dup-media-items">
                   {g.items.map((m) => (
-                    <div key={m.id} className="photo" onClick={() => openItem(m)} onContextMenu={(e) => actions.openMenu(e, m)}>
+                    <div key={m.id} className="photo df-dup-photo" onClick={() => openItem(m)} onContextMenu={(e) => actions.openMenu(e, m)}>
                       <MediaThumb media={m} sizes={GRID_SIZES} />
                       {m.kind === 'video' && (
                         <div className="vbadge">
