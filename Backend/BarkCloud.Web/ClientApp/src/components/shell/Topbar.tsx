@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Icon } from '../Icon';
+import { UploadIndicator } from '../upload/UploadIndicator';
 import type { PageHeader } from '../../hooks/usePageHeader';
 
 export function Topbar({ kicker, title, actions, search = true }: PageHeader) {
@@ -35,6 +36,7 @@ export function Topbar({ kicker, title, actions, search = true }: PageHeader) {
       )}
       <div className="tb-actions">
         {actions}
+        <UploadIndicator />
         <button className="icon-btn" title="Уведомления">
           <Icon.bell size={22} />
           <span className="dot-badge" />

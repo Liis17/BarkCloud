@@ -14,13 +14,13 @@ function fmtSize(bytes: number): string {
 
 function StatusIcon({ status }: { status: TaskStatus }) {
   switch (status) {
-    case 'done': return <Icon.check size={16} className="upload-status done" />;
-    case 'error': return <Icon.x size={16} className="upload-status err" />;
+    case 'done': return <Icon.check size={14} className="upload-status done" />;
+    case 'error': return <Icon.x size={14} className="upload-status err" />;
     case 'skipped': return <Icon.x size={14} className="upload-status skip" />;
     case 'uploading':
     case 'checking':
     case 'attaching':
-      return <span className="spinner" style={{ width: 16, height: 16, borderWidth: 2 }} />;
+      return <span className="spinner" style={{ width: 14, height: 14, borderWidth: 2 }} />;
     default: return null;
   }
 }
@@ -52,6 +52,11 @@ function TaskRow({ task, onRetry, onDismiss }: { task: UploadTask; onRetry: (id:
             <div className="bar-fill" style={{ width: Math.round(task.progress * 100) + '%' }} />
           </div>
         )}
+        {task.status === 'attaching' && (
+          <div className="upload-task-bar">
+            <div className="bar-fill" style={{ width: '100%' }} />
+          </div>
+        )}
         {task.status === 'error' && task.error && (
           <div className="upload-task-error">{task.error}</div>
         )}
@@ -72,58 +77,54 @@ function TaskRow({ task, onRetry, onDismiss }: { task: UploadTask; onRetry: (id:
   );
 }
 
-export function UploadBanner() {
+export function UploadIndicator() {
   const { tasks, summary, hasActive, dupPrompt, retry, dismiss, clearCompleted, answerDuplicate } = useUploadState();
-  const [expanded, setExpanded] = React.useState(false);
+  const [open, setOpen] = React.useState(false);
 
   if (tasks.length === 0) return null;
 
-  const finished = summary.done + summary.skipped + summary.error;
-  const allDone = !hasActive && finished > 0;
-  const processed = summary.done + summary.skipped + summary.error + summary.active;
-
   return (
-    <div className="upload-area">
-      <button className="upload-bar" onClick={() => setExpanded(e => !e)}>
-        <span className="upload-bar-icon">
-          {hasActive
-            ? <span className="spinner" style={{ width: 16, height: 16, borderWidth: 2 }} />
-            : <Icon.check size={16} />}
-        </span>
-        <span className="upload-bar-text">
-          {hasActive
-            ? <>Загрузка {processed} из {summary.total} файл{summary.total === 1 ? 'а' : 'ов'}</>
-            : allDone
-              ? summary.error > 0
-                ? <>Завершено с ошибками ({summary.error} из {summary.total})</>
-                : summary.skipped > 0
-                  ? <>Загружено {summary.done}, пропущено {summary.skipped}</>
-                  : <>Загружено: {summary.done} из {summary.total}</>
-              : null}
-        </span>
-        <div className="upload-bar-progress">
-          <div className="bar-fill" style={{ width: Math.round(summary.overallProgress * 100) + '%' }} />
-        </div>
-        <span className={'upload-bar-chev' + (expanded ? ' open' : '')}>
-          <Icon.chevDown size={18} />
-        </span>
+    <>
+      <button
+        className={'icon-btn upload-indicator' + (hasActive ? ' active' : '')}
+        title={hasActive ? `Загрузка ${summary.active} файл(ов)` : 'Загрузки'}
+        onClick={() => setOpen(v => !v)}
+      >
+        <Icon.upload size={20} />
+        {hasActive && <span className="upload-ind-badge">{summary.active}</span>}
+        {!hasActive && summary.error > 0 && <span className="upload-ind-badge err">{summary.error}</span>}
       </button>
 
-      {expanded && (
-        <div className="upload-panel">
-          <div className="upload-panel-head">
-            <span className="upload-panel-title">Загрузки</span>
-            {(summary.done + summary.skipped + summary.error > 0) && (
-              <button className="btn text" onClick={clearCompleted}>Очистить</button>
-            )}
+      {open && (
+        <div className="upload-popup">
+          <div className="upload-popup-head">
+            <span className="upload-popup-title">Загрузки</span>
+            <button className="icon-btn sm" title="Закрыть" onClick={() => setOpen(false)}>
+              <Icon.x size={16} />
+            </button>
           </div>
-          <div className="upload-panel-list">
+          {hasActive && (
+            <div className="upload-popup-progress">
+              <div className="upload-popup-bar">
+                <div className="bar-fill" style={{ width: Math.round(summary.overallProgress * 100) + '%' }} />
+              </div>
+              <span className="upload-popup-pct">{Math.round(summary.overallProgress * 100)}%</span>
+            </div>
+          )}
+          <div className="upload-popup-list">
             {tasks.map(t => (
               <TaskRow key={t.id} task={t} onRetry={retry} onDismiss={dismiss} />
             ))}
           </div>
+          {summary.done + summary.skipped + summary.error > 0 && (
+            <div className="upload-popup-foot">
+              <button className="btn text" onClick={() => { clearCompleted(); if (!tasks.some(t => t.status !== 'done' && t.status !== 'error' && t.status !== 'skipped')) setOpen(false); }}>Очистить завершённые</button>
+            </div>
+          )}
         </div>
       )}
+
+      {open && <div className="upload-popup-backdrop" onClick={() => setOpen(false)} />}
 
       {dupPrompt && (
         <Modal
@@ -151,6 +152,6 @@ export function UploadBanner() {
           </div>
         </Modal>
       )}
-    </div>
+    </>
   );
 }
