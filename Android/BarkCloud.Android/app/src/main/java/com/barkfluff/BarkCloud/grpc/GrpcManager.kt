@@ -2,6 +2,7 @@ package com.barkfluff.BarkCloud.grpc
 
 import barkcloud.files.AlbumApiGrpcKt
 import barkcloud.files.CloudApiGrpcKt
+import barkcloud.files.DynamicFolderApiGrpcKt
 import barkcloud.files.FilesApiGrpcKt
 import barkcloud.identity.IdentityApiGrpcKt
 import barkcloud.users.UsersApiGrpcKt
@@ -42,6 +43,9 @@ class GrpcManager(
 
     fun albumStub(): AlbumApiGrpcKt.AlbumApiCoroutineStub =
         AlbumApiGrpcKt.AlbumApiCoroutineStub(channelFor(BuildConfig.FILES_API_ADDRESS))
+
+    fun dynamicFolderStub(): DynamicFolderApiGrpcKt.DynamicFolderApiCoroutineStub =
+        DynamicFolderApiGrpcKt.DynamicFolderApiCoroutineStub(channelFor(BuildConfig.FILES_API_ADDRESS))
 
     private fun channelFor(address: String): Channel =
         interceptedChannels.computeIfAbsent(address) {

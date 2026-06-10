@@ -69,6 +69,10 @@ class FileTransferService(
     suspend fun upload(uri: Uri, fileName: String, urlString: String): String =
         upload(uriRequestBody(uri), fileName, urlString)
 
+    /** Залить локальный staged-файл из app storage. */
+    suspend fun upload(file: File, fileName: String, urlString: String): String =
+        upload(fileRequestBody(file), fileName, urlString)
+
     /** Залить готовые байты (например, аватар). */
     suspend fun upload(bytes: ByteArray, fileName: String, urlString: String): String =
         upload(bytes.toRequestBody(OCTET_STREAM), fileName, urlString)
@@ -111,6 +115,14 @@ class FileTransferService(
             appContext.contentResolver.openInputStream(uri)?.use { input ->
                 sink.writeAll(input.source())
             } ?: throw IOException("Cannot open $uri")
+        }
+    }
+
+    private fun fileRequestBody(file: File): RequestBody = object : RequestBody() {
+        override fun contentType() = OCTET_STREAM
+        override fun contentLength(): Long = file.length()
+        override fun writeTo(sink: BufferedSink) {
+            file.inputStream().use { input -> sink.writeAll(input.source()) }
         }
     }
 

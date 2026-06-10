@@ -1,5 +1,6 @@
 package com.barkfluff.BarkCloud.ui.navigation
 
+import android.net.Uri
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
@@ -14,7 +15,7 @@ private const val ROUTE_LOGIN = "login"
 private const val ROUTE_MAIN = "main"
 
 @Composable
-fun RootNavGraph() {
+fun RootNavGraph(deepLink: Uri? = null) {
     val context = LocalContext.current
     val app = context.applicationContext as BarkCloudApplication
     val startDestination = remember(app) {
@@ -38,6 +39,7 @@ fun RootNavGraph() {
         }
         composable(ROUTE_MAIN) {
             MainScreen(
+                deepLink = deepLink,
                 onSignOut = {
                     navController.navigate(ROUTE_LOGIN) {
                         popUpTo(ROUTE_MAIN) { inclusive = true }

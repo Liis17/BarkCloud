@@ -24,6 +24,7 @@ import barkcloud.files.FilesApiOuterClass.RestoreFromTrashRequest
 import barkcloud.files.FilesApiOuterClass.UploadFileType
 import com.barkfluff.BarkCloud.grpc.GrpcManager
 import com.barkfluff.BarkCloud.net.FileTransferService
+import java.io.File
 
 /**
  * Доступ к сервису Files: галерея (`ListUserMedia`), каталоги (`CloudApi`), корзина,
@@ -203,6 +204,13 @@ class CloudRepository(
     suspend fun uploadFile(uri: Uri, fileName: String, directoryId: String? = null): String {
         val target = transfer.getUploadUrl(UploadFileType.CLOUD_FILE)
         val fileId = transfer.upload(uri, fileName, target.url)
+        if (directoryId != null) attachFile(fileId, directoryId, fileName)
+        return fileId
+    }
+
+    suspend fun uploadFile(file: File, fileName: String, directoryId: String? = null): String {
+        val target = transfer.getUploadUrl(UploadFileType.CLOUD_FILE)
+        val fileId = transfer.upload(file, fileName, target.url)
         if (directoryId != null) attachFile(fileId, directoryId, fileName)
         return fileId
     }

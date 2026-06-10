@@ -11,6 +11,7 @@ import com.barkfluff.BarkCloud.data.cloud.CloudDirectory
 import com.barkfluff.BarkCloud.data.cloud.CloudFileEntry
 import com.barkfluff.BarkCloud.data.cloud.CloudRepository
 import com.barkfluff.BarkCloud.data.cloud.PathCrumb
+import com.barkfluff.BarkCloud.data.upload.UploadScheduler
 import com.barkfluff.BarkCloud.net.queryFileName
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -82,10 +83,13 @@ class CloudBrowserViewModel(
         viewModelScope.launch {
             var failures = 0
             uris.forEach { uri ->
-                runCatching { cloudRepository.uploadFile(uri, queryFileName(appContext, uri), directoryId) }
+                runCatching {
+                    (appContext as BarkCloudApplication).uploadQueue.enqueue(uri, queryFileName(appContext, uri), directoryId)
+                }
                     .onFailure { failures++ }
             }
-            _state.update { it.copy(isUploading = false, snackbar = if (failures == 0) null else UPLOAD_PARTIAL) }
+            if (failures < uris.size) UploadScheduler.enqueue(appContext)
+            _state.update { it.copy(isUploading = false, snackbar = if (failures == 0) UPLOAD_QUEUED else UPLOAD_PARTIAL) }
             reload()
         }
     }
@@ -105,6 +109,7 @@ class CloudBrowserViewModel(
 
     companion object {
         private const val UPLOAD_PARTIAL = "Часть файлов не загрузилась"
+        private const val UPLOAD_QUEUED = "Загрузка поставлена в очередь"
 
         fun factory(): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")

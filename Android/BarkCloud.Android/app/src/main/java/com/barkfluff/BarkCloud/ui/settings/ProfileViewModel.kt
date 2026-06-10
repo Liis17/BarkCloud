@@ -1,5 +1,6 @@
 package com.barkfluff.BarkCloud.ui.settings
 
+import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -9,6 +10,7 @@ import com.barkfluff.BarkCloud.BarkCloudApplication
 import com.barkfluff.BarkCloud.data.SessionManager
 import com.barkfluff.BarkCloud.data.users.UserRepository
 import com.barkfluff.BarkCloud.net.FileTransferService
+import com.barkfluff.BarkCloud.widgets.StorageWidgetBridge
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -32,6 +34,7 @@ data class ProfileUiState(
 )
 
 class ProfileViewModel(
+    private val appContext: Context,
     private val userRepository: UserRepository,
     private val transfer: FileTransferService,
     private val sessionManager: SessionManager,
@@ -52,6 +55,7 @@ class ProfileViewModel(
                     .ifEmpty { user.username }
                 val avatar = user.profilePicturePreview.ifEmpty { user.profilePicture }.ifEmpty { null }
                 val storage = runCatching { transfer.storageInfo() }.getOrNull()
+                if (storage != null) StorageWidgetBridge.update(appContext, storage.used, storage.limit)
                 _state.update {
                     it.copy(
                         isLoading = false,
@@ -126,7 +130,7 @@ class ProfileViewModel(
             override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
                 val app = extras[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]
                     as BarkCloudApplication
-                return ProfileViewModel(app.userRepository, app.fileTransfer, app.sessionManager) as T
+                return ProfileViewModel(app, app.userRepository, app.fileTransfer, app.sessionManager) as T
             }
         }
     }

@@ -2,7 +2,11 @@ package com.barkfluff.BarkCloud.data
 
 import android.content.Context
 import coil3.SingletonImageLoader
+import com.barkfluff.BarkCloud.data.cache.FileCacheService
+import com.barkfluff.BarkCloud.data.gallery.AutoUploadScheduler
+import com.barkfluff.BarkCloud.data.upload.UploadQueueStore
 import com.barkfluff.BarkCloud.grpc.GrpcManager
+import kotlinx.coroutines.runBlocking
 
 /**
  * Централизованный выход из аккаунта (зеркалит iOS `AppEnvironment.signOut`).
@@ -14,6 +18,8 @@ class SessionManager(
     private val authRepository: AuthRepository,
     private val globalParam: GlobalParam,
     private val grpcManager: GrpcManager,
+    private val fileCache: FileCacheService,
+    private val uploadQueue: UploadQueueStore,
 ) {
 
     suspend fun signOut() {
@@ -23,7 +29,10 @@ class SessionManager(
 
     fun resetLocalState() {
         globalParam.clearSession()
+        AutoUploadScheduler.disable(appContext)
         grpcManager.shutdown()
+        runBlocking { fileCache.clearAll() }
+        uploadQueue.clear()
         val loader = SingletonImageLoader.get(appContext)
         loader.memoryCache?.clear()
         loader.diskCache?.clear()

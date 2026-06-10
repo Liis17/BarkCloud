@@ -24,9 +24,7 @@ fun rememberRemoteOpener(): (fileId: String, fileName: String, onError: (String)
         { fileId, fileName, onError ->
             scope.launch {
                 runCatching {
-                    val url = app.fileTransfer.tempDownloadUrls(listOf(fileId))[fileId]
-                        ?: error("no download url")
-                    val file = app.fileTransfer.download(url, fileName)
+                    val file = app.fileCache.loadOriginal(fileId, fileName)
                     context.startActivity(FileShareHelper.buildOpenIntent(context, file, MimeIcon.mimeFor(fileName)))
                 }.onFailure { onError(it.message ?: "open failed") }
             }
