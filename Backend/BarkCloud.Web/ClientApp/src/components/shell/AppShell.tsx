@@ -3,7 +3,6 @@ import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 import { Footbar } from './Footbar';
-import { UploadBanner } from '../upload/UploadBanner';
 import { ShellContext } from '../../hooks/useShell';
 import { PageHeaderContext, type PageHeader } from '../../hooks/usePageHeader';
 import { UploadManagerProvider } from '../../hooks/useUploadManager';
@@ -42,7 +41,6 @@ export function AppShell() {
             <div className="main">
               <Topbar {...header} />
               <div className={'content' + (header.contentClass ? ' ' + header.contentClass : '')}>
-                <UploadBanner />
                 <Outlet />
               </div>
               <Footbar />
