@@ -953,19 +953,27 @@ public static class CloudApiEndpoints
 
     // ───────────────────────── Инфраструктура ─────────────────────────
 
+    private static string ResolveOrigin(HttpContext http)
+    {
+        var publicHost = http.RequestServices.GetRequiredService<IConfiguration>()["App:PublicHost"];
+        if (!string.IsNullOrWhiteSpace(publicHost) && Uri.TryCreate(publicHost, UriKind.Absolute, out var uri))
+            return $"{uri.Scheme}://{uri.Authority}";
+        return $"{http.Request.Scheme}://{http.Request.Host}";
+    }
+
     /// <summary>
-    /// JSON-представление публичной ссылки. Дружелюбный URL собирается из хоста текущего
-    /// запроса (Web — владелец публичного роута /s/{token}), а не приходит из Files.
+    /// JSON-представление публичной ссылки. Дружелюбный URL собирается из App:PublicHost
+    /// (если задан — включает порт) либо из хоста текущего запроса.
     /// </summary>
     private static object ShareJson(HttpContext http, ShareInfo s)
     {
-        var origin = $"{http.Request.Scheme}://{http.Request.Host}";
+        var origin = ResolveOrigin(http);
         return new
         {
             id = s.Id,
             token = s.Token,
-            url = $"{origin}/v/{s.Token}",         // публичная страница просмотра (основная ссылка)
-            downloadUrl = $"{origin}/s/{s.Token}", // прямое скачивание (302)
+            url = $"{origin}/v/{s.Token}",
+            downloadUrl = $"{origin}/s/{s.Token}",
             fileId = s.FileId,
             name = s.Name,
             createdAt = s.CreatedAt?.ToDateTimeOffset(),
@@ -973,10 +981,10 @@ public static class CloudApiEndpoints
         };
     }
 
-    /// <summary>JSON-представление публичной папки. Дружелюбный URL `/f/{token}` собирается из хоста запроса.</summary>
+    /// <summary>JSON-представление публичной папки. URL `/f/{token}` собирается из App:PublicHost либо хоста запроса.</summary>
     private static object FolderShareJson(HttpContext http, FolderShareInfo s)
     {
-        var origin = $"{http.Request.Scheme}://{http.Request.Host}";
+        var origin = ResolveOrigin(http);
         return new
         {
             id = s.Id,
@@ -990,10 +998,10 @@ public static class CloudApiEndpoints
         };
     }
 
-    /// <summary>JSON-представление публичного альбома. Дружелюбный URL `/al/{token}` собирается из хоста запроса.</summary>
+    /// <summary>JSON-представление публичного альбома. URL `/al/{token}` собирается из App:PublicHost либо хоста запроса.</summary>
     private static object AlbumShareJson(HttpContext http, AlbumShareInfo s)
     {
-        var origin = $"{http.Request.Scheme}://{http.Request.Host}";
+        var origin = ResolveOrigin(http);
         return new
         {
             id = s.Id,
