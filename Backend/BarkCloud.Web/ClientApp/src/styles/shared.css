@@ -1027,6 +1027,10 @@ img.avatar { object-fit: cover; }
   border-radius: var(--r-full);
   transition: width 200ms ease;
 }
+.upload-task-eta {
+  color: var(--md-on-surface-variant);
+  opacity: .7;
+}
 .upload-task-error {
   font-size: 12px;
   color: var(--md-error);
@@ -1036,11 +1040,7 @@ img.avatar { object-fit: cover; }
   display: flex;
   gap: 2px;
   flex-shrink: 0;
-  opacity: 0;
-  transition: opacity var(--d-short);
 }
-.upload-task:hover .upload-task-actions,
-.upload-task.has-error .upload-task-actions { opacity: 1; }
 
 /* Album cards (Фото / Видео) */
 .album-grid {

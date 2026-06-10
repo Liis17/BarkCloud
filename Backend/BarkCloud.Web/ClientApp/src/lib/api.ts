@@ -108,16 +108,19 @@ export async function checkDuplicate(file: File): Promise<{ exists: boolean; loc
 
 /** Загрузка файла (новый блоб). Серверный дедуп снят — каждая загрузка создаёт копию;
  *  предварительную проверку дубликата делает вызывающий код через checkDuplicate. */
-export async function uploadFile(file: File, onProgress?: (frac: number) => void): Promise<UploadResult> {
-  return uploadXhr(file, onProgress);
+export async function uploadFile(file: File, onProgress?: (frac: number) => void, signal?: AbortSignal): Promise<UploadResult> {
+  return uploadXhr(file, onProgress, signal);
 }
 
-/** Передача байтов файла через XHR (прогресс — fetch не отдаёт upload-progress). */
-function uploadXhr(file: File, onProgress?: (frac: number) => void): Promise<UploadResult> {
+function uploadXhr(file: File, onProgress?: (frac: number) => void, signal?: AbortSignal): Promise<UploadResult> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open('POST', '/api/files/upload');
     xhr.withCredentials = true;
+    if (signal) {
+      if (signal.aborted) { xhr.abort(); reject(new DOMException('Aborted', 'AbortError')); return; }
+      signal.addEventListener('abort', () => { xhr.abort(); reject(new DOMException('Aborted', 'AbortError')); }, { once: true });
+    }
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable && onProgress) onProgress(e.loaded / e.total);
     };

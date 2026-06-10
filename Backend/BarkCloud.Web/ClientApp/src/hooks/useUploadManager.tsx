@@ -22,6 +22,9 @@ export interface UploadTask {
   error: string | null;
   attachOptions: AttachOptions;
   batchId: string;
+  startedAt: number | null;
+  eta: number | null;
+  abortCtrl: AbortController | null;
 }
 
 export interface UploadSummary {
@@ -31,6 +34,7 @@ export interface UploadSummary {
   error: number;
   active: number;
   overallProgress: number;
+  eta: number | null;
 }
 
 interface DupPromptReq {
@@ -52,6 +56,7 @@ interface StateValue {
   retry: (id: string) => void;
   dismiss: (id: string) => void;
   clearCompleted: () => void;
+  cancel: (id: string) => void;
   answerDuplicate: (d: DuplicateDecision) => void;
 }
 
@@ -108,6 +113,8 @@ export function UploadManagerProvider({ children }: { children: React.ReactNode 
   const processTask = React.useCallback(async (task: UploadTask) => {
     task.status = 'checking';
     task.progress = 0;
+    task.startedAt = Date.now();
+    task.eta = null;
     bumpRef.current();
 
     try {
@@ -134,13 +141,20 @@ export function UploadManagerProvider({ children }: { children: React.ReactNode 
     }
 
     task.status = 'uploading';
+    const ctrl = new AbortController();
+    task.abortCtrl = ctrl;
     bumpRef.current();
 
     try {
       const result = await uploadFile(task.file, (frac) => {
         task.progress = frac;
+        if (frac > 0.01 && task.startedAt) {
+          const elapsed = (Date.now() - task.startedAt) / 1000;
+          const totalEst = elapsed / frac;
+          task.eta = Math.max(0, totalEst - elapsed);
+        }
         bumpRef.current();
-      });
+      }, ctrl.signal);
 
       task.status = 'attaching';
       task.progress = 1;
@@ -162,8 +176,14 @@ export function UploadManagerProvider({ children }: { children: React.ReactNode 
       bumpRef.current();
       setAttachVersion(v => v + 1);
     } catch (e) {
-      task.status = 'error';
-      task.error = (e as Error).message || 'Ошибка загрузки';
+      if ((e as Error).name === 'AbortError') {
+        task.status = 'error';
+        task.error = 'Отменено';
+      } else {
+        task.status = 'error';
+        task.error = (e as Error).message || 'Ошибка загрузки';
+      }
+      task.abortCtrl = null;
       bumpRef.current();
     }
   }, []);
@@ -200,6 +220,9 @@ export function UploadManagerProvider({ children }: { children: React.ReactNode 
       error: null,
       attachOptions,
       batchId,
+      startedAt: null,
+      eta: null,
+      abortCtrl: null,
     }));
     tasksRef.current = [...tasksRef.current, ...newTasks];
     bumpRef.current();
@@ -228,6 +251,16 @@ export function UploadManagerProvider({ children }: { children: React.ReactNode 
     bumpRef.current();
   }, []);
 
+  const cancel = React.useCallback((id: string) => {
+    const task = tasksRef.current.find(t => t.id === id);
+    if (!task) return;
+    if (task.abortCtrl) { task.abortCtrl.abort(); task.abortCtrl = null; }
+    if (task.status === 'pending') {
+      tasksRef.current = tasksRef.current.filter(t => t.id !== id);
+    }
+    bumpRef.current();
+  }, []);
+
   React.useEffect(() => {
     const active = tasksRef.current.some(
       t => t.status === 'pending' || t.status === 'checking' || t.status === 'uploading' || t.status === 'attaching',
@@ -253,7 +286,12 @@ export function UploadManagerProvider({ children }: { children: React.ReactNode 
       }
     }
     const total = t.length;
-    return { total, done, skipped, error, active, overallProgress: total > 0 ? uploaded / total : 0 };
+    let eta: number | null = null;
+    const uploadingTasks = t.filter(x => x.status === 'uploading' && x.eta !== null);
+    if (uploadingTasks.length > 0) {
+      eta = Math.max(...uploadingTasks.map(x => x.eta!));
+    }
+    return { total, done, skipped, error, active, overallProgress: total > 0 ? uploaded / total : 0, eta };
   }, [rev]);
 
   const hasActive = summary.active > 0;
@@ -271,6 +309,7 @@ export function UploadManagerProvider({ children }: { children: React.ReactNode 
     retry,
     dismiss,
     clearCompleted,
+    cancel,
     answerDuplicate,
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [rev, dupPrompt]);

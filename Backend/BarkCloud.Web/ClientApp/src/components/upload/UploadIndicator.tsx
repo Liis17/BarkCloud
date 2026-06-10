@@ -12,6 +12,17 @@ function fmtSize(bytes: number): string {
   return (i === 0 ? v.toFixed(0) : v.toFixed(v < 10 ? 1 : 0)).replace('.', ',') + ' ' + u[i];
 }
 
+function fmtEta(seconds: number | null): string {
+  if (seconds === null || seconds < 1) return '';
+  if (seconds < 60) return Math.ceil(seconds) + ' сек';
+  const m = Math.floor(seconds / 60);
+  const s = Math.ceil(seconds % 60);
+  if (m < 60) return m + ' мин ' + (s > 0 ? s + ' сек' : '');
+  const h = Math.floor(m / 60);
+  const rm = m % 60;
+  return h + ' ч ' + (rm > 0 ? rm + ' мин' : '');
+}
+
 function StatusIcon({ status }: { status: TaskStatus }) {
   switch (status) {
     case 'done': return <Icon.check size={14} className="upload-status done" />;
@@ -37,7 +48,8 @@ function statusLabel(s: TaskStatus): string {
   }
 }
 
-function TaskRow({ task, onRetry, onDismiss }: { task: UploadTask; onRetry: (id: string) => void; onDismiss: (id: string) => void }) {
+function TaskRow({ task, onRetry, onDismiss, onCancel }: { task: UploadTask; onRetry: (id: string) => void; onDismiss: (id: string) => void; onCancel: (id: string) => void }) {
+  const isActive = task.status === 'pending' || task.status === 'checking' || task.status === 'uploading' || task.status === 'attaching';
   return (
     <div className={'upload-task' + (task.status === 'error' ? ' has-error' : '')}>
       <div className="upload-task-icon"><StatusIcon status={task.status} /></div>
@@ -46,6 +58,9 @@ function TaskRow({ task, onRetry, onDismiss }: { task: UploadTask; onRetry: (id:
         <div className="upload-task-meta">
           {task.fileSize > 0 && <span className="upload-task-size">{fmtSize(task.fileSize)}</span>}
           <span className="upload-task-status">{statusLabel(task.status)}</span>
+          {task.status === 'uploading' && task.eta !== null && task.eta > 1 && (
+            <span className="upload-task-eta">~{fmtEta(task.eta)}</span>
+          )}
         </div>
         {task.status === 'uploading' && (
           <div className="upload-task-bar">
@@ -67,7 +82,17 @@ function TaskRow({ task, onRetry, onDismiss }: { task: UploadTask; onRetry: (id:
             <Icon.refresh size={16} />
           </button>
         )}
-        {(task.status === 'done' || task.status === 'error' || task.status === 'skipped') && (
+        {isActive && (
+          <button className="icon-btn" title="Отменить" onClick={() => onCancel(task.id)}>
+            <Icon.x size={16} />
+          </button>
+        )}
+        {(task.status === 'done' || task.status === 'skipped') && (
+          <button className="icon-btn" title="Убрать" onClick={() => onDismiss(task.id)}>
+            <Icon.x size={16} />
+          </button>
+        )}
+        {task.status === 'error' && (
           <button className="icon-btn" title="Убрать" onClick={() => onDismiss(task.id)}>
             <Icon.x size={16} />
           </button>
@@ -78,7 +103,7 @@ function TaskRow({ task, onRetry, onDismiss }: { task: UploadTask; onRetry: (id:
 }
 
 export function UploadIndicator() {
-  const { tasks, summary, hasActive, dupPrompt, retry, dismiss, clearCompleted, answerDuplicate } = useUploadState();
+  const { tasks, summary, hasActive, dupPrompt, retry, dismiss, clearCompleted, cancel, answerDuplicate } = useUploadState();
   const [open, setOpen] = React.useState(false);
 
   if (tasks.length === 0) return null;
@@ -108,12 +133,15 @@ export function UploadIndicator() {
               <div className="upload-popup-bar">
                 <div className="bar-fill" style={{ width: Math.round(summary.overallProgress * 100) + '%' }} />
               </div>
-              <span className="upload-popup-pct">{Math.round(summary.overallProgress * 100)}%</span>
+              <span className="upload-popup-pct">
+                {Math.round(summary.overallProgress * 100)}%
+                {summary.eta !== null && summary.eta > 1 && <span className="upload-popup-eta"> ~{fmtEta(summary.eta)}</span>}
+              </span>
             </div>
           )}
           <div className="upload-popup-list">
             {tasks.map(t => (
-              <TaskRow key={t.id} task={t} onRetry={retry} onDismiss={dismiss} />
+              <TaskRow key={t.id} task={t} onRetry={retry} onDismiss={dismiss} onCancel={cancel} />
             ))}
           </div>
           {summary.done + summary.skipped + summary.error > 0 && (
