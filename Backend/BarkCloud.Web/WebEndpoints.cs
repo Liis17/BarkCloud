@@ -8,6 +8,8 @@ using BarkCloud.Web.Rendering;
 
 using Grpc.Core;
 
+using System.Net;
+
 namespace BarkCloud.Web;
 
 public static class WebEndpoints
@@ -64,6 +66,37 @@ public static class WebEndpoints
             var user = await auth.AuthenticateAsync(http);
             await auth.LogoutAsync(http, user);
             return Results.Redirect("/login");
+        });
+
+        // Same-origin прокси для favicon-превью: браузерный canvas не может надёжно
+        // скруглить внешнюю картинку без CORS, поэтому отдаём разрешённые preview URL через Web.
+        app.MapGet("/api/head/icon", async (HttpContext http, IHttpClientFactory httpFactory, IConfiguration config, string? url) =>
+        {
+            if (!TryValidateIconProxyUrl(http, config, url, out var target))
+                return Results.BadRequest();
+
+            try
+            {
+                var client = httpFactory.CreateClient("files-upload");
+                using var resp = await client.GetAsync(target, HttpCompletionOption.ResponseHeadersRead, http.RequestAborted);
+                if (!resp.IsSuccessStatusCode)
+                    return Results.StatusCode(StatusCodes.Status502BadGateway);
+
+                var contentType = resp.Content.Headers.ContentType?.MediaType ?? "";
+                if (!contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+                    return Results.StatusCode(StatusCodes.Status415UnsupportedMediaType);
+
+                var bytes = await resp.Content.ReadAsByteArrayAsync(http.RequestAborted);
+                if (bytes.Length > 2_097_152)
+                    return Results.StatusCode(StatusCodes.Status413PayloadTooLarge);
+
+                http.Response.Headers.CacheControl = "public, max-age=86400";
+                return Results.File(bytes, contentType);
+            }
+            catch
+            {
+                return Results.StatusCode(StatusCodes.Status502BadGateway);
+            }
         });
 
         // ───────── Регистрация (с подтверждением кодом по почте) ─────────
@@ -309,6 +342,54 @@ public static class WebEndpoints
         // Страницы приложения (/photos, /videos, /files, /favorites, /trash, /settings, /shared)
         // отдаёт React-SPA через SPA-fallback в Program.cs (UseStaticFiles + MapFallback).
         // Данные грузятся на клиенте через /api (включая /api/me и /api/settings/full).
+    }
+
+    private static bool TryValidateIconProxyUrl(HttpContext http, IConfiguration config, string? raw, out Uri target)
+    {
+        target = null!;
+        if (!Uri.TryCreate(raw, UriKind.Absolute, out var uri))
+            return false;
+
+        if (uri.Scheme is not ("http" or "https"))
+            return false;
+
+        if (!uri.AbsolutePath.Contains("/download/", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        var requestHost = PublicHost(config) ?? http.Request.Host.Host;
+        if (string.Equals(uri.Host, requestHost, StringComparison.OrdinalIgnoreCase))
+        {
+            target = uri;
+            return true;
+        }
+
+        if (IsLoopbackHost(requestHost) && uri.IsLoopback)
+        {
+            target = uri;
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool IsLoopbackHost(string host)
+    {
+        if (string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        return IPAddress.TryParse(host, out var ip) && IPAddress.IsLoopback(ip);
+    }
+
+    private static string? PublicHost(IConfiguration config)
+    {
+        var value = config["App:PublicHost"];
+        if (string.IsNullOrWhiteSpace(value))
+            return null;
+
+        if (Uri.TryCreate(value, UriKind.Absolute, out var absolute))
+            return absolute.Host;
+
+        return value.Split(':', 2)[0];
     }
 
     private static Dictionary<string, string?> LoginVars(

@@ -81,30 +81,29 @@ function roundedRect(ctx: CanvasRenderingContext2D, size: number, radius: number
 function loadIconImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
-    try {
-      if (new URL(src, window.location.href).origin !== window.location.origin) {
-        img.crossOrigin = 'anonymous';
-      }
-    } catch {
-      // Некорректный URL дальше отработает через onerror.
-    }
     img.onload = () => resolve(img);
     img.onerror = () => reject(new Error('icon load failed'));
     img.src = src;
   });
 }
 
+function iconCanvasSource(src: string): string {
+  const url = new URL(src, window.location.href);
+  if (url.origin === window.location.origin) return url.href;
+  return `/api/head/icon?url=${encodeURIComponent(url.href)}`;
+}
+
 async function makeRoundedIcon(src: string): Promise<string> {
   const cached = roundedIconCache.get(src);
   if (cached) return cached;
 
-  const img = await loadIconImage(src);
+  const img = await loadIconImage(iconCanvasSource(src));
   const canvas = document.createElement('canvas');
   canvas.width = ICON_SIZE;
   canvas.height = ICON_SIZE;
 
   const ctx = canvas.getContext('2d');
-  if (!ctx) return src;
+  if (!ctx) throw new Error('canvas unavailable');
 
   const scale = Math.max(ICON_SIZE / img.naturalWidth, ICON_SIZE / img.naturalHeight);
   const width = img.naturalWidth * scale;
@@ -130,7 +129,7 @@ async function applyDocumentHead(head: DocumentHeadDescriptor | null, cancelled:
     const rounded = await makeRoundedIcon(iconUrl);
     if (!cancelled()) setIconLink(rounded);
   } catch {
-    if (!cancelled()) setIconLink(iconUrl, iconUrl === DEFAULT_ICON_URL ? 'image/png' : 'image/jpeg');
+    if (!cancelled()) setIconLink(DEFAULT_ICON_URL);
   }
 }
 
