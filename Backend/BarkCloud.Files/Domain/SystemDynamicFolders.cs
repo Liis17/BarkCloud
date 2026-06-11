@@ -37,7 +37,12 @@ public static class SystemDynamicFolders
             Operator = DfOperator.Equals,
             Value = $"{(int)MediaKind.Photo},{(int)MediaKind.Video}"
         };
-        var docKind = new DynamicFolderRule { Field = DfField.MediaKind, Operator = DfOperator.Equals, Value = ((int)MediaKind.Document).ToString() };
+        var nonMediaKinds = new DynamicFolderRule
+        {
+            Field = DfField.MediaKind,
+            Operator = DfOperator.Equals,
+            Value = $"{(int)MediaKind.Document},{(int)MediaKind.Audio},{(int)MediaKind.Other}"
+        };
 
         return new[]
         {
@@ -45,9 +50,9 @@ public static class SystemDynamicFolders
                 recentDays, mediaKinds),
 
             Build(KeyRecentDocs, "Недавние документы", "doc", "#5C97A8", 1, DfViewMode.List,
-                recentDays, docKind),
+                recentDays, nonMediaKinds),
 
-            Build(KeyLarge, "Большие файлы", "hdd", "#E0883B", 2, DfViewMode.Grid,
+            Build(KeyLarge, "Большие файлы", "hdd", "#E0883B", 2, DfViewMode.List,
                 new DynamicFolderRule { Field = DfField.Size, Operator = DfOperator.GreaterThan, Value = LargeSizeBytes.ToString() }),
 
             Build(KeyScreenshots, "Скриншоты", "camera", "#7E57C2", 3, DfViewMode.Grid,
