@@ -26,8 +26,9 @@ function MemoryCard({ group, onOpen }: { group: MemoryGroup; onOpen: () => void 
 }
 
 /** Лента «Воспоминания — В этот день»: фото/видео за сегодняшнюю дату прошлых лет.
- *  Скрывается, если воспоминаний нет. Клик по году открывает Lightbox с его снимками. */
-export function MemoriesStrip() {
+ *  Скрывается, если воспоминаний нет. Клик по году открывает Lightbox с его снимками.
+ *  refreshKey: инкремент — перезагрузить группы (например, после удаления фото в галерее). */
+export function MemoriesStrip({ refreshKey = 0 }: { refreshKey?: number }) {
   const [groups, setGroups] = React.useState<MemoryGroup[] | null>(null);
   const [open, setOpen] = React.useState<MemoryGroup | null>(null);
 
@@ -35,7 +36,7 @@ export function MemoriesStrip() {
     apiGet<{ groups: MemoryGroup[] }>('/api/cloud/memories')
       .then((d) => setGroups(d.groups || []))
       .catch(() => setGroups([]));
-  }, []);
+  }, [refreshKey]);
 
   if (!groups || groups.length === 0) return null;
 
