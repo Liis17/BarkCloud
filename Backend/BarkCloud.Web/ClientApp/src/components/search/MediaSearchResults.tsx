@@ -4,9 +4,11 @@ import { Icon } from '../Icon';
 import { MediaThumb } from '../media/MediaThumb';
 import { Lightbox } from '../media/Lightbox';
 import { EmptyState, Loading } from '../ui/EmptyState';
+import { useMediaActions } from '../../hooks/useMediaActions';
 import { apiGet } from '../../lib/api';
 import { GRID_SIZES, plural } from '../../lib/format';
-import type { Entry, MediaItem } from '../../lib/types';
+import type { Album, Entry, MediaItem } from '../../lib/types';
+import type { ToastPush } from '../../hooks/useToast';
 
 interface SearchResponse {
   files: Entry[];
@@ -24,14 +26,26 @@ function toMediaItem(e: Entry): MediaItem {
 }
 
 /** Результаты поиска фото/видео (вкладки «Фото»/«Видео», ?q=): сетка с превью,
- *  «Показать ещё» по cursor-пагинации, Lightbox по клику. */
-export function MediaSearchResults({ q }: { q: string }) {
+ *  «Показать ещё» по cursor-пагинации, Lightbox с панелью действий по клику. */
+export function MediaSearchResults({ q, albums, toast, reloadAlbums }: {
+  q: string;
+  albums: Album[];
+  toast: ToastPush;
+  reloadAlbums?: () => void;
+}) {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const [items, setItems] = React.useState<MediaItem[] | null>(null);
   const [cursor, setCursor] = React.useState<{ at: string; id: string } | null>(null);
   const [loadingMore, setLoadingMore] = React.useState(false);
   const [lightbox, setLightbox] = React.useState<number | null>(null);
+
+  const actionsCtx = useMediaActions({
+    albums,
+    toast,
+    onRemoved: (m) => setItems((prev) => (prev ? prev.filter((x) => x.id !== m.id) : prev)),
+    reloadAlbums,
+  });
 
   const fetchPage = React.useCallback(
     (after?: { at: string; id: string }) => {
@@ -65,6 +79,7 @@ export function MediaSearchResults({ q }: { q: string }) {
 
   return (
     <>
+      {actionsCtx.overlay}
       <div className="section-head">
         <h2 style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <Icon.search size={18} /> Результаты поиска: «{q}»
@@ -110,7 +125,7 @@ export function MediaSearchResults({ q }: { q: string }) {
         </>
       )}
 
-      {lightbox !== null && items && <Lightbox items={items} index={lightbox} onClose={() => setLightbox(null)} />}
+      {lightbox !== null && items && <Lightbox items={items} index={lightbox} actions={actionsCtx.api} onClose={() => setLightbox(null)} />}
     </>
   );
 }

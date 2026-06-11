@@ -72,7 +72,7 @@ export function AlbumsPage() {
       {toastNode}
 
       {openAlbum ? (
-        <AlbumDetail album={openAlbum} candidates={candidates} toast={toast} onBack={() => setOpenAlbum(null)} onChanged={loadAlbums} />
+        <AlbumDetail album={openAlbum} candidates={candidates} albums={albums || []} toast={toast} onBack={() => setOpenAlbum(null)} onChanged={loadAlbums} />
       ) : albums === null ? (
         <Loading />
       ) : albums.length === 0 ? (
