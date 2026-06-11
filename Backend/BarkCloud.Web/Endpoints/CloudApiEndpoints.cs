@@ -990,7 +990,9 @@ public static class CloudApiEndpoints
             fileId = s.FileId,
             name = s.Name,
             createdAt = s.CreatedAt?.ToDateTimeOffset(),
-            clickCount = s.ClickCount
+            clickCount = s.ClickCount,
+            mediaKind = CloudJson.MediaKindName(s.MediaKind),
+            previewUrl = s.PreviewUrl
         };
     }
 

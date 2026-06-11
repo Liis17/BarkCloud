@@ -174,6 +174,8 @@ export interface ShareLink {
   createdAt: string | null;
   clickCount: number;
   kind?: 'file' | 'folder' | 'album';
+  mediaKind?: string;
+  previewUrl?: string;
 }
 
 /** Ответ курсор-пагинации. */

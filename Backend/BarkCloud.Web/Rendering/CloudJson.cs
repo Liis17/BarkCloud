@@ -134,7 +134,7 @@ public static class CloudJson
         items = g.Items.Select(Media).ToArray()
     };
 
-    private static string MediaKindName(MediaKind kind) => kind switch
+    internal static string MediaKindName(MediaKind kind) => kind switch
     {
         MediaKind.Photo => "photo",
         MediaKind.Video => "video",
