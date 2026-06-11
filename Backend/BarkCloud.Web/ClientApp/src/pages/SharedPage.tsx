@@ -272,6 +272,19 @@ function SharedFolderCard({ item, onOpen }: { item: SharedFolderItem; onOpen: (i
   );
 }
 
+type Cursor = { at: string; id: string } | null;
+
+function cursorOf(d: { nextCursorAt: string | null; nextCursorId: string | null }): Cursor {
+  return d.nextCursorAt && d.nextCursorId ? { at: d.nextCursorAt, id: d.nextCursorId } : null;
+}
+function withCursor(url: string, c: Cursor): string {
+  if (!c) return url;
+  return `${url}${url.includes('?') ? '&' : '?'}cursorAt=${encodeURIComponent(c.at)}&cursorId=${encodeURIComponent(c.id)}`;
+}
+function byCreatedDesc(a: ShareLink, b: ShareLink): number {
+  return (b.createdAt || '').localeCompare(a.createdAt || '');
+}
+
 export function SharedPage() {
   const [tab, setTab] = React.useState<'public' | 'ishared' | 'mine'>('public');
   const [links, setLinks] = React.useState<ShareLink[] | null>(null);
@@ -280,18 +293,28 @@ export function SharedPage() {
   const [shared, setShared] = React.useState<SharedItem[] | null>(null);
   const [sharedFolders, setSharedFolders] = React.useState<SharedFolderItem[] | null>(null);
   const [openFolder, setOpenFolder] = React.useState<{ id: string; name: string } | null>(null);
+  // Курсоры пагинации: «Мои публичные» — три источника, у грантов курсор только у файлов.
+  const [pubCursors, setPubCursors] = React.useState<{ file: Cursor; folder: Cursor; album: Cursor }>({ file: null, folder: null, album: null });
+  const [iSharedCursor, setISharedCursor] = React.useState<Cursor>(null);
+  const [sharedCursor, setSharedCursor] = React.useState<Cursor>(null);
+  const [moreBusy, setMoreBusy] = React.useState(false);
   const [toastNode, toast] = useToast();
 
   const loadPublic = React.useCallback(() => {
     setLinks(null);
     Promise.all([
-      apiGet<Page<ShareLink>>('/api/shares').then((d) => (d.items || []).map((l) => ({ ...l, kind: 'file' as const }))),
-      apiGet<Page<ShareLink>>('/api/folder-shares').then((d) => (d.items || []).map((l) => ({ ...l, kind: 'folder' as const }))),
-      apiGet<Page<ShareLink>>('/api/album-shares').then((d) => (d.items || []).map((l) => ({ ...l, kind: 'album' as const }))),
+      apiGet<Page<ShareLink>>('/api/shares'),
+      apiGet<Page<ShareLink>>('/api/folder-shares'),
+      apiGet<Page<ShareLink>>('/api/album-shares'),
     ])
       .then(([files, folders, albums]) => {
-        const all = [...files, ...folders, ...albums].sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+        const all = [
+          ...(files.items || []).map((l) => ({ ...l, kind: 'file' as const })),
+          ...(folders.items || []).map((l) => ({ ...l, kind: 'folder' as const })),
+          ...(albums.items || []).map((l) => ({ ...l, kind: 'album' as const })),
+        ].sort(byCreatedDesc);
         setLinks(all);
+        setPubCursors({ file: cursorOf(files), folder: cursorOf(folders), album: cursorOf(albums) });
       })
       .catch((e) => {
         toast((e as Error).message, 'err');
@@ -301,8 +324,11 @@ export function SharedPage() {
   const loadIShared = React.useCallback(() => {
     setIShared(null);
     setISharedFolders(null);
-    apiGet<{ items: ISharedItem[] }>('/api/shared/i-shared')
-      .then((d) => setIShared(d.items || []))
+    apiGet<Page<ISharedItem>>('/api/shared/i-shared')
+      .then((d) => {
+        setIShared(d.items || []);
+        setISharedCursor(cursorOf(d));
+      })
       .catch((e) => {
         toast((e as Error).message, 'err');
         setIShared([]);
@@ -314,8 +340,11 @@ export function SharedPage() {
   const loadShared = React.useCallback(() => {
     setShared(null);
     setSharedFolders(null);
-    apiGet<{ items: SharedItem[] }>('/api/shared/with-me')
-      .then((d) => setShared(d.items || []))
+    apiGet<Page<SharedItem>>('/api/shared/with-me')
+      .then((d) => {
+        setShared(d.items || []);
+        setSharedCursor(cursorOf(d));
+      })
       .catch((e) => {
         toast((e as Error).message, 'err');
         setShared([]);
@@ -325,11 +354,63 @@ export function SharedPage() {
       .catch(() => setSharedFolders([]));
   }, [toast]);
 
+  // Все три вкладки грузятся сразу при открытии страницы — счётчики актуальны без кликов.
   React.useEffect(() => {
-    if (tab === 'public') loadPublic();
-    else if (tab === 'ishared') loadIShared();
-    else loadShared();
-  }, [tab, loadPublic, loadIShared, loadShared]);
+    loadPublic();
+    loadIShared();
+    loadShared();
+  }, [loadPublic, loadIShared, loadShared]);
+
+  const hasPubMore = !!(pubCursors.file || pubCursors.folder || pubCursors.album);
+
+  function loadMorePublic() {
+    if (!hasPubMore || moreBusy) return;
+    setMoreBusy(true);
+    const fetchNext = (url: string, c: Cursor, kind: ShareLink['kind']) =>
+      c
+        ? apiGet<Page<ShareLink>>(withCursor(url, c)).then((d) => ({
+            items: (d.items || []).map((l) => ({ ...l, kind })),
+            cursor: cursorOf(d),
+          }))
+        : Promise.resolve({ items: [] as ShareLink[], cursor: null as Cursor });
+    Promise.all([
+      fetchNext('/api/shares', pubCursors.file, 'file'),
+      fetchNext('/api/folder-shares', pubCursors.folder, 'folder'),
+      fetchNext('/api/album-shares', pubCursors.album, 'album'),
+    ])
+      .then(([files, folders, albums]) => {
+        setLinks((prev) => [...(prev || []), ...files.items, ...folders.items, ...albums.items].sort(byCreatedDesc));
+        setPubCursors({
+          file: pubCursors.file ? files.cursor : null,
+          folder: pubCursors.folder ? folders.cursor : null,
+          album: pubCursors.album ? albums.cursor : null,
+        });
+      })
+      .catch((e) => toast((e as Error).message, 'err'))
+      .finally(() => setMoreBusy(false));
+  }
+  function loadMoreIShared() {
+    if (!iSharedCursor || moreBusy) return;
+    setMoreBusy(true);
+    apiGet<Page<ISharedItem>>(withCursor('/api/shared/i-shared', iSharedCursor))
+      .then((d) => {
+        setIShared((prev) => [...(prev || []), ...(d.items || [])]);
+        setISharedCursor(cursorOf(d));
+      })
+      .catch((e) => toast((e as Error).message, 'err'))
+      .finally(() => setMoreBusy(false));
+  }
+  function loadMoreShared() {
+    if (!sharedCursor || moreBusy) return;
+    setMoreBusy(true);
+    apiGet<Page<SharedItem>>(withCursor('/api/shared/with-me', sharedCursor))
+      .then((d) => {
+        setShared((prev) => [...(prev || []), ...(d.items || [])]);
+        setSharedCursor(cursorOf(d));
+      })
+      .catch((e) => toast((e as Error).message, 'err'))
+      .finally(() => setMoreBusy(false));
+  }
 
   const iSharedGroups = React.useMemo(() => (iShared ? groupIShared(iShared) : null), [iShared]);
   const iFolderGroups = React.useMemo(() => (iSharedFolders ? groupIFolders(iSharedFolders) : null), [iSharedFolders]);
@@ -415,17 +496,32 @@ export function SharedPage() {
         <button className={'sh-tab' + (tab === 'public' ? ' on' : '')} onClick={() => setTab('public')}>
           <Icon.link size={18} />
           Мои публичные
-          {links && links.length > 0 && <span className="count">{links.length}</span>}
+          {links && links.length > 0 && (
+            <span className="count">
+              {links.length}
+              {hasPubMore ? '+' : ''}
+            </span>
+          )}
         </button>
         <button className={'sh-tab' + (tab === 'ishared' ? ' on' : '')} onClick={() => setTab('ishared')}>
           <Icon.user size={18} />
           Я поделился
-          {iSharedCount > 0 && <span className="count">{iSharedCount}</span>}
+          {iSharedCount > 0 && (
+            <span className="count">
+              {iSharedCount}
+              {iSharedCursor ? '+' : ''}
+            </span>
+          )}
         </button>
         <button className={'sh-tab' + (tab === 'mine' ? ' on' : '')} onClick={() => setTab('mine')}>
           <Icon.share size={18} />
           Мне доступны
-          {mineCount > 0 && <span className="count">{mineCount}</span>}
+          {mineCount > 0 && (
+            <span className="count">
+              {mineCount}
+              {sharedCursor ? '+' : ''}
+            </span>
+          )}
         </button>
       </div>
 
@@ -449,6 +545,13 @@ export function SharedPage() {
             {links.map((l) => (
               <LinkCard key={l.id} link={l} onCopy={copy} onRevoke={revoke} />
             ))}
+            {hasPubMore && (
+              <div style={{ display: 'flex', justifyContent: 'center', padding: '14px 0' }}>
+                <button className="btn outlined" onClick={loadMorePublic} disabled={moreBusy}>
+                  {moreBusy ? 'Загрузка…' : 'Показать ещё'}
+                </button>
+              </div>
+            )}
           </>
         ))}
 
@@ -489,6 +592,13 @@ export function SharedPage() {
                 ))}
               </>
             )}
+            {iSharedCursor && (
+              <div style={{ display: 'flex', justifyContent: 'center', padding: '14px 0' }}>
+                <button className="btn outlined" onClick={loadMoreIShared} disabled={moreBusy}>
+                  {moreBusy ? 'Загрузка…' : 'Показать ещё'}
+                </button>
+              </div>
+            )}
           </>
         ))}
 
@@ -524,6 +634,13 @@ export function SharedPage() {
                   <SharedCard key={it.grantId} item={it} onDownload={download} />
                 ))}
               </>
+            )}
+            {sharedCursor && (
+              <div style={{ display: 'flex', justifyContent: 'center', padding: '14px 0' }}>
+                <button className="btn outlined" onClick={loadMoreShared} disabled={moreBusy}>
+                  {moreBusy ? 'Загрузка…' : 'Показать ещё'}
+                </button>
+              </div>
             )}
           </>
         ))}
