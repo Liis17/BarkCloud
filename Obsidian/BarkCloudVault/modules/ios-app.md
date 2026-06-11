@@ -71,7 +71,7 @@ BarkCloud/
 │   │   ├── MediaItem.swift         модель (id=file_id, thumbnailURL?, isVideo, fileName) + init(asset:) + placeholders
 │   │   ├── MediaTabScreen.swift    CloudMediaScreen: 3-сегментный переключатель → MediaGridScreen(.photo/.video) / AlbumsGridScreen(nil)
 │   │   ├── MediaGridViewModel.swift @Observable: ListUserMedia + cursor-пагинация + загрузка + мультивыбор (selection/isSelecting/isProcessing/deleteDone/deleteTotal): deleteSelected (последовательно DeleteUserMedia(file_id) с прогрессом), addSelectedToAlbum, createAlbumAndAddSelected
-│   │   ├── MediaGridScreen.swift   LazyVGrid 3 кол. (MediaThumb) с секциями по датам для реальных фото/видео (плейсхолдеры без заголовков), загрузка через кастомный DeviceAssetPickerScreen (бейджи «уже в облаке»), полноэкранный просмотр; кнопка «Выбрать» → мультивыбор + нижняя панель без фона (Удалить — подтверждение поповером над кнопкой / В альбом)
+│   │   ├── MediaGridScreen.swift   LazyVGrid 3 кол. (MediaThumb) с секциями по датам для реальных фото/видео (плейсхолдеры без заголовков), загрузка через кастомный DeviceAssetPickerScreen (бейджи «уже в облаке»), полноэкранный просмотр с панелью действий (см. [[#Свайп-просмотрщик]]); кнопка «Выбрать» → мультивыбор + нижняя панель без фона (Удалить — подтверждение поповером над кнопкой / В альбом)
 │   │   └── Albums/                 AlbumsViewModel, AlbumsGridScreen (kind: MediaKind? — nil=без фильтра), AlbumDetailScreen+VM (items, обложка, add/remove), AlbumPickerSheet (выбор альбома + «создать новый»)
 │   └── Files/                      файл-браузер (локальный + облачный + «Общий доступ»→SharedHubScreen)
 │       ├── Domain/                 FsEntry, FsSort
@@ -485,6 +485,22 @@ BarkCloud/
   (`loadMoreIfNeeded`), дописывает `ids` и зовёт `reloadData()` с восстановлением текущей
   позиции — листается до конца без выхода к сетке. Передан в Альбомы-таб и содержимое
   альбома; в Галерее устройства `nil` (медиатека грузится целиком, пагинации нет).
+- **Панель действий (опциональная):** `actions: MediaPagerActions?` — для облачных коллекций
+  включает плавающую капсулу внизу (`.regularMaterial`): **Поделиться** (системный Share Sheet
+  с самим файлом — оригинал под оригинальным именем через hardlink-копию во temp), **В альбом**
+  (`AlbumPickerSheet` прямо из вьювера), **Свойства** (`FilePropertiesSheet(.cloud)`),
+  **Удалить** (confirmationDialog → `delete`-колбэк → `onClose`; в сетке остаётся undo-снекбар
+  `deleteSingle`). В тулбаре появляется меню «⋯»: **Скачать оригинал** (качает оригинал, не
+  JpegView, и сохраняет в медиатеку Фото через `PHAssetCreationRequest`; сохранённый ассет
+  линкуется в `CloudDeviceLinkStore`) и **Скопировать в буфер обмена** (фото → `UIPasteboard.image`
+  из показанного JPEG; видео → `NSItemProvider(contentsOf:)` файлом без чтения байтов в память).
+  Конфиг содержит `albums`-репозиторий, `item(id)`-lookup, `resolveOriginal` (резолвер без карты
+  видов) и колбэки на VM (`addToAlbum`/`createAlbumAndAdd` возвращают `Bool` для снекбара вьювера).
+  **Отслеживание текущей страницы:** у `QLPreviewController` нет колбэка смены элемента —
+  `Coordinator` репортит `currentPreviewItemIndex` после каждого `previewItemAt` (async) плюс
+  страховочный таймер 0.4 с (свайп назад у края не вызывает `previewItemAt`). Подключено во
+  вкладках **Фото/Видео** (`MediaGridScreen`); Галерея устройства, альбомы и smart-папки — без
+  панели (`actions: nil`).
 - **Ограничения:** видео играет в QuickLook **без автостарта** (у `QLPreviewController`
   нет API автозапуска; ковыряние внутренней иерархии вью отвергнуто как хрупкое/риск App
   Store). При первом открытии не-кешированного файла короткий пустой кадр, пока идёт
