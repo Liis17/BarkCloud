@@ -499,8 +499,16 @@ BarkCloud/
   **Отслеживание текущей страницы:** у `QLPreviewController` нет колбэка смены элемента —
   `Coordinator` репортит `currentPreviewItemIndex` после каждого `previewItemAt` (async) плюс
   страховочный таймер 0.4 с (свайп назад у края не вызывает `previewItemAt`). Подключено во
-  вкладках **Фото/Видео** (`MediaGridScreen`); Галерея устройства, альбомы и smart-папки — без
-  панели (`actions: nil`).
+  вкладках **Фото/Видео** (`MediaGridScreen`); альбомы и smart-папки — без панели (`actions: nil`).
+- **Панель галереи устройства:** `deviceActions: MediaPagerDeviceActions?` (id = localIdentifier,
+  колбэки на `GalleryViewModel`) — та же плавающая капсула, три кнопки: **В альбом**
+  (`addToAlbum(asset:)` через `resolveAndRun` — загрузит в облако при необходимости, дедуп по хешу),
+  **Загрузить в облако** (`uploadToCloud(asset:)` = `resolveAndRun` без действия; дефолтная папка
+  по типу медиа), **Удалить** (`deleteEverywhere(asset:)`: с устройства всегда + из облака, если
+  файл там есть; подтверждение показывает сам PhotoKit; отмена системного диалога → `false`,
+  вьювер остаётся открытым, успех → вьювер закрывается). `resolveAndRun`/`addToAlbum`/
+  `createAlbumAndAdd`/`deleteEverywhere` возвращают `@discardableResult Bool` для снекбара
+  вьювера. Подключено в `GalleryScreen`.
 - **Ограничения:** видео играет в QuickLook **без автостарта** (у `QLPreviewController`
   нет API автозапуска; ковыряние внутренней иерархии вью отвергнуто как хрупкое/риск App
   Store). При первом открытии не-кешированного файла короткий пустой кадр, пока идёт

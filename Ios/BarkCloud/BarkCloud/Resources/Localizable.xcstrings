@@ -93,6 +93,29 @@
         }
       }
     },
+    "viewer_uploaded" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Загружено в облако"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uploaded to cloud"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In die Cloud hochgeladen"
+          }
+        }
+      }
+    },
     "viewer_action_failed" : {
       "extractionState" : "manual",
       "localizations" : {

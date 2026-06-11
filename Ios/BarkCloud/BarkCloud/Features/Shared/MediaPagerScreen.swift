@@ -22,6 +22,22 @@ struct MediaPagerActions {
     let createAlbumAndAdd: (MediaItem) async -> Bool
 }
 
+/// Действия вьювера галереи устройства (таб «Галерея», id = localIdentifier
+/// ассета): плавающая панель внизу — в альбом (с загрузкой в облако при
+/// необходимости), загрузка в облако, удаление.
+struct MediaPagerDeviceActions {
+    let albums: AlbumRepository
+    /// Загрузить в облако (дефолтная папка по типу медиа; дедуп по хешу). `true` — успех.
+    let upload: (String) async -> Bool
+    /// Загрузить (при необходимости) и добавить в существующий альбом. `true` — успех.
+    let addToAlbum: (_ id: String, _ albumID: String) async -> Bool
+    /// Загрузить (при необходимости), создать альбом и добавить. `true` — успех.
+    let createAlbumAndAdd: (String) async -> Bool
+    /// Удалить с устройства (и из облака, если файл там уже есть). `false` —
+    /// пользователь отменил системный диалог, вьювер остаётся открытым.
+    let delete: (String) async -> Bool
+}
+
 /// Полноэкранный просмотрщик с листанием влево/вправо между файлами коллекции.
 ///
 /// Построен на **многоэлементном** `QLPreviewController` — он сам реализует
@@ -41,8 +57,10 @@ struct MediaPagerScreen: View {
     /// полный обновлённый список id. `nil` — пагинации нет (напр. медиатека
     /// устройства грузится целиком).
     var loadMore: (() async -> [String])? = nil
-    /// Действия над текущим файлом. `nil` — только просмотр (галерея устройства).
+    /// Действия над текущим облачным файлом. `nil` — без облачной панели.
     var actions: MediaPagerActions? = nil
+    /// Действия над текущим ассетом устройства (таб «Галерея»). `nil` — без панели.
+    var deviceActions: MediaPagerDeviceActions? = nil
     let onClose: () -> Void
 
     /// id текущей страницы пейджера (репортит координатор QuickLook).
@@ -62,7 +80,7 @@ struct MediaPagerScreen: View {
                 startIndex: startIndex,
                 resolve: resolve,
                 loadMore: loadMore,
-                onCurrentID: actions == nil ? nil : { currentID = $0 }
+                onCurrentID: (actions == nil && deviceActions == nil) ? nil : { currentID = $0 }
             )
             .ignoresSafeArea()
             .toolbar {
@@ -74,7 +92,11 @@ struct MediaPagerScreen: View {
                 }
             }
             .overlay(alignment: .bottom) {
-                if let actions { actionBar(actions) }
+                if let actions {
+                    actionBar(actions)
+                } else if let deviceActions {
+                    deviceActionBar(deviceActions)
+                }
             }
             .overlay(alignment: .bottom) { snackbar }
         }
@@ -105,29 +127,55 @@ struct MediaPagerScreen: View {
 
     // MARK: - Панель действий
 
-    /// Плавающая панель внизу: поделиться / в альбом / свойства / удалить.
+    /// Плавающая панель внизу (облако): поделиться / в альбом / свойства / удалить.
     /// На время скачивания (share) заменяется спиннером.
     private func actionBar(_ actions: MediaPagerActions) -> some View {
+        barContainer {
+            HStack(spacing: 4) {
+                barButton("square.and.arrow.up", labelKey: "files_action_share") {
+                    Task { await share(actions) }
+                }
+                barButton("rectangle.stack.badge.plus", labelKey: "ctx_add_to_album") {
+                    showAlbumPicker = true
+                }
+                barButton("info.circle", labelKey: "ctx_properties") {
+                    if let asset = currentItem?.asset { propertiesTarget = .cloud(asset) }
+                }
+                barButton("trash", labelKey: "action_delete", tint: AppColors.error) {
+                    showDeleteConfirm = true
+                }
+            }
+            .disabled(currentItem == nil)
+        }
+    }
+
+    /// Плавающая панель внизу (галерея устройства): в альбом / загрузить в облако /
+    /// удалить. На время загрузки/удаления заменяется спиннером.
+    private func deviceActionBar(_ actions: MediaPagerDeviceActions) -> some View {
+        barContainer {
+            HStack(spacing: 4) {
+                barButton("rectangle.stack.badge.plus", labelKey: "ctx_add_to_album") {
+                    showAlbumPicker = true
+                }
+                barButton("icloud.and.arrow.up", labelKey: "share_action_upload") {
+                    Task { await uploadDevice(actions) }
+                }
+                barButton("trash", labelKey: "action_delete", tint: AppColors.error) {
+                    Task { await deleteDevice(actions) }
+                }
+            }
+            .disabled(currentID == nil)
+        }
+    }
+
+    /// Общая капсула панели; при `isBusy` вместо кнопок — спиннер.
+    private func barContainer<Content: View>(@ViewBuilder content: () -> Content) -> some View {
         Group {
             if isBusy {
                 ProgressView()
                     .frame(width: 56, height: 50)
             } else {
-                HStack(spacing: 4) {
-                    barButton("square.and.arrow.up", labelKey: "files_action_share") {
-                        Task { await share(actions) }
-                    }
-                    barButton("rectangle.stack.badge.plus", labelKey: "ctx_add_to_album") {
-                        showAlbumPicker = true
-                    }
-                    barButton("info.circle", labelKey: "ctx_properties") {
-                        if let asset = currentItem?.asset { propertiesTarget = .cloud(asset) }
-                    }
-                    barButton("trash", labelKey: "action_delete", tint: AppColors.error) {
-                        showDeleteConfirm = true
-                    }
-                }
-                .disabled(currentItem == nil)
+                content()
             }
         }
         .padding(.horizontal, 8)
@@ -190,6 +238,32 @@ struct MediaPagerScreen: View {
                     }
                 }
             )
+        } else if let deviceActions, let id = currentID {
+            // Ассет устройства: перед добавлением может идти загрузка в облако —
+            // на это время панель показывает спиннер (isBusy).
+            AlbumPickerSheet(
+                albums: deviceActions.albums,
+                onPickExisting: { albumID in
+                    Task {
+                        isBusy = true
+                        let ok = await deviceActions.addToAlbum(id, albumID)
+                        isBusy = false
+                        snackbarText = ok
+                            ? String(localized: "media_added_to_album")
+                            : String(localized: "viewer_action_failed")
+                    }
+                },
+                onCreateNew: {
+                    Task {
+                        isBusy = true
+                        let ok = await deviceActions.createAlbumAndAdd(id)
+                        isBusy = false
+                        snackbarText = ok
+                            ? String(localized: "media_added_to_album")
+                            : String(localized: "viewer_action_failed")
+                    }
+                }
+            )
         }
     }
 
@@ -202,7 +276,7 @@ struct MediaPagerScreen: View {
                 .padding(12)
                 .background(.regularMaterial)
                 .clipShape(RoundedRectangle(cornerRadius: 10))
-                .padding(.bottom, actions == nil ? 16 : 86)
+                .padding(.bottom, (actions == nil && deviceActions == nil) ? 16 : 86)
                 .task(id: text) {
                     try? await Task.sleep(nanoseconds: 2_000_000_000)
                     snackbarText = nil
@@ -280,6 +354,27 @@ struct MediaPagerScreen: View {
             return
         }
         snackbarText = String(localized: "viewer_copied")
+    }
+
+    /// Загрузить текущий ассет устройства в облако (дефолтная папка по типу медиа).
+    private func uploadDevice(_ actions: MediaPagerDeviceActions) async {
+        guard let id = currentID, !isBusy else { return }
+        isBusy = true
+        defer { isBusy = false }
+        snackbarText = await actions.upload(id)
+            ? String(localized: "viewer_uploaded")
+            : String(localized: "viewer_action_failed")
+    }
+
+    /// Удалить текущий ассет устройства (и облачную копию, если она есть).
+    /// Подтверждение показывает сама система (PhotoKit); при успехе вьювер
+    /// закрывается, при отмене — остаётся открытым.
+    private func deleteDevice(_ actions: MediaPagerDeviceActions) async {
+        guard let id = currentID, !isBusy else { return }
+        isBusy = true
+        let ok = await actions.delete(id)
+        isBusy = false
+        if ok { onClose() }
     }
 
     /// Жёсткая ссылка (или копия) кеш-файла `original.<ext>` под оригинальным
