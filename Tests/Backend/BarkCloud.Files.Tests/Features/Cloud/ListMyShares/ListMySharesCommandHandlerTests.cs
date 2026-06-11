@@ -1,10 +1,13 @@
+using BarkCloud.Files.Domain;
 using BarkCloud.Files.Features.Cloud.ListMyShares;
 using BarkCloud.Files.Persistence;
 using BarkCloud.Files.Tests._Helpers;
+using BarkCloud.GrpcServer.Settings;
 
 using Microsoft.Extensions.Logging.Abstractions;
 
 using DomainShareLink = BarkCloud.Files.Domain.ShareLink;
+using UploadFileEntity = BarkCloud.Files.Domain.UploadFile;
 
 namespace BarkCloud.Files.Tests.Features.Cloud.ListMyShares;
 
@@ -12,11 +15,23 @@ public class ListMySharesCommandHandlerTests
 {
     private const long OwnerId = 42;
     private readonly Mock<IShareStorage> _storage = new();
+    private readonly Mock<IUploadedFilesStorage> _uploadedFiles = new();
 
-    private ListMySharesCommandHandler CreateSut() => new(
-        _storage.Object,
-        UserContextFactory.Create(OwnerId),
-        NullLogger<ListMySharesCommandHandler>.Instance);
+    private ListMySharesCommandHandler CreateSut()
+    {
+        _uploadedFiles.Setup(s => s.GetFiles(It.IsAny<List<Guid>>()))
+            .ReturnsAsync(new List<UploadFileEntity>());
+        _uploadedFiles.Setup(s => s.GetPreviewsForFiles(It.IsAny<IEnumerable<Guid>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<Guid, List<FilePreview>>());
+
+        return new ListMySharesCommandHandler(
+            _storage.Object,
+            _uploadedFiles.Object,
+            UserContextFactory.Create(OwnerId),
+            new RunSettings { Host = "http://localhost", Http1Port = 7026 },
+            TestConfiguration.Empty(),
+            NullLogger<ListMySharesCommandHandler>.Instance);
+    }
 
     [Fact]
     public async Task Handle_Empty_ReturnsEmpty()
