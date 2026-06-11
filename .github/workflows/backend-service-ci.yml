@@ -55,7 +55,6 @@ jobs:
     runs-on: [self-hosted, linux]
     permissions:
       contents: read
-      pull-requests: read
     outputs:
       should_test: ${{ steps.decide.outputs.should_test }}
       should_build: ${{ steps.decide.outputs.should_build }}
