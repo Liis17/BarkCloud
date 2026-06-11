@@ -440,11 +440,15 @@ public struct CloudDirectory: Identifiable, Hashable, Sendable {
     public let id: String
     public let parentID: String
     public let name: String
+    public let createdAt: Date?
+    public let updatedAt: Date?
 
     public init(_ d: Barkcloud_Files_DirectoryInfo) {
         self.id = d.id
         self.parentID = d.parentID
         self.name = d.name
+        self.createdAt = d.hasCreatedAt ? d.createdAt.date : nil
+        self.updatedAt = d.hasUpdatedAt ? d.updatedAt.date : nil
     }
 }
 

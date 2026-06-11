@@ -1,7 +1,6 @@
 import Foundation
 import FileProvider
 import UniformTypeIdentifiers
-import BarkCloudKit
 
 /// `NSFileProviderItem` облака BarkCloud — папка или файл.
 ///
@@ -66,12 +65,6 @@ final class BarkCloudFileProviderItem: NSObject, NSFileProviderItem {
         )
     }
 
-    static func directory(_ d: CloudDirectory,
-                          parent: NSFileProviderItemIdentifier,
-                          modified: Date = Date()) -> BarkCloudFileProviderItem {
-        directory(id: d.id, name: d.name, parent: parent, modified: modified)
-    }
-
     static func directory(id: String, name: String,
                           parent: NSFileProviderItemIdentifier,
                           modified: Date) -> BarkCloudFileProviderItem {
@@ -93,14 +86,6 @@ final class BarkCloudFileProviderItem: NSObject, NSFileProviderItem {
             ],
             isUploaded: true
         )
-    }
-
-    static func file(_ f: CloudFileEntry,
-                     parent: NSFileProviderItemIdentifier) -> BarkCloudFileProviderItem {
-        file(entryID: f.id, fileID: f.fileID, name: f.name,
-             size: f.asset.fileSize,
-             modified: f.asset.uploadedAt ?? f.asset.createdAt,
-             parent: parent)
     }
 
     static func file(entryID: String, fileID: String, name: String,
