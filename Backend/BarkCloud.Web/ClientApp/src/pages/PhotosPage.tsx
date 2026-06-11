@@ -45,6 +45,8 @@ export function PhotosPage() {
   const searchQuery = (new URLSearchParams(location.search).get('q') || '').trim();
   const [albums, setAlbums] = React.useState<Album[] | null>(null);
   const [lightbox, setLightbox] = React.useState<number | null>(null);
+  // Инкремент при удалении фото — «В этот день» перезагружается, иначе там остаётся удалённый снимок.
+  const [memKey, setMemKey] = React.useState(0);
   const [toastNode, toast] = useToast();
   const { enqueue, attachVersion } = useUploadActions();
 
@@ -67,7 +69,10 @@ export function PhotosPage() {
     albums: albums || [],
     toast,
     onRenamed: (m, name) => updateItem(m.id, { entryNames: [name, ...(m.entryNames || []).slice(1)] }),
-    onRemoved: (m) => removeItem(m.id),
+    onRemoved: (m) => {
+      removeItem(m.id);
+      setMemKey((k) => k + 1);
+    },
     onItemPatched: updateItem,
     reloadAlbums: loadAlbums,
   });
@@ -79,7 +84,16 @@ export function PhotosPage() {
   }
 
   const { over, dropHandlers } = useFileDrop((f) => doUpload(f));
-  const bulk = useBulkMedia({ items: photos, albums: albums || [], toast, onRemoved: removeItem, onReloadAlbums: loadAlbums });
+  const bulk = useBulkMedia({
+    items: photos,
+    albums: albums || [],
+    toast,
+    onRemoved: (id) => {
+      removeItem(id);
+      setMemKey((k) => k + 1);
+    },
+    onReloadAlbums: loadAlbums,
+  });
 
   const prependRef = React.useRef(prependItems);
   prependRef.current = prependItems;
@@ -148,7 +162,7 @@ export function PhotosPage() {
         </div>
       </div>
 
-      <MemoriesStrip />
+      <MemoriesStrip refreshKey={memKey} />
 
       {(loading && photos.length === 0 ? (
           <Loading />
