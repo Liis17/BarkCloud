@@ -268,7 +268,7 @@ export function VideosPage() {
         ))}
       </div>
 
-      {lightbox !== null && <Lightbox items={videos} index={lightbox} onClose={() => setLightbox(null)} />}
+      {lightbox !== null && <Lightbox items={videos} index={lightbox} actions={actionsCtx.api} onClose={() => setLightbox(null)} />}
     </>
   );
 }

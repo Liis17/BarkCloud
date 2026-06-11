@@ -682,7 +682,7 @@ img.avatar { object-fit: cover; }
 
 /* Modal */
 .modal-backdrop {
-  position: fixed; inset: 0; z-index: 1000;
+  position: fixed; inset: 0; z-index: 1150; /* выше .lightbox (1100): модалки открываются и из панели Lightbox */
   background: rgba(0,0,0,.5);
   display: flex; align-items: center; justify-content: center;
   padding: 24px;
@@ -773,6 +773,20 @@ img.avatar { object-fit: cover; }
 .lb-download {
   position: absolute; bottom: 22px; left: 50%; transform: translateX(-50%);
 }
+/* Плавающая панель действий под изображением (рендерится при переданных actions) */
+.lb-actions {
+  position: absolute; bottom: 22px; left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 4px;
+  padding: 6px 10px;
+  background: rgba(18,18,18,.72);
+  border-radius: var(--r-xl);
+  backdrop-filter: blur(10px);
+}
+.lb-actions .icon-btn { color: #fff; }
+.lb-actions .icon-btn:hover { background: rgba(255,255,255,.16); color: #fff; }
+.lb-actions .icon-btn:disabled { opacity: .35; cursor: default; }
+.lb-actions .icon-btn:disabled:hover { background: transparent; }
+.lb-actions .icon-btn.danger:hover { background: color-mix(in srgb, var(--md-error) 38%, transparent); }
 /* Прозрачные кнопки перелистывания по краям — проявляются при наведении */
 .lb-nav {
   position: absolute; top: 50%; transform: translateY(-50%);

@@ -24,6 +24,22 @@ interface UseMediaActionsArgs {
   reloadAlbums?: () => void;
 }
 
+/** Действия над медиа, экспонированные наружу (панель Lightbox). Модалки
+ *  (подтверждение, свойства, шаринг) рендерятся в overlay родителя. */
+export interface MediaActionsApi {
+  albums: Album[];
+  membership: ReturnType<typeof useAlbumMembership>;
+  toast: ToastPush;
+  copyTempLink: (m: MediaItem) => void;
+  createPublicLink: (m: MediaItem) => void;
+  shareWithUser: (m: MediaItem) => void;
+  addToAlbum: (m: MediaItem, albumId: string) => void;
+  removeFromAlbum: (m: MediaItem, albumId: string) => void;
+  revealInFolder: (m: MediaItem) => void;
+  showProperties: (m: MediaItem) => void;
+  requestDelete: (m: MediaItem) => void;
+}
+
 /** Добавить cache-bust к URL превью, чтобы браузер перезапросил обновлённое изображение. */
 function bustPreviews(m: MediaItem): Partial<MediaItem> {
   const t = Date.now();
@@ -176,6 +192,20 @@ export function useMediaActions({ albums, toast, onRenamed, onRemoved, onItemPat
     return out;
   }
 
+  const api: MediaActionsApi = {
+    albums: albums || [],
+    membership,
+    toast,
+    copyTempLink: copyLink,
+    createPublicLink: (m) => createShare(m.id, m.name, toast),
+    shareWithUser: setShareWith,
+    addToAlbum,
+    removeFromAlbum,
+    revealInFolder,
+    showProperties: setProps,
+    requestDelete: setConfirm,
+  };
+
   const overlay = (
     <>
       {menu && <ContextMenu x={menu.x} y={menu.y} items={buildItems(menu.media)} onClose={() => setMenu(null)} />}
@@ -205,5 +235,5 @@ export function useMediaActions({ albums, toast, onRenamed, onRemoved, onItemPat
     </>
   );
 
-  return { overlay, openMenu };
+  return { overlay, openMenu, api };
 }

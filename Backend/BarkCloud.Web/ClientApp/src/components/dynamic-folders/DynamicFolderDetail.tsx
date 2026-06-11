@@ -282,7 +282,7 @@ export function DynamicFolderDetail({ folder, onBack, onChanged, toast, albums, 
           onConfirm={bulkDelete}
         />
       )}
-      {lightbox !== null && <Lightbox items={media} index={lightbox} onClose={() => setLightbox(null)} />}
+      {lightbox !== null && <Lightbox items={media} index={lightbox} actions={actions.api} onClose={() => setLightbox(null)} />}
       {actions.overlay}
     </div>
   );
