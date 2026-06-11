@@ -764,6 +764,7 @@ message SearchFilesRequest {
   int32 limit = 2;                                  // 1..200, default 50
   google.protobuf.Timestamp cursor_created_at = 3;  // exclusive; пусто = с самых свежих
   string cursor_entry_id = 4;                       // tie-breaker для стабильной cursor-пагинации
+  repeated MediaKind kind_filter = 5;               // пусто = все типы; иначе только перечисленные (напр. PHOTO+VIDEO)
 }
 
 message SearchFilesResponse {

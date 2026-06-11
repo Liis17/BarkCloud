@@ -227,15 +227,21 @@ public class CloudHierarchyStorage : ICloudHierarchyStorage
     /// <summary>
     /// Поиск живых записей файлов владельца по подстроке имени (регистронезависимо), по всему облаку.
     /// Сортировка (CreatedAt desc, Id desc), cursor-пагинация; возвращает limit+1 для определения след. страницы.
+    /// <paramref name="kinds"/> — необязательный фильтр по типу медиа файла (пусто/null = все типы).
     /// </summary>
     public async Task<List<CloudFileEntry>> SearchFileEntriesPage(
-        long ownerId, string query, DateTime? cursorCreatedAt, Guid? cursorEntryId, int limit, CancellationToken cancellationToken = default)
+        long ownerId, string query, DateTime? cursorCreatedAt, Guid? cursorEntryId, int limit,
+        IReadOnlyCollection<MediaKind>? kinds = null, CancellationToken cancellationToken = default)
     {
         var pattern = query.Trim().ToLower();
 
         var q = _context.CloudFileEntries
             .AsNoTracking()
             .Where(x => x.OwnerId == ownerId && !x.IsDeleted && x.Name.ToLower().Contains(pattern));
+
+        // Фильтр по типу медиа — в SQL до Take(limit+1), чтобы limit/cursor оставались честными.
+        if (kinds is { Count: > 0 })
+            q = q.Where(x => _context.UploadedFiles.Any(f => f.Id == x.FileId && kinds.Contains(f.MediaKind)));
 
         if (cursorCreatedAt.HasValue && cursorEntryId.HasValue)
         {
