@@ -203,6 +203,46 @@ public static class CloudApiEndpoints
                 return Results.Json(new { ok = true }, Json);
             }));
 
+        api.MapPost("/cloud/entries/delete", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud, EntryIdsReq body) =>
+            await Guarded(http, auth, async token =>
+            {
+                var rawIds = body.EntryIds ?? Array.Empty<string>();
+                var invalid = new List<string>();
+                var ids = new List<string>();
+                var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+                foreach (var raw in rawIds)
+                {
+                    if (!Guid.TryParse(raw, out var id))
+                    {
+                        invalid.Add(raw);
+                        continue;
+                    }
+
+                    var normalized = id.ToString();
+                    if (seen.Add(normalized))
+                        ids.Add(normalized);
+                }
+
+                var deleted = 0;
+                foreach (var chunk in ids.Chunk(100))
+                {
+                    var req = new DeleteFileEntriesRequest();
+                    req.EntryIds.AddRange(chunk);
+                    var resp = await cloud.DeleteFileEntriesAsync(req, token);
+                    deleted += resp.DeletedCount;
+                }
+
+                var total = ids.Count + invalid.Count;
+                return Results.Json(new
+                {
+                    total,
+                    succeeded = deleted,
+                    failed = total - deleted,
+                    invalidIds = invalid.ToArray()
+                }, Json);
+            }));
+
         // ───────────────────────── Корзина ─────────────────────────
 
         api.MapGet("/cloud/trash", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud,
@@ -231,11 +271,27 @@ public static class CloudApiEndpoints
                 return Results.Json(new { ok = true }, Json);
             }));
 
+        api.MapPost("/cloud/trash/restore-batch", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud, EntryIdsReq body) =>
+            await Guarded(http, auth, async token =>
+            {
+                var result = await RunIdBatch(body.EntryIds, async entryId =>
+                    await cloud.RestoreFromTrashAsync(new RestoreFromTrashRequest { EntryId = entryId }, token));
+                return Results.Json(result, Json);
+            }));
+
         api.MapPost("/cloud/trash/purge", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud, EntryIdReq body) =>
             await Guarded(http, auth, async token =>
             {
                 await cloud.DeleteFromTrashAsync(new DeleteFromTrashRequest { EntryId = body.EntryId }, token);
                 return Results.Json(new { ok = true }, Json);
+            }));
+
+        api.MapPost("/cloud/trash/purge-batch", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud, EntryIdsReq body) =>
+            await Guarded(http, auth, async token =>
+            {
+                var result = await RunIdBatch(body.EntryIds, async entryId =>
+                    await cloud.DeleteFromTrashAsync(new DeleteFromTrashRequest { EntryId = entryId }, token));
+                return Results.Json(result, Json);
             }));
 
         api.MapPost("/cloud/trash/empty", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud) =>
@@ -275,6 +331,14 @@ public static class CloudApiEndpoints
             {
                 await cloud.DeleteUserMediaAsync(new DeleteUserMediaRequest { FileId = body.FileId }, token);
                 return Results.Json(new { ok = true }, Json);
+            }));
+
+        api.MapPost("/cloud/media/delete-batch", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud, FileIdsReq body) =>
+            await Guarded(http, auth, async token =>
+            {
+                var result = await RunIdBatch(body.FileIds, async fileId =>
+                    await cloud.DeleteUserMediaAsync(new DeleteUserMediaRequest { FileId = fileId }, token));
+                return Results.Json(result, Json);
             }));
 
         // «Воспоминания — В этот день»: фото/видео за сегодняшнюю дату прошлых лет, по группам-годам.
@@ -1067,6 +1131,55 @@ public static class CloudApiEndpoints
             .ToDictionary(g => g.Key, g => g.First());
     }
 
+    private static async Task<object> RunIdBatch(string[]? rawIds, Func<string, Task> action)
+    {
+        var invalid = new List<string>();
+        var ids = new List<string>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var raw in rawIds ?? Array.Empty<string>())
+        {
+            if (!Guid.TryParse(raw, out var id))
+            {
+                invalid.Add(raw);
+                continue;
+            }
+
+            var normalized = id.ToString();
+            if (seen.Add(normalized))
+                ids.Add(normalized);
+        }
+
+        var succeeded = 0;
+        var succeededIds = new List<string>();
+        var failedIds = new List<string>(invalid);
+        foreach (var id in ids)
+        {
+            try
+            {
+                await action(id);
+                succeeded++;
+                succeededIds.Add(id);
+            }
+            catch (RpcException ex) when (ex.StatusCode is StatusCode.FailedPrecondition or StatusCode.NotFound or StatusCode.PermissionDenied)
+            {
+                // Частичная ошибка одного элемента не должна валить всю batch-операцию.
+                failedIds.Add(id);
+            }
+        }
+
+        var total = ids.Count + invalid.Count;
+        return new
+        {
+            total,
+            succeeded,
+            failed = total - succeeded,
+            invalidIds = invalid.ToArray(),
+            succeededIds = succeededIds.ToArray(),
+            failedIds = failedIds.ToArray()
+        };
+    }
+
     /// <summary>
     /// gRPC <see cref="FileMetadataInfo"/> → плоский JSON для модалки «Свойства».
     /// Все поля опциональны — отдаём только те, что заданы (через HasFoo), без «пустых» нулей.
@@ -1148,7 +1261,9 @@ public static class CloudApiEndpoints
     private sealed record EntryRenameReq(string EntryId, string Name);
     private sealed record EntryMoveReq(string EntryId, string? Dir);
     private sealed record EntryIdReq(string EntryId);
+    private sealed record EntryIdsReq(string[]? EntryIds);
     private sealed record FileIdReq(string FileId);
+    private sealed record FileIdsReq(string[]? FileIds);
     private sealed record GrantReq(string FileId, long RecipientUserId);
     private sealed record GrantFolderReq(string DirectoryId, long RecipientUserId);
     private sealed record GrantIdReq(string GrantId);

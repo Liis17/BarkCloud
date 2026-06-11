@@ -8,7 +8,7 @@ import { ConfirmModal } from '../ui/ConfirmModal';
 import { DynamicFolderFormModal } from './DynamicFolderFormModal';
 import { useMediaActions } from '../../hooks/useMediaActions';
 import { useSelection } from '../../hooks/useSelection';
-import { apiGet, apiPost } from '../../lib/api';
+import { apiGet, apiPost, deleteEntriesBatch, deleteMediaBatch } from '../../lib/api';
 import { GRID_SIZES, kindRu, fmtFull, plural } from '../../lib/format';
 import { useDocumentHead } from '../../hooks/useDocumentHead';
 import type { Album, DynamicFolder, MediaItem, Page } from '../../lib/types';
@@ -96,20 +96,46 @@ export function DynamicFolderDetail({ folder, onBack, onChanged, toast, albums, 
   async function bulkDelete() {
     const selected = (items || []).filter((m) => fsel.has(m.id));
     let ok = 0;
+    const entryIds: string[] = [];
+    const fallbackMedia: MediaItem[] = [];
 
     for (const m of selected) {
+      if (m.entryIds && m.entryIds.length > 0) {
+        entryIds.push(...m.entryIds);
+      } else {
+        fallbackMedia.push(m);
+      }
+    }
+
+    if (entryIds.length) {
       try {
-        if (m.entryIds && m.entryIds.length > 0) {
-          for (const entryId of m.entryIds)
-            await apiPost('/api/cloud/entry/delete', { entryId });
-        } else if (m.kind === 'photo' || m.kind === 'video') {
-          await apiPost('/api/cloud/media/delete', { fileId: m.id });
-        } else {
+        const result = await deleteEntriesBatch(entryIds);
+        ok += result.succeeded;
+        if (result.failed)
+          toast(`Не удалось переместить записей: ${result.failed}`, 'err');
+      } catch (e) {
+        toast((e as Error).message, 'err');
+      }
+    }
+
+    const fallbackIds: string[] = [];
+    for (const m of fallbackMedia) {
+      try {
+        if (m.kind !== 'photo' && m.kind !== 'video')
           throw new Error('нет записи файла в папке');
-        }
-        ok++;
+        fallbackIds.push(m.id);
       } catch (e) {
         toast(`«${m.entryNames?.[0] || m.name}»: ${(e as Error).message}`, 'err');
+      }
+    }
+    if (fallbackIds.length) {
+      try {
+        const result = await deleteMediaBatch(fallbackIds);
+        ok += result.succeeded;
+        if (result.failed)
+          toast(`Не удалось переместить медиа: ${result.failed}`, 'err');
+      } catch (e) {
+        toast((e as Error).message, 'err');
       }
     }
 

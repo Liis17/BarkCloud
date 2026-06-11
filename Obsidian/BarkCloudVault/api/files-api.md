@@ -36,6 +36,7 @@ Package: `barkcloud.files`
 | `RenameFileEntry(RenameFileEntryRequest) → CloudEmpty` | Переименовать запись (не меняет `UploadFile.Filename`) |
 | `MoveFileEntry(MoveFileEntryRequest) → CloudEmpty` | Переместить запись (`new_directory_id` пуст = корень) |
 | `DeleteFileEntry(DeleteFileEntryRequest) → CloudEmpty` | Удалить запись в корзину (`UploadFile`/`Uploaders` не трогает; blob удаляется только при очистке корзины) |
+| `DeleteFileEntries(DeleteFileEntriesRequest) → DeleteFileEntriesResponse` | Массово переместить записи в корзину; чужие/несуществующие/уже удалённые id пропускаются, ответ содержит `deleted_count` |
 | `ListUserImages(ListUserImagesRequest) → ListUserImagesResponse` | **[DEPRECATED]** Все изображения пользователя; используйте `ListUserMedia(PHOTO)`. Исключает превью-блобы |
 | `ListUserMedia(ListUserMediaRequest) → ListUserMediaResponse` | Медиа пользователя по типу (`kind` = PHOTO/VIDEO) от новых к старым; cursor-пагинация (`cursor_created_at` + `cursor_file_id`); фильтр по `MediaKind`, исключает превью-блобы |
 | `DeleteUserMedia(DeleteUserMediaRequest) → CloudEmpty` | Удалить медиа из галереи по `file_id`: живые записи каталога перемещает в корзину; если записей нет — создаёт запись корзины в системной папке по типу медиа |

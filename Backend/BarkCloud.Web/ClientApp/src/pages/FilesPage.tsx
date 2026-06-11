@@ -21,7 +21,7 @@ import { useUploadActions } from '../hooks/useUploadManager';
 import { DynamicFoldersStrip } from '../components/dynamic-folders/DynamicFoldersStrip';
 import { DynamicFolderDetail } from '../components/dynamic-folders/DynamicFolderDetail';
 import { DynamicFolderFormModal } from '../components/dynamic-folders/DynamicFolderFormModal';
-import { apiGet, apiPost, pickFiles } from '../lib/api';
+import { apiGet, apiPost, deleteEntriesBatch, pickFiles } from '../lib/api';
 import { createShare, createFolderShare } from '../lib/share';
 import type { Album, CardFile, DirInfo, DynamicFolder, Entry, Listing } from '../lib/types';
 
@@ -463,22 +463,21 @@ export function FilesPage() {
 
   async function bulkDelete() {
     const chosen = (listing?.files || []).filter((e) => fsel.has(e.entryId));
-    let ok = 0;
-    for (const e of chosen) {
-      try {
-        await apiPost('/api/cloud/entry/delete', { entryId: e.entryId });
-        ok++;
-      } catch (err) {
-        toast(`«${e.name}»: ${(err as Error).message}`, 'err');
+    try {
+      const result = await deleteEntriesBatch(chosen.map((e) => e.entryId));
+      setBulkConfirm(false);
+      fsel.clear();
+      if (result.succeeded) {
+        toast(result.failed ? `Перемещено в корзину: ${result.succeeded}, не удалось: ${result.failed}` : `Перемещено в корзину: ${result.succeeded}`);
+        load();
+      } else if (result.failed) {
+        toast('Не удалось переместить выбранные файлы в корзину', 'err');
       }
-    }
-    setBulkConfirm(false);
-    fsel.clear();
-    if (ok) {
-      toast(`Перемещено в корзину: ${ok}`);
-      load();
+    } catch (err) {
+      toast((err as Error).message, 'err');
     }
   }
+
   async function bulkMove(targetDir: string) {
     const chosen = (listing?.files || []).filter((e) => fsel.has(e.entryId));
     let ok = 0;

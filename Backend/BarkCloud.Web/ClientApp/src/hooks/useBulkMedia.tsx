@@ -3,7 +3,7 @@ import { useSelection } from './useSelection';
 import { SelectionBar } from '../components/ui/SelectionBar';
 import { ConfirmModal } from '../components/ui/ConfirmModal';
 import { Modal } from '../components/ui/Modal';
-import { apiGet, apiPost } from '../lib/api';
+import { apiGet, apiPost, deleteMediaBatch } from '../lib/api';
 import type { Album, MediaItem } from '../lib/types';
 import type { ToastPush } from './useToast';
 
@@ -32,19 +32,20 @@ export function useBulkMedia({ items, albums, toast, onRemoved, onReloadAlbums }
 
   async function bulkDelete() {
     const list = chosen();
-    let ok = 0;
-    for (const m of list) {
-      try {
-        await apiPost('/api/cloud/media/delete', { fileId: m.id });
+    try {
+      const result = await deleteMediaBatch(list.map((m) => m.id));
+      const removed = new Set(result.succeededIds || (result.failed ? [] : list.map((m) => m.id)));
+      for (const m of list.filter((item) => removed.has(item.id)))
         onRemoved(m.id);
-        ok++;
-      } catch (e) {
-        toast(`«${(m.entryNames && m.entryNames[0]) || m.name}»: ${(e as Error).message}`, 'err');
-      }
+      setConfirmDel(false);
+      sel.clear();
+      if (result.succeeded)
+        toast(result.failed ? `Перемещено в корзину: ${result.succeeded}, не удалось: ${result.failed}` : `Перемещено в корзину: ${result.succeeded}`);
+      else if (result.failed)
+        toast('Не удалось переместить выбранные файлы в корзину', 'err');
+    } catch (e) {
+      toast((e as Error).message, 'err');
     }
-    setConfirmDel(false);
-    sel.clear();
-    if (ok) toast(`Перемещено в корзину: ${ok}`);
   }
 
   async function bulkCopyLinks() {
