@@ -782,6 +782,8 @@ message ShareInfo {
   string name = 4;                          // Имя файла на момент создания ссылки
   google.protobuf.Timestamp created_at = 5; // Когда создана ссылка
   int64 click_count = 6;                    // Сколько раз по ссылке переходили
+  MediaKind media_kind = 7;                 // Тип медиа файла (для отрисовки карточки)
+  string preview_url = 8;                   // Публичный URL превью (фото/видео); пусто — превью нет
 }
 
 message CreateShareRequest {

@@ -98,8 +98,16 @@ function groupIFolders(items: IFolderShareItem[]): IFolderGroup[] {
 function LinkCard({ link, onCopy, onRevoke }: { link: ShareLink; onCopy: (l: ShareLink) => void; onRevoke: (l: ShareLink) => void }) {
   return (
     <div className="link-card">
-      <div className="link-icon">
-        {link.kind === 'folder' ? <Icon.folder size={22} /> : link.kind === 'album' ? <Icon.photo size={22} /> : <Icon.link size={22} />}
+      <div className="link-icon" style={link.previewUrl ? { overflow: 'hidden' } : undefined}>
+        {link.previewUrl ? (
+          <img src={link.previewUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        ) : link.kind === 'folder' ? (
+          <Icon.folder size={22} />
+        ) : link.kind === 'album' ? (
+          <Icon.photo size={22} />
+        ) : (
+          <Icon.link size={22} />
+        )}
       </div>
       <div>
         <div style={{ fontSize: 15, fontWeight: 500, color: 'var(--md-on-surface)', marginBottom: 8 }}>{link.name || 'Без имени'}</div>
