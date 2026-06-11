@@ -58,6 +58,12 @@ Parent: [[ios-app]]
   `resetLocalState()`.
 - `RecentMediaWidget` — `.systemMedium`/`.systemLarge`. Каждая ячейка — `Link` на
   `barkcloud://media/<id>`; фон виджета — `barkcloud://albums`.
+- Раскладка (перерисована 2026-06-11): коллаж равными ячейками на весь виджет —
+  medium один ряд (до 4), large два сбалансированных ряда (`top = ceil(n/2)`,
+  например 5 фото → 3+2). Ячейка: `Color`-база + `overlay { Image.scaledToFill }`
+  + `clipShape` — фото обрезается строго по ячейке. Старый вариант
+  (`ZStack { Image.scaledToFill }.aspectRatio(1, .fill)` в `LazyVGrid`) давал
+  расползание картинок за пределы ячеек с наездами друг на друга.
 - Per-photo навигация: `DeepLink.media(id)` → `MainScreen` ставит `AppEnvironment.pendingMediaID`
   → сетка фото (`MediaGridScreen`, kind .photo) открывает пейджер по id (consume-once,
   мягкий фолбэк — если id не в загруженной странице, остаётся обычная сетка).

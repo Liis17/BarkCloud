@@ -83,7 +83,6 @@ struct RecentMediaWidgetEntryView: View {
     @Environment(\.widgetFamily) private var family
     let entries: [RecentMediaEntry]
 
-    private var columns: Int { 4 }
     private var maxCount: Int { family == .systemLarge ? 8 : 4 }
     private let fallbackURL = URL(string: "barkcloud://albums")!
 
@@ -91,11 +90,29 @@ struct RecentMediaWidgetEntryView: View {
         if entries.isEmpty {
             emptyState
         } else {
-            let shown = Array(entries.prefix(maxCount))
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: columns), spacing: 4) {
-                ForEach(shown, id: \.id) { entry in
-                    Link(destination: URL(string: "barkcloud://media/\(entry.id)") ?? fallbackURL) {
-                        cell(entry)
+            collage(Array(entries.prefix(maxCount)))
+        }
+    }
+
+    /// Коллаж равными ячейками, заполняющий весь виджет: medium — один ряд,
+    /// large — два сбалансированных ряда (например, 5 фото → 3+2). Размер ячейки
+    /// задаёт контейнер (HStack делит ширину поровну), фото вписывается через
+    /// `scaledToFill` в overlay и обрезается по ячейке — наезды исключены.
+    private func collage(_ shown: [RecentMediaEntry]) -> some View {
+        let rows: [[RecentMediaEntry]]
+        if family == .systemLarge && shown.count > 1 {
+            let top = (shown.count + 1) / 2
+            rows = [Array(shown.prefix(top)), Array(shown.dropFirst(top))]
+        } else {
+            rows = [shown]
+        }
+        return VStack(spacing: 4) {
+            ForEach(rows.indices, id: \.self) { rowIndex in
+                HStack(spacing: 4) {
+                    ForEach(rows[rowIndex], id: \.id) { entry in
+                        Link(destination: URL(string: "barkcloud://media/\(entry.id)") ?? fallbackURL) {
+                            cell(entry)
+                        }
                     }
                 }
             }
@@ -103,27 +120,28 @@ struct RecentMediaWidgetEntryView: View {
     }
 
     private func cell(_ entry: RecentMediaEntry) -> some View {
-        ZStack(alignment: .bottomTrailing) {
-            if let image = RecentMediaStore.image(for: entry) {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-            } else {
-                Color(uiColor: .secondarySystemBackground)
-                    .overlay {
-                        Image(systemName: "photo")
-                            .foregroundStyle(.secondary)
-                    }
+        Color(uiColor: .secondarySystemBackground)
+            .overlay {
+                if let image = RecentMediaStore.image(for: entry) {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                } else {
+                    Image(systemName: "photo")
+                        .foregroundStyle(.secondary)
+                }
             }
-            if entry.isVideo {
-                Image(systemName: "play.circle.fill")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.white)
-                    .padding(3)
+            .overlay(alignment: .bottomTrailing) {
+                if entry.isVideo {
+                    Image(systemName: "play.fill")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(.white)
+                        .padding(5)
+                        .background(.black.opacity(0.45), in: Circle())
+                        .padding(4)
+                }
             }
-        }
-        .aspectRatio(1, contentMode: .fill)
-        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
     private var emptyState: some View {
