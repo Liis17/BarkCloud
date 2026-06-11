@@ -51,6 +51,25 @@ struct GalleryScreen: View {
                 ids: assets.map(\.localIdentifier),
                 startIndex: assets.firstIndex(where: { $0.localIdentifier == item.id }) ?? 0,
                 resolve: Self.deviceResolve(assets: assets),
+                deviceActions: MediaPagerDeviceActions(
+                    albums: env.albumRepository,
+                    upload: { id in
+                        guard let asset = asset(withID: id) else { return false }
+                        return await vm?.uploadToCloud(asset: asset) ?? false
+                    },
+                    addToAlbum: { id, albumID in
+                        guard let asset = asset(withID: id) else { return false }
+                        return await vm?.addToAlbum(asset: asset, albumID: albumID) ?? false
+                    },
+                    createAlbumAndAdd: { id in
+                        guard let asset = asset(withID: id) else { return false }
+                        return await vm?.createAlbumAndAdd(asset: asset) ?? false
+                    },
+                    delete: { id in
+                        guard let asset = asset(withID: id) else { return false }
+                        return await vm?.deleteEverywhere(asset: asset) ?? false
+                    }
+                ),
                 onClose: { viewer = nil }
             )
         }
@@ -78,6 +97,11 @@ struct GalleryScreen: View {
         }
         .overlay { if vm?.isUploading == true { uploadingOverlay(vm!) } }
         .overlay { if vm?.isProcessing == true { processingOverlay } }
+    }
+
+    /// PHAsset по localIdentifier из актуального списка VM (для действий вьювера).
+    private func asset(withID id: String) -> PHAsset? {
+        vm?.assets.first { $0.localIdentifier == id }
     }
 
     private var processingOverlay: some View {

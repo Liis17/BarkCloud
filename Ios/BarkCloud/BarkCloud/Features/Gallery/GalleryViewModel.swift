@@ -290,19 +290,31 @@ final class GalleryViewModel {
     }
 
     /// Обёртка: резолвим `file_id` (с индикатором), затем выполняем действие.
-    private func resolveAndRun(_ asset: PHAsset, _ action: (String) async throws -> Void) async {
-        guard !isUploading else { return }
+    /// `true` — успех (для снекбара вьювера).
+    @discardableResult
+    private func resolveAndRun(_ asset: PHAsset, _ action: (String) async throws -> Void) async -> Bool {
+        guard !isUploading else { return false }
         isUploading = true
         uploadTotal = 1
         uploadDone = 0
+        var ok = true
         do {
             let fileID = try await ensureCloudFileID(for: asset)
             try await action(fileID)
         } catch {
             snackbar = domainErrorMessage(error)
+            ok = false
         }
         isUploading = false
         uploadTotal = 0
+        return ok
+    }
+
+    /// Загрузить один ассет в облако (дефолтная папка по типу медиа). Если файл
+    /// уже в облаке — резолв по хешу, без повторной заливки. `true` — успех.
+    @discardableResult
+    func uploadToCloud(asset: PHAsset) async -> Bool {
+        await resolveAndRun(asset) { _ in }
     }
 
     func copyLink(asset: PHAsset) async {
@@ -334,14 +346,16 @@ final class GalleryViewModel {
         }
     }
 
-    func addToAlbum(asset: PHAsset, albumID: String) async {
+    @discardableResult
+    func addToAlbum(asset: PHAsset, albumID: String) async -> Bool {
         await resolveAndRun(asset) { fileID in
             try await albums.addItems(albumID: albumID, fileIDs: [fileID])
             snackbar = String(localized: "media_added_to_album")
         }
     }
 
-    func createAlbumAndAdd(asset: PHAsset) async {
+    @discardableResult
+    func createAlbumAndAdd(asset: PHAsset) async -> Bool {
         await resolveAndRun(asset) { fileID in
             let name = "\(String(localized: "albums_create_title")) \(Self.randomSuffix())"
             let album = try await albums.createAlbum(name: name)
@@ -359,17 +373,20 @@ final class GalleryViewModel {
 
     /// «Удалить»: убрать копию и с устройства, и из облака (если файл там есть —
     /// в корзину, восстановимо). Сначала системное удаление ассета; если
-    /// пользователь его отменил — облако не трогаем (операция атомарна по намерению).
-    func deleteEverywhere(asset: PHAsset) async {
+    /// пользователь его отменил — облако не трогаем (операция атомарна по
+    /// намерению). `true` — ассет удалён с устройства (вьювер закрывается).
+    @discardableResult
+    func deleteEverywhere(asset: PHAsset) async -> Bool {
         let fileID = await resolveCloudFileIDIfPresent(for: asset)
-        guard await deleteFromDevice(asset: asset) else { return }
-        guard let fileID else { return }
+        guard await deleteFromDevice(asset: asset) else { return false }
+        guard let fileID else { return true }
         do {
             try await cloud.deleteUserMedia(fileID: fileID)
             await CloudDeviceLinkStore.shared.remove(fileIDs: [fileID])
         } catch {
             snackbar = domainErrorMessage(error)
         }
+        return true
     }
 
     /// Удалить ассет с устройства. iOS сам показывает системное подтверждение;
