@@ -112,6 +112,47 @@ public sealed class PageDataBuilder
         return vars;
     }
 
+    /// <summary>
+    /// Только блок хранилища для сайдбара (GET /api/storage) — без профиля.
+    /// GetUser дёргается лишь при отсутствии лимита в Files (фолбэк StorageLimitGb).
+    /// </summary>
+    public async Task<object> BuildStorageAsync(WebUser user)
+    {
+        var token = BrowserContext.UserToken(user.AccessToken);
+
+        long used = 0, limit = 0;
+        try
+        {
+            var storage = await _files.GetUserStorageInfoAsync(new GetUserStorageInfoRequest(), token);
+            used = storage.TotalUsedStorage;
+            limit = storage.StorageLimit;
+        }
+        catch (RpcException ex)
+        {
+            _logger.LogWarning("Storage/GetUserStorageInfo не выполнен: {Status}", ex.StatusCode);
+        }
+
+        if (limit <= 0)
+        {
+            try
+            {
+                var profile = (await _users.GetUserAsync(new GetUserRequest { UserId = user.UserId }, token)).User;
+                limit = ResolveLimit(0, profile?.StorageLimitGb ?? 0);
+            }
+            catch (RpcException ex)
+            {
+                _logger.LogWarning("Storage/GetUser не выполнен: {Status}", ex.StatusCode);
+            }
+        }
+
+        return new
+        {
+            usedLabel = Format.Size(used),
+            totalLabel = Format.Size(limit),
+            percent = Format.Percent(used, limit)
+        };
+    }
+
     // ───────────────────────── Settings ─────────────────────────
 
     public async Task<string> BuildSettingsJsonAsync(WebUser user, HttpContext http)
