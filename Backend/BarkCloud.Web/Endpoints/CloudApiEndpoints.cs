@@ -69,6 +69,16 @@ public static class CloudApiEndpoints
             }, Json);
         });
 
+        // Лёгкий рефетч блока хранилища (Sidebar) при переключении вкладок SPA.
+        api.MapGet("/storage", async (HttpContext http, AuthGateway auth, PageDataBuilder data) =>
+        {
+            var user = await auth.AuthenticateAsync(http);
+            if (user is null)
+                return Results.Json(new { error = "Не авторизован" }, Json, statusCode: 401);
+
+            return Results.Json(await data.BuildStorageAsync(user), Json);
+        });
+
         // ───────────────────────── Каталоги ─────────────────────────
 
         api.MapGet("/cloud/list", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud, string? dir) =>

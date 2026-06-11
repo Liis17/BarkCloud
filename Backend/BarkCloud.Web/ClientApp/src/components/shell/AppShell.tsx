@@ -1,5 +1,5 @@
 import React from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 import { Footbar } from './Footbar';
@@ -15,6 +15,8 @@ import type { Shell } from '../../lib/types';
 export function AppShell() {
   const [shell, setShell] = React.useState<Shell | null>(null);
   const [header, setHeader] = React.useState<PageHeader>({ title: '' });
+  const { pathname } = useLocation();
+  const firstPath = React.useRef(true);
 
   React.useEffect(() => {
     // 401 внутри apiGet сам редиректит на /login.
@@ -22,6 +24,18 @@ export function AppShell() {
       .then(setShell)
       .catch(() => {});
   }, []);
+
+  // Блок хранилища обновляется при каждом переключении вкладки (pathname, без ?q=);
+  // первое срабатывание пропускаем — storage только что пришёл из /api/me.
+  React.useEffect(() => {
+    if (firstPath.current) {
+      firstPath.current = false;
+      return;
+    }
+    apiGet<Shell['storage']>('/api/storage')
+      .then((storage) => setShell((prev) => (prev ? { ...prev, storage } : prev)))
+      .catch(() => {});
+  }, [pathname]);
 
   const headerCtx = React.useMemo(() => ({ header, setHeader }), [header]);
   const documentTitle = header.documentTitle ?? (typeof header.title === 'string' ? header.title : '');
