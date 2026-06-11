@@ -84,14 +84,20 @@ public final class FileTransferService: Sendable {
     }
 
     /// Скачать оригинал во временный файл (для предпросмотра / шеринга).
+    /// Каждое скачивание кладётся в собственную UUID-поддиректорию: параллельные
+    /// загрузки файлов с одинаковым именем иначе гонялись бы за один путь
+    /// (removeItem выдёргивал бы файл из-под читателя).
     public func download(from url: URL, suggestedName: String) async throws -> URL {
         let (tempURL, response) = try await InsecureHTTP.session.download(from: url)
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
             throw FileTransferError.downloadFailed
         }
-        let name = suggestedName.isEmpty ? UUID().uuidString : suggestedName
-        let dest = FileManager.default.temporaryDirectory.appendingPathComponent(name)
-        try? FileManager.default.removeItem(at: dest)
+        let safeName = suggestedName.replacingOccurrences(of: "/", with: ":")
+        let name = safeName.isEmpty ? UUID().uuidString : safeName
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let dest = dir.appendingPathComponent(name)
         try FileManager.default.moveItem(at: tempURL, to: dest)
         return dest
     }

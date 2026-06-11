@@ -71,14 +71,14 @@ final class BarkCloudFileProvider: NSObject, NSFileProviderReplicatedExtension {
                 return
             }
             if let dir = await cache.directory(for: identifier) {
-                completionHandler(BarkCloudFileProviderItem.directory(id: dir.dirID, name: dir.name,
+                completionHandler(BarkCloudFileProviderItem.directory(id: dir.dirID, name: dir.displayName,
                                                                       parent: dir.parentIdentifier,
                                                                       modified: dir.modified), nil)
                 return
             }
             if let file = await cache.file(for: identifier) {
                 completionHandler(BarkCloudFileProviderItem.file(entryID: file.entryID, fileID: file.fileID,
-                                                                 name: file.name, size: file.size,
+                                                                 name: file.displayName, size: file.size,
                                                                  modified: file.modified,
                                                                  parent: file.parentIdentifier), nil)
                 return
@@ -122,9 +122,9 @@ final class BarkCloudFileProvider: NSObject, NSFileProviderReplicatedExtension {
                     completionHandler(nil, nil, NSFileProviderError(.serverUnreachable))
                     return
                 }
-                let dest = try await services.transfer.download(from: url, suggestedName: file.name)
+                let dest = try await services.transfer.download(from: url, suggestedName: file.displayName)
                 let item = BarkCloudFileProviderItem.file(entryID: file.entryID, fileID: file.fileID,
-                                                          name: file.name, size: file.size,
+                                                          name: file.displayName, size: file.size,
                                                           modified: file.modified,
                                                           parent: file.parentIdentifier)
                 progress.completedUnitCount = 1
@@ -155,14 +155,36 @@ final class BarkCloudFileProvider: NSObject, NSFileProviderReplicatedExtension {
                     completionHandler(nil, [], false, NSFileProviderError(.noSuchItem))
                     return
                 }
-                let services = try await loadServices()
                 let isFolder = itemTemplate.contentType?.conforms(to: .folder) ?? false
                 let name = itemTemplate.filename
+
+                // Служебные файлы Finder в облако не тянем: система оставит их
+                // локальными и не будет ретраить синхронизацию.
+                if !isFolder && Self.isFinderJunk(name) {
+                    completionHandler(nil, [], false, NSFileProviderError(.excludedFromSync))
+                    return
+                }
+
+                let services = try await loadServices()
+
+                // Реимпорт после сброса/потери replica: item уже может существовать
+                // в облаке. Без проверки upload дедуплицируется по хешу, а attach
+                // падает FileAlreadyAttached (инвариант «один блоб — одна запись»).
+                if options.contains(.mayAlreadyExist),
+                   let existing = try await existingItem(named: name, isFolder: isFolder,
+                                                         parentDirID: parentDirID, parent: parent,
+                                                         services: services) {
+                    completionHandler(existing, [], false, nil)
+                    return
+                }
+
                 if isFolder {
                     let d = try await services.cloud.createDirectory(parentID: parentDirID, name: name)
-                    await cache.put(directory: d, parent: parent)
+                    let local = LocalNameAllocator.sanitize(d.name)
+                    await cache.put(directory: d, parent: parent, localName: local)
                     await noteLocalChange(parent: parent)
-                    let item = BarkCloudFileProviderItem.directory(d, parent: parent)
+                    let item = BarkCloudFileProviderItem.directory(id: d.id, name: local, parent: parent,
+                                                                   modified: d.updatedAt ?? Date())
                     completionHandler(item, [], false, nil)
                 } else {
                     guard let src = url else {
@@ -173,7 +195,8 @@ final class BarkCloudFileProvider: NSObject, NSFileProviderReplicatedExtension {
                     let fileID = try await services.cloud.uploadFile(data: data,
                                                                      fileName: name,
                                                                      toDirectory: parentDirID)
-                    // entryID назад не возвращается — резолвим листингом.
+                    // entryID назад не возвращается — резолвим листингом. Имя могло
+                    // быть авто-переименовано бэкендом при коллизии (« (1)»).
                     guard let entry = try await Self.findEntry(in: services.cloud,
                                                                directoryID: parentDirID,
                                                                name: name,
@@ -181,9 +204,14 @@ final class BarkCloudFileProvider: NSObject, NSFileProviderReplicatedExtension {
                         completionHandler(nil, [], false, NSFileProviderError(.cannotSynchronize))
                         return
                     }
-                    await cache.put(file: entry, parentDirID: parentDirID, parent: parent)
+                    let local = LocalNameAllocator.sanitize(entry.name)
+                    await cache.put(file: entry, parentDirID: parentDirID, parent: parent, localName: local)
                     await noteLocalChange(parent: parent)
-                    completionHandler(BarkCloudFileProviderItem.file(entry, parent: parent), [], false, nil)
+                    let item = BarkCloudFileProviderItem.file(entryID: entry.id, fileID: entry.fileID,
+                                                              name: local, size: entry.asset.fileSize,
+                                                              modified: entry.asset.uploadedAt ?? entry.asset.createdAt,
+                                                              parent: parent)
+                    completionHandler(item, [], false, nil)
                 }
             } catch {
                 completionHandler(nil, [], false, error)
@@ -207,60 +235,98 @@ final class BarkCloudFileProvider: NSObject, NSFileProviderReplicatedExtension {
                 let newParent = item.parentItemIdentifier
 
                 if let dir = await cache.directory(for: id) {
-                    if changedFields.contains(.parentItemIdentifier),
-                       let newParentDirID = await parentDirID(for: newParent),
-                       newParentDirID != dir.parentIdentifier.rawValue {
-                        try await services.cloud.moveDirectory(dir.dirID, newParentID: newParentDirID)
+                    if changedFields.contains(.parentItemIdentifier) {
+                        guard let newParentDirID = await parentDirID(for: newParent) else {
+                            // Неизвестный родитель (например .trashContainer) —
+                            // не рапортуем ложный успех без RPC.
+                            completionHandler(nil, [], false, NSFileProviderError(.noSuchItem))
+                            return
+                        }
+                        let oldParentDirID = await parentDirID(for: dir.parentIdentifier)
+                        if newParentDirID != oldParentDirID {
+                            try await services.cloud.moveDirectory(dir.dirID, newParentID: newParentDirID)
+                        }
                     }
-                    if changedFields.contains(.filename) && newName != dir.name {
+                    let renamed = changedFields.contains(.filename) && newName != dir.displayName
+                    if renamed {
                         try await services.cloud.renameDirectory(dir.dirID, newName: newName)
                     }
-                    await cache.putDirectory(dirID: dir.dirID, parent: newParent, name: newName, modified: Date())
+                    // Облачное имя меняется только при rename; при чистом move
+                    // сохраняем прежнюю пару cloud/local имён.
+                    let cloudName = renamed ? newName : dir.name
+                    let localName = renamed ? newName : dir.displayName
+                    await cache.putDirectory(dirID: dir.dirID, parent: newParent,
+                                             name: cloudName, localName: localName, modified: Date())
                     await noteLocalChange(parent: dir.parentIdentifier, also: newParent)
-                    let updated = BarkCloudFileProviderItem.directory(id: dir.dirID, name: newName,
+                    let updated = BarkCloudFileProviderItem.directory(id: dir.dirID, name: localName,
                                                                      parent: newParent, modified: Date())
                     completionHandler(updated, [], false, nil)
                     return
                 }
 
                 if let file = await cache.file(for: id) {
-                    // Contents-modify (блобы иммутабельны) → delete old + upload as new
-                    if changedFields.contains(.contents), let src = newContents,
-                       let newParentDirID = await parentDirID(for: newParent) {
-                        let data = try Data(contentsOf: src)
-                        try? await services.cloud.deleteFileEntry(file.entryID)
-                        await cache.forget(id)
-                        let fileID = try await services.cloud.uploadFile(data: data,
-                                                                         fileName: newName,
-                                                                         toDirectory: newParentDirID)
-                        guard let entry = try await Self.findEntry(in: services.cloud,
-                                                                   directoryID: newParentDirID,
-                                                                   name: newName,
-                                                                   fileID: fileID) else {
-                            completionHandler(nil, [], false, NSFileProviderError(.cannotSynchronize))
+                    // Contents-modify: блобы иммутабельны → старая запись в корзину,
+                    // новое содержимое — новым entry. При сбое заливки запись
+                    // восстанавливается из корзины, чтобы файл не пропал из папки.
+                    if changedFields.contains(.contents), let src = newContents {
+                        guard let newParentDirID = await parentDirID(for: newParent) else {
+                            completionHandler(nil, [], false, NSFileProviderError(.noSuchItem))
                             return
                         }
-                        await cache.put(file: entry, parentDirID: newParentDirID, parent: newParent)
-                        await noteLocalChange(parent: file.parentIdentifier, also: newParent)
-                        completionHandler(BarkCloudFileProviderItem.file(entry, parent: newParent), [], false, nil)
+                        let data = try Data(contentsOf: src)
+                        try? await services.cloud.deleteFileEntry(file.entryID)
+                        do {
+                            let fileID = try await services.cloud.uploadFile(data: data,
+                                                                             fileName: newName,
+                                                                             toDirectory: newParentDirID)
+                            guard let entry = try await Self.findEntry(in: services.cloud,
+                                                                       directoryID: newParentDirID,
+                                                                       name: newName,
+                                                                       fileID: fileID) else {
+                                throw NSFileProviderError(.cannotSynchronize)
+                            }
+                            await cache.forget(id)
+                            let local = LocalNameAllocator.sanitize(entry.name)
+                            await cache.put(file: entry, parentDirID: newParentDirID,
+                                            parent: newParent, localName: local)
+                            await noteLocalChange(parent: file.parentIdentifier, also: newParent)
+                            let item = BarkCloudFileProviderItem.file(
+                                entryID: entry.id, fileID: entry.fileID,
+                                name: local, size: entry.asset.fileSize,
+                                modified: entry.asset.uploadedAt ?? entry.asset.createdAt,
+                                parent: newParent)
+                            completionHandler(item, [], false, nil)
+                        } catch {
+                            try? await services.cloud.restoreFromTrash(entryID: file.entryID)
+                            completionHandler(nil, [], false, error)
+                        }
                         return
                     }
                     // Только метаданные: rename / move
-                    if changedFields.contains(.parentItemIdentifier),
-                       let newParentDirID = await parentDirID(for: newParent),
-                       newParentDirID != file.parentDirID {
-                        try await services.cloud.moveFileEntry(file.entryID, newDirectoryID: newParentDirID)
+                    if changedFields.contains(.parentItemIdentifier) {
+                        guard let newParentDirID = await parentDirID(for: newParent) else {
+                            completionHandler(nil, [], false, NSFileProviderError(.noSuchItem))
+                            return
+                        }
+                        if newParentDirID != file.parentDirID {
+                            try await services.cloud.moveFileEntry(file.entryID, newDirectoryID: newParentDirID)
+                        }
                     }
-                    if changedFields.contains(.filename) && newName != file.name {
+                    let renamed = changedFields.contains(.filename) && newName != file.displayName
+                    if renamed {
                         try await services.cloud.renameFileEntry(file.entryID, newName: newName)
                     }
+                    let cloudName = renamed ? newName : file.name
+                    let localName = renamed ? newName : file.displayName
                     let newParentDirID = (await parentDirID(for: newParent)) ?? file.parentDirID
                     await cache.putFile(entryID: file.entryID, fileID: file.fileID,
                                         parentDirID: newParentDirID, parent: newParent,
-                                        name: newName, size: file.size, modified: Date())
+                                        name: cloudName, localName: localName,
+                                        size: file.size, modified: Date(),
+                                        previewURL: file.previewURL)
                     await noteLocalChange(parent: file.parentIdentifier, also: newParent)
                     let updated = BarkCloudFileProviderItem.file(entryID: file.entryID, fileID: file.fileID,
-                                                                 name: newName, size: file.size,
+                                                                 name: localName, size: file.size,
                                                                  modified: Date(), parent: newParent)
                     completionHandler(updated, [], false, nil)
                     return
@@ -326,15 +392,85 @@ final class BarkCloudFileProvider: NSObject, NSFileProviderReplicatedExtension {
         }
     }
 
-    /// Найти `CloudFileEntry` в листинге директории по имени и (опционально) fileID
-    /// — после `uploadFile`+`attachFile` бэкенд не возвращает entryID, а нам он нужен.
+    /// Найти `CloudFileEntry` в листинге директории — после `uploadFile`+`attachFile`
+    /// бэкенд не возвращает entryID, а нам он нужен. Ищем по `fileID`: инвариант
+    /// бэкенда «один блоб владельца — максимум одна живая запись» делает совпадение
+    /// однозначным, а имя могло быть авто-переименовано при коллизии (« (1)»).
     private static func findEntry(in cloud: CloudRepository,
                                   directoryID: String,
                                   name: String,
                                   fileID: String) async throws -> CloudFileEntry? {
         let listing = try await cloud.listDirectory(directoryID)
-        if let f = listing.files.first(where: { $0.fileID == fileID && $0.name == name }) { return f }
+        if let f = listing.files.first(where: { $0.fileID == fileID }) { return f }
         return listing.files.first(where: { $0.name == name })
+    }
+
+    /// Служебные файлы Finder/macOS, бессмысленные в облаке.
+    private static func isFinderJunk(_ name: String) -> Bool {
+        name == ".DS_Store" || name == ".localized" || name.hasPrefix("._")
+    }
+
+    /// Поиск уже существующего в облаке item'а по имени — для `createItem`
+    /// с опцией `.mayAlreadyExist` (реимпорт). Сравнение имён — как в APFS:
+    /// без регистра, в единой юникод-нормализации.
+    private func existingItem(named name: String, isFolder: Bool,
+                              parentDirID: String, parent: NSFileProviderItemIdentifier,
+                              services: BarkCloudServices) async throws -> BarkCloudFileProviderItem? {
+        let key = LocalNameAllocator.collationKey(LocalNameAllocator.sanitize(name))
+        func matches(_ cloudName: String) -> Bool {
+            LocalNameAllocator.collationKey(LocalNameAllocator.sanitize(cloudName)) == key
+        }
+        let listing = try await services.cloud.listDirectory(parentDirID)
+        if isFolder {
+            guard let d = listing.subdirs.first(where: { matches($0.name) }) else { return nil }
+            let local = LocalNameAllocator.sanitize(d.name)
+            await cache.put(directory: d, parent: parent, localName: local)
+            return BarkCloudFileProviderItem.directory(id: d.id, name: local, parent: parent,
+                                                       modified: d.updatedAt ?? Date())
+        }
+        guard let f = listing.files.first(where: { matches($0.name) }) else { return nil }
+        let local = LocalNameAllocator.sanitize(f.name)
+        await cache.put(file: f, parentDirID: parentDirID, parent: parent, localName: local)
+        return BarkCloudFileProviderItem.file(entryID: f.id, fileID: f.fileID, name: local,
+                                              size: f.asset.fileSize,
+                                              modified: f.asset.uploadedAt ?? f.asset.createdAt,
+                                              parent: parent)
+    }
+}
+
+// MARK: - Миниатюры
+
+/// Миниатюры Finder из облачных превью: бэкенд генерирует превью для фото/видео,
+/// их URL кэшируются при enumerate — оригинал для миниатюры не скачивается.
+extension BarkCloudFileProvider: NSFileProviderThumbnailing {
+    func fetchThumbnails(for itemIdentifiers: [NSFileProviderItemIdentifier],
+                         requestedSize size: CGSize,
+                         perThumbnailCompletionHandler: @escaping (NSFileProviderItemIdentifier, Data?, Error?) -> Void,
+                         completionHandler: @escaping (Error?) -> Void) -> Progress {
+        let progress = Progress(totalUnitCount: Int64(itemIdentifiers.count))
+        Task {
+            for identifier in itemIdentifiers {
+                defer { progress.completedUnitCount += 1 }
+                guard let file = await cache.file(for: identifier),
+                      let raw = file.previewURL,
+                      let url = URL(string: raw) else {
+                    perThumbnailCompletionHandler(identifier, nil, nil)
+                    continue
+                }
+                do {
+                    let (data, response) = try await InsecureHTTP.session.data(from: url)
+                    if let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) {
+                        perThumbnailCompletionHandler(identifier, data, nil)
+                    } else {
+                        perThumbnailCompletionHandler(identifier, nil, nil)
+                    }
+                } catch {
+                    perThumbnailCompletionHandler(identifier, nil, error)
+                }
+            }
+            completionHandler(nil)
+        }
+        return progress
     }
 }
 

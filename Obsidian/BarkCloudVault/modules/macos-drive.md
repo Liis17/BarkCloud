@@ -85,11 +85,14 @@ app-контейнер + app-extension `BarkCloudFS` (`com.apple.fileprovider-no
   `"d:<dirID>"` / `"f:<entryID>"` / `.rootContainer`, `itemVersion`
   (contentVersion=fileID, metadataVersion=name+parent+modified),
   capabilities per-type.
-- `BarkCloudItemCache.swift` — `actor` cache `identifier → CloudDirectory/
-  CloudFileEntry`, заполняется при enumerate. На cache miss — `.noSuchItem`,
-  fileproviderd перезапросит листинг родителя.
+- `BarkCloudItemCache.swift` — `actor` cache `identifier → DirInfo/FileInfo`
+  с persistent JSON (`items-cache.json` в App Group), заполняется при
+  enumerate. Хранит пары имён cloud/local (`name`/`localName`), даты и URL
+  превью для миниатюр. На cache miss — `.noSuchItem`, fileproviderd
+  перезапросит листинг родителя.
 - `BarkCloudEnumerator.swift` — per-container enumerator + EmptyEnumerator
-  (working-set/trash) + PendingEnumerator (резолв подпапки из actor-кэша).
+  (working-set/trash) + PendingEnumerator (резолв подпапки из actor-кэша) +
+  **`LocalNameAllocator`** — санитизация и дедупликация имён (см. ниже).
 - Info.plist: `NSExtension.NSExtensionPointIdentifier =
   com.apple.fileprovider-nonui`, `NSExtensionPrincipalClass =
   ...BarkCloudFileProvider`, `NSExtensionFileProviderSupportsEnumeration = YES`.
@@ -123,6 +126,35 @@ SwiftUI app + menu-bar (`MenuBarExtra`), переиспользует `BarkCloud
 (AppIntent), поднимает gRPC прямо в процессе виджета (адрес/токены из shared
 storage), пишет свежий снимок и просит `WidgetCenter.reloadTimelines`.
 
+**Ревизия 2026-06-11 — фикс «не все файлы отображаются» + добротность:**
+- **`LocalNameAllocator`** (`BarkCloudEnumerator.swift`): бэкенд хранит имена
+  как есть (уникальность — байтовая и только среди файлов при attach), а
+  fileproviderd молча отбрасывает item'ы с «/» в имени и с коллизиями
+  (регистр `Photo.JPG`/`photo.jpg`, NFC/NFD-юникод, файл против папки) — они
+  «не отображались» в Finder. Теперь имена санитизируются («/»→«:», без
+  control chars, ≤255 байт, непустые) и дедуплицируются внутри контейнера
+  суффиксом « (2)» (нумерация стабильна — листинг отсортирован по имени).
+  Пара cloud/local имени живёт в кэше; rename сравнивает с local-именем.
+- **`findEntry` по `fileID`**: attach мог авто-переименовать файл (« (1)»),
+  и поиск по имени цеплял чужую запись — теперь матч по fileID (инвариант
+  «один блоб — одна живая запись» делает его однозначным).
+- **`createItem`**: `.DS_Store`/`._*`/`.localized` → `.excludedFromSync`
+  (не засоряют облако); `.mayAlreadyExist` (реимпорт после сброса replica)
+  ищет существующий item по имени — иначе upload дедуплицировался по хешу и
+  attach падал `FileAlreadyAttached`.
+- **`modifyItem`**: при сбое перезаписи содержимого старая запись
+  восстанавливается из корзины (`restoreFromTrash`) — раньше файл терялся;
+  неразрешимый новый родитель (например `.trashContainer`) → ошибка вместо
+  ложного успеха; исправлено сравнение родителя папки (dirID vs identifier).
+- **Миниатюры**: `NSFileProviderThumbnailing` — Finder получает превью
+  фото/видео с бэкенда (URL кэшируется при enumerate), без скачивания
+  оригиналов.
+- **`FileTransferService.download`** (Kit, общий с iOS): каждая загрузка — в
+  собственную UUID-поддиректорию tmp (гонка параллельных скачиваний с
+  одинаковым именем), suggestedName чистится от «/».
+- **`CloudDirectory`** (Kit): + `createdAt`/`updatedAt` из `DirectoryInfo` —
+  папки в Finder показывают реальные даты, а не момент энумерации.
+
 **Нужно от пользователя для рантайма** (компиляция не требует): любой Apple
 Developer Team ID (даже Personal — в отличие от FSKit). Эмпирически проверить
 read/write/listing в Finder, поведение cache после рестарта `fileproviderd`.
@@ -145,19 +177,23 @@ read/write/listing в Finder, поведение cache после рестарт
 
 ## Открытые вопросы / риски
 
-- **Persistent cache.** `BarkCloudItemCache` — in-memory actor. После рестарта
-  `fileproviderd` cache пустой; обычно сразу делается enumerate корня и
-  вглубь, восстанавливая cache. Если пин/recents в Finder обращаются к item'у
-  не из enumerate-цепочки — потребуется persistent cache (App Group
-  UserDefaults или SQLite).
-- **`findEntry` после upload.** После `cloud.uploadFile` бэкенд не возвращает
-  `entryID`, поэтому делаем `listDirectory(parentDirID)` и ищем по
-  `fileID + name`. Эпизодически возможна гонка — мониторить, при
-  необходимости добавить proto-метод «attach и верни entryID».
-- **`enumerateChanges` без incremental sync.** Сейчас возвращаем «никаких
-  изменений», что заставляет fileproviderd периодически делать полный
-  `enumerateItems`. Для пуш-обновлений с других клиентов понадобится
-  бэкенд-стрим изменений и нормальный `currentSyncAnchor`.
+- **Копия файла внутри диска невозможна по модели бэкенда.** Finder-копия
+  дублирует содержимое → upload дедуплицируется по хешу → attach падает
+  `FileAlreadyAttached` (инвариант «один блоб владельца — одна запись»).
+  Finder покажет ошибку синхронизации, локальная копия останется. Лечится
+  только на бэкенде (разрешить N записей на блоб или copy-RPC).
+- **`enumerateChanges` без incremental sync.** Глобальный anchor: любая
+  локальная мутация инвалидирует все контейнеры → полный `enumerateItems`.
+  Для пуш-обновлений с других клиентов понадобится бэкенд-стрим изменений и
+  нормальный `currentSyncAnchor` (хотя бы per-container).
+- **Большие файлы и память.** `createItem`/`modifyItem` читают файл целиком в
+  `Data` и клеят multipart в памяти; у многогигабайтных файлов будет пик RSS.
+  Нужен streaming upload (URLSession uploadTask с файлом).
+- **Очень большие папки.** `ListDirectoryDetailed` не пагинируется; на тысячах
+  файлов ответ может упереться в лимит receive-message gRPC — мониторить.
+- **Прогресс в Finder.** `fetchContents`/`createItem` возвращают фиктивный
+  `Progress` — у больших файлов индикатор неинформативен. Можно пробросить
+  прогресс URLSession.
 
 ## План фаз
 
