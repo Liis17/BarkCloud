@@ -78,6 +78,25 @@ export interface DuplicateLocation {
   directoryName: string;
 }
 
+export interface BatchSummary {
+  total: number;
+  succeeded: number;
+  failed: number;
+  invalidIds?: string[];
+  succeededIds?: string[];
+  failedIds?: string[];
+}
+
+export async function deleteEntriesBatch(entryIds: string[]): Promise<BatchSummary> {
+  if (!entryIds.length) return { total: 0, succeeded: 0, failed: 0, invalidIds: [] };
+  return apiPost<BatchSummary>('/api/cloud/entries/delete', { entryIds });
+}
+
+export async function deleteMediaBatch(fileIds: string[]): Promise<BatchSummary> {
+  if (!fileIds.length) return { total: 0, succeeded: 0, failed: 0, invalidIds: [] };
+  return apiPost<BatchSummary>('/api/cloud/media/delete-batch', { fileIds });
+}
+
 /** SHA256 файла в hex. Читает файл целиком в память — допустимо при лимите 512 МБ;
  *  Web Crypto не умеет инкрементальный digest. null — если crypto недоступен (http) или ошибка. */
 async function sha256Hex(file: File): Promise<string | null> {
