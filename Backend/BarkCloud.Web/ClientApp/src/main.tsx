@@ -8,6 +8,7 @@ import './styles/pages.css';
 import { AppShell } from './components/shell/AppShell';
 import { PhotosPage } from './pages/PhotosPage';
 import { VideosPage } from './pages/VideosPage';
+import { AlbumsPage } from './pages/AlbumsPage';
 import { FilesPage } from './pages/FilesPage';
 import { FavoritesPage } from './pages/FavoritesPage';
 import { TrashPage } from './pages/TrashPage';
@@ -30,6 +31,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             <Route index element={<Navigate to="/photos" replace />} />
             <Route path="photos" element={<PhotosPage />} />
             <Route path="videos" element={<VideosPage />} />
+            <Route path="albums" element={<AlbumsPage />} />
             <Route path="files" element={<FilesPage />} />
             <Route path="favorites" element={<FavoritesPage />} />
             <Route path="trash" element={<TrashPage />} />
