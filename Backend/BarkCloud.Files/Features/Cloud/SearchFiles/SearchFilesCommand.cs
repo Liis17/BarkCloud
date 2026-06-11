@@ -13,4 +13,7 @@ public class SearchFilesCommand : IRequest<SearchFilesResponse>
     public DateTime? CursorCreatedAt { get; set; }
 
     public Guid? CursorEntryId { get; set; }
+
+    /// <summary>Пустой список — все типы медиа.</summary>
+    public List<Domain.MediaKind> KindFilter { get; set; } = new();
 }

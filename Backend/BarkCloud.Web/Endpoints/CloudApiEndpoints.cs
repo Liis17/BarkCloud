@@ -86,8 +86,9 @@ public static class CloudApiEndpoints
             }));
 
         // Поиск файлов пользователя по имени (по всему облаку), cursor-пагинация.
+        // kind: media (фото+видео) | photo | video; не задан — все типы.
         api.MapGet("/cloud/search", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud,
-            string? q, int? limit, string? cursorAt, string? cursorId) =>
+            string? q, string? kind, int? limit, string? cursorAt, string? cursorId) =>
             await Guarded(http, auth, async token =>
             {
                 var query = (q ?? "").Trim();
@@ -95,6 +96,12 @@ public static class CloudApiEndpoints
                     return Results.Json(new { files = Array.Empty<object>(), nextCursorAt = (DateTimeOffset?)null, nextCursorId = "" }, Json);
 
                 var req = new SearchFilesRequest { Query = query, Limit = limit is > 0 and <= 200 ? limit.Value : 50 };
+                switch (kind)
+                {
+                    case "media": req.KindFilter.Add(MediaKind.Photo); req.KindFilter.Add(MediaKind.Video); break;
+                    case "photo": req.KindFilter.Add(MediaKind.Photo); break;
+                    case "video": req.KindFilter.Add(MediaKind.Video); break;
+                }
                 if (DateTimeOffset.TryParse(cursorAt, out var dt))
                     req.CursorCreatedAt = Timestamp.FromDateTimeOffset(dt.ToUniversalTime());
                 if (!string.IsNullOrEmpty(cursorId))

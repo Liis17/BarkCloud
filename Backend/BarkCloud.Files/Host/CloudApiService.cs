@@ -150,7 +150,8 @@ public class CloudApiService : CloudApi.CloudApiBase
             Query = request.Query,
             Limit = request.Limit,
             CursorCreatedAt = cursorCreatedAt,
-            CursorEntryId = cursorEntryId
+            CursorEntryId = cursorEntryId,
+            KindFilter = request.KindFilter.Select(k => (BarkCloud.Files.Domain.MediaKind)(int)k).Distinct().ToList()
         });
     }
 
