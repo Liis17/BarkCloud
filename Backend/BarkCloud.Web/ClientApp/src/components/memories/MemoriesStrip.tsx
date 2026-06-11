@@ -4,6 +4,7 @@ import { MediaThumb } from '../media/MediaThumb';
 import { Lightbox } from '../media/Lightbox';
 import { apiGet } from '../../lib/api';
 import { plural } from '../../lib/format';
+import type { MediaActionsApi } from '../../hooks/useMediaActions';
 import type { MemoryGroup } from '../../lib/types';
 
 function yearsAgoLabel(n: number): string {
@@ -27,8 +28,9 @@ function MemoryCard({ group, onOpen }: { group: MemoryGroup; onOpen: () => void 
 
 /** Лента «Воспоминания — В этот день»: фото/видео за сегодняшнюю дату прошлых лет.
  *  Скрывается, если воспоминаний нет. Клик по году открывает Lightbox с его снимками.
- *  refreshKey: инкремент — перезагрузить группы (например, после удаления фото в галерее). */
-export function MemoriesStrip({ refreshKey = 0 }: { refreshKey?: number }) {
+ *  refreshKey: инкремент — перезагрузить группы (например, после удаления фото в галерее).
+ *  actions: панель действий в Lightbox (useMediaActions().api). */
+export function MemoriesStrip({ refreshKey = 0, actions }: { refreshKey?: number; actions?: MediaActionsApi }) {
   const [groups, setGroups] = React.useState<MemoryGroup[] | null>(null);
   const [open, setOpen] = React.useState<MemoryGroup | null>(null);
 
@@ -51,7 +53,7 @@ export function MemoriesStrip({ refreshKey = 0 }: { refreshKey?: number }) {
           <MemoryCard key={g.year} group={g} onOpen={() => setOpen(g)} />
         ))}
       </div>
-      {open && <Lightbox items={open.items} index={0} onClose={() => setOpen(null)} />}
+      {open && <Lightbox items={open.items} index={0} actions={actions} onClose={() => setOpen(null)} />}
     </div>
   );
 }

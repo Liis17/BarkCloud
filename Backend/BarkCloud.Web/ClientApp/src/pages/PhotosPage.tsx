@@ -162,7 +162,7 @@ export function PhotosPage() {
         </div>
       </div>
 
-      <MemoriesStrip refreshKey={memKey} />
+      <MemoriesStrip refreshKey={memKey} actions={actionsCtx.api} />
 
       {(loading && photos.length === 0 ? (
           <Loading />
@@ -211,7 +211,7 @@ export function PhotosPage() {
         ))}
       </div>
 
-      {lightbox !== null && <Lightbox items={photos} index={lightbox} onClose={() => setLightbox(null)} />}
+      {lightbox !== null && <Lightbox items={photos} index={lightbox} actions={actionsCtx.api} onClose={() => setLightbox(null)} />}
     </>
   );
 }
