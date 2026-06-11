@@ -297,23 +297,30 @@ final class MediaGridViewModel {
         )
     }
 
-    func addToAlbum(fileID: String, albumID: String) async {
+    /// `true` — успех (вьювер показывает свой снекбар по результату).
+    @discardableResult
+    func addToAlbum(fileID: String, albumID: String) async -> Bool {
         do {
             try await albums.addItems(albumID: albumID, fileIDs: [fileID])
             state.snackbar = String(localized: "media_added_to_album")
+            return true
         } catch {
             state.snackbar = domainErrorMessage(error)
+            return false
         }
     }
 
-    func createAlbumAndAdd(fileID: String) async {
+    @discardableResult
+    func createAlbumAndAdd(fileID: String) async -> Bool {
         do {
             let name = "\(String(localized: "albums_create_title")) \(Self.randomSuffix())"
             let album = try await albums.createAlbum(name: name)
             try await albums.addItems(albumID: album.id, fileIDs: [fileID])
             state.snackbar = String(localized: "media_added_to_album")
+            return true
         } catch {
             state.snackbar = domainErrorMessage(error)
+            return false
         }
     }
 }

@@ -78,6 +78,17 @@ struct MediaGridScreen: View {
                         await vm.loadMoreIfNeeded(current: last)
                         return vm.state.items.map(\.id)
                     },
+                    actions: MediaPagerActions(
+                        albums: env.albumRepository,
+                        item: { id in vm.state.items.first { $0.id == id } },
+                        resolveOriginal: MediaPagerResolver.cloud(
+                            transfer: env.fileTransfer,
+                            cache: env.fileCache
+                        ),
+                        delete: { vm.deleteSingle($0) },
+                        addToAlbum: { item, albumID in await vm.addToAlbum(fileID: item.id, albumID: albumID) },
+                        createAlbumAndAdd: { item in await vm.createAlbumAndAdd(fileID: item.id) }
+                    ),
                     onClose: { selected = nil }
                 )
             }
