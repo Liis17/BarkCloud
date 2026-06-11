@@ -228,6 +228,8 @@ export function FilesPage() {
   const [smartFolders, setSmartFolders] = React.useState<DynamicFolder[]>([]);
   const [openSmart, setOpenSmart] = React.useState<DynamicFolder | null>(null);
   const [creatingSmart, setCreatingSmart] = React.useState(false);
+  const [searchCursor, setSearchCursor] = React.useState<{ at: string; id: string } | null>(null);
+  const [searchMore, setSearchMore] = React.useState(false);
   const [toastNode, toast] = useToast();
   const { enqueue, attachVersion } = useUploadActions();
   const { menu, openAt } = useContextMenu();
@@ -252,10 +254,16 @@ export function FilesPage() {
     setListing(null);
     setSel(null);
     fsel.clear();
-    // Режим поиска: результаты по имени (по всему облаку), без подпапок.
+    // Режим поиска: результаты по имени (по всему облаку), без подпапок; cursor-пагинация.
     if (searchQuery) {
-      apiGet<{ files: Entry[] }>('/api/cloud/search?q=' + encodeURIComponent(searchQuery))
-        .then((d) => setListing({ dirs: [], files: d.files || [] }))
+      setSearchCursor(null);
+      apiGet<{ files: Entry[]; nextCursorAt: string | null; nextCursorId: string }>(
+        '/api/cloud/search?q=' + encodeURIComponent(searchQuery),
+      )
+        .then((d) => {
+          setListing({ dirs: [], files: d.files || [] });
+          setSearchCursor(d.nextCursorAt && d.nextCursorId ? { at: d.nextCursorAt, id: d.nextCursorId } : null);
+        })
         .catch((e) => {
           toast((e as Error).message, 'err');
           setListing({ dirs: [], files: [] });
@@ -302,6 +310,20 @@ export function FilesPage() {
     membership.ensureLoaded();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [albums]);
+
+  function loadMoreSearch() {
+    if (!searchCursor || searchMore) return;
+    setSearchMore(true);
+    apiGet<{ files: Entry[]; nextCursorAt: string | null; nextCursorId: string }>(
+      `/api/cloud/search?q=${encodeURIComponent(searchQuery)}&cursorAt=${encodeURIComponent(searchCursor.at)}&cursorId=${encodeURIComponent(searchCursor.id)}`,
+    )
+      .then((d) => {
+        setListing((prev) => ({ dirs: prev?.dirs || [], files: [...(prev?.files || []), ...(d.files || [])] }));
+        setSearchCursor(d.nextCursorAt && d.nextCursorId ? { at: d.nextCursorAt, id: d.nextCursorId } : null);
+      })
+      .catch((e) => toast((e as Error).message, 'err'))
+      .finally(() => setSearchMore(false));
+  }
 
   const openDir = (dir: DirInfo) => setStack((s) => [...s, { id: dir.id, name: dir.name }]);
   const gotoIndex = (i: number) => setStack((s) => s.slice(0, i + 1));
@@ -653,6 +675,13 @@ export function FilesPage() {
                   ))}
                 </tbody>
               </table>
+            )}
+            {searchQuery && searchCursor && (
+              <div style={{ display: 'flex', justifyContent: 'center', padding: '14px 0' }}>
+                <button className="btn outlined" onClick={loadMoreSearch} disabled={searchMore}>
+                  {searchMore ? 'Загрузка…' : 'Показать ещё'}
+                </button>
+              </div>
             )}
           </div>
           )}
