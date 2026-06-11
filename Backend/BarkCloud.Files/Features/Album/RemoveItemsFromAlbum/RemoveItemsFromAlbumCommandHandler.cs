@@ -1,4 +1,6 @@
+using BarkCloud.Files.Domain;
 using BarkCloud.Files.Persistence;
+using BarkCloud.Files.Services;
 using BarkCloud.GrpcServer.XAuth;
 using BarkCloud.Proto.Files;
 using BarkCloud.Shared.Exceptions.Files;
@@ -11,15 +13,18 @@ public class RemoveItemsFromAlbumCommandHandler : IRequestHandler<RemoveItemsFro
 {
     private readonly IAlbumStorage _storage;
     private readonly UserContext _userContext;
+    private readonly FileActivityWriter _activity;
     private readonly ILogger<RemoveItemsFromAlbumCommandHandler> _logger;
 
     public RemoveItemsFromAlbumCommandHandler(
         IAlbumStorage storage,
         UserContext userContext,
-        ILogger<RemoveItemsFromAlbumCommandHandler> logger)
+        ILogger<RemoveItemsFromAlbumCommandHandler> logger,
+        FileActivityWriter? activity = null)
     {
         _storage = storage;
         _userContext = userContext;
+        _activity = activity ?? FileActivityWriter.Noop;
         _logger = logger;
     }
 
@@ -51,6 +56,18 @@ public class RemoveItemsFromAlbumCommandHandler : IRequestHandler<RemoveItemsFro
         _logger.LogInformation(
             "Из альбома {AlbumId} удалено {Count} элементов (Owner: {OwnerId})",
             album.Id, removed, ownerId);
+
+        if (removed > 0)
+        {
+            await _activity.AddManyAsync(fileIds.Select(fileId => FileActivityWriter.Create(
+                ownerId,
+                fileId,
+                ownerId,
+                FileActivityKind.AlbumRemoved,
+                $"Убран из альбома «{album.Name}»",
+                details: new { albumId = album.Id, album.Name })),
+                cancellationToken);
+        }
 
         return new CloudEmpty();
     }

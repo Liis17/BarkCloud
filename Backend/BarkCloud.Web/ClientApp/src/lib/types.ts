@@ -121,6 +121,18 @@ export interface FileInfo extends CardFile {
   metadata?: FileMetadata | null;
 }
 
+/** Событие истории файла (GET /api/files/activity). */
+export interface FileActivity {
+  id: string;
+  fileId: string;
+  entryId: string;
+  actorUserId: number;
+  kind: string;
+  summary: string;
+  detailsJson: string;
+  createdAt: string | null;
+}
+
 /**
  * Метаданные блоба (EXIF / ffprobe / PDF / Office). Все поля опциональны —
  * сервер отдаёт только заданные, остальные приходят как undefined.

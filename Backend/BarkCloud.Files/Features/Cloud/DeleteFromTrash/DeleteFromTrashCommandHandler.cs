@@ -1,3 +1,4 @@
+using BarkCloud.Files.Domain;
 using BarkCloud.Files.Persistence;
 using BarkCloud.Files.Services;
 using BarkCloud.GrpcServer.XAuth;
@@ -17,17 +18,20 @@ public class DeleteFromTrashCommandHandler : IRequestHandler<DeleteFromTrashComm
     private readonly ICloudHierarchyStorage _storage;
     private readonly ITrashPurgeService _purge;
     private readonly UserContext _userContext;
+    private readonly FileActivityWriter _activity;
     private readonly ILogger<DeleteFromTrashCommandHandler> _logger;
 
     public DeleteFromTrashCommandHandler(
         ICloudHierarchyStorage storage,
         ITrashPurgeService purge,
         UserContext userContext,
-        ILogger<DeleteFromTrashCommandHandler> logger)
+        ILogger<DeleteFromTrashCommandHandler> logger,
+        FileActivityWriter? activity = null)
     {
         _storage = storage;
         _purge = purge;
         _userContext = userContext;
+        _activity = activity ?? FileActivityWriter.Noop;
         _logger = logger;
     }
 
@@ -44,6 +48,16 @@ public class DeleteFromTrashCommandHandler : IRequestHandler<DeleteFromTrashComm
         await _purge.PurgeEntriesAsync(new[] { entry }, cancellationToken);
 
         _logger.LogInformation("Запись {EntryId} (Owner: {OwnerId}) удалена из корзины навсегда", entry.Id, ownerId);
+
+        await _activity.AddAsync(
+            ownerId,
+            entry.FileId,
+            ownerId,
+            FileActivityKind.Purged,
+            "Удалён навсегда",
+            entry.Id,
+            new { entry.Name },
+            cancellationToken);
 
         return new CloudEmpty();
     }

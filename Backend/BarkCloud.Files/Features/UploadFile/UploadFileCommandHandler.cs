@@ -25,6 +25,7 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
     private readonly HeicImageConverter _heicConverter;
     private readonly FileMetadataExtractor _metadataExtractor;
     private readonly PreviewPersistenceService _previewPersistence;
+    private readonly FileActivityWriter _activity;
     private readonly ILogger<UploadFileCommandHandler> _logger;
 
     /// <summary>
@@ -52,7 +53,8 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
         HeicImageConverter heicConverter,
         FileMetadataExtractor metadataExtractor,
         PreviewPersistenceService previewPersistence,
-        ILogger<UploadFileCommandHandler> logger)
+        ILogger<UploadFileCommandHandler> logger,
+        FileActivityWriter? activity = null)
     {
         _filesStorage = filesStorage;
         _hashesStorage = hashesStorage;
@@ -64,6 +66,7 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
         _heicConverter = heicConverter;
         _metadataExtractor = metadataExtractor;
         _previewPersistence = previewPersistence;
+        _activity = activity ?? FileActivityWriter.Noop;
         _logger = logger;
     }
 
@@ -466,6 +469,19 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
         }
 
         _logger.LogInformation("Обработка файла {FileId} успешно завершена", file.Id);
+
+        var ownerId = file.Uploaders.FirstOrDefault();
+        if (ownerId > 0 && file.Type == UploadFileType.CloudFile)
+        {
+            await _activity.AddAsync(
+                ownerId,
+                file.Id,
+                ownerId,
+                FileActivityKind.Uploaded,
+                "Файл загружен",
+                details: new { fileName = file.Filename, size = file.Size, mediaKind = file.MediaKind.ToString() },
+                cancellationToken: cancellationToken);
+        }
 
         return file.Id.ToString();
     }

@@ -960,6 +960,32 @@ public static class CloudApiEndpoints
                 }, Json);
             }));
 
+        api.MapGet("/files/activity", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud,
+            string? id, int? limit, string? cursorAt, string? cursorId) =>
+            await Guarded(http, auth, async token =>
+            {
+                if (string.IsNullOrWhiteSpace(id))
+                    return Results.Json(new { error = "Не указан id" }, Json, statusCode: 400);
+
+                var req = new ListFileActivityRequest
+                {
+                    FileId = id,
+                    Limit = limit is > 0 and <= 100 ? limit.Value : 30
+                };
+                if (DateTimeOffset.TryParse(cursorAt, out var dt))
+                    req.CursorCreatedAt = Timestamp.FromDateTimeOffset(dt.ToUniversalTime());
+                if (!string.IsNullOrWhiteSpace(cursorId))
+                    req.CursorEventId = cursorId;
+
+                var resp = await cloud.ListFileActivityAsync(req, token);
+                return Results.Json(new
+                {
+                    items = resp.Items.Select(FileActivityJson).ToArray(),
+                    nextCursorAt = resp.NextCursorCreatedAt?.ToDateTimeOffset(),
+                    nextCursorId = resp.NextCursorEventId
+                }, Json);
+            }));
+
         // Полные свойства файла по file_id (для модалки «Свойства») — через серверный GetFileData.
         // FilesServerApi авторизуется сервисным токеном (интерцептор), поэтому проверяем владение вручную.
         // Дополнительно подтягиваем EXIF/ffprobe/PDF/Office-метаданные через клиентский GetFileMetadata
@@ -1114,6 +1140,18 @@ public static class CloudApiEndpoints
     };
 
     private static object MinimalUserJson(long id) => new { id, username = "", firstName = "", lastName = "", avatar = "" };
+
+    private static object FileActivityJson(FileActivityInfo item) => new
+    {
+        id = item.Id,
+        fileId = item.FileId,
+        entryId = item.EntryId,
+        actorUserId = item.ActorUserId,
+        kind = item.Kind,
+        summary = item.Summary,
+        detailsJson = item.DetailsJson,
+        createdAt = item.CreatedAt?.ToDateTimeOffset()
+    };
 
     /// <summary>Резолв id пользователей → User через UsersServerApi (имена «от кого / кому»).</summary>
     private static async Task<Dictionary<long, User>> ResolveUsers(

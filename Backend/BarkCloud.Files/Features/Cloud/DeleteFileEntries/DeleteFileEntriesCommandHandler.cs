@@ -1,3 +1,4 @@
+using BarkCloud.Files.Domain;
 using BarkCloud.Files.Persistence;
 using BarkCloud.Files.Services;
 using BarkCloud.GrpcServer.XAuth;
@@ -18,15 +19,18 @@ public class DeleteFileEntriesCommandHandler : IRequestHandler<DeleteFileEntries
 {
     private readonly ICloudHierarchyStorage _storage;
     private readonly UserContext _userContext;
+    private readonly FileActivityWriter _activity;
     private readonly ILogger<DeleteFileEntriesCommandHandler> _logger;
 
     public DeleteFileEntriesCommandHandler(
         ICloudHierarchyStorage storage,
         UserContext userContext,
-        ILogger<DeleteFileEntriesCommandHandler> logger)
+        ILogger<DeleteFileEntriesCommandHandler> logger,
+        FileActivityWriter? activity = null)
     {
         _storage = storage;
         _userContext = userContext;
+        _activity = activity ?? FileActivityWriter.Noop;
         _logger = logger;
     }
 
@@ -54,6 +58,16 @@ public class DeleteFileEntriesCommandHandler : IRequestHandler<DeleteFileEntries
         _logger.LogInformation(
             "Массовое удаление: запрошено {RequestedCount} записей, перемещено в корзину {DeletedCount} (Owner: {OwnerId}, PurgeAt={PurgeAt})",
             ids.Count, entries.Count, ownerId, purgeAt);
+
+        await _activity.AddManyAsync(entries.Select(entry => FileActivityWriter.Create(
+            ownerId,
+            entry.FileId,
+            ownerId,
+            FileActivityKind.Deleted,
+            "Перемещён в корзину",
+            entry.Id,
+            new { entry.Name, entry.DirectoryId, entry.PurgeAt })),
+            cancellationToken);
 
         return new DeleteFileEntriesResponse { DeletedCount = entries.Count };
     }

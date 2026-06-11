@@ -1,4 +1,6 @@
+using BarkCloud.Files.Domain;
 using BarkCloud.Files.Persistence;
+using BarkCloud.Files.Services;
 using BarkCloud.GrpcServer.XAuth;
 using BarkCloud.Proto.Files;
 using BarkCloud.Shared.Exceptions.Files;
@@ -15,17 +17,20 @@ public class AddItemsToAlbumCommandHandler : IRequestHandler<AddItemsToAlbumComm
     private readonly IAlbumStorage _storage;
     private readonly IUploadedFilesStorage _filesStorage;
     private readonly UserContext _userContext;
+    private readonly FileActivityWriter _activity;
     private readonly ILogger<AddItemsToAlbumCommandHandler> _logger;
 
     public AddItemsToAlbumCommandHandler(
         IAlbumStorage storage,
         IUploadedFilesStorage filesStorage,
         UserContext userContext,
-        ILogger<AddItemsToAlbumCommandHandler> logger)
+        ILogger<AddItemsToAlbumCommandHandler> logger,
+        FileActivityWriter? activity = null)
     {
         _storage = storage;
         _filesStorage = filesStorage;
         _userContext = userContext;
+        _activity = activity ?? FileActivityWriter.Noop;
         _logger = logger;
     }
 
@@ -87,6 +92,15 @@ public class AddItemsToAlbumCommandHandler : IRequestHandler<AddItemsToAlbumComm
         _logger.LogInformation(
             "В альбом {AlbumId} добавлено {Count} элементов (Owner: {OwnerId})",
             album.Id, toAdd.Count, ownerId);
+
+        await _activity.AddManyAsync(toAdd.Select(fileId => FileActivityWriter.Create(
+            ownerId,
+            fileId,
+            ownerId,
+            FileActivityKind.AlbumAdded,
+            $"Добавлен в альбом «{album.Name}»",
+            details: new { albumId = album.Id, album.Name })),
+            cancellationToken);
 
         return new CloudEmpty();
     }

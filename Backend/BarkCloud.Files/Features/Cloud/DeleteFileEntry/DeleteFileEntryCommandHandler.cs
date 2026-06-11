@@ -1,3 +1,4 @@
+using BarkCloud.Files.Domain;
 using BarkCloud.Files.Persistence;
 using BarkCloud.Files.Services;
 using BarkCloud.GrpcServer.XAuth;
@@ -18,15 +19,18 @@ public class DeleteFileEntryCommandHandler : IRequestHandler<DeleteFileEntryComm
 {
     private readonly ICloudHierarchyStorage _storage;
     private readonly UserContext _userContext;
+    private readonly FileActivityWriter _activity;
     private readonly ILogger<DeleteFileEntryCommandHandler> _logger;
 
     public DeleteFileEntryCommandHandler(
         ICloudHierarchyStorage storage,
         UserContext userContext,
-        ILogger<DeleteFileEntryCommandHandler> logger)
+        ILogger<DeleteFileEntryCommandHandler> logger,
+        FileActivityWriter? activity = null)
     {
         _storage = storage;
         _userContext = userContext;
+        _activity = activity ?? FileActivityWriter.Noop;
         _logger = logger;
     }
 
@@ -50,6 +54,16 @@ public class DeleteFileEntryCommandHandler : IRequestHandler<DeleteFileEntryComm
         _logger.LogInformation(
             "Запись {EntryId} (FileId: {FileId}, Owner: {OwnerId}) перемещена в корзину, PurgeAt={PurgeAt}",
             entry.Id, entry.FileId, ownerId, entry.PurgeAt);
+
+        await _activity.AddAsync(
+            ownerId,
+            entry.FileId,
+            ownerId,
+            FileActivityKind.Deleted,
+            "Перемещён в корзину",
+            entry.Id,
+            new { entry.Name, entry.DirectoryId, entry.PurgeAt },
+            cancellationToken);
 
         return new CloudEmpty();
     }

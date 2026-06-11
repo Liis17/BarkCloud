@@ -23,6 +23,13 @@ public class ShareStorage : IShareStorage
         await _context.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task<ShareLink?> Get(long ownerId, Guid shareId, CancellationToken cancellationToken = default)
+    {
+        return await _context.ShareLinks
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.OwnerId == ownerId && x.Id == shareId, cancellationToken);
+    }
+
     public async Task<ShareLink?> GetByToken(string token, CancellationToken cancellationToken = default)
     {
         return await _context.ShareLinks

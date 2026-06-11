@@ -2,7 +2,7 @@ import React from 'react';
 import { Modal } from './Modal';
 import { apiGet } from '../../lib/api';
 import { fmtFull, kindRu } from '../../lib/format';
-import type { CardFile, FileInfo, FileMetadata, MediaItem } from '../../lib/types';
+import type { CardFile, FileActivity, FileInfo, FileMetadata, MediaItem, Page } from '../../lib/types';
 
 interface PropertiesModalProps {
   fileId: string;
@@ -13,15 +13,28 @@ interface PropertiesModalProps {
 /** Свойства файла — отдельный запрос GetFileData (/api/files/info), пока грузит — данные из карточки. */
 export function PropertiesModal({ fileId, fallback, onClose }: PropertiesModalProps) {
   const [info, setInfo] = React.useState<FileInfo | null>(null);
+  const [activity, setActivity] = React.useState<FileActivity[]>([]);
+  const [activityErr, setActivityErr] = React.useState<string | null>(null);
   const [err, setErr] = React.useState<string | null>(null);
   React.useEffect(() => {
     let alive = true;
+    setInfo(null);
+    setActivity([]);
+    setErr(null);
+    setActivityErr(null);
     apiGet<FileInfo>('/api/files/info?id=' + encodeURIComponent(fileId))
       .then((d) => {
         if (alive) setInfo(d);
       })
       .catch((e) => {
         if (alive) setErr(e.message);
+      });
+    apiGet<Page<FileActivity>>('/api/files/activity?id=' + encodeURIComponent(fileId) + '&limit=30')
+      .then((d) => {
+        if (alive) setActivity(d.items || []);
+      })
+      .catch((e) => {
+        if (alive) setActivityErr(e.message);
       });
     return () => {
       alive = false;
@@ -79,8 +92,46 @@ export function PropertiesModal({ fileId, fallback, onClose }: PropertiesModalPr
           <FileLocationMap lat={meta!.latitude!} lon={meta!.longitude!} />
         </>
       )}
+
+      <div className="prop-section">История</div>
+      {activityErr && <div className="prop-err">История недоступна: {activityErr}</div>}
+      {!activityErr && activity.length === 0 && <div className="prop-empty">Событий пока нет</div>}
+      {activity.length > 0 && (
+        <div className="prop-activity">
+          {activity.map((item) => (
+            <div className="prop-activity-row" key={item.id}>
+              <div className="pa-dot" />
+              <div className="pa-main">
+                <div className="pa-text">{item.summary || activityLabel(item.kind)}</div>
+                <div className="pa-time">{fmtFull(item.createdAt)}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </Modal>
   );
+}
+
+function activityLabel(kind: string): string {
+  switch (kind) {
+    case 'uploaded': return 'Файл загружен';
+    case 'attached': return 'Добавлен в папку';
+    case 'renamed': return 'Переименован';
+    case 'moved': return 'Перемещён';
+    case 'deleted': return 'Перемещён в корзину';
+    case 'restored': return 'Восстановлен';
+    case 'purged': return 'Удалён навсегда';
+    case 'favorite_added': return 'Добавлен в избранное';
+    case 'favorite_removed': return 'Убран из избранного';
+    case 'share_created': return 'Создана публичная ссылка';
+    case 'share_revoked': return 'Публичная ссылка отозвана';
+    case 'shared_with_user': return 'Выдан доступ пользователю';
+    case 'user_share_revoked': return 'Доступ пользователя отозван';
+    case 'album_added': return 'Добавлен в альбом';
+    case 'album_removed': return 'Убран из альбома';
+    default: return 'Событие файла';
+  }
 }
 
 /** Мини-карта с маркером в точке съёмки (встроенный OpenStreetMap, без JS-зависимостей). */
