@@ -4,10 +4,11 @@ import { MediaThumb } from '../components/media/MediaThumb';
 import { Lightbox } from '../components/media/Lightbox';
 import { EmptyState, Loading } from '../components/ui/EmptyState';
 import { useToast } from '../hooks/useToast';
+import { useMediaActions } from '../hooks/useMediaActions';
 import { usePageHeader } from '../hooks/usePageHeader';
 import { apiGet, apiPost } from '../lib/api';
 import { GRID_SIZES, plural, groupByDate } from '../lib/format';
-import type { CardFile, Page } from '../lib/types';
+import type { Album, CardFile, Page } from '../lib/types';
 
 // Файл можно открыть в просмотрщике, только если это фото/видео с готовым превью.
 const viewable = (m: CardFile) => m.previews && m.previews.length > 0 && (m.kind === 'photo' || m.kind === 'video');
@@ -46,6 +47,7 @@ function FavCard({ m, onOpen, onUnstar }: { m: CardFile; onOpen: (m: CardFile) =
 export function FavoritesPage() {
   const [items, setItems] = React.useState<CardFile[] | null>(null);
   const [lightbox, setLightbox] = React.useState<CardFile | null>(null);
+  const [albums, setAlbums] = React.useState<Album[]>([]);
   const [toastNode, toast] = useToast();
 
   const load = React.useCallback(() => {
@@ -58,6 +60,26 @@ export function FavoritesPage() {
       });
   }, [toast]);
   React.useEffect(load, [load]);
+
+  const loadAlbums = React.useCallback(() => {
+    apiGet<{ albums: Album[] }>('/api/albums')
+      .then((d) => setAlbums(d.albums || []))
+      .catch(() => {});
+  }, []);
+  React.useEffect(() => {
+    loadAlbums();
+  }, [loadAlbums]);
+
+  // Панель действий Lightbox: удалённый файл убираем из списка и закрываем вьювер.
+  const actionsCtx = useMediaActions({
+    albums,
+    toast,
+    onRemoved: (m) => {
+      setItems((list) => (list || []).filter((x) => x.id !== m.id));
+      setLightbox((lb) => (lb && lb.id === m.id ? null : lb));
+    },
+    reloadAlbums: loadAlbums,
+  });
 
   async function download(m: CardFile) {
     try {
@@ -104,6 +126,7 @@ export function FavoritesPage() {
   return (
     <>
       {toastNode}
+      {actionsCtx.overlay}
 
       {items === null ? (
         <Loading />
@@ -129,7 +152,7 @@ export function FavoritesPage() {
         ))
       )}
 
-      {lightbox && <Lightbox media={lightbox} onClose={() => setLightbox(null)} />}
+      {lightbox && <Lightbox media={lightbox} actions={actionsCtx.api} onClose={() => setLightbox(null)} />}
     </>
   );
 }

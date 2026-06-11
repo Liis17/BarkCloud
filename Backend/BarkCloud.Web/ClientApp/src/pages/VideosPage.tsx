@@ -153,7 +153,7 @@ export function VideosPage() {
     return (
       <>
         {toastNode}
-        <MediaSearchResults q={searchQuery} />
+        <MediaSearchResults q={searchQuery} albums={albums || []} toast={toast} reloadAlbums={loadAlbums} />
       </>
     );
   }
