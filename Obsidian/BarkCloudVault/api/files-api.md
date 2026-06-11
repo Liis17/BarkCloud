@@ -65,7 +65,7 @@ Package: `barkcloud.files`
 
 > **Публичные альбомы (динамическая страница)**: сущность `AlbumShareLink` (владелец→альбом, уникальный `Token`, уникальность `(OwnerId, AlbumId)`). RPC `CreateAlbumShare` (идемпотентно), `ListMyAlbumShares`, `RevokeAlbumShare` (CloudApi, владелец) и `ResolveAlbumShare(token, cursor)` (FilesServerApi, анонимно). Резолв динамический: по токену отдаёт элементы альбома (cursor-пагинация) с публичными temp-URL и URL превью, исключая «эффективно удалённые». Зеркало публичных папок; `DeleteAlbum` снимает публичность. Страница `/al/{token}`.
 
-> **Поиск по имени**: `SearchFiles(query, limit, cursor)` (CloudApi, владелец) → `SearchFilesResponse { files[FileEntryDetailed], next_cursor_created_at, next_cursor_entry_id }`. Подстрока имени по живым `CloudFileEntry` владельца (по всему облаку), `(CreatedAt desc, Id desc)`, обогащение как `ListDirectoryDetailed`.
+> **Поиск по имени**: `SearchFiles(query, limit, cursor, kind_filter)` (CloudApi, владелец) → `SearchFilesResponse { files[FileEntryDetailed], next_cursor_created_at, next_cursor_entry_id }`. Подстрока имени по живым `CloudFileEntry` владельца (по всему облаку), `(CreatedAt desc, Id desc)`, обогащение как `ListDirectoryDetailed`. `kind_filter` (repeated MediaKind, пусто = все типы) — фильтр по типу медиа файла, применяется в SQL до `Take(limit+1)` (limit/cursor честные).
 
 > **Шаринг между пользователями**: приватные гранты `FileGrant` (владелец→получатель→файл). RPC `ShareFileWithUser`/`RevokeUserShare`/`ListMyOutgoingShares` (с кем поделён один файл)/`ListMyOutgoingSharesAll` (все мои исходящие гранты — «я поделился», плоский список с `UploadFileInfo`+получателем, cursor-пагинация по `CreatedAt desc, Id desc`; группировку по файлу делает веб) и `ListSharedWithMe`/`GetSharedFileDownloadUrl` (получатель — доступ строго по гранту через `TempFile`, без обхода `DownloadFileCommandHandler`). Имена резолвит веб-слой через Users (`UsersServerApi.ListByIds`). Публичный `ResolveShare` дополнительно отдаёт `media_kind`/`preview_url`/размеры для страницы просмотра. Гранты чистятся в `UserDeleted`/`TrashPurge`.
 
@@ -87,7 +87,7 @@ Package: `barkcloud.files`
 - `AddFavoriteRequest` / `RemoveFavoriteRequest { file_id; }`
 - `ListFavoritesRequest { limit; cursor_favorited_at; cursor_file_id; }` → `ListFavoritesResponse { repeated FavoriteEntry items; next_cursor_favorited_at; next_cursor_file_id; }`
 - `FavoriteEntry { UploadFileInfo file; favorited_at; }` — карточка по `UploadFile` (как в галерее) + дата добавления в избранное
-- `ShareInfo { id; token; file_id; name; created_at; click_count; }` — публичная ссылка; `token` — часть дружелюбного URL `/s/{token}`
+- `ShareInfo { id; token; file_id; name; created_at; click_count; media_kind; preview_url; }` — публичная ссылка; `token` — часть дружелюбного URL `/s/{token}`. `media_kind`/`preview_url` (минимальное превью, target 128) заполняет `ListMyShares` батчем — для карточек «Мои публичные» в вебе; `CreateShare` отдаёт их пустыми
 - `CreateShareRequest { file_id; name; }`
 - `ListMySharesRequest { limit; cursor_created_at; cursor_share_id; }` → `ListMySharesResponse { repeated ShareInfo shares; next_cursor_created_at; next_cursor_share_id; }`
 - `RevokeShareRequest { share_id; }`
