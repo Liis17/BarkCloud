@@ -185,6 +185,8 @@ struct BackupSheet: View {
             }
 
             if !manager.queuePreview.isEmpty {
+                // Spacer прижимает превью влево: при опустении очереди миниатюры
+                // не растягиваются на освободившуюся ширину.
                 HStack(spacing: 8) {
                     ForEach(manager.queuePreview, id: \.localIdentifier) { asset in
                         BackupThumb(
@@ -196,6 +198,7 @@ struct BackupSheet: View {
                             removal: .move(edge: .leading).combined(with: .opacity)
                         ))
                     }
+                    Spacer(minLength: 0)
                 }
                 .clipped()
                 .padding(.horizontal, 8)
@@ -301,17 +304,18 @@ private struct StorageDonut: View {
 }
 
 /// Квадратное превью ассета в очереди автозагрузки; у текущего — спиннер.
-/// Размер квадрата задаётся родителем (растягивается на всю доступную ширину).
+/// Размер фиксированный, чтобы миниатюры не разрастались по мере опустения очереди.
 private struct BackupThumb: View {
     let asset: PHAsset
     let isCurrent: Bool
+
+    private static let side: CGFloat = 64
 
     @State private var image: UIImage?
 
     var body: some View {
         Color.clear
-            .aspectRatio(1, contentMode: .fit)
-            .frame(maxWidth: .infinity)
+            .frame(width: Self.side, height: Self.side)
             .background(AppColors.onSurface.opacity(0.08))
             .overlay {
                 if let image {
@@ -331,7 +335,7 @@ private struct BackupThumb: View {
                 }
             }
             .task(id: asset.localIdentifier) {
-                let side = 140 * UIScreen.main.scale
+                let side = Self.side * UIScreen.main.scale
                 image = await DeviceMediaImageLoader.shared.thumbnail(
                     for: asset,
                     targetSize: CGSize(width: side, height: side)
