@@ -1,9 +1,11 @@
 import React from 'react';
+import { useLocation } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import { MediaThumb } from '../components/media/MediaThumb';
 import { Lightbox } from '../components/media/Lightbox';
 import { EmptyState, Loading } from '../components/ui/EmptyState';
 import { MemoriesStrip } from '../components/memories/MemoriesStrip';
+import { MediaSearchResults } from '../components/search/MediaSearchResults';
 import { useToast } from '../hooks/useToast';
 import { useInfiniteMedia } from '../hooks/useInfiniteMedia';
 import { useMediaActions } from '../hooks/useMediaActions';
@@ -39,6 +41,8 @@ function Photo({ m, selecting, checked, onToggle, onOpen, onMenu }: {
 }
 
 export function PhotosPage() {
+  const location = useLocation();
+  const searchQuery = (new URLSearchParams(location.search).get('q') || '').trim();
   const [albums, setAlbums] = React.useState<Album[] | null>(null);
   const [lightbox, setLightbox] = React.useState<number | null>(null);
   const [toastNode, toast] = useToast();
@@ -107,6 +111,15 @@ export function PhotosPage() {
     }),
     [],
   );
+
+  if (searchQuery) {
+    return (
+      <>
+        {toastNode}
+        <MediaSearchResults q={searchQuery} />
+      </>
+    );
+  }
 
   return (
     <>
