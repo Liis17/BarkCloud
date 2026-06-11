@@ -44,6 +44,7 @@ Package: `barkcloud.files`
 | `GetMemories(GetMemoriesRequest) → GetMemoriesResponse` | «Воспоминания — В этот день»: фото/видео за указанный (или сегодняшний UTC) месяц+день прошлых лет по `FileMetadata.TakenAt`, группы-годы (`MemoryGroup { year; years_ago; total_count; items }`) от свежего к старому; ≤`per_year_limit` превью на год |
 | `ListMediaLocations(ListMediaLocationsRequest) → ListMediaLocationsResponse` | Точки для карты: медиа с GPS (`MediaLocationPoint { file_id; latitude; longitude; media_kind; preview_url; taken_at?; created_at }`), cursor-пагинация (`cursor_created_at`+`cursor_file_id`); клиент кластеризует |
 | `GetPath(GetPathRequest) → PathResponse` | Построить путь до объекта в иерархии |
+| `ListFileActivity(ListFileActivityRequest) → ListFileActivityResponse` | История действий по файлу для «Свойства»: последние события по `file_id`, cursor-пагинация (`cursor_created_at` + `cursor_event_id`), доступ только владельцу blob |
 | `ListTrash(ListTrashRequest) → ListTrashResponse` | Список файлов в корзине (от свежеудалённых); cursor `(cursor_deleted_at + cursor_entry_id)`; `TrashEntry` содержит `entry`, `file`, `deleted_at`, `purge_at` |
 | `GetTrashSummary(GetTrashSummaryRequest) → GetTrashSummaryResponse` | Лёгкая сводка: `total_count` + `oldest_purge_at` (серверный `COUNT` + `MIN(PurgeAt)`). Для бейджей/виджета корзины — «самый истекающий» файл без выгрузки страниц |
 | `RestoreFromTrash(RestoreFromTrashRequest) → CloudEmpty` | Восстановить файл из корзины (в исходную папку либо в корень, если она удалена) |
@@ -95,6 +96,8 @@ Package: `barkcloud.files`
 - Запросы: `Create/Rename/Move/Delete/ListDirectoryRequest`, `Attach/Rename/Move/DeleteFileEntryRequest`, `DeleteUserMediaRequest`, `GetPathRequest`, `ListUserImagesRequest`, `ListUserMediaRequest`
 - `ListDirectoryRequest.directory_id` — `optional string`, пустая/неуказанная = корень
 - `PathResponse` — путь до объекта
+- `ListFileActivityRequest { file_id; limit; cursor_created_at; cursor_event_id; }` → `ListFileActivityResponse { repeated FileActivityInfo items; next_cursor_created_at; next_cursor_event_id; }`
+- `FileActivityInfo { id; file_id; entry_id; actor_user_id; kind; summary; details_json; created_at; }` — append-only событие активности. `kind` — строковый код (`uploaded`, `attached`, `renamed`, `moved`, `deleted`, `restored`, `purged`, `favorite_added`, `favorite_removed`, `share_created`, `share_revoked`, `shared_with_user`, `user_share_revoked`, `album_added`, `album_removed`)
 
 ### UploadFileInfo · поле upload_device_name
 

@@ -30,17 +30,20 @@ public class DeleteUserMediaCommandHandler : IRequestHandler<DeleteUserMediaComm
     private readonly ICloudHierarchyStorage _cloudHierarchy;
     private readonly IUploadedFilesStorage _uploadedFiles;
     private readonly UserContext _userContext;
+    private readonly FileActivityWriter _activity;
     private readonly ILogger<DeleteUserMediaCommandHandler> _logger;
 
     public DeleteUserMediaCommandHandler(
         ICloudHierarchyStorage cloudHierarchy,
         IUploadedFilesStorage uploadedFiles,
         UserContext userContext,
-        ILogger<DeleteUserMediaCommandHandler> logger)
+        ILogger<DeleteUserMediaCommandHandler> logger,
+        FileActivityWriter? activity = null)
     {
         _cloudHierarchy = cloudHierarchy;
         _uploadedFiles = uploadedFiles;
         _userContext = userContext;
+        _activity = activity ?? FileActivityWriter.Noop;
         _logger = logger;
     }
 
@@ -65,6 +68,16 @@ public class DeleteUserMediaCommandHandler : IRequestHandler<DeleteUserMediaComm
             _logger.LogInformation(
                 "DeleteUserMedia: {Count} записей файла {FileId} (Owner: {OwnerId}) перемещены в корзину",
                 liveEntries.Count, request.FileId, ownerId);
+
+            await _activity.AddManyAsync(liveEntries.Select(entry => FileActivityWriter.Create(
+                ownerId,
+                entry.FileId,
+                ownerId,
+                FileActivityKind.Deleted,
+                "Перемещён в корзину",
+                entry.Id,
+                new { entry.Name, entry.DirectoryId, entry.PurgeAt })),
+                cancellationToken);
         }
         else
         {
@@ -100,6 +113,16 @@ public class DeleteUserMediaCommandHandler : IRequestHandler<DeleteUserMediaComm
             _logger.LogInformation(
                 "DeleteUserMedia: для файла {FileId} (Owner: {OwnerId}) создана запись корзины {EntryId}",
                 request.FileId, ownerId, entry.Id);
+
+            await _activity.AddAsync(
+                ownerId,
+                request.FileId,
+                ownerId,
+                FileActivityKind.Deleted,
+                "Перемещён в корзину",
+                entry.Id,
+                new { entry.Name, entry.DirectoryId, entry.PurgeAt },
+                cancellationToken);
         }
 
         return new CloudEmpty();

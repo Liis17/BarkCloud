@@ -45,6 +45,8 @@ public class FilesContext : DbContext
 
     public DbSet<FileMetadata> FileMetadata { get; set; }
 
+    public DbSet<FileActivityEvent> FileActivityEvents { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<TempFile>()
@@ -187,6 +189,17 @@ public class FilesContext : DbContext
             b.HasIndex(x => new { x.RecipientId, x.CreatedAt });
             // Обратный поиск/чистка по папке.
             b.HasIndex(x => x.DirectoryId);
+        });
+
+        modelBuilder.Entity<FileActivityEvent>(b =>
+        {
+            // История конкретного файла в модалке свойств: свежие события первыми.
+            b.HasIndex(x => new { x.OwnerId, x.FileId, x.CreatedAt });
+            // Задел под будущий общий activity feed владельца.
+            b.HasIndex(x => new { x.OwnerId, x.CreatedAt });
+            b.Property(x => x.Kind).HasMaxLength(64);
+            b.Property(x => x.Summary).HasMaxLength(512);
+            b.Property(x => x.DetailsJson).HasColumnType("jsonb");
         });
     }
 }

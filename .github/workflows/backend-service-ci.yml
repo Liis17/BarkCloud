@@ -1,0 +1,255 @@
+name: "Backend service CI/CD"
+
+on:
+  workflow_call:
+    inputs:
+      service-name:
+        required: true
+        type: string
+      service-key:
+        required: true
+        type: string
+      service-path:
+        required: true
+        type: string
+      test-path:
+        required: true
+        type: string
+      project-path:
+        required: true
+        type: string
+      test-project-path:
+        required: true
+        type: string
+      dockerfile:
+        required: true
+        type: string
+      image-name:
+        required: true
+        type: string
+      web-client-directory:
+        required: false
+        type: string
+        default: ""
+      force-run:
+        required: false
+        type: boolean
+        default: false
+    secrets:
+      TELEGRAM_BOT_TOKEN:
+        required: true
+      TELEGRAM_CHANNEL_ID:
+        required: true
+      REGISTRY_USERNAME:
+        required: true
+      REGISTRY_PASSWORD:
+        required: true
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  changes:
+    name: "Определение изменений"
+    runs-on: [self-hosted, linux]
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      should_test: ${{ steps.decide.outputs.should_test }}
+      should_build: ${{ steps.decide.outputs.should_build }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: dorny/paths-filter@v4
+        id: filter
+        with:
+          filters: |
+            runtime:
+              - '${{ inputs.service-path }}/**'
+              - 'Shared/**'
+              - 'Backend/rebuild.trigger'
+            tests:
+              - '${{ inputs.test-path }}/**'
+              - 'Tests/BarkCloud.TestKit/**'
+
+      - name: "Решение о запуске"
+        id: decide
+        run: |
+          should_test=false
+          should_build=false
+
+          if [ "${{ inputs.force-run }}" = "true" ] || [ "${{ steps.filter.outputs.runtime }}" = "true" ] || [ "${{ steps.filter.outputs.tests }}" = "true" ]; then
+            should_test=true
+          fi
+
+          if [ "${{ inputs.force-run }}" = "true" ] || [ "${{ steps.filter.outputs.runtime }}" = "true" ]; then
+            should_build=true
+          fi
+
+          echo "should_test=${should_test}" >> "$GITHUB_OUTPUT"
+          echo "should_build=${should_build}" >> "$GITHUB_OUTPUT"
+
+  check_dotnet:
+    name: "Проверка .NET 10.0 SDK"
+    needs: changes
+    if: ${{ needs.changes.outputs.should_test == 'true' }}
+    runs-on: [self-hosted, linux]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "Проверка наличия .NET 10.0 SDK"
+        id: check
+        run: |
+          if ! dotnet --list-sdks 2>/dev/null | grep -q "^10\."; then
+            echo "missing=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "missing=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: "Уведомление: .NET 10.0 SDK не установлен"
+        if: ${{ steps.check.outputs.missing == 'true' }}
+        env:
+          TG_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TG_CHAT: ${{ secrets.TELEGRAM_CHANNEL_ID }}
+          TG_ACTION_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          TG_MESSAGE: |
+            ❌ *Сборка невозможна: .NET 10.0 SDK не установлен на раннере*
+
+            🐳 *${{ inputs.service-name }}*
+            📌 Ветка: `${{ github.ref_name }}`
+            👤 Автор: *${{ github.actor }}*
+        run: |
+          bash .github/scripts/send-telegram.sh
+          exit 1
+
+  test:
+    name: "Тесты ${{ inputs.service-name }}"
+    needs:
+      - changes
+      - check_dotnet
+    if: ${{ needs.changes.outputs.should_test == 'true' && needs.check_dotnet.result == 'success' }}
+    runs-on: [self-hosted, linux]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "Test"
+        id: test
+        run: dotnet test ${{ inputs.test-project-path }} -c Release --logger "trx;LogFileName=${{ inputs.service-key }}.trx" --results-directory TestResults
+
+      - name: "Upload test results"
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ inputs.service-key }}
+          path: TestResults/**
+
+      - name: "Уведомление: тесты провалены"
+        if: ${{ failure() && steps.test.outcome == 'failure' }}
+        env:
+          TG_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TG_CHAT: ${{ secrets.TELEGRAM_CHANNEL_ID }}
+          TG_ACTION_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          TG_MESSAGE: |
+            ❌ *Тесты провалены*
+
+            🧪 *${{ inputs.service-name }}*
+            📌 Ветка: `${{ github.ref_name }}`
+            🔗 Коммит: `${{ github.sha }}`
+            👤 Автор: *${{ github.actor }}*
+        run: bash .github/scripts/send-telegram.sh
+
+  build:
+    name: "Сборка и публикация ${{ inputs.service-name }}"
+    needs:
+      - changes
+      - test
+    if: ${{ needs.changes.outputs.should_build == 'true' && needs.test.result == 'success' }}
+    runs-on: [self-hosted, linux]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "Установка Node.js 22"
+        if: ${{ inputs.web-client-directory != '' }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: "Сборка React-SPA (Vite → wwwroot)"
+        if: ${{ inputs.web-client-directory != '' }}
+        working-directory: ${{ inputs.web-client-directory }}
+        run: |
+          npm ci
+          npm run build
+
+      - name: "dotnet publish (Linux Release)"
+        run: |
+          dotnet publish ${{ inputs.project-path }} \
+            -c Release \
+            -o ./publish \
+            /p:UseAppHost=false
+          mkdir -p ./publish/logs
+
+      - name: "Login to Private Registry"
+        uses: docker/login-action@v2
+        with:
+          registry: docker.barkfluff.com:5000
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+
+      - name: "Set up Docker Buildx"
+        uses: docker/setup-buildx-action@v2
+
+      - name: "Set tags"
+        id: vars
+        run: |
+          if [ "${{ github.ref_name }}" = "dev" ]; then
+            image="${{ inputs.image-name }}-dev"
+          else
+            image="${{ inputs.image-name }}"
+          fi
+
+          echo "tags=docker.barkfluff.com:5000/${image}:latest,docker.barkfluff.com:5000/${image}:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          echo "tag_sha=docker.barkfluff.com:5000/${image}:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: "Build and Push Docker image"
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: ./${{ inputs.dockerfile }}
+          push: true
+          tags: ${{ steps.vars.outputs.tags }}
+
+      - name: "Уведомление: сборка готова"
+        if: success()
+        env:
+          TG_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TG_CHAT: ${{ secrets.TELEGRAM_CHANNEL_ID }}
+          TG_ACTION_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          TG_MESSAGE: |
+            ✅ *Сборка готова*
+
+            🐳 *${{ inputs.service-name }}*
+            📌 Ветка: `${{ github.ref_name }}`
+            🔗 Коммит: `${{ github.sha }}`
+            👤 Автор: *${{ github.actor }}*
+            🏷️ Тег: `${{ steps.vars.outputs.tag_sha }}`
+        run: bash .github/scripts/send-telegram.sh
+
+      - name: "Уведомление: сборка провалена"
+        if: failure()
+        env:
+          TG_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TG_CHAT: ${{ secrets.TELEGRAM_CHANNEL_ID }}
+          TG_ACTION_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          TG_MESSAGE: |
+            ❌ *Сборка провалена*
+
+            🐳 *${{ inputs.service-name }}*
+            📌 Ветка: `${{ github.ref_name }}`
+            🔗 Коммит: `${{ github.sha }}`
+            👤 Автор: *${{ github.actor }}*
+        run: bash .github/scripts/send-telegram.sh

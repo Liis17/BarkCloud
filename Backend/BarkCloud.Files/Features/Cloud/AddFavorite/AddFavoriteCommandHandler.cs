@@ -1,4 +1,6 @@
+using BarkCloud.Files.Domain;
 using BarkCloud.Files.Persistence;
+using BarkCloud.Files.Services;
 using BarkCloud.GrpcServer.XAuth;
 using BarkCloud.Proto.Files;
 using BarkCloud.Shared.Exceptions.Files;
@@ -14,17 +16,20 @@ public class AddFavoriteCommandHandler : IRequestHandler<AddFavoriteCommand, Clo
     private readonly IFavoriteFilesStorage _storage;
     private readonly IUploadedFilesStorage _filesStorage;
     private readonly UserContext _userContext;
+    private readonly FileActivityWriter _activity;
     private readonly ILogger<AddFavoriteCommandHandler> _logger;
 
     public AddFavoriteCommandHandler(
         IFavoriteFilesStorage storage,
         IUploadedFilesStorage filesStorage,
         UserContext userContext,
-        ILogger<AddFavoriteCommandHandler> logger)
+        ILogger<AddFavoriteCommandHandler> logger,
+        FileActivityWriter? activity = null)
     {
         _storage = storage;
         _filesStorage = filesStorage;
         _userContext = userContext;
+        _activity = activity ?? FileActivityWriter.Noop;
         _logger = logger;
     }
 
@@ -50,6 +55,14 @@ public class AddFavoriteCommandHandler : IRequestHandler<AddFavoriteCommand, Clo
         }, cancellationToken);
 
         _logger.LogInformation("Файл {FileId} добавлен в избранное (Owner: {OwnerId})", request.FileId, ownerId);
+
+        await _activity.AddAsync(
+            ownerId,
+            request.FileId,
+            ownerId,
+            FileActivityKind.FavoriteAdded,
+            "Добавлен в избранное",
+            cancellationToken: cancellationToken);
 
         return new CloudEmpty();
     }

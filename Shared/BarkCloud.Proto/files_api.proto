@@ -40,6 +40,7 @@ service CloudApi {
   rpc DeleteUserMedia      (DeleteUserMediaRequest)      returns (CloudEmpty);                // Удалить медиа из галереи по file_id: живые записи каталога → в корзину; если записей нет — создать запись корзины
 
   rpc GetPath              (GetPathRequest)              returns (PathResponse);             // Построить путь до объекта в иерархии
+  rpc ListFileActivity     (ListFileActivityRequest)     returns (ListFileActivityResponse); // История действий с файлом (для «Свойства»)
 
   rpc SetVideoThumbnail    (SetVideoThumbnailRequest)    returns (CloudEmpty);               // Заменить превью видео загруженной картинкой
 
@@ -523,6 +524,32 @@ message PathResponse {
   repeated PathSegment segments = 1;
   // Полный текстовый путь, например /A/B/C/file.txt
   string full_path = 2;
+}
+
+// ============ История активности файла ============
+
+message ListFileActivityRequest {
+  string file_id = 1;
+  int32 limit = 2;                                  // 1..100, default 30
+  google.protobuf.Timestamp cursor_created_at = 3;  // exclusive; пусто = с самых свежих
+  string cursor_event_id = 4;                       // tie-breaker для стабильной cursor-пагинации
+}
+
+message FileActivityInfo {
+  string id = 1;
+  string file_id = 2;
+  string entry_id = 3;
+  int64 actor_user_id = 4;
+  string kind = 5;
+  string summary = 6;
+  string details_json = 7;
+  google.protobuf.Timestamp created_at = 8;
+}
+
+message ListFileActivityResponse {
+  repeated FileActivityInfo items = 1;
+  google.protobuf.Timestamp next_cursor_created_at = 2; // пусто = больше нет страниц
+  string next_cursor_event_id = 3;
 }
 
 message GetUserStorageInfoResponse {

@@ -7,6 +7,9 @@ on:
       - master
     paths:
       - 'Backend/BarkCloud.Users/**'
+      - 'Shared/**'
+      - 'Tests/Backend/BarkCloud.Users.Tests/**'
+      - 'Tests/BarkCloud.TestKit/**'
       - 'Backend/rebuild.trigger'
   workflow_dispatch:
 
@@ -15,120 +18,16 @@ permissions:
   actions: write
 
 jobs:
-  # ═══════════════════════════════════════════════════════════════
-  #  1. Проверка наличия .NET 10.0 SDK на раннере
-  # ═══════════════════════════════════════════════════════════════
-  check-dotnet:
-    name: "🔍 Проверка .NET 10.0 SDK"
-    runs-on: [self-hosted, linux]
-    steps:
-      - name: "Проверка наличия .NET 10.0 SDK"
-        id: check
-        run: |
-          if ! dotnet --list-sdks 2>/dev/null | grep -q "^10\."; then
-            echo "missing=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "missing=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: "❌ .NET 10.0 SDK не установлен — уведомление в Telegram"
-        if: steps.check.outputs.missing == 'true'
-        env:
-          TG_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TG_CHAT: ${{ secrets.TELEGRAM_CHANNEL_ID }}
-          TG_MESSAGE: |
-            ❌ *Сборка невозможна: .NET 10.0 SDK не установлен на раннере*
-
-            🐳 *BarkCloud.Users*
-            📌 Ветка: `${{ github.ref_name }}`
-            👤 Автор: *${{ github.actor }}*
-        run: |
-          curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
-            --data-urlencode "chat_id=${TG_CHAT}" \
-            --data-urlencode "parse_mode=Markdown" \
-            --data-urlencode "text=${TG_MESSAGE}"
-          exit 1
-
-  # ═══════════════════════════════════════════════════════════════
-  #  2. dotnet publish → Docker build → Push
-  # ═══════════════════════════════════════════════════════════════
-  build:
-    name: "🐳 Сборка и публикация BarkCloud.Users"
-    needs: check-dotnet
-    runs-on: [self-hosted, linux]
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: "⚙️ dotnet publish (Linux Release)"
-        run: |
-          dotnet publish Backend/BarkCloud.Users/BarkCloud.Users.csproj \
-            -c Release \
-            -o ./publish \
-            /p:UseAppHost=false
-          mkdir -p ./publish/logs
-
-      - name: Login to Private Registry
-        uses: docker/login-action@v2
-        with:
-          registry: docker.barkfluff.com:5000
-          username: ${{ secrets.REGISTRY_USERNAME }}
-          password: ${{ secrets.REGISTRY_PASSWORD }}
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-
-      - name: Set tags
-        id: vars
-        run: |
-          if [ "${{ github.ref_name }}" = "dev" ]; then
-            echo "tags=docker.barkfluff.com:5000/barkcloud-users-dev:latest,docker.barkfluff.com:5000/barkcloud-users-dev:${{ github.sha }}" >> "$GITHUB_OUTPUT"
-            echo "tag_sha=docker.barkfluff.com:5000/barkcloud-users-dev:${{ github.sha }}" >> "$GITHUB_OUTPUT"
-          else
-            echo "tags=docker.barkfluff.com:5000/barkcloud-users:latest,docker.barkfluff.com:5000/barkcloud-users:${{ github.sha }}" >> "$GITHUB_OUTPUT"
-            echo "tag_sha=docker.barkfluff.com:5000/barkcloud-users:${{ github.sha }}" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Build and Push Docker image
-        uses: docker/build-push-action@v4
-        with:
-          context: .
-          file: ./Backend/BarkCloud.Users/Dockerfile.slim
-          push: true
-          tags: ${{ steps.vars.outputs.tags }}
-
-      - name: "✅ Уведомление об успехе"
-        if: success()
-        env:
-          TG_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TG_CHAT: ${{ secrets.TELEGRAM_CHANNEL_ID }}
-          TG_MESSAGE: |
-            ✅ *Сборка успешна*
-
-            🐳 *BarkCloud.Users*
-            📌 Ветка: `${{ github.ref_name }}`
-            🔗 Коммит: `${{ github.sha }}`
-            👤 Автор: *${{ github.actor }}*
-            🏷️ Тег: `${{ steps.vars.outputs.tag_sha }}`
-        run: |
-          curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
-            --data-urlencode "chat_id=${TG_CHAT}" \
-            --data-urlencode "parse_mode=Markdown" \
-            --data-urlencode "text=${TG_MESSAGE}"
-
-      - name: "❌ Уведомление об ошибке"
-        if: failure()
-        env:
-          TG_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TG_CHAT: ${{ secrets.TELEGRAM_CHANNEL_ID }}
-          TG_MESSAGE: |
-            ❌ *Сборка провалена*
-
-            🐳 *BarkCloud.Users*
-            📌 Ветка: `${{ github.ref_name }}`
-            🔗 Коммит: `${{ github.sha }}`
-            👤 Автор: *${{ github.actor }}*
-        run: |
-          curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
-            --data-urlencode "chat_id=${TG_CHAT}" \
-            --data-urlencode "parse_mode=Markdown" \
-            --data-urlencode "text=${TG_MESSAGE}"
+  ci:
+    uses: ./.github/workflows/backend-service-ci.yml
+    with:
+      service-name: BarkCloud.Users
+      service-key: users
+      service-path: Backend/BarkCloud.Users
+      test-path: Tests/Backend/BarkCloud.Users.Tests
+      project-path: Backend/BarkCloud.Users/BarkCloud.Users.csproj
+      test-project-path: Tests/Backend/BarkCloud.Users.Tests/BarkCloud.Users.Tests.csproj
+      dockerfile: Backend/BarkCloud.Users/Dockerfile.slim
+      image-name: barkcloud-users
+      force-run: ${{ github.event_name == 'workflow_dispatch' }}
+    secrets: inherit

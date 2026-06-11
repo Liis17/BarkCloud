@@ -5,6 +5,7 @@ namespace BarkCloud.Files.Persistence;
 public interface IShareStorage
 {
     Task Add(ShareLink item, CancellationToken cancellationToken = default);
+    Task<ShareLink?> Get(long ownerId, Guid shareId, CancellationToken cancellationToken = default);
     Task<ShareLink?> GetByToken(string token, CancellationToken cancellationToken = default);
     Task<int> Remove(long ownerId, Guid shareId, CancellationToken cancellationToken = default);
     Task<int> RemoveByFiles(long ownerId, IReadOnlyCollection<Guid> fileIds, CancellationToken cancellationToken = default);

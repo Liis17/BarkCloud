@@ -1,4 +1,6 @@
+using BarkCloud.Files.Domain;
 using BarkCloud.Files.Persistence;
+using BarkCloud.Files.Services;
 using BarkCloud.GrpcServer.XAuth;
 using BarkCloud.Proto.Files;
 using BarkCloud.Shared.Exceptions.Files;
@@ -13,15 +15,18 @@ public class MoveFileEntryCommandHandler : IRequestHandler<MoveFileEntryCommand,
 {
     private readonly ICloudHierarchyStorage _storage;
     private readonly UserContext _userContext;
+    private readonly FileActivityWriter _activity;
     private readonly ILogger<MoveFileEntryCommandHandler> _logger;
 
     public MoveFileEntryCommandHandler(
         ICloudHierarchyStorage storage,
         UserContext userContext,
-        ILogger<MoveFileEntryCommandHandler> logger)
+        ILogger<MoveFileEntryCommandHandler> logger,
+        FileActivityWriter? activity = null)
     {
         _storage = storage;
         _userContext = userContext;
+        _activity = activity ?? FileActivityWriter.Noop;
         _logger = logger;
     }
 
@@ -56,12 +61,23 @@ public class MoveFileEntryCommandHandler : IRequestHandler<MoveFileEntryCommand,
         if (await _storage.FileEntryNameExists(ownerId, newStorageDirectoryId, entry.Name, cancellationToken))
             throw new DirectoryNameConflictException();
 
+        var oldDirectoryId = entry.DirectoryId;
         entry.DirectoryId = newStorageDirectoryId;
         await _storage.UpdateFileEntry(entry, cancellationToken);
 
         _logger.LogInformation(
             "Перемещена запись {EntryId} в директорию {DirectoryId}",
             entry.Id, newStorageDirectoryId);
+
+        await _activity.AddAsync(
+            ownerId,
+            entry.FileId,
+            ownerId,
+            FileActivityKind.Moved,
+            "Перемещён в другую папку",
+            entry.Id,
+            new { oldDirectoryId, newDirectoryId = newStorageDirectoryId },
+            cancellationToken);
 
         return new CloudEmpty();
     }

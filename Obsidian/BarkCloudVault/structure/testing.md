@@ -87,13 +87,23 @@ dotnet test Tests/Backend/BarkCloud.Identity.Tests/BarkCloud.Identity.Tests.cspr
 
 ## CI
 
-Workflow `.github/workflows/tests.yml` — гранулярный запуск по изменённым путям через `dorny/paths-filter@v4`:
+Workflow `.github/workflows/tests.yml` — гранулярный запуск по изменённым путям через `dorny/paths-filter@v4` для pull request и ручных прогонов:
 - **`changes`** — джоба-диспетчер: определяет изменённые части (per-микросервис, `shared`, `android`) и выдаёт outputs. Изменения в `Shared/**` или `Tests/BarkCloud.TestKit/**` триггерят все backend-тесты (микросервисы зависят от Shared/Proto).
 - **`test-<сервис>`** (configuration/files/grpcserver/identity/notification/users/web) — `runs-on: [self-hosted, linux]`, каждая гоняет только свой `.Tests`-проект; `if`: изменена своя папка **или** `shared`.
 - **`test-shared`** — все `Shared.*.Tests` одним прогоном при изменении `Shared/**`.
 - **`android-tests`** — `runs-on: ubuntu-latest`, `./gradlew :app:testDebugUnitTest`, только при изменениях в `Android/**`.
 - **`ios-tests`** — будет добавлен в этапе P3 (требует macOS-раннера).
 
+Backend deploy-воркфлоу `build-backend-*.yml` вызывают общий reusable workflow `.github/workflows/backend-service-ci.yml`:
+- **`changes`** — проверяет runtime-изменения (`Backend/BarkCloud.<Service>/**`, `Shared/**`, `Backend/rebuild.trigger`) и test-only изменения (`Tests/Backend/BarkCloud.<Service>.Tests/**`, `Tests/BarkCloud.TestKit/**`).
+- **`check-dotnet`** — проверяет .NET 10.0 SDK на `[self-hosted, linux]`.
+- **`test`** — сначала запускает тесты конкретного сервиса. При падении отправляет Telegram-сообщение с inline-кнопкой на текущий GitHub Actions run, а сборка не стартует.
+- **`build`** — запускается только после успешных тестов и только при runtime-изменениях или ручном запуске. Публикует Docker-образ и отправляет Telegram-сообщение об успехе или провале с кнопкой на GitHub Actions run.
+
+Docker-теги сохраняют прежнее правило: для ветки `dev` используется постфикс `-dev`, для `master` — имя образа без постфикса. Например, `barkcloud-files-dev:<sha>` в `dev` и `barkcloud-files:<sha>` в `master`.
+
 Drive (`Drive/*`, WPF/Windows, тестов нет) в CI не собирается — только локально. Backend-воркфлоу `build-backend-*.yml` привязаны к `[self-hosted, linux]`, чтобы не уехать на Windows self-hosted runner (общий label `self-hosted`).
 
-Триггеры: push в `dev`/`master`/`claude/**`, pull_request в `dev`/`master`, workflow_dispatch.
+Триггеры:
+- `tests.yml`: pull_request в `dev`/`master`, workflow_dispatch.
+- `build-backend-*.yml`: push в `dev`/`master` по путям конкретного сервиса, `Shared/**`, его тестам, `Tests/BarkCloud.TestKit/**`, `Backend/rebuild.trigger`; также workflow_dispatch.
