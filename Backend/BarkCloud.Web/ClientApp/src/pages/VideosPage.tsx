@@ -3,9 +3,6 @@ import { Icon } from '../components/Icon';
 import { MediaThumb } from '../components/media/MediaThumb';
 import { Lightbox } from '../components/media/Lightbox';
 import { EmptyState, Loading } from '../components/ui/EmptyState';
-import { AlbumCard } from '../components/albums/AlbumCard';
-import { AlbumFormModal } from '../components/albums/AlbumFormModal';
-import { AlbumDetail } from '../components/albums/AlbumDetail';
 import { useToast } from '../hooks/useToast';
 import { useInfiniteMedia } from '../hooks/useInfiniteMedia';
 import { useMediaActions } from '../hooks/useMediaActions';
@@ -73,11 +70,8 @@ function VideoCard({ m, selecting, checked, onToggle, onOpen, onMenu }: {
 }
 
 export function VideosPage() {
-  const [tab, setTab] = React.useState<'videos' | 'albums'>('videos');
   const [albums, setAlbums] = React.useState<Album[] | null>(null);
-  const [openAlbum, setOpenAlbum] = React.useState<Album | null>(null);
   const [lightbox, setLightbox] = React.useState<number | null>(null);
-  const [creating, setCreating] = React.useState(false);
   const [toastNode, toast] = useToast();
   const { enqueue, attachVersion } = useUploadActions();
 
@@ -134,8 +128,7 @@ export function VideosPage() {
   usePageHeader(
     () => ({
       title: 'Видео',
-      documentTitle: openAlbum ? openAlbum.name : tab === 'albums' ? 'Альбомы' : 'Видео',
-      documentIconUrl: openAlbum?.coverUrl || null,
+      documentTitle: 'Видео',
       kicker: (
         <>
           <span>Библиотека</span>
@@ -144,19 +137,12 @@ export function VideosPage() {
         </>
       ),
       actions: (
-        <>
-          {tab === 'albums' && (
-            <button className="btn outlined" onClick={() => setCreating(true)}>
-              <Icon.plus size={16} /> Альбом
-            </button>
-          )}
-          <button className="btn primary" onClick={() => doUpload()}>
-            <Icon.upload size={16} /> Загрузить видео
-          </button>
-        </>
+        <button className="btn primary" onClick={() => doUpload()}>
+          <Icon.upload size={16} /> Загрузить видео
+        </button>
       ),
     }),
-    [tab, openAlbum?.name, openAlbum?.coverUrl],
+    [],
   );
 
   return (
@@ -185,39 +171,17 @@ export function VideosPage() {
 
       <div className="vid-toolbar">
         <div className="chip-row">
-          <button className={'chip' + (tab === 'videos' ? ' active' : '')} onClick={() => { setTab('videos'); setOpenAlbum(null); }}>
-            {tab === 'videos' && <Icon.check size={16} />} Все видео
+          <span className="chip active">
+            <Icon.check size={16} /> Все видео
             <span className="count">
               {videos.length}
               {done ? '' : '+'}
             </span>
-          </button>
-          <button className={'chip' + (tab === 'albums' ? ' active' : '')} onClick={() => setTab('albums')}>
-            {tab === 'albums' && <Icon.check size={16} />} Альбомы
-            {albums && <span className="count">{albums.length}</span>}
-          </button>
+          </span>
         </div>
       </div>
 
-      {tab === 'albums' &&
-        (openAlbum ? (
-          <AlbumDetail album={openAlbum} candidates={videos} toast={toast} onBack={() => setOpenAlbum(null)} onChanged={() => loadAlbums()} />
-        ) : albums === null ? (
-          <Loading />
-        ) : (
-          <div className="album-grid">
-            {albums.map((a) => (
-              <AlbumCard key={a.id} album={a} onOpen={(al) => setOpenAlbum(al)} />
-            ))}
-            <div className="album-card new-album" onClick={() => setCreating(true)}>
-              <Icon.plus size={28} />
-              <span>Создать альбом</span>
-            </div>
-          </div>
-        ))}
-
-      {tab === 'videos' &&
-        (loading && videos.length === 0 ? (
+      {(loading && videos.length === 0 ? (
           <Loading />
         ) : videos.length === 0 ? (
           <EmptyState
@@ -291,18 +255,6 @@ export function VideosPage() {
         ))}
       </div>
 
-      {creating && (
-        <AlbumFormModal
-          onClose={() => setCreating(false)}
-          onSaved={() => {
-            setCreating(false);
-            setTab('albums');
-            loadAlbums();
-            toast('Альбом создан');
-          }}
-          toast={toast}
-        />
-      )}
       {lightbox !== null && <Lightbox items={videos} index={lightbox} onClose={() => setLightbox(null)} />}
     </>
   );

@@ -3,9 +3,6 @@ import { Icon } from '../components/Icon';
 import { MediaThumb } from '../components/media/MediaThumb';
 import { Lightbox } from '../components/media/Lightbox';
 import { EmptyState, Loading } from '../components/ui/EmptyState';
-import { AlbumCard } from '../components/albums/AlbumCard';
-import { AlbumFormModal } from '../components/albums/AlbumFormModal';
-import { AlbumDetail } from '../components/albums/AlbumDetail';
 import { MemoriesStrip } from '../components/memories/MemoriesStrip';
 import { useToast } from '../hooks/useToast';
 import { useInfiniteMedia } from '../hooks/useInfiniteMedia';
@@ -42,11 +39,8 @@ function Photo({ m, selecting, checked, onToggle, onOpen, onMenu }: {
 }
 
 export function PhotosPage() {
-  const [tab, setTab] = React.useState<'photos' | 'albums'>('photos');
   const [albums, setAlbums] = React.useState<Album[] | null>(null);
-  const [openAlbum, setOpenAlbum] = React.useState<Album | null>(null);
   const [lightbox, setLightbox] = React.useState<number | null>(null);
-  const [creating, setCreating] = React.useState(false);
   const [toastNode, toast] = useToast();
   const { enqueue, attachVersion } = useUploadActions();
 
@@ -97,8 +91,7 @@ export function PhotosPage() {
   usePageHeader(
     () => ({
       title: 'Фотогалерея',
-      documentTitle: openAlbum ? openAlbum.name : tab === 'albums' ? 'Альбомы' : 'Фото',
-      documentIconUrl: openAlbum?.coverUrl || null,
+      documentTitle: 'Фото',
       kicker: (
         <>
           <span>Библиотека</span>
@@ -107,19 +100,12 @@ export function PhotosPage() {
         </>
       ),
       actions: (
-        <>
-          {tab === 'albums' && (
-            <button className="btn outlined" onClick={() => setCreating(true)}>
-              <Icon.plus size={16} /> Альбом
-            </button>
-          )}
-          <button className="btn primary" onClick={() => doUpload()}>
-            <Icon.upload size={16} /> Загрузить
-          </button>
-        </>
+        <button className="btn primary" onClick={() => doUpload()}>
+          <Icon.upload size={16} /> Загрузить
+        </button>
       ),
     }),
-    [tab, openAlbum?.name, openAlbum?.coverUrl],
+    [],
   );
 
   return (
@@ -139,41 +125,19 @@ export function PhotosPage() {
 
       <div className="photos-toolbar">
         <div className="chip-row">
-          <button className={'chip' + (tab === 'photos' ? ' active' : '')} onClick={() => { setTab('photos'); setOpenAlbum(null); }}>
-            {tab === 'photos' && <Icon.check size={16} />} Все фото
+          <span className="chip active">
+            <Icon.check size={16} /> Все фото
             <span className="count">
               {photos.length}
               {done ? '' : '+'}
             </span>
-          </button>
-          <button className={'chip' + (tab === 'albums' ? ' active' : '')} onClick={() => setTab('albums')}>
-            {tab === 'albums' && <Icon.check size={16} />} Альбомы
-            {albums && <span className="count">{albums.length}</span>}
-          </button>
+          </span>
         </div>
       </div>
 
-      {tab === 'albums' &&
-        (openAlbum ? (
-          <AlbumDetail album={openAlbum} candidates={photos} toast={toast} onBack={() => setOpenAlbum(null)} onChanged={() => loadAlbums()} />
-        ) : albums === null ? (
-          <Loading />
-        ) : (
-          <div className="album-grid">
-            {albums.map((a) => (
-              <AlbumCard key={a.id} album={a} onOpen={(al) => setOpenAlbum(al)} />
-            ))}
-            <div className="album-card new-album" onClick={() => setCreating(true)}>
-              <Icon.plus size={28} />
-              <span>Создать альбом</span>
-            </div>
-          </div>
-        ))}
+      <MemoriesStrip />
 
-      {tab === 'photos' && <MemoriesStrip />}
-
-      {tab === 'photos' &&
-        (loading && photos.length === 0 ? (
+      {(loading && photos.length === 0 ? (
           <Loading />
         ) : photos.length === 0 ? (
           <EmptyState
@@ -220,18 +184,6 @@ export function PhotosPage() {
         ))}
       </div>
 
-      {creating && (
-        <AlbumFormModal
-          onClose={() => setCreating(false)}
-          onSaved={() => {
-            setCreating(false);
-            setTab('albums');
-            loadAlbums();
-            toast('Альбом создан');
-          }}
-          toast={toast}
-        />
-      )}
       {lightbox !== null && <Lightbox items={photos} index={lightbox} onClose={() => setLightbox(null)} />}
     </>
   );

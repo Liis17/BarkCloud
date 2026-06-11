@@ -12,6 +12,7 @@ interface NavItem {
 const NAV_PRIMARY: NavItem[] = [
   { key: 'photos', to: '/photos', label: 'Фото', icon: 'photo' },
   { key: 'videos', to: '/videos', label: 'Видео', icon: 'video' },
+  { key: 'albums', to: '/albums', label: 'Альбомы', icon: 'grid' },
   { key: 'files', to: '/files', label: 'Файлы', icon: 'folder' },
 ];
 const NAV_SHARE: NavItem[] = [
