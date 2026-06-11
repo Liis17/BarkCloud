@@ -183,6 +183,8 @@ AppEnvironment подписывает системный хук attachFile, Uplo
    `refreshScanForNewAssets` пере-проверяет это по `checkFileHashes` → недостающее
    уходит в загрузку снова (бэкенд дедуплицирует по SHA256). Если передачи идут —
    не пере-сверяем, чтобы не задублировать ещё не дозагруженные ассеты.
+   В той же ветке сбрасываются `inFlightCount = 0` и `assetByJobID` — события
+   по мёртвым job'ам уже не придут, счётчик не должен застрять.
 - `confirmedInCloudIDs: Set<String>` — ассеты, подтверждённые на сервере (classify
   увидел `exists==true`). Только они безусловно пропускаются при пере-сверке.
 
@@ -233,9 +235,26 @@ AppEnvironment подписывает системный хук attachFile, Uplo
   AppEnvironment с `route_by_media_kind`: сервер сам кладёт в системные
   «Фото»/«Видео»/«Другие документы» по типу медиа. Папка «Недавно загруженные»
   больше не создаётся (метод `ensureRecentUploadsFolder` удалён).
-- В `reclaimable` (предложить удалить оригинал) ассет попадает только когда
-  следующий скан подтвердит его на сервере (`classify`), а не сразу после подачи
-  в очередь — до подтверждения предлагать удаление нельзя.
+- **Учёт по факту завершения** (2026-06-11): `uploadDone`/`uploadFailed` двигаются
+  НЕ при подаче в очередь, а по completion/failure-событиям координатора
+  (`BackupManager` подписан в init; карта `assetByJobID: [jobID → PHAsset]`,
+  чужие job'ы — manual/share/прошлые запуски — отфильтровываются).
+  `remainingCount = pendingUpload.count + inFlightCount` (поданные, но не
+  завершённые). Раньше «✓ всё загружено» показывалось, когда передачи ещё шли.
+- В `reclaimable` (предложить удалить оригинал) ассет попадает сразу по
+  completed-событию (сервер подтвердил 2xx) или когда скан подтвердит его
+  через `classify` — но не при простой подаче в очередь.
+- По completed-событию также: `CloudDeviceLinkStore.link(fileID:localIdentifier:)`
+  и notification `.backupAssetUploaded` → `CloudPresenceTracker` каждого экрана
+  сразу рисует бейдж «в облаке» (иначе закэшированное «не в облаке» висело до
+  pull-to-refresh — это был баг «не все помечаются как загруженные»).
+- `onOpen()` (открытие модалки BackupSheet): если первый скан уже был —
+  `refreshScanForNewAssets()`, чтобы состояние (числа, кнопка «Освободить
+  место») не оставалось снимком прошлого открытия.
+- `setAutoUpload(true)`: `processedAssetIDs = confirmedInCloudIDs ∪ {pendingUpload}`
+  (НЕ `removeAll()` — иначе скан надублировал бы уже стоящие в очереди ассеты).
+  При выключении — `inFlightCount = 0`, `assetByJobID.removeAll()` до отмены
+  jobs, чтобы их failure-события не попали в счётчик ошибок.
 
 **Manual** (`CloudBrowserViewModel.upload`):
 - Сразу `cloud.enqueueBackgroundUpload(data:fileName:directoryID:)`. UI не
