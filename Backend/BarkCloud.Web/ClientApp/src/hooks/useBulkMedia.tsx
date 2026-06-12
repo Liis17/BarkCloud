@@ -3,7 +3,7 @@ import { useSelection } from './useSelection';
 import { SelectionBar } from '../components/ui/SelectionBar';
 import { ConfirmModal } from '../components/ui/ConfirmModal';
 import { Modal } from '../components/ui/Modal';
-import { apiGet, apiPost, deleteMediaBatch } from '../lib/api';
+import { apiGet, apiPost, deleteMediaBatch, downloadArchive } from '../lib/api';
 import type { Album, MediaItem } from '../lib/types';
 import type { ToastPush } from './useToast';
 
@@ -24,6 +24,7 @@ export function useBulkMedia({ items, albums, toast, onRemoved, onReloadAlbums }
   const sel = useSelection();
   const [confirmDel, setConfirmDel] = React.useState(false);
   const [pickAlbum, setPickAlbum] = React.useState(false);
+  const [archiving, setArchiving] = React.useState(false);
 
   const chosen = React.useCallback(() => items.filter((m) => sel.has(m.id)), [items, sel]);
 
@@ -60,6 +61,21 @@ export function useBulkMedia({ items, albums, toast, onRemoved, onReloadAlbums }
     }
   }
 
+  async function bulkArchive() {
+    if (!sel.count || archiving) return;
+    setArchiving(true);
+    toast('Готовлю архив…');
+    try {
+      await downloadArchive({ fileIds: sel.list });
+      sel.clear();
+      toast('Архив готов, скачивание началось');
+    } catch (e) {
+      toast((e as Error).message, 'err');
+    } finally {
+      setArchiving(false);
+    }
+  }
+
   async function bulkAddToAlbum(albumId: string) {
     try {
       await apiPost('/api/albums/items/add', { album: albumId, fileIds: sel.list });
@@ -79,6 +95,7 @@ export function useBulkMedia({ items, albums, toast, onRemoved, onReloadAlbums }
       onClear={sel.clear}
       actions={[
         ...(albums.length ? [{ label: 'В альбом', icon: 'plus', onClick: () => setPickAlbum(true) }] : []),
+        { label: archiving ? 'Архивирую…' : 'Скачать архивом', icon: 'download', disabled: archiving, onClick: bulkArchive },
         { label: 'Копировать ссылки', icon: 'link', onClick: bulkCopyLinks },
         { label: 'Удалить', icon: 'trash', danger: true, onClick: () => setConfirmDel(true) },
       ]}

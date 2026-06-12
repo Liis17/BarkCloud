@@ -35,6 +35,9 @@ service CloudApi {
   rpc DeleteFileEntry      (DeleteFileEntryRequest)      returns (CloudEmpty);               // Удалить запись о файле
   rpc DeleteFileEntries    (DeleteFileEntriesRequest)    returns (DeleteFileEntriesResponse); // Массовое удаление записей в корзину (до 100 за запрос)
 
+  // ───────── Архив (ZIP) ─────────
+  rpc CreateArchive        (CreateArchiveRequest)        returns (CreateArchiveResponse);     // Собрать выбранное/папку/альбом в ZIP, положить в корзину (3 дня) и вернуть временную ссылку
+
   rpc ListUserImages       (ListUserImagesRequest)       returns (ListUserImagesResponse);   // [DEPRECATED] Все изображения пользователя; используйте ListUserMedia(PHOTO)
   rpc ListUserMedia        (ListUserMediaRequest)        returns (ListUserMediaResponse);     // Медиа пользователя по типу (фото / видео) от новых к старым (cursor pagination)
   rpc DeleteUserMedia      (DeleteUserMediaRequest)      returns (CloudEmpty);                // Удалить медиа из галереи по file_id: живые записи каталога → в корзину; если записей нет — создать запись корзины
@@ -123,6 +126,21 @@ service DynamicFolderApi {
   rpc DeleteDynamicFolder    (DeleteDynamicFolderRequest)    returns (CloudEmpty);                   // Удалить умную папку
   rpc ListDynamicFolders     (ListDynamicFoldersRequest)     returns (ListDynamicFoldersResponse);   // Системные + пользовательские (обложка / счётчик)
   rpc ListDynamicFolderItems (ListDynamicFolderItemsRequest) returns (ListDynamicFolderItemsResponse); // Содержимое папки (файлы по критериям)
+}
+
+// Источники могут комбинироваться: всё, что задано, попадает в один архив.
+message CreateArchiveRequest {
+  repeated string entry_ids   = 1; // Записи иерархии (выделение во вкладке «Файлы»)
+  repeated string file_ids    = 2; // Блобы напрямую (выделение в галерее Фото/Видео)
+  string directory_id         = 3; // Вся папка рекурсивно (пусто — не задано)
+  string album_id             = 4; // Весь альбом (пусто — не задано)
+  string archive_name         = 5; // Желаемое имя архива без расширения (необяз.)
+}
+
+message CreateArchiveResponse {
+  string file_id   = 1; // Идентификатор блоба-архива (лежит в корзине)
+  string url       = 2; // Временная ссылка для немедленного скачивания
+  string file_name = 3; // Итоговое имя архива (с .zip)
 }
 
 message GetTempDownloadUrlRequest {

@@ -243,6 +243,27 @@ public static class CloudApiEndpoints
                 }, Json);
             }));
 
+        // Собрать выбранное / папку / альбом в ZIP. Архив кладётся в корзину (3 дня)
+        // и возвращается временная ссылка на немедленное скачивание.
+        api.MapPost("/cloud/archive", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud, ArchiveReq body) =>
+            await Guarded(http, auth, async token =>
+            {
+                var req = new CreateArchiveRequest();
+                if (body.EntryIds is { Length: > 0 })
+                    req.EntryIds.AddRange(body.EntryIds);
+                if (body.FileIds is { Length: > 0 })
+                    req.FileIds.AddRange(body.FileIds);
+                if (!string.IsNullOrWhiteSpace(body.DirectoryId))
+                    req.DirectoryId = body.DirectoryId;
+                if (!string.IsNullOrWhiteSpace(body.AlbumId))
+                    req.AlbumId = body.AlbumId;
+                if (!string.IsNullOrWhiteSpace(body.Name))
+                    req.ArchiveName = body.Name;
+
+                var resp = await cloud.CreateArchiveAsync(req, token);
+                return Results.Json(new { url = resp.Url, fileName = resp.FileName, fileId = resp.FileId }, Json);
+            }));
+
         // ───────────────────────── Корзина ─────────────────────────
 
         api.MapGet("/cloud/trash", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud,
@@ -1337,6 +1358,7 @@ public static class CloudApiEndpoints
     private sealed record EntryIdsReq(string[]? EntryIds);
     private sealed record FileIdReq(string FileId);
     private sealed record FileIdsReq(string[]? FileIds);
+    private sealed record ArchiveReq(string[]? EntryIds, string[]? FileIds, string? DirectoryId, string? AlbumId, string? Name);
     private sealed record GrantReq(string FileId, long RecipientUserId);
     private sealed record GrantFolderReq(string DirectoryId, long RecipientUserId);
     private sealed record GrantIdReq(string GrantId);

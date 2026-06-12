@@ -8,7 +8,7 @@ import { PickMediaModal } from './PickMediaModal';
 import { useContextMenu, type ContextItem } from '../ui/ContextMenu';
 import { PropertiesModal } from '../ui/PropertiesModal';
 import { ShareWithUserModal } from '../ui/ShareWithUserModal';
-import { apiGet, apiPost } from '../../lib/api';
+import { apiGet, apiPost, downloadArchive } from '../../lib/api';
 import { createShare, createAlbumShare } from '../../lib/share';
 import { GRID_SIZES } from '../../lib/format';
 import { useDocumentHead } from '../../hooks/useDocumentHead';
@@ -35,6 +35,7 @@ export function AlbumDetail({ album, candidates, albums, gridSizes = GRID_SIZES,
   const [picking, setPicking] = React.useState(false);
   const [props, setProps] = React.useState<CardFile | null>(null);
   const [shareWith, setShareWith] = React.useState<CardFile | null>(null);
+  const [archiving, setArchiving] = React.useState(false);
   const { menu, openAt } = useContextMenu();
 
   useDocumentHead(
@@ -103,6 +104,19 @@ export function AlbumDetail({ album, candidates, albums, gridSizes = GRID_SIZES,
       toast((e as Error).message, 'err');
     }
   }
+  async function downloadAlbum() {
+    if (archiving) return;
+    setArchiving(true);
+    toast('Готовлю архив альбома…');
+    try {
+      await downloadArchive({ albumId: album.id, name: album.name });
+      toast('Архив готов, скачивание началось');
+    } catch (e) {
+      toast((e as Error).message, 'err');
+    } finally {
+      setArchiving(false);
+    }
+  }
   async function addToFavorites(id: string) {
     try {
       await apiPost('/api/cloud/favorites/add', { fileId: id });
@@ -138,6 +152,9 @@ export function AlbumDetail({ album, candidates, albums, gridSizes = GRID_SIZES,
         <div className="right" style={{ gap: 8 }}>
           <button className="btn outlined" onClick={() => setPicking(true)}>
             <Icon.plus size={16} /> Добавить
+          </button>
+          <button className="btn outlined" onClick={downloadAlbum} disabled={archiving} title="Скачать весь альбом архивом">
+            <Icon.download size={16} /> {archiving ? 'Архивирую…' : 'Скачать'}
           </button>
           <button className="btn outlined" onClick={() => createAlbumShare(album.id, album.name, toast)} title="Создать публичную ссылку на альбом">
             <Icon.share size={16} /> Поделиться

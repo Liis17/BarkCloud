@@ -61,6 +61,7 @@ Parent: [[index]] · See also: [[structure/overview]] · [[structure/entrypoints
 - `minio_data` — данные MinIO по умолчанию (named volume). Источник `/data` переопределяется через `MINIO_DATA_PATH` в `.env`; тот же источник монтируется в `cloud-files` read-only как `/mnt/minio-data` для расчёта физического объёма диска. Вынос на отдельный диск — см. раздел «MinIO на отдельном диске» ниже.
 - `backup_volume` — бэкапы Postgres (монтируется в Postgres-контейнер на `/backup`); переопределяется через `BACKUP_PATH`
 - `seq_data` — данные Seq; переопределяется через `SEQ_DATA_PATH`
+- `archive_temp` — временный файл ZIP при «Скачать архивом» (монтируется в `cloud-files` как `/mnt/archive-temp`, путь читается из env `Archive__TempPath`); переопределяется через `ARCHIVE_TEMP_PATH`. Только в прод-`docker-compose.yml`. Сценарий: zip собирается на диск → заливается в S3 → temp удаляется; готовый архив кладётся в корзину со сроком 3 дня (переиспользует фоновую очистку `TrashCleanupService`). Вынести на второй диск (где больше места, чем в образе) — `ARCHIVE_TEMP_PATH=/d/barkcloud/archive-temp`. Папка на NTFS/drvfs здесь годится (последовательная запись файла, без БД-семантики).
 
 ## MinIO на отдельном диске (Windows/WSL2)
 
