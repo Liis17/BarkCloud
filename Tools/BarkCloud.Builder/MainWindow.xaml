@@ -1,12 +1,287 @@
-﻿<Window x:Class="BarkCloud.Builder.MainWindow"
-        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:local="clr-namespace:BarkCloud.Builder"
-        mc:Ignorable="d"
-        Title="MainWindow" Height="450" Width="800">
-    <Grid>
+<ui:FluentWindow x:Class="BarkCloud.Builder.MainWindow"
+                 xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                 xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+                 xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+                 xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+                 xmlns:local="clr-namespace:BarkCloud.Builder"
+                 mc:Ignorable="d"
+                 Title="BarkCloud Builder"
+                 Width="780" Height="880"
+                 MinWidth="620" MinHeight="520"
+                 ExtendsContentIntoTitleBar="True"
+                 WindowBackdropType="Mica"
+                 WindowStartupLocation="CenterScreen">
 
+    <ui:FluentWindow.Resources>
+        <Style x:Key="FieldLabel" TargetType="TextBlock">
+            <Setter Property="Margin" Value="0,10,0,2" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+        </Style>
+        <Style x:Key="SectionCaption" TargetType="TextBlock">
+            <Setter Property="Margin" Value="0,14,0,2" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+        </Style>
+    </ui:FluentWindow.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <ui:TitleBar Grid.Row="0" Title="BarkCloud Builder — генератор docker-compose">
+            <ui:TitleBar.Icon>
+                <ui:SymbolIcon Symbol="Box24" />
+            </ui:TitleBar.Icon>
+        </ui:TitleBar>
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="16,8,16,8">
+            <StackPanel>
+
+                <!-- Сервисы -->
+                <ui:Card Margin="0,0,0,8" Padding="16">
+                    <StackPanel>
+                        <TextBlock FontSize="16" FontWeight="SemiBold" Text="Сервисы в compose" />
+                        <TextBlock Margin="0,2,0,10"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                   TextWrapping="Wrap"
+                                   Text="Ядро (configuration, identity, users, files) включается всегда. Остальное — по выбору." />
+                        <UniformGrid Columns="2">
+                            <ui:ToggleSwitch Margin="0,4" Content="web (веб-клиент)" IsChecked="{Binding IncludeWeb}" />
+                            <ui:ToggleSwitch Margin="0,4" Content="nginx (reverse-proxy)" IsChecked="{Binding IncludeNginx}" />
+                            <ui:ToggleSwitch Margin="0,4" Content="notification (SMTP)" IsChecked="{Binding IncludeNotification}" />
+                            <ui:ToggleSwitch Margin="0,4" Content="minio (хранилище)" IsChecked="{Binding IncludeMinio}" />
+                            <ui:ToggleSwitch Margin="0,4" Content="rabbitmq (очередь)" IsChecked="{Binding IncludeRabbitmq}" />
+                            <ui:ToggleSwitch Margin="0,4" Content="postgres (БД)" IsChecked="{Binding IncludePostgres}" />
+                            <ui:ToggleSwitch Margin="0,4" Content="seq (логи)" IsChecked="{Binding IncludeSeq}" />
+                        </UniformGrid>
+                    </StackPanel>
+                </ui:Card>
+
+                <!-- Общие -->
+                <ui:CardExpander Margin="0,0,0,8" Icon="{ui:SymbolIcon Settings24}" IsExpanded="True">
+                    <ui:CardExpander.Header>
+                        <StackPanel>
+                            <TextBlock FontWeight="Medium" Text="Общие" />
+                            <TextBlock FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       Text="Окружение и bootstrap-ключ" />
+                        </StackPanel>
+                    </ui:CardExpander.Header>
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="ASPNETCORE_ENVIRONMENT" />
+                        <ComboBox SelectedValue="{Binding AspNetCoreEnvironment, Mode=TwoWay}" SelectedValuePath="Content">
+                            <ComboBoxItem Content="Production" />
+                            <ComboBoxItem Content="Development" />
+                        </ComboBox>
+
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="CONFIGURATION_SERVICE_URL" />
+                        <ui:TextBox Margin="0,0,0,6" Text="{Binding ConfigurationServiceUrl, UpdateSourceTrigger=PropertyChanged}" />
+
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="CONFIGURATION_ACCESS_KEY (одинаковый у всех сервисов)" />
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <ui:TextBox x:Name="AccessKeyBox" Grid.Column="0"
+                                        Text="{Binding ConfigurationAccessKey, UpdateSourceTrigger=PropertyChanged}" />
+                            <ui:Button Grid.Column="1" Margin="8,0,0,0" Content="Случайный"
+                                       Icon="{ui:SymbolIcon ArrowSync24}" Click="OnGenerateKey" />
+                        </Grid>
+                    </StackPanel>
+                </ui:CardExpander>
+
+                <!-- Образы -->
+                <ui:CardExpander Margin="0,0,0,8" Icon="{ui:SymbolIcon Box24}">
+                    <ui:CardExpander.Header>
+                        <StackPanel>
+                            <TextBlock FontWeight="Medium" Text="Образы" />
+                            <TextBlock FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       Text="Реестр и тег docker-образов" />
+                        </StackPanel>
+                    </ui:CardExpander.Header>
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="Префикс реестра" />
+                        <ui:TextBox Margin="0,0,0,6" Text="{Binding ImageRegistryPrefix, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="Тег" />
+                        <ui:TextBox Text="{Binding ImageTag, UpdateSourceTrigger=PropertyChanged}" />
+                    </StackPanel>
+                </ui:CardExpander>
+
+                <!-- MinIO -->
+                <ui:CardExpander Margin="0,0,0,8" Icon="{ui:SymbolIcon Storage24}">
+                    <ui:CardExpander.Header>
+                        <StackPanel>
+                            <TextBlock FontWeight="Medium" Text="MinIO" />
+                            <TextBlock FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       Text="S3-совместимое хранилище файлов" />
+                        </StackPanel>
+                    </ui:CardExpander.Header>
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="MINIO_ROOT_USER" />
+                        <ui:TextBox Margin="0,0,0,6" Text="{Binding MinioRootUser, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="MINIO_ROOT_PASSWORD" />
+                        <ui:TextBox Margin="0,0,0,6" Text="{Binding MinioRootPassword, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="MINIO_PORT (API)" />
+                        <ui:TextBox Margin="0,0,0,6" Text="{Binding MinioPort, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="MINIO_WEBPORT (консоль)" />
+                        <ui:TextBox Margin="0,0,0,6" Text="{Binding MinioWebPort, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="MINIO_DATA_PATH (пусто — named volume)" />
+                        <ui:TextBox Margin="0,0,0,6" PlaceholderText="/d/barkcloud/minio"
+                                    Text="{Binding MinioDataPath, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="ARCHIVE_TEMP_PATH (пусто — named volume)" />
+                        <ui:TextBox Text="{Binding ArchiveTempPath, UpdateSourceTrigger=PropertyChanged}" />
+                    </StackPanel>
+                </ui:CardExpander>
+
+                <!-- RabbitMQ -->
+                <ui:CardExpander Margin="0,0,0,8" Icon="{ui:SymbolIcon Mail24}">
+                    <ui:CardExpander.Header>
+                        <StackPanel>
+                            <TextBlock FontWeight="Medium" Text="RabbitMQ" />
+                            <TextBlock FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       Text="Брокер сообщений" />
+                        </StackPanel>
+                    </ui:CardExpander.Header>
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="RABBITMQ_DEFAULT_USER" />
+                        <ui:TextBox Margin="0,0,0,6" Text="{Binding RabbitUser, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="RABBITMQ_DEFAULT_PASS" />
+                        <ui:TextBox Text="{Binding RabbitPass, UpdateSourceTrigger=PropertyChanged}" />
+                    </StackPanel>
+                </ui:CardExpander>
+
+                <!-- PostgreSQL -->
+                <ui:CardExpander Margin="0,0,0,8" Icon="{ui:SymbolIcon Database24}">
+                    <ui:CardExpander.Header>
+                        <StackPanel>
+                            <TextBlock FontWeight="Medium" Text="PostgreSQL" />
+                            <TextBlock FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       Text="База данных + подключение Configuration" />
+                        </StackPanel>
+                    </ui:CardExpander.Header>
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="POSTGRES_USER" />
+                        <ui:TextBox Margin="0,0,0,6" Text="{Binding PostgresUser, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="POSTGRES_PASSWORD" />
+                        <ui:TextBox Margin="0,0,0,6" Text="{Binding PostgresPassword, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="POSTGRES_DB" />
+                        <ui:TextBox Margin="0,0,0,6" Text="{Binding PostgresDb, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="POSTGRES_PORT (host-маппинг)" />
+                        <ui:TextBox Margin="0,0,0,6" Text="{Binding PostgresPort, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="POSTGRES_DATA_PATH (пусто — named volume)" />
+                        <ui:TextBox Margin="0,0,0,6" Text="{Binding PostgresDataPath, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="BACKUP_PATH (пусто — named volume)" />
+                        <ui:TextBox Text="{Binding BackupPath, UpdateSourceTrigger=PropertyChanged}" />
+
+                        <TextBlock Style="{StaticResource SectionCaption}" Text="Подключение Configuration к Postgres" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="CONFIGURATION_HOST" />
+                        <ui:TextBox Margin="0,0,0,6" Text="{Binding ConfigurationHost, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="CONFIGURATION_DATABASE" />
+                        <ui:TextBox Margin="0,0,0,6" Text="{Binding ConfigurationDatabase, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="CONFIGURATION_USERNAME" />
+                        <ui:TextBox Margin="0,0,0,6" Text="{Binding ConfigurationUsername, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="CONFIGURATION_PASSWORD" />
+                        <ui:TextBox Margin="0,0,0,6" Text="{Binding ConfigurationPassword, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="CONFIGURATION_PORT" />
+                        <ui:TextBox Text="{Binding ConfigurationPort, UpdateSourceTrigger=PropertyChanged}" />
+                    </StackPanel>
+                </ui:CardExpander>
+
+                <!-- Порты сервисов -->
+                <ui:CardExpander Margin="0,0,0,8" Icon="{ui:SymbolIcon Server24}">
+                    <ui:CardExpander.Header>
+                        <StackPanel>
+                            <TextBlock FontWeight="Medium" Text="Порты сервисов" />
+                            <TextBlock FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       Text="Внешние порты (через nginx)" />
+                        </StackPanel>
+                    </ui:CardExpander.Header>
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="IDENTITY_PORT" />
+                        <ui:TextBox Margin="0,0,0,6" Text="{Binding IdentityPort, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="USERS_PORT" />
+                        <ui:TextBox Margin="0,0,0,6" Text="{Binding UsersPort, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="FILES_PORT" />
+                        <ui:TextBox Margin="0,0,0,6" Text="{Binding FilesPort, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="FILES_HTTP1PORT" />
+                        <ui:TextBox Text="{Binding FilesHttp1Port, UpdateSourceTrigger=PropertyChanged}" />
+                    </StackPanel>
+                </ui:CardExpander>
+
+                <!-- Seq -->
+                <ui:CardExpander Margin="0,0,0,8" Icon="{ui:SymbolIcon DocumentBulletList24}">
+                    <ui:CardExpander.Header>
+                        <StackPanel>
+                            <TextBlock FontWeight="Medium" Text="Seq" />
+                            <TextBlock FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       Text="Агрегатор логов" />
+                        </StackPanel>
+                    </ui:CardExpander.Header>
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="SEQ_ADMIN_PASSWORD" />
+                        <ui:TextBox Margin="0,0,0,6" Text="{Binding SeqAdminPassword, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="SEQ_WEBPORT" />
+                        <ui:TextBox Margin="0,0,0,6" Text="{Binding SeqWebPort, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="SEQ_DATA_PATH (пусто — named volume)" />
+                        <ui:TextBox Text="{Binding SeqDataPath, UpdateSourceTrigger=PropertyChanged}" />
+                    </StackPanel>
+                </ui:CardExpander>
+
+                <!-- Веб-клиент -->
+                <ui:CardExpander Margin="0,0,0,8" Icon="{ui:SymbolIcon Globe24}">
+                    <ui:CardExpander.Header>
+                        <StackPanel>
+                            <TextBlock FontWeight="Medium" Text="Веб-клиент" />
+                            <TextBlock FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       Text="BarkCloud.Web" />
+                        </StackPanel>
+                    </ui:CardExpander.Header>
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="WEB_PORT" />
+                        <ui:TextBox Margin="0,0,0,6" Text="{Binding WebPort, UpdateSourceTrigger=PropertyChanged}" />
+                        <ui:ToggleSwitch Margin="0,8,0,0" Content="WEB_COOKIE_SECURE" IsChecked="{Binding WebCookieSecure}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="WEB_PUBLIC_HOST (пусто — из заголовка запроса)" />
+                        <ui:TextBox Margin="0,0,0,6" Text="{Binding WebPublicHost, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="WEB_ADMIN_PASSWORD (пусто — раздел «Обслуживание» недоступен)" />
+                        <ui:TextBox Text="{Binding WebAdminPassword, UpdateSourceTrigger=PropertyChanged}" />
+                    </StackPanel>
+                </ui:CardExpander>
+
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Нижняя панель действий -->
+        <Border Grid.Row="2" Padding="16,12"
+                Background="{DynamicResource ApplicationBackgroundBrush}"
+                BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                BorderThickness="0,1,0,0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <ui:TextBox Grid.Row="0" Grid.Column="0" x:Name="OutputPathBox"
+                            PlaceholderText="Папка для docker-compose.yml и .env"
+                            Text="{Binding OutputPath, UpdateSourceTrigger=PropertyChanged}" />
+                <ui:Button Grid.Row="0" Grid.Column="1" Margin="8,0,0,0" Content="Обзор…"
+                           Icon="{ui:SymbolIcon FolderOpen24}" Click="OnBrowse" />
+                <ui:Button Grid.Row="0" Grid.Column="2" Margin="8,0,0,0" Appearance="Primary"
+                           Content="Сгенерировать" Icon="{ui:SymbolIcon DocumentArrowRight24}" Click="OnGenerate" />
+
+                <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3" x:Name="StatusText"
+                           Margin="0,8,0,0" TextWrapping="Wrap" />
+            </Grid>
+        </Border>
     </Grid>
-</Window>
+</ui:FluentWindow>

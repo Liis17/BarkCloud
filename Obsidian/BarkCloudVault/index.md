@@ -48,6 +48,9 @@
 ### 💻 Модули — macOS (Desktop)
 - [[modules/macos-drive]] — Папка облака в Finder (NSFileProviderReplicatedExtension, Swift). Каталог `Mac/`. Текущее: код read+write+контейнер компилируется, осталась рантайм-проверка
 
+### 🛠 Инструменты
+- [[modules/tools-builder]] — BarkCloud.Builder: WPF-генератор `docker-compose.yml` и `.env` для поднятия бэкенда (WPF-UI, Win11)
+
 ### 🛡 Аудит
 - `Docs/audit/SECURITY_PERFORMANCE_AUDIT.md` — Пошаговый план аудита безопасности и производительности (Backend + Web + инфраструктура): сквозные этапы E1–E10, проверки по каждому микросервису, нагрузочное тестирование, шаблон отчёта и приложение с известными горячими точками (file:line).
 - `Docs/audit/SECURITY_AUDIT_FINDINGS.md` — Отчёт по выполненному аудиту: находки с верификацией по коду (2 Critical, 6 High, 7 Medium, 6 Low), поправки к предварительным находкам, производительность, матрица покрытия и приоритеты ремедиации.
