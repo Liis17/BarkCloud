@@ -77,8 +77,10 @@ public class TrashPurgeService : ITrashPurgeService
             .Where(e => entryIds.Contains(e.Id))
             .ExecuteDeleteAsync(cancellationToken);
 
-        // 2. Снимаем владельца с блоба и его превью, если у него не осталось ни одной записи
-        //    (любого состояния) на этот файл — повторяет логику декремента из ручного удаления.
+        // 2. Снимаем владельца с блоба, если у него не осталось ни одной записи (любого
+        //    состояния) на этот файл. Сначала фиксируем, какие (владелец, файл) реально
+        //    освобождаются, — превью обрабатываем отдельным проходом ниже.
+        var released = new List<(long OwnerId, Guid FileId)>();
         foreach (var pair in pairs)
         {
             var stillReferenced = await _context.CloudFileEntries
@@ -89,21 +91,42 @@ public class TrashPurgeService : ITrashPurgeService
             var uploadFile = await _context.UploadedFiles
                 .FirstOrDefaultAsync(f => f.Id == pair.FileId, cancellationToken);
             uploadFile?.Uploaders.Remove(pair.OwnerId);
+            released.Add((pair.OwnerId, pair.FileId));
+        }
+
+        // Снимаем владельца с превью-блобов. Превью дедуплицируются по SHA256, поэтому один
+        // блоб-превью может быть привязан сразу к нескольким оригиналам. Убираем владельца с
+        // превью ТОЛЬКО если у него не осталось другого (не удаляемого сейчас) оригинала,
+        // ссылающегося на тот же превью-блоб, — иначе оставшийся файл лишился бы превью.
+        foreach (var ownerGroup in released.GroupBy(r => r.OwnerId))
+        {
+            var ownerId = ownerGroup.Key;
+            var releasedFileIds = ownerGroup.Select(r => r.FileId).ToList();
 
             var previewFileIds = await _context.FilePreviews
                 .AsNoTracking()
-                .Where(p => p.OriginalFileId == pair.FileId)
+                .Where(p => releasedFileIds.Contains(p.OriginalFileId))
                 .Select(p => p.PreviewFileId)
+                .Distinct()
+                .ToListAsync(cancellationToken);
+            if (previewFileIds.Count == 0)
+                continue;
+
+            var previewFiles = await _context.UploadedFiles
+                .Where(f => previewFileIds.Contains(f.Id))
                 .ToListAsync(cancellationToken);
 
-            if (previewFileIds.Count > 0)
+            foreach (var pf in previewFiles)
             {
-                var previewFiles = await _context.UploadedFiles
-                    .Where(f => previewFileIds.Contains(f.Id))
-                    .ToListAsync(cancellationToken);
+                var stillNeeded = await _context.FilePreviews
+                    .AsNoTracking()
+                    .AnyAsync(p => p.PreviewFileId == pf.Id
+                        && !releasedFileIds.Contains(p.OriginalFileId)
+                        && _context.UploadedFiles.Any(o => o.Id == p.OriginalFileId && o.Uploaders.Contains(ownerId)),
+                        cancellationToken);
 
-                foreach (var pf in previewFiles)
-                    pf.Uploaders.Remove(pair.OwnerId);
+                if (!stillNeeded)
+                    pf.Uploaders.Remove(ownerId);
             }
         }
 

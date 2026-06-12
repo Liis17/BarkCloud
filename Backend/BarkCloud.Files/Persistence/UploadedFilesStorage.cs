@@ -322,8 +322,21 @@ public class UploadedFilesStorage : IUploadedFilesStorage
             .Where(f => oldPreviewFileIds.Contains(f.Id))
             .ToListAsync(cancellationToken);
 
+        // Превью дедуплицируются по SHA256 — один блоб может быть привязан к нескольким оригиналам.
+        // Снимаем владельца только если у него не осталось другого оригинала на этот же превью-блоб,
+        // иначе тот файл лишился бы превью (пустой Uploaders → блоб добьёт OrphanBlobCleanupService).
         foreach (var pf in oldPreviewFiles)
-            pf.Uploaders.Remove(ownerId);
+        {
+            var stillNeeded = await _context.FilePreviews
+                .AsNoTracking()
+                .AnyAsync(p => p.PreviewFileId == pf.Id
+                    && p.OriginalFileId != originalFileId
+                    && _context.UploadedFiles.Any(o => o.Id == p.OriginalFileId && o.Uploaders.Contains(ownerId)),
+                    cancellationToken);
+
+            if (!stillNeeded)
+                pf.Uploaders.Remove(ownerId);
+        }
 
         _context.FilePreviews.RemoveRange(oldPreviews);
         await _context.SaveChangesAsync(cancellationToken);
