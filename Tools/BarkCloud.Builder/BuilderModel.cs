@@ -28,7 +28,7 @@ public sealed class BuilderModel
     public string MinioRootPassword { get; set; } = "password";
     public string MinioPort { get; set; } = "9020";
     public string MinioWebPort { get; set; } = "9021";
-    public string MinioDataPath { get; set; } = "/d/barkcloud/minio";
+    public string MinioDataPath { get; set; } = "";
 
     // RabbitMQ
     public string RabbitUser { get; set; } = "user";
@@ -39,8 +39,8 @@ public sealed class BuilderModel
     public string PostgresPassword { get; set; } = "password";
     public string PostgresDb { get; set; } = "postgrescloud";
     public string PostgresPort { get; set; } = "6543";
-    public string PostgresDataPath { get; set; } = "/d/barkcloud/pgdata";
-    public string BackupPath { get; set; } = "/d/barkcloud/backup";
+    public string PostgresDataPath { get; set; } = "";
+    public string BackupPath { get; set; } = "";
 
     // Порты сервисов
     public string IdentityPort { get; set; } = "7020";
@@ -52,7 +52,7 @@ public sealed class BuilderModel
     // Seq
     public string SeqAdminPassword { get; set; } = "password";
     public string SeqWebPort { get; set; } = "8881";
-    public string SeqDataPath { get; set; } = "/d/barkcloud/seq";
+    public string SeqDataPath { get; set; } = "";
 
     // Веб-клиент
     public string WebPort { get; set; } = "63222";

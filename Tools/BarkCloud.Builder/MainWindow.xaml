@@ -166,7 +166,7 @@
                         <TextBlock Style="{StaticResource FieldLabel}" Text="MINIO_WEBPORT (консоль)" />
                         <ui:TextBox Margin="0,0,0,6" Text="{Binding MinioWebPort, UpdateSourceTrigger=PropertyChanged}" />
                         <TextBlock Style="{StaticResource FieldLabel}" Text="MINIO_DATA_PATH (пусто — named volume)" />
-                        <ui:TextBox Text="{Binding MinioDataPath, UpdateSourceTrigger=PropertyChanged}" />
+                        <ui:TextBox PlaceholderText="/d/barkcloud/minio" Text="{Binding MinioDataPath, UpdateSourceTrigger=PropertyChanged}" />
                     </StackPanel>
                 </ui:CardExpander>
 
@@ -238,9 +238,9 @@
                         <TextBlock Style="{StaticResource FieldLabel}" Text="POSTGRES_PORT (host-маппинг)" />
                         <ui:TextBox Margin="0,0,0,6" Text="{Binding PostgresPort, UpdateSourceTrigger=PropertyChanged}" />
                         <TextBlock Style="{StaticResource FieldLabel}" Text="POSTGRES_DATA_PATH (пусто — named volume)" />
-                        <ui:TextBox Margin="0,0,0,6" Text="{Binding PostgresDataPath, UpdateSourceTrigger=PropertyChanged}" />
+                        <ui:TextBox Margin="0,0,0,6" PlaceholderText="/d/barkcloud/pgdata" Text="{Binding PostgresDataPath, UpdateSourceTrigger=PropertyChanged}" />
                         <TextBlock Style="{StaticResource FieldLabel}" Text="BACKUP_PATH (пусто — named volume)" />
-                        <ui:TextBox Text="{Binding BackupPath, UpdateSourceTrigger=PropertyChanged}" />
+                        <ui:TextBox PlaceholderText="/d/barkcloud/backup" Text="{Binding BackupPath, UpdateSourceTrigger=PropertyChanged}" />
                     </StackPanel>
                 </ui:CardExpander>
 
@@ -290,7 +290,7 @@
                         <TextBlock Style="{StaticResource FieldLabel}" Text="SEQ_WEBPORT" />
                         <ui:TextBox Margin="0,0,0,6" Text="{Binding SeqWebPort, UpdateSourceTrigger=PropertyChanged}" />
                         <TextBlock Style="{StaticResource FieldLabel}" Text="SEQ_DATA_PATH (пусто — named volume)" />
-                        <ui:TextBox Text="{Binding SeqDataPath, UpdateSourceTrigger=PropertyChanged}" />
+                        <ui:TextBox PlaceholderText="/d/barkcloud/seq" Text="{Binding SeqDataPath, UpdateSourceTrigger=PropertyChanged}" />
                     </StackPanel>
                 </ui:CardExpander>
 
