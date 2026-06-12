@@ -1,5 +1,6 @@
 import React from 'react';
 import { Icon } from '../Icon';
+import { proxiedImageUrl } from '../../lib/api';
 
 interface Props {
   /** Имя файла — для атрибута download. */
@@ -39,7 +40,8 @@ export function PublicViewerActions({ name, downloadHref, mediaKind, imageSrc, o
   async function copyImage() {
     try {
       if (!imageSrc) throw new Error();
-      const blob = await (await fetch(imageSrc)).blob();
+      // Через same-origin прокси — иначе чужой origin Files даёт CORS/tainted-canvas.
+      const blob = await (await fetch(proxiedImageUrl(imageSrc))).blob();
       // Clipboard API принимает только PNG — перегоняем через canvas.
       const bitmap = await createImageBitmap(blob);
       const canvas = document.createElement('canvas');

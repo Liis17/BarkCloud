@@ -99,6 +99,49 @@ public static class WebEndpoints
             }
         });
 
+        // Same-origin прокси байтов картинки для кнопки «копировать в буфер» во вьюверах.
+        // Браузер не даёт прочитать пиксели картинки чужого origin (tainted canvas / CORS),
+        // поэтому отдаём содержимое через web. Анонимный (нужен и публичным страницам шаринга).
+        // SSRF не возможен: из входного URL берётся только GUID блоба, запрос всегда идёт на
+        // внутренний Files (/download/{id}), а тот отдаёт лишь превью-блобы и temp-файлы.
+        app.MapGet("/api/files/image", async (HttpContext http, IHttpClientFactory httpFactory, IConfiguration config, string? url) =>
+        {
+            if (string.IsNullOrEmpty(url)
+                || !Uri.TryCreate(url, UriKind.Absolute, out var uri)
+                || uri.Scheme is not ("http" or "https")
+                || !uri.AbsolutePath.Contains("/download/", StringComparison.OrdinalIgnoreCase))
+                return Results.BadRequest();
+
+            var id = uri.Segments[^1].Trim('/');
+            if (!Guid.TryParse(id, out _))
+                return Results.BadRequest();
+
+            // Тянем с внутреннего HTTP1-эндпоинта Files (минуя nginx/TLS), как upload/view-прокси.
+            var http1Base = config["FilesService:Http1Base"];
+            var fetchUrl = string.IsNullOrEmpty(http1Base) ? url : $"{http1Base}/download/{id}";
+
+            try
+            {
+                var client = httpFactory.CreateClient("files-upload");
+                using var upstream = await client.GetAsync(fetchUrl, HttpCompletionOption.ResponseHeadersRead, http.RequestAborted);
+                if (!upstream.IsSuccessStatusCode)
+                    return Results.StatusCode(StatusCodes.Status502BadGateway);
+
+                var contentType = upstream.Content.Headers.ContentType?.MediaType ?? "";
+                if (!contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+                    return Results.StatusCode(StatusCodes.Status415UnsupportedMediaType);
+
+                http.Response.ContentType = contentType;
+                http.Response.Headers.CacheControl = "private, max-age=300";
+                await upstream.Content.CopyToAsync(http.Response.Body, http.RequestAborted);
+                return Results.Empty;
+            }
+            catch
+            {
+                return Results.StatusCode(StatusCodes.Status502BadGateway);
+            }
+        });
+
         // ───────── Регистрация (с подтверждением кодом по почте) ─────────
 
         app.MapGet("/register", async (HttpContext http, AuthGateway auth, PageService pages, IConfiguration config) =>
