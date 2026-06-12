@@ -42,15 +42,31 @@ public class ConfigurationDefaultsPopulator
     };
 
     /// <summary>
-    /// Маппинг ServiceId → порт по умолчанию
+    /// Маппинг ServiceId → (имя env-переменной с портом, фолбэк-значение).
+    /// Порт берётся из .env (Configuration-контейнер получает его через env_file), чтобы записанные
+    /// в БД RunSettings:Port и *Service:Host совпадали с портом, на котором реально слушает сервис
+    /// (он берёт тот же env). Notification внешнего порта не имеет — только фолбэк.
     /// </summary>
-    private static readonly Dictionary<ServiceId, int> DefaultPorts = new()
+    private static readonly Dictionary<ServiceId, (string? EnvName, int Fallback)> ServicePorts = new()
     {
-        { ServiceId.Identity, 7000 },
-        { ServiceId.Users, 7001 },
-        { ServiceId.Notification, 7022 },
-        { ServiceId.Files, 7005 },
+        { ServiceId.Identity, ("IDENTITY_PORT", 7020) },
+        { ServiceId.Users, ("USERS_PORT", 7021) },
+        { ServiceId.Notification, (null, 7022) },
+        { ServiceId.Files, ("FILES_PORT", 7025) },
     };
+
+    private static int ResolveServicePort(ServiceId serviceId)
+    {
+        if (!ServicePorts.TryGetValue(serviceId, out var p))
+            return 0;
+        if (p.EnvName != null
+            && int.TryParse(Environment.GetEnvironmentVariable(p.EnvName), out var v) && v > 0)
+            return v;
+        return p.Fallback;
+    }
+
+    private static int ResolveFilesHttp1Port()
+        => int.TryParse(Environment.GetEnvironmentVariable("FILES_HTTP1PORT"), out var v) && v > 0 ? v : 7026;
 
     /// <summary>
     /// Маппинг ServiceId → субдомен для внешнего доступа
@@ -238,7 +254,8 @@ public class ConfigurationDefaultsPopulator
         // --- RunSettings:Port ---
         if (config.Section == "RunSettings" && config.Key == "Port")
         {
-            if (DefaultPorts.TryGetValue(serviceId, out var port))
+            var port = ResolveServicePort(serviceId);
+            if (port > 0)
                 return port.ToString();
         }
 
@@ -246,7 +263,7 @@ public class ConfigurationDefaultsPopulator
         if (config.Section == "RunSettings" && config.Key == "Http1Port")
         {
             if (serviceId == ServiceId.Files)
-                return "7006";
+                return ResolveFilesHttp1Port().ToString();
         }
 
         // --- JwtSettings ---
@@ -302,7 +319,7 @@ public class ConfigurationDefaultsPopulator
         {
             return config.Key switch
             {
-                "Host" => $"http://{ContainerNames[ServiceId.Users]}:{DefaultPorts[ServiceId.Users]}",
+                "Host" => $"http://{ContainerNames[ServiceId.Users]}:{ResolveServicePort(ServiceId.Users)}",
                 "Token" => GenerateServiceToken(jwtSecret, jwtIssuer, jwtAudience, "UsersServiceClient"),
                 _ => null
             };
@@ -313,7 +330,7 @@ public class ConfigurationDefaultsPopulator
         {
             return config.Key switch
             {
-                "Host" => $"http://{ContainerNames[ServiceId.Files]}:{DefaultPorts[ServiceId.Files]}",
+                "Host" => $"http://{ContainerNames[ServiceId.Files]}:{ResolveServicePort(ServiceId.Files)}",
                 "Token" => GenerateServiceToken(jwtSecret, jwtIssuer, jwtAudience, "FilesServiceClient"),
                 _ => null
             };
@@ -324,7 +341,7 @@ public class ConfigurationDefaultsPopulator
         {
             return config.Key switch
             {
-                "Host" => $"http://{ContainerNames[ServiceId.Identity]}:{DefaultPorts[ServiceId.Identity]}",
+                "Host" => $"http://{ContainerNames[ServiceId.Identity]}:{ResolveServicePort(ServiceId.Identity)}",
                 "Token" => GenerateServiceToken(jwtSecret, jwtIssuer, jwtAudience, "IdentityServiceClient"),
                 _ => null
             };

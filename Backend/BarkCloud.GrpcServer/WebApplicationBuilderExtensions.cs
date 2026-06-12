@@ -17,6 +17,16 @@ public static class WebApplicationBuilderExtensions
     public static WebApplicationBuilder SetRunningAddress(this WebApplicationBuilder builder,
         IConfiguration configuration)
     {
+        // Listen-порт приоритетно берётся из env (.env → docker-compose: SERVICE_PORT/SERVICE_HTTP1PORT)
+        // и переопределяет значение из конфиг-БД, чтобы внешний (nginx/.env) и внутренний порт совпадали.
+        var portOverrides = new Dictionary<string, string?>();
+        if (int.TryParse(Environment.GetEnvironmentVariable("SERVICE_PORT"), out var envPort) && envPort > 0)
+            portOverrides["RunSettings:Port"] = envPort.ToString();
+        if (int.TryParse(Environment.GetEnvironmentVariable("SERVICE_HTTP1PORT"), out var envHttp1Port) && envHttp1Port > 0)
+            portOverrides["RunSettings:Http1Port"] = envHttp1Port.ToString();
+        if (portOverrides.Count > 0)
+            builder.Configuration.AddInMemoryCollection(portOverrides);
+
         builder.Services.AddSettings<RunSettings>(configuration, "RunSettings");
 
         var runSettings = configuration.GetSection("RunSettings").Get<RunSettings>();

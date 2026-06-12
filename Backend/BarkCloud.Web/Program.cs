@@ -37,16 +37,15 @@ for (var attempt = 1; ; attempt++)
 
 // Адреса сервисов в docker-сети. Первичный источник — Configuration
 // (IdentityService:Host / UsersService:Host / FilesService:Host).
-// Внутренний порт сервиса = его RunSettings:Port в Configuration-БД; оператор задаёт
-// его через .env (контейнер web получает .env через env_file), поэтому fallback строим
-// из USERS_PORT/FILES_PORT, а не из захардкоженных значений. Identity слушает 7000
-// (его IDENTITY_PORT из .env — это только host-маппинг nginx). См. nginx/cloud.barkfluff.conf.
+// Внутренний порт сервиса = его listen-порт из .env (IDENTITY_PORT/USERS_PORT/FILES_PORT);
+// контейнер web получает .env через env_file, поэтому fallback строим из этих переменных,
+// а не из захардкоженных значений. Внешний (nginx) и внутренний порт совпадают.
 static string EnvPort(string name, int fallback)
     => int.TryParse(Environment.GetEnvironmentVariable(name), out var p) && p > 0 ? p.ToString() : fallback.ToString();
 
-var identityAddress = builder.Configuration["IdentityService:Host"] ?? "http://cloud-identity:7000";
-var usersAddress = builder.Configuration["UsersService:Host"] ?? $"http://cloud-users:{EnvPort("USERS_PORT", 7001)}";
-var filesAddress = builder.Configuration["FilesService:Host"] ?? $"http://cloud-files:{EnvPort("FILES_PORT", 7005)}";
+var identityAddress = builder.Configuration["IdentityService:Host"] ?? $"http://cloud-identity:{EnvPort("IDENTITY_PORT", 7020)}";
+var usersAddress = builder.Configuration["UsersService:Host"] ?? $"http://cloud-users:{EnvPort("USERS_PORT", 7021)}";
+var filesAddress = builder.Configuration["FilesService:Host"] ?? $"http://cloud-files:{EnvPort("FILES_PORT", 7025)}";
 
 // Внутренний HTTP1-эндпоинт Files (тот же хост, что и gRPC, но порт Http1Port) для прокси-загрузки
 // байтов внутри docker-сети — минуя nginx/TLS и зависимость от ExternalEndpoint:Host.

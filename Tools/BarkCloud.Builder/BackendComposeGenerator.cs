@@ -59,6 +59,7 @@ services:
     restart: always
     environment:
       <<: *common-variables
+      SERVICE_PORT: ${IDENTITY_PORT}
     networks:
       - barkcloud-network
     depends_on:
@@ -70,6 +71,7 @@ services:
     restart: always
     environment:
       <<: *common-variables
+      SERVICE_PORT: ${USERS_PORT}
     networks:
       - barkcloud-network
     depends_on:
@@ -81,6 +83,8 @@ services:
     restart: always
     environment:
       <<: *common-variables
+      SERVICE_PORT: ${FILES_PORT}
+      SERVICE_HTTP1PORT: ${FILES_HTTP1PORT}
       StorageProbe__Path: "/mnt/minio-data"
       Archive__TempPath: "/mnt/archive-temp"
     volumes:
@@ -148,6 +152,8 @@ services:
     restart: always
     # Наружу выставлены только эти порты; микросервисы доступны лишь через прокси
     ports:
+      - "80:80"
+      - "443:443"
       - "${IDENTITY_PORT}:${IDENTITY_PORT}"
       - "${USERS_PORT}:${USERS_PORT}"
       - "${FILES_PORT}:${FILES_PORT}"
@@ -160,6 +166,7 @@ services:
       - identity
       - users
       - files
+      - web
 """);
 
         if (m.IncludeSeq || m.IncludeMinio || m.IncludeRabbitmq || m.IncludePostgres)
