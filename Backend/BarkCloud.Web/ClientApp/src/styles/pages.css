@@ -96,10 +96,10 @@ tr.selected .row-actions { opacity: 1; }
 
 /* ─────────── Файлы — раскладка с инспектором ─────────── */
 .files-shell { display: grid; grid-template-columns: 1fr 360px; gap: 16px; height: 100%; padding: 4px 16px 16px; }
-.files-main { display: flex; flex-direction: column; overflow: hidden; background: var(--md-surface-container-low); border-radius: var(--r-xl); }
+.files-main { display: flex; flex-direction: column; overflow-y: auto; background: var(--md-surface-container-low); border-radius: var(--r-xl); }
 .files-inspector { background: var(--md-surface-container-low); border-radius: var(--r-xl); overflow-y: auto; padding: 24px; }
-.files-bar { display: flex; align-items: center; gap: 14px; padding: 16px 24px; }
-.files-list { flex: 1; overflow: auto; }
+.files-bar { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 14px; padding: 16px 24px; background: var(--md-surface-container-low); }
+.files-list { flex: 1; }
 .files-main .ftable tbody tr { cursor: pointer; }
 .ftable tbody tr.selected { background: var(--md-secondary-container); }
 .ftable tbody tr.selected:hover { background: color-mix(in srgb, var(--md-on-secondary-container) 10%, var(--md-secondary-container)); }
