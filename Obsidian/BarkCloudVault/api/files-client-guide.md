@@ -203,7 +203,7 @@ CLOUD_FILE = 2;   // обычный файл пользовательского 
 
 `FilesApi.GetUserStorageInfo`
 - Передать: `GetUserStorageInfoRequest {}`
-- Вернётся: `GetUserStorageInfoResponse { total_used_storage, storage_limit, storage_by_types[] }` (байты).
+- Вернётся: `GetUserStorageInfoResponse { total_used_storage, storage_limit, storage_by_types[], total_available_storage, disk_used_storage, s3_used_storage }` (байты). Если `Users.storage_limit_gb = 0`, `storage_limit` равен `total_available_storage`; свободное место клиент считает как `total_available_storage - disk_used_storage - s3_used_storage`.
 
 ---
 

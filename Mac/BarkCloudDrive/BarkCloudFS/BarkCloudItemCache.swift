@@ -23,12 +23,18 @@ actor BarkCloudItemCache {
     struct DirInfo: Sendable, Codable {
         let dirID: String
         let parentIdentifierRaw: String
+        /// Имя в облаке (как хранит бэкенд).
         let name: String
+        /// Имя, показанное в Finder (после санитизации/дедупликации);
+        /// `nil` в кэшах, записанных до введения локальных имён.
+        let localName: String?
         let modified: Date
 
         var parentIdentifier: NSFileProviderItemIdentifier {
             NSFileProviderItemIdentifier(parentIdentifierRaw)
         }
+
+        var displayName: String { localName ?? name }
     }
 
     struct FileInfo: Sendable, Codable {
@@ -36,13 +42,20 @@ actor BarkCloudItemCache {
         let fileID: String
         let parentDirID: String
         let parentIdentifierRaw: String
+        /// Имя в облаке (как хранит бэкенд).
         let name: String
+        /// Имя, показанное в Finder (после санитизации/дедупликации).
+        let localName: String?
         let size: Int64
         let modified: Date
+        /// URL превью с бэкенда — для миниатюр Finder (`fetchThumbnails`).
+        let previewURL: String?
 
         var parentIdentifier: NSFileProviderItemIdentifier {
             NSFileProviderItemIdentifier(parentIdentifierRaw)
         }
+
+        var displayName: String { localName ?? name }
     }
 
     private struct Snapshot: Codable {
@@ -84,49 +97,58 @@ actor BarkCloudItemCache {
     // `bumpAnchorAndPersist()`, который провайдер вызывает после успешной
     // локальной операции.
 
-    func put(directory d: CloudDirectory, parent: NSFileProviderItemIdentifier) {
+    func put(directory d: CloudDirectory, parent: NSFileProviderItemIdentifier, localName: String? = nil) {
         snapshot.dirs["d:\(d.id)"] = DirInfo(
             dirID: d.id,
             parentIdentifierRaw: parent.rawValue,
             name: d.name,
-            modified: Date()
+            localName: localName,
+            modified: d.updatedAt ?? Date()
         )
         persist()
     }
 
-    func put(file f: CloudFileEntry, parentDirID: String, parent: NSFileProviderItemIdentifier) {
+    func put(file f: CloudFileEntry, parentDirID: String, parent: NSFileProviderItemIdentifier,
+             localName: String? = nil) {
         snapshot.files["f:\(f.id)"] = FileInfo(
             entryID: f.id,
             fileID: f.fileID,
             parentDirID: parentDirID,
             parentIdentifierRaw: parent.rawValue,
             name: f.name,
+            localName: localName,
             size: f.asset.fileSize,
-            modified: f.asset.uploadedAt ?? f.asset.createdAt
+            modified: f.asset.uploadedAt ?? f.asset.createdAt,
+            previewURL: f.asset.previewURL(preferredWidth: 512)?.absoluteString
         )
         persist()
     }
 
-    func putDirectory(dirID: String, parent: NSFileProviderItemIdentifier, name: String, modified: Date) {
+    func putDirectory(dirID: String, parent: NSFileProviderItemIdentifier,
+                      name: String, localName: String?, modified: Date) {
         snapshot.dirs["d:\(dirID)"] = DirInfo(
             dirID: dirID,
             parentIdentifierRaw: parent.rawValue,
             name: name,
+            localName: localName,
             modified: modified
         )
         persist()
     }
 
     func putFile(entryID: String, fileID: String, parentDirID: String,
-                 parent: NSFileProviderItemIdentifier, name: String, size: Int64, modified: Date) {
+                 parent: NSFileProviderItemIdentifier, name: String, localName: String?,
+                 size: Int64, modified: Date, previewURL: String?) {
         snapshot.files["f:\(entryID)"] = FileInfo(
             entryID: entryID,
             fileID: fileID,
             parentDirID: parentDirID,
             parentIdentifierRaw: parent.rawValue,
             name: name,
+            localName: localName,
             size: size,
-            modified: modified
+            modified: modified,
+            previewURL: previewURL
         )
         persist()
     }

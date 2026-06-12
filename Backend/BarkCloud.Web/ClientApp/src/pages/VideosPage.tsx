@@ -1,19 +1,18 @@
 import React from 'react';
+import { useLocation } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import { MediaThumb } from '../components/media/MediaThumb';
 import { Lightbox } from '../components/media/Lightbox';
 import { EmptyState, Loading } from '../components/ui/EmptyState';
-import { AlbumCard } from '../components/albums/AlbumCard';
-import { AlbumFormModal } from '../components/albums/AlbumFormModal';
-import { AlbumDetail } from '../components/albums/AlbumDetail';
+import { MediaSearchResults } from '../components/search/MediaSearchResults';
 import { useToast } from '../hooks/useToast';
 import { useInfiniteMedia } from '../hooks/useInfiniteMedia';
 import { useMediaActions } from '../hooks/useMediaActions';
-import { useDuplicatePrompt } from '../hooks/useDuplicatePrompt';
 import { useFileDrop } from '../hooks/useFileDrop';
 import { useBulkMedia } from '../hooks/useBulkMedia';
 import { usePageHeader } from '../hooks/usePageHeader';
-import { apiGet, apiPost, pickFiles, uploadFile, checkDuplicate } from '../lib/api';
+import { useUploadActions } from '../hooks/useUploadManager';
+import { apiGet, pickFiles } from '../lib/api';
 import { plural, dateLabel } from '../lib/format';
 import type { Album, MediaItem } from '../lib/types';
 
@@ -72,23 +71,15 @@ function VideoCard({ m, selecting, checked, onToggle, onOpen, onMenu }: {
   );
 }
 
-interface UploadState {
-  pct: number;
-  current: number;
-  total: number;
-}
-
 export function VideosPage() {
-  const [tab, setTab] = React.useState<'videos' | 'albums'>('videos');
+  const location = useLocation();
+  const searchQuery = (new URLSearchParams(location.search).get('q') || '').trim();
   const [albums, setAlbums] = React.useState<Album[] | null>(null);
-  const [openAlbum, setOpenAlbum] = React.useState<Album | null>(null);
   const [lightbox, setLightbox] = React.useState<number | null>(null);
-  const [creating, setCreating] = React.useState(false);
-  const [upload, setUpload] = React.useState<UploadState | null>(null);
   const [toastNode, toast] = useToast();
-  const dup = useDuplicatePrompt();
+  const { enqueue, attachVersion } = useUploadActions();
 
-  const { items: videos, loading, done, sentinelRef, removeItem, updateItem, reload } = useInfiniteMedia('video', toast);
+  const { items: videos, loading, done, sentinelRef, removeItem, updateItem, prependItems } = useInfiniteMedia('video', toast);
 
   const loadAlbums = React.useCallback(() => {
     apiGet<{ albums: Album[] }>('/api/albums')
@@ -115,41 +106,23 @@ export function VideosPage() {
   async function doUpload(dropped?: File[]) {
     const files = dropped && dropped.length ? dropped : await pickFiles({ accept: 'video/*' });
     if (!files.length) return;
-    let processed = 0;
-    let uploaded = 0;
-    for (const f of files) {
-      setUpload({ current: processed + 1, total: files.length, pct: 0 });
-      try {
-        const d = await checkDuplicate(f);
-        if (d.exists && !(await dup.ask(f.name, d.locations))) {
-          processed++;
-          continue;
-        }
-        const res = await uploadFile(f, (p) => setUpload({ current: processed + 1, total: files.length, pct: Math.round(p * 100) }));
-        if (res?.fileId) {
-          // Загрузка с вкладки «Видео» → авто-распределение по типу в системную папку.
-          try {
-            await apiPost('/api/cloud/attach', { fileId: res.fileId, name: res.name || f.name, routeByMediaKind: true });
-          } catch {
-            /* attach best-effort */
-          }
-        }
-        uploaded++;
-      } catch (e) {
-        toast(`«${f.name}»: ${(e as Error).message}`, 'err');
-      }
-      processed++;
-    }
-    setUpload(null);
-    if (uploaded > 0) toast(`Загружено: ${uploaded} ${plural(uploaded, 'видео', 'видео', 'видео')}`);
-    reload();
+    enqueue(files, { routeByMediaKind: true });
   }
 
   const { over, dropHandlers } = useFileDrop((f) => doUpload(f));
   const bulk = useBulkMedia({ items: videos, albums: albums || [], toast, onRemoved: removeItem, onReloadAlbums: loadAlbums });
 
+  const prependRef = React.useRef(prependItems);
+  prependRef.current = prependItems;
+
   const featured = videos.length ? videos[0] : null;
   const totalSize = videos.reduce((s, v) => s + (v.size || 0), 0);
+
+  React.useEffect(() => {
+    apiGet<{ items: MediaItem[] }>('/api/cloud/media?kind=video&limit=60')
+      .then((d) => prependRef.current(d.items || []))
+      .catch(() => {});
+  }, [attachVersion]);
   const stats = [
     { k: 'Всего видео', v: videos.length ? videos.length + (done ? '' : '+') : '—' },
     { k: 'Занято видео', v: fmtSize(totalSize) },
@@ -159,6 +132,7 @@ export function VideosPage() {
   usePageHeader(
     () => ({
       title: 'Видео',
+      documentTitle: 'Видео',
       kicker: (
         <>
           <span>Библиотека</span>
@@ -167,26 +141,27 @@ export function VideosPage() {
         </>
       ),
       actions: (
-        <>
-          {tab === 'albums' && (
-            <button className="btn outlined" onClick={() => setCreating(true)}>
-              <Icon.plus size={16} /> Альбом
-            </button>
-          )}
-          <button className="btn primary" onClick={() => doUpload()}>
-            <Icon.upload size={16} /> Загрузить видео
-          </button>
-        </>
+        <button className="btn primary" onClick={() => doUpload()}>
+          <Icon.upload size={16} /> Загрузить видео
+        </button>
       ),
     }),
-    [tab],
+    [],
   );
+
+  if (searchQuery) {
+    return (
+      <>
+        {toastNode}
+        <MediaSearchResults q={searchQuery} albums={albums || []} toast={toast} reloadAlbums={loadAlbums} />
+      </>
+    );
+  }
 
   return (
     <>
       {toastNode}
       {actionsCtx.overlay}
-      {dup.overlay}
       {bulk.bar}
       {bulk.overlay}
 
@@ -209,49 +184,17 @@ export function VideosPage() {
 
       <div className="vid-toolbar">
         <div className="chip-row">
-          <button className={'chip' + (tab === 'videos' ? ' active' : '')} onClick={() => { setTab('videos'); setOpenAlbum(null); }}>
-            {tab === 'videos' && <Icon.check size={16} />} Все видео
+          <span className="chip active">
+            <Icon.check size={16} /> Все видео
             <span className="count">
               {videos.length}
               {done ? '' : '+'}
             </span>
-          </button>
-          <button className={'chip' + (tab === 'albums' ? ' active' : '')} onClick={() => setTab('albums')}>
-            {tab === 'albums' && <Icon.check size={16} />} Альбомы
-            {albums && <span className="count">{albums.length}</span>}
-          </button>
+          </span>
         </div>
       </div>
 
-      {upload && (
-        <div className="upload-banner">
-          <span className="spinner" />
-          Загрузка {upload.current}/{upload.total}…
-          <div className="bar">
-            <div className="bar-fill" style={{ width: upload.pct + '%' }} />
-          </div>
-        </div>
-      )}
-
-      {tab === 'albums' &&
-        (openAlbum ? (
-          <AlbumDetail album={openAlbum} candidates={videos} toast={toast} onBack={() => setOpenAlbum(null)} onChanged={() => loadAlbums()} />
-        ) : albums === null ? (
-          <Loading />
-        ) : (
-          <div className="album-grid">
-            {albums.map((a) => (
-              <AlbumCard key={a.id} album={a} onOpen={(al) => setOpenAlbum(al)} />
-            ))}
-            <div className="album-card new-album" onClick={() => setCreating(true)}>
-              <Icon.plus size={28} />
-              <span>Создать альбом</span>
-            </div>
-          </div>
-        ))}
-
-      {tab === 'videos' &&
-        (loading && videos.length === 0 ? (
+      {(loading && videos.length === 0 ? (
           <Loading />
         ) : videos.length === 0 ? (
           <EmptyState
@@ -325,19 +268,7 @@ export function VideosPage() {
         ))}
       </div>
 
-      {creating && (
-        <AlbumFormModal
-          onClose={() => setCreating(false)}
-          onSaved={() => {
-            setCreating(false);
-            setTab('albums');
-            loadAlbums();
-            toast('Альбом создан');
-          }}
-          toast={toast}
-        />
-      )}
-      {lightbox !== null && <Lightbox items={videos} index={lightbox} onClose={() => setLightbox(null)} />}
+      {lightbox !== null && <Lightbox items={videos} index={lightbox} actions={actionsCtx.api} onClose={() => setLightbox(null)} />}
     </>
   );
 }

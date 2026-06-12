@@ -25,6 +25,7 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
     private readonly HeicImageConverter _heicConverter;
     private readonly FileMetadataExtractor _metadataExtractor;
     private readonly PreviewPersistenceService _previewPersistence;
+    private readonly FileActivityWriter _activity;
     private readonly ILogger<UploadFileCommandHandler> _logger;
 
     /// <summary>
@@ -52,7 +53,8 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
         HeicImageConverter heicConverter,
         FileMetadataExtractor metadataExtractor,
         PreviewPersistenceService previewPersistence,
-        ILogger<UploadFileCommandHandler> logger)
+        ILogger<UploadFileCommandHandler> logger,
+        FileActivityWriter? activity = null)
     {
         _filesStorage = filesStorage;
         _hashesStorage = hashesStorage;
@@ -64,6 +66,7 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
         _heicConverter = heicConverter;
         _metadataExtractor = metadataExtractor;
         _previewPersistence = previewPersistence;
+        _activity = activity ?? FileActivityWriter.Noop;
         _logger = logger;
     }
 
@@ -287,10 +290,10 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
                 }
             }
 
-            // 2-jpeg) Полноразмерный JPEG-вид: HEIC уже сконвертирован (heicJpegBytes);
-            // прочие НЕ-jpeg изображения перекодируем в JPEG 90% (оригинал-JPEG ссылается
-            // на себя позже, без отдельного блоба).
-            if (file.Type == UploadFileType.CloudFile && isImageContent && contentType != "image/jpeg")
+            // 2-jpeg) Полноразмерный JPEG-вид (JPEG 90%) для всех изображений-облаков:
+            // HEIC уже сконвертирован (heicJpegBytes); прочие — перекодируем сами, включая
+            // JPEG-оригинал (отдаём перекодированную копию, а не сам файл).
+            if (file.Type == UploadFileType.CloudFile && isImageContent)
             {
                 if (isHeic)
                 {
@@ -415,26 +418,20 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
             CleanupTempFile();
         }
 
-        // JpegView: для оригинала-JPEG ссылаемся на сам файл (без лишнего блоба); для прочих
-        // изображений — отдельный полноразмерный JPEG-блоб. Он регистрируется как превью
-        // (TargetWidth=0), поэтому автоматически исключается из галереи и чистится при удалении.
-        if (file.Type == UploadFileType.CloudFile && isImageContent)
+        // JpegView: для всех изображений-облаков сохраняем отдельный полноразмерный JPEG-блоб.
+        // Он регистрируется как превью (TargetWidth=0), поэтому раздаётся публично, автоматически
+        // исключается из галереи и чистится при удалении оригинала. Сам оригинал остаётся
+        // доступен только по временным ссылкам.
+        if (file.Type == UploadFileType.CloudFile && isImageContent && jpegViewBytes is not null)
         {
-            if (contentType == "image/jpeg")
+            try
             {
-                file.JpegViewFileId = file.Id;
+                file.JpegViewFileId = await _previewPersistence.PersistJpegViewAsync(
+                    file, jpegViewBytes, file.ImageWidth ?? 0, file.ImageHeight ?? 0, bucketName, cancellationToken);
             }
-            else if (jpegViewBytes is not null)
+            catch (Exception ex)
             {
-                try
-                {
-                    file.JpegViewFileId = await _previewPersistence.PersistJpegViewAsync(
-                        file, jpegViewBytes, file.ImageWidth ?? 0, file.ImageHeight ?? 0, bucketName, cancellationToken);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Не удалось сохранить JpegView-блоб для {FileId}", file.Id);
-                }
+                _logger.LogWarning(ex, "Не удалось сохранить JpegView-блоб для {FileId}", file.Id);
             }
         }
 
@@ -472,6 +469,19 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
         }
 
         _logger.LogInformation("Обработка файла {FileId} успешно завершена", file.Id);
+
+        var ownerId = file.Uploaders.FirstOrDefault();
+        if (ownerId > 0 && file.Type == UploadFileType.CloudFile)
+        {
+            await _activity.AddAsync(
+                ownerId,
+                file.Id,
+                ownerId,
+                FileActivityKind.Uploaded,
+                "Файл загружен",
+                details: new { fileName = file.Filename, size = file.Size, mediaKind = file.MediaKind.ToString() },
+                cancellationToken: cancellationToken);
+        }
 
         return file.Id.ToString();
     }

@@ -69,6 +69,16 @@ public static class CloudApiEndpoints
             }, Json);
         });
 
+        // Лёгкий рефетч блока хранилища (Sidebar) при переключении вкладок SPA.
+        api.MapGet("/storage", async (HttpContext http, AuthGateway auth, PageDataBuilder data) =>
+        {
+            var user = await auth.AuthenticateAsync(http);
+            if (user is null)
+                return Results.Json(new { error = "Не авторизован" }, Json, statusCode: 401);
+
+            return Results.Json(await data.BuildStorageAsync(user), Json);
+        });
+
         // ───────────────────────── Каталоги ─────────────────────────
 
         api.MapGet("/cloud/list", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud, string? dir) =>
@@ -86,8 +96,9 @@ public static class CloudApiEndpoints
             }));
 
         // Поиск файлов пользователя по имени (по всему облаку), cursor-пагинация.
+        // kind: media (фото+видео) | photo | video; не задан — все типы.
         api.MapGet("/cloud/search", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud,
-            string? q, int? limit, string? cursorAt, string? cursorId) =>
+            string? q, string? kind, int? limit, string? cursorAt, string? cursorId) =>
             await Guarded(http, auth, async token =>
             {
                 var query = (q ?? "").Trim();
@@ -95,6 +106,12 @@ public static class CloudApiEndpoints
                     return Results.Json(new { files = Array.Empty<object>(), nextCursorAt = (DateTimeOffset?)null, nextCursorId = "" }, Json);
 
                 var req = new SearchFilesRequest { Query = query, Limit = limit is > 0 and <= 200 ? limit.Value : 50 };
+                switch (kind)
+                {
+                    case "media": req.KindFilter.Add(MediaKind.Photo); req.KindFilter.Add(MediaKind.Video); break;
+                    case "photo": req.KindFilter.Add(MediaKind.Photo); break;
+                    case "video": req.KindFilter.Add(MediaKind.Video); break;
+                }
                 if (DateTimeOffset.TryParse(cursorAt, out var dt))
                     req.CursorCreatedAt = Timestamp.FromDateTimeOffset(dt.ToUniversalTime());
                 if (!string.IsNullOrEmpty(cursorId))
@@ -186,6 +203,46 @@ public static class CloudApiEndpoints
                 return Results.Json(new { ok = true }, Json);
             }));
 
+        api.MapPost("/cloud/entries/delete", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud, EntryIdsReq body) =>
+            await Guarded(http, auth, async token =>
+            {
+                var rawIds = body.EntryIds ?? Array.Empty<string>();
+                var invalid = new List<string>();
+                var ids = new List<string>();
+                var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+                foreach (var raw in rawIds)
+                {
+                    if (!Guid.TryParse(raw, out var id))
+                    {
+                        invalid.Add(raw);
+                        continue;
+                    }
+
+                    var normalized = id.ToString();
+                    if (seen.Add(normalized))
+                        ids.Add(normalized);
+                }
+
+                var deleted = 0;
+                foreach (var chunk in ids.Chunk(100))
+                {
+                    var req = new DeleteFileEntriesRequest();
+                    req.EntryIds.AddRange(chunk);
+                    var resp = await cloud.DeleteFileEntriesAsync(req, token);
+                    deleted += resp.DeletedCount;
+                }
+
+                var total = ids.Count + invalid.Count;
+                return Results.Json(new
+                {
+                    total,
+                    succeeded = deleted,
+                    failed = total - deleted,
+                    invalidIds = invalid.ToArray()
+                }, Json);
+            }));
+
         // ───────────────────────── Корзина ─────────────────────────
 
         api.MapGet("/cloud/trash", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud,
@@ -214,11 +271,27 @@ public static class CloudApiEndpoints
                 return Results.Json(new { ok = true }, Json);
             }));
 
+        api.MapPost("/cloud/trash/restore-batch", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud, EntryIdsReq body) =>
+            await Guarded(http, auth, async token =>
+            {
+                var result = await RunIdBatch(body.EntryIds, async entryId =>
+                    await cloud.RestoreFromTrashAsync(new RestoreFromTrashRequest { EntryId = entryId }, token));
+                return Results.Json(result, Json);
+            }));
+
         api.MapPost("/cloud/trash/purge", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud, EntryIdReq body) =>
             await Guarded(http, auth, async token =>
             {
                 await cloud.DeleteFromTrashAsync(new DeleteFromTrashRequest { EntryId = body.EntryId }, token);
                 return Results.Json(new { ok = true }, Json);
+            }));
+
+        api.MapPost("/cloud/trash/purge-batch", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud, EntryIdsReq body) =>
+            await Guarded(http, auth, async token =>
+            {
+                var result = await RunIdBatch(body.EntryIds, async entryId =>
+                    await cloud.DeleteFromTrashAsync(new DeleteFromTrashRequest { EntryId = entryId }, token));
+                return Results.Json(result, Json);
             }));
 
         api.MapPost("/cloud/trash/empty", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud) =>
@@ -251,6 +324,21 @@ public static class CloudApiEndpoints
                     nextCursorAt = resp.NextCursorCreatedAt?.ToDateTimeOffset(),
                     nextCursorId = resp.NextCursorFileId
                 }, Json);
+            }));
+
+        api.MapPost("/cloud/media/delete", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud, FileIdReq body) =>
+            await Guarded(http, auth, async token =>
+            {
+                await cloud.DeleteUserMediaAsync(new DeleteUserMediaRequest { FileId = body.FileId }, token);
+                return Results.Json(new { ok = true }, Json);
+            }));
+
+        api.MapPost("/cloud/media/delete-batch", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud, FileIdsReq body) =>
+            await Guarded(http, auth, async token =>
+            {
+                var result = await RunIdBatch(body.FileIds, async fileId =>
+                    await cloud.DeleteUserMediaAsync(new DeleteUserMediaRequest { FileId = fileId }, token));
+                return Results.Json(result, Json);
             }));
 
         // «Воспоминания — В этот день»: фото/видео за сегодняшнюю дату прошлых лет, по группам-годам.
@@ -810,14 +898,20 @@ public static class CloudApiEndpoints
         // Прокси-загрузка: получаем upload-URL у Files и стримим туда байты (same-origin, без CORS).
         // Байты льём на ВНУТРЕННИЙ HTTP1-эндпоинт Files (минуя nginx/TLS); публичный upload.Url — fallback.
         api.MapPost("/files/upload", async (HttpContext http, AuthGateway auth, FilesApi.FilesApiClient files, IHttpClientFactory httpFactory, IConfiguration config) =>
-            await Guarded(http, auth, async token =>
+            await Guarded(http, auth, async (user, _) =>
             {
                 var form = await http.Request.ReadFormAsync();
                 var file = form.Files["file"];
                 if (file is null || file.Length == 0)
                     return Results.BadRequest(new { error = "Файл не выбран или пустой." });
 
-                var upload = await files.GetUploadUrlAsync(new GetUploadUrlRequest { FileType = UploadFileType.CloudFile }, token);
+                var device = BrowserContext.BuildDeviceInfo(
+                    http,
+                    user.DeviceId ?? auth.GetOrCreateDeviceId(http),
+                    config.Value("App:AppName", "BarkCloud Web"),
+                    config.Value("App:Version", "v1.0.0"));
+                var uploadToken = BrowserContext.UserTokenWithDevice(user.AccessToken, device);
+                var upload = await files.GetUploadUrlAsync(new GetUploadUrlRequest { FileType = UploadFileType.CloudFile }, uploadToken);
 
                 var http1Base = config["FilesService:Http1Base"];
                 var uploadUrl = string.IsNullOrEmpty(http1Base) ? upload.Url : $"{http1Base}/upload/{upload.FileId}";
@@ -863,6 +957,66 @@ public static class CloudApiEndpoints
                 return Results.Json(new
                 {
                     urls = resp.FileUrls.ToDictionary(f => f.FileId, f => f.Url)
+                }, Json);
+            }));
+
+        // Inline-просмотр оригинала same-origin (для текста/кода — открыть в браузере, не скачивать).
+        // Скачивание Files всегда идёт с Content-Disposition: attachment, а CORS на files нет —
+        // поэтому web проксирует содержимое через внутренний HTTP1-эндпоинт (как upload-прокси).
+        api.MapGet("/files/view", async (HttpContext http, AuthGateway auth, FilesApi.FilesApiClient files,
+            IHttpClientFactory httpFactory, IConfiguration config, string id) =>
+            await Guarded(http, auth, async token =>
+            {
+                var req = new GetTempDownloadUrlRequest();
+                req.FileIds.Add(id);
+                var resp = await files.GetTempDownloadUrlAsync(req, token);
+                var url = resp.FileUrls.FirstOrDefault()?.Url;
+                if (string.IsNullOrEmpty(url))
+                    return Results.NotFound();
+
+                // Качаем с внутреннего HTTP1-эндпоинта Files (минуя nginx/TLS), как upload-прокси.
+                var http1Base = config["FilesService:Http1Base"];
+                var fetchUrl = url;
+                if (!string.IsNullOrEmpty(http1Base))
+                {
+                    var tempId = new Uri(url).Segments[^1];
+                    fetchUrl = $"{http1Base}/download/{tempId}";
+                }
+
+                var client = httpFactory.CreateClient("files-upload");
+                using var upstream = await client.GetAsync(fetchUrl, HttpCompletionOption.ResponseHeadersRead);
+                if (!upstream.IsSuccessStatusCode)
+                    return Results.StatusCode((int)upstream.StatusCode);
+
+                // Без Content-Disposition: attachment — браузер отрендерит текст/код в новой вкладке.
+                http.Response.ContentType = upstream.Content.Headers.ContentType?.ToString() ?? "text/plain; charset=utf-8";
+                await upstream.Content.CopyToAsync(http.Response.Body);
+                return Results.Empty;
+            }));
+
+        api.MapGet("/files/activity", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud,
+            string? id, int? limit, string? cursorAt, string? cursorId) =>
+            await Guarded(http, auth, async token =>
+            {
+                if (string.IsNullOrWhiteSpace(id))
+                    return Results.Json(new { error = "Не указан id" }, Json, statusCode: 400);
+
+                var req = new ListFileActivityRequest
+                {
+                    FileId = id,
+                    Limit = limit is > 0 and <= 100 ? limit.Value : 30
+                };
+                if (DateTimeOffset.TryParse(cursorAt, out var dt))
+                    req.CursorCreatedAt = Timestamp.FromDateTimeOffset(dt.ToUniversalTime());
+                if (!string.IsNullOrWhiteSpace(cursorId))
+                    req.CursorEventId = cursorId;
+
+                var resp = await cloud.ListFileActivityAsync(req, token);
+                return Results.Json(new
+                {
+                    items = resp.Items.Select(FileActivityJson).ToArray(),
+                    nextCursorAt = resp.NextCursorCreatedAt?.ToDateTimeOffset(),
+                    nextCursorId = resp.NextCursorEventId
                 }, Json);
             }));
 
@@ -946,30 +1100,40 @@ public static class CloudApiEndpoints
 
     // ───────────────────────── Инфраструктура ─────────────────────────
 
+    private static string ResolveOrigin(HttpContext http)
+    {
+        var publicHost = http.RequestServices.GetRequiredService<IConfiguration>()["App:PublicHost"];
+        if (!string.IsNullOrWhiteSpace(publicHost) && Uri.TryCreate(publicHost, UriKind.Absolute, out var uri))
+            return $"{uri.Scheme}://{uri.Authority}";
+        return $"{http.Request.Scheme}://{http.Request.Host}";
+    }
+
     /// <summary>
-    /// JSON-представление публичной ссылки. Дружелюбный URL собирается из хоста текущего
-    /// запроса (Web — владелец публичного роута /s/{token}), а не приходит из Files.
+    /// JSON-представление публичной ссылки. Дружелюбный URL собирается из App:PublicHost
+    /// (если задан — включает порт) либо из хоста текущего запроса.
     /// </summary>
     private static object ShareJson(HttpContext http, ShareInfo s)
     {
-        var origin = $"{http.Request.Scheme}://{http.Request.Host}";
+        var origin = ResolveOrigin(http);
         return new
         {
             id = s.Id,
             token = s.Token,
-            url = $"{origin}/v/{s.Token}",         // публичная страница просмотра (основная ссылка)
-            downloadUrl = $"{origin}/s/{s.Token}", // прямое скачивание (302)
+            url = $"{origin}/v/{s.Token}",
+            downloadUrl = $"{origin}/s/{s.Token}",
             fileId = s.FileId,
             name = s.Name,
             createdAt = s.CreatedAt?.ToDateTimeOffset(),
-            clickCount = s.ClickCount
+            clickCount = s.ClickCount,
+            mediaKind = CloudJson.MediaKindName(s.MediaKind),
+            previewUrl = s.PreviewUrl
         };
     }
 
-    /// <summary>JSON-представление публичной папки. Дружелюбный URL `/f/{token}` собирается из хоста запроса.</summary>
+    /// <summary>JSON-представление публичной папки. URL `/f/{token}` собирается из App:PublicHost либо хоста запроса.</summary>
     private static object FolderShareJson(HttpContext http, FolderShareInfo s)
     {
-        var origin = $"{http.Request.Scheme}://{http.Request.Host}";
+        var origin = ResolveOrigin(http);
         return new
         {
             id = s.Id,
@@ -983,10 +1147,10 @@ public static class CloudApiEndpoints
         };
     }
 
-    /// <summary>JSON-представление публичного альбома. Дружелюбный URL `/al/{token}` собирается из хоста запроса.</summary>
+    /// <summary>JSON-представление публичного альбома. URL `/al/{token}` собирается из App:PublicHost либо хоста запроса.</summary>
     private static object AlbumShareJson(HttpContext http, AlbumShareInfo s)
     {
-        var origin = $"{http.Request.Scheme}://{http.Request.Host}";
+        var origin = ResolveOrigin(http);
         return new
         {
             id = s.Id,
@@ -1011,6 +1175,18 @@ public static class CloudApiEndpoints
 
     private static object MinimalUserJson(long id) => new { id, username = "", firstName = "", lastName = "", avatar = "" };
 
+    private static object FileActivityJson(FileActivityInfo item) => new
+    {
+        id = item.Id,
+        fileId = item.FileId,
+        entryId = item.EntryId,
+        actorUserId = item.ActorUserId,
+        kind = item.Kind,
+        summary = item.Summary,
+        detailsJson = item.DetailsJson,
+        createdAt = item.CreatedAt?.ToDateTimeOffset()
+    };
+
     /// <summary>Резолв id пользователей → User через UsersServerApi (имена «от кого / кому»).</summary>
     private static async Task<Dictionary<long, User>> ResolveUsers(
         UsersServerApi.UsersServerApiClient usersServer, IEnumerable<long> ids)
@@ -1025,6 +1201,55 @@ public static class CloudApiEndpoints
         return resp.Users
             .GroupBy(u => u.Id)
             .ToDictionary(g => g.Key, g => g.First());
+    }
+
+    private static async Task<object> RunIdBatch(string[]? rawIds, Func<string, Task> action)
+    {
+        var invalid = new List<string>();
+        var ids = new List<string>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var raw in rawIds ?? Array.Empty<string>())
+        {
+            if (!Guid.TryParse(raw, out var id))
+            {
+                invalid.Add(raw);
+                continue;
+            }
+
+            var normalized = id.ToString();
+            if (seen.Add(normalized))
+                ids.Add(normalized);
+        }
+
+        var succeeded = 0;
+        var succeededIds = new List<string>();
+        var failedIds = new List<string>(invalid);
+        foreach (var id in ids)
+        {
+            try
+            {
+                await action(id);
+                succeeded++;
+                succeededIds.Add(id);
+            }
+            catch (RpcException ex) when (ex.StatusCode is StatusCode.FailedPrecondition or StatusCode.NotFound or StatusCode.PermissionDenied)
+            {
+                // Частичная ошибка одного элемента не должна валить всю batch-операцию.
+                failedIds.Add(id);
+            }
+        }
+
+        var total = ids.Count + invalid.Count;
+        return new
+        {
+            total,
+            succeeded,
+            failed = total - succeeded,
+            invalidIds = invalid.ToArray(),
+            succeededIds = succeededIds.ToArray(),
+            failedIds = failedIds.ToArray()
+        };
     }
 
     /// <summary>
@@ -1069,6 +1294,10 @@ public static class CloudApiEndpoints
 
     /// <summary>Авторизация по cookie + единая обработка gRPC-ошибок.</summary>
     private static async Task<IResult> Guarded(HttpContext http, AuthGateway auth, Func<Metadata, Task<IResult>> action)
+        => await Guarded(http, auth, async (_, token) => await action(token));
+
+    /// <summary>Авторизация по cookie + единая обработка gRPC-ошибок.</summary>
+    private static async Task<IResult> Guarded(HttpContext http, AuthGateway auth, Func<WebUser, Metadata, Task<IResult>> action)
     {
         var user = await auth.AuthenticateAsync(http);
         if (user is null)
@@ -1076,7 +1305,7 @@ public static class CloudApiEndpoints
 
         try
         {
-            return await action(BrowserContext.UserToken(user.AccessToken));
+            return await action(user, BrowserContext.UserToken(user.AccessToken));
         }
         catch (RpcException ex) when (ex.StatusCode == StatusCode.FailedPrecondition)
         {
@@ -1104,7 +1333,9 @@ public static class CloudApiEndpoints
     private sealed record EntryRenameReq(string EntryId, string Name);
     private sealed record EntryMoveReq(string EntryId, string? Dir);
     private sealed record EntryIdReq(string EntryId);
+    private sealed record EntryIdsReq(string[]? EntryIds);
     private sealed record FileIdReq(string FileId);
+    private sealed record FileIdsReq(string[]? FileIds);
     private sealed record GrantReq(string FileId, long RecipientUserId);
     private sealed record GrantFolderReq(string DirectoryId, long RecipientUserId);
     private sealed record GrantIdReq(string GrantId);

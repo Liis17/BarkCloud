@@ -7,9 +7,10 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.CreationExtras
 import com.barkfluff.BarkCloud.BarkCloudApplication
+import com.barkfluff.BarkCloud.R
 import com.barkfluff.BarkCloud.data.cloud.AlbumRepository
-import com.barkfluff.BarkCloud.data.cloud.CloudRepository
 import com.barkfluff.BarkCloud.data.cloud.MediaAsset
+import com.barkfluff.BarkCloud.data.upload.UploadScheduler
 import com.barkfluff.BarkCloud.net.queryFileName
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -33,7 +34,6 @@ data class AlbumDetailUiState(
 class AlbumDetailViewModel(
     private val appContext: Context,
     private val albumRepository: AlbumRepository,
-    private val cloudRepository: CloudRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(AlbumDetailUiState())
@@ -99,12 +99,17 @@ class AlbumDetailViewModel(
         _state.update { it.copy(isUploading = true) }
         viewModelScope.launch {
             try {
-                val fileIds = uris.mapNotNull { uri ->
-                    runCatching { cloudRepository.uploadFile(uri, queryFileName(appContext, uri)) }.getOrNull()
+                val app = appContext as BarkCloudApplication
+                uris.forEach { uri ->
+                    app.uploadQueue.enqueue(uri, queryFileName(appContext, uri), albumId = albumId)
                 }
-                if (fileIds.isNotEmpty()) albumRepository.addItems(albumId, fileIds)
-                _state.update { it.copy(isUploading = false) }
-                reload()
+                UploadScheduler.enqueue(appContext)
+                _state.update {
+                    it.copy(
+                        isUploading = false,
+                        snackbar = appContext.getString(R.string.share_queued),
+                    )
+                }
             } catch (e: Exception) {
                 _state.update { it.copy(isUploading = false, snackbar = e.message) }
             }
@@ -160,7 +165,7 @@ class AlbumDetailViewModel(
             override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
                 val app = extras[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]
                     as BarkCloudApplication
-                return AlbumDetailViewModel(app, app.albumRepository, app.cloudRepository) as T
+                return AlbumDetailViewModel(app, app.albumRepository) as T
             }
         }
     }

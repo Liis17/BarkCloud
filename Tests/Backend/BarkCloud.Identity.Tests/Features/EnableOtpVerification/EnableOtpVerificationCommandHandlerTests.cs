@@ -14,6 +14,7 @@ using BarkCloud.TestKit;
 
 using MassTransit;
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -30,13 +31,17 @@ public class EnableOtpVerificationCommandHandlerTests
 
     public EnableOtpVerificationCommandHandlerTests()
     {
-        _notifications = new Mock<NotificationQueueSender>(Mock.Of<IPublishEndpoint>());
+        _notifications = new Mock<NotificationQueueSender>(Mock.Of<IPublishEndpoint>(), new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build());
         _notifications.Setup(n => n.SendNotification(It.IsAny<Notification>())).Returns(Task.CompletedTask);
         _location = new Mock<LocationClient>(new HttpClient(), new MetricsCollector(), NullLogger<LocationClient>.Instance);
         _location.Setup(c => c.GetLocation(It.IsAny<string>())).ReturnsAsync((IpLocation?)null);
     }
 
-    private EnableOtpVerificationCommandHandler CreateSut(RequestContext? ctx = null, UserContext? user = null)
+    private static IConfiguration EmailConfig(bool enabled) => new ConfigurationBuilder()
+        .AddInMemoryCollection(new Dictionary<string, string?> { ["Features:EmailEnabled"] = enabled ? "true" : "false" })
+        .Build();
+
+    private EnableOtpVerificationCommandHandler CreateSut(RequestContext? ctx = null, UserContext? user = null, bool emailEnabled = true)
         => new(user ?? UserContextFactory.Create(42),
             _authProps.Object,
             _usersClient.Object,
@@ -44,6 +49,7 @@ public class EnableOtpVerificationCommandHandlerTests
             ctx ?? FullContext(),
             _location.Object,
             _metrics,
+            EmailConfig(emailEnabled),
             _logger);
 
     private static RequestContext FullContext() => new()
@@ -126,6 +132,21 @@ public class EnableOtpVerificationCommandHandlerTests
         _authProps.Verify(s => s.UpdateOptType(OtpType.Email, 42), Times.Once);
         _notifications.Verify(n => n.SendNotification(It.Is<EmailNotification>(
             e => e.Type == NotificationType.ConfirmationOtpEmail)), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_EmailType_EmailDisabled_Throws()
+    {
+        _usersClient
+            .Setup(c => c.GetByIdAsync(It.IsAny<GetByIdRequest>(), null, null, default))
+            .Returns(GrpcCallHelpers.AsyncUnary(new GetByIdResponse { User = new User { Id = 42, Username = "u" } }));
+
+        var act = () => CreateSut(emailEnabled: false).Handle(
+            new EnableOtpVerificationCommand { OptType = OtpTypeId.Email }, default);
+
+        await act.Should().ThrowAsync<EmailServiceDisabledException>();
+        _authProps.Verify(s => s.UpdateOptType(OtpType.Email, It.IsAny<long>()), Times.Never);
+        _notifications.Verify(n => n.SendNotification(It.IsAny<Notification>()), Times.Never);
     }
 
     [Fact]

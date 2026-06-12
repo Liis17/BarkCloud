@@ -24,6 +24,7 @@ import androidx.compose.material.icons.outlined.Devices
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.Storage
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
@@ -66,6 +67,7 @@ fun SettingsScreen(
     onEditProfile: () -> Unit,
     onPrivacy: () -> Unit,
     onDevices: () -> Unit,
+    onCache: () -> Unit,
     onSignedOut: () -> Unit,
     viewModel: ProfileViewModel = viewModel(factory = ProfileViewModel.factory()),
 ) {
@@ -128,6 +130,8 @@ fun SettingsScreen(
                     SettingsRow(Icons.Outlined.Lock, stringResource(R.string.settings_privacy), onPrivacy)
                     HorizontalDivider()
                     SettingsRow(Icons.Outlined.Devices, stringResource(R.string.settings_devices), onDevices)
+                    HorizontalDivider()
+                    SettingsRow(Icons.Outlined.Storage, stringResource(R.string.cache_title), onCache)
                 }
 
                 OutlinedButton(

@@ -1,16 +1,28 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Icon } from '../Icon';
+import { UploadIndicator } from '../upload/UploadIndicator';
 import type { PageHeader } from '../../hooks/usePageHeader';
 
 export function Topbar({ kicker, title, actions, search = true }: PageHeader) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [q, setQ] = React.useState('');
+
+  // На Фото/Видео ищем в текущей вкладке (медиа-сетка), иначе — в «Файлах».
+  const isMediaTab = location.pathname.startsWith('/photos') || location.pathname.startsWith('/videos');
+
+  // Синхронизация поля с текущим ?q= (например, после «Очистить» на странице результатов).
+  React.useEffect(() => {
+    setQ(new URLSearchParams(location.search).get('q') || '');
+  }, [location.pathname, location.search]);
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
     const query = q.trim();
-    if (query.length > 0) navigate(`/files?q=${encodeURIComponent(query)}`);
+    if (query.length === 0) return;
+    const target = isMediaTab ? location.pathname : '/files';
+    navigate(`${target}?q=${encodeURIComponent(query)}`);
   }
 
   return (
@@ -26,7 +38,7 @@ export function Topbar({ kicker, title, actions, search = true }: PageHeader) {
           </span>
           <input
             type="text"
-            placeholder="Найти файлы по имени…"
+            placeholder={isMediaTab ? 'Найти фото и видео по имени…' : 'Найти файлы по имени…'}
             value={q}
             onChange={(e) => setQ(e.target.value)}
           />
@@ -35,6 +47,7 @@ export function Topbar({ kicker, title, actions, search = true }: PageHeader) {
       )}
       <div className="tb-actions">
         {actions}
+        <UploadIndicator />
         <button className="icon-btn" title="Уведомления">
           <Icon.bell size={22} />
           <span className="dot-badge" />

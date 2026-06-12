@@ -24,6 +24,22 @@ interface UseMediaActionsArgs {
   reloadAlbums?: () => void;
 }
 
+/** Действия над медиа, экспонированные наружу (панель Lightbox). Модалки
+ *  (подтверждение, свойства, шаринг) рендерятся в overlay родителя. */
+export interface MediaActionsApi {
+  albums: Album[];
+  membership: ReturnType<typeof useAlbumMembership>;
+  toast: ToastPush;
+  copyTempLink: (m: MediaItem) => void;
+  createPublicLink: (m: MediaItem) => void;
+  shareWithUser: (m: MediaItem) => void;
+  addToAlbum: (m: MediaItem, albumId: string) => void;
+  removeFromAlbum: (m: MediaItem, albumId: string) => void;
+  revealInFolder: (m: MediaItem) => void;
+  showProperties: (m: MediaItem) => void;
+  requestDelete: (m: MediaItem) => void;
+}
+
 /** Добавить cache-bust к URL превью, чтобы браузер перезапросил обновлённое изображение. */
 function bustPreviews(m: MediaItem): Partial<MediaItem> {
   const t = Date.now();
@@ -77,13 +93,8 @@ export function useMediaActions({ albums, toast, onRenamed, onRemoved, onItemPat
     }
   }
   async function doDelete(m: MediaItem) {
-    const ids = (m.entryIds || []).slice();
-    if (!ids.length) {
-      toast('Файл не привязан к папке', 'err');
-      return;
-    }
     try {
-      for (const eid of ids) await apiPost('/api/cloud/entry/delete', { entryId: eid });
+      await apiPost('/api/cloud/media/delete', { fileId: m.id });
       setConfirm(null);
       onRemoved && onRemoved(m);
       toast('Перемещено в корзину');
@@ -177,9 +188,23 @@ export function useMediaActions({ albums, toast, onRenamed, onRemoved, onItemPat
     out.push({ label: 'Добавить в избранное', icon: 'star', onClick: () => addToFavorites(m) });
     out.push({ label: 'Свойства', icon: 'info', onClick: () => setProps(m) });
     out.push({ divider: true });
-    out.push({ label: 'Удалить', icon: 'trash', danger: true, disabled: !hasEntry, onClick: () => setConfirm(m) });
+    out.push({ label: 'Удалить', icon: 'trash', danger: true, onClick: () => setConfirm(m) });
     return out;
   }
+
+  const api: MediaActionsApi = {
+    albums: albums || [],
+    membership,
+    toast,
+    copyTempLink: copyLink,
+    createPublicLink: (m) => createShare(m.id, m.name, toast),
+    shareWithUser: setShareWith,
+    addToAlbum,
+    removeFromAlbum,
+    revealInFolder,
+    showProperties: setProps,
+    requestDelete: setConfirm,
+  };
 
   const overlay = (
     <>
@@ -210,5 +235,5 @@ export function useMediaActions({ albums, toast, onRenamed, onRemoved, onItemPat
     </>
   );
 
-  return { overlay, openMenu };
+  return { overlay, openMenu, api };
 }

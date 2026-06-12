@@ -114,6 +114,37 @@ public class UploadFileCommandHandlerTests
     }
 
     [Fact]
+    public async Task Handle_JpegFile_GeneratesSeparateJpegViewBlob()
+    {
+        var id = Guid.NewGuid();
+        _files.Setup(s => s.GetFile(id))
+            .ReturnsAsync(new UploadFileEntity { Id = id, Type = UploadFileType.CloudFile, Uploaders = new() { 42 } });
+
+        var viewBytes = System.Text.Encoding.UTF8.GetBytes("jpeg-view");
+        _imageCompressor
+            .Setup(c => c.EncodeFullJpegAsync(It.IsAny<Stream>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(viewBytes);
+
+        var viewId = Guid.NewGuid();
+        _previewPersistence
+            .Setup(p => p.PersistJpegViewAsync(
+                It.IsAny<UploadFileEntity>(), It.IsAny<byte[]>(), It.IsAny<int>(), It.IsAny<int>(),
+                It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(viewId);
+
+        var response = await CreateSut().Handle(
+            new UploadFileCommand { FileId = id, FileName = "photo.jpg", FileStream = MakeStream() }, default);
+
+        response.Should().Be(id.ToString());
+        // JPEG-оригинал тоже перекодируется в отдельный полноразмерный JPEG-блоб (не ссылается на себя),
+        // иначе JpegViewUrl указывал бы на /download/{оригинал}, который запрещён для CloudFile → 404.
+        _previewPersistence.Verify(p => p.PersistJpegViewAsync(
+            It.IsAny<UploadFileEntity>(), viewBytes, It.IsAny<int>(), It.IsAny<int>(), "test-bucket", It.IsAny<CancellationToken>()),
+            Times.Once);
+        _files.Verify(s => s.UpdateFile(It.Is<UploadFileEntity>(f => f.JpegViewFileId == viewId)), Times.Once);
+    }
+
+    [Fact]
     public async Task Handle_HeicFile_KeepsOriginalAndGeneratesJpegView()
     {
         var id = Guid.NewGuid();

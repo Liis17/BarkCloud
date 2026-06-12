@@ -1,15 +1,6 @@
 name: "🧪 BarkCloud Tests"
 
 on:
-  push:
-    branches:
-      - dev
-      - master
-      - 'claude/**'
-    paths-ignore:
-      - 'Docs/**'
-      - 'Obsidian/**'
-      - '**.md'
   pull_request:
     branches:
       - dev

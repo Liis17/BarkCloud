@@ -1,6 +1,7 @@
 using BarkCloud.Files.Domain;
 using BarkCloud.Files.Helpers;
 using BarkCloud.Files.Persistence;
+using BarkCloud.Files.Services;
 using BarkCloud.GrpcServer.XAuth;
 using BarkCloud.Proto.Files;
 using BarkCloud.Shared.Exceptions.Files;
@@ -18,17 +19,20 @@ public class AttachFileCommandHandler : IRequestHandler<AttachFileCommand, Cloud
     private readonly ICloudHierarchyStorage _storage;
     private readonly IUploadedFilesStorage _filesStorage;
     private readonly UserContext _userContext;
+    private readonly FileActivityWriter _activity;
     private readonly ILogger<AttachFileCommandHandler> _logger;
 
     public AttachFileCommandHandler(
         ICloudHierarchyStorage storage,
         IUploadedFilesStorage filesStorage,
         UserContext userContext,
-        ILogger<AttachFileCommandHandler> logger)
+        ILogger<AttachFileCommandHandler> logger,
+        FileActivityWriter? activity = null)
     {
         _storage = storage;
         _filesStorage = filesStorage;
         _userContext = userContext;
+        _activity = activity ?? FileActivityWriter.Noop;
         _logger = logger;
     }
 
@@ -96,6 +100,16 @@ public class AttachFileCommandHandler : IRequestHandler<AttachFileCommand, Cloud
         _logger.LogInformation(
             "Файл {FileId} привязан к директории {DirectoryId} как {EntryId} (Name: {Name}, Owner: {OwnerId})",
             file.Id, storageDirectoryId, entry.Id, name, ownerId);
+
+        await _activity.AddAsync(
+            ownerId,
+            file.Id,
+            ownerId,
+            FileActivityKind.Attached,
+            $"Добавлен в папку как «{name}»",
+            entry.Id,
+            new { directoryId = storageDirectoryId, name },
+            cancellationToken);
 
         return new CloudEmpty();
     }

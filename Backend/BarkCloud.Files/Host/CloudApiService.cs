@@ -21,6 +21,7 @@ using BarkCloud.Files.Features.Cloud.GetTrashSummary;
 using BarkCloud.Files.Features.Cloud.ListTrash;
 using BarkCloud.Files.Features.Cloud.ListDirectory;
 using BarkCloud.Files.Features.Cloud.ListDirectoryDetailed;
+using BarkCloud.Files.Features.Cloud.ListFileActivity;
 using BarkCloud.Files.Features.Cloud.SearchFiles;
 using BarkCloud.Files.Features.Cloud.ListUserImages;
 using BarkCloud.Files.Features.Cloud.ListUserMedia;
@@ -150,7 +151,8 @@ public class CloudApiService : CloudApi.CloudApiBase
             Query = request.Query,
             Limit = request.Limit,
             CursorCreatedAt = cursorCreatedAt,
-            CursorEntryId = cursorEntryId
+            CursorEntryId = cursorEntryId,
+            KindFilter = request.KindFilter.Select(k => (BarkCloud.Files.Domain.MediaKind)(int)k).Distinct().ToList()
         });
     }
 
@@ -589,6 +591,25 @@ public class CloudApiService : CloudApi.CloudApiBase
         }
 
         return _mediator.Send(command);
+    }
+
+    public override Task<ListFileActivityResponse> ListFileActivity(ListFileActivityRequest request, ServerCallContext context)
+    {
+        DateTime? cursorCreatedAt = null;
+        Guid? cursorEventId = null;
+        if (request.CursorCreatedAt is not null && !string.IsNullOrWhiteSpace(request.CursorEventId))
+        {
+            cursorCreatedAt = request.CursorCreatedAt.ToDateTime();
+            cursorEventId = Guid.Parse(request.CursorEventId);
+        }
+
+        return _mediator.Send(new ListFileActivityCommand
+        {
+            FileId = Guid.Parse(request.FileId),
+            Limit = request.Limit,
+            CursorCreatedAt = cursorCreatedAt,
+            CursorEventId = cursorEventId
+        });
     }
 
     /// <summary>

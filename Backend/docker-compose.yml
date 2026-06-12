@@ -61,12 +61,18 @@ services:
     restart: always
     environment:
       <<: *common-variables
+      StorageProbe__Path: "/mnt/minio-data"
+    volumes:
+      - ${MINIO_DATA_PATH:-minio_data}:/mnt/minio-data:ro
     networks:
       - barkcloud-network
     depends_on:
       - configuration
 
   # Сервис уведомлений (consumer RabbitMQ → SMTP). Внешнего API нет — в nginx не маршрутизируется.
+  # Опционален: если в Configuration не заданы Email:* (Host/Port/SenderEmail/SenderPassword),
+  # сервер работает в режиме «без почты» (Features:EmailEnabled=false) и задачи в очередь не шлёт —
+  # этот сервис можно остановить или удалить из compose. Никто на него не depends_on.
   notification:
     image: docker.barkfluff.com:5000/barkcloud-notification:latest
     container_name: cloud-notification
@@ -161,7 +167,7 @@ services:
       MINIO_ROOT_USER: "${MINIO_ROOT_USER}"
       MINIO_ROOT_PASSWORD: "${MINIO_ROOT_PASSWORD}"
     volumes:
-      - minio_data:/data
+      - ${MINIO_DATA_PATH:-minio_data}:/data
     command: server /data --console-address ":9001"
     networks:
       - barkcloud-network

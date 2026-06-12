@@ -1,20 +1,19 @@
 import React from 'react';
+import { useLocation } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import { MediaThumb } from '../components/media/MediaThumb';
 import { Lightbox } from '../components/media/Lightbox';
 import { EmptyState, Loading } from '../components/ui/EmptyState';
-import { AlbumCard } from '../components/albums/AlbumCard';
-import { AlbumFormModal } from '../components/albums/AlbumFormModal';
-import { AlbumDetail } from '../components/albums/AlbumDetail';
 import { MemoriesStrip } from '../components/memories/MemoriesStrip';
+import { MediaSearchResults } from '../components/search/MediaSearchResults';
 import { useToast } from '../hooks/useToast';
 import { useInfiniteMedia } from '../hooks/useInfiniteMedia';
 import { useMediaActions } from '../hooks/useMediaActions';
-import { useDuplicatePrompt } from '../hooks/useDuplicatePrompt';
 import { useFileDrop } from '../hooks/useFileDrop';
 import { useBulkMedia } from '../hooks/useBulkMedia';
 import { usePageHeader } from '../hooks/usePageHeader';
-import { apiGet, apiPost, pickFiles, uploadFile, checkDuplicate } from '../lib/api';
+import { useUploadActions } from '../hooks/useUploadManager';
+import { apiGet, pickFiles } from '../lib/api';
 import { GRID_SIZES, plural, groupByDate } from '../lib/format';
 import type { Album, MediaItem } from '../lib/types';
 
@@ -41,23 +40,17 @@ function Photo({ m, selecting, checked, onToggle, onOpen, onMenu }: {
   );
 }
 
-interface UploadState {
-  pct: number;
-  current: number;
-  total: number;
-}
-
 export function PhotosPage() {
-  const [tab, setTab] = React.useState<'photos' | 'albums'>('photos');
+  const location = useLocation();
+  const searchQuery = (new URLSearchParams(location.search).get('q') || '').trim();
   const [albums, setAlbums] = React.useState<Album[] | null>(null);
-  const [openAlbum, setOpenAlbum] = React.useState<Album | null>(null);
   const [lightbox, setLightbox] = React.useState<number | null>(null);
-  const [creating, setCreating] = React.useState(false);
-  const [upload, setUpload] = React.useState<UploadState | null>(null);
+  // Инкремент при удалении фото — «В этот день» перезагружается, иначе там остаётся удалённый снимок.
+  const [memKey, setMemKey] = React.useState(0);
   const [toastNode, toast] = useToast();
-  const dup = useDuplicatePrompt();
+  const { enqueue, attachVersion } = useUploadActions();
 
-  const { items: photos, loading, done, sentinelRef, removeItem, updateItem, reload } = useInfiniteMedia('photo', toast);
+  const { items: photos, loading, done, sentinelRef, removeItem, updateItem, prependItems } = useInfiniteMedia('photo', toast);
 
   const loadAlbums = React.useCallback(() => {
     apiGet<{ albums: Album[] }>('/api/albums')
@@ -76,7 +69,10 @@ export function PhotosPage() {
     albums: albums || [],
     toast,
     onRenamed: (m, name) => updateItem(m.id, { entryNames: [name, ...(m.entryNames || []).slice(1)] }),
-    onRemoved: (m) => removeItem(m.id),
+    onRemoved: (m) => {
+      removeItem(m.id);
+      setMemKey((k) => k + 1);
+    },
     onItemPatched: updateItem,
     reloadAlbums: loadAlbums,
   });
@@ -84,44 +80,36 @@ export function PhotosPage() {
   async function doUpload(dropped?: File[]) {
     const files = dropped && dropped.length ? dropped : await pickFiles({ accept: 'image/*' });
     if (!files.length) return;
-    let processed = 0;
-    let uploaded = 0;
-    for (const f of files) {
-      setUpload({ current: processed + 1, total: files.length, pct: 0 });
-      try {
-        const d = await checkDuplicate(f);
-        if (d.exists && !(await dup.ask(f.name, d.locations))) {
-          processed++;
-          continue;
-        }
-        const res = await uploadFile(f, (p) => setUpload({ current: processed + 1, total: files.length, pct: Math.round(p * 100) }));
-        if (res?.fileId) {
-          // Загрузка с вкладки «Фото» → авто-распределение по типу в системную папку.
-          try {
-            await apiPost('/api/cloud/attach', { fileId: res.fileId, name: res.name || f.name, routeByMediaKind: true });
-          } catch {
-            /* attach best-effort */
-          }
-        }
-        uploaded++;
-      } catch (e) {
-        toast(`«${f.name}»: ${(e as Error).message}`, 'err');
-      }
-      processed++;
-    }
-    setUpload(null);
-    if (uploaded > 0) toast(`Загружено: ${uploaded} ${plural(uploaded, 'файл', 'файла', 'файлов')}`);
-    reload();
+    enqueue(files, { routeByMediaKind: true });
   }
 
   const { over, dropHandlers } = useFileDrop((f) => doUpload(f));
-  const bulk = useBulkMedia({ items: photos, albums: albums || [], toast, onRemoved: removeItem, onReloadAlbums: loadAlbums });
+  const bulk = useBulkMedia({
+    items: photos,
+    albums: albums || [],
+    toast,
+    onRemoved: (id) => {
+      removeItem(id);
+      setMemKey((k) => k + 1);
+    },
+    onReloadAlbums: loadAlbums,
+  });
+
+  const prependRef = React.useRef(prependItems);
+  prependRef.current = prependItems;
 
   const groups = React.useMemo(() => groupByDate(photos), [photos]);
+
+  React.useEffect(() => {
+    apiGet<{ items: MediaItem[] }>('/api/cloud/media?kind=photo&limit=60')
+      .then((d) => prependRef.current(d.items || []))
+      .catch(() => {});
+  }, [attachVersion]);
 
   usePageHeader(
     () => ({
       title: 'Фотогалерея',
+      documentTitle: 'Фото',
       kicker: (
         <>
           <span>Библиотека</span>
@@ -130,26 +118,27 @@ export function PhotosPage() {
         </>
       ),
       actions: (
-        <>
-          {tab === 'albums' && (
-            <button className="btn outlined" onClick={() => setCreating(true)}>
-              <Icon.plus size={16} /> Альбом
-            </button>
-          )}
-          <button className="btn primary" onClick={() => doUpload()}>
-            <Icon.upload size={16} /> Загрузить
-          </button>
-        </>
+        <button className="btn primary" onClick={() => doUpload()}>
+          <Icon.upload size={16} /> Загрузить
+        </button>
       ),
     }),
-    [tab],
+    [],
   );
+
+  if (searchQuery) {
+    return (
+      <>
+        {toastNode}
+        <MediaSearchResults q={searchQuery} albums={albums || []} toast={toast} reloadAlbums={loadAlbums} />
+      </>
+    );
+  }
 
   return (
     <>
       {toastNode}
       {actionsCtx.overlay}
-      {dup.overlay}
       {bulk.bar}
       {bulk.overlay}
 
@@ -163,51 +152,19 @@ export function PhotosPage() {
 
       <div className="photos-toolbar">
         <div className="chip-row">
-          <button className={'chip' + (tab === 'photos' ? ' active' : '')} onClick={() => { setTab('photos'); setOpenAlbum(null); }}>
-            {tab === 'photos' && <Icon.check size={16} />} Все фото
+          <span className="chip active">
+            <Icon.check size={16} /> Все фото
             <span className="count">
               {photos.length}
               {done ? '' : '+'}
             </span>
-          </button>
-          <button className={'chip' + (tab === 'albums' ? ' active' : '')} onClick={() => setTab('albums')}>
-            {tab === 'albums' && <Icon.check size={16} />} Альбомы
-            {albums && <span className="count">{albums.length}</span>}
-          </button>
+          </span>
         </div>
       </div>
 
-      {upload && (
-        <div className="upload-banner">
-          <span className="spinner" />
-          Загрузка {upload.current}/{upload.total}…
-          <div className="bar">
-            <div className="bar-fill" style={{ width: upload.pct + '%' }} />
-          </div>
-        </div>
-      )}
+      <MemoriesStrip refreshKey={memKey} actions={actionsCtx.api} />
 
-      {tab === 'albums' &&
-        (openAlbum ? (
-          <AlbumDetail album={openAlbum} candidates={photos} toast={toast} onBack={() => setOpenAlbum(null)} onChanged={() => loadAlbums()} />
-        ) : albums === null ? (
-          <Loading />
-        ) : (
-          <div className="album-grid">
-            {albums.map((a) => (
-              <AlbumCard key={a.id} album={a} onOpen={(al) => setOpenAlbum(al)} />
-            ))}
-            <div className="album-card new-album" onClick={() => setCreating(true)}>
-              <Icon.plus size={28} />
-              <span>Создать альбом</span>
-            </div>
-          </div>
-        ))}
-
-      {tab === 'photos' && <MemoriesStrip />}
-
-      {tab === 'photos' &&
-        (loading && photos.length === 0 ? (
+      {(loading && photos.length === 0 ? (
           <Loading />
         ) : photos.length === 0 ? (
           <EmptyState
@@ -254,19 +211,7 @@ export function PhotosPage() {
         ))}
       </div>
 
-      {creating && (
-        <AlbumFormModal
-          onClose={() => setCreating(false)}
-          onSaved={() => {
-            setCreating(false);
-            setTab('albums');
-            loadAlbums();
-            toast('Альбом создан');
-          }}
-          toast={toast}
-        />
-      )}
-      {lightbox !== null && <Lightbox items={photos} index={lightbox} onClose={() => setLightbox(null)} />}
+      {lightbox !== null && <Lightbox items={photos} index={lightbox} actions={actionsCtx.api} onClose={() => setLightbox(null)} />}
     </>
   );
 }

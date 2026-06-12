@@ -2,12 +2,27 @@ import SwiftUI
 import Observation
 import BarkCloudKit
 
-/// Контекст «что расшариваем». Передаётся в `.sheet(item:)` из вызывающего
-/// экрана. Identifiable, чтобы биндить по fileID.
+/// Контекст «что расшариваем» — файл или папка. Передаётся в `.sheet(item:)` из
+/// вызывающего экрана. Два инициализатора: файловый (старый API сохранён) и
+/// папочный. `entityID` — fileID либо directoryID в зависимости от `isFolder`.
 struct ShareWithUserContext: Identifiable, Hashable, Sendable {
-    let fileID: String
-    let fileName: String
-    var id: String { fileID }
+    let entityID: String
+    let name: String
+    let isFolder: Bool
+    /// Префикс разводит file/folder с одинаковым id в разные `.sheet(item:)`.
+    var id: String { (isFolder ? "d:" : "f:") + entityID }
+
+    init(fileID: String, fileName: String) {
+        self.entityID = fileID
+        self.name = fileName
+        self.isFolder = false
+    }
+
+    init(folderID: String, folderName: String) {
+        self.entityID = folderID
+        self.name = folderName
+        self.isFolder = true
+    }
 }
 
 /// Sheet «Поделиться с пользователем»: поиск получателя по юзернейму/имени
@@ -41,7 +56,7 @@ struct ShareWithUserSheet: View {
                 if outgoingCount > 0 { outgoingBanner }
                 content
             }
-            .navigationTitle(String(format: String(localized: "shared_with_user_title"), context.fileName))
+            .navigationTitle(String(format: String(localized: "shared_with_user_title"), context.name))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -92,8 +107,12 @@ struct ShareWithUserSheet: View {
     /// Вызывается при открытии sheet и после закрытия `OutgoingSharesSheet`
     /// (в нём могли отозвать).
     private func refreshOutgoingCount() async {
-        let count = (try? await env.cloudRepository.listMyOutgoingShares(fileID: context.fileID).count) ?? 0
-        outgoingCount = count
+        if context.isFolder {
+            let all = (try? await env.cloudRepository.listMyOutgoingFolderShares()) ?? []
+            outgoingCount = all.filter { $0.directoryID == context.entityID }.count
+        } else {
+            outgoingCount = (try? await env.cloudRepository.listMyOutgoingShares(fileID: context.entityID).count) ?? 0
+        }
     }
 
     private var searchField: some View {
@@ -195,10 +214,17 @@ struct ShareWithUserSheet: View {
     private func share(_ user: CloudUser) async {
         let alreadyShared = sharedIDs.contains(user.id)
         do {
-            try await env.cloudRepository.shareFileWithUser(
-                fileID: context.fileID,
-                recipientUserID: user.id
-            )
+            if context.isFolder {
+                try await env.cloudRepository.shareFolderWithUser(
+                    directoryID: context.entityID,
+                    recipientUserID: user.id
+                )
+            } else {
+                try await env.cloudRepository.shareFileWithUser(
+                    fileID: context.entityID,
+                    recipientUserID: user.id
+                )
+            }
             sharedIDs.insert(user.id)
             if !alreadyShared { outgoingCount += 1 }
             snackbar = String(format: String(localized: "shared_grant_success"), user.displayName)

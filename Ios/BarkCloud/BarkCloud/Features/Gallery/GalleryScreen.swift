@@ -51,6 +51,25 @@ struct GalleryScreen: View {
                 ids: assets.map(\.localIdentifier),
                 startIndex: assets.firstIndex(where: { $0.localIdentifier == item.id }) ?? 0,
                 resolve: Self.deviceResolve(assets: assets),
+                deviceActions: MediaPagerDeviceActions(
+                    albums: env.albumRepository,
+                    upload: { id in
+                        guard let asset = asset(withID: id) else { return false }
+                        return await vm?.uploadToCloud(asset: asset) ?? false
+                    },
+                    addToAlbum: { id, albumID in
+                        guard let asset = asset(withID: id) else { return false }
+                        return await vm?.addToAlbum(asset: asset, albumID: albumID) ?? false
+                    },
+                    createAlbumAndAdd: { id in
+                        guard let asset = asset(withID: id) else { return false }
+                        return await vm?.createAlbumAndAdd(asset: asset) ?? false
+                    },
+                    delete: { id in
+                        guard let asset = asset(withID: id) else { return false }
+                        return await vm?.deleteEverywhere(asset: asset) ?? false
+                    }
+                ),
                 onClose: { viewer = nil }
             )
         }
@@ -65,12 +84,10 @@ struct GalleryScreen: View {
         )) { context in
             ShareWithUserSheet(context: context) { vm?.pendingShareWithUser = nil }
         }
-        .sheet(item: Binding(
+        .sharePresenter(url: Binding(
             get: { vm?.pendingShareURL },
             set: { vm?.pendingShareURL = $0 }
-        )) { item in
-            ActivityViewController(activityItems: [item.url])
-        }
+        ))
         .sheet(item: $albumPickerAsset) { picker in
             AlbumPickerSheet(
                 albums: env.albumRepository,
@@ -80,6 +97,11 @@ struct GalleryScreen: View {
         }
         .overlay { if vm?.isUploading == true { uploadingOverlay(vm!) } }
         .overlay { if vm?.isProcessing == true { processingOverlay } }
+    }
+
+    /// PHAsset по localIdentifier из актуального списка VM (для действий вьювера).
+    private func asset(withID id: String) -> PHAsset? {
+        vm?.assets.first { $0.localIdentifier == id }
     }
 
     private var processingOverlay: some View {
@@ -111,28 +133,38 @@ struct GalleryScreen: View {
     private func grid(_ vm: GalleryViewModel) -> some View {
         ScrollView {
             LazyVGrid(columns: columns, spacing: Self.spacing) {
-                ForEach(vm.assets, id: \.localIdentifier) { asset in
-                    DeviceMediaThumb(
-                        asset: asset,
-                        isSelecting: vm.isSelecting,
-                        isSelected: vm.isSelected(asset),
-                        isInCloud: vm.cloudPresence[asset.localIdentifier] == true
-                    )
-                    .onTapGesture {
-                        if vm.isSelecting {
-                            vm.toggle(asset)
-                        } else {
-                            viewer = ViewerItem(id: asset.localIdentifier, asset: asset)
+                ForEach(MediaDateSections.make(from: vm.assets, date: gallerySectionDate)) { section in
+                    Section {
+                        ForEach(section.items, id: \.localIdentifier) { asset in
+                            DeviceMediaThumb(
+                                asset: asset,
+                                isSelecting: vm.isSelecting,
+                                isSelected: vm.isSelected(asset),
+                                isInCloud: vm.cloudPresence[asset.localIdentifier] == true
+                            )
+                            .onTapGesture {
+                                if vm.isSelecting {
+                                    vm.toggle(asset)
+                                } else {
+                                    viewer = ViewerItem(id: asset.localIdentifier, asset: asset)
+                                }
+                            }
+                            .shakeContextMenu(isActive: !vm.isSelecting) { itemMenu(vm, asset) }
+                            .onAppear { vm.observeCloudPresence(for: asset) }
                         }
+                    } header: {
+                        MediaDateSectionHeader(title: section.title)
                     }
-                    .shakeContextMenu(isActive: !vm.isSelecting) { itemMenu(vm, asset) }
-                    .onAppear { vm.observeCloudPresence(for: asset) }
                 }
             }
         }
         .barkRefreshable { await vm.refresh() }
         .safeAreaInset(edge: .bottom) { selectionBar(vm) }
         .overlay(alignment: .bottom) { snackbar(vm) }
+    }
+
+    private func gallerySectionDate(_ asset: PHAsset) -> Date {
+        asset.creationDate ?? asset.modificationDate ?? Date(timeIntervalSince1970: 0)
     }
 
     @ViewBuilder

@@ -6,7 +6,7 @@ import { SelectionBar } from '../components/ui/SelectionBar';
 import { useToast } from '../hooks/useToast';
 import { usePageHeader } from '../hooks/usePageHeader';
 import { useSelection } from '../hooks/useSelection';
-import { apiGet, apiPost } from '../lib/api';
+import { apiGet, apiPost, type BatchSummary } from '../lib/api';
 import { plural } from '../lib/format';
 import type { Page, TrashItem } from '../lib/types';
 
@@ -108,37 +108,33 @@ export function TrashPage() {
   }
   async function bulkRestore() {
     const chosen = (items || []).filter((i) => fsel.has(i.entryId));
-    let ok = 0;
-    for (const it of chosen) {
-      try {
-        await apiPost('/api/cloud/trash/restore', { entryId: it.entryId });
-        ok++;
-      } catch (e) {
-        toast(`«${it.name}»: ${(e as Error).message}`, 'err');
+    try {
+      const result = await apiPost<BatchSummary>('/api/cloud/trash/restore-batch', { entryIds: chosen.map((it) => it.entryId) });
+      fsel.clear();
+      if (result.succeeded) {
+        toast(result.failed ? `Восстановлено: ${result.succeeded}, не удалось: ${result.failed}` : `Восстановлено: ${result.succeeded}`);
+        load();
+      } else if (result.failed) {
+        toast('Не удалось восстановить выбранные файлы', 'err');
       }
-    }
-    fsel.clear();
-    if (ok) {
-      toast(`Восстановлено: ${ok}`);
-      load();
+    } catch (e) {
+      toast((e as Error).message, 'err');
     }
   }
   async function bulkPurge() {
     const chosen = (items || []).filter((i) => fsel.has(i.entryId));
-    let ok = 0;
-    for (const it of chosen) {
-      try {
-        await apiPost('/api/cloud/trash/purge', { entryId: it.entryId });
-        ok++;
-      } catch (e) {
-        toast(`«${it.name}»: ${(e as Error).message}`, 'err');
+    try {
+      const result = await apiPost<BatchSummary>('/api/cloud/trash/purge-batch', { entryIds: chosen.map((it) => it.entryId) });
+      setBulkPurgeConfirm(false);
+      fsel.clear();
+      if (result.succeeded) {
+        toast(result.failed ? `Удалено навсегда: ${result.succeeded}, не удалось: ${result.failed}` : `Удалено навсегда: ${result.succeeded}`);
+        load();
+      } else if (result.failed) {
+        toast('Не удалось удалить выбранные файлы навсегда', 'err');
       }
-    }
-    setBulkPurgeConfirm(false);
-    fsel.clear();
-    if (ok) {
-      toast(`Удалено навсегда: ${ok}`);
-      load();
+    } catch (e) {
+      toast((e as Error).message, 'err');
     }
   }
   async function empty() {

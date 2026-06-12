@@ -3,6 +3,13 @@ import Observation
 import Photos
 import BarkCloudKit
 
+extension Notification.Name {
+    /// BackupManager → CloudPresenceTracker: ассет с этим `localIdentifier`
+    /// (userInfo) подтверждённо загружен в облако фоновой автозагрузкой. Трекеры
+    /// галереи/пикера сразу показывают бейдж «в облаке» без повторного запроса.
+    static let backupAssetUploaded = Notification.Name("BarkCloud.backupAssetUploaded")
+}
+
 /// Управляет резервным копированием медиатеки устройства в облако: показывает квоту,
 /// ведёт прогрессивный скан (что уже в облаке — по SHA256 оригиналов), автозагрузку
 /// недостающего и освобождение места.
@@ -23,11 +30,17 @@ final class BackupManager {
     var scannedCount = 0
     var totalAssets = 0
 
-    // Очередь автозагрузки.
+    // Очередь автозагрузки. `uploadDone` растёт по факту завершения фоновой
+    // передачи (событие координатора), а не при постановке в URLSession.
     private(set) var pendingUpload: [PHAsset] = []
     var uploadDone = 0
     var uploadFailed = 0
     var currentAsset: PHAsset?
+    /// Сколько ассетов уже подано в URLSession, но ещё не завершилось/упало.
+    private var inFlightCount = 0
+    /// UploadJob.id → ассет: чтобы по completion-событию координатора понять,
+    /// какой именно ассет догрузился (jobs самих PHAsset не знают).
+    private var assetByJobID: [String: PHAsset] = [:]
     /// Имя файла текущего загружаемого ассета — для баннера прогресса над TabBar
     /// ([[UploadProgressObserver]]), который зеркалит эти счётчики.
     var currentFileName = ""
@@ -69,6 +82,12 @@ final class BackupManager {
         self.libraryObserver = BackupPhotoLibraryObserver { [weak self] in
             Task { @MainActor in await self?.refreshScanForNewAssets() }
         }
+        // Слушаем фактическое завершение фоновых передач: только по нему ассет
+        // считается загруженным (счётчики, бейдж в галерее, «Освободить место»).
+        BackgroundUploadCoordinator.shared.addObserver(
+            completion: { [weak self] snapshot in self?.backupJobFinished(snapshot, success: true) },
+            failure: { [weak self] snapshot in self?.backupJobFinished(snapshot, success: false) }
+        )
     }
 
     /// Текущий загружаемый + следующие 3 в очереди (как в Google Photos).
@@ -79,15 +98,23 @@ final class BackupManager {
         return result
     }
 
-    /// Сколько ещё осталось загрузить (включая текущий).
-    var remainingCount: Int { pendingUpload.count + (currentAsset != nil ? 1 : 0) }
+    /// Сколько ещё осталось загрузить: очередь + уже поданные в URLSession, но
+    /// ещё не завершившиеся передачи (текущий ассет учтён в `inFlightCount`).
+    var remainingCount: Int { pendingUpload.count + inFlightCount }
 
     // MARK: - Открытие модалки / возобновление при старте
 
-    /// Вызывать при открытии модалки: подтянуть квоту и запустить скан.
+    /// Вызывать при открытии модалки: подтянуть квоту и запустить скан. Если
+    /// первый скан уже был — лёгкий повторный (новые ассеты), чтобы числа и
+    /// кнопка «Освободить место» отражали актуальное состояние, а не снимок
+    /// на момент прошлого открытия.
     func onOpen() async {
         await loadStorageInfo()
-        startScanIfNeeded()
+        if didStartScan {
+            await refreshScanForNewAssets()
+        } else {
+            startScanIfNeeded()
+        }
     }
 
     /// Вызывать при старте приложения: если автозагрузка включена — продолжить
@@ -117,6 +144,10 @@ final class BackupManager {
             keep.formUnion(pendingUpload.map(\.localIdentifier))
             if let currentAsset { keep.insert(currentAsset.localIdentifier) }
             processedAssetIDs = keep
+            // Живых backup-jobs нет — события по «зависшим» in-flight уже не
+            // придут (их подберёт пере-скан), счётчик не должен застрять > 0.
+            inFlightCount = 0
+            assetByJobID.removeAll()
         }
         await refreshScanForNewAssets()
     }
@@ -220,11 +251,13 @@ final class BackupManager {
         autoUploadEnabled = on
         settings.autoUploadEnabled = on
         if on {
-            // Сбрасываем кеш processedAssetIDs — при предыдущем выключении мы
-            // могли потерять pendingUpload (отмена in-flight jobs) и теперь
-            // нужно дать scan'у снова разложить ассеты по бакетам. Иначе
-            // pendingUpload останется пуст и uploadLoop сразу же выйдет.
-            processedAssetIDs.removeAll()
+            // При предыдущем выключении мы могли потерять in-flight ассеты
+            // (отмена jobs) — даём scan'у разложить их заново. Подтверждённые
+            // и уже стоящие в очереди пропускаем, иначе scan надублирует их
+            // в pendingUpload и они уйдут на сервер повторно.
+            var keep = confirmedInCloudIDs
+            keep.formUnion(pendingUpload.map(\.localIdentifier))
+            processedAssetIDs = keep
             didStartScan = false
             startScanIfNeeded()
             startUploadLoop()
@@ -232,11 +265,14 @@ final class BackupManager {
             // Останавливаем продюсера и отменяем уже поданные в URLSession
             // backup-jobs (manual/share не трогаем). pendingUpload оставляем —
             // он переживёт re-toggle, чтобы при повторном включении не ждать
-            // полного re-scan'a.
+            // полного re-scan'a. Карту job→asset чистим до отмены: их
+            // failure-события не должны попасть в счётчик ошибок.
             uploadTask?.cancel()
             uploadTask = nil
             currentAsset = nil
             currentFileName = ""
+            inFlightCount = 0
+            assetByJobID.removeAll()
             Task { await BackgroundUploadCoordinator.shared.cancelActiveJobs(source: .backup) }
         }
     }
@@ -270,16 +306,16 @@ final class BackupManager {
                 continue
             }
             let asset = pendingUpload.removeFirst()
+            inFlightCount += 1
             currentAsset = asset
             currentFileName = PHAssetResource.assetResources(for: asset).first?.originalFilename ?? ""
             do {
-                try await enqueueAssetForBackup(asset)
-                uploadDone += 1
-                // В reclaimable ассет попадёт, только когда следующий скан
-                // подтвердит его на сервере (classify) — до подтверждения
-                // предлагать удалить оригинал нельзя.
-                await loadStorageInfo()
+                // Дальше судьбу job'а решает координатор: completed/failed
+                // прилетит в `backupJobFinished` — там счётчики и reclaimable.
+                let jobID = try await enqueueAssetForBackup(asset)
+                assetByJobID[jobID] = asset
             } catch {
+                inFlightCount = max(0, inFlightCount - 1)
                 uploadFailed += 1
             }
         }
@@ -288,10 +324,42 @@ final class BackupManager {
         await loadStorageInfo()
     }
 
+    /// Событие координатора: фоновая передача backup-job'а завершилась. Только
+    /// здесь ассет считается загруженным: двигаем счётчики, сразу предлагаем
+    /// освободить место (сервер файл подтвердил 2xx-ответом) и показываем бейдж
+    /// «в облаке» в галерее. Чужие job'ы (manual/share, прошлые запуски) — мимо.
+    private func backupJobFinished(_ snapshot: UploadJobSnapshot, success: Bool) {
+        guard snapshot.source == .backup,
+              let asset = assetByJobID.removeValue(forKey: snapshot.id) else { return }
+        inFlightCount = max(0, inFlightCount - 1)
+        guard success else {
+            uploadFailed += 1
+            return
+        }
+        uploadDone += 1
+        let id = asset.localIdentifier
+        if confirmedInCloudIDs.insert(id).inserted {
+            reclaimable.append(asset)
+            reclaimableBytes += DeviceAssetResource.originalByteSize(for: asset)
+        }
+        // Связь облако↔устройство — для синхронного удаления с устройства.
+        let fileID = snapshot.preparedFileID
+        if !fileID.isEmpty {
+            Task { await CloudDeviceLinkStore.shared.link(fileID: fileID, localIdentifier: id) }
+        }
+        NotificationCenter.default.post(
+            name: .backupAssetUploaded,
+            object: nil,
+            userInfo: ["localIdentifier": id]
+        )
+        Task { await loadStorageInfo() }
+    }
+
     /// Подготовить файл оригинала ассета в App Group container стримом (без RAM),
     /// получить uploadURL и поставить UploadJob в координатор. Фактическая
     /// передача идёт в фоне — переживает сворачивание и kill main app.
-    private func enqueueAssetForBackup(_ asset: PHAsset) async throws {
+    /// Возвращает id созданного UploadJob (ключ для `assetByJobID`).
+    private func enqueueAssetForBackup(_ asset: PHAsset) async throws -> String {
         guard let stagingDir = UploadConstants.stagingDirectory else {
             throw DeviceAssetError.noResource
         }
@@ -302,7 +370,7 @@ final class BackupManager {
         let sourcePath = FileManager.default.fileExists(atPath: renamed.path) ? renamed : originalPath
         // Без явной папки: сервер разложит по системным «Фото»/«Видео»/«Другие
         // документы» по типу медиа (route_by_media_kind) при attach в main app.
-        _ = try await cloud.enqueueBackgroundUpload(
+        return try await cloud.enqueueBackgroundUpload(
             sourceFile: sourcePath,
             fileName: fileName,
             mimeType: nil,

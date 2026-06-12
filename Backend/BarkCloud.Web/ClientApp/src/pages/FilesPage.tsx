@@ -14,13 +14,14 @@ import { SelectionBar } from '../components/ui/SelectionBar';
 import { useToast } from '../hooks/useToast';
 import { useAlbumMembership } from '../hooks/useAlbumMembership';
 import { useFileDrop } from '../hooks/useFileDrop';
-import { useDuplicatePrompt } from '../hooks/useDuplicatePrompt';
 import { useSelection } from '../hooks/useSelection';
 import { usePageHeader } from '../hooks/usePageHeader';
+import { pickDocumentIcon } from '../hooks/useDocumentHead';
+import { useUploadActions } from '../hooks/useUploadManager';
 import { DynamicFoldersStrip } from '../components/dynamic-folders/DynamicFoldersStrip';
 import { DynamicFolderDetail } from '../components/dynamic-folders/DynamicFolderDetail';
 import { DynamicFolderFormModal } from '../components/dynamic-folders/DynamicFolderFormModal';
-import { apiGet, apiPost, pickFiles, uploadFile, checkDuplicate } from '../lib/api';
+import { apiGet, apiPost, deleteEntriesBatch, pickFiles } from '../lib/api';
 import { createShare, createFolderShare } from '../lib/share';
 import type { Album, CardFile, DirInfo, DynamicFolder, Entry, Listing } from '../lib/types';
 
@@ -33,6 +34,16 @@ function fmtFull(iso: string | null): string {
 }
 function kindLabel(k: string | undefined): string {
   return k === 'photo' ? 'фото' : k === 'video' ? 'видео' : k === 'audio' ? 'аудио' : k === 'document' ? 'документ' : 'файл';
+}
+
+// Расширения, которые браузер показывает как текст — их открываем во вкладке (inline-прокси), не скачиваем.
+const TEXT_EXTS = new Set([
+  'txt', 'md', 'markdown', 'log', 'csv', 'tsv', 'json', 'xml', 'yaml', 'yml', 'ini', 'conf', 'cfg', 'env',
+  'html', 'htm', 'css', 'js', 'jsx', 'ts', 'tsx', 'cs', 'py', 'java', 'go', 'rs', 'rb', 'php',
+  'c', 'cpp', 'h', 'hpp', 'sh', 'bat', 'ps1', 'sql', 'svg',
+]);
+function isTextFile(m: CardFile | null | undefined): boolean {
+  return !!m && TEXT_EXTS.has((m.ext || '').toLowerCase());
 }
 
 type RenameTarget = { isDir: boolean; target: DirInfo | Entry };
@@ -70,12 +81,13 @@ function DirRow({ dir, onOpen, onRename, onDelete, onMenu }: {
   );
 }
 
-function FileRow({ entry, selected, bulkChecked, onBulkToggle, onSelect, onRename, onDelete, onDownload, onMenu }: {
+function FileRow({ entry, selected, bulkChecked, onBulkToggle, onSelect, onOpen, onRename, onDelete, onDownload, onMenu }: {
   entry: Entry;
   selected: boolean;
   bulkChecked: boolean;
   onBulkToggle: (e: Entry, shift: boolean) => void;
   onSelect: (e: Entry) => void;
+  onOpen: (e: Entry) => void;
   onRename: (e: Entry) => void;
   onDelete: (e: Entry) => void;
   onDownload: (e: Entry) => void;
@@ -83,7 +95,12 @@ function FileRow({ entry, selected, bulkChecked, onBulkToggle, onSelect, onRenam
 }) {
   const m = entry.media;
   return (
-    <tr className={(selected ? 'selected' : '') + (bulkChecked ? ' checked' : '')} onClick={() => onSelect(entry)} onContextMenu={(e) => onMenu(e, entry)}>
+    <tr
+      className={(selected ? 'selected' : '') + (bulkChecked ? ' checked' : '')}
+      onClick={() => onSelect(entry)}
+      onDoubleClick={() => onOpen(entry)}
+      onContextMenu={(e) => onMenu(e, entry)}
+    >
       <td className="selcell" onClick={(e) => e.stopPropagation()}>
         <input
           type="checkbox"
@@ -204,12 +221,6 @@ function Inspector({ entry, onOpen, onRename, onDelete, onDownload }: {
   );
 }
 
-interface UploadState {
-  pct: number;
-  current: number;
-  total: number;
-}
-
 export function FilesPage() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -220,7 +231,6 @@ export function FilesPage() {
   const [listing, setListing] = React.useState<Listing | null>(null);
   const [sel, setSel] = React.useState<Entry | null>(null);
   const [lightbox, setLightbox] = React.useState<CardFile | null>(null);
-  const [upload, setUpload] = React.useState<UploadState | null>(null);
   const [creating, setCreating] = React.useState(false);
   const [renaming, setRenaming] = React.useState<RenameTarget | null>(null);
   const [name, setName] = React.useState('');
@@ -234,23 +244,42 @@ export function FilesPage() {
   const [smartFolders, setSmartFolders] = React.useState<DynamicFolder[]>([]);
   const [openSmart, setOpenSmart] = React.useState<DynamicFolder | null>(null);
   const [creatingSmart, setCreatingSmart] = React.useState(false);
+  const [searchCursor, setSearchCursor] = React.useState<{ at: string; id: string } | null>(null);
+  const [searchMore, setSearchMore] = React.useState(false);
   const [toastNode, toast] = useToast();
-  const dup = useDuplicatePrompt();
+  const { enqueue, attachVersion } = useUploadActions();
   const { menu, openAt } = useContextMenu();
   const membership = useAlbumMembership(albums);
   const { over, dropHandlers } = useFileDrop((f) => doUpload(f));
   const fsel = useSelection();
 
   const currentDir = stack.length ? stack[stack.length - 1].id : '';
+  const selectedIconUrl = pickDocumentIcon(sel?.media);
+  const documentTitle = sel
+    ? sel.name
+    : openSmart
+      ? openSmart.name
+      : searchQuery
+        ? `Поиск: ${searchQuery}`
+        : stack.length
+          ? stack[stack.length - 1].name
+          : 'Файлы';
+  const documentIconUrl = sel ? selectedIconUrl : openSmart?.coverUrl || null;
 
   const load = React.useCallback(() => {
     setListing(null);
     setSel(null);
     fsel.clear();
-    // Режим поиска: результаты по имени (по всему облаку), без подпапок.
+    // Режим поиска: результаты по имени (по всему облаку), без подпапок; cursor-пагинация.
     if (searchQuery) {
-      apiGet<{ files: Entry[] }>('/api/cloud/search?q=' + encodeURIComponent(searchQuery))
-        .then((d) => setListing({ dirs: [], files: d.files || [] }))
+      setSearchCursor(null);
+      apiGet<{ files: Entry[]; nextCursorAt: string | null; nextCursorId: string }>(
+        '/api/cloud/search?q=' + encodeURIComponent(searchQuery),
+      )
+        .then((d) => {
+          setListing({ dirs: [], files: d.files || [] });
+          setSearchCursor(d.nextCursorAt && d.nextCursorId ? { at: d.nextCursorAt, id: d.nextCursorId } : null);
+        })
         .catch((e) => {
           toast((e as Error).message, 'err');
           setListing({ dirs: [], files: [] });
@@ -272,6 +301,9 @@ export function FilesPage() {
       });
   }, [currentDir, searchQuery, toast, fsel.clear]);
   React.useEffect(load, [load]);
+  const loadRef = React.useRef(load);
+  loadRef.current = load;
+  React.useEffect(() => { loadRef.current(); }, [attachVersion]);
 
   const loadAlbums = React.useCallback(() => {
     apiGet<{ albums: Album[] }>('/api/albums')
@@ -294,6 +326,20 @@ export function FilesPage() {
     membership.ensureLoaded();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [albums]);
+
+  function loadMoreSearch() {
+    if (!searchCursor || searchMore) return;
+    setSearchMore(true);
+    apiGet<{ files: Entry[]; nextCursorAt: string | null; nextCursorId: string }>(
+      `/api/cloud/search?q=${encodeURIComponent(searchQuery)}&cursorAt=${encodeURIComponent(searchCursor.at)}&cursorId=${encodeURIComponent(searchCursor.id)}`,
+    )
+      .then((d) => {
+        setListing((prev) => ({ dirs: prev?.dirs || [], files: [...(prev?.files || []), ...(d.files || [])] }));
+        setSearchCursor(d.nextCursorAt && d.nextCursorId ? { at: d.nextCursorAt, id: d.nextCursorId } : null);
+      })
+      .catch((e) => toast((e as Error).message, 'err'))
+      .finally(() => setSearchMore(false));
+  }
 
   const openDir = (dir: DirInfo) => setStack((s) => [...s, { id: dir.id, name: dir.name }]);
   const gotoIndex = (i: number) => setStack((s) => s.slice(0, i + 1));
@@ -355,6 +401,13 @@ export function FilesPage() {
     } catch (e) {
       toast((e as Error).message, 'err');
     }
+  }
+  // Двойной клик: фото/видео — в просмотрщике, текст — inline во вкладке, прочее — скачать.
+  function openEntry(entry: Entry) {
+    const m = entry.media;
+    if (m && (m.kind === 'photo' || m.kind === 'video')) setLightbox(m);
+    else if (isTextFile(m)) window.open('/api/files/view?id=' + encodeURIComponent(entry.fileId), '_blank');
+    else download(entry);
   }
   async function copyLink(fileId: string) {
     try {
@@ -428,48 +481,26 @@ export function FilesPage() {
   async function doUpload(dropped?: File[]) {
     const files = dropped && dropped.length ? dropped : await pickFiles({});
     if (!files.length) return;
-    let processed = 0;
-    let uploaded = 0;
-    for (const f of files) {
-      setUpload({ current: processed + 1, total: files.length, pct: 0 });
-      try {
-        const d = await checkDuplicate(f);
-        if (d.exists && !(await dup.ask(f.name, d.locations))) {
-          processed++;
-          continue;
-        }
-        const res = await uploadFile(f, (p) => setUpload({ current: processed + 1, total: files.length, pct: Math.round(p * 100) }));
-        // Загрузка в открытую папку — кладём именно в неё (без авто-распределения по типу).
-        await apiPost('/api/cloud/attach', { dir: currentDir, fileId: res.fileId, name: f.name });
-        uploaded++;
-      } catch (e) {
-        toast(`«${f.name}»: ${(e as Error).message}`, 'err');
-      }
-      processed++;
-    }
-    setUpload(null);
-    if (uploaded > 0) toast(`Загружено: ${uploaded}`);
-    load();
+    enqueue(files, { dir: currentDir });
   }
 
   async function bulkDelete() {
     const chosen = (listing?.files || []).filter((e) => fsel.has(e.entryId));
-    let ok = 0;
-    for (const e of chosen) {
-      try {
-        await apiPost('/api/cloud/entry/delete', { entryId: e.entryId });
-        ok++;
-      } catch (err) {
-        toast(`«${e.name}»: ${(err as Error).message}`, 'err');
+    try {
+      const result = await deleteEntriesBatch(chosen.map((e) => e.entryId));
+      setBulkConfirm(false);
+      fsel.clear();
+      if (result.succeeded) {
+        toast(result.failed ? `Перемещено в корзину: ${result.succeeded}, не удалось: ${result.failed}` : `Перемещено в корзину: ${result.succeeded}`);
+        load();
+      } else if (result.failed) {
+        toast('Не удалось переместить выбранные файлы в корзину', 'err');
       }
-    }
-    setBulkConfirm(false);
-    fsel.clear();
-    if (ok) {
-      toast(`Перемещено в корзину: ${ok}`);
-      load();
+    } catch (err) {
+      toast((err as Error).message, 'err');
     }
   }
+
   async function bulkMove(targetDir: string) {
     const chosen = (listing?.files || []).filter((e) => fsel.has(e.entryId));
     let ok = 0;
@@ -504,6 +535,8 @@ export function FilesPage() {
   usePageHeader(
     () => ({
       title: 'Файлы',
+      documentTitle,
+      documentIconUrl,
       kicker: (
         <>
           <span>Библиотека</span>
@@ -523,7 +556,7 @@ export function FilesPage() {
         </>
       ),
     }),
-    [currentDir],
+    [currentDir, documentTitle, documentIconUrl],
   );
 
   const dirs = listing ? listing.dirs : [];
@@ -534,7 +567,6 @@ export function FilesPage() {
   return (
     <>
       {toastNode}
-      {dup.overlay}
       <SelectionBar
         count={fsel.count}
         onClear={fsel.clear}
@@ -581,15 +613,6 @@ export function FilesPage() {
               </div>
             )}
           </div>
-
-          {upload && (
-            <div className="upload-banner" style={{ margin: '0 24px 12px' }}>
-              <span className="spinner" /> Загрузка {upload.current}/{upload.total}…
-              <div className="bar">
-                <div className="bar-fill" style={{ width: upload.pct + '%' }} />
-              </div>
-            </div>
-          )}
 
           {!openSmart && !searchQuery && smartFolders.length > 0 && (
             <DynamicFoldersStrip folders={smartFolders} onOpen={setOpenSmart} onCreate={() => setCreatingSmart(true)} />
@@ -666,6 +689,7 @@ export function FilesPage() {
                       bulkChecked={fsel.has(e.entryId)}
                       onBulkToggle={(t, shift) => fsel.select(t.entryId, files.map((f) => f.entryId), shift)}
                       onSelect={setSel}
+                      onOpen={openEntry}
                       onDownload={download}
                       onRename={(t) => startRename(t, false)}
                       onDelete={(t) => requestDelete(t, false)}
@@ -674,6 +698,13 @@ export function FilesPage() {
                   ))}
                 </tbody>
               </table>
+            )}
+            {searchQuery && searchCursor && (
+              <div style={{ display: 'flex', justifyContent: 'center', padding: '14px 0' }}>
+                <button className="btn outlined" onClick={loadMoreSearch} disabled={searchMore}>
+                  {searchMore ? 'Загрузка…' : 'Показать ещё'}
+                </button>
+              </div>
             )}
           </div>
           )}

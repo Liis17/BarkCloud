@@ -11,6 +11,7 @@ using BarkCloud.TestKit;
 
 using MassTransit;
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -31,15 +32,19 @@ public class ResetPasswordCommandHandlerTests
 
     public ResetPasswordCommandHandlerTests()
     {
-        _notifications = new Mock<NotificationQueueSender>(Mock.Of<IPublishEndpoint>());
+        _notifications = new Mock<NotificationQueueSender>(Mock.Of<IPublishEndpoint>(), new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build());
         _notifications.Setup(n => n.SendNotification(It.IsAny<Notification>())).Returns(Task.CompletedTask);
         _location = new Mock<LocationClient>(new HttpClient(), new MetricsCollector(), NullLogger<LocationClient>.Instance);
         _location.Setup(c => c.GetLocation(It.IsAny<string>())).ReturnsAsync((IpLocation?)null);
     }
 
-    private ResetPasswordCommandHandler CreateSut(RequestContext? ctx = null) => new(
+    private static IConfiguration EmailConfig(bool enabled) => new ConfigurationBuilder()
+        .AddInMemoryCollection(new Dictionary<string, string?> { ["Features:EmailEnabled"] = enabled ? "true" : "false" })
+        .Build();
+
+    private ResetPasswordCommandHandler CreateSut(RequestContext? ctx = null, bool emailEnabled = true) => new(
         _resets.Object, _authProps.Object, _usersClient.Object,
-        ctx ?? FullContext(), _notifications.Object, _location.Object, _metrics, _logger);
+        ctx ?? FullContext(), _notifications.Object, _location.Object, _metrics, EmailConfig(emailEnabled), _logger);
 
     private static RequestContext FullContext() => new()
     {
@@ -138,5 +143,15 @@ public class ResetPasswordCommandHandlerTests
         _notifications.Verify(n => n.SendNotification(It.Is<EmailNotification>(
             e => e.Type == NotificationType.ResetPassword)), Times.Once);
         _metrics.SnapshotAndReset().Should().ContainKey("password_reset_initiated_email");
+    }
+
+    [Fact]
+    public async Task Handle_EmailType_EmailDisabled_Throws()
+    {
+        var act = () => CreateSut(emailEnabled: false).Handle(
+            new ResetPasswordCommand { Email = "u@e", OtpType = OtpType.Email }, default);
+
+        await act.Should().ThrowAsync<EmailServiceDisabledException>();
+        _usersClient.Verify(c => c.FindByLoginAsync(It.IsAny<FindByLoginRequest>(), null, null, default), Times.Never);
     }
 }

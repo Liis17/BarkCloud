@@ -60,9 +60,9 @@ Tests/
 | Проект | Тестов | Покрытые компоненты |
 |--------|-------:|---------------------|
 | `BarkCloud.Identity.Tests` | 119 | 20/20 хендлеров (client + 6 `*Server` admin-вариантов), `Services/` (`JwtService`, `PasswordHasher`, `CodeGenerator`, `RefreshTokenGenerator`), консьюмеры |
-| `BarkCloud.Users.Tests` | 69 | Все хендлеры (Devices×7, Privacy×2, Search/ListByIds/Contacts, ProfilePicture×2, ProfileServer, StorageLimit и пр.) + `SessionRevokedConsumer` |
+| `BarkCloud.Users.Tests` | 70 | Все хендлеры (Devices×7, Privacy×2, Search/ListByIds/Contacts, ProfilePicture×2, ProfileServer, StorageLimit и пр.) + `SessionRevokedConsumer` |
 | `BarkCloud.Web.Tests` | 49 | Rendering (`Format`, `FileKind`, `CloudJson`), `AuthGateway` (маппинг x-error-code → `LoginOutcome`) |
-| `BarkCloud.Files.Tests` | 164 | 43/44 хендлеров (Album×7, Cloud×26 — директории/корзина/шеринг/избранное/медиа, `GetFileData`/`GetFilesData`, `UploadFile` и др.), сервисы `ImageCompressor`/`AlbumViewBuilder`, `SessionRevokedConsumer`. Пропущены: `UploadAvatarServer` (линейный S3/image-IO, `ImageCompressor` не `virtual`), `UserDeletedConsumer` (прямые `ExecuteDeleteAsync` по `FilesContext`), `VideoThumbnailExtractor`/`PreviewPersistenceService`/`*CleanupService` (IO/таймеры) |
+| `BarkCloud.Files.Tests` | 167 | 43/44 хендлеров (Album×7, Cloud×26 — директории/корзина/шеринг/избранное/медиа, `GetFileData`/`GetFilesData`, `UploadFile` и др.), сервисы `ImageCompressor`/`AlbumViewBuilder`/`PhysicalStorageStatsProvider`, `SessionRevokedConsumer`. Пропущены: `UploadAvatarServer` (линейный S3/image-IO, `ImageCompressor` не `virtual`), `UserDeletedConsumer` (прямые `ExecuteDeleteAsync` по `FilesContext`), `VideoThumbnailExtractor`/`PreviewPersistenceService`/`*CleanupService` (IO/таймеры) |
 | `BarkCloud.Shared.SecurityUtilities.Tests` | 23 | `SecurityUtilities.EvaluatePasswordStrength`, `GetPasswordStrengthMessage` |
 | `BarkCloud.GrpcServer.Tests` | 17 | `TokenRevocationCache`, `MetricsCollector`, `ServerExceptionInterceptor` |
 | `BarkCloud.Notification.Tests` | 9 | `EmailMasker`, `HtmlEmailTemplateParser`, `EmailQueueConsumer` |
@@ -87,13 +87,23 @@ dotnet test Tests/Backend/BarkCloud.Identity.Tests/BarkCloud.Identity.Tests.cspr
 
 ## CI
 
-Workflow `.github/workflows/tests.yml` — гранулярный запуск по изменённым путям через `dorny/paths-filter@v4`:
+Workflow `.github/workflows/tests.yml` — гранулярный запуск по изменённым путям через `dorny/paths-filter@v4` для pull request и ручных прогонов:
 - **`changes`** — джоба-диспетчер: определяет изменённые части (per-микросервис, `shared`, `android`) и выдаёт outputs. Изменения в `Shared/**` или `Tests/BarkCloud.TestKit/**` триггерят все backend-тесты (микросервисы зависят от Shared/Proto).
 - **`test-<сервис>`** (configuration/files/grpcserver/identity/notification/users/web) — `runs-on: [self-hosted, linux]`, каждая гоняет только свой `.Tests`-проект; `if`: изменена своя папка **или** `shared`.
 - **`test-shared`** — все `Shared.*.Tests` одним прогоном при изменении `Shared/**`.
 - **`android-tests`** — `runs-on: ubuntu-latest`, `./gradlew :app:testDebugUnitTest`, только при изменениях в `Android/**`.
 - **`ios-tests`** — будет добавлен в этапе P3 (требует macOS-раннера).
 
+Backend deploy-воркфлоу `build-backend-*.yml` вызывают общий reusable workflow `.github/workflows/backend-service-ci.yml`:
+- **`changes`** — проверяет runtime-изменения (`Backend/BarkCloud.<Service>/**`, `Shared/**`, `Backend/rebuild.trigger`) и test-only изменения (`Tests/Backend/BarkCloud.<Service>.Tests/**`, `Tests/BarkCloud.TestKit/**`).
+- **`check-dotnet`** — проверяет .NET 10.0 SDK на `[self-hosted, linux]`.
+- **`test`** — сначала запускает тесты конкретного сервиса. При падении отправляет Telegram-сообщение с inline-кнопкой на текущий GitHub Actions run, а сборка не стартует.
+- **`build`** — запускается только после успешных тестов и только при runtime-изменениях или ручном запуске. Публикует Docker-образ и отправляет Telegram-сообщение об успехе или провале с кнопкой на GitHub Actions run.
+
+Docker-теги сохраняют прежнее правило: для ветки `dev` используется постфикс `-dev`, для `master` — имя образа без постфикса. Например, `barkcloud-files-dev:<sha>` в `dev` и `barkcloud-files:<sha>` в `master`.
+
 Drive (`Drive/*`, WPF/Windows, тестов нет) в CI не собирается — только локально. Backend-воркфлоу `build-backend-*.yml` привязаны к `[self-hosted, linux]`, чтобы не уехать на Windows self-hosted runner (общий label `self-hosted`).
 
-Триггеры: push в `dev`/`master`/`claude/**`, pull_request в `dev`/`master`, workflow_dispatch.
+Триггеры:
+- `tests.yml`: pull_request в `dev`/`master`, workflow_dispatch.
+- `build-backend-*.yml`: push в `dev`/`master` по путям конкретного сервиса, `Shared/**`, его тестам, `Tests/BarkCloud.TestKit/**`, `Backend/rebuild.trigger`; также workflow_dispatch.

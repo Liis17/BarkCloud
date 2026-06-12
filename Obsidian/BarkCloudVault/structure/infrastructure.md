@@ -58,7 +58,7 @@ Parent: [[index]] · See also: [[structure/overview]] · [[structure/entrypoints
 
 - `pgdata` — данные PostgreSQL
 - `rabbitmq_data` — данные RabbitMQ
-- `minio_data` — данные MinIO (named volume по умолчанию; путь `/data` переопределяется через `MINIO_DATA_PATH` в `.env` — см. раздел «MinIO на отдельном диске» ниже)
+- `minio_data` — данные MinIO по умолчанию (named volume). Источник `/data` переопределяется через `MINIO_DATA_PATH` в `.env`; тот же источник монтируется в `cloud-files` read-only как `/mnt/minio-data` для расчёта физического объёма диска. Вынос на отдельный диск — см. раздел «MinIO на отдельном диске» ниже.
 - `backup_volume` — бэкапы (монтируется в Postgres-контейнер на `/backup`)
 - `seq_data` — данные Seq
 

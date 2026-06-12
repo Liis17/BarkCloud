@@ -12,6 +12,8 @@ public static class SystemDynamicFolders
     public const string KeyRecentDocs = "sys-recent-docs";
     public const string KeyLarge = "sys-large";
     public const string KeyScreenshots = "sys-screenshots";
+    public const string KeyDuplicateMedia = "sys-duplicate-media";
+    public const string KeyDuplicateFiles = "sys-duplicate-files";
 
     /// <summary>«Недавно загруженные» — за последние N дней.</summary>
     public const int RecentDays = 3;
@@ -35,7 +37,12 @@ public static class SystemDynamicFolders
             Operator = DfOperator.Equals,
             Value = $"{(int)MediaKind.Photo},{(int)MediaKind.Video}"
         };
-        var docKind = new DynamicFolderRule { Field = DfField.MediaKind, Operator = DfOperator.Equals, Value = ((int)MediaKind.Document).ToString() };
+        var nonMediaKinds = new DynamicFolderRule
+        {
+            Field = DfField.MediaKind,
+            Operator = DfOperator.Equals,
+            Value = $"{(int)MediaKind.Document},{(int)MediaKind.Audio},{(int)MediaKind.Other}"
+        };
 
         return new[]
         {
@@ -43,13 +50,17 @@ public static class SystemDynamicFolders
                 recentDays, mediaKinds),
 
             Build(KeyRecentDocs, "Недавние документы", "doc", "#5C97A8", 1, DfViewMode.List,
-                recentDays, docKind),
+                recentDays, nonMediaKinds),
 
-            Build(KeyLarge, "Большие файлы", "hdd", "#E0883B", 2, DfViewMode.Grid,
+            Build(KeyLarge, "Большие файлы", "hdd", "#E0883B", 2, DfViewMode.List,
                 new DynamicFolderRule { Field = DfField.Size, Operator = DfOperator.GreaterThan, Value = LargeSizeBytes.ToString() }),
 
             Build(KeyScreenshots, "Скриншоты", "camera", "#7E57C2", 3, DfViewMode.Grid,
                 new DynamicFolderRule { Field = DfField.Name, Operator = DfOperator.Contains, Value = ScreenshotToken }),
+
+            Build(KeyDuplicateMedia, "Дубликаты фото и видео", "photo", "#2F8F83", 4, DfViewMode.Grid),
+
+            Build(KeyDuplicateFiles, "Дубликаты файлов", "doc", "#8A6BBE", 5, DfViewMode.List),
         };
     }
 
@@ -63,6 +74,10 @@ public static class SystemDynamicFolders
     }
 
     public static bool IsSystemKey(string? id) => id is not null && id.StartsWith("sys-", StringComparison.Ordinal);
+
+    public static bool IsDuplicateKey(string? id) => id is KeyDuplicateMedia or KeyDuplicateFiles;
+
+    public static bool IsDuplicateMediaKey(string? id) => id == KeyDuplicateMedia;
 
     private static DynamicFolder Build(string key, string name, string icon, string color, int order, DfViewMode viewMode, params DynamicFolderRule[] rules)
     {

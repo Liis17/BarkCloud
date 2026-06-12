@@ -682,7 +682,7 @@ img.avatar { object-fit: cover; }
 
 /* Modal */
 .modal-backdrop {
-  position: fixed; inset: 0; z-index: 1000;
+  position: fixed; inset: 0; z-index: 1150; /* выше .lightbox (1100): модалки открываются и из панели Lightbox */
   background: rgba(0,0,0,.5);
   display: flex; align-items: center; justify-content: center;
   padding: 24px;
@@ -707,7 +707,7 @@ img.avatar { object-fit: cover; }
 .modal-head h3 { font-size: 20px; font-weight: 500; color: var(--md-on-surface); }
 .modal-body { padding: 4px 20px 8px; overflow-y: auto; }
 .modal-actions {
-  display: flex; gap: 8px; justify-content: flex-end;
+  display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap;
   padding: 14px 20px 20px;
 }
 .modal label.field-label {
@@ -773,6 +773,20 @@ img.avatar { object-fit: cover; }
 .lb-download {
   position: absolute; bottom: 22px; left: 50%; transform: translateX(-50%);
 }
+/* Плавающая панель действий под изображением (рендерится при переданных actions) */
+.lb-actions {
+  position: absolute; bottom: 22px; left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 4px;
+  padding: 6px 10px;
+  background: rgba(18,18,18,.72);
+  border-radius: var(--r-xl);
+  backdrop-filter: blur(10px);
+}
+.lb-actions .icon-btn { color: #fff; }
+.lb-actions .icon-btn:hover { background: rgba(255,255,255,.16); color: #fff; }
+.lb-actions .icon-btn:disabled { opacity: .35; cursor: default; }
+.lb-actions .icon-btn:disabled:hover { background: transparent; }
+.lb-actions .icon-btn.danger:hover { background: color-mix(in srgb, var(--md-error) 38%, transparent); }
 /* Прозрачные кнопки перелистывания по краям — проявляются при наведении */
 .lb-nav {
   position: absolute; top: 50%; transform: translateY(-50%);
@@ -872,26 +886,186 @@ img.avatar { object-fit: cover; }
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
+.prop-empty { font-size: 14px; color: var(--md-on-surface-variant); padding: 4px 0 8px; }
+.prop-activity { display: grid; gap: 10px; padding: 4px 0 8px; }
+.prop-activity-row { display: grid; grid-template-columns: 14px 1fr; gap: 10px; align-items: start; }
+.pa-dot {
+  width: 8px; height: 8px; margin: 6px 0 0 3px;
+  border-radius: var(--r-full);
+  background: var(--md-primary);
+}
+.pa-main { min-width: 0; }
+.pa-text { font-size: 14px; color: var(--md-on-surface); overflow-wrap: anywhere; }
+.pa-time { margin-top: 2px; font-size: 12px; color: var(--md-on-surface-variant); }
 
 /* Сентинел бесконечной прокрутки */
 .infinite-sentinel { min-height: 1px; padding: 8px 0 28px; display: flex; justify-content: center; }
 
-/* Upload progress (для тулбара/баннера) */
-.upload-banner {
-  display: flex; align-items: center; gap: 12px;
-  padding: 12px 16px;
-  background: var(--md-primary-container);
-  color: var(--md-on-primary-container);
-  border-radius: var(--r-md);
-  margin-bottom: 16px;
-  font-size: 14px; font-weight: 500;
+/* Upload indicator in topbar + popup panel */
+.upload-indicator {
+  position: relative;
+  transition: background var(--d-short), color var(--d-short);
 }
-.upload-banner .bar {
-  flex: 1; height: 6px; border-radius: var(--r-full);
-  background: color-mix(in srgb, var(--md-on-primary-container) 20%, transparent);
+.upload-indicator.active {
+  color: var(--md-primary);
+  background: color-mix(in srgb, var(--md-primary) 12%, transparent);
+}
+.upload-ind-badge {
+  position: absolute;
+  top: 4px; right: 4px;
+  min-width: 16px; height: 16px;
+  padding: 0 4px;
+  border-radius: var(--r-full);
+  background: var(--md-primary);
+  color: var(--md-on-primary);
+  font-size: 10px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+.upload-ind-badge.err { background: var(--md-error); color: var(--md-on-error, #fff); }
+
+.upload-popup {
+  position: absolute;
+  top: 56px;
+  right: 28px;
+  width: 400px;
+  max-height: 480px;
+  background: var(--md-surface-container-low);
+  border: 1px solid var(--md-outline-variant);
+  border-radius: var(--r-lg);
+  box-shadow: var(--el-3);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  animation: bc-pop var(--d-short) var(--m-emph);
+}
+.upload-popup-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 99;
+}
+
+.upload-popup-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px 8px;
+}
+.upload-popup-title {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--md-on-surface);
+}
+.icon-btn.sm {
+  width: 32px; height: 32px;
+}
+
+.upload-popup-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 16px 10px;
+}
+.upload-popup-bar {
+  flex: 1;
+  height: 4px;
+  background: var(--md-surface-container-highest);
+  border-radius: var(--r-full);
   overflow: hidden;
 }
-.upload-banner .bar-fill { height: 100%; background: var(--md-primary); transition: width var(--d-short); }
+.upload-popup-bar .bar-fill {
+  height: 100%;
+  background: var(--md-primary);
+  border-radius: var(--r-full);
+  transition: width 200ms ease;
+}
+.upload-popup-pct {
+  font-size: 12px;
+  color: var(--md-on-surface-variant);
+  font-weight: 500;
+  min-width: 36px;
+  text-align: right;
+}
+
+.upload-popup-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 8px;
+}
+
+.upload-popup-foot {
+  padding: 8px 12px;
+  border-top: 1px solid var(--md-outline-variant);
+}
+
+.upload-task {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px;
+  border-radius: var(--r-sm);
+  transition: background var(--d-short);
+}
+.upload-task:hover { background: var(--md-surface-container-high); }
+.upload-task-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+  flex-shrink: 0;
+}
+.upload-status.done { color: var(--md-success); }
+.upload-status.err { color: var(--md-error); }
+.upload-status.skip { color: var(--md-on-surface-variant); opacity: .5; }
+
+.upload-task-body { flex: 1; min-width: 0; }
+.upload-task-name {
+  font-size: 14px;
+  color: var(--md-on-surface);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.upload-task-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--md-on-surface-variant);
+  margin-top: 2px;
+}
+.upload-task-bar {
+  height: 4px;
+  background: var(--md-surface-container-highest);
+  border-radius: var(--r-full);
+  overflow: hidden;
+  margin-top: 6px;
+}
+.upload-task-bar .bar-fill {
+  height: 100%;
+  background: var(--md-primary);
+  border-radius: var(--r-full);
+  transition: width 200ms ease;
+}
+.upload-task-eta {
+  color: var(--md-on-surface-variant);
+  opacity: .7;
+}
+.upload-task-error {
+  font-size: 12px;
+  color: var(--md-error);
+  margin-top: 4px;
+}
+.upload-task-actions {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
 
 /* Album cards (Фото / Видео) */
 .album-grid {
@@ -1009,12 +1183,103 @@ img.avatar { object-fit: cover; }
   cursor: pointer;
 }
 .df-list-row:hover { background: var(--md-surface-container-high); }
+.df-list-row.checked { background: var(--md-primary-container); }
 .df-list-main { flex: 1; min-width: 0; }
 .df-list-main .fn { font-size: 14px; color: var(--md-on-surface); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .df-list-main .meta { font-size: 12px; color: var(--md-on-surface-variant); margin-top: 2px; }
 .df-list-size { flex: 0 0 auto; width: 90px; text-align: right; font-size: 13px; color: var(--md-on-surface-variant); }
 .df-list-date { flex: 0 0 auto; width: 160px; text-align: right; font-size: 13px; color: var(--md-on-surface-variant); }
+.df-selbox {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid var(--md-outline);
+  background: var(--md-surface);
+  color: var(--md-on-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.df-list-row:hover .df-selbox,
+.df-list-row.checked .df-selbox {
+  border-color: var(--md-primary);
+}
+.df-list-row.checked .df-selbox {
+  background: var(--md-primary);
+}
 @media (max-width: 700px) { .df-list-date { display: none; } }
+
+/* Группы системных папок дубликатов */
+.df-dup-groups { display: flex; gap: 14px; }
+.df-dup-groups.media {
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+.df-dup-groups.list {
+  flex-direction: column;
+}
+.df-dup-group {
+  border: 1px solid var(--md-outline-variant);
+  background: var(--md-surface-container-low);
+  border-radius: var(--r-lg);
+  box-shadow: 0 1px 2px rgba(0,0,0,.05);
+}
+.df-dup-group.media {
+  width: fit-content;
+  max-width: 100%;
+  padding: 12px;
+}
+.df-dup-group.list {
+  width: 100%;
+  padding: 10px;
+}
+.df-dup-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.df-dup-title { font-size: 15px; font-weight: 650; color: var(--md-on-surface); }
+.df-dup-meta { font-size: 12px; color: var(--md-on-surface-variant); margin-top: 2px; }
+.df-dup-media-items {
+  display: grid;
+  grid-template-columns: repeat(var(--dup-cols), minmax(96px, 148px));
+  gap: 10px;
+}
+.df-dup-photo {
+  position: relative;
+  aspect-ratio: 1/1;
+  cursor: pointer;
+  border-radius: var(--r-md);
+  overflow: hidden;
+  background: var(--md-surface-container);
+  transition: transform var(--d-short);
+}
+.df-dup-photo:hover { transform: scale(1.02); z-index: 2; }
+.df-dup-photo.checked { outline: 3px solid var(--md-primary); outline-offset: -3px; }
+.df-dup-photo .thumb { width: 100%; height: 100%; border-radius: var(--r-md); }
+.df-dup-photo .vbadge {
+  position: absolute; bottom: 8px; right: 8px;
+  font-size: 11px;
+  background: rgba(0,0,0,.65); color: #fff;
+  padding: 3px 8px; border-radius: var(--r-full);
+  font-weight: 500;
+  display: inline-flex; align-items: center; gap: 4px;
+}
+.df-dup-list {
+  overflow: hidden;
+  border-radius: var(--r-md);
+  background: var(--md-surface);
+}
+.df-dup-list .df-list-row { border-radius: 0; }
+.df-dup-list .df-list-row + .df-list-row { border-top: 1px solid var(--md-outline-variant); }
+@media (max-width: 700px) {
+  .df-dup-group.media { width: 100%; }
+  .df-dup-media-items { grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); }
+}
 
 /* Сетка медиа (фото/видео/элементы альбома) — общая для страниц Фото и Видео */
 .photo-grid {
@@ -1071,7 +1336,8 @@ img.avatar { object-fit: cover; }
 
 /* ─────────── Множественный выбор в галереях ─────────── */
 .photo-grid .photo .selbox,
-.vcard .vthumb .selbox {
+.vcard .vthumb .selbox,
+.df-dup-photo .selbox {
   position: absolute; top: 8px; left: 8px; z-index: 3;
   width: 24px; height: 24px; border-radius: 50%;
   border: 2px solid #fff; background: rgba(0,0,0,.35); color: #fff;
@@ -1079,10 +1345,13 @@ img.avatar { object-fit: cover; }
   opacity: 0; transition: opacity var(--d-short), background var(--d-short);
 }
 .photo-grid .photo:hover .selbox,
+.df-dup-photo:hover .selbox,
 .vcard:hover .vthumb .selbox,
 .photo-grid .photo.checked .selbox,
+.df-dup-photo.checked .selbox,
 .vcard.checked .vthumb .selbox { opacity: 1; }
 .photo-grid .photo.checked .selbox,
+.df-dup-photo.checked .selbox,
 .vcard.checked .vthumb .selbox { background: var(--md-primary); border-color: var(--md-primary); }
 .photo-grid .photo.checked { outline: 3px solid var(--md-primary); outline-offset: -3px; }
 .vcard.checked .vthumb { outline: 3px solid var(--md-primary); outline-offset: -3px; }

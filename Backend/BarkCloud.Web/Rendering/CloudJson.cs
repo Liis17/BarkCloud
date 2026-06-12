@@ -26,6 +26,7 @@ public static class CloudJson
         card["entriesCount"] = i.EntriesCount;
         card["entryNames"] = i.EntryNames.ToArray();
         card["entryIds"] = i.EntryIds.ToArray();
+        card["duplicateGroupKey"] = i.DuplicateGroupKey;
         return card;
     }
 
@@ -133,7 +134,7 @@ public static class CloudJson
         items = g.Items.Select(Media).ToArray()
     };
 
-    private static string MediaKindName(MediaKind kind) => kind switch
+    internal static string MediaKindName(MediaKind kind) => kind switch
     {
         MediaKind.Photo => "photo",
         MediaKind.Video => "video",

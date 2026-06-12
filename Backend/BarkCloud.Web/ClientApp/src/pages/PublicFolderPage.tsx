@@ -1,6 +1,8 @@
 import React from 'react';
 import { useParams } from 'react-router-dom';
 import { Icon } from '../components/Icon';
+import { PublicShareHeader, PublicShareShell, PublicStatus } from '../components/public/PublicShareShell';
+import { useDocumentHead } from '../hooks/useDocumentHead';
 
 interface PubDir {
   id: string;
@@ -37,9 +39,6 @@ function fmtSize(bytes: number): string {
   return (i === 0 ? v.toFixed(0) : v.toFixed(v < 10 ? 1 : 0)).replace('.', ',') + ' ' + u[i];
 }
 
-const wrap: React.CSSProperties = { minHeight: '100vh', background: 'var(--md-surface, #101014)', color: 'var(--md-on-surface, #e6e6ea)' };
-const inner: React.CSSProperties = { maxWidth: 1100, margin: '0 auto', padding: '24px 20px 64px' };
-
 /** Публичная страница папки по шаринг-ссылке (/f/:token). Без авторизации; контент динамический. */
 export function PublicFolderPage() {
   const { token } = useParams<{ token: string }>();
@@ -50,6 +49,14 @@ export function PublicFolderPage() {
   const [viewer, setViewer] = React.useState<PubFile | null>(null);
 
   const here = stack[stack.length - 1];
+  const folderTitle = data?.currentName || here.name || data?.folderName || 'Публичная папка';
+  const headTitle = viewer?.name || (state === 'notfound' ? 'Папка недоступна' : folderTitle);
+  const headIconUrl = viewer?.previewUrl || null;
+
+  useDocumentHead(
+    () => ({ title: headTitle, iconUrl: headIconUrl }),
+    [headTitle, headIconUrl],
+  );
 
   React.useEffect(() => {
     let alive = true;
@@ -79,70 +86,62 @@ export function PublicFolderPage() {
   }
 
   if (state === 'loading') {
-    return (
-      <div style={{ ...wrap, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <span className="spinner" />
-      </div>
-    );
+    return <PublicStatus icon={Icon.folder} title="Открываем папку" loading />;
   }
   if (state === 'notfound') {
     return (
-      <div style={{ ...wrap, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, textAlign: 'center' }}>
-        <div>
-          <Icon.folder size={44} />
-          <h2 style={{ margin: '12px 0 6px' }}>Папка недоступна</h2>
-          <p style={{ color: 'var(--md-on-surface-variant, #9a9aa6)' }}>Папка не найдена или ссылка была отозвана.</p>
-        </div>
-      </div>
+      <PublicStatus
+        icon={Icon.folder}
+        title="Папка недоступна"
+        text="Папка не найдена или владелец отозвал доступ."
+      />
     );
   }
 
   const d = data!;
+  const meta = `${d.subdirs.length} папок · ${d.files.length} файлов`;
   return (
-    <div style={wrap}>
-      <div style={inner}>
-        <div className="breadcrumb" style={{ marginBottom: 18, fontSize: 15 }}>
+    <PublicShareShell>
+      <PublicShareHeader
+        icon={Icon.folder}
+        label="Публичная папка BarkCloud"
+        title={d.currentName || d.folderName}
+        subtitle="Содержимое открывается прямо по ссылке, без входа в аккаунт."
+        meta={meta}
+      />
+
+      <div className="public-breadcrumb">
           {stack.map((s, i) => (
             <React.Fragment key={s.id || 'root'}>
               {i > 0 && <span className="sep">/</span>}
               {i === stack.length - 1 ? (
-                <span className="cur" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <span className="cur">
                   <Icon.folder size={18} /> {s.name || d.folderName}
                 </span>
               ) : (
-                <a style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }} onClick={() => setStack((st) => st.slice(0, i + 1))}>
+                <a onClick={() => setStack((st) => st.slice(0, i + 1))}>
                   {i === 0 ? <Icon.folder size={18} /> : null} {s.name || d.folderName}
                 </a>
               )}
             </React.Fragment>
           ))}
-        </div>
+      </div>
 
         {d.subdirs.length === 0 && d.files.length === 0 ? (
-          <p style={{ color: 'var(--md-on-surface-variant, #9a9aa6)' }}>Папка пуста.</p>
+          <div className="public-empty">Папка пуста.</div>
         ) : (
-          <div className="pubfolder-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 14 }}>
+          <div className="public-grid">
             {d.subdirs.map((sd) => (
               <button
                 key={sd.id}
                 onClick={() => setStack((st) => [...st, { id: sd.id, name: sd.name }])}
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 8,
-                  aspectRatio: '1 / 1',
-                  borderRadius: 12,
-                  border: '1px solid var(--md-outline-variant, #333)',
-                  background: 'var(--md-surface-container, #1b1b22)',
-                  color: 'inherit',
-                  cursor: 'pointer',
-                  padding: 12,
-                }}
+                className="public-tile"
               >
-                <Icon.folder size={40} />
-                <span style={{ fontSize: 13, textAlign: 'center', wordBreak: 'break-word' }}>{sd.name}</span>
+                <div className="public-tile-media">
+                  <Icon.folder size={44} />
+                </div>
+                <div className="public-tile-title">{sd.name}</div>
+                <div className="public-tile-sub">Папка</div>
               </button>
             ))}
             {d.files.map((f) => {
@@ -152,53 +151,40 @@ export function PublicFolderPage() {
                   key={f.fileId}
                   onClick={() => openFile(f)}
                   title={f.name}
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    borderRadius: 12,
-                    overflow: 'hidden',
-                    border: '1px solid var(--md-outline-variant, #333)',
-                    background: 'var(--md-surface-container, #1b1b22)',
-                    color: 'inherit',
-                    cursor: 'pointer',
-                    padding: 0,
-                  }}
+                  className="public-tile"
                 >
-                  <div style={{ position: 'relative', aspectRatio: '1 / 1', background: 'var(--md-surface-container-high, #25252e)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div className="public-tile-media">
                     {isMedia && f.previewUrl ? (
-                      <img src={f.previewUrl} alt={f.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      <img src={f.previewUrl} alt={f.name} />
                     ) : (
                       <Icon.file size={40} />
                     )}
                     {f.mediaKind === 'video' && (
-                      <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+                      <span className="public-play">
                         <Icon.play size={34} />
                       </span>
                     )}
                   </div>
-                  <div style={{ padding: '8px 10px', textAlign: 'left' }}>
-                    <div style={{ fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{f.name}</div>
-                    {f.fileSize > 0 && <div style={{ fontSize: 11, color: 'var(--md-on-surface-variant, #9a9aa6)' }}>{fmtSize(f.fileSize)}</div>}
-                  </div>
+                  <div className="public-tile-title">{f.name}</div>
+                  <div className="public-tile-sub">{f.fileSize > 0 ? fmtSize(f.fileSize) : ''}</div>
                 </button>
               );
             })}
           </div>
         )}
-      </div>
 
       {viewer && (
         <div
           onClick={() => setViewer(null)}
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, zIndex: 50 }}
+          className="public-viewer"
         >
-          <div onClick={(e) => e.stopPropagation()} style={{ maxWidth: '92vw', maxHeight: '92vh', textAlign: 'center' }}>
+          <div onClick={(e) => e.stopPropagation()} className="public-viewer-body">
             {viewer.mediaKind === 'video' ? (
-              <video src={viewer.downloadUrl} controls autoPlay style={{ maxWidth: '92vw', maxHeight: '80vh', borderRadius: 8 }} />
+              <video src={viewer.downloadUrl} controls autoPlay />
             ) : (
-              <img src={viewer.downloadUrl} alt={viewer.name} style={{ maxWidth: '92vw', maxHeight: '80vh', borderRadius: 8, objectFit: 'contain' }} />
+              <img src={viewer.downloadUrl} alt={viewer.name} />
             )}
-            <div style={{ marginTop: 12, display: 'flex', gap: 10, justifyContent: 'center' }}>
+            <div className="public-viewer-actions">
               <a className="btn primary" href={viewer.downloadUrl} style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                 <Icon.download size={16} /> Скачать
               </a>
@@ -209,6 +195,6 @@ export function PublicFolderPage() {
           </div>
         </div>
       )}
-    </div>
+    </PublicShareShell>
   );
 }

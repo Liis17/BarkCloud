@@ -54,7 +54,9 @@ namespace BarkCloud.Users.Persistence.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<int>("StorageLimitGb")
-                        .HasColumnType("integer");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
 
                     b.Property<string>("Username")
                         .IsRequired()

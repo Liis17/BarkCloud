@@ -5,7 +5,7 @@ Parent: [[index]] · See also: [[api/files-api]] · [[modules/backend-files-clou
 ## Назначение
 
 Сервис файлов. Основные ответственности:
-1. **Загрузка/скачивание**: presigned URL в MinIO, квоты, временные файлы, сжатие изображений, превью видео (FFmpeg). **Оригинал хранится как есть** (с 2026-06: HEIC больше НЕ подменяется на JPEG — иначе серверный SHA256 не совпадал с клиентским и ломались дедуп автозагрузки/индикатор «уже в облаке»). Для изображений генерируется **полноразмерный JPEG 90% — `JpegView`** (HEIC через ffmpeg, прочие не-JPEG через ImageSharp; оригинал-JPEG ссылается на себя): отдельный блоб, связан как превью с `TargetWidth=0` → исключён из галереи и чистится при удалении; file_id хранится в колонке `UploadFile.JpegViewFileId`, отдаётся клиентам как `jpeg_view_file_id/jpeg_view_url` для просмотра, оригинал — для скачивания. **Дедупликация контента по хешу снята** — одинаковые файлы сохраняются как отдельные блобы (хеш пишется для проверок наличия; превью по-прежнему дедуплицируются по SHA256). ⚠️ `LegacyPreviewBackfillService` всё ещё перекодирует HEIC-оригинал в JPEG (старая логика) — новые загрузки он не трогает (у них есть превью), но согласовать с JpegView-подходом стоит отдельным шагом
+1. **Загрузка/скачивание**: presigned URL в MinIO, квоты, временные файлы, сжатие изображений, превью видео (FFmpeg). **Оригинал хранится как есть** (с 2026-06: HEIC больше НЕ подменяется на JPEG — иначе серверный SHA256 не совпадал с клиентским и ломались дедуп автозагрузки/индикатор «уже в облаке»). Для изображений генерируется **полноразмерный JPEG 90% — `JpegView`** (HEIC через ffmpeg, прочие, **включая сам JPEG**, через ImageSharp): отдельный блоб, связан как превью с `TargetWidth=0` → исключён из галереи и чистится при удалении; file_id хранится в колонке `UploadFile.JpegViewFileId`, отдаётся клиентам как `jpeg_view_file_id/jpeg_view_url` для просмотра, оригинал — для скачивания. ⚠️ С 2026-06 JPEG-оригинал **больше не ссылается сам на себя**: раньше `JpegViewUrl` указывал на `/download/{оригинал}`, но `DownloadFile` отдаёт по прямому id только аватарки и превью-файлы (`IsPreviewFile`) → для JPEG-фото вьювер получал **404**. Теперь для всех изображений создаётся отдельный JpegView-блоб (он зарегистрирован как превью → раздаётся; оригинал остаётся за временными ссылками). Легаси-файлы добирает [[#Services|`LegacyJpegViewBackfillService`]]. **Дедупликация контента по хешу снята** — одинаковые файлы сохраняются как отдельные блобы (хеш пишется для проверок наличия; превью по-прежнему дедуплицируются по SHA256). ⚠️ `LegacyPreviewBackfillService` всё ещё перекодирует HEIC-оригинал в JPEG (старая логика) — новые загрузки он не трогает (у них есть превью), но согласовать с JpegView-подходом стоит отдельным шагом
 2. **Облачная иерархия** (NextCloud-подобная): папки + записи о файлах — см. дочернюю заметку [[modules/backend-files-cloud]]
 3. **Галерея и альбомы**: классификация медиа (`MediaKind`), раздельные списки фото/видео (`ListUserMedia`), универсальные альбомы фото/видео (`AlbumApi`)
 
@@ -25,11 +25,12 @@ Parent: [[index]] · See also: [[api/files-api]] · [[modules/backend-files-clou
 - `CloudDirectory.cs` — папка в облачной иерархии → [[modules/backend-files-cloud]]
 - `CloudFileEntry.cs` — запись о файле в иерархии → [[modules/backend-files-cloud]]
 - `Album.cs` — альбом (универсальная коллекция фото/видео): `Name`, `Description`, `CoverFileId`
-- `AlbumItem.cs` — привязка файла к альбому (many-to-many). При безвозвратном удалении файла (`DeleteUserMedia` hard-delete, `TrashPurge`, `UserDeleted`) членство чистится явно, обложки переустанавливаются на первый оставшийся элемент
+- `AlbumItem.cs` — привязка файла к альбому (many-to-many). При безвозвратном удалении файла (`TrashPurge`, `UserDeleted`) членство чистится явно, обложки переустанавливаются на первый оставшийся элемент
 - `FavoriteFile.cs` — отметка «избранное» на уровне пользователя (`OwnerId`+`FileId`, уникальна). Привязка к блобу, а не к записи иерархии → покрывает и фото/видео из галереи, и файлы/документы из папок
 - `ShareLink.cs` — постоянная публичная ссылка на блоб (`OwnerId`, `FileId`, уникальный `Token`, `Name`, `CreatedAt`, `ClickCount`). Названа `ShareLink` (не `FileShare`) во избежание коллизии с `System.IO.FileShare`
 - `FileGrant.cs` — приватный грант доступа к блобу конкретному пользователю (`OwnerId`→`RecipientId`→`FileId`, уникальная тройка). Получатель видит файл в «мне доступны», смотрит/скачивает (без редактирования/ре-шаринга); чистится при удалении файла/аккаунта
 - `FileMetadata.cs` — метаданные блоба 1:1 к `UploadFile` через `FileId`-PK (24 nullable-поля): GPS (`Latitude`/`Longitude`/`Altitude`), `TakenAt`, `CreatorTool`, камера (`CameraMake`/`CameraModel`/`LensModel`), параметры съёмки (`FocalLengthMm`, `FNumber`, `ExposureTimeSeconds`, `Iso`, `Orientation`, `Flash`), видео (`DurationSeconds`, `VideoCodec`, `AudioCodec`, `Bitrate`, `FrameRate`), документ (`DocumentAuthor`, `DocumentTitle`, `DocumentSubject`, `DocumentPageCount`). Привязка к блобу, а не к пользователю — дедупликация прозрачна
+- `FileActivityEvent.cs` / `FileActivityKind.cs` — журнал действий по файлу: владелец, blob `FileId`, optional `EntryId`, актор, тип события, краткое описание, JSON-детали и `CreatedAt`. Пишется для загрузки/привязки, rename/move/delete/restore/purge, избранного, публичных ссылок, приватного шаринга и альбомов
 
 ### Host
 - `FilesApiService.cs` — клиентский gRPC `FilesApi`
@@ -53,19 +54,22 @@ Parent: [[index]] · See also: [[api/files-api]] · [[modules/backend-files-clou
 - `TempFileCleanupService.cs` — фоновая очистка временных файлов (BackgroundService)
 - `TrashPurgeService.cs` — окончательная зачистка корзины: снятие `Uploaders`, удаление из альбомов (`AlbumItems`), избранного (`FavoriteFiles`) и публичных ссылок (`ShareLinks`) владельца, удаление записей. Физическое удаление осиротевших блобов вынесено в публичный `PurgeOrphanBlobsAsync` (S3 + хеш + связки `FilePreview` + строка `UploadedFiles`); **строка БД удаляется только при успешном удалении объекта из S3** — иначе блоб остаётся осиротевшим и его добивает воркер (объект не «протекает» в S3). Общий для ручных RPC и воркеров. Константа `Retention = 14 дней`
 - `TrashCleanupService.cs` — фоновый воркер (BackgroundService, раз в 6 ч): зачищает записи корзины с истёкшим `PurgeAt` через `TrashPurgeService`
-- `OrphanBlobCleanupService.cs` — фоновый воркер (BackgroundService, раз в 6 ч): находит блобы `UploadFile` с пустым `Uploaders` и добивает их через `TrashPurgeService.PurgeOrphanBlobsAsync`. Покрывает пути, которые лишь декрементят `Uploaders` (удаление аккаунта, удаление медиа из галереи), и ретраит неудавшиеся S3-удаления
+- `OrphanBlobCleanupService.cs` — фоновый воркер (BackgroundService, раз в 6 ч): находит блобы `UploadFile` с пустым `Uploaders` и добивает их через `TrashPurgeService.PurgeOrphanBlobsAsync`. Покрывает пути, которые лишь декрементят `Uploaders` (например удаление аккаунта), и ретраит неудавшиеся S3-удаления
 - `LegacyMetadataBackfillService.cs` — фоновый разовый бэкафилл при старте контейнера (BackgroundService) по образцу `LegacyPreviewBackfillService`: находит `UploadFile` (`CloudFile`, с `Etag`) без `FileMetadata` через `IFileMetadataStorage.ListFilesMissingMetadata`, скачивает блоб из S3 во временный файл, прогоняет через нужный `ExtractFromX` по content-type (image / video / pdf / office) и сохраняет метаданные. Курсор по `UploadFile.Id` возрастающий; дёшев на повторных стартах
+- `LegacyJpegViewBackfillService.cs` — фоновый разовый бэкафилл при старте (BackgroundService, задержка 45с — после превью- и метаданных-бэкафиллов): находит фото-оригиналы (`MediaKind.Photo`, с `Etag`) **без JpegView-связки** (нет `FilePreview` с `TargetWidth=0`) и не являющиеся сами превью-блобом, скачивает оригинал, перекодирует в полноразмерный JPEG 90% (HEIC через ffmpeg `ConvertToJpegAsync`, прочие через `EncodeFullJpegAsync`), сохраняет через `PersistJpegViewAsync` и проставляет `JpegViewFileId`. **Оригинальный блоб в S3 не трогает** (в отличие от `LegacyPreviewBackfillService`). Покрывает легаси-JPEG, что раньше давали 404 во вьювере. Курсор по `Id` возрастающий; дёшев на повторных стартах
+- `FileActivityWriter.cs` — best-effort writer истории: команды не падают, если запись события не удалась; детали сериализуются в `DetailsJson`. В тестах может подставляться `Noop`, чтобы старые unit-тесты хендлеров не требовали нового dependency
 
 ### Infrastructure
 - `S3BucketInitializer.cs` — создание/проверка бакетов MinIO при старте
 - `S3BucketRegistry.cs` — реестр бакетов
 - `S3Uploader.cs` — обёртка над S3/MinIO: `UploadAsync`, `DownloadAsync`, `DeleteAsync` (удаление объекта, идемпотентно — используется зачисткой корзины)
+- `PhysicalStorageStatsProvider.cs` — ленивый snapshot диска MinIO: общий размер, занято не-S3, занято S3; кеш 5 минут, обновляется только при запросах storage-info
 
 ### Configurations
 - `BucketS3Options.cs` — настройки S3-бакета
 
 ### Persistence
-- `FilesContext.cs`, `FilesContextFactory.cs` — EF Core DbContext (содержит `UploadedFiles`, `FileHashes`, `TempFiles`, `CloudDirectories`, `CloudFileEntries`, `FilePreviews`, `Albums`, `AlbumItems`, `DynamicFolders`, `FavoriteFiles`, `ShareLinks`, `FolderShareLinks`, `FileGrants`, `DirectoryGrants`, `FileMetadata`). Миграция `20260602120000_AddUploadedFilesUploadersIndex.cs` — raw-SQL GIN-индекс на массив `UploadedFiles."Uploaders"` (`array_ops`): галерея `ListUserMedia` и подсчёт квоты фильтруют `Uploaders.Contains(ownerId)` → `@>`, ранее seq-scan
+- `FilesContext.cs`, `FilesContextFactory.cs` — EF Core DbContext (содержит `UploadedFiles`, `FileHashes`, `TempFiles`, `CloudDirectories`, `CloudFileEntries`, `FilePreviews`, `Albums`, `AlbumItems`, `DynamicFolders`, `FavoriteFiles`, `ShareLinks`, `FolderShareLinks`, `FileGrants`, `DirectoryGrants`, `FileMetadata`, `FileActivityEvents`). Миграция `20260602120000_AddUploadedFilesUploadersIndex.cs` — raw-SQL GIN-индекс на массив `UploadedFiles."Uploaders"` (`array_ops`): галерея `ListUserMedia` и подсчёт квоты фильтруют `Uploaders.Contains(ownerId)` → `@>`, ранее seq-scan
 - `UploadedFilesStorage.cs`
 - `FileHashesStorage.cs`
 - `TempFilesStorage.cs`
@@ -75,6 +79,7 @@ Parent: [[index]] · See also: [[api/files-api]] · [[modules/backend-files-clou
 - `UploadedFilesStorage.cs` — добавлены `ListMemoriesForDay` (фото/видео с `FileMetadata.TakenAt` за месяц+день любых лет, для «Воспоминаний») и `ListMediaWithLocationPage` (медиа с `Latitude/Longitude`, cursor, для карты). Оба фильтруют как `ListUserMediaPage` (живые блобы владельца, не превью, не в корзине) + join к `FileMetadata`. DTO-записи `MemoryMediaItem`/`LocatedMediaItem` объявлены в `IUploadedFilesStorage.cs`. **Отдельных индексов нет**: запросы ведутся через GIN по `Uploaders` + PK `FileMetadata.FileId`
 - `ShareStorage.cs` — публичные ссылки: `Add`/`GetByToken`/`Remove` (scoped по владельцу, идемпотентно)/`IncrementClicks`/`ListPage` (cursor-пагинация), по образцу `FavoriteFilesStorage`
 - `FileMetadataStorage.cs` — метаданные блоба: `Get`/`AddIfMissing` (идемпотентно, не перезаписывает)/`ListFilesMissingMetadata` (LEFT JOIN-выборка для бэкафилла)
+- `FileActivityStorage.cs` — append-only журнал действий: `Add`/`AddRange` и cursor-пагинация `ListPage(ownerId, fileId, cursorCreatedAt, cursorEventId, limit)` по `(CreatedAt desc, Id desc)`
 - `Migrations/`:
   - `20260518172338_InitialCreate.cs`
   - `20260518174041_AddCloudDirectories.cs` — добавляет таблицы Cloud
@@ -85,6 +90,7 @@ Parent: [[index]] · See also: [[api/files-api]] · [[modules/backend-files-clou
   - `20260528041219_AddUploadDeviceName.cs` — nullable-колонка `UploadDeviceName` в `UploadedFiles` (имя устройства загрузки)
   - `20260528215548_AddShareLinks.cs` — таблица `ShareLinks` (уник. индекс `Token`, индекс `(OwnerId, CreatedAt)`)
   - `20260530132207_AddFileMetadata.cs` — таблица `FileMetadata` (PK = `FileId`, 24 nullable-колонки)
+  - `20260611221205_AddFileActivityEvents.cs` — таблица `FileActivityEvents` + индексы `(OwnerId, CreatedAt)` и `(OwnerId, FileId, CreatedAt)`
 
 ### Exceptions (локальные)
 - `FileAlreadyUploadedException.cs`
@@ -110,17 +116,19 @@ Parent: [[index]] · See also: [[api/files-api]] · [[modules/backend-files-clou
 | `GetUploadUrl` | Выдать presigned URL для загрузки |
 | `UploadFile` | Серверная загрузка файла |
 | `GetTempDownloadUrl` | Временные ссылки на скачивание + превью |
-| `DownloadFile` | Скачивание (через контроллер) |
+| `DownloadFile` | Скачивание (через контроллер); для `TempFile`-ссылок отдаёт оригинальный `UploadFile.Filename` в `Content-Disposition`, а не `{fileId}.{ext}` |
 | `CheckFileHash` | Проверка наличия по хешу (без побочных эффектов); возвращает `exists` + локации копий пользователя (имя+папка) для модалки «файл уже есть» |
 | `CheckFileHashes` | Пакетная проверка наличия по списку SHA256-хешей (без побочных эффектов; для пассивной индикации «в облаке») |
 | `GetFileData` / `GetFilesData` | Метаданные файла(ов) |
 | `GetFileMetadata` | EXIF/ffprobe/PDF/Office метаданные блоба (для диалога «Свойства»). Только собственные файлы (по `Uploaders`). Возвращает `HasMetadata=false`, если ничего не извлекалось |
-| `GetUserStorageInfo` / `GetUserStorageInfoServer` | Информация о квоте |
+| `GetUserStorageInfo` / `GetUserStorageInfoServer` | Информация о квоте + физический snapshot диска MinIO |
 | `UploadAvatarServer` | Загрузка аватара пользователя (служебный) |
 
 ### Облачная иерархия + галерея (вложенно в `Features/Cloud/`)
 
-`CreateDirectory`, `RenameDirectory`, `MoveDirectory`, `DeleteDirectory`, `ListDirectory`, `ListDirectoryDetailed`, `AttachFile`, `RenameFileEntry`, `MoveFileEntry`, `DeleteFileEntry`, `GetPath`, `ListUserImages` (deprecated), `ListUserMedia` (фото/видео по `MediaKind`), `SetVideoThumbnail`. **Корзина**: `ListTrash`, `RestoreFromTrash`, `DeleteFromTrash`, `EmptyTrash` (`DeleteFileEntry`/`DeleteDirectory` теперь soft-delete). **Избранное**: `AddFavorite`/`RemoveFavorite` (по `file_id`, идемпотентны), `ListFavorites` (cursor-пагинация, исключает корзину и осиротевшие ссылки). **Публичные ссылки**: `CreateShare` (проверка владения, токен base64url), `ListMyShares` (cursor-пагинация), `RevokeShare` (идемпотентно). `CopyFileEntry` **удалён** (инвариант одной директории). Подробнее — [[modules/backend-files-cloud]].
+`CreateDirectory`, `RenameDirectory`, `MoveDirectory`, `DeleteDirectory`, `ListDirectory`, `ListDirectoryDetailed`, `AttachFile`, `RenameFileEntry`, `MoveFileEntry`, `DeleteFileEntry`, `GetPath`, `ListFileActivity`, `ListUserImages` (deprecated), `ListUserMedia` (фото/видео по `MediaKind`), `DeleteUserMedia` (удаление галерейного `file_id` в корзину; если записи каталога нет — создаёт удалённую запись в системной папке), `SetVideoThumbnail`. **Корзина**: `ListTrash`, `RestoreFromTrash`, `DeleteFromTrash`, `EmptyTrash` (`DeleteFileEntry`/`DeleteDirectory` теперь soft-delete). **Избранное**: `AddFavorite`/`RemoveFavorite` (по `file_id`, идемпотентны), `ListFavorites` (cursor-пагинация, исключает корзину и осиротевшие ссылки). **Публичные ссылки**: `CreateShare` (проверка владения, токен base64url), `ListMyShares` (cursor-пагинация), `RevokeShare` (идемпотентно). `CopyFileEntry` **удалён** (инвариант одной директории). Подробнее — [[modules/backend-files-cloud]].
+
+**История активности** (`ListFileActivity`): read-only RPC для карточки «Свойства». Проверяет, что файл принадлежит владельцу (`Uploaders`), затем отдаёт последние события по blob `file_id` с cursor `(cursor_created_at + cursor_event_id)`. События пишутся синхронно, но best-effort: ошибка аудита логируется и не откатывает пользовательскую операцию.
 
 **Воспоминания / Карта** (вложенно в `Features/Cloud/`): `GetMemories` («В этот день» — фото/видео за сегодняшнюю дату прошлых лет, сгруппированы по году от свежего к старому; группировка в памяти из выборки ≤500, ≤`per_year_limit` превью на год) и `ListMediaLocations` (точки для карты — медиа с GPS, cursor-пагинация; на точку отдаётся узкое превью; клиент кластеризует). Read-only, без миграций — опираются на уже извлечённые `FileMetadata`. См. [[api/files-api]] · `CloudApi`.
 

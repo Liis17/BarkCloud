@@ -78,6 +78,25 @@ export interface DuplicateLocation {
   directoryName: string;
 }
 
+export interface BatchSummary {
+  total: number;
+  succeeded: number;
+  failed: number;
+  invalidIds?: string[];
+  succeededIds?: string[];
+  failedIds?: string[];
+}
+
+export async function deleteEntriesBatch(entryIds: string[]): Promise<BatchSummary> {
+  if (!entryIds.length) return { total: 0, succeeded: 0, failed: 0, invalidIds: [] };
+  return apiPost<BatchSummary>('/api/cloud/entries/delete', { entryIds });
+}
+
+export async function deleteMediaBatch(fileIds: string[]): Promise<BatchSummary> {
+  if (!fileIds.length) return { total: 0, succeeded: 0, failed: 0, invalidIds: [] };
+  return apiPost<BatchSummary>('/api/cloud/media/delete-batch', { fileIds });
+}
+
 /** SHA256 файла в hex. Читает файл целиком в память — допустимо при лимите 512 МБ;
  *  Web Crypto не умеет инкрементальный digest. null — если crypto недоступен (http) или ошибка. */
 async function sha256Hex(file: File): Promise<string | null> {
@@ -108,16 +127,19 @@ export async function checkDuplicate(file: File): Promise<{ exists: boolean; loc
 
 /** Загрузка файла (новый блоб). Серверный дедуп снят — каждая загрузка создаёт копию;
  *  предварительную проверку дубликата делает вызывающий код через checkDuplicate. */
-export async function uploadFile(file: File, onProgress?: (frac: number) => void): Promise<UploadResult> {
-  return uploadXhr(file, onProgress);
+export async function uploadFile(file: File, onProgress?: (frac: number) => void, signal?: AbortSignal): Promise<UploadResult> {
+  return uploadXhr(file, onProgress, signal);
 }
 
-/** Передача байтов файла через XHR (прогресс — fetch не отдаёт upload-progress). */
-function uploadXhr(file: File, onProgress?: (frac: number) => void): Promise<UploadResult> {
+function uploadXhr(file: File, onProgress?: (frac: number) => void, signal?: AbortSignal): Promise<UploadResult> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open('POST', '/api/files/upload');
     xhr.withCredentials = true;
+    if (signal) {
+      if (signal.aborted) { xhr.abort(); reject(new DOMException('Aborted', 'AbortError')); return; }
+      signal.addEventListener('abort', () => { xhr.abort(); reject(new DOMException('Aborted', 'AbortError')); }, { once: true });
+    }
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable && onProgress) onProgress(e.loaded / e.total);
     };

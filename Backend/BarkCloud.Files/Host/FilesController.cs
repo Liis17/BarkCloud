@@ -7,6 +7,7 @@ using MediatR;
 
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Net.Http.Headers;
 
 namespace BarkCloud.Files.Host;
 
@@ -89,7 +90,9 @@ public class FilesController : Controller
 
         Response.Headers.AcceptRanges = "bytes";
         Response.ContentType = result.ContentType;
-        Response.Headers.ContentDisposition = $"attachment; filename=\"{result.FileName}\"";
+        var contentDisposition = new ContentDispositionHeaderValue("attachment");
+        contentDisposition.SetHttpFileName(result.FileName);
+        Response.Headers.ContentDisposition = contentDisposition.ToString();
 
         if (result.IsPartial)
         {

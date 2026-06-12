@@ -7,9 +7,12 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.CreationExtras
 import com.barkfluff.BarkCloud.BarkCloudApplication
 import com.barkfluff.BarkCloud.data.cloud.CloudRepository
+import com.barkfluff.BarkCloud.data.gallery.AutoUploadScheduler
+import com.barkfluff.BarkCloud.data.gallery.AutoUploadSettings
 import com.barkfluff.BarkCloud.data.gallery.DeviceMedia
 import com.barkfluff.BarkCloud.data.gallery.DeviceMediaStore
 import com.barkfluff.BarkCloud.data.gallery.MediaHasher
+import com.barkfluff.BarkCloud.data.upload.UploadScheduler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -31,12 +34,17 @@ data class GalleryUiState(
     val isUploading: Boolean = false,
     val uploadDone: Int = 0,
     val uploadTotal: Int = 0,
+    val autoUploadEnabled: Boolean = false,
+    val lastAutoUploadCount: Int = 0,
     val snackbar: String? = null,
-)
+) {
+    val reclaimableCount: Int get() = items.count { cloudPresence[it.id] == true }
+}
 
 class GalleryViewModel(
     private val appContext: Context,
     private val cloudRepository: CloudRepository,
+    private val autoUploadSettings: AutoUploadSettings,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(GalleryUiState())
@@ -46,6 +54,15 @@ class GalleryViewModel(
     private val hashPresence = ConcurrentHashMap<String, Boolean>()
     private val pending = LinkedHashSet<String>()
     private var flushJob: Job? = null
+
+    init {
+        _state.update {
+            it.copy(
+                autoUploadEnabled = autoUploadSettings.enabled,
+                lastAutoUploadCount = autoUploadSettings.lastUploadedCount,
+            )
+        }
+    }
 
     fun onPermissionResult(granted: Boolean) {
         _state.update { it.copy(permissionGranted = granted) }
@@ -86,11 +103,12 @@ class GalleryViewModel(
         viewModelScope.launch {
             var failures = 0
             targets.forEachIndexed { index, media ->
-                runCatching { cloudRepository.uploadFile(media.uri, media.name) }
+                runCatching { (appContext as BarkCloudApplication).uploadQueue.enqueue(media.uri, media.name) }
                     .onFailure { failures++ }
                     .onSuccess { idToHash[media.id]?.let { h -> hashPresence[h] = true } }
                 _state.update { it.copy(uploadDone = index + 1) }
             }
+            if (failures < targets.size) UploadScheduler.enqueue(appContext)
             _state.update {
                 it.copy(
                     isUploading = false,
@@ -101,6 +119,27 @@ class GalleryViewModel(
                 )
             }
         }
+    }
+
+    fun setAutoUpload(enabled: Boolean) {
+        autoUploadSettings.enabled = enabled
+        if (enabled) {
+            AutoUploadScheduler.enable(appContext)
+        } else {
+            AutoUploadScheduler.disable(appContext)
+        }
+        _state.update {
+            it.copy(
+                autoUploadEnabled = enabled,
+                lastAutoUploadCount = autoUploadSettings.lastUploadedCount,
+                snackbar = if (enabled) AUTO_UPLOAD_ON else AUTO_UPLOAD_OFF,
+            )
+        }
+    }
+
+    fun onDeviceCopiesDeleted(count: Int) {
+        _state.update { it.copy(snackbar = appContext.getString(com.barkfluff.BarkCloud.R.string.gallery_device_copies_deleted, count)) }
+        load()
     }
 
     fun observeCloudPresence(media: DeviceMedia) {
@@ -149,15 +188,17 @@ class GalleryViewModel(
     fun snackbarShown() = _state.update { it.copy(snackbar = null) }
 
     companion object {
-        private const val UPLOAD_OK = "Загрузка завершена"
-        private const val UPLOAD_PARTIAL = "Часть файлов не загрузилась"
+        private const val UPLOAD_OK = "Загрузка поставлена в очередь"
+        private const val UPLOAD_PARTIAL = "Часть файлов не удалось поставить в очередь"
+        private const val AUTO_UPLOAD_ON = "Автозагрузка включена"
+        private const val AUTO_UPLOAD_OFF = "Автозагрузка выключена"
 
         fun factory(): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
                 val app = extras[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]
                     as BarkCloudApplication
-                return GalleryViewModel(app, app.cloudRepository) as T
+                return GalleryViewModel(app, app.cloudRepository, app.autoUploadSettings) as T
             }
         }
     }

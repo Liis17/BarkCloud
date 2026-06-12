@@ -1,4 +1,5 @@
 using BarkCloud.Files.Persistence;
+using BarkCloud.Files.Services;
 using BarkCloud.GrpcServer.XAuth;
 using BarkCloud.Proto.Files;
 
@@ -9,17 +10,20 @@ namespace BarkCloud.Files.Features.GetUserStorageInfo;
 public class GetUserStorageInfoCommandHandler : IRequestHandler<GetUserStorageInfoCommand, GetUserStorageInfoResponse>
 {
     private readonly IUploadedFilesStorage _uploadedFilesStorage;
+    private readonly IPhysicalStorageStatsProvider _storageStatsProvider;
     private readonly UserContext _userContext;
     private readonly BarkCloud.Proto.Users.UsersServerApi.UsersServerApiClient _usersClient;
     private readonly ILogger<GetUserStorageInfoCommandHandler> _logger;
 
     public GetUserStorageInfoCommandHandler(
         IUploadedFilesStorage uploadedFilesStorage,
+        IPhysicalStorageStatsProvider storageStatsProvider,
         UserContext userContext,
         BarkCloud.Proto.Users.UsersServerApi.UsersServerApiClient usersClient,
         ILogger<GetUserStorageInfoCommandHandler> logger)
     {
         _uploadedFilesStorage = uploadedFilesStorage;
+        _storageStatsProvider = storageStatsProvider;
         _userContext = userContext;
         _usersClient = usersClient;
         _logger = logger;
@@ -38,8 +42,11 @@ public class GetUserStorageInfoCommandHandler : IRequestHandler<GetUserStorageIn
             UserId = _userContext.UserId
         }, cancellationToken: cancellationToken);
 
-        // Конвертируем ГБ в байты
-        long storageLimitBytes = (long)userResponse.User.StorageLimitGb * 1024 * 1024 * 1024;
+        var storageStats = await _storageStatsProvider.GetStatsAsync(cancellationToken);
+
+        var storageLimitBytes = userResponse.User.StorageLimitGb > 0
+            ? (long)userResponse.User.StorageLimitGb * 1024 * 1024 * 1024
+            : storageStats.TotalBytes;
 
         // Получаем общее использованное пространство
         var totalUsedStorage = await _uploadedFilesStorage.GetUserStorageUsed(_userContext.UserId);
@@ -50,7 +57,10 @@ public class GetUserStorageInfoCommandHandler : IRequestHandler<GetUserStorageIn
         var response = new GetUserStorageInfoResponse
         {
             TotalUsedStorage = totalUsedStorage,
-            StorageLimit = storageLimitBytes
+            StorageLimit = storageLimitBytes,
+            TotalAvailableStorage = storageStats.TotalBytes,
+            DiskUsedStorage = storageStats.DiskUsedWithoutS3Bytes,
+            S3UsedStorage = storageStats.S3UsedBytes
         };
 
         // Добавляем информацию по типам файлов
@@ -64,10 +74,11 @@ public class GetUserStorageInfoCommandHandler : IRequestHandler<GetUserStorageIn
         }
 
         _logger.LogInformation(
-            "Информация о хранилище получена. UserId: {UserId}, Использовано: {UsedStorage} байт, Лимит: {TotalStorage} байт",
+            "Информация о хранилище получена. UserId: {UserId}, Использовано: {UsedStorage} байт, Лимит: {TotalStorage} байт, S3: {S3UsedStorage} байт",
             _userContext.UserId,
             totalUsedStorage,
-            storageLimitBytes
+            storageLimitBytes,
+            storageStats.S3UsedBytes
         );
 
         return response;

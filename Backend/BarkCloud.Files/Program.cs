@@ -66,8 +66,10 @@ public class Program
         builder.Services.AddScoped<IAlbumShareStorage, AlbumShareStorage>();
         builder.Services.AddScoped<IGrantStorage, GrantStorage>();
         builder.Services.AddScoped<IDirectoryGrantStorage, DirectoryGrantStorage>();
+        builder.Services.AddScoped<IFileActivityStorage, FileActivityStorage>();
         builder.Services.AddScoped<FolderGrantAccessService>();
         builder.Services.AddScoped<IFileMetadataStorage, FileMetadataStorage>();
+        builder.Services.AddScoped<FileActivityWriter>();
         builder.Services.AddSingleton<ImageCompressor>();
         builder.Services.AddSingleton<VideoThumbnailExtractor>();
         builder.Services.AddSingleton<HeicImageConverter>();
@@ -76,11 +78,13 @@ public class Program
         builder.Services.AddScoped<AlbumViewBuilder>();
         builder.Services.AddScoped<DynamicFolderViewBuilder>();
         builder.Services.AddScoped<ITrashPurgeService, TrashPurgeService>();
+        builder.Services.AddSingleton<IPhysicalStorageStatsProvider, PhysicalStorageStatsProvider>();
         builder.Services.AddHostedService<TempFileCleanupService>();
         builder.Services.AddHostedService<TrashCleanupService>();
         builder.Services.AddHostedService<OrphanBlobCleanupService>();
         builder.Services.AddHostedService<LegacyPreviewBackfillService>();
         builder.Services.AddHostedService<LegacyMetadataBackfillService>();
+        builder.Services.AddHostedService<LegacyJpegViewBackfillService>();
 
         // Путь к бинарям ffmpeg/ffprobe в образе (см. Dockerfile). По умолчанию — /usr/local/bin.
         FFMpegCore.GlobalFFOptions.Configure(o =>

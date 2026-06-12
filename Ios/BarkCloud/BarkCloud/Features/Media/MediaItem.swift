@@ -10,6 +10,7 @@ struct MediaItem: Identifiable, Hashable {
     let previewWidth: Int
     let isVideo: Bool
     let fileName: String
+    let date: Date
     /// Полные метаданные файла для экрана свойств. `nil` у плейсхолдеров.
     let asset: MediaAsset?
 
@@ -19,6 +20,7 @@ struct MediaItem: Identifiable, Hashable {
         self.previewWidth = previewWidth
         self.isVideo = isVideo
         self.fileName = fileName
+        self.date = Date(timeIntervalSince1970: 0)
         self.asset = nil
     }
 
@@ -29,6 +31,7 @@ struct MediaItem: Identifiable, Hashable {
         self.previewWidth = preview?.width ?? 512
         self.isVideo = asset.isVideo
         self.fileName = asset.fileName
+        self.date = asset.uploadedAt ?? asset.createdAt
         self.asset = asset
     }
 

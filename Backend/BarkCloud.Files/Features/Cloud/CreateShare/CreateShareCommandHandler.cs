@@ -1,6 +1,8 @@
 using System.Security.Cryptography;
 
+using BarkCloud.Files.Domain;
 using BarkCloud.Files.Persistence;
+using BarkCloud.Files.Services;
 using BarkCloud.GrpcServer.XAuth;
 using BarkCloud.Proto.Files;
 using BarkCloud.Shared.Exceptions.Files;
@@ -18,17 +20,20 @@ public class CreateShareCommandHandler : IRequestHandler<CreateShareCommand, Sha
     private readonly IShareStorage _storage;
     private readonly IUploadedFilesStorage _filesStorage;
     private readonly UserContext _userContext;
+    private readonly FileActivityWriter _activity;
     private readonly ILogger<CreateShareCommandHandler> _logger;
 
     public CreateShareCommandHandler(
         IShareStorage storage,
         IUploadedFilesStorage filesStorage,
         UserContext userContext,
-        ILogger<CreateShareCommandHandler> logger)
+        ILogger<CreateShareCommandHandler> logger,
+        FileActivityWriter? activity = null)
     {
         _storage = storage;
         _filesStorage = filesStorage;
         _userContext = userContext;
+        _activity = activity ?? FileActivityWriter.Noop;
         _logger = logger;
     }
 
@@ -56,6 +61,15 @@ public class CreateShareCommandHandler : IRequestHandler<CreateShareCommand, Sha
 
         _logger.LogInformation("Создана публичная ссылка {ShareId} на файл {FileId} (Owner: {OwnerId})",
             share.Id, request.FileId, ownerId);
+
+        await _activity.AddAsync(
+            ownerId,
+            request.FileId,
+            ownerId,
+            FileActivityKind.ShareCreated,
+            "Создана публичная ссылка",
+            details: new { shareId = share.Id, share.Name },
+            cancellationToken: cancellationToken);
 
         return ToGrpc(share);
     }

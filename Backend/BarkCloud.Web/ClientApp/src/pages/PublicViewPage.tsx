@@ -1,6 +1,8 @@
 import React from 'react';
 import { useParams } from 'react-router-dom';
 import { Icon } from '../components/Icon';
+import { PublicShareHeader, PublicShareShell, PublicStatus } from '../components/public/PublicShareShell';
+import { useDocumentHead } from '../hooks/useDocumentHead';
 
 interface ShareInfo {
   found: boolean;
@@ -25,28 +27,18 @@ function fmtSize(bytes: number): string {
   return (i === 0 ? v.toFixed(0) : v.toFixed(v < 10 ? 1 : 0)).replace('.', ',') + ' ' + u[i];
 }
 
-const wrap: React.CSSProperties = {
-  minHeight: '100vh',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  padding: 24,
-  background: 'var(--md-surface, #101014)',
-};
-const card: React.CSSProperties = {
-  width: 'min(560px, 100%)',
-  background: 'var(--md-surface-container, #1b1b22)',
-  color: 'var(--md-on-surface, #e6e6ea)',
-  borderRadius: 16,
-  padding: 28,
-  textAlign: 'center',
-  boxShadow: '0 12px 48px rgba(0,0,0,.35)',
-};
-
 /** Публичная страница просмотра файла по шаринг-ссылке (/v/:token). Без авторизации. */
 export function PublicViewPage() {
   const { token } = useParams<{ token: string }>();
   const [state, setState] = React.useState<'loading' | 'notfound' | ShareInfo>('loading');
+  const headInfo = typeof state === 'object' ? state : null;
+  const headTitle = headInfo ? headInfo.name : state === 'notfound' ? 'Ссылка недоступна' : 'Публичный файл';
+  const headIconUrl = headInfo?.previewUrl || null;
+
+  useDocumentHead(
+    () => ({ title: headTitle, iconUrl: headIconUrl }),
+    [headTitle, headIconUrl],
+  );
 
   React.useEffect(() => {
     let alive = true;
@@ -61,70 +53,59 @@ export function PublicViewPage() {
   }, [token]);
 
   if (state === 'loading') {
-    return (
-      <div style={wrap}>
-        <div style={card}>
-          <span className="spinner" />
-        </div>
-      </div>
-    );
+    return <PublicStatus icon={Icon.cloud} title="Открываем файл" loading />;
   }
   if (state === 'notfound') {
     return (
-      <div style={wrap}>
-        <div style={card}>
-          <Icon.link size={40} />
-          <h2 style={{ margin: '12px 0 6px' }}>Ссылка недоступна</h2>
-          <p style={{ color: 'var(--md-on-surface-variant, #9a9aa6)' }}>Файл не найден или ссылка была отозвана.</p>
-        </div>
-      </div>
+      <PublicStatus
+        icon={Icon.link}
+        title="Ссылка недоступна"
+        text="Файл не найден или владелец отозвал доступ."
+      />
     );
   }
 
   const info = state;
   const hasPreview = (info.mediaKind === 'photo' || info.mediaKind === 'video') && !!info.previewUrl;
   return (
-    <div style={wrap}>
-      <div style={card}>
-        {hasPreview ? (
-          <div style={{ position: 'relative', marginBottom: 18 }}>
+    <PublicShareShell>
+      <PublicShareHeader
+        icon={info.mediaKind === 'video' ? Icon.video : info.mediaKind === 'photo' ? Icon.photo : Icon.file}
+        label="Публичный файл BarkCloud"
+        title={info.name}
+        meta={info.fileSize > 0 ? fmtSize(info.fileSize) : undefined}
+      >
+        <a className="btn primary" href={info.downloadPath || `/s/${token}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+          <Icon.download size={18} /> Скачать
+        </a>
+      </PublicShareHeader>
+
+      <div className="public-view-card">
+        <div className="public-preview">
+          {hasPreview ? (
             <img
               src={info.previewUrl}
               alt={info.name}
-              style={{ maxWidth: '100%', maxHeight: '60vh', borderRadius: 12, display: 'block', margin: '0 auto' }}
             />
-            {info.mediaKind === 'video' && (
-              <div
-                style={{
-                  position: 'absolute',
-                  inset: 0,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  pointerEvents: 'none',
-                }}
-              >
-                <Icon.play size={48} />
-              </div>
-            )}
-          </div>
-        ) : (
-          <div style={{ marginBottom: 18 }}>
+          ) : (
             <Icon.file size={56} />
+          )}
+          {info.mediaKind === 'video' && (
+            <div className="public-play">
+                <Icon.play size={48} />
+            </div>
+          )}
+        </div>
+        <div className="public-file-summary">
+          <div>
+            <h2>{info.name}</h2>
+            {info.fileSize > 0 && <p>{fmtSize(info.fileSize)}</p>}
           </div>
-        )}
-        <h2 style={{ margin: '0 0 6px', wordBreak: 'break-word' }}>{info.name}</h2>
-        {info.fileSize > 0 && (
-          <div style={{ color: 'var(--md-on-surface-variant, #9a9aa6)', marginBottom: 18 }}>{fmtSize(info.fileSize)}</div>
-        )}
-        <a
-          className="btn primary"
-          href={info.downloadPath || `/s/${token}`}
-          style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}
-        >
-          <Icon.download size={18} /> Скачать
-        </a>
+          <a className="btn primary" href={info.downloadPath || `/s/${token}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+            <Icon.download size={18} /> Скачать
+          </a>
+        </div>
       </div>
-    </div>
+    </PublicShareShell>
   );
 }

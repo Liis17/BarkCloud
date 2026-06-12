@@ -11,12 +11,16 @@ import { ShareWithUserModal } from '../ui/ShareWithUserModal';
 import { apiGet, apiPost } from '../../lib/api';
 import { createShare, createAlbumShare } from '../../lib/share';
 import { GRID_SIZES } from '../../lib/format';
+import { useDocumentHead } from '../../hooks/useDocumentHead';
+import { useMediaActions } from '../../hooks/useMediaActions';
 import type { Album, CardFile, Page } from '../../lib/types';
 import type { ToastPush } from '../../hooks/useToast';
 
 interface AlbumDetailProps {
   album: Album;
   candidates: CardFile[];
+  /** Все альбомы пользователя — для панели действий Lightbox («Добавить в альбом»). */
+  albums?: Album[];
   gridSizes?: string;
   onBack: () => void;
   onChanged: () => void;
@@ -24,7 +28,7 @@ interface AlbumDetailProps {
 }
 
 /** Просмотр альбома: сетка элементов, обложка, добавить/убрать, переименовать, удалить. */
-export function AlbumDetail({ album, candidates, gridSizes = GRID_SIZES, onBack, onChanged, toast }: AlbumDetailProps) {
+export function AlbumDetail({ album, candidates, albums, gridSizes = GRID_SIZES, onBack, onChanged, toast }: AlbumDetailProps) {
   const [items, setItems] = React.useState<CardFile[] | null>(null);
   const [lightbox, setLightbox] = React.useState<number | null>(null);
   const [editing, setEditing] = React.useState(false);
@@ -32,6 +36,12 @@ export function AlbumDetail({ album, candidates, gridSizes = GRID_SIZES, onBack,
   const [props, setProps] = React.useState<CardFile | null>(null);
   const [shareWith, setShareWith] = React.useState<CardFile | null>(null);
   const { menu, openAt } = useContextMenu();
+
+  useDocumentHead(
+    () => ({ title: album.name, iconUrl: album.coverUrl || null }),
+    [album.name, album.coverUrl],
+    10,
+  );
 
   const load = React.useCallback(() => {
     setItems(null);
@@ -44,6 +54,17 @@ export function AlbumDetail({ album, candidates, gridSizes = GRID_SIZES, onBack,
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [album.id]);
   React.useEffect(load, [load]);
+
+  // Панель действий Lightbox; после удаления в корзину альбом перезагружается (вьювер закрывается).
+  const actionsCtx = useMediaActions({
+    albums,
+    toast,
+    onRemoved: () => {
+      load();
+      onChanged();
+    },
+    reloadAlbums: onChanged,
+  });
 
   const excludeIds = React.useMemo(() => new Set((items || []).map((i) => i.id)), [items]);
 
@@ -181,7 +202,8 @@ export function AlbumDetail({ album, candidates, gridSizes = GRID_SIZES, onBack,
       {picking && (
         <PickMediaModal candidates={candidates} exclude={excludeIds} onClose={() => setPicking(false)} onAdd={addItems} toast={toast} />
       )}
-      {lightbox !== null && items && <Lightbox items={items} index={lightbox} onClose={() => setLightbox(null)} />}
+      {actionsCtx.overlay}
+      {lightbox !== null && items && <Lightbox items={items} index={lightbox} actions={actionsCtx.api} onClose={() => setLightbox(null)} />}
       {props && <PropertiesModal fileId={props.id} fallback={props} onClose={() => setProps(null)} />}
       {shareWith && (
         <ShareWithUserModal fileId={shareWith.id} fileName={shareWith.name} onClose={() => setShareWith(null)} toast={toast} />

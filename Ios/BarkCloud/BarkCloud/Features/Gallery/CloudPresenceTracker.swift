@@ -23,10 +23,36 @@ final class CloudPresenceTracker {
     private var pendingByHash: [String: [String]] = [:]  // sha256 → localId, ждущие запроса
     private var queryScheduled = false
     private var linkedHashes: Set<String> = []           // sha256, для которых уже связан file_id
+    /// Токен подписки на `.backupAssetUploaded` (фоновая автозагрузка завершила
+    /// ассет) — без неё закэшированное «не в облаке» висело бы до pull-to-refresh.
+    /// nonisolated(unsafe) (+ @ObservationIgnored, чтобы остаться stored-свойством):
+    /// пишется один раз в init, читается в deinit; removeObserver потокобезопасен.
+    @ObservationIgnored nonisolated(unsafe) private var uploadedObserver: (any NSObjectProtocol)?
 
-    init(cloud: CloudRepository) { self.cloud = cloud }
+    init(cloud: CloudRepository) {
+        self.cloud = cloud
+        uploadedObserver = NotificationCenter.default.addObserver(
+            forName: .backupAssetUploaded, object: nil, queue: .main
+        ) { [weak self] note in
+            guard let id = note.userInfo?["localIdentifier"] as? String else { return }
+            MainActor.assumeIsolated { self?.markUploadedByBackup(id) }
+        }
+    }
+
+    deinit {
+        if let uploadedObserver {
+            NotificationCenter.default.removeObserver(uploadedObserver)
+        }
+    }
 
     func isInCloud(_ id: String) -> Bool { presence[id] == true }
+
+    /// Ассет догрузился фоновой автозагрузкой: помечаем и сам ассет, и его хеш
+    /// (дубликаты с тем же содержимым тоже получат бейдж без запроса).
+    private func markUploadedByBackup(_ id: String) {
+        presence[id] = true
+        if let hash = hashByAsset[id] { existsByHash[hash] = true }
+    }
 
     /// Пометить ассет как точно загруженный — вызывать после успешной загрузки в
     /// облако, чтобы сразу показать иконку без повторного запроса.

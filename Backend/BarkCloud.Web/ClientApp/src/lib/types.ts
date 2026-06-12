@@ -31,6 +31,7 @@ export interface MediaItem extends CardFile {
   entriesCount: number;
   entryNames: string[];
   entryIds: string[];
+  duplicateGroupKey?: string;
 }
 
 /** Группа «Воспоминаний» за один год (CloudJson.MemoryGroup). */
@@ -120,6 +121,18 @@ export interface FileInfo extends CardFile {
   metadata?: FileMetadata | null;
 }
 
+/** Событие истории файла (GET /api/files/activity). */
+export interface FileActivity {
+  id: string;
+  fileId: string;
+  entryId: string;
+  actorUserId: number;
+  kind: string;
+  summary: string;
+  detailsJson: string;
+  createdAt: string | null;
+}
+
 /**
  * Метаданные блоба (EXIF / ffprobe / PDF / Office). Все поля опциональны —
  * сервер отдаёт только заданные, остальные приходят как undefined.
@@ -173,6 +186,8 @@ export interface ShareLink {
   createdAt: string | null;
   clickCount: number;
   kind?: 'file' | 'folder' | 'album';
+  mediaKind?: string;
+  previewUrl?: string;
 }
 
 /** Ответ курсор-пагинации. */
@@ -246,5 +261,5 @@ export interface SettingsState {
   sessions: Session[];
   sessionsHeader: string;
   admin: { enabled: boolean; unlocked: boolean };
-  system: { version: string; edition: string };
+  system: { version: string; edition: string; emailEnabled: boolean };
 }

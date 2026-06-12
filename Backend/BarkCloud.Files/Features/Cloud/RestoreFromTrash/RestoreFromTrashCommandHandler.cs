@@ -1,5 +1,7 @@
+using BarkCloud.Files.Domain;
 using BarkCloud.Files.Helpers;
 using BarkCloud.Files.Persistence;
+using BarkCloud.Files.Services;
 using BarkCloud.GrpcServer.XAuth;
 using BarkCloud.Proto.Files;
 using BarkCloud.Shared.Exceptions.Files;
@@ -18,15 +20,18 @@ public class RestoreFromTrashCommandHandler : IRequestHandler<RestoreFromTrashCo
 {
     private readonly ICloudHierarchyStorage _storage;
     private readonly UserContext _userContext;
+    private readonly FileActivityWriter _activity;
     private readonly ILogger<RestoreFromTrashCommandHandler> _logger;
 
     public RestoreFromTrashCommandHandler(
         ICloudHierarchyStorage storage,
         UserContext userContext,
-        ILogger<RestoreFromTrashCommandHandler> logger)
+        ILogger<RestoreFromTrashCommandHandler> logger,
+        FileActivityWriter? activity = null)
     {
         _storage = storage;
         _userContext = userContext;
+        _activity = activity ?? FileActivityWriter.Noop;
         _logger = logger;
     }
 
@@ -70,6 +75,16 @@ public class RestoreFromTrashCommandHandler : IRequestHandler<RestoreFromTrashCo
         _logger.LogInformation(
             "Запись {EntryId} (FileId: {FileId}, Owner: {OwnerId}) восстановлена из корзины в директорию {DirectoryId} как {Name}",
             entry.Id, entry.FileId, ownerId, targetDirectoryId, name);
+
+        await _activity.AddAsync(
+            ownerId,
+            entry.FileId,
+            ownerId,
+            FileActivityKind.Restored,
+            "Восстановлен из корзины",
+            entry.Id,
+            new { entry.Name, entry.DirectoryId },
+            cancellationToken);
 
         return new CloudEmpty();
     }

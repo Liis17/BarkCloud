@@ -1,10 +1,12 @@
 import React from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 import { Footbar } from './Footbar';
 import { ShellContext } from '../../hooks/useShell';
 import { PageHeaderContext, type PageHeader } from '../../hooks/usePageHeader';
+import { UploadManagerProvider } from '../../hooks/useUploadManager';
+import { useDocumentHead } from '../../hooks/useDocumentHead';
 import { apiGet } from '../../lib/api';
 import type { Shell } from '../../lib/types';
 
@@ -13,6 +15,8 @@ import type { Shell } from '../../lib/types';
 export function AppShell() {
   const [shell, setShell] = React.useState<Shell | null>(null);
   const [header, setHeader] = React.useState<PageHeader>({ title: '' });
+  const { pathname } = useLocation();
+  const firstPath = React.useRef(true);
 
   React.useEffect(() => {
     // 401 внутри apiGet сам редиректит на /login.
@@ -21,22 +25,43 @@ export function AppShell() {
       .catch(() => {});
   }, []);
 
+  // Блок хранилища обновляется при каждом переключении вкладки (pathname, без ?q=);
+  // первое срабатывание пропускаем — storage только что пришёл из /api/me.
+  React.useEffect(() => {
+    if (firstPath.current) {
+      firstPath.current = false;
+      return;
+    }
+    apiGet<Shell['storage']>('/api/storage')
+      .then((storage) => setShell((prev) => (prev ? { ...prev, storage } : prev)))
+      .catch(() => {});
+  }, [pathname]);
+
   const headerCtx = React.useMemo(() => ({ header, setHeader }), [header]);
+  const documentTitle = header.documentTitle ?? (typeof header.title === 'string' ? header.title : '');
+  const documentIconUrl = header.documentIconUrl ?? null;
+
+  useDocumentHead(
+    () => ({ title: documentTitle, iconUrl: documentIconUrl }),
+    [documentTitle, documentIconUrl],
+  );
 
   return (
     <ShellContext.Provider value={shell}>
-      <PageHeaderContext.Provider value={headerCtx}>
-        <div className="app">
-          <Sidebar />
-          <div className="main">
-            <Topbar {...header} />
-            <div className={'content' + (header.contentClass ? ' ' + header.contentClass : '')}>
-              <Outlet />
+      <UploadManagerProvider>
+        <PageHeaderContext.Provider value={headerCtx}>
+          <div className="app">
+            <Sidebar />
+            <div className="main">
+              <Topbar {...header} />
+              <div className={'content' + (header.contentClass ? ' ' + header.contentClass : '')}>
+                <Outlet />
+              </div>
+              <Footbar />
             </div>
-            <Footbar />
           </div>
-        </div>
-      </PageHeaderContext.Provider>
+        </PageHeaderContext.Provider>
+      </UploadManagerProvider>
     </ShellContext.Provider>
   );
 }

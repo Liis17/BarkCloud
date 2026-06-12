@@ -1,3 +1,4 @@
+using BarkCloud.GrpcServer;
 using BarkCloud.Proto.Files;
 
 using Google.Protobuf.WellKnownTypes;
@@ -6,6 +7,8 @@ using BarkCloud.Web.Infrastructure;
 using BarkCloud.Web.Rendering;
 
 using Grpc.Core;
+
+using System.Net;
 
 namespace BarkCloud.Web;
 
@@ -65,6 +68,37 @@ public static class WebEndpoints
             return Results.Redirect("/login");
         });
 
+        // Same-origin прокси для favicon-превью: браузерный canvas не может надёжно
+        // скруглить внешнюю картинку без CORS, поэтому отдаём разрешённые preview URL через Web.
+        app.MapGet("/api/head/icon", async (HttpContext http, IHttpClientFactory httpFactory, IConfiguration config, string? url) =>
+        {
+            if (!TryValidateIconProxyUrl(http, config, url, out var target))
+                return Results.BadRequest();
+
+            try
+            {
+                var client = httpFactory.CreateClient("files-upload");
+                using var resp = await client.GetAsync(target, HttpCompletionOption.ResponseHeadersRead, http.RequestAborted);
+                if (!resp.IsSuccessStatusCode)
+                    return Results.StatusCode(StatusCodes.Status502BadGateway);
+
+                var contentType = resp.Content.Headers.ContentType?.MediaType ?? "";
+                if (!contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+                    return Results.StatusCode(StatusCodes.Status415UnsupportedMediaType);
+
+                var bytes = await resp.Content.ReadAsByteArrayAsync(http.RequestAborted);
+                if (bytes.Length > 2_097_152)
+                    return Results.StatusCode(StatusCodes.Status413PayloadTooLarge);
+
+                http.Response.Headers.CacheControl = "public, max-age=86400";
+                return Results.File(bytes, contentType);
+            }
+            catch
+            {
+                return Results.StatusCode(StatusCodes.Status502BadGateway);
+            }
+        });
+
         // ───────── Регистрация (с подтверждением кодом по почте) ─────────
 
         app.MapGet("/register", async (HttpContext http, AuthGateway auth, PageService pages, IConfiguration config) =>
@@ -87,6 +121,10 @@ public static class WebEndpoints
             var password = form["password"].ToString();
 
             var result = await registration.BeginAsync(http, firstName, lastName, username, email, password);
+
+            // Режим без почты: аккаунт создан и сессия открыта сразу — без экрана ввода кода.
+            if (result.Outcome == RegistrationOutcome.Success)
+                return Results.Redirect("/photos");
 
             if (result.Outcome == RegistrationOutcome.PendingConfirmation)
             {
@@ -123,6 +161,10 @@ public static class WebEndpoints
 
         app.MapGet("/forgot", async (HttpContext http, AuthGateway auth, PageService pages, IConfiguration config) =>
         {
+            // Режим без почты: сброс пароля недоступен (доставить код некуда).
+            if (!config.EmailEnabled())
+                return Results.Redirect("/login");
+
             if (await auth.AuthenticateAsync(http) is not null)
                 return Results.Redirect("/photos");
 
@@ -133,6 +175,9 @@ public static class WebEndpoints
         // Шаг 1: отправляет код сброса на почту → экран ввода кода и нового пароля.
         app.MapPost("/forgot", async (HttpContext http, PasswordResetGateway reset, PageService pages, IConfiguration config) =>
         {
+            if (!config.EmailEnabled())
+                return Results.Redirect("/login");
+
             var form = await http.Request.ReadFormAsync();
             var login = form["login"].ToString();
 
@@ -152,6 +197,9 @@ public static class WebEndpoints
         // Шаг 2: проверяет код, ставит новый пароль и открывает сессию.
         app.MapPost("/forgot/confirm", async (HttpContext http, PasswordResetGateway reset, PageService pages, IConfiguration config) =>
         {
+            if (!config.EmailEnabled())
+                return Results.Redirect("/login");
+
             var form = await http.Request.ReadFormAsync();
             var resetId = form["reset_id"].ToString();
             var code = form["otp"].ToString();
@@ -296,6 +344,54 @@ public static class WebEndpoints
         // Данные грузятся на клиенте через /api (включая /api/me и /api/settings/full).
     }
 
+    private static bool TryValidateIconProxyUrl(HttpContext http, IConfiguration config, string? raw, out Uri target)
+    {
+        target = null!;
+        if (!Uri.TryCreate(raw, UriKind.Absolute, out var uri))
+            return false;
+
+        if (uri.Scheme is not ("http" or "https"))
+            return false;
+
+        if (!uri.AbsolutePath.Contains("/download/", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        var requestHost = PublicHost(config) ?? http.Request.Host.Host;
+        if (string.Equals(uri.Host, requestHost, StringComparison.OrdinalIgnoreCase))
+        {
+            target = uri;
+            return true;
+        }
+
+        if (IsLoopbackHost(requestHost) && uri.IsLoopback)
+        {
+            target = uri;
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool IsLoopbackHost(string host)
+    {
+        if (string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        return IPAddress.TryParse(host, out var ip) && IPAddress.IsLoopback(ip);
+    }
+
+    private static string? PublicHost(IConfiguration config)
+    {
+        var value = config["App:PublicHost"];
+        if (string.IsNullOrWhiteSpace(value))
+            return null;
+
+        if (Uri.TryCreate(value, UriKind.Absolute, out var absolute))
+            return absolute.Host;
+
+        return value.Split(':', 2)[0];
+    }
+
     private static Dictionary<string, string?> LoginVars(
         HttpContext http, IConfiguration config, string flashKind, string? email, string? login, string? password)
         => new()
@@ -304,6 +400,7 @@ public static class WebEndpoints
             ["server.host"] = config.Value("App:PublicHost", http.Request.Host.Value),
             ["server.tls"] = config.Value("App:TlsLabel", "TLS 1.3"),
             ["flash.kind"] = flashKind,
+            ["email.enabled"] = config.EmailEnabled() ? "true" : "false",
             ["form.email"] = email ?? "",
             ["form.password_masked"] = "",
             ["form.attempts_left"] = "—",
@@ -321,6 +418,7 @@ public static class WebEndpoints
             ["server.host"] = config.Value("App:PublicHost", http.Request.Host.Value),
             ["server.tls"] = config.Value("App:TlsLabel", "TLS 1.3"),
             ["flash.kind"] = "register",
+            ["email.enabled"] = config.EmailEnabled() ? "true" : "false",
             ["form.error"] = error ?? "",
             ["form.first_name"] = firstName,
             ["form.last_name"] = lastName,
@@ -337,6 +435,7 @@ public static class WebEndpoints
             ["server.host"] = config.Value("App:PublicHost", http.Request.Host.Value),
             ["server.tls"] = config.Value("App:TlsLabel", "TLS 1.3"),
             ["flash.kind"] = "register_confirm",
+            ["email.enabled"] = config.EmailEnabled() ? "true" : "false",
             ["form.error"] = error ?? "",
             ["form.code_id"] = codeId,
             ["form.email"] = email,
@@ -352,6 +451,7 @@ public static class WebEndpoints
             ["server.host"] = config.Value("App:PublicHost", http.Request.Host.Value),
             ["server.tls"] = config.Value("App:TlsLabel", "TLS 1.3"),
             ["flash.kind"] = "forgot",
+            ["email.enabled"] = config.EmailEnabled() ? "true" : "false",
             ["form.error"] = error ?? "",
             ["form.login"] = login,
             ["year"] = DateTime.UtcNow.Year.ToString()
@@ -365,6 +465,7 @@ public static class WebEndpoints
             ["server.host"] = config.Value("App:PublicHost", http.Request.Host.Value),
             ["server.tls"] = config.Value("App:TlsLabel", "TLS 1.3"),
             ["flash.kind"] = "forgot_confirm",
+            ["email.enabled"] = config.EmailEnabled() ? "true" : "false",
             ["form.error"] = error ?? "",
             ["form.reset_id"] = resetId,
             ["form.login"] = login,

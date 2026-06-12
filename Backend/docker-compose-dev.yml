@@ -52,12 +52,17 @@ services:
     restart: always
     environment:
       <<: *common-variables
+      StorageProbe__Path: "/mnt/minio-data"
+    volumes:
+      - ${MINIO_DATA_PATH:-minio_data}:/mnt/minio-data:ro
     networks:
       - barkcloud-network
     depends_on:
       - configuration
 
   # Сервис уведомлений (consumer RabbitMQ → SMTP). Внешнего API нет, портов наружу не открывает.
+  # Опционален: при пустых Email:* в Configuration сервер в режиме «без почты»
+  # (Features:EmailEnabled=false) задачи в очередь не публикует — сервис можно не запускать.
   notification:
     image: barkcloud-notification-dev:latest
     container_name: cloud-notification
@@ -122,7 +127,7 @@ services:
       # Источник данных MinIO. По умолчанию — named volume minio_data (внутри образа диска Docker).
       # Чтобы вынести данные на отдельный физический диск (Windows/WSL2): смонтируй ext4-vhdx в WSL2
       # и задай в .env MINIO_DATA_PATH=/mnt/wsl/minio. Ранбук: Obsidian/BarkCloudVault/structure/infrastructure.md
-      - "${MINIO_DATA_PATH:-minio_data}:/data"
+      - ${MINIO_DATA_PATH:-minio_data}:/data
     command: server /data --console-address ":${MINIO_WEBPORT}"
     networks:
       - barkcloud-network

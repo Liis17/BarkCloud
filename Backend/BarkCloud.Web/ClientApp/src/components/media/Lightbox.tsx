@@ -1,7 +1,10 @@
 import React from 'react';
 import { Icon } from '../Icon';
+import { useContextMenu } from '../ui/ContextMenu';
 import { apiGet } from '../../lib/api';
-import type { CardFile } from '../../lib/types';
+import { pickDocumentIcon, useDocumentHead } from '../../hooks/useDocumentHead';
+import type { MediaActionsApi } from '../../hooks/useMediaActions';
+import type { CardFile, MediaItem } from '../../lib/types';
 
 interface DownloadResponse {
   urls: Record<string, string | null>;
@@ -12,11 +15,14 @@ interface LightboxProps {
   index?: number;
   media?: CardFile;
   onClose?: () => void;
+  /** Действия панели под изображением (useMediaActions().api); без них панель не рендерится. */
+  actions?: MediaActionsApi;
 }
 
 /** Полноэкранный просмотр ОРИГИНАЛА (временная ссылка через /api/files/download).
- *  Листание стрелками/кнопками, зум колесом для фото, перемотка ±5c для видео. */
-export function Lightbox({ items, index = 0, media, onClose }: LightboxProps) {
+ *  Листание стрелками/кнопками, зум колесом для фото, перемотка ±5c для видео.
+ *  При переданных actions под изображением — плавающая панель действий. */
+export function Lightbox({ items, index = 0, media, onClose, actions }: LightboxProps) {
   const list: CardFile[] = Array.isArray(items) ? items : media ? [media] : [];
   const [i, setI] = React.useState(index);
   const [urls, setUrls] = React.useState<Record<string, string | null>>({});
@@ -26,10 +32,17 @@ export function Lightbox({ items, index = 0, media, onClose }: LightboxProps) {
   const videoRef = React.useRef<HTMLVideoElement | null>(null);
   const stageRef = React.useRef<HTMLDivElement | null>(null);
   const dragRef = React.useRef<{ x: number; y: number; px: number; py: number } | null>(null);
+  const { menu, openAt } = useContextMenu();
 
   const cur = list[i] || null;
   const fileId = cur && cur.id;
   const isVideo = !!cur && cur.kind === 'video';
+
+  useDocumentHead(
+    () => ({ title: cur?.name || null, iconUrl: pickDocumentIcon(cur) }),
+    [cur?.id, cur?.name, cur?.jpegViewUrl, cur?.previews],
+    20,
+  );
 
   React.useEffect(() => {
     let alive = true;
@@ -52,6 +65,15 @@ export function Lightbox({ items, index = 0, media, onClose }: LightboxProps) {
     setScale(1);
     setPan({ x: 0, y: 0 });
   }, [i]);
+
+  // Родитель убрал элемент(ы) из items (например, после удаления) — корректируем индекс.
+  React.useEffect(() => {
+    if (list.length === 0) {
+      onClose && onClose();
+      return;
+    }
+    if (i >= list.length) setI(list.length - 1);
+  }, [list.length, i, onClose]);
 
   const go = React.useCallback(
     (delta: number) => {
@@ -98,6 +120,9 @@ export function Lightbox({ items, index = 0, media, onClose }: LightboxProps) {
   // Для фото показываем JpegView (HEIC и пр. браузеро-недружелюбные форматы), если он есть.
   const photoSrc = isVideo ? null : (cur.jpegViewUrl && cur.jpegViewUrl.length > 0 ? cur.jpegViewUrl : url);
   const ready = isVideo ? !!url : !!photoSrc;
+  // Для действий панели: элементы галерей — MediaItem, у прочих entryIds может не быть.
+  const curM = cur as MediaItem;
+  const hasEntry = !!(curM.entryIds && curM.entryIds.length > 0);
 
   function onMouseDown(e: React.MouseEvent) {
     if (isVideo || scale <= 1) return;
@@ -113,6 +138,47 @@ export function Lightbox({ items, index = 0, media, onClose }: LightboxProps) {
   }
   function endDrag() {
     dragRef.current = null;
+  }
+
+  function openShareMenu(e: React.MouseEvent) {
+    if (!actions) return;
+    openAt(e, [
+      { label: 'Создать публичную ссылку', icon: 'share', onClick: () => actions.createPublicLink(curM) },
+      { label: 'Копировать временную ссылку', icon: 'link', onClick: () => actions.copyTempLink(curM) },
+      { label: 'Поделиться с пользователем', icon: 'user', onClick: () => actions.shareWithUser(curM) },
+    ]);
+  }
+  function openAlbumMenu(e: React.MouseEvent) {
+    if (!actions) return;
+    actions.membership.ensureLoaded();
+    const inAlbums = actions.membership.of(curM.id);
+    const available = actions.albums.filter((a) => !inAlbums.has(a.id));
+    openAt(
+      e,
+      available.length
+        ? available.map((a) => ({ label: a.name, onClick: () => actions.addToAlbum(curM, a.id) }))
+        : [{ label: actions.albums.length ? 'Уже во всех альбомах' : 'Нет альбомов', disabled: true }],
+    );
+  }
+  async function copyImage() {
+    if (!actions) return;
+    try {
+      if (!photoSrc) throw new Error('Изображение ещё не загружено');
+      const blob = await (await fetch(photoSrc)).blob();
+      // Clipboard API принимает только PNG — перегоняем через canvas.
+      const bitmap = await createImageBitmap(blob);
+      const canvas = document.createElement('canvas');
+      canvas.width = bitmap.width;
+      canvas.height = bitmap.height;
+      canvas.getContext('2d')!.drawImage(bitmap, 0, 0);
+      const png = await new Promise<Blob>((res, rej) =>
+        canvas.toBlob((b) => (b ? res(b) : rej(new Error('Не удалось подготовить изображение'))), 'image/png'),
+      );
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': png })]);
+      actions.toast('Изображение скопировано');
+    } catch {
+      actions.toast('Не удалось скопировать изображение', 'err');
+    }
   }
 
   return (
@@ -156,10 +222,54 @@ export function Lightbox({ items, index = 0, media, onClose }: LightboxProps) {
         )}
       </div>
 
-      {url && (
-        <a className="lb-download btn" href={url} download={cur.name} onClick={(e) => e.stopPropagation()}>
-          <Icon.download size={16} /> Скачать оригинал
-        </a>
+      {actions ? (
+        <div className="lb-actions" onClick={(e) => e.stopPropagation()}>
+          <button className="icon-btn" title="Поделиться" onClick={openShareMenu}>
+            <Icon.share size={20} />
+          </button>
+          <button className="icon-btn" title="Добавить в альбом" onClick={openAlbumMenu}>
+            <Icon.plus size={20} />
+          </button>
+          <button
+            className="icon-btn"
+            title={hasEntry ? 'Показать в папке' : 'Файл не привязан к папке'}
+            disabled={!hasEntry}
+            onClick={() => {
+              onClose && onClose();
+              actions.revealInFolder(curM);
+            }}
+          >
+            <Icon.folder size={20} />
+          </button>
+          {url && (
+            <a className="icon-btn" href={url} download={cur.name} title="Скачать оригинал">
+              <Icon.download size={20} />
+            </a>
+          )}
+          {!isVideo && (
+            <button className="icon-btn" title="Скопировать в буфер обмена" onClick={copyImage}>
+              <Icon.copy size={20} />
+            </button>
+          )}
+          <button className="icon-btn" title="Свойства" onClick={() => actions.showProperties(curM)}>
+            <Icon.info size={20} />
+          </button>
+          <button className="icon-btn danger" title="Удалить" onClick={() => actions.requestDelete(curM)}>
+            <Icon.trash size={20} />
+          </button>
+        </div>
+      ) : (
+        url && (
+          <a className="lb-download btn" href={url} download={cur.name} onClick={(e) => e.stopPropagation()}>
+            <Icon.download size={16} /> Скачать оригинал
+          </a>
+        )
+      )}
+
+      {menu && (
+        <div onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
+          {menu}
+        </div>
       )}
     </div>
   );

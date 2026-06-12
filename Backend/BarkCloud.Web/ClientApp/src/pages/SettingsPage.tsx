@@ -282,6 +282,12 @@ function SystemSection({ admin, system }: { admin: SettingsState['admin']; syste
                 {s.image}
               </div>
             )}
+            {s.service === 'notification' && !system.emailEnabled && (
+              <div className="svc-note" style={{ fontSize: 12, color: 'var(--md-on-surface-variant)', marginTop: 4 }}>
+                Не используется — почта на сервере не настроена. Сервис можно остановить, а чтобы убрать совсем —
+                удалить <code>notification</code> из <code>docker-compose.yml</code> и его переменные из <code>.env</code>.
+              </div>
+            )}
           </div>
         </div>
         <div className="svc-actions">{busy[s.service] ? <span className="spin" style={{ margin: '0 11px' }} /> : actions(s.state === 'running')}</div>
@@ -1144,9 +1150,13 @@ export function SettingsPage() {
     window.location.hash = key;
   };
 
+  const active = navKeys.includes(section) ? section : 'account';
+  const activeLabel = nav.find((n) => n.key === active)?.label || 'Аккаунт';
+
   usePageHeader(
     () => ({
       title: 'Настройки',
+      documentTitle: `Настройки: ${activeLabel}`,
       kicker: (
         <>
           <span>Прочее</span>
@@ -1156,13 +1166,12 @@ export function SettingsPage() {
       ),
       search: false,
     }),
-    [],
+    [activeLabel],
   );
 
   if (err) return <div style={{ color: 'var(--md-error)', padding: 24 }}>{err}</div>;
   if (!data) return <Loading label="Загрузка настроек…" />;
 
-  const active = navKeys.includes(section) ? section : 'account';
   let content: React.ReactNode;
   switch (active) {
     case 'security':

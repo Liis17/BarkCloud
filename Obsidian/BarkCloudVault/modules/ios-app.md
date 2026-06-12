@@ -62,8 +62,8 @@ BarkCloud/
 │   ├── ServerSetup/                ServerSetupScreen — ввод адресов self-hosted сервера на первом запуске (см. [[#Server Setup]])
 │   ├── Login/                      LoginScreen + LoginUiState + LoginViewModel (логин/пароль + OTP; внизу ссылка «Настройки сервера» → лист ServerSetupScreen)
 │   ├── Main/                       MainScreen (TabView, 5 табов: Галерея/Файлы/Альбомы(default)/Корзина/Настройки), MainDestination
-│   ├── Gallery/                    GalleryScreen+VM (медиатека устройства PhotoKit: сетка фото+видео, выбор, загрузка в облако), DeviceMediaViews (PHImageManager-загрузчик + ячейка + полноэкранный просмотр фото/видео), DeviceAssetResource (общее чтение оригинала+SHA256), CloudPresenceTracker (индикация «уже в облаке»), DeviceAssetPickerScreen (кастомный пикер загрузки — замена PhotosPicker)
-│   ├── Shared/                     RemoteImage (self-signed AsyncImage-замена + NSCache; cache-aware вариант `RemoteImage(fileId:variant:url:)` и `FallbackRemoteImage(fileId:urls:)` тянут байты через дисковый кеш [[ios-file-cache]]), FilePreviewController/RemoteFilePreviewScreen (QuickLook; оригинал через FileCacheService.loadFile(.original)), MediaThumb (fileId + previewWidth) + SquareThumbClip (квадратная обрезка fill-картинки с корректным хит-тестом), ComingSoonScreen (универсальная заглушка «скоро»), BarkMascot/BarkRefreshHeader/BarkRefreshable (фирменный pull-to-refresh — **полностью свой, без системного `.refreshable`**, поэтому в зазоре нет ни системного спиннера, ни подложки: видна только пиксель-арт оранжевая лиса в Canvas — сидит ровно анфас, пушистый хвост справа виляет вверх-вниз непрерывным сдвигом по синусу; виляние идёт и при вытягивании, и при обновлении — TimelineView `.animation` с paused: `!(isRefreshing || progress > 0.001)`, масштаб появления ведётся от `pullProgress`. Жест: `onScrollGeometryChange` → `pullProgress`, `onScrollPhaseChange` → при отпускании (`.idle`/`.decelerating`) и `pullProgress >= 1` запускает обновление; во время обновления контент опускается на `refreshGap` через `.contentMargins(.top,…,for:.scrollContent)`, чтобы лиса была в чистом зазоре; **критично #1:** `pullProgress` считается как `max(0, -(contentOffset.y + contentInsets.top))/threshold` — именно `+ contentInsets.top`, потому что в покое `List` (TrashScreen) репортит `contentOffset.y == -contentInsets.top` (инсет навбара), и без поправки лиса висела бы постоянно; `ScrollView` (остальные экраны) покоится около 0, поэтому там баг не проявлялся; **критично #2:** прогресс/флаг обновления и сама задача (`Task`) хранятся в `@Observable BarkRefreshState`, а НЕ в `@State` модификатора — `body(content:)` читает только `isRefreshing` (редкий тогл для `contentMargins`), но НЕ `pullProgress`, поэтому прокрутка не пересобирает модификатор; задача обновления живёт в state-объекте и перерисовками view не отменяется (иначе рвался бы gRPC-запрос → «the transport threw an unexpected error»))
+│   ├── Gallery/                    GalleryScreen+VM (медиатека устройства PhotoKit: сетка фото+видео с секциями по датам, выбор, загрузка в облако), DeviceMediaViews (PHImageManager-загрузчик + ячейка + полноэкранный просмотр фото/видео), DeviceAssetResource (общее чтение оригинала+SHA256), CloudPresenceTracker (индикация «уже в облаке»), DeviceAssetPickerScreen (кастомный пикер загрузки — замена PhotosPicker)
+│   ├── Shared/                     RemoteImage (self-signed AsyncImage-замена + NSCache; cache-aware вариант `RemoteImage(fileId:variant:url:)` и `FallbackRemoteImage(fileId:urls:)` тянут байты через дисковый кеш [[ios-file-cache]]), FilePreviewController/RemoteFilePreviewScreen (QuickLook; оригинал через FileCacheService.loadFile(.original)), MediaThumb (fileId + previewWidth) + SquareThumbClip (квадратная обрезка fill-картинки с корректным хит-тестом), MediaDateSections/MediaDateSectionHeader (общие секции фотосеток по календарному дню: Сегодня/Вчера/Завтра через системную локаль, иначе день+месяц), ComingSoonScreen (универсальная заглушка «скоро»), BarkMascot/BarkRefreshHeader/BarkRefreshable (фирменный pull-to-refresh — **полностью свой, без системного `.refreshable`**, поэтому в зазоре нет ни системного спиннера, ни подложки: видна только пиксель-арт оранжевая лиса в Canvas — сидит ровно анфас, пушистый хвост справа виляет вверх-вниз непрерывным сдвигом по синусу; виляние идёт и при вытягивании, и при обновлении — TimelineView `.animation` с paused: `!(isRefreshing || progress > 0.001)`, масштаб появления ведётся от `pullProgress`. Жест: `onScrollGeometryChange` → `pullProgress`, `onScrollPhaseChange` → при отпускании (`.idle`/`.decelerating`) и `pullProgress >= 1` запускает обновление; во время обновления контент опускается на `refreshGap` через `.contentMargins(.top,…,for:.scrollContent)`, чтобы лиса была в чистом зазоре; **критично #1:** `pullProgress` считается как `max(0, -(contentOffset.y + contentInsets.top))/threshold` — именно `+ contentInsets.top`, потому что в покое `List` (TrashScreen) репортит `contentOffset.y == -contentInsets.top` (инсет навбара), и без поправки лиса висела бы постоянно; `ScrollView` (остальные экраны) покоится около 0, поэтому там баг не проявлялся; **критично #2:** прогресс/флаг обновления и сама задача (`Task`) хранятся в `@Observable BarkRefreshState`, а НЕ в `@State` модификатора — `body(content:)` читает только `isRefreshing` (редкий тогл для `contentMargins`), но НЕ `pullProgress`, поэтому прокрутка не пересобирает модификатор; задача обновления живёт в state-объекте и перерисовками view не отменяется (иначе рвался бы gRPC-запрос → «the transport threw an unexpected error»))
 │   ├── Settings/                   SettingsScreen + ProfileViewModel (профиль/аватар/хранилище/выход/удаление), EditProfileScreen, PrivacySettingsScreen, DevicesScreen, CacheSettingsScreen + CacheSettingsViewModel (раздел «Кеш»: размер/записи/лимит/очистка — [[ios-file-cache]])
 │   ├── Trash/                      TrashScreen+VM (корзина облака: ListTrash + cursor-пагинация, restore/delete-forever свайпом, EmptyTrash)
 │   ├── Media/                      таб «Альбомы»: CloudMediaScreen с переключателем Фото/Видео/Альбомы
@@ -71,7 +71,7 @@ BarkCloud/
 │   │   ├── MediaItem.swift         модель (id=file_id, thumbnailURL?, isVideo, fileName) + init(asset:) + placeholders
 │   │   ├── MediaTabScreen.swift    CloudMediaScreen: 3-сегментный переключатель → MediaGridScreen(.photo/.video) / AlbumsGridScreen(nil)
 │   │   ├── MediaGridViewModel.swift @Observable: ListUserMedia + cursor-пагинация + загрузка + мультивыбор (selection/isSelecting/isProcessing/deleteDone/deleteTotal): deleteSelected (последовательно DeleteUserMedia(file_id) с прогрессом), addSelectedToAlbum, createAlbumAndAddSelected
-│   │   ├── MediaGridScreen.swift   LazyVGrid 3 кол. (MediaThumb), загрузка через кастомный DeviceAssetPickerScreen (бейджи «уже в облаке»), полноэкранный просмотр; кнопка «Выбрать» → мультивыбор + нижняя панель без фона (Удалить — подтверждение поповером над кнопкой / В альбом)
+│   │   ├── MediaGridScreen.swift   LazyVGrid 3 кол. (MediaThumb) с секциями по датам для реальных фото/видео (плейсхолдеры без заголовков), загрузка через кастомный DeviceAssetPickerScreen (бейджи «уже в облаке»), полноэкранный просмотр с панелью действий (см. [[#Свайп-просмотрщик]]); кнопка «Выбрать» → мультивыбор + нижняя панель без фона (Удалить — подтверждение поповером над кнопкой / В альбом)
 │   │   └── Albums/                 AlbumsViewModel, AlbumsGridScreen (kind: MediaKind? — nil=без фильтра), AlbumDetailScreen+VM (items, обложка, add/remove), AlbumPickerSheet (выбор альбома + «создать новый»)
 │   └── Files/                      файл-браузер (локальный + облачный + «Общий доступ»→SharedHubScreen)
 │       ├── Domain/                 FsEntry, FsSort
@@ -300,9 +300,9 @@ BarkCloud/
   «В альбом» (`AlbumPickerSheet`: список альбомов + первым пунктом «Создать новый альбом» →
   `CreateAlbum("Новый альбом"+5 случайных символов)` + `AddItemsToAlbum`). **`DeleteUserMedia`** (новый RPC,
   бэкенд `Backend/BarkCloud.Files/Features/Cloud/DeleteUserMedia/`): живые `CloudFileEntries` владельца → в
-  корзину (восстановимо); если записей нет (медиа загружено без привязки к папке) — `RemoveUploaderFromFile`
-  (жёсткое удаление из галереи, освобождает квоту). Решает проблему: медиа из таба грузится без записи
-  каталога, поэтому `DeleteFileEntry`/`entry_ids` для него не работали.
+  корзину (восстановимо); если записей нет (медиа загружено без привязки к папке) — создаётся новая
+  `CloudFileEntry` сразу в корзине в системной папке по типу медиа. Решает проблему: медиа из таба грузится
+  без записи каталога, поэтому `DeleteFileEntry`/`entry_ids` для него не работали.
   Альбомы (`AlbumApi`, `kind=nil` — без
   фильтра): карточки (`ListAlbums`), открытие (`ListAlbumItems`), создание, добавление файлов тем же
   пикером (`AlbumDetailViewModel.uploadAndAddAssets` → `uploadFile` грузит оригинал и кладёт в альбом;
@@ -340,22 +340,31 @@ BarkCloud/
   Нижняя панель (`safeAreaInset`, фон `.bar`): «Переместить» (`CloudMovePicker` → `moveSelected`)
   и «Удалить» (подтверждение поповером → `deleteSelected`, батч последовательно с прогрессом
   done/total, без undo — зеркалит `MediaGridViewModel`).
-- **Общий доступ** (`Features/Shared/SharedHubScreen.swift`) — хаб с **тремя** сегментами:
-  - **Мои публичные** (`MySharesListView`/`MySharesViewModel`) — постоянные публичные ссылки
-    (`CloudApi.ListMyShares`, копировать/отозвать). См. [[share-links-client-guide]].
-  - **Я поделился** (`MyOutgoingSharesListView`/`MyOutgoingSharesViewModel`) — файлы, которыми я
-    поделился с конкретными пользователями (приватные гранты), и с кем. Источник —
-    `CloudApi.ListMyOutgoingSharesAll` (плоский список грантов с `UploadFileInfo`, курсор-пагинация);
-    VM **группирует по файлу** (`SharedByMeGroup` — порядок по первому появлению, raw отсортирован от
-    свежих) и резолвит получателей через `UserRepository.getUser`. Карточка: превью + имя файла +
-    чипсы получателей (`FlowLayout`) с крестиком — отзыв гранта `revokeUserShare` (оптимистично).
-    Зеркалит веб-таб `SharedPage.tsx` (`/api/shared/i-shared`).
-  - **Мне доступны** (`SharedWithMeListView`/`SharedWithMeViewModel`) — входящие гранты
-    (`ListSharedWithMe`, скачивание через `GetSharedFileDownloadUrl` → `UIDocumentPicker`).
-  VM каждого таба создаётся/грузится лениво при первом переключении. Выдача гранта на файл —
-  `ShareWithUserSheet` (поиск пользователя), управление одним файлом — `OutgoingSharesSheet`;
-  обе вызываются из контекстного меню (`CloudBrowserScreen`/сетки). Бэкенд: новый RPC
-  `ListMyOutgoingSharesAll` + фича `Features/Cloud/ListMyOutgoingSharesAll` в сервисе Files.
+- **Общий доступ** (`Features/Shared/SharedHubScreen.swift`) — хаб с **тремя** сегментами. Паритет с
+  веб-табом `SharedPage.tsx`: публичные ссылки и приватные гранты **трёх типов — файлы, папки, альбомы**
+  (альбомы — только публичные, RPC шаринга альбома с пользователем нет).
+  - **Мои публичные** (`MySharesListView`/`MySharesViewModel`) — постоянные публичные ссылки. VM грузит
+    **три типа** (`ListMyShares` + `ListMyFolderShares` + `ListMyAlbumShares`, по 200) и сводит в один
+    список `[PublicShareItem]` (enum `Kind` file/folder/album) от свежих к старым; пагинации нет (как на
+    вебе). Карточка с иконкой по типу; отзыв маршрутизируется по типу (`revokeShare`/`revokeFolderShare`/
+    `revokeAlbumShare`). См. [[share-links-client-guide]].
+  - **Я поделился** (`MyOutgoingSharesListView`/`MyOutgoingSharesViewModel`) — приватные гранты, и с кем.
+    **Файлы:** `CloudApi.ListMyOutgoingSharesAll` (плоский список с `UploadFileInfo`, курсор-пагинация),
+    VM группирует по файлу (`SharedByMeGroup`). **Папки** (секция «Папки, которыми я поделился»):
+    `ListMyOutgoingFolderShares` (без пагинации), группировка по папке (`SharedByMeFolderGroup`,
+    `FolderGroupRow`). Получатели резолвятся через `UserRepository.getUser`; чипсы (`FlowLayout`) с
+    крестиком — отзыв `revokeUserShare` / `revokeFolderUserShare` (оптимистично, маршрут по `isFolder`).
+  - **Мне доступны** (`SharedWithMeListView`/`SharedWithMeViewModel`) — входящие гранты. **Файлы:**
+    `ListSharedWithMe` (скачивание `GetSharedFileDownloadUrl` → `UIDocumentPicker`). **Папки** (секция
+    «Доступные мне папки»): `ListSharedFoldersWithMe`; тап → `SharedFolderBrowserScreen` — навигация по
+    поддереву (`ListSharedDirectory`, рекурсивно), тап по файлу качает его по готовой временной ссылке
+    (`PublicFileEntry.download_url`) во временный файл и открывает в QuickLook (`FilePreviewController`).
+  VM каждого таба создаётся/грузится лениво при первом переключении. **Выдача гранта** (`ShareWithUserSheet`,
+  поиск пользователя) и **управление получателями** (`OutgoingSharesSheet`) обобщены на файл/папку:
+  `ShareWithUserContext` несёт `entityID` + `isFolder` (инициализаторы `init(fileID:)`/`init(folderID:)`);
+  вызовы — из контекстного меню файла (сетки/CloudBrowser) и папки (CloudBrowser). Бэкенд-RPC уже были в
+  proto — на iOS добавлены лишь обёртки в `CloudRepository` и модели (`FolderShareLink`,
+  `OutgoingFolderShareItem`, `SharedFolderItem`, `SharedDirectoryListing`).
 - **Контекстное меню по удержанию на сетках** (`Features/Shared/ShakeContextMenu.swift`) — кастомный
   `ViewModifier` `.shakeContextMenu(isActive:menu:)` вместо нативного `.contextMenu`: по
   `.onLongPressGesture(minimumDuration:0.4)` ячейка увеличивается (`scaleEffect 1.09`), «трясётся»
@@ -368,7 +377,10 @@ BarkCloud/
   (`FileTransferService.tempDownloadURLs` → `UIPasteboard.general.url`), **Сделать публичной**
   (`CloudApi.CreateShare` → клиент сам собирает `{GrpcEndpoint.webHost}/s/{token}` через
   `publicShareURL(token:)`, см. [[share-links-client-guide]] — URL ведёт на веб-UI :443, бэкенд готовый
-  URL не отдаёт; см. ограничение revoke в гайде), **Добавить в альбом** (`AlbumPickerSheet` на один файл),
+  URL не отдаёт; см. ограничение revoke в гайде; **после создания любой публичной ссылки — единый
+  диалог `SharePresenter`** (`.sharePresenter(url:)`): «Скопировать ссылку» в буфер или «Поделиться…»
+  через системный `UIActivityViewController`; применён в Gallery/MediaGrid/AlbumDetail/CloudBrowser/
+  MyShares), **Добавить в альбом** (`AlbumPickerSheet` на один файл),
   **Удалить** (галерея/альбом → `DeleteUserMedia` в корзину **оптимистично через [[#PendingDelete]]** —
   файл сразу пропадает из сетки, внизу snackbar 5 с с «Отменить»; устройство → «Удалить с устройства»
   `PHAssetChangeRequest.deleteAssets`). **Экран свойств** (`Features/Shared/FilePropertiesSheet.swift`,
@@ -392,7 +404,7 @@ BarkCloud/
   по SHA256 (`cachedSHA256` → `CloudApi.CheckFileHash`, одиночный), а при отсутствии заливает оригинал
   с `routeByMediaKind: true` (системные «Фото»/«Видео»/«Другие документы»); на время резолва — оверлей `isUploading`.
 
-### Поиск по имени · Шаринг альбома
+### Поиск по имени · Шаринг альбома · Шаринг папок
 
 - **Поиск** (`Features/Files/UI/CloudBrowserScreen` + `CloudBrowserViewModel`): `.searchable`
   в навбаре облачного браузера; `searchTextChanged` — живой поиск с дебаунсом 300 мс через
@@ -401,8 +413,15 @@ BarkCloud/
   «Поделиться с пользователем»). Модель `CloudSearchPage`, обёртка в `BarkCloudKit/CloudRepository`.
 - **Шаринг альбома** (`Features/Media/Albums/AlbumDetailScreen`): пункт меню «Поделиться альбомом»
   (`albums_share`) → `AlbumDetailViewModel.shareAlbum` → `CloudRepository.createAlbumShare(albumID:)`
-  (RPC `CloudApi.CreateAlbumShare`) → `pendingShareURL` → системный Share Sheet. URL — `{webHost}/al/{token}`
-  (`GrpcEndpoint.publicAlbumShareURL`), модель `AlbumShareLink`. Публичная страница рендерится веб-клиентом.
+  (RPC `CloudApi.CreateAlbumShare`) → `pendingShareURL` → диалог `SharePresenter` (копировать/поделиться).
+  URL — `{webHost}/al/{token}` (`GrpcEndpoint.publicAlbumShareURL`), модель `AlbumShareLink`. Публичная
+  страница рендерится веб-клиентом.
+- **Шаринг папки** (`Features/Files/UI/CloudBrowserScreen`, контекстное меню строки папки): «Сделать
+  публичной» (`CloudBrowserViewModel.makeFolderPublic` → `CloudRepository.createFolderShare` →
+  `{webHost}/f/{token}`, модель `FolderShareLink`, идемпотентно) и «Поделиться с пользователем»
+  (`ShareWithUserContext(folderID:)` → `ShareWithUserSheet` → `shareFolderWithUser`). Публичная страница
+  папки `/f/{token}` рендерится веб-клиентом; приватный грант виден получателю во вкладке «Мне доступны»
+  (`SharedFolderBrowserScreen`).
 
 ### Умные (динамические) папки — таб «Файлы»
 
@@ -466,6 +485,30 @@ BarkCloud/
   (`loadMoreIfNeeded`), дописывает `ids` и зовёт `reloadData()` с восстановлением текущей
   позиции — листается до конца без выхода к сетке. Передан в Альбомы-таб и содержимое
   альбома; в Галерее устройства `nil` (медиатека грузится целиком, пагинации нет).
+- **Панель действий (опциональная):** `actions: MediaPagerActions?` — для облачных коллекций
+  включает плавающую капсулу внизу (`.regularMaterial`): **Поделиться** (системный Share Sheet
+  с самим файлом — оригинал под оригинальным именем через hardlink-копию во temp), **В альбом**
+  (`AlbumPickerSheet` прямо из вьювера), **Свойства** (`FilePropertiesSheet(.cloud)`),
+  **Удалить** (confirmationDialog → `delete`-колбэк → `onClose`; в сетке остаётся undo-снекбар
+  `deleteSingle`). В тулбаре появляется меню «⋯»: **Скачать оригинал** (качает оригинал, не
+  JpegView, и сохраняет в медиатеку Фото через `PHAssetCreationRequest`; сохранённый ассет
+  линкуется в `CloudDeviceLinkStore`) и **Скопировать в буфер обмена** (фото → `UIPasteboard.image`
+  из показанного JPEG; видео → `NSItemProvider(contentsOf:)` файлом без чтения байтов в память).
+  Конфиг содержит `albums`-репозиторий, `item(id)`-lookup, `resolveOriginal` (резолвер без карты
+  видов) и колбэки на VM (`addToAlbum`/`createAlbumAndAdd` возвращают `Bool` для снекбара вьювера).
+  **Отслеживание текущей страницы:** у `QLPreviewController` нет колбэка смены элемента —
+  `Coordinator` репортит `currentPreviewItemIndex` после каждого `previewItemAt` (async) плюс
+  страховочный таймер 0.4 с (свайп назад у края не вызывает `previewItemAt`). Подключено во
+  вкладках **Фото/Видео** (`MediaGridScreen`); альбомы и smart-папки — без панели (`actions: nil`).
+- **Панель галереи устройства:** `deviceActions: MediaPagerDeviceActions?` (id = localIdentifier,
+  колбэки на `GalleryViewModel`) — та же плавающая капсула, три кнопки: **В альбом**
+  (`addToAlbum(asset:)` через `resolveAndRun` — загрузит в облако при необходимости, дедуп по хешу),
+  **Загрузить в облако** (`uploadToCloud(asset:)` = `resolveAndRun` без действия; дефолтная папка
+  по типу медиа), **Удалить** (`deleteEverywhere(asset:)`: с устройства всегда + из облака, если
+  файл там есть; подтверждение показывает сам PhotoKit; отмена системного диалога → `false`,
+  вьювер остаётся открытым, успех → вьювер закрывается). `resolveAndRun`/`addToAlbum`/
+  `createAlbumAndAdd`/`deleteEverywhere` возвращают `@discardableResult Bool` для снекбара
+  вьювера. Подключено в `GalleryScreen`.
 - **Ограничения:** видео играет в QuickLook **без автостарта** (у `QLPreviewController`
   нет API автозапуска; ковыряние внутренней иерархии вью отвергнуто как хрупкое/риск App
   Store). При первом открытии не-кешированного файла короткий пустой кадр, пока идёт

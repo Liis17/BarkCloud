@@ -2,6 +2,8 @@ import React from 'react';
 
 export interface PageHeader {
   title: React.ReactNode;
+  documentTitle?: string;
+  documentIconUrl?: string | null;
   kicker?: React.ReactNode;
   actions?: React.ReactNode;
   search?: boolean;
