@@ -10,8 +10,9 @@ public static class BackendComposeGenerator
 {
     public static string BuildCompose(BuilderModel m)
     {
-        string p = m.ImageRegistryPrefix;
-        string t = m.ImageTag;
+        // Образ приложения: docker.barkfluff.com:5000/barkcloud-<svc>[-dev]:latest
+        string suffix = m.ImageChannel == "Dev" ? "-dev" : "";
+        string Img(string name) => $"{BuilderModel.ImageRegistry}/barkcloud-{name}{suffix}:latest";
 
         // Каждый блок-секция не содержит завершающего перевода строки; секции склеиваются
         // через пустую строку, что даёт ровно один разделитель между сервисами.
@@ -30,21 +31,19 @@ services:
   # === Основные микросервисы (prod-образы) ===
 
   configuration:
-    image: {{p}}configuration:{{t}}
+    image: {{Img("configuration")}}
     container_name: cloud-configuration
     restart: always
     env_file:
       - .env
     environment:
       <<: *common-variables
-      CONFIGURATION_HOST: ${CONFIGURATION_HOST}
-      CONFIGURATION_DATABASE: ${CONFIGURATION_DATABASE}
-      CONFIGURATION_USERNAME: ${CONFIGURATION_USERNAME}
-      CONFIGURATION_PASSWORD: ${CONFIGURATION_PASSWORD}
+      CONFIGURATION_HOST:  postgres_barkcloud:${POSTGRES_PORT}
+      CONFIGURATION_DATABASE: configuration
+      CONFIGURATION_USERNAME: ${POSTGRES_USER}
+      CONFIGURATION_PASSWORD: ${POSTGRES_PASSWORD}
       CONFIGURATION_PORT: ${CONFIGURATION_PORT}
-      # Postgres внутри контейнера всегда слушает 5432 — POSTGRES_PORT из .env это host-маппинг
       CONFIGURATION_DBPORT: "5432"
-      # MinIO внутри контейнера всегда слушает 9000 — MINIO_PORT из .env это host-маппинг
       MINIO_HOST: minio
       MINIO_PORT: "9000"
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
@@ -55,7 +54,7 @@ services:
       - barkcloud-network
 
   identity:
-    image: {{p}}identity:{{t}}
+    image: {{Img("identity")}}
     container_name: cloud-identity
     restart: always
     environment:
@@ -66,7 +65,7 @@ services:
       - configuration
 
   users:
-    image: {{p}}users:{{t}}
+    image: {{Img("users")}}
     container_name: cloud-users
     restart: always
     environment:
@@ -77,7 +76,7 @@ services:
       - configuration
 
   files:
-    image: {{p}}files:{{t}}
+    image: {{Img("files")}}
     container_name: cloud-files
     restart: always
     environment:
@@ -96,9 +95,9 @@ services:
 
         if (m.IncludeNotification)
             sections.Add($$"""
-  # Сервис уведомлений (consumer RabbitMQ → SMTP). Внешнего API нет — в nginx не маршрутизируется. Опционален
+  # Сервис уведомлений. Внешнего API нет — в nginx не маршрутизируется. Опционален
   notification:
-    image: {{p}}notification:{{t}}
+    image: {{Img("notification")}}
     container_name: cloud-notification
     restart: always
     environment:
@@ -109,14 +108,13 @@ services:
       - configuration
 """);
 
-        if (m.IncludeWeb)
-            sections.Add($$"""
-  # Веб-клиент (HTTP, отдаёт страницы браузеру; к микросервисам обращается по docker-сети через gRPC)
+        // Веб-клиент — всегда (отключить нельзя).
+        sections.Add($$"""
+  # Веб-клиент
   web:
-    image: {{p}}web:{{t}}
+    image: {{Img("web")}}
     container_name: cloud-web
     restart: always
-    # root нужен для доступа к docker.sock — веб управляет обновлением бэкенда из страницы настроек.
     user: root
     env_file:
       - .env
@@ -148,11 +146,11 @@ services:
     image: nginx:latest
     container_name: cloud-nginx
     restart: always
-    # Наружу выставлены только эти порты; микросервисы доступны лишь через прокси.
+    # Наружу выставлены только эти порты; микросервисы доступны лишь через прокси
     ports:
-      - "${IDENTITY_PORT}:7020"
-      - "${USERS_PORT}:7021"
-      - "${FILES_PORT}:7025"
+      - "${IDENTITY_PORT}:${IDENTITY_PORT}"
+      - "${USERS_PORT}:${USERS_PORT}"
+      - "${FILES_PORT}:${FILES_PORT}"
     volumes:
       - ./nginx/cloud.barkfluff.conf:/etc/nginx/conf.d/cloud.barkfluff.conf:ro
       - ./certs:/etc/nginx/certs:ro
@@ -307,7 +305,8 @@ volumes:
         sb.Append("# Сгенерировано BarkCloud.Builder\n");
 
         Section("Публичный адрес Configuration-сервиса для остальных сервисов");
-        K("CONFIGURATION_SERVICE_URL", m.ConfigurationServiceUrl);
+        // Всегда http:// + имя контейнера + порт конфигурации.
+        K("CONFIGURATION_SERVICE_URL", $"http://cloud-configuration:{m.ConfigurationPort}");
         sb.Append('\n');
         // Bootstrap-ключ доступа к ConfigurationApi. Должен совпадать у всех сервисов.
         K("CONFIGURATION_ACCESS_KEY", m.ConfigurationAccessKey);
@@ -315,45 +314,54 @@ volumes:
         Section("Режим ASP.NET Core");
         K("ASPNETCORE_ENVIRONMENT", m.AspNetCoreEnvironment);
 
-        Section("MinIO");
-        K("MINIO_ROOT_USER", m.MinioRootUser);
-        K("MINIO_ROOT_PASSWORD", m.MinioRootPassword);
-        K("MINIO_PORT", m.MinioPort);
-        K("MINIO_WEBPORT", m.MinioWebPort);
-        K("MINIO_DATA_PATH", m.MinioDataPath);
-        K("ARCHIVE_TEMP_PATH", m.ArchiveTempPath);
+        if (m.IncludeMinio)
+        {
+            Section("MinIO");
+            K("MINIO_ROOT_USER", m.MinioRootUser);
+            K("MINIO_ROOT_PASSWORD", m.MinioRootPassword);
+            K("MINIO_PORT", m.MinioPort);
+            K("MINIO_WEBPORT", m.MinioWebPort);
+            K("MINIO_DATA_PATH", m.MinioDataPath);
+        }
 
-        Section("RabbitMQ");
-        K("RABBITMQ_DEFAULT_USER", m.RabbitUser);
-        K("RABBITMQ_DEFAULT_PASS", m.RabbitPass);
+        if (m.IncludeRabbitmq)
+        {
+            Section("RabbitMQ");
+            K("RABBITMQ_DEFAULT_USER", m.RabbitUser);
+            K("RABBITMQ_DEFAULT_PASS", m.RabbitPass);
+        }
 
-        Section("Postgres");
-        K("POSTGRES_USER", m.PostgresUser);
-        K("POSTGRES_PASSWORD", m.PostgresPassword);
-        K("POSTGRES_DB", m.PostgresDb);
-        K("POSTGRES_PORT", m.PostgresPort);
-        K("POSTGRES_DATA_PATH", m.PostgresDataPath);
-        K("BACKUP_PATH", m.BackupPath);
+        if (m.IncludePostgres)
+        {
+            Section("Postgres");
+            K("POSTGRES_USER", m.PostgresUser);
+            K("POSTGRES_PASSWORD", m.PostgresPassword);
+            K("POSTGRES_DB", m.PostgresDb);
+            K("POSTGRES_PORT", m.PostgresPort);
+            K("POSTGRES_DATA_PATH", m.PostgresDataPath);
+            K("BACKUP_PATH", m.BackupPath);
 
-        Section("Параметры подключения Configuration к Postgres");
-        K("CONFIGURATION_HOST", m.ConfigurationHost);
-        K("CONFIGURATION_DATABASE", m.ConfigurationDatabase);
-        K("CONFIGURATION_USERNAME", m.ConfigurationUsername);
-        K("CONFIGURATION_PASSWORD", m.ConfigurationPassword);
-        K("CONFIGURATION_PORT", m.ConfigurationPort);
+            Section("Параметры подключения Configuration к Postgres");
+            K("CONFIGURATION_USERNAME", m.ConfigurationUsername);
+            K("CONFIGURATION_PASSWORD", m.ConfigurationPassword);
+        }
 
         Section("Порты сервисов");
         K("IDENTITY_PORT", m.IdentityPort);
         K("USERS_PORT", m.UsersPort);
+        K("CONFIGURATION_PORT", m.ConfigurationPort);
         K("FILES_PORT", m.FilesPort);
         K("FILES_HTTP1PORT", m.FilesHttp1Port);
 
-        Section("Seq (агрегатор логов)");
-        K("SEQ_ADMIN_PASSWORD", m.SeqAdminPassword);
-        K("SEQ_WEBPORT", m.SeqWebPort);
-        K("SEQ_DATA_PATH", m.SeqDataPath);
+        if (m.IncludeSeq)
+        {
+            Section("Seq (агрегатор логов)");
+            K("SEQ_ADMIN_PASSWORD", m.SeqAdminPassword);
+            K("SEQ_WEBPORT", m.SeqWebPort);
+            K("SEQ_DATA_PATH", m.SeqDataPath);
+        }
 
-        Section("Веб-клиент (BarkCloud.Web)");
+        Section("Веб-клиент");
         K("WEB_PORT", m.WebPort);
         K("WEB_COOKIE_SECURE", m.WebCookieSecure ? "true" : "false");
         K("WEB_PUBLIC_HOST", m.WebPublicHost);

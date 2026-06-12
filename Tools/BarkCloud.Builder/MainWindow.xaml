@@ -14,6 +14,7 @@
                  WindowStartupLocation="CenterScreen">
 
     <ui:FluentWindow.Resources>
+        <local:InverseBoolConverter x:Key="InverseBool" />
         <Style x:Key="FieldLabel" TargetType="TextBlock">
             <Setter Property="Margin" Value="0,10,0,2" />
             <Setter Property="FontSize" Value="12" />
@@ -49,16 +50,32 @@
                         <TextBlock Margin="0,2,0,10"
                                    Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                                    TextWrapping="Wrap"
-                                   Text="Ядро (configuration, identity, users, files) включается всегда. Остальное — по выбору." />
+                                   Text="Ядро (configuration, identity, users, files) и web включаются всегда. Остальное — по выбору." />
                         <UniformGrid Columns="2">
-                            <ui:ToggleSwitch Margin="0,4" Content="web (веб-клиент)" IsChecked="{Binding IncludeWeb}" />
                             <ui:ToggleSwitch Margin="0,4" Content="nginx (reverse-proxy)" IsChecked="{Binding IncludeNginx}" />
                             <ui:ToggleSwitch Margin="0,4" Content="notification (SMTP)" IsChecked="{Binding IncludeNotification}" />
-                            <ui:ToggleSwitch Margin="0,4" Content="minio (хранилище)" IsChecked="{Binding IncludeMinio}" />
-                            <ui:ToggleSwitch Margin="0,4" Content="rabbitmq (очередь)" IsChecked="{Binding IncludeRabbitmq}" />
-                            <ui:ToggleSwitch Margin="0,4" Content="postgres (БД)" IsChecked="{Binding IncludePostgres}" />
-                            <ui:ToggleSwitch Margin="0,4" Content="seq (логи)" IsChecked="{Binding IncludeSeq}" />
+                            <ui:ToggleSwitch x:Name="MinioToggle" Margin="0,4" Content="minio (хранилище)" IsChecked="{Binding IncludeMinio}" />
+                            <ui:ToggleSwitch x:Name="RabbitToggle" Margin="0,4" Content="rabbitmq (очередь)" IsChecked="{Binding IncludeRabbitmq}" />
+                            <ui:ToggleSwitch x:Name="PostgresToggle" Margin="0,4" Content="postgres (БД)" IsChecked="{Binding IncludePostgres}" />
+                            <ui:ToggleSwitch x:Name="SeqToggle" Margin="0,4" Content="seq (логи)" IsChecked="{Binding IncludeSeq}" />
                         </UniformGrid>
+
+                        <ui:InfoBar Margin="0,10,0,0" Severity="Warning" IsClosable="False"
+                                    IsOpen="{Binding IsChecked, ElementName=MinioToggle, Converter={StaticResource InverseBool}}"
+                                    Title="MinIO отключён"
+                                    Message="Хранилище нужно поднять отдельно и вручную прописать его параметры в базе Configuration." />
+                        <ui:InfoBar Margin="0,8,0,0" Severity="Warning" IsClosable="False"
+                                    IsOpen="{Binding IsChecked, ElementName=RabbitToggle, Converter={StaticResource InverseBool}}"
+                                    Title="RabbitMQ отключён"
+                                    Message="Брокер нужно поднять отдельно и вручную прописать его параметры в базе Configuration." />
+                        <ui:InfoBar Margin="0,8,0,0" Severity="Warning" IsClosable="False"
+                                    IsOpen="{Binding IsChecked, ElementName=PostgresToggle, Converter={StaticResource InverseBool}}"
+                                    Title="PostgreSQL отключён"
+                                    Message="Базу нужно поднять отдельно и вручную прописать подключение в базе Configuration." />
+                        <ui:InfoBar Margin="0,8,0,0" Severity="Warning" IsClosable="False"
+                                    IsOpen="{Binding IsChecked, ElementName=SeqToggle, Converter={StaticResource InverseBool}}"
+                                    Title="Seq отключён"
+                                    Message="Агрегатор логов нужно поднять отдельно и вручную прописать его в базе Configuration." />
                     </StackPanel>
                 </ui:Card>
 
@@ -78,8 +95,9 @@
                             <ComboBoxItem Content="Development" />
                         </ComboBox>
 
-                        <TextBlock Style="{StaticResource FieldLabel}" Text="CONFIGURATION_SERVICE_URL" />
-                        <ui:TextBox Margin="0,0,0,6" Text="{Binding ConfigurationServiceUrl, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="CONFIGURATION_SERVICE_URL (имя контейнера + порт)" />
+                        <ui:TextBox IsReadOnly="True"
+                                    Text="{Binding Text, ElementName=ConfigPortBox, Mode=OneWay, StringFormat='http://cloud-configuration:{0}'}" />
 
                         <TextBlock Style="{StaticResource FieldLabel}" Text="CONFIGURATION_ACCESS_KEY (одинаковый у всех сервисов)" />
                         <Grid>
@@ -90,7 +108,8 @@
                             <ui:TextBox x:Name="AccessKeyBox" Grid.Column="0"
                                         Text="{Binding ConfigurationAccessKey, UpdateSourceTrigger=PropertyChanged}" />
                             <ui:Button Grid.Column="1" Margin="8,0,0,0" Content="Случайный"
-                                       Icon="{ui:SymbolIcon ArrowSync24}" Click="OnGenerateKey" />
+                                       Icon="{ui:SymbolIcon ArrowSync24}" Tag="50"
+                                       CommandParameter="{Binding ElementName=AccessKeyBox}" Click="OnRandom" />
                         </Grid>
                     </StackPanel>
                 </ui:CardExpander>
@@ -101,14 +120,17 @@
                         <StackPanel>
                             <TextBlock FontWeight="Medium" Text="Образы" />
                             <TextBlock FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                                       Text="Реестр и тег docker-образов" />
+                                       Text="Реестр и канал docker-образов" />
                         </StackPanel>
                     </ui:CardExpander.Header>
                     <StackPanel>
-                        <TextBlock Style="{StaticResource FieldLabel}" Text="Префикс реестра" />
-                        <ui:TextBox Margin="0,0,0,6" Text="{Binding ImageRegistryPrefix, UpdateSourceTrigger=PropertyChanged}" />
-                        <TextBlock Style="{StaticResource FieldLabel}" Text="Тег" />
-                        <ui:TextBox Text="{Binding ImageTag, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="Реестр" />
+                        <ui:TextBox IsReadOnly="True" Text="docker.barkfluff.com:5000" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="Канал" />
+                        <ComboBox SelectedValue="{Binding ImageChannel, Mode=TwoWay}" SelectedValuePath="Tag">
+                            <ComboBoxItem Content="Релиз — barkcloud-*:latest" Tag="Release" />
+                            <ComboBoxItem Content="Дев — barkcloud-*-dev:latest" Tag="Dev" />
+                        </ComboBox>
                     </StackPanel>
                 </ui:CardExpander>
 
@@ -123,18 +145,31 @@
                     </ui:CardExpander.Header>
                     <StackPanel>
                         <TextBlock Style="{StaticResource FieldLabel}" Text="MINIO_ROOT_USER" />
-                        <ui:TextBox Margin="0,0,0,6" Text="{Binding MinioRootUser, UpdateSourceTrigger=PropertyChanged}" />
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <ui:TextBox x:Name="MinioUserBox" Grid.Column="0" Text="{Binding MinioRootUser, UpdateSourceTrigger=PropertyChanged}" />
+                            <ui:Button Grid.Column="1" Margin="8,0,0,0" Content="Случайно" Icon="{ui:SymbolIcon ArrowSync24}"
+                                       Tag="12" CommandParameter="{Binding ElementName=MinioUserBox}" Click="OnRandom" />
+                        </Grid>
                         <TextBlock Style="{StaticResource FieldLabel}" Text="MINIO_ROOT_PASSWORD" />
-                        <ui:TextBox Margin="0,0,0,6" Text="{Binding MinioRootPassword, UpdateSourceTrigger=PropertyChanged}" />
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <ui:TextBox x:Name="MinioPassBox" Grid.Column="0" Text="{Binding MinioRootPassword, UpdateSourceTrigger=PropertyChanged}" />
+                            <ui:Button Grid.Column="1" Margin="8,0,0,0" Content="Случайно" Icon="{ui:SymbolIcon ArrowSync24}"
+                                       Tag="20" CommandParameter="{Binding ElementName=MinioPassBox}" Click="OnRandom" />
+                        </Grid>
                         <TextBlock Style="{StaticResource FieldLabel}" Text="MINIO_PORT (API)" />
                         <ui:TextBox Margin="0,0,0,6" Text="{Binding MinioPort, UpdateSourceTrigger=PropertyChanged}" />
                         <TextBlock Style="{StaticResource FieldLabel}" Text="MINIO_WEBPORT (консоль)" />
                         <ui:TextBox Margin="0,0,0,6" Text="{Binding MinioWebPort, UpdateSourceTrigger=PropertyChanged}" />
                         <TextBlock Style="{StaticResource FieldLabel}" Text="MINIO_DATA_PATH (пусто — named volume)" />
-                        <ui:TextBox Margin="0,0,0,6" PlaceholderText="/d/barkcloud/minio"
-                                    Text="{Binding MinioDataPath, UpdateSourceTrigger=PropertyChanged}" />
-                        <TextBlock Style="{StaticResource FieldLabel}" Text="ARCHIVE_TEMP_PATH (пусто — named volume)" />
-                        <ui:TextBox Text="{Binding ArchiveTempPath, UpdateSourceTrigger=PropertyChanged}" />
+                        <ui:TextBox Text="{Binding MinioDataPath, UpdateSourceTrigger=PropertyChanged}" />
                     </StackPanel>
                 </ui:CardExpander>
 
@@ -149,9 +184,25 @@
                     </ui:CardExpander.Header>
                     <StackPanel>
                         <TextBlock Style="{StaticResource FieldLabel}" Text="RABBITMQ_DEFAULT_USER" />
-                        <ui:TextBox Margin="0,0,0,6" Text="{Binding RabbitUser, UpdateSourceTrigger=PropertyChanged}" />
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <ui:TextBox x:Name="RabbitUserBox" Grid.Column="0" Text="{Binding RabbitUser, UpdateSourceTrigger=PropertyChanged}" />
+                            <ui:Button Grid.Column="1" Margin="8,0,0,0" Content="Случайно" Icon="{ui:SymbolIcon ArrowSync24}"
+                                       Tag="12" CommandParameter="{Binding ElementName=RabbitUserBox}" Click="OnRandom" />
+                        </Grid>
                         <TextBlock Style="{StaticResource FieldLabel}" Text="RABBITMQ_DEFAULT_PASS" />
-                        <ui:TextBox Text="{Binding RabbitPass, UpdateSourceTrigger=PropertyChanged}" />
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <ui:TextBox x:Name="RabbitPassBox" Grid.Column="0" Text="{Binding RabbitPass, UpdateSourceTrigger=PropertyChanged}" />
+                            <ui:Button Grid.Column="1" Margin="8,0,0,0" Content="Случайно" Icon="{ui:SymbolIcon ArrowSync24}"
+                                       Tag="20" CommandParameter="{Binding ElementName=RabbitPassBox}" Click="OnRandom" />
+                        </Grid>
                     </StackPanel>
                 </ui:CardExpander>
 
@@ -179,16 +230,10 @@
                         <ui:TextBox Text="{Binding BackupPath, UpdateSourceTrigger=PropertyChanged}" />
 
                         <TextBlock Style="{StaticResource SectionCaption}" Text="Подключение Configuration к Postgres" />
-                        <TextBlock Style="{StaticResource FieldLabel}" Text="CONFIGURATION_HOST" />
-                        <ui:TextBox Margin="0,0,0,6" Text="{Binding ConfigurationHost, UpdateSourceTrigger=PropertyChanged}" />
-                        <TextBlock Style="{StaticResource FieldLabel}" Text="CONFIGURATION_DATABASE" />
-                        <ui:TextBox Margin="0,0,0,6" Text="{Binding ConfigurationDatabase, UpdateSourceTrigger=PropertyChanged}" />
                         <TextBlock Style="{StaticResource FieldLabel}" Text="CONFIGURATION_USERNAME" />
                         <ui:TextBox Margin="0,0,0,6" Text="{Binding ConfigurationUsername, UpdateSourceTrigger=PropertyChanged}" />
                         <TextBlock Style="{StaticResource FieldLabel}" Text="CONFIGURATION_PASSWORD" />
-                        <ui:TextBox Margin="0,0,0,6" Text="{Binding ConfigurationPassword, UpdateSourceTrigger=PropertyChanged}" />
-                        <TextBlock Style="{StaticResource FieldLabel}" Text="CONFIGURATION_PORT" />
-                        <ui:TextBox Text="{Binding ConfigurationPort, UpdateSourceTrigger=PropertyChanged}" />
+                        <ui:TextBox Text="{Binding ConfigurationPassword, UpdateSourceTrigger=PropertyChanged}" />
                     </StackPanel>
                 </ui:CardExpander>
 
@@ -206,6 +251,8 @@
                         <ui:TextBox Margin="0,0,0,6" Text="{Binding IdentityPort, UpdateSourceTrigger=PropertyChanged}" />
                         <TextBlock Style="{StaticResource FieldLabel}" Text="USERS_PORT" />
                         <ui:TextBox Margin="0,0,0,6" Text="{Binding UsersPort, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="CONFIGURATION_PORT (порт запуска; доступен только в docker-сети)" />
+                        <ui:TextBox x:Name="ConfigPortBox" Margin="0,0,0,6" Text="{Binding ConfigurationPort, UpdateSourceTrigger=PropertyChanged}" />
                         <TextBlock Style="{StaticResource FieldLabel}" Text="FILES_PORT" />
                         <ui:TextBox Margin="0,0,0,6" Text="{Binding FilesPort, UpdateSourceTrigger=PropertyChanged}" />
                         <TextBlock Style="{StaticResource FieldLabel}" Text="FILES_HTTP1PORT" />
@@ -224,7 +271,15 @@
                     </ui:CardExpander.Header>
                     <StackPanel>
                         <TextBlock Style="{StaticResource FieldLabel}" Text="SEQ_ADMIN_PASSWORD" />
-                        <ui:TextBox Margin="0,0,0,6" Text="{Binding SeqAdminPassword, UpdateSourceTrigger=PropertyChanged}" />
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <ui:TextBox x:Name="SeqPassBox" Grid.Column="0" Text="{Binding SeqAdminPassword, UpdateSourceTrigger=PropertyChanged}" />
+                            <ui:Button Grid.Column="1" Margin="8,0,0,0" Content="Случайно" Icon="{ui:SymbolIcon ArrowSync24}"
+                                       Tag="20" CommandParameter="{Binding ElementName=SeqPassBox}" Click="OnRandom" />
+                        </Grid>
                         <TextBlock Style="{StaticResource FieldLabel}" Text="SEQ_WEBPORT" />
                         <ui:TextBox Margin="0,0,0,6" Text="{Binding SeqWebPort, UpdateSourceTrigger=PropertyChanged}" />
                         <TextBlock Style="{StaticResource FieldLabel}" Text="SEQ_DATA_PATH (пусто — named volume)" />
@@ -244,11 +299,23 @@
                     <StackPanel>
                         <TextBlock Style="{StaticResource FieldLabel}" Text="WEB_PORT" />
                         <ui:TextBox Margin="0,0,0,6" Text="{Binding WebPort, UpdateSourceTrigger=PropertyChanged}" />
-                        <ui:ToggleSwitch Margin="0,8,0,0" Content="WEB_COOKIE_SECURE" IsChecked="{Binding WebCookieSecure}" />
+                        <ui:ToggleSwitch x:Name="CookieSecureToggle" Margin="0,8,0,0" Content="WEB_COOKIE_SECURE" IsChecked="{Binding WebCookieSecure}" />
+                        <ui:InfoBar Margin="0,8,0,0" Severity="Warning" IsClosable="False"
+                                    IsOpen="{Binding IsChecked, ElementName=CookieSecureToggle}"
+                                    Title="WEB_COOKIE_SECURE = true"
+                                    Message="Включайте только при работе без nginx (не тестировалось)." />
                         <TextBlock Style="{StaticResource FieldLabel}" Text="WEB_PUBLIC_HOST (пусто — из заголовка запроса)" />
                         <ui:TextBox Margin="0,0,0,6" Text="{Binding WebPublicHost, UpdateSourceTrigger=PropertyChanged}" />
                         <TextBlock Style="{StaticResource FieldLabel}" Text="WEB_ADMIN_PASSWORD (пусто — раздел «Обслуживание» недоступен)" />
-                        <ui:TextBox Text="{Binding WebAdminPassword, UpdateSourceTrigger=PropertyChanged}" />
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <ui:TextBox x:Name="WebAdminBox" Grid.Column="0" Text="{Binding WebAdminPassword, UpdateSourceTrigger=PropertyChanged}" />
+                            <ui:Button Grid.Column="1" Margin="8,0,0,0" Content="Случайно" Icon="{ui:SymbolIcon ArrowSync24}"
+                                       Tag="20" CommandParameter="{Binding ElementName=WebAdminBox}" Click="OnRandom" />
+                        </Grid>
                     </StackPanel>
                 </ui:CardExpander>
 
