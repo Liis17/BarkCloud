@@ -64,62 +64,30 @@ Parent: [[index]] · See also: [[structure/overview]] · [[structure/entrypoints
 
 ## MinIO на отдельном диске (Windows/WSL2)
 
-> Зачем: named volume `minio_data` лежит внутри образа диска Docker (обычно на C:) и растёт вместе с загрузками в S3. Задача — вынести **только** данные MinIO на второй диск (D:) с сохранением POSIX-ФС. Напрямую отдать MinIO виндовую папку (`/mnt/d/...`) нельзя: это 9P/drvfs без xattr/`O_DIRECT`, MinIO такое не поддерживает.
+> Зачем: named volume `minio_data` лежит внутри образа диска Docker (обычно на C:) и растёт вместе с загрузками в S3. Чтобы хранить S3-данные на втором диске (D:), укажи путь к папке на нём через `MINIO_DATA_PATH` (по умолчанию — named volume, поведение не меняется).
 
-Решение: отдельный **ext4-vhdx** на D:, смонтированный в WSL2, и bind-mount его в контейнер MinIO. Путь задаётся `MINIO_DATA_PATH` в `.env` (по умолчанию — named volume, поведение не меняется). Сценарий: Docker Desktop (WSL2-бэкенд).
+**1. Создай папку на D:**, напр. `D:\barkcloud\minio`.
 
-**1. Создать пустой динамический vhdx на D:** (cmd, через diskpart — без Hyper-V):
+**2. Укажи путь в `Backend/.env`.** Форма для Docker Desktop, когда compose запускается из Windows-шелла (cmd/PowerShell):
 ```
-diskpart
-  create vdisk file="D:\wsl\minio.vhdx" maximum=512000 type=expandable
-  exit
+MINIO_DATA_PATH=/d/barkcloud/minio
 ```
-`maximum` в МБ (512000 ≈ 500 ГБ), `expandable` = растёт по мере заполнения.
+Если compose запускаешь изнутри WSL2 — путь к тому же диску будет `/mnt/d/barkcloud/minio`.
 
-**2. Подключить «сырой» диск в WSL2 и отформатировать ext4:**
-```
-wsl --mount --vhd "D:\wsl\minio.vhdx" --bare
-```
-В WSL найти устройство (по размеру, без разделов) — ⚠️ не перепутай диск, `mkfs` затирает данные:
-```
-lsblk
-sudo mkfs.ext4 /dev/sdX     # X — новый ~500ГБ диск
-```
-
-**3. Перемонтировать как ext4 с именем** (виден всем WSL2-дистрам, включая docker-desktop):
-```
-wsl --unmount "D:\wsl\minio.vhdx"
-wsl --mount --vhd "D:\wsl\minio.vhdx" --name minio
-ls -la /mnt/wsl/minio       # проверить путь монтирования
-```
-
-**4. Перенести существующие данные MinIO** (чтобы не потерять текущий S3-контент):
+**3. Перенеси существующие данные** (чтобы не потерять текущий S3-контент):
 ```
 docker volume ls                      # найти имя, напр. backend_minio_data
 docker compose -f docker-compose-dev.yml stop minio
-docker run --rm -v backend_minio_data:/from -v /mnt/wsl/minio:/to alpine \
+docker run --rm -v backend_minio_data:/from -v /d/barkcloud/minio:/to alpine \
   sh -c "cp -a /from/. /to/"          # копирует и скрытый .minio.sys
 ```
 
-**5. Указать путь и поднять MinIO.** В `Backend/.env`:
-```
-MINIO_DATA_PATH=/mnt/wsl/minio
-```
+**4. Подними MinIO:**
 ```
 docker compose -f docker-compose-dev.yml up -d minio
 ```
 
-**6. Персистентность после перезагрузки (ВАЖНО).** `wsl --mount` не переживает reboot/`wsl --shutdown`, и диск обязан монтироваться **до** старта MinIO (иначе MinIO создаст пустой `/data` на C:).
-- Docker Desktop → Settings → General → снять «Start Docker Desktop when you sign in».
-- `D:\wsl\start-barkcloud.bat`:
-  ```
-  @echo off
-  wsl --mount --vhd "D:\wsl\minio.vhdx" --name minio
-  "C:\Program Files\Docker\Docker\Docker Desktop.exe"
-  ```
-- Task Scheduler → задача «При входе в систему» → запуск этого `.bat`. Гарантирует порядок: сначала монтирование, потом Docker.
-
-> Если стартовать Docker без смонтированного диска — MinIO поднимется ПУСТЫМ (данные уйдут на C:). В таком состоянии не загружай: смонтируй диск и перезапусти `minio`.
+> ⚠️ Папка на NTFS-диске Windows пробрасывается в контейнер через drvfs/9p — без Unix-прав, xattr и атомарных rename. MinIO официально такие ФС **не поддерживает**: под нагрузкой возможны ошибки и повреждение данных. Это не зависит от того, как написан путь (`/d/...` через Docker Desktop или `/mnt/d/...` изнутри WSL) — под капотом тот же NTFS через drvfs. Надёжный (но более громоздкий) вариант — отдельный **ext4-vhdx**, смонтированный в WSL2 через `wsl --mount`, и `MINIO_DATA_PATH=/mnt/wsl/minio`.
 
 ## Запуск dev-окружения
 
