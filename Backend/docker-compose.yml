@@ -116,9 +116,9 @@ services:
     restart: always
     # Наружу выставлены только эти порты; микросервисы доступны лишь через прокси
     ports:
-      - "${IDENTITY_PORT}:{IDENTITY_PORT}"
-      - "${USERS_PORT}:{USERS_PORT}"
-      - "${FILES_PORT}:{FILES_PORT}"
+      - "${IDENTITY_PORT}:${IDENTITY_PORT}"
+      - "${USERS_PORT}:${USERS_PORT}"
+      - "${FILES_PORT}:${FILES_PORT}"
     volumes:
       - ./nginx/cloud.barkfluff.conf:/etc/nginx/conf.d/cloud.barkfluff.conf:ro
       - ./certs:/etc/nginx/certs:ro
