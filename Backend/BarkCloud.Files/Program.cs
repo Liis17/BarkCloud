@@ -27,6 +27,14 @@ public class Program
         builder.AddBarkCloudSerilog("BarkCloud.Files");
         builder.SetRunningAddress(builder.Configuration);
 
+        // Загрузка/скачивание файлов без лимита размера тела и без ограничения минимальной
+        // скорости (HTTP1-эндпоинт 7026: иначе большой файл на медленном канале оборвётся).
+        builder.WebHost.ConfigureKestrel(o =>
+        {
+            o.Limits.MaxRequestBodySize = null;
+            o.Limits.MinRequestBodyDataRate = null;
+        });
+
         // Регистрируем gRPC сервисы с интерцепторами
         builder.Services.AddGrpc(options =>
         {
