@@ -60,6 +60,18 @@ public sealed class BuilderModel
     public string WebPublicHost { get; set; } = "https://cloud.barkfluff.com";
     public string WebAdminPassword { get; set; } = "";
 
+    // Внешние адреса сервисов для клиентов (обязательны). Configuration пишет их в БД
+    // на чистом старте. По умолчанию — единый домен + порт сервиса (как маршрутизирует nginx).
+    public string ExternalIdentityHost { get; set; } = "https://cloud.barkfluff.com:7020";
+    public string ExternalUsersHost { get; set; } = "https://cloud.barkfluff.com:7021";
+    public string ExternalFilesHost { get; set; } = "https://cloud.barkfluff.com:7025";
+
+    // Почта (SMTP) — опционально. Все 4 поля непусты → подтверждение по email включено; иначе выключено.
+    public string EmailHost { get; set; } = "";
+    public string EmailPort { get; set; } = "";
+    public string EmailSenderEmail { get; set; } = "";
+    public string EmailSenderPassword { get; set; } = "";
+
     // Nginx / HTTPS (server_name + сертификаты). Пути — к исходным файлам на диске;
     // в конфиг и в папку certs попадают их имена (basename).
     public string NginxDomain { get; set; } = "cloud.barkfluff.com";

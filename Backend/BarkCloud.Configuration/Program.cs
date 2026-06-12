@@ -117,15 +117,37 @@ public class Program
                         var minioAccessKey = builder.Configuration["MINIO_ROOT_USER"] ?? "minioadmin";
                         var minioSecretKey = builder.Configuration["MINIO_ROOT_PASSWORD"] ?? "minioadmin";
 
+                        // SMTP-поля Notification: опциональны, пусто → режим без почты.
+                        var emailHost = builder.Configuration["EMAIL_HOST"] ?? "";
+                        var emailPort = builder.Configuration["EMAIL_PORT"] ?? "";
+                        var emailSenderEmail = builder.Configuration["EMAIL_SENDER_EMAIL"] ?? "";
+                        var emailSenderPassword = builder.Configuration["EMAIL_SENDER_PASSWORD"] ?? "";
+
+                        // Внешние адреса сервисов для клиентов: обязательны вне Development.
+                        var externalIdentityHost = builder.Configuration["EXTERNAL_IDENTITY_HOST"] ?? "";
+                        var externalUsersHost = builder.Configuration["EXTERNAL_USERS_HOST"] ?? "";
+                        var externalFilesHost = builder.Configuration["EXTERNAL_FILES_HOST"] ?? "";
+
                         var populatorLogger = scope.ServiceProvider.GetRequiredService<ILogger<ConfigurationDefaultsPopulator>>();
                         var populator = new ConfigurationDefaultsPopulator(
                             ctx, populatorLogger, pgHostOnly, username, password,
                             rabbitUsername, rabbitPassword,
                             minioHost, minioPort, minioAccessKey, minioSecretKey,
+                            emailHost, emailPort, emailSenderEmail, emailSenderPassword,
+                            externalIdentityHost, externalUsersHost, externalFilesHost,
+                            requireExternalEndpoints: !app.Environment.IsDevelopment(),
                             metrics);
 
                         populator.EnsureSeedAsync().GetAwaiter().GetResult();
                         populator.PopulateDefaultsAsync().GetAwaiter().GetResult();
+                    }
+                    catch (InvalidOperationException configEx)
+                    {
+                        // Обязательная конфигурация не задана (например, внешние адреса) —
+                        // падаем, чтобы оператор увидел и исправил .env, а не работал с битым адресом.
+                        metrics.Increment("defaults_populator_failed");
+                        logger.LogError(configEx, "Обязательная конфигурация не задана при авто-заполнении. Старт прерван.");
+                        throw;
                     }
                     catch (Exception populateEx)
                     {

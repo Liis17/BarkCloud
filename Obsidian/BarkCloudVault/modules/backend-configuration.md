@@ -18,7 +18,7 @@ Parent: [[index]] · See also: [[api/configuration-api]]
 - `Infrastructure/ConfigurationContext.cs` — EF Core DbContext
 - `Infrastructure/ConfigurationContextFactory.cs` — фабрика контекста (для EF Tools)
 - `Infrastructure/ConfigurationSeed.cs` — эталонный список всех ожидаемых ключей (`Section`/`Key`/`ServiceId`), включая SMTP-поля `Email:*` для Notification
-- `Infrastructure/ConfigurationDefaultsPopulator.cs` — заливка дефолтных значений. `EnsureSeedAsync` при **каждом** старте сверяет таблицу с `ConfigurationSeed` и досевает только недостающие ключи (по тройке `Section/Key/ServiceId`), без дубликатов — новые ключи доезжают и в уже существующую БД. `PopulateDefaultsAsync` заполняет пустые записи дефолтами (кроме секретов вроде `Email:SenderPassword`)
+- `Infrastructure/ConfigurationDefaultsPopulator.cs` — заливка дефолтных значений. `EnsureSeedAsync` при **каждом** старте сверяет таблицу с `ConfigurationSeed` и досевает только недостающие ключи (по тройке `Section/Key/ServiceId`), без дубликатов — новые ключи доезжают и в уже существующую БД. `PopulateDefaultsAsync` заполняет **пустые** записи дефолтами. SMTP-поля `Email:*` (Notification) и `ExternalEndpoint:Host` (Identity/Users/Files) берутся из env (`.env`): email опционален (пусто → не трогаем, режим без почты), внешние адреса обязательны — вне Development пустой env даёт `InvalidOperationException` при старте (проброшен в `Program.cs`, контейнер падает). В Development внешние адреса фолбэчат на `https://{subdomain}.example.com`. Конструктор получает эти значения из `Program.cs` (`EMAIL_*`, `EXTERNAL_{IDENTITY,USERS,FILES}_HOST`) + флаг `requireExternalEndpoints = !IsDevelopment()`
 - `Infrastructure/ConfigurationStorage.cs` — слой доступа к данным
 - `Persistence/Migrations/20260518172647_InitialCreate.cs` — единственная миграция
 - `Dockerfile`, `Dockerfile.slim`
@@ -45,6 +45,12 @@ Parent: [[index]] · See also: [[api/configuration-api]]
 
 ENV переменные: `CONFIGURATION_HOST`, `CONFIGURATION_DATABASE`, `CONFIGURATION_USERNAME`, `CONFIGURATION_PASSWORD`, `CONFIGURATION_PORT` (см. [[structure/infrastructure]]).
 
+Для авто-заполнения БД на чистом старте сервис `configuration` также получает:
+- `EMAIL_HOST` / `EMAIL_PORT` / `EMAIL_SENDER_EMAIL` / `EMAIL_SENDER_PASSWORD` — SMTP (опционально; пусто → без почты).
+- `EXTERNAL_IDENTITY_HOST` / `EXTERNAL_USERS_HOST` / `EXTERNAL_FILES_HOST` — внешние адреса сервисов для клиентов (обязательны вне Development).
+
+Эти ключи генерит [[modules/tools-builder]] в `.env` и продублированы в `Backend/sample.env`.
+
 ## Режим без почты (Features:EmailEnabled)
 
 `GetConfigurationCommandHandler` подмешивает в ответ **всем** сервисам вычисляемый ключ
@@ -52,5 +58,6 @@ ENV переменные: `CONFIGURATION_HOST`, `CONFIGURATION_DATABASE`, `CONFI
 Значение считается `ConfigurationStorage.IsEmailConfiguredAsync()`: `true`, только если **все 4** поля
 `Email:Host/Port/SenderEmail/SenderPassword` (под `ServiceId.Notification`) непусты; иначе `false`.
 Ключ **не хранится** в БД — всегда свежий на старте сервиса (смена SMTP требует рестарта Identity/Web).
-Так как `ConfigurationDefaultsPopulator` не заполняет секцию `Email`, по умолчанию свежий деплой работает
-в режиме без почты. Потребители флага — [[modules/backend-identity]] и [[modules/backend-web]].
+`ConfigurationDefaultsPopulator` заполняет секцию `Email` из env (`EMAIL_*`): если все 4 заданы — почта
+включается, если env пуст — поля остаются пустыми и деплой работает в режиме без почты (дефолт).
+Потребители флага — [[modules/backend-identity]] и [[modules/backend-web]].

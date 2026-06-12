@@ -30,6 +30,9 @@
   прописать в базе Configuration).
 - **Образы:** реестр фиксирован (`docker.barkfluff.com:5000`, read-only), выбор канала
   Release/Dev → `barkcloud-<svc>[-dev]:latest`.
+- **Внешние адреса и почта** (карточки UI → `EXTERNAL_*_HOST`, `EMAIL_*` в `.env`): эти env
+  читает `configuration` и пишет в БД на чистом старте (см. [[modules/backend-configuration]]).
+  Внешние адреса обязательны (дефолт — домен + порт сервиса), SMTP опционален (пусто → без почты).
 - **Nginx (при включённом тумблере):** в выходную папку пишутся `nginx/cloud.barkfluff.conf`
   (генерируется из шаблона: `server_name`/домен, listen+upstream порты, имена файлов
   сертификатов подставляются из полей) и папка `certs/` (выбранные crt/key копируются туда
