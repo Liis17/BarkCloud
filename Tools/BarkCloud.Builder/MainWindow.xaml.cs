@@ -5,6 +5,8 @@ using System.Windows;
 using System.Windows.Media;
 using Microsoft.Win32;
 using Wpf.Ui.Controls;
+using Button = Wpf.Ui.Controls.Button;
+using TextBox = Wpf.Ui.Controls.TextBox;
 
 namespace BarkCloud.Builder
 {
@@ -18,12 +20,24 @@ namespace BarkCloud.Builder
         public MainWindow()
         {
             InitializeComponent();
-            _model = new BuilderModel { ConfigurationAccessKey = GenerateKey(50) };
+            _model = new BuilderModel
+            {
+                ConfigurationAccessKey = GenerateKey(50),
+                WebAdminPassword = GenerateKey(20),
+            };
             DataContext = _model;
         }
 
-        private void OnGenerateKey(object sender, RoutedEventArgs e)
-            => AccessKeyBox.Text = GenerateKey(50);
+        // Единый обработчик кнопок «Случайно»: целевое поле — в CommandParameter, длина — в Tag.
+        private void OnRandom(object sender, RoutedEventArgs e)
+        {
+            var button = (Button)sender;
+            if (button.CommandParameter is TextBox box)
+            {
+                int length = int.TryParse(button.Tag?.ToString(), out var n) ? n : 20;
+                box.Text = GenerateKey(length);
+            }
+        }
 
         private void OnBrowse(object sender, RoutedEventArgs e)
         {
