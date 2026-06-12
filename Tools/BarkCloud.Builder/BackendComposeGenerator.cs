@@ -1,0 +1,364 @@
+using System.Text;
+
+namespace BarkCloud.Builder;
+
+/// <summary>
+/// Собирает docker-compose.yml (по набору включённых сервисов) и .env (по значениям параметров).
+/// Сам compose почти не зависит от значений — всё подставляется из .env через ${VAR}.
+/// </summary>
+public static class BackendComposeGenerator
+{
+    public static string BuildCompose(BuilderModel m)
+    {
+        string p = m.ImageRegistryPrefix;
+        string t = m.ImageTag;
+
+        // Каждый блок-секция не содержит завершающего перевода строки; секции склеиваются
+        // через пустую строку, что даёт ровно один разделитель между сервисами.
+        var sections = new List<string>
+        {
+            // Шапка + ядро микросервисов (всегда присутствует).
+            $$"""
+version: '3.8'
+
+x-common-variables: &common-variables
+  CONFIGURATION_SERVICE_URL: "${CONFIGURATION_SERVICE_URL}"
+  ASPNETCORE_ENVIRONMENT: "${ASPNETCORE_ENVIRONMENT}"
+  CONFIGURATION_ACCESS_KEY: "${CONFIGURATION_ACCESS_KEY}"
+
+services:
+  # === Основные микросервисы (prod-образы) ===
+
+  configuration:
+    image: {{p}}configuration:{{t}}
+    container_name: cloud-configuration
+    restart: always
+    env_file:
+      - .env
+    environment:
+      <<: *common-variables
+      CONFIGURATION_HOST: ${CONFIGURATION_HOST}
+      CONFIGURATION_DATABASE: ${CONFIGURATION_DATABASE}
+      CONFIGURATION_USERNAME: ${CONFIGURATION_USERNAME}
+      CONFIGURATION_PASSWORD: ${CONFIGURATION_PASSWORD}
+      CONFIGURATION_PORT: ${CONFIGURATION_PORT}
+      # Postgres внутри контейнера всегда слушает 5432 — POSTGRES_PORT из .env это host-маппинг
+      CONFIGURATION_DBPORT: "5432"
+      # MinIO внутри контейнера всегда слушает 9000 — MINIO_PORT из .env это host-маппинг
+      MINIO_HOST: minio
+      MINIO_PORT: "9000"
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
+    networks:
+      - barkcloud-network
+
+  identity:
+    image: {{p}}identity:{{t}}
+    container_name: cloud-identity
+    restart: always
+    environment:
+      <<: *common-variables
+    networks:
+      - barkcloud-network
+    depends_on:
+      - configuration
+
+  users:
+    image: {{p}}users:{{t}}
+    container_name: cloud-users
+    restart: always
+    environment:
+      <<: *common-variables
+    networks:
+      - barkcloud-network
+    depends_on:
+      - configuration
+
+  files:
+    image: {{p}}files:{{t}}
+    container_name: cloud-files
+    restart: always
+    environment:
+      <<: *common-variables
+      StorageProbe__Path: "/mnt/minio-data"
+      Archive__TempPath: "/mnt/archive-temp"
+    volumes:
+      - ${MINIO_DATA_PATH:-minio_data}:/mnt/minio-data:ro
+      - ${ARCHIVE_TEMP_PATH:-archive_temp}:/mnt/archive-temp
+    networks:
+      - barkcloud-network
+    depends_on:
+      - configuration
+""",
+        };
+
+        if (m.IncludeNotification)
+            sections.Add($$"""
+  # Сервис уведомлений (consumer RabbitMQ → SMTP). Внешнего API нет — в nginx не маршрутизируется. Опционален
+  notification:
+    image: {{p}}notification:{{t}}
+    container_name: cloud-notification
+    restart: always
+    environment:
+      <<: *common-variables
+    networks:
+      - barkcloud-network
+    depends_on:
+      - configuration
+""");
+
+        if (m.IncludeWeb)
+            sections.Add($$"""
+  # Веб-клиент (HTTP, отдаёт страницы браузеру; к микросервисам обращается по docker-сети через gRPC)
+  web:
+    image: {{p}}web:{{t}}
+    container_name: cloud-web
+    restart: always
+    # root нужен для доступа к docker.sock — веб управляет обновлением бэкенда из страницы настроек.
+    user: root
+    env_file:
+      - .env
+    environment:
+      <<: *common-variables
+      ASPNETCORE_URLS: "http://+:8080"
+      App__CookieSecure: "${WEB_COOKIE_SECURE}"
+      App__PublicHost: "${WEB_PUBLIC_HOST}"
+      App__AdminPassword: "${WEB_ADMIN_PASSWORD}"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./docker-compose.yml:/docker-compose.yml:ro
+      - ./.env:/.env:ro
+    ports:
+      - "${WEB_PORT}:8080"
+    networks:
+      - barkcloud-network
+    depends_on:
+      - configuration
+      - identity
+      - users
+      - files
+""");
+
+        if (m.IncludeNginx)
+            sections.Add("""
+  # === Reverse-proxy (единственная точка выхода наружу) ===
+  nginx:
+    image: nginx:latest
+    container_name: cloud-nginx
+    restart: always
+    # Наружу выставлены только эти порты; микросервисы доступны лишь через прокси.
+    ports:
+      - "${IDENTITY_PORT}:7020"
+      - "${USERS_PORT}:7021"
+      - "${FILES_PORT}:7025"
+    volumes:
+      - ./nginx/cloud.barkfluff.conf:/etc/nginx/conf.d/cloud.barkfluff.conf:ro
+      - ./certs:/etc/nginx/certs:ro
+    networks:
+      - barkcloud-network
+    depends_on:
+      - identity
+      - users
+      - files
+""");
+
+        if (m.IncludeSeq || m.IncludeMinio || m.IncludeRabbitmq || m.IncludePostgres)
+            sections.Add("  # === Инфраструктурные сервисы ===");
+
+        if (m.IncludeSeq)
+            sections.Add("""
+  seq:
+    image: datalust/seq:latest
+    container_name: seq
+    restart: always
+    ports:
+      - "${SEQ_WEBPORT}:80"
+    environment:
+      ACCEPT_EULA: "Y"
+      SEQ_FIRSTRUN_ADMINPASSWORD: "${SEQ_ADMIN_PASSWORD}"
+    volumes:
+      - ${SEQ_DATA_PATH:-seq_data}:/data
+    networks:
+      - barkcloud-network
+""");
+
+        if (m.IncludeMinio)
+            sections.Add("""
+  minio:
+    image: quay.io/minio/minio:RELEASE.2025-04-22T22-12-26Z-cpuv1
+    container_name: minio
+    restart: always
+    ports:
+      - "${MINIO_PORT}:9000"
+      - "${MINIO_WEBPORT}:9001"
+    environment:
+      MINIO_ROOT_USER: "${MINIO_ROOT_USER}"
+      MINIO_ROOT_PASSWORD: "${MINIO_ROOT_PASSWORD}"
+    volumes:
+      - ${MINIO_DATA_PATH:-minio_data}:/data
+    command: server /data --console-address ":9001"
+    networks:
+      - barkcloud-network
+""");
+
+        if (m.IncludeRabbitmq)
+            sections.Add("""
+  rabbitmq:
+    image: rabbitmq:latest
+    container_name: rabbitmq
+    restart: always
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: "${RABBITMQ_DEFAULT_USER}"
+      RABBITMQ_DEFAULT_PASS: "${RABBITMQ_DEFAULT_PASS}"
+    networks:
+      - barkcloud-network
+""");
+
+        if (m.IncludePostgres)
+            sections.Add("""
+  postgres:
+    image: postgres:18
+    container_name: postgres_barkcloud
+    restart: always
+    environment:
+      POSTGRES_USER: "${POSTGRES_USER}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+      POSTGRES_DB: "${POSTGRES_DB}"
+      PGDATA: /var/lib/postgresql/data/pgdata
+    command:
+      - "postgres"
+      - "-c"
+      - "shared_buffers=1GB"
+      - "-c"
+      - "effective_cache_size=3GB"
+      - "-c"
+      - "work_mem=16MB"
+      - "-c"
+      - "maintenance_work_mem=256MB"
+      - "-c"
+      - "max_connections=100"
+      - "-c"
+      - "wal_buffers=16MB"
+      - "-c"
+      - "min_wal_size=1GB"
+      - "-c"
+      - "max_wal_size=4GB"
+      - "-c"
+      - "checkpoint_completion_target=0.9"
+      - "-c"
+      - "random_page_cost=1.1"
+      - "-c"
+      - "effective_io_concurrency=200"
+      - "-c"
+      - "max_worker_processes=2"
+      - "-c"
+      - "max_parallel_workers=2"
+      - "-c"
+      - "max_parallel_workers_per_gather=1"
+      - "-c"
+      - "jit=off"
+    volumes:
+      - ${POSTGRES_DATA_PATH:-pgdata}:/var/lib/postgresql
+      - ${BACKUP_PATH:-backup_volume}:/backup
+    ports:
+      - "${POSTGRES_PORT}:5432"
+    networks:
+      - barkcloud-network
+""");
+
+        var sb = new StringBuilder();
+        sb.Append(string.Join("\n\n", sections));
+
+        // Сети + тома (объявляем только используемые named-тома; порядок — как в исходнике).
+        sb.Append("\n\n");
+        sb.Append("""
+networks:
+  barkcloud-network:
+    driver: bridge
+
+volumes:
+
+""");
+        if (m.IncludePostgres) sb.Append("  pgdata:\n");
+        if (m.IncludeRabbitmq) sb.Append("  rabbitmq_data:\n");
+        sb.Append("  minio_data:\n");
+        if (m.IncludePostgres) sb.Append("  backup_volume:\n");
+        if (m.IncludeSeq) sb.Append("  seq_data:\n");
+        sb.Append("  archive_temp:\n");
+
+        return sb.ToString();
+    }
+
+    public static string BuildEnv(BuilderModel m)
+    {
+        var sb = new StringBuilder();
+
+        void Section(string title)
+        {
+            sb.Append('\n');
+            sb.Append("# ").Append(title).Append('\n');
+        }
+        void K(string key, string value) => sb.Append(key).Append('=').Append(value).Append('\n');
+
+        sb.Append("# Сгенерировано BarkCloud.Builder\n");
+
+        Section("Публичный адрес Configuration-сервиса для остальных сервисов");
+        K("CONFIGURATION_SERVICE_URL", m.ConfigurationServiceUrl);
+        sb.Append('\n');
+        // Bootstrap-ключ доступа к ConfigurationApi. Должен совпадать у всех сервисов.
+        K("CONFIGURATION_ACCESS_KEY", m.ConfigurationAccessKey);
+
+        Section("Режим ASP.NET Core");
+        K("ASPNETCORE_ENVIRONMENT", m.AspNetCoreEnvironment);
+
+        Section("MinIO");
+        K("MINIO_ROOT_USER", m.MinioRootUser);
+        K("MINIO_ROOT_PASSWORD", m.MinioRootPassword);
+        K("MINIO_PORT", m.MinioPort);
+        K("MINIO_WEBPORT", m.MinioWebPort);
+        K("MINIO_DATA_PATH", m.MinioDataPath);
+        K("ARCHIVE_TEMP_PATH", m.ArchiveTempPath);
+
+        Section("RabbitMQ");
+        K("RABBITMQ_DEFAULT_USER", m.RabbitUser);
+        K("RABBITMQ_DEFAULT_PASS", m.RabbitPass);
+
+        Section("Postgres");
+        K("POSTGRES_USER", m.PostgresUser);
+        K("POSTGRES_PASSWORD", m.PostgresPassword);
+        K("POSTGRES_DB", m.PostgresDb);
+        K("POSTGRES_PORT", m.PostgresPort);
+        K("POSTGRES_DATA_PATH", m.PostgresDataPath);
+        K("BACKUP_PATH", m.BackupPath);
+
+        Section("Параметры подключения Configuration к Postgres");
+        K("CONFIGURATION_HOST", m.ConfigurationHost);
+        K("CONFIGURATION_DATABASE", m.ConfigurationDatabase);
+        K("CONFIGURATION_USERNAME", m.ConfigurationUsername);
+        K("CONFIGURATION_PASSWORD", m.ConfigurationPassword);
+        K("CONFIGURATION_PORT", m.ConfigurationPort);
+
+        Section("Порты сервисов");
+        K("IDENTITY_PORT", m.IdentityPort);
+        K("USERS_PORT", m.UsersPort);
+        K("FILES_PORT", m.FilesPort);
+        K("FILES_HTTP1PORT", m.FilesHttp1Port);
+
+        Section("Seq (агрегатор логов)");
+        K("SEQ_ADMIN_PASSWORD", m.SeqAdminPassword);
+        K("SEQ_WEBPORT", m.SeqWebPort);
+        K("SEQ_DATA_PATH", m.SeqDataPath);
+
+        Section("Веб-клиент (BarkCloud.Web)");
+        K("WEB_PORT", m.WebPort);
+        K("WEB_COOKIE_SECURE", m.WebCookieSecure ? "true" : "false");
+        K("WEB_PUBLIC_HOST", m.WebPublicHost);
+        K("WEB_ADMIN_PASSWORD", m.WebAdminPassword);
+
+        return sb.ToString();
+    }
+}
