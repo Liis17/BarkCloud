@@ -2,6 +2,7 @@ import React from 'react';
 import { Icon } from '../Icon';
 import { useContextMenu } from '../ui/ContextMenu';
 import { apiGet } from '../../lib/api';
+import { persistVolumeRef } from '../../lib/volume';
 import { pickDocumentIcon, useDocumentHead } from '../../hooks/useDocumentHead';
 import type { MediaActionsApi } from '../../hooks/useMediaActions';
 import type { CardFile, MediaItem } from '../../lib/types';
@@ -205,7 +206,17 @@ export function Lightbox({ items, index = 0, media, onClose, actions }: Lightbox
             <span className="spinner" /> Загрузка…
           </div>
         )}
-        {ready && isVideo && <video ref={videoRef} src={url!} controls autoPlay />}
+        {ready && isVideo && (
+          <video
+            ref={(el) => {
+              videoRef.current = el;
+              persistVolumeRef(el);
+            }}
+            src={url!}
+            controls
+            autoPlay
+          />
+        )}
         {ready && !isVideo && (
           <img
             src={photoSrc!}

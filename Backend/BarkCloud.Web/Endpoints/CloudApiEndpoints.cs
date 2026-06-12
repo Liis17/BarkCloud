@@ -1160,7 +1160,8 @@ public static class CloudApiEndpoints
             albumId = s.AlbumId,
             name = s.Name,
             createdAt = s.CreatedAt?.ToDateTimeOffset(),
-            clickCount = s.ClickCount
+            clickCount = s.ClickCount,
+            previewUrl = s.CoverPreviewUrl
         };
     }
 

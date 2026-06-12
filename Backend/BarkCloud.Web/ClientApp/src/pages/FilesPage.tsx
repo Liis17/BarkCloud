@@ -94,6 +94,8 @@ function FileRow({ entry, selected, bulkChecked, onBulkToggle, onSelect, onOpen,
   onMenu: (e: React.MouseEvent, entry: Entry) => void;
 }) {
   const m = entry.media;
+  const isMedia = m?.kind === 'photo' || m?.kind === 'video';
+  const hasPreview = (m?.previews || []).length > 0;
   return (
     <tr
       className={(selected ? 'selected' : '') + (bulkChecked ? ' checked' : '')}
@@ -110,7 +112,11 @@ function FileRow({ entry, selected, bulkChecked, onBulkToggle, onSelect, onOpen,
         />
       </td>
       <td className="name">
-        <div className={'file-icon ' + (m?.iconKind || 'doc')}>{m?.ext || 'FILE'}</div>
+        {isMedia && hasPreview ? (
+          <MediaThumb media={m} className="thumb file-thumb" sizes="40px" />
+        ) : (
+          <div className={'file-icon ' + (m?.iconKind || 'doc')}>{m?.ext || 'FILE'}</div>
+        )}
         <div className="file-name-col">
           <div className="fn">{entry.name}</div>
           <div className="meta">{kindLabel(m?.kind)}</div>

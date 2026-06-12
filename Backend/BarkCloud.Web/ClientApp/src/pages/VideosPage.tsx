@@ -13,7 +13,7 @@ import { useBulkMedia } from '../hooks/useBulkMedia';
 import { usePageHeader } from '../hooks/usePageHeader';
 import { useUploadActions } from '../hooks/useUploadManager';
 import { apiGet, pickFiles } from '../lib/api';
-import { plural, dateLabel } from '../lib/format';
+import { plural, dateLabel, groupByDate } from '../lib/format';
 import type { Album, MediaItem } from '../lib/types';
 
 function fmtSize(bytes: number): string {
@@ -117,6 +117,7 @@ export function VideosPage() {
 
   const featured = videos.length ? videos[0] : null;
   const totalSize = videos.reduce((s, v) => s + (v.size || 0), 0);
+  const groups = React.useMemo(() => groupByDate(videos), [videos]);
 
   React.useEffect(() => {
     apiGet<{ items: MediaItem[] }>('/api/cloud/media?kind=video&limit=60')
@@ -241,26 +242,31 @@ export function VideosPage() {
               </div>
             )}
 
-            <div className="section-head">
-              <h2>Все видео</h2>
-              <div className="meta">
-                {videos.length} {plural(videos.length, 'ролик', 'ролика', 'роликов')}
+            {groups.map((g) => (
+              <div key={g.key} className="date-group">
+                <div className="date-head">
+                  <h3>{g.label}</h3>
+                  <div className="right">
+                    <span>
+                      {g.items.length} {plural(g.items.length, 'ролик', 'ролика', 'роликов')}
+                    </span>
+                  </div>
+                </div>
+                <div className="vid-grid">
+                  {g.items.map((m) => (
+                    <VideoCard
+                      key={m.id}
+                      m={m}
+                      selecting={bulk.active}
+                      checked={bulk.isSelected(m.id)}
+                      onToggle={(shift) => bulk.toggle(m.id, shift)}
+                      onOpen={() => setLightbox(videos.findIndex((v) => v.id === m.id))}
+                      onMenu={actionsCtx.openMenu}
+                    />
+                  ))}
+                </div>
               </div>
-            </div>
-
-            <div className="vid-grid">
-              {videos.map((m, idx) => (
-                <VideoCard
-                  key={m.id}
-                  m={m}
-                  selecting={bulk.active}
-                  checked={bulk.isSelected(m.id)}
-                  onToggle={(shift) => bulk.toggle(m.id, shift)}
-                  onOpen={() => setLightbox(idx)}
-                  onMenu={actionsCtx.openMenu}
-                />
-              ))}
-            </div>
+            ))}
             <div ref={sentinelRef} className="infinite-sentinel">
               {loading && videos.length > 0 && <Loading label="Загрузка…" />}
             </div>

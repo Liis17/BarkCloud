@@ -2,13 +2,16 @@ import React from 'react';
 import { useParams } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import { PublicShareHeader, PublicShareShell, PublicStatus } from '../components/public/PublicShareShell';
+import { PublicViewerActions } from '../components/public/PublicViewerActions';
 import { useDocumentHead } from '../hooks/useDocumentHead';
+import { persistVolumeRef } from '../lib/volume';
 
 interface ShareInfo {
   found: boolean;
   name: string;
   mediaKind: string;
   previewUrl: string;
+  downloadUrl: string;
   imageWidth: number;
   imageHeight: number;
   fileSize: number;
@@ -66,6 +69,7 @@ export function PublicViewPage() {
   }
 
   const info = state;
+  const isVideo = info.mediaKind === 'video';
   const hasPreview = (info.mediaKind === 'photo' || info.mediaKind === 'video') && !!info.previewUrl;
   return (
     <PublicShareShell>
@@ -82,7 +86,14 @@ export function PublicViewPage() {
 
       <div className="public-view-card">
         <div className="public-preview">
-          {hasPreview ? (
+          {isVideo && info.downloadUrl ? (
+            <video
+              ref={persistVolumeRef}
+              src={info.downloadUrl}
+              poster={info.previewUrl || undefined}
+              controls
+            />
+          ) : hasPreview ? (
             <img
               src={info.previewUrl}
               alt={info.name}
@@ -90,12 +101,13 @@ export function PublicViewPage() {
           ) : (
             <Icon.file size={56} />
           )}
-          {info.mediaKind === 'video' && (
-            <div className="public-play">
-                <Icon.play size={48} />
-            </div>
-          )}
         </div>
+        <PublicViewerActions
+          name={info.name}
+          downloadHref={info.downloadPath || `/s/${token}`}
+          mediaKind={info.mediaKind}
+          imageSrc={info.downloadUrl || info.previewUrl}
+        />
         <div className="public-file-summary">
           <div>
             <h2>{info.name}</h2>

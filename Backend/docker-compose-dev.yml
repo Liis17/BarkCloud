@@ -109,7 +109,7 @@ services:
       ACCEPT_EULA: "Y"
       SEQ_FIRSTRUN_ADMINPASSWORD: "${SEQ_ADMIN_PASSWORD}"
     volumes:
-      - seq_data:/data
+      - ${SEQ_DATA_PATH:-seq_data}:/data
     networks:
       - barkcloud-network
 
@@ -154,8 +154,8 @@ services:
       POSTGRES_DB: "${POSTGRES_DB}"
       PGDATA: /var/lib/postgresql/data/pgdata
     volumes:
-      - pgdata:/var/lib/postgresql
-      - backup_volume:/backup
+      - ${POSTGRES_DATA_PATH:-pgdata}:/var/lib/postgresql
+      - ${BACKUP_PATH:-backup_volume}:/backup
     ports:
       - "${POSTGRES_PORT}:${POSTGRES_PORT}"
     networks:
