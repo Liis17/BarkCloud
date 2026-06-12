@@ -61,6 +61,7 @@
   display: flex; align-items: center; justify-content: center;
   flex-shrink: 0; font-size: 10px; font-weight: 600; letter-spacing: .3px;
 }
+.file-thumb { width: 40px; height: 40px; flex-shrink: 0; border-radius: var(--r-md); }
 .file-icon.folder { background: var(--md-primary-container); color: var(--md-on-primary-container); }
 .file-icon.img { background: #C8E6C9; color: #1B5E20; }
 .file-icon.vid { background: #D1C4E9; color: #311B92; }
