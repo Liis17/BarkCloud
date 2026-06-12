@@ -15,6 +15,19 @@ public static class BackendComposeGenerator
         string suffix = m.ImageChannel == "Dev" ? "-dev" : "";
         string Img(string name) => $"{BuilderModel.ImageRegistry}/barkcloud-{name}{suffix}:latest";
 
+        // Без nginx микросервисы остаются отрезанными: единственным мостом наружу был nginx
+        // (он публиковал их порты и проксировал в docker-сеть). Тогда публикуем порты прямо на
+        // сервисе; при включённом nginx этого делать не нужно — он сам пробрасывает порты.
+        string Ports(params string[] portVars)
+        {
+            if (m.IncludeNginx)
+                return "";
+            var b = new StringBuilder("\n    ports:");
+            foreach (var v in portVars)
+                b.Append("\n      - \"${").Append(v).Append("}:${").Append(v).Append("}\"");
+            return b.ToString();
+        }
+
         // Каждый блок-секция не содержит завершающего перевода строки; секции склеиваются
         // через пустую строку, что даёт ровно один разделитель между сервисами.
         var sections = new List<string>
@@ -69,7 +82,7 @@ services:
     restart: always
     environment:
       <<: *common-variables
-      SERVICE_PORT: ${IDENTITY_PORT}
+      SERVICE_PORT: ${IDENTITY_PORT}{{Ports("IDENTITY_PORT")}}
     networks:
       - barkcloud-network
     depends_on:
@@ -81,7 +94,7 @@ services:
     restart: always
     environment:
       <<: *common-variables
-      SERVICE_PORT: ${USERS_PORT}
+      SERVICE_PORT: ${USERS_PORT}{{Ports("USERS_PORT")}}
     networks:
       - barkcloud-network
     depends_on:
@@ -96,7 +109,7 @@ services:
       SERVICE_PORT: ${FILES_PORT}
       SERVICE_HTTP1PORT: ${FILES_HTTP1PORT}
       StorageProbe__Path: "/mnt/minio-data"
-      Archive__TempPath: "/mnt/archive-temp"
+      Archive__TempPath: "/mnt/archive-temp"{{Ports("FILES_PORT", "FILES_HTTP1PORT")}}
     volumes:
       - ${MINIO_DATA_PATH:-minio_data}:/mnt/minio-data:ro
       - ${ARCHIVE_TEMP_PATH:-archive_temp}:/mnt/archive-temp
