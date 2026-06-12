@@ -1,0 +1,14 @@
+<Project>
+
+  <!--
+    Обходной путь для NETSDK1226 на CI-раннере: установленный там SDK (snap 10.0.108)
+    не содержит prune-данных для .NET 10, из-за чего падает restore/publish.
+    Пруннинг транзитивных пакетов — лишь оптимизация графа restore (пакеты, уже входящие
+    в shared framework), на сборку и рантайм не влияет. На SDK с данными (напр. 10.0.300)
+    свойство ни на что не влияет.
+  -->
+  <PropertyGroup>
+    <AllowMissingPrunePackageData>true</AllowMissingPrunePackageData>
+  </PropertyGroup>
+
+</Project>
