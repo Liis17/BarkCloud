@@ -589,12 +589,14 @@ tr.selected .row-actions { opacity: 1; }
   color: #d8e8e5;
   background: #24282d;
 }
-.public-preview img {
+.public-preview img,
+.public-preview video {
   display: block;
   max-width: 100%;
   max-height: min(62vh, 620px);
   object-fit: contain;
 }
+.public-preview video { width: 100%; }
 .public-play {
   position: absolute;
   inset: 0;
