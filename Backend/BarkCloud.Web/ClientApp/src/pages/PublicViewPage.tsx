@@ -108,15 +108,6 @@ export function PublicViewPage() {
           mediaKind={info.mediaKind}
           imageSrc={info.downloadUrl || info.previewUrl}
         />
-        <div className="public-file-summary">
-          <div>
-            <h2>{info.name}</h2>
-            {info.fileSize > 0 && <p>{fmtSize(info.fileSize)}</p>}
-          </div>
-          <a className="btn primary" href={info.downloadPath || `/s/${token}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-            <Icon.download size={18} /> Скачать
-          </a>
-        </div>
       </div>
     </PublicShareShell>
   );
