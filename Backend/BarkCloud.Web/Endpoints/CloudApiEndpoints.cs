@@ -960,6 +960,40 @@ public static class CloudApiEndpoints
                 }, Json);
             }));
 
+        // Inline-просмотр оригинала same-origin (для текста/кода — открыть в браузере, не скачивать).
+        // Скачивание Files всегда идёт с Content-Disposition: attachment, а CORS на files нет —
+        // поэтому web проксирует содержимое через внутренний HTTP1-эндпоинт (как upload-прокси).
+        api.MapGet("/files/view", async (HttpContext http, AuthGateway auth, FilesApi.FilesApiClient files,
+            IHttpClientFactory httpFactory, IConfiguration config, string id) =>
+            await Guarded(http, auth, async token =>
+            {
+                var req = new GetTempDownloadUrlRequest();
+                req.FileIds.Add(id);
+                var resp = await files.GetTempDownloadUrlAsync(req, token);
+                var url = resp.FileUrls.FirstOrDefault()?.Url;
+                if (string.IsNullOrEmpty(url))
+                    return Results.NotFound();
+
+                // Качаем с внутреннего HTTP1-эндпоинта Files (минуя nginx/TLS), как upload-прокси.
+                var http1Base = config["FilesService:Http1Base"];
+                var fetchUrl = url;
+                if (!string.IsNullOrEmpty(http1Base))
+                {
+                    var tempId = new Uri(url).Segments[^1];
+                    fetchUrl = $"{http1Base}/download/{tempId}";
+                }
+
+                var client = httpFactory.CreateClient("files-upload");
+                using var upstream = await client.GetAsync(fetchUrl, HttpCompletionOption.ResponseHeadersRead);
+                if (!upstream.IsSuccessStatusCode)
+                    return Results.StatusCode((int)upstream.StatusCode);
+
+                // Без Content-Disposition: attachment — браузер отрендерит текст/код в новой вкладке.
+                http.Response.ContentType = upstream.Content.Headers.ContentType?.ToString() ?? "text/plain; charset=utf-8";
+                await upstream.Content.CopyToAsync(http.Response.Body);
+                return Results.Empty;
+            }));
+
         api.MapGet("/files/activity", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud,
             string? id, int? limit, string? cursorAt, string? cursorId) =>
             await Guarded(http, auth, async token =>

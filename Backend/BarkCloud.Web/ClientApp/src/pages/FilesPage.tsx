@@ -36,6 +36,16 @@ function kindLabel(k: string | undefined): string {
   return k === 'photo' ? 'фото' : k === 'video' ? 'видео' : k === 'audio' ? 'аудио' : k === 'document' ? 'документ' : 'файл';
 }
 
+// Расширения, которые браузер показывает как текст — их открываем во вкладке (inline-прокси), не скачиваем.
+const TEXT_EXTS = new Set([
+  'txt', 'md', 'markdown', 'log', 'csv', 'tsv', 'json', 'xml', 'yaml', 'yml', 'ini', 'conf', 'cfg', 'env',
+  'html', 'htm', 'css', 'js', 'jsx', 'ts', 'tsx', 'cs', 'py', 'java', 'go', 'rs', 'rb', 'php',
+  'c', 'cpp', 'h', 'hpp', 'sh', 'bat', 'ps1', 'sql', 'svg',
+]);
+function isTextFile(m: CardFile | null | undefined): boolean {
+  return !!m && TEXT_EXTS.has((m.ext || '').toLowerCase());
+}
+
 type RenameTarget = { isDir: boolean; target: DirInfo | Entry };
 
 function DirRow({ dir, onOpen, onRename, onDelete, onMenu }: {
@@ -71,12 +81,13 @@ function DirRow({ dir, onOpen, onRename, onDelete, onMenu }: {
   );
 }
 
-function FileRow({ entry, selected, bulkChecked, onBulkToggle, onSelect, onRename, onDelete, onDownload, onMenu }: {
+function FileRow({ entry, selected, bulkChecked, onBulkToggle, onSelect, onOpen, onRename, onDelete, onDownload, onMenu }: {
   entry: Entry;
   selected: boolean;
   bulkChecked: boolean;
   onBulkToggle: (e: Entry, shift: boolean) => void;
   onSelect: (e: Entry) => void;
+  onOpen: (e: Entry) => void;
   onRename: (e: Entry) => void;
   onDelete: (e: Entry) => void;
   onDownload: (e: Entry) => void;
@@ -84,7 +95,12 @@ function FileRow({ entry, selected, bulkChecked, onBulkToggle, onSelect, onRenam
 }) {
   const m = entry.media;
   return (
-    <tr className={(selected ? 'selected' : '') + (bulkChecked ? ' checked' : '')} onClick={() => onSelect(entry)} onContextMenu={(e) => onMenu(e, entry)}>
+    <tr
+      className={(selected ? 'selected' : '') + (bulkChecked ? ' checked' : '')}
+      onClick={() => onSelect(entry)}
+      onDoubleClick={() => onOpen(entry)}
+      onContextMenu={(e) => onMenu(e, entry)}
+    >
       <td className="selcell" onClick={(e) => e.stopPropagation()}>
         <input
           type="checkbox"
@@ -386,6 +402,13 @@ export function FilesPage() {
       toast((e as Error).message, 'err');
     }
   }
+  // Двойной клик: фото/видео — в просмотрщике, текст — inline во вкладке, прочее — скачать.
+  function openEntry(entry: Entry) {
+    const m = entry.media;
+    if (m && (m.kind === 'photo' || m.kind === 'video')) setLightbox(m);
+    else if (isTextFile(m)) window.open('/api/files/view?id=' + encodeURIComponent(entry.fileId), '_blank');
+    else download(entry);
+  }
   async function copyLink(fileId: string) {
     try {
       const d = await apiGet<{ urls: Record<string, string | null> }>('/api/files/download?ids=' + encodeURIComponent(fileId));
@@ -666,6 +689,7 @@ export function FilesPage() {
                       bulkChecked={fsel.has(e.entryId)}
                       onBulkToggle={(t, shift) => fsel.select(t.entryId, files.map((f) => f.entryId), shift)}
                       onSelect={setSel}
+                      onOpen={openEntry}
                       onDownload={download}
                       onRename={(t) => startRename(t, false)}
                       onDelete={(t) => requestDelete(t, false)}
