@@ -6,6 +6,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Реляционный провайдер для интеграционных тестов с реальным FilesContext (нужен ExecuteDelete
+         и primitive collections; InMemory не поддерживает ExecuteDelete). -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.8" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Update="coverlet.collector" Version="10.0.1">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
