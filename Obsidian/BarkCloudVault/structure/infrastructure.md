@@ -58,9 +58,36 @@ Parent: [[index]] · See also: [[structure/overview]] · [[structure/entrypoints
 
 - `pgdata` — данные PostgreSQL
 - `rabbitmq_data` — данные RabbitMQ
-- `minio_data` — данные MinIO по умолчанию. В `docker-compose*.yml` источник можно заменить через `MINIO_DATA_PATH` (например `/d/barkcloud/minio`); тот же источник монтируется в `cloud-files` read-only как `/mnt/minio-data` для расчёта физического объёма диска.
+- `minio_data` — данные MinIO по умолчанию (named volume). Источник `/data` переопределяется через `MINIO_DATA_PATH` в `.env`; тот же источник монтируется в `cloud-files` read-only как `/mnt/minio-data` для расчёта физического объёма диска. Вынос на отдельный диск — см. раздел «MinIO на отдельном диске» ниже.
 - `backup_volume` — бэкапы (монтируется в Postgres-контейнер на `/backup`)
 - `seq_data` — данные Seq
+
+## MinIO на отдельном диске (Windows/WSL2)
+
+> Зачем: named volume `minio_data` лежит внутри образа диска Docker (обычно на C:) и растёт вместе с загрузками в S3. Чтобы хранить S3-данные на втором диске (D:), укажи путь к папке на нём через `MINIO_DATA_PATH` (по умолчанию — named volume, поведение не меняется).
+
+**1. Создай папку на D:**, напр. `D:\barkcloud\minio`.
+
+**2. Укажи путь в `Backend/.env`.** Форма для Docker Desktop, когда compose запускается из Windows-шелла (cmd/PowerShell):
+```
+MINIO_DATA_PATH=/d/barkcloud/minio
+```
+Если compose запускаешь изнутри WSL2 — путь к тому же диску будет `/mnt/d/barkcloud/minio`.
+
+**3. Перенеси существующие данные** (чтобы не потерять текущий S3-контент):
+```
+docker volume ls                      # найти имя, напр. backend_minio_data
+docker compose -f docker-compose-dev.yml stop minio
+docker run --rm -v backend_minio_data:/from -v /d/barkcloud/minio:/to alpine \
+  sh -c "cp -a /from/. /to/"          # копирует и скрытый .minio.sys
+```
+
+**4. Подними MinIO:**
+```
+docker compose -f docker-compose-dev.yml up -d minio
+```
+
+> ⚠️ Папка на NTFS-диске Windows пробрасывается в контейнер через drvfs/9p — без Unix-прав, xattr и атомарных rename. MinIO официально такие ФС **не поддерживает**: под нагрузкой возможны ошибки и повреждение данных. Это не зависит от того, как написан путь (`/d/...` через Docker Desktop или `/mnt/d/...` изнутри WSL) — под капотом тот же NTFS через drvfs. Надёжный (но более громоздкий) вариант — отдельный **ext4-vhdx**, смонтированный в WSL2 через `wsl --mount`, и `MINIO_DATA_PATH=/mnt/wsl/minio`.
 
 ## Запуск dev-окружения
 
