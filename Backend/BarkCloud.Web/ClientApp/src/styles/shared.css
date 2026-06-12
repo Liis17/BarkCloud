@@ -1116,6 +1116,7 @@ img.avatar { object-fit: cover; }
   overflow-y: hidden;
   padding: 4px 24px 14px;
   scrollbar-width: thin;
+  flex-shrink: 0; /* не сжиматься в флекс-колонке .files-main — уезжать со скроллом, а не схлопываться */
 }
 .df-card {
   position: relative;

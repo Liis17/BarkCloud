@@ -99,7 +99,7 @@ tr.selected .row-actions { opacity: 1; }
 .files-shell { display: grid; grid-template-columns: 1fr 360px; gap: 16px; height: 100%; padding: 4px 16px 16px; }
 .files-main { display: flex; flex-direction: column; overflow-y: auto; background: var(--md-surface-container-low); border-radius: var(--r-xl); }
 .files-inspector { background: var(--md-surface-container-low); border-radius: var(--r-xl); overflow-y: auto; padding: 24px; }
-.files-bar { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 14px; padding: 16px 24px; background: var(--md-surface-container-low); }
+.files-bar { position: sticky; top: 0; z-index: 2; flex-shrink: 0; display: flex; align-items: center; gap: 14px; padding: 16px 24px; background: var(--md-surface-container-low); }
 .files-list { flex: 1; }
 .files-main .ftable tbody tr { cursor: pointer; }
 .ftable tbody tr.selected { background: var(--md-secondary-container); }
@@ -587,16 +587,16 @@ tr.selected .row-actions { opacity: 1; }
   border-radius: 8px;
   overflow: hidden;
   color: #d8e8e5;
-  background: #24282d;
+  background: #000;
 }
 .public-preview img,
 .public-preview video {
   display: block;
   max-width: 100%;
-  max-height: min(62vh, 620px);
+  max-height: min(72vh, 720px);
   object-fit: contain;
 }
-.public-preview video { width: 100%; }
+.public-preview video { width: auto; }
 .public-play {
   position: absolute;
   inset: 0;
@@ -606,24 +606,6 @@ tr.selected .row-actions { opacity: 1; }
   pointer-events: none;
   color: #fff;
   background: rgba(0,0,0,.12);
-}
-.public-file-summary {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 16px;
-}
-.public-file-summary h2 {
-  margin: 0;
-  color: #fff;
-  font-size: 21px;
-  line-height: 1.25;
-  word-break: break-word;
-}
-.public-file-summary p {
-  margin: 6px 0 0;
-  color: #b8c1c0;
-  font-size: 13px;
 }
 .public-grid {
   display: grid;
@@ -759,7 +741,5 @@ tr.selected .row-actions { opacity: 1; }
     justify-content: flex-start;
   }
   .public-hero h1 { font-size: 23px; }
-  .public-file-summary { grid-template-columns: 1fr; }
-  .public-file-summary .btn { justify-self: start; }
   .public-grid { grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); }
 }
