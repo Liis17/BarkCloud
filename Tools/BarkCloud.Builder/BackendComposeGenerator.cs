@@ -1,3 +1,4 @@
+using System.IO;
 using System.Text;
 
 namespace BarkCloud.Builder;
@@ -347,10 +348,6 @@ volumes:
             K("POSTGRES_PORT", m.PostgresPort);
             K("POSTGRES_DATA_PATH", m.PostgresDataPath);
             K("BACKUP_PATH", m.BackupPath);
-
-            Section("Параметры подключения Configuration к Postgres");
-            K("CONFIGURATION_USERNAME", m.ConfigurationUsername);
-            K("CONFIGURATION_PASSWORD", m.ConfigurationPassword);
         }
 
         Section("Порты сервисов");
@@ -375,5 +372,184 @@ volumes:
         K("WEB_ADMIN_PASSWORD", m.WebAdminPassword);
 
         return sb.ToString();
+    }
+
+    /// <summary>
+    /// nginx/cloud.barkfluff.conf: домен (server_name), порты (listen + upstream) и
+    /// имена файлов сертификатов подставляются из полей модели.
+    /// </summary>
+    public static string BuildNginxConf(BuilderModel m)
+    {
+        string domain = string.IsNullOrWhiteSpace(m.NginxDomain) ? "cloud.barkfluff.com" : m.NginxDomain.Trim();
+        string crt = string.IsNullOrWhiteSpace(m.CertCrtPath) ? "barkfluff.com-crt.pem" : Path.GetFileName(m.CertCrtPath);
+        string key = string.IsNullOrWhiteSpace(m.CertKeyPath) ? "barkfluff.com-key.pem" : Path.GetFileName(m.CertKeyPath);
+
+        return $$"""
+# BarkCloud — единый субдомен {{domain}}, маршрутизация по порту.
+
+# --- Пулы соединений к бэкендам (постоянные h2c-соединения для gRPC) ---
+upstream barkcloud_identity {
+    server cloud-identity:{{m.IdentityPort}};
+    keepalive 32;            # держать до 32 idle-соединений в пуле на воркер
+    keepalive_requests 1000; # пересоздавать соединение после 1000 запросов
+    keepalive_timeout 60s;   # закрыть простаивающее соединение через 60с
+}
+
+upstream barkcloud_users {
+    server cloud-users:{{m.UsersPort}};
+    keepalive 32;
+    keepalive_requests 1000;
+    keepalive_timeout 60s;
+}
+
+upstream barkcloud_files {
+    server cloud-files:{{m.FilesPort}};
+    keepalive 32;
+    keepalive_requests 1000;
+    keepalive_timeout 60s;
+}
+
+# HTTP/1.1-пул для скачивания/загрузки файлов (/web/).
+upstream barkcloud_files_http {
+    server cloud-files:{{m.FilesHttp1Port}};
+    keepalive 16;
+    keepalive_timeout 60s;
+}
+
+# --- Identity (порт {{m.IdentityPort}}) ---
+server {
+    listen {{m.IdentityPort}} ssl;
+    http2 on;
+    server_name {{domain}};
+
+    ssl_certificate     /etc/nginx/certs/{{crt}};
+    ssl_certificate_key /etc/nginx/certs/{{key}};
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    ssl_ciphers         HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+    ssl_session_cache   shared:SSL:10m;
+    ssl_session_timeout 10m;
+
+    location / {
+        grpc_pass grpc://barkcloud_identity;
+        grpc_set_header Host $host;
+        grpc_set_header X-Real-IP $remote_addr;
+        grpc_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        grpc_set_header X-Forwarded-Proto $scheme;
+        grpc_read_timeout 300s;
+        grpc_send_timeout 300s;
+    }
+}
+
+# --- Users (порт {{m.UsersPort}}) ---
+server {
+    listen {{m.UsersPort}} ssl;
+    http2 on;
+    server_name {{domain}};
+
+    ssl_certificate     /etc/nginx/certs/{{crt}};
+    ssl_certificate_key /etc/nginx/certs/{{key}};
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    ssl_ciphers         HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+    ssl_session_cache   shared:SSL:10m;
+    ssl_session_timeout 10m;
+
+    location / {
+        grpc_pass grpc://barkcloud_users;
+        grpc_set_header Host $host;
+        grpc_set_header X-Real-IP $remote_addr;
+        grpc_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        grpc_set_header X-Forwarded-Proto $scheme;
+        grpc_read_timeout 300s;
+        grpc_send_timeout 300s;
+    }
+}
+
+# --- Files (порт {{m.FilesPort}}): gRPC + HTTP1 веб для скачивания/загрузки ---
+server {
+    listen {{m.FilesPort}} ssl;
+    http2 on;
+    server_name {{domain}};
+
+    ssl_certificate     /etc/nginx/certs/{{crt}};
+    ssl_certificate_key /etc/nginx/certs/{{key}};
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    ssl_ciphers         HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+    ssl_session_cache   shared:SSL:10m;
+    ssl_session_timeout 10m;
+
+    client_max_body_size 0;  # без лимита размера тела (загрузка файлов)
+
+    # gRPC API (основной)
+    location / {
+        grpc_pass grpc://barkcloud_files;
+        grpc_set_header Host $host;
+        grpc_set_header X-Real-IP $remote_addr;
+        grpc_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        grpc_set_header X-Forwarded-Proto $scheme;
+        grpc_read_timeout 300s;
+        grpc_send_timeout 300s;
+    }
+
+    # HTTP-веб: /web/upload/{id}, /web/download/{id} -> cloud-files:{{m.FilesHttp1Port}}/upload|download
+    location /web/ {
+        rewrite ^/web/(.*) /$1 break;
+        proxy_pass http://barkcloud_files_http;
+        # keepalive к апстриму требует HTTP/1.1 и очистки заголовка Connection
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # Большие файлы — буферизацию выключаем, таймауты увеличиваем (2 часа)
+        proxy_request_buffering off;
+        proxy_buffering off;
+        proxy_read_timeout 7200s;
+        proxy_send_timeout 7200s;
+        client_body_timeout 7200s;
+    }
+}
+
+# --- Веб-клиент (порт 443): HTTP→HTTPS редирект + прокси на cloud-web:8080 ---
+server {
+    listen 80;
+    server_name {{domain}};
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    server_name {{domain}};
+    client_max_body_size 0;  # без лимита размера тела (загрузка через браузер)
+    ssl_certificate /etc/nginx/certs/{{crt}};
+    ssl_certificate_key /etc/nginx/certs/{{key}};
+
+    location / {
+        proxy_pass http://cloud-web:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cookie_path / "/; secure; HttpOnly; SameSite=strict";
+        proxy_redirect off;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+
+        # Загрузка/скачивание больших файлов через браузер: буферизация off, таймауты 2 часа
+        proxy_request_buffering off;
+        proxy_buffering off;
+        proxy_read_timeout 7200s;
+        proxy_send_timeout 7200s;
+        client_body_timeout 7200s;
+    }
+}
+
+""";
     }
 }

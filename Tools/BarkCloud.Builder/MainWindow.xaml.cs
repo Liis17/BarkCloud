@@ -46,6 +46,22 @@ namespace BarkCloud.Builder
                 OutputPathBox.Text = dialog.FolderName;
         }
 
+        // Выбор файла сертификата; целевое поле передаётся в CommandParameter.
+        private void OnPickCert(object sender, RoutedEventArgs e)
+        {
+            var button = (Button)sender;
+            if (button.CommandParameter is TextBox box)
+            {
+                var dialog = new OpenFileDialog
+                {
+                    Title = "Выберите файл сертификата",
+                    Filter = "Сертификаты (*.pem;*.crt;*.key)|*.pem;*.crt;*.key|Все файлы (*.*)|*.*",
+                };
+                if (dialog.ShowDialog() == true)
+                    box.Text = dialog.FileName;
+            }
+        }
+
         private void OnGenerate(object sender, RoutedEventArgs e)
         {
             var dir = _model.OutputPath?.Trim();
@@ -62,12 +78,36 @@ namespace BarkCloud.Builder
                     ToLf(BackendComposeGenerator.BuildCompose(_model)), encoding);
                 File.WriteAllText(Path.Combine(dir, ".env"),
                     ToLf(BackendComposeGenerator.BuildEnv(_model)), encoding);
-                SetStatus($"Готово: docker-compose.yml и .env записаны в {dir}", error: false);
+
+                var extra = "";
+                if (_model.IncludeNginx)
+                {
+                    var nginxDir = Path.Combine(dir, "nginx");
+                    Directory.CreateDirectory(nginxDir);
+                    File.WriteAllText(Path.Combine(nginxDir, "cloud.barkfluff.conf"),
+                        ToLf(BackendComposeGenerator.BuildNginxConf(_model)), encoding);
+
+                    var certsDir = Path.Combine(dir, "certs");
+                    Directory.CreateDirectory(certsDir);
+                    CopyCert(_model.CertCrtPath, certsDir);
+                    CopyCert(_model.CertKeyPath, certsDir);
+
+                    extra = " + nginx/ и certs/";
+                }
+
+                SetStatus($"Готово: docker-compose.yml, .env{extra} записаны в {dir}", error: false);
             }
             catch (Exception ex)
             {
                 SetStatus("Ошибка: " + ex.Message, error: true);
             }
+        }
+
+        // Копирует выбранный сертификат в certs/ под его исходным именем.
+        private static void CopyCert(string? source, string certsDir)
+        {
+            if (!string.IsNullOrWhiteSpace(source) && File.Exists(source))
+                File.Copy(source, Path.Combine(certsDir, Path.GetFileName(source)), overwrite: true);
         }
 
         // Docker/Linux ожидает LF; нормализуем переводы строк.

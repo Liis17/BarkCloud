@@ -30,6 +30,12 @@
   прописать в базе Configuration).
 - **Образы:** реестр фиксирован (`docker.barkfluff.com:5000`, read-only), выбор канала
   Release/Dev → `barkcloud-<svc>[-dev]:latest`.
+- **Nginx (при включённом тумблере):** в выходную папку пишутся `nginx/cloud.barkfluff.conf`
+  (генерируется из шаблона: `server_name`/домен, listen+upstream порты, имена файлов
+  сертификатов подставляются из полей) и папка `certs/` (выбранные crt/key копируются туда
+  под их именами). Секция UI видна только когда nginx включён; при невыбранных сертификатах —
+  предупреждение (можно продолжить без HTTPS, небезопасно). Дефолты дают конфиг, **байт-в-байт**
+  совпадающий с `Backend/nginx/cloud.barkfluff.conf`.
 - **Генерация — сборка секций строк** (`BackendComposeGenerator`), не парсинг YAML.
   Сам compose почти не зависит от значений — всё идёт через `${VAR}` из `.env`.
   При всех включённых сервисах и канале Release вывод **байт-в-байт** совпадает с исходным
@@ -41,8 +47,9 @@
 | Файл | Назначение |
 |---|---|
 | `BuilderModel.cs` | Все параметры + тумблеры сервисов с дефолтами |
-| `BackendComposeGenerator.cs` | `BuildCompose(model)` и `BuildEnv(model)` |
+| `BackendComposeGenerator.cs` | `BuildCompose(model)`, `BuildEnv(model)`, `BuildNginxConf(model)` |
 | `InverseBoolConverter.cs` | Инверсия bool для показа предупреждений при выключенном тумблере |
-| `MainWindow.xaml(.cs)` | FluentWindow: секции-экспандеры, кнопки «Обзор…» / «Сгенерировать» |
+| `AnyEmptyToBoolConverter.cs` | MultiValue: предупреждение о сертификатах, если хоть одно поле пусто |
+| `MainWindow.xaml(.cs)` | FluentWindow: секции-экспандеры, выбор сертификатов, запись nginx/+certs/ |
 
 См. также [[structure/infrastructure]] (исходный docker-compose и инфраструктура).

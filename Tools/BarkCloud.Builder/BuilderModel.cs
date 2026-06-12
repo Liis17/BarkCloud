@@ -42,10 +42,6 @@ public sealed class BuilderModel
     public string PostgresDataPath { get; set; } = "/d/barkcloud/pgdata";
     public string BackupPath { get; set; } = "/d/barkcloud/backup";
 
-    // Configuration → Postgres
-    public string ConfigurationUsername { get; set; } = "user";
-    public string ConfigurationPassword { get; set; } = "password";
-
     // Порты сервисов
     public string IdentityPort { get; set; } = "7020";
     public string UsersPort { get; set; } = "7021";
@@ -63,6 +59,12 @@ public sealed class BuilderModel
     public bool WebCookieSecure { get; set; } = false;
     public string WebPublicHost { get; set; } = "https://cloud.barkfluff.com";
     public string WebAdminPassword { get; set; } = "";
+
+    // Nginx / HTTPS (server_name + сертификаты). Пути — к исходным файлам на диске;
+    // в конфиг и в папку certs попадают их имена (basename).
+    public string NginxDomain { get; set; } = "cloud.barkfluff.com";
+    public string CertCrtPath { get; set; } = "";
+    public string CertKeyPath { get; set; } = "";
 
     // Вывод
     public string OutputPath { get; set; } = "";
