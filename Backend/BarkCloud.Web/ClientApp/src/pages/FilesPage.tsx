@@ -21,7 +21,7 @@ import { useUploadActions } from '../hooks/useUploadManager';
 import { DynamicFoldersStrip } from '../components/dynamic-folders/DynamicFoldersStrip';
 import { DynamicFolderDetail } from '../components/dynamic-folders/DynamicFolderDetail';
 import { DynamicFolderFormModal } from '../components/dynamic-folders/DynamicFolderFormModal';
-import { apiGet, apiPost, deleteEntriesBatch, pickFiles } from '../lib/api';
+import { apiGet, apiPost, deleteEntriesBatch, downloadArchive, pickFiles } from '../lib/api';
 import { createShare, createFolderShare } from '../lib/share';
 import type { Album, CardFile, DirInfo, DynamicFolder, Entry, Listing } from '../lib/types';
 
@@ -247,6 +247,7 @@ export function FilesPage() {
   const [confirmDel, setConfirmDel] = React.useState<RenameTarget | null>(null);
   const [bulkConfirm, setBulkConfirm] = React.useState(false);
   const [bulkMoving, setBulkMoving] = React.useState(false);
+  const [archiving, setArchiving] = React.useState(false);
   const [smartFolders, setSmartFolders] = React.useState<DynamicFolder[]>([]);
   const [openSmart, setOpenSmart] = React.useState<DynamicFolder | null>(null);
   const [creatingSmart, setCreatingSmart] = React.useState(false);
@@ -477,6 +478,7 @@ export function FilesPage() {
   }
   function dirMenu(dir: DirInfo): ContextItem[] {
     return [
+      { label: 'Скачать папку', icon: 'download', onClick: () => archiveFolder(dir) },
       { label: 'Сделать папку публичной', icon: 'share', onClick: () => createFolderShare(dir.id, dir.name, toast) },
       { label: 'Поделиться с пользователем', icon: 'user', onClick: () => setShareDirWith(dir) },
       { label: 'Переименовать', icon: 'pencil', onClick: () => startRename(dir, true) },
@@ -537,6 +539,34 @@ export function FilesPage() {
       toast((e as Error).message || 'Не удалось скопировать', 'err');
     }
   }
+  async function bulkArchive() {
+    const entryIds = (listing?.files || []).filter((e) => fsel.has(e.entryId)).map((e) => e.entryId);
+    if (!entryIds.length || archiving) return;
+    setArchiving(true);
+    toast('Готовлю архив…');
+    try {
+      await downloadArchive({ entryIds });
+      fsel.clear();
+      toast('Архив готов, скачивание началось');
+    } catch (e) {
+      toast((e as Error).message, 'err');
+    } finally {
+      setArchiving(false);
+    }
+  }
+  async function archiveFolder(dir: DirInfo) {
+    if (archiving) return;
+    setArchiving(true);
+    toast('Готовлю архив папки…');
+    try {
+      await downloadArchive({ directoryId: dir.id, name: dir.name });
+      toast('Архив готов, скачивание началось');
+    } catch (e) {
+      toast((e as Error).message, 'err');
+    } finally {
+      setArchiving(false);
+    }
+  }
 
   usePageHeader(
     () => ({
@@ -578,6 +608,7 @@ export function FilesPage() {
         onClear={fsel.clear}
         actions={[
           { label: 'Переместить', icon: 'folder', onClick: () => setBulkMoving(true) },
+          { label: archiving ? 'Архивирую…' : 'Скачать архивом', icon: 'download', disabled: archiving, onClick: bulkArchive },
           { label: 'Копировать ссылки', icon: 'link', onClick: bulkCopyLinks },
           { label: 'Удалить', icon: 'trash', danger: true, onClick: () => setBulkConfirm(true) },
         ]}

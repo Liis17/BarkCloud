@@ -62,17 +62,16 @@ services:
     environment:
       <<: *common-variables
       StorageProbe__Path: "/mnt/minio-data"
+      Archive__TempPath: "/mnt/archive-temp"
     volumes:
       - ${MINIO_DATA_PATH:-minio_data}:/mnt/minio-data:ro
+      - ${ARCHIVE_TEMP_PATH:-archive_temp}:/mnt/archive-temp
     networks:
       - barkcloud-network
     depends_on:
       - configuration
 
-  # Сервис уведомлений (consumer RabbitMQ → SMTP). Внешнего API нет — в nginx не маршрутизируется.
-  # Опционален: если в Configuration не заданы Email:* (Host/Port/SenderEmail/SenderPassword),
-  # сервер работает в режиме «без почты» (Features:EmailEnabled=false) и задачи в очередь не шлёт —
-  # этот сервис можно остановить или удалить из compose. Никто на него не depends_on.
+  # Сервис уведомлений (consumer RabbitMQ → SMTP). Внешнего API нет — в nginx не маршрутизируется. Опционален
   notification:
     image: docker.barkfluff.com:5000/barkcloud-notification:latest
     container_name: cloud-notification
@@ -85,7 +84,6 @@ services:
       - configuration
 
   # Веб-клиент (HTTP, отдаёт страницы браузеру; к микросервисам обращается по docker-сети через gRPC)
-  # JwtSettings и адреса сервисов тянет из Configuration-сервиса (CONFIGURATION_SERVICE_URL), как остальные.
   web:
     image: docker.barkfluff.com:5000/barkcloud-web:latest
     container_name: cloud-web
@@ -99,12 +97,9 @@ services:
       ASPNETCORE_URLS: "http://+:8080"
       App__CookieSecure: "${WEB_COOKIE_SECURE}"
       App__PublicHost: "${WEB_PUBLIC_HOST}"
-      # Пароль доступа к разделу «Обслуживание» (обновление бэкенда). Пусто → раздел недоступен.
       App__AdminPassword: "${WEB_ADMIN_PASSWORD}"
     volumes:
-      # Управление контейнерами бэкенда (pull/up/restart) через локальный Docker.
       - /var/run/docker.sock:/var/run/docker.sock
-      # compose-файл и .env нужны для `docker compose pull/up`; монтируем по тем же путям, что админка BarkFluff.
       - ./docker-compose.yml:/docker-compose.yml:ro
       - ./.env:/.env:ro
     ports:
@@ -118,7 +113,6 @@ services:
       - files
 
   # === Reverse-proxy (единственная точка выхода наружу) ===
-
   nginx:
     image: nginx:latest
     container_name: cloud-nginx
@@ -158,8 +152,6 @@ services:
     image: quay.io/minio/minio:RELEASE.2025-04-22T22-12-26Z-cpuv1
     container_name: minio
     restart: always
-    # MINIO_PORT / MINIO_WEBPORT в .env — это host-маппинг.
-    # Внутри контейнера MinIO всегда слушает 9000 (API) и 9001 (console).
     ports:
       - "${MINIO_PORT}:9000"
       - "${MINIO_WEBPORT}:9001"
@@ -193,14 +185,6 @@ services:
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
       POSTGRES_DB: "${POSTGRES_DB}"
       PGDATA: /var/lib/postgresql/data/pgdata
-    # Тюнинг под 2 ядра / 8 ГБ на машине, где Postgres делит ресурсы с 6 .NET-сервисами,
-    # RabbitMQ и Seq. Значения консервативны: память отдаётся не вся, чтобы не уйти в своп.
-    #   shared_buffers=1GB              — собственный кэш страниц PG (~12% ОЗУ)
-    #   effective_cache_size=3GB        — оценка доступного ОС-кэша (планировщику, память не резервирует)
-    #   work_mem=16MB                   — на сортировку/hash на операцию
-    #   maintenance_work_mem=256MB      — VACUUM / CREATE INDEX
-    #   random_page_cost=1.1, effective_io_concurrency=200 — диск считаем SSD
-    #   max_parallel_workers*=… подрезаны под 2 ядра; jit=off — короткие OLTP-запросы без задержки на JIT
     command:
       - "postgres"
       - "-c"
@@ -236,7 +220,6 @@ services:
     volumes:
       - ${POSTGRES_DATA_PATH:-pgdata}:/var/lib/postgresql
       - ${BACKUP_PATH:-backup_volume}:/backup
-    # POSTGRES_PORT в .env — host-маппинг. Внутри контейнера Postgres всегда слушает 5432.
     ports:
       - "${POSTGRES_PORT}:5432"
     networks:
@@ -252,3 +235,4 @@ volumes:
   minio_data:
   backup_volume:
   seq_data:
+  archive_temp:

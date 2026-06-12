@@ -5,6 +5,7 @@ export interface BulkAction {
   icon?: string;
   onClick: () => void;
   danger?: boolean;
+  disabled?: boolean;
 }
 
 /** Плавающая панель групповых действий — видна, когда что-то выбрано. */
@@ -17,7 +18,7 @@ export function SelectionBar({ count, actions, onClear }: { count: number; actio
         {actions.map((a, i) => {
           const Ic = a.icon ? Icon[a.icon] : null;
           return (
-            <button key={i} className={'btn ' + (a.danger ? 'danger' : 'outlined')} onClick={a.onClick}>
+            <button key={i} className={'btn ' + (a.danger ? 'danger' : 'outlined')} onClick={a.onClick} disabled={a.disabled}>
               {Ic ? <Ic size={16} /> : null} {a.label}
             </button>
           );

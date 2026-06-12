@@ -97,6 +97,22 @@ export async function deleteMediaBatch(fileIds: string[]): Promise<BatchSummary>
   return apiPost<BatchSummary>('/api/cloud/media/delete-batch', { fileIds });
 }
 
+export interface ArchivePayload {
+  entryIds?: string[];
+  fileIds?: string[];
+  directoryId?: string;
+  albumId?: string;
+  name?: string;
+}
+
+/** Собрать выбранное / папку / альбом в ZIP на сервере (архив кладётся в корзину на 3 дня)
+ *  и открыть скачивание. Запрос синхронный — может занять время на больших объёмах. */
+export async function downloadArchive(payload: ArchivePayload): Promise<void> {
+  const d = await apiPost<{ url?: string; fileName?: string }>('/api/cloud/archive', payload);
+  if (!d.url) throw new Error('Ссылка на архив недоступна');
+  window.open(d.url, '_blank');
+}
+
 /** SHA256 файла в hex. Читает файл целиком в память — допустимо при лимите 512 МБ;
  *  Web Crypto не умеет инкрементальный digest. null — если crypto недоступен (http) или ошибка. */
 async function sha256Hex(file: File): Promise<string | null> {

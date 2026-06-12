@@ -4,6 +4,7 @@ using BarkCloud.Files.Features.Cloud.CreateDirectory;
 using BarkCloud.Files.Features.Cloud.DeleteDirectory;
 using BarkCloud.Files.Features.Cloud.DeleteFileEntry;
 using BarkCloud.Files.Features.Cloud.DeleteFileEntries;
+using BarkCloud.Files.Features.Cloud.CreateArchive;
 using BarkCloud.Files.Features.Cloud.DeleteFromTrash;
 using BarkCloud.Files.Features.Cloud.DeleteUserMedia;
 using BarkCloud.Files.Features.Cloud.EmptyTrash;
@@ -209,6 +210,20 @@ public class CloudApiService : CloudApi.CloudApiBase
                 ids.Add(id);
 
         var command = new DeleteFileEntriesCommand { EntryIds = ids };
+
+        return _mediator.Send(command);
+    }
+
+    public override Task<CreateArchiveResponse> CreateArchive(CreateArchiveRequest request, ServerCallContext context)
+    {
+        var command = new CreateArchiveCommand
+        {
+            EntryIds = ParseGuids(request.EntryIds),
+            FileIds = ParseGuids(request.FileIds),
+            DirectoryId = ParseOptionalGuid(request.DirectoryId),
+            AlbumId = ParseOptionalGuid(request.AlbumId),
+            ArchiveName = string.IsNullOrWhiteSpace(request.ArchiveName) ? null : request.ArchiveName,
+        };
 
         return _mediator.Send(command);
     }
@@ -618,5 +633,15 @@ public class CloudApiService : CloudApi.CloudApiBase
     private static Guid? ParseOptionalGuid(string? value)
     {
         return string.IsNullOrWhiteSpace(value) ? null : Guid.Parse(value);
+    }
+
+    /// <summary>Парсит набор строк в Guid, молча отбрасывая невалидные.</summary>
+    private static List<Guid> ParseGuids(IEnumerable<string> values)
+    {
+        var result = new List<Guid>();
+        foreach (var raw in values)
+            if (Guid.TryParse(raw, out var id))
+                result.Add(id);
+        return result;
     }
 }
