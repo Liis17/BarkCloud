@@ -1,7 +1,7 @@
 import React from 'react';
 import { Icon } from '../Icon';
 import { useContextMenu } from '../ui/ContextMenu';
-import { apiGet } from '../../lib/api';
+import { apiGet, proxiedImageUrl } from '../../lib/api';
 import { persistVolumeRef } from '../../lib/volume';
 import { pickDocumentIcon, useDocumentHead } from '../../hooks/useDocumentHead';
 import type { MediaActionsApi } from '../../hooks/useMediaActions';
@@ -165,7 +165,8 @@ export function Lightbox({ items, index = 0, media, onClose, actions }: Lightbox
     if (!actions) return;
     try {
       if (!photoSrc) throw new Error('Изображение ещё не загружено');
-      const blob = await (await fetch(photoSrc)).blob();
+      // Через same-origin прокси — иначе чужой origin Files даёт CORS/tainted-canvas.
+      const blob = await (await fetch(proxiedImageUrl(photoSrc))).blob();
       // Clipboard API принимает только PNG — перегоняем через canvas.
       const bitmap = await createImageBitmap(blob);
       const canvas = document.createElement('canvas');

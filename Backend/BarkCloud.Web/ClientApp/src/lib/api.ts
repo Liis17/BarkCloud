@@ -12,6 +12,11 @@ export class ApiError extends Error {
   }
 }
 
+/** Same-origin прокси байтов картинки (обходит CORS/tainted-canvas для копирования в буфер). */
+export function proxiedImageUrl(url: string): string {
+  return '/api/files/image?url=' + encodeURIComponent(url);
+}
+
 export async function api<T = unknown>(path: string, opts: RequestInit = {}): Promise<T> {
   const res = await fetch(path, {
     credentials: 'same-origin',
