@@ -15,14 +15,11 @@
 
     <ui:FluentWindow.Resources>
         <local:InverseBoolConverter x:Key="InverseBool" />
+        <local:AnyEmptyToBoolConverter x:Key="AnyEmpty" />
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
         <Style x:Key="FieldLabel" TargetType="TextBlock">
             <Setter Property="Margin" Value="0,10,0,2" />
             <Setter Property="FontSize" Value="12" />
-            <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
-        </Style>
-        <Style x:Key="SectionCaption" TargetType="TextBlock">
-            <Setter Property="Margin" Value="0,14,0,2" />
-            <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
         </Style>
     </ui:FluentWindow.Resources>
@@ -52,7 +49,7 @@
                                    TextWrapping="Wrap"
                                    Text="Ядро (configuration, identity, users, files) и web включаются всегда. Остальное — по выбору." />
                         <UniformGrid Columns="2">
-                            <ui:ToggleSwitch Margin="0,4" Content="nginx (reverse-proxy)" IsChecked="{Binding IncludeNginx}" />
+                            <ui:ToggleSwitch x:Name="NginxToggle" Margin="0,4" Content="nginx (reverse-proxy)" IsChecked="{Binding IncludeNginx}" />
                             <ui:ToggleSwitch Margin="0,4" Content="notification (SMTP)" IsChecked="{Binding IncludeNotification}" />
                             <ui:ToggleSwitch x:Name="MinioToggle" Margin="0,4" Content="minio (хранилище)" IsChecked="{Binding IncludeMinio}" />
                             <ui:ToggleSwitch x:Name="RabbitToggle" Margin="0,4" Content="rabbitmq (очередь)" IsChecked="{Binding IncludeRabbitmq}" />
@@ -217,9 +214,25 @@
                     </ui:CardExpander.Header>
                     <StackPanel>
                         <TextBlock Style="{StaticResource FieldLabel}" Text="POSTGRES_USER" />
-                        <ui:TextBox Margin="0,0,0,6" Text="{Binding PostgresUser, UpdateSourceTrigger=PropertyChanged}" />
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <ui:TextBox x:Name="PostgresUserBox" Grid.Column="0" Text="{Binding PostgresUser, UpdateSourceTrigger=PropertyChanged}" />
+                            <ui:Button Grid.Column="1" Margin="8,0,0,0" Content="Случайно" Icon="{ui:SymbolIcon ArrowSync24}"
+                                       Tag="12" CommandParameter="{Binding ElementName=PostgresUserBox}" Click="OnRandom" />
+                        </Grid>
                         <TextBlock Style="{StaticResource FieldLabel}" Text="POSTGRES_PASSWORD" />
-                        <ui:TextBox Margin="0,0,0,6" Text="{Binding PostgresPassword, UpdateSourceTrigger=PropertyChanged}" />
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <ui:TextBox x:Name="PostgresPassBox" Grid.Column="0" Text="{Binding PostgresPassword, UpdateSourceTrigger=PropertyChanged}" />
+                            <ui:Button Grid.Column="1" Margin="8,0,0,0" Content="Случайно" Icon="{ui:SymbolIcon ArrowSync24}"
+                                       Tag="20" CommandParameter="{Binding ElementName=PostgresPassBox}" Click="OnRandom" />
+                        </Grid>
                         <TextBlock Style="{StaticResource FieldLabel}" Text="POSTGRES_DB" />
                         <ui:TextBox Margin="0,0,0,6" Text="{Binding PostgresDb, UpdateSourceTrigger=PropertyChanged}" />
                         <TextBlock Style="{StaticResource FieldLabel}" Text="POSTGRES_PORT (host-маппинг)" />
@@ -228,12 +241,6 @@
                         <ui:TextBox Margin="0,0,0,6" Text="{Binding PostgresDataPath, UpdateSourceTrigger=PropertyChanged}" />
                         <TextBlock Style="{StaticResource FieldLabel}" Text="BACKUP_PATH (пусто — named volume)" />
                         <ui:TextBox Text="{Binding BackupPath, UpdateSourceTrigger=PropertyChanged}" />
-
-                        <TextBlock Style="{StaticResource SectionCaption}" Text="Подключение Configuration к Postgres" />
-                        <TextBlock Style="{StaticResource FieldLabel}" Text="CONFIGURATION_USERNAME" />
-                        <ui:TextBox Margin="0,0,0,6" Text="{Binding ConfigurationUsername, UpdateSourceTrigger=PropertyChanged}" />
-                        <TextBlock Style="{StaticResource FieldLabel}" Text="CONFIGURATION_PASSWORD" />
-                        <ui:TextBox Text="{Binding ConfigurationPassword, UpdateSourceTrigger=PropertyChanged}" />
                     </StackPanel>
                 </ui:CardExpander>
 
@@ -316,6 +323,62 @@
                             <ui:Button Grid.Column="1" Margin="8,0,0,0" Content="Случайно" Icon="{ui:SymbolIcon ArrowSync24}"
                                        Tag="20" CommandParameter="{Binding ElementName=WebAdminBox}" Click="OnRandom" />
                         </Grid>
+                    </StackPanel>
+                </ui:CardExpander>
+
+                <!-- Nginx / HTTPS -->
+                <ui:CardExpander Margin="0,0,0,8" Icon="{ui:SymbolIcon ShieldLock24}"
+                                 Visibility="{Binding IsChecked, ElementName=NginxToggle, Converter={StaticResource BoolToVis}}">
+                    <ui:CardExpander.Header>
+                        <StackPanel>
+                            <TextBlock FontWeight="Medium" Text="Nginx / HTTPS" />
+                            <TextBlock FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       Text="Домен и TLS-сертификаты (порты берутся из «Порты сервисов»)" />
+                        </StackPanel>
+                    </ui:CardExpander.Header>
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="Внешний домен (server_name)" />
+                        <ui:TextBox Text="{Binding NginxDomain, UpdateSourceTrigger=PropertyChanged}" />
+                        <ui:InfoBar Margin="0,8,0,0" Severity="Informational" IsClosable="False" IsOpen="True"
+                                    Title="Домен панели"
+                                    Message="Рекомендуется, чтобы домен совпадал с хостом из WEB_PUBLIC_HOST." />
+
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="Сертификат — crt (barkfluff.com-crt.pem)" />
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <ui:TextBox x:Name="CertCrtBox" Grid.Column="0" IsReadOnly="True"
+                                        PlaceholderText="не выбран"
+                                        Text="{Binding CertCrtPath, UpdateSourceTrigger=PropertyChanged}" />
+                            <ui:Button Grid.Column="1" Margin="8,0,0,0" Content="Выбрать…" Icon="{ui:SymbolIcon FolderOpen24}"
+                                       CommandParameter="{Binding ElementName=CertCrtBox}" Click="OnPickCert" />
+                        </Grid>
+
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="Ключ — key (barkfluff.com-key.pem)" />
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <ui:TextBox x:Name="CertKeyBox" Grid.Column="0" IsReadOnly="True"
+                                        PlaceholderText="не выбран"
+                                        Text="{Binding CertKeyPath, UpdateSourceTrigger=PropertyChanged}" />
+                            <ui:Button Grid.Column="1" Margin="8,0,0,0" Content="Выбрать…" Icon="{ui:SymbolIcon FolderOpen24}"
+                                       CommandParameter="{Binding ElementName=CertKeyBox}" Click="OnPickCert" />
+                        </Grid>
+
+                        <ui:InfoBar Margin="0,10,0,0" Severity="Warning" IsClosable="False"
+                                    Title="Сертификаты не выбраны"
+                                    Message="Нужны для HTTPS. Можно сгенерировать и без них (положить в certs/ позже), но это очень небезопасно.">
+                            <ui:InfoBar.IsOpen>
+                                <MultiBinding Converter="{StaticResource AnyEmpty}">
+                                    <Binding Path="Text" ElementName="CertCrtBox" />
+                                    <Binding Path="Text" ElementName="CertKeyBox" />
+                                </MultiBinding>
+                            </ui:InfoBar.IsOpen>
+                        </ui:InfoBar>
                     </StackPanel>
                 </ui:CardExpander>
 
