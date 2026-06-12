@@ -16,14 +16,12 @@ services:
       - .env
     environment:
       <<: *common-variables
-      CONFIGURATION_HOST: ${CONFIGURATION_HOST}
-      CONFIGURATION_DATABASE: ${CONFIGURATION_DATABASE}
-      CONFIGURATION_USERNAME: ${CONFIGURATION_USERNAME}
-      CONFIGURATION_PASSWORD: ${CONFIGURATION_PASSWORD}
+      CONFIGURATION_HOST:  postgres_barkcloud:${POSTGRES_PORT}
+      CONFIGURATION_DATABASE: configuration
+      CONFIGURATION_USERNAME: ${POSTGRES_USER}
+      CONFIGURATION_PASSWORD: ${POSTGRES_PASSWORD}
       CONFIGURATION_PORT: ${CONFIGURATION_PORT}
-      # Postgres внутри контейнера всегда слушает 5432 — POSTGRES_PORT из .env это host-маппинг
       CONFIGURATION_DBPORT: "5432"
-      # MinIO внутри контейнера всегда слушает 9000 — MINIO_PORT из .env это host-маппинг
       MINIO_HOST: minio
       MINIO_PORT: "9000"
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
@@ -71,7 +69,7 @@ services:
     depends_on:
       - configuration
 
-  # Сервис уведомлений (consumer RabbitMQ → SMTP). Внешнего API нет — в nginx не маршрутизируется. Опционален
+  # Сервис уведомлений. Внешнего API нет — в nginx не маршрутизируется. Опционален
   notification:
     image: docker.barkfluff.com:5000/barkcloud-notification:latest
     container_name: cloud-notification
@@ -83,12 +81,11 @@ services:
     depends_on:
       - configuration
 
-  # Веб-клиент (HTTP, отдаёт страницы браузеру; к микросервисам обращается по docker-сети через gRPC)
+  # Веб-клиент
   web:
     image: docker.barkfluff.com:5000/barkcloud-web:latest
     container_name: cloud-web
     restart: always
-    # root нужен для доступа к docker.sock — веб управляет обновлением бэкенда из страницы настроек.
     user: root
     env_file:
       - .env
@@ -117,11 +114,11 @@ services:
     image: nginx:latest
     container_name: cloud-nginx
     restart: always
-    # Наружу выставлены только эти порты; микросервисы доступны лишь через прокси.
+    # Наружу выставлены только эти порты; микросервисы доступны лишь через прокси
     ports:
-      - "${IDENTITY_PORT}:7020"
-      - "${USERS_PORT}:7021"
-      - "${FILES_PORT}:7025"
+      - "${IDENTITY_PORT}:{IDENTITY_PORT}"
+      - "${USERS_PORT}:{USERS_PORT}"
+      - "${FILES_PORT}:{FILES_PORT}"
     volumes:
       - ./nginx/cloud.barkfluff.conf:/etc/nginx/conf.d/cloud.barkfluff.conf:ro
       - ./certs:/etc/nginx/certs:ro
