@@ -76,7 +76,7 @@ public class CreateAlbumShareCommandHandler : IRequestHandler<CreateAlbumShareCo
             .TrimEnd('=');
     }
 
-    internal static AlbumShareInfo ToGrpc(DomainAlbumShareLink share)
+    internal static AlbumShareInfo ToGrpc(DomainAlbumShareLink share, string? coverPreviewUrl = null)
     {
         return new AlbumShareInfo
         {
@@ -85,7 +85,8 @@ public class CreateAlbumShareCommandHandler : IRequestHandler<CreateAlbumShareCo
             AlbumId = share.AlbumId.ToString(),
             Name = share.Name,
             CreatedAt = Timestamp.FromDateTime(DateTime.SpecifyKind(share.CreatedAt, DateTimeKind.Utc)),
-            ClickCount = share.ClickCount
+            ClickCount = share.ClickCount,
+            CoverPreviewUrl = coverPreviewUrl ?? ""
         };
     }
 }
