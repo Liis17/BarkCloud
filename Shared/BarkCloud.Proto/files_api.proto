@@ -992,6 +992,7 @@ message AlbumShareInfo {
   string name = 4;                          // Имя альбома на момент публикации
   google.protobuf.Timestamp created_at = 5; // Когда опубликован
   int64 click_count = 6;                    // Сколько раз открывали
+  string cover_preview_url = 7;             // URL превью обложки альбома (пусто, если нет)
 }
 
 message CreateAlbumShareRequest {

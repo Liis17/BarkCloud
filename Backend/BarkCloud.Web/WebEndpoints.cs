@@ -249,6 +249,8 @@ public static class WebEndpoints
                     name = resp.Name,
                     mediaKind = resp.MediaKind.ToString().ToLowerInvariant(),
                     previewUrl = resp.PreviewUrl,
+                    // Прямой temp-URL оригинала (для встроенного плеера видео); тот же, что отдаёт редирект /s/{token}.
+                    downloadUrl = resp.DownloadUrl,
                     imageWidth = resp.ImageWidth,
                     imageHeight = resp.ImageHeight,
                     fileSize = resp.FileSize,

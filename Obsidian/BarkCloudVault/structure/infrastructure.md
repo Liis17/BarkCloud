@@ -56,11 +56,11 @@ Parent: [[index]] · See also: [[structure/overview]] · [[structure/entrypoints
 
 ## Volumes
 
-- `pgdata` — данные PostgreSQL
+- `pgdata` — данные PostgreSQL по умолчанию (named volume); переопределяется через `POSTGRES_DATA_PATH` — см. «Переносимый диск с данными БД» ниже
 - `rabbitmq_data` — данные RabbitMQ
 - `minio_data` — данные MinIO по умолчанию (named volume). Источник `/data` переопределяется через `MINIO_DATA_PATH` в `.env`; тот же источник монтируется в `cloud-files` read-only как `/mnt/minio-data` для расчёта физического объёма диска. Вынос на отдельный диск — см. раздел «MinIO на отдельном диске» ниже.
-- `backup_volume` — бэкапы (монтируется в Postgres-контейнер на `/backup`)
-- `seq_data` — данные Seq
+- `backup_volume` — бэкапы Postgres (монтируется в Postgres-контейнер на `/backup`); переопределяется через `BACKUP_PATH`
+- `seq_data` — данные Seq; переопределяется через `SEQ_DATA_PATH`
 
 ## MinIO на отдельном диске (Windows/WSL2)
 
@@ -88,6 +88,72 @@ docker compose -f docker-compose-dev.yml up -d minio
 ```
 
 > ⚠️ Папка на NTFS-диске Windows пробрасывается в контейнер через drvfs/9p — без Unix-прав, xattr и атомарных rename. MinIO официально такие ФС **не поддерживает**: под нагрузкой возможны ошибки и повреждение данных. Это не зависит от того, как написан путь (`/d/...` через Docker Desktop или `/mnt/d/...` изнутри WSL) — под капотом тот же NTFS через drvfs. Надёжный (но более громоздкий) вариант — отдельный **ext4-vhdx**, смонтированный в WSL2 через `wsl --mount`, и `MINIO_DATA_PATH=/mnt/wsl/minio`.
+
+## Переносимый диск с данными БД (ext4-vhdx, Windows/WSL2)
+
+> Зачем: named volumes `pgdata`/`backup_volume` лежат внутри образа диска Docker (WSL2, обычно на C:) — их нельзя просто перенести на другой ПК. Чтобы БД «переезжала» вместе с диском, выноси её на **ext4**-том. Виндовую NTFS-папку (`/d/...` через drvfs) для Postgres использовать **нельзя**: на ней Postgres не стартует (нет Unix-прав, `fsync`, файловых блокировок). Нужен ext4 — в виде vhdx, смонтированного в WSL2.
+
+**Раскладка по сервисам:**
+
+| Сервис | Куда | Почему |
+|---|---|---|
+| Postgres (`POSTGRES_DATA_PATH`) | **отдельный** ext4-vhdx | нужна POSIX-ФС; свой vhdx |
+| Бэкапы (`BACKUP_PATH`) | **отдельный** ext4-vhdx | раздельно с данными — если vhdx с БД повредится, бэкапы на втором уцелеют |
+| MinIO (`MINIO_DATA_PATH`) | отдельными блобами на диске (раздел «MinIO на отдельном диске» выше) | vhdx — один файл; его повреждение = потеря **всех** файлов сразу. Блобы по-файлово изолируют потери |
+| RabbitMQ | остаётся в образе WSL (named volume `rabbitmq_data`) | данные — транзиентные очереди, при переносе не нужны |
+| Seq (`SEQ_DATA_PATH`) | опционально, папкой на диске | логи; интегритет не критичен, vhdx не нужен. По умолчанию — в образе |
+
+Два vhdx именно **раздельные**: цель бэкапов — пережить порчу основного тома, поэтому они не должны делить с ним один файл.
+
+**1. Создать два динамических vhdx** (cmd, diskpart — без Hyper-V):
+```
+diskpart
+  create vdisk file="D:\barkcloud\postgres.vhdx" maximum=256000 type=expandable
+  create vdisk file="D:\barkcloud\backup.vhdx"   maximum=256000 type=expandable
+  exit
+```
+`maximum` в МБ, `expandable` = растёт по мере заполнения.
+
+**2. Отформатировать ext4 и смонтировать каждый с именем** (⚠️ `lsblk` → не перепутай устройство, `mkfs` затирает данные):
+```
+# postgres.vhdx → /mnt/wsl/pg
+wsl --mount --vhd "D:\barkcloud\postgres.vhdx" --bare
+lsblk                                   # найти новое устройство, напр. /dev/sdX
+sudo mkfs.ext4 /dev/sdX
+wsl --unmount "D:\barkcloud\postgres.vhdx"
+wsl --mount --vhd "D:\barkcloud\postgres.vhdx" --name pg
+
+# backup.vhdx → /mnt/wsl/backup
+wsl --mount --vhd "D:\barkcloud\backup.vhdx" --bare
+lsblk                                   # теперь новое устройство, напр. /dev/sdY
+sudo mkfs.ext4 /dev/sdY
+wsl --unmount "D:\barkcloud\backup.vhdx"
+wsl --mount --vhd "D:\barkcloud\backup.vhdx" --name backup
+```
+
+**3. Прописать пути в `Backend/.env`:**
+```
+POSTGRES_DATA_PATH=/mnt/wsl/pg
+BACKUP_PATH=/mnt/wsl/backup
+# MinIO — отдельными блобами на диске (не в vhdx), см. раздел MinIO:
+MINIO_DATA_PATH=/d/barkcloud/minio
+```
+
+**4. (Если уже есть данные в named volumes)** перенеси каждый том на свой vhdx:
+```
+docker compose -f docker-compose-dev.yml down
+docker run --rm -v backend_pgdata:/from        -v /mnt/wsl/pg:/to     alpine sh -c "cp -a /from/. /to/"
+docker run --rm -v backend_backup_volume:/from -v /mnt/wsl/backup:/to alpine sh -c "cp -a /from/. /to/"
+```
+
+**5. Поднять стек:**
+```
+docker compose -f docker-compose-dev.yml up -d
+```
+
+**Перенос на другой ПК:** скопируй `postgres.vhdx` и `backup.vhdx` (+ папку MinIO-блобов с диска) на второй ПК → `wsl --mount --vhd "...\postgres.vhdx" --name pg` и `--name backup` → те же пути в `.env` → `up -d`. Данные подхватятся.
+
+> ⚠️ Персистентность: `wsl --mount` не переживает reboot/`wsl --shutdown` и должен выполняться **до** старта контейнеров (иначе Postgres создаст пустые данные на C:). Автоматизируй монтирование обоих vhdx перед запуском Docker (Task Scheduler «при входе» → `.bat` с `wsl --mount` + запуск Docker Desktop).
 
 ## Запуск dev-окружения
 
