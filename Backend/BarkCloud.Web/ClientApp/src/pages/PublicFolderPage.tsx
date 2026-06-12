@@ -2,6 +2,7 @@ import React from 'react';
 import { useParams } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import { PublicShareHeader, PublicShareShell, PublicStatus } from '../components/public/PublicShareShell';
+import { PublicViewerActions } from '../components/public/PublicViewerActions';
 import { useDocumentHead } from '../hooks/useDocumentHead';
 import { persistVolumeRef } from '../lib/volume';
 
@@ -185,14 +186,13 @@ export function PublicFolderPage() {
             ) : (
               <img src={viewer.downloadUrl} alt={viewer.name} />
             )}
-            <div className="public-viewer-actions">
-              <a className="btn primary" href={viewer.downloadUrl} style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-                <Icon.download size={16} /> Скачать
-              </a>
-              <button className="btn outlined" onClick={() => setViewer(null)}>
-                Закрыть
-              </button>
-            </div>
+            <PublicViewerActions
+              name={viewer.name}
+              downloadHref={viewer.downloadUrl}
+              mediaKind={viewer.mediaKind}
+              imageSrc={viewer.downloadUrl}
+              onClose={() => setViewer(null)}
+            />
           </div>
         </div>
       )}

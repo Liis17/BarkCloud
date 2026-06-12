@@ -2,6 +2,7 @@ import React from 'react';
 import { useParams } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import { PublicShareHeader, PublicShareShell, PublicStatus } from '../components/public/PublicShareShell';
+import { PublicViewerActions } from '../components/public/PublicViewerActions';
 import { useDocumentHead } from '../hooks/useDocumentHead';
 import { persistVolumeRef } from '../lib/volume';
 
@@ -101,6 +102,12 @@ export function PublicViewPage() {
             <Icon.file size={56} />
           )}
         </div>
+        <PublicViewerActions
+          name={info.name}
+          downloadHref={info.downloadPath || `/s/${token}`}
+          mediaKind={info.mediaKind}
+          imageSrc={info.downloadUrl || info.previewUrl}
+        />
         <div className="public-file-summary">
           <div>
             <h2>{info.name}</h2>

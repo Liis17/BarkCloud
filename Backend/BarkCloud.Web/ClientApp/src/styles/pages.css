@@ -737,6 +737,14 @@ tr.selected .row-actions { opacity: 1; }
   gap: 10px;
   margin-top: 12px;
 }
+/* Обрезанная панель действий публичных вьюверов: облик .lb-actions, но в потоке (центрирована). */
+.public-actions {
+  position: static;
+  transform: none;
+  width: fit-content;
+  margin: 14px auto 0;
+}
+.public-actions-flash { margin-left: 4px; padding-right: 6px; color: #fff; font-size: 13px; white-space: nowrap; }
 
 @media (max-width: 720px) {
   .public-topbar { padding-inline: 16px; }
