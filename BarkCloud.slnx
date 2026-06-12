@@ -38,4 +38,5 @@
   <Project Path="Drive/BarkCloud.Drive.App/BarkCloud.Drive.App.csproj" />
   <Project Path="Drive/BarkCloud.Drive.Contracts/BarkCloud.Drive.Contracts.csproj" />
   <Project Path="Drive/BarkCloud.Drive.Engine/BarkCloud.Drive.Engine.csproj" />
+  <Project Path="Tools/BarkCloud.Builder/BarkCloud.Builder.csproj" Id="ae01e0c9-7432-4671-bef6-35732df4d19a" />
 </Solution>
