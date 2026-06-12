@@ -39,7 +39,7 @@ services:
       - .env
     environment:
       <<: *common-variables
-      CONFIGURATION_HOST:  postgres_barkcloud:${POSTGRES_PORT}
+      CONFIGURATION_HOST:  postgres_barkcloud:5432
       CONFIGURATION_DATABASE: configuration
       CONFIGURATION_USERNAME: ${POSTGRES_USER}
       CONFIGURATION_PASSWORD: ${POSTGRES_PASSWORD}
@@ -51,6 +51,15 @@ services:
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
+      # SMTP для подтверждений по email (опционально; пусто — режим без почты)
+      EMAIL_HOST: ${EMAIL_HOST}
+      EMAIL_PORT: ${EMAIL_PORT}
+      EMAIL_SENDER_EMAIL: ${EMAIL_SENDER_EMAIL}
+      EMAIL_SENDER_PASSWORD: ${EMAIL_SENDER_PASSWORD}
+      # Внешние адреса сервисов для клиентов (обязательны)
+      EXTERNAL_IDENTITY_HOST: ${EXTERNAL_IDENTITY_HOST}
+      EXTERNAL_USERS_HOST: ${EXTERNAL_USERS_HOST}
+      EXTERNAL_FILES_HOST: ${EXTERNAL_FILES_HOST}
     networks:
       - barkcloud-network
 
@@ -370,6 +379,17 @@ volumes:
         K("WEB_COOKIE_SECURE", m.WebCookieSecure ? "true" : "false");
         K("WEB_PUBLIC_HOST", m.WebPublicHost);
         K("WEB_ADMIN_PASSWORD", m.WebAdminPassword);
+
+        Section("Внешние адреса сервисов для клиентов (обязательны)");
+        K("EXTERNAL_IDENTITY_HOST", m.ExternalIdentityHost);
+        K("EXTERNAL_USERS_HOST", m.ExternalUsersHost);
+        K("EXTERNAL_FILES_HOST", m.ExternalFilesHost);
+
+        Section("Почта SMTP (опционально; заполните все 4 поля, чтобы включить подтверждение по email)");
+        K("EMAIL_HOST", m.EmailHost);
+        K("EMAIL_PORT", m.EmailPort);
+        K("EMAIL_SENDER_EMAIL", m.EmailSenderEmail);
+        K("EMAIL_SENDER_PASSWORD", m.EmailSenderPassword);
 
         return sb.ToString();
     }

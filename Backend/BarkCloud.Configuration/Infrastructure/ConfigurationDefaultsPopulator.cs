@@ -30,6 +30,14 @@ public class ConfigurationDefaultsPopulator
     private readonly string _minioPort;
     private readonly string _minioAccessKey;
     private readonly string _minioSecretKey;
+    private readonly string _emailHost;
+    private readonly string _emailPort;
+    private readonly string _emailSenderEmail;
+    private readonly string _emailSenderPassword;
+    private readonly string _externalIdentityHost;
+    private readonly string _externalUsersHost;
+    private readonly string _externalFilesHost;
+    private readonly bool _requireExternalEndpoints;
 
     /// <summary>
     /// Маппинг ServiceId → имя контейнера в Docker
@@ -100,6 +108,14 @@ public class ConfigurationDefaultsPopulator
         string minioPort,
         string minioAccessKey,
         string minioSecretKey,
+        string emailHost,
+        string emailPort,
+        string emailSenderEmail,
+        string emailSenderPassword,
+        string externalIdentityHost,
+        string externalUsersHost,
+        string externalFilesHost,
+        bool requireExternalEndpoints,
         MetricsCollector? metrics = null)
     {
         _context = context;
@@ -114,6 +130,14 @@ public class ConfigurationDefaultsPopulator
         _minioPort = minioPort;
         _minioAccessKey = minioAccessKey;
         _minioSecretKey = minioSecretKey;
+        _emailHost = emailHost;
+        _emailPort = emailPort;
+        _emailSenderEmail = emailSenderEmail;
+        _emailSenderPassword = emailSenderPassword;
+        _externalIdentityHost = externalIdentityHost;
+        _externalUsersHost = externalUsersHost;
+        _externalFilesHost = externalFilesHost;
+        _requireExternalEndpoints = requireExternalEndpoints;
     }
 
     /// <summary>
@@ -307,9 +331,45 @@ public class ConfigurationDefaultsPopulator
             }
         }
 
-        // --- ExternalEndpoint:Host (внешние субдомены) ---
+        // --- Email (SMTP для Notification) ---
+        // Значения приходят из env (.env). Поля опциональны: если env пуст — оставляем
+        // запись пустой (режим без почты). Заполняем только непустыми значениями.
+        if (config.Section == "Email" && serviceId == ServiceId.Notification)
+        {
+            var value = config.Key switch
+            {
+                "Host" => _emailHost,
+                "Port" => _emailPort,
+                "SenderEmail" => _emailSenderEmail,
+                "SenderPassword" => _emailSenderPassword,
+                _ => null
+            };
+            return string.IsNullOrEmpty(value) ? null : value;
+        }
+
+        // --- ExternalEndpoint:Host (внешние адреса для клиентов) ---
+        // Берётся из env (.env). Адреса обязательны: вне Development пустое значение —
+        // ошибка старта (чтобы клиенты не получили нерабочий адрес из БД).
         if (config.Section == "ExternalEndpoint" && config.Key == "Host")
         {
+            var host = serviceId switch
+            {
+                ServiceId.Identity => _externalIdentityHost,
+                ServiceId.Users => _externalUsersHost,
+                ServiceId.Files => _externalFilesHost,
+                _ => null
+            };
+
+            if (!string.IsNullOrWhiteSpace(host))
+                return host;
+
+            if (_requireExternalEndpoints && SubdomainNames.ContainsKey(serviceId))
+                throw new InvalidOperationException(
+                    $"ExternalEndpoint:Host для сервиса {serviceId} обязателен, но env-переменная "
+                    + $"EXTERNAL_{serviceId.ToString().ToUpperInvariant()}_HOST не задана. "
+                    + "Укажите её в .env (например, https://example.com).");
+
+            // Development: допускаем плейсхолдер, чтобы локальный запуск не падал.
             if (SubdomainNames.TryGetValue(serviceId, out var subdomain))
                 return $"https://{subdomain}.example.com";
         }

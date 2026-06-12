@@ -326,6 +326,55 @@
                     </StackPanel>
                 </ui:CardExpander>
 
+                <!-- Внешние адреса сервисов -->
+                <ui:CardExpander Margin="0,0,0,8" Icon="{ui:SymbolIcon Link24}" IsExpanded="True">
+                    <ui:CardExpander.Header>
+                        <StackPanel>
+                            <TextBlock FontWeight="Medium" Text="Внешние адреса сервисов" />
+                            <TextBlock FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       Text="Публичные адреса для клиентов (записываются в БД Configuration на чистом старте)" />
+                        </StackPanel>
+                    </ui:CardExpander.Header>
+                    <StackPanel>
+                        <ui:InfoBar Margin="0,0,0,4" Severity="Informational" IsClosable="False" IsOpen="True"
+                                    Title="Обязательны"
+                                    Message="По умолчанию — домен + порт сервиса (как маршрутизирует nginx). Если оставить пусто, Configuration вне Development упадёт при старте." />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="EXTERNAL_IDENTITY_HOST" />
+                        <ui:TextBox Margin="0,0,0,6" Text="{Binding ExternalIdentityHost, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="EXTERNAL_USERS_HOST" />
+                        <ui:TextBox Margin="0,0,0,6" Text="{Binding ExternalUsersHost, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="EXTERNAL_FILES_HOST" />
+                        <ui:TextBox Text="{Binding ExternalFilesHost, UpdateSourceTrigger=PropertyChanged}" />
+                    </StackPanel>
+                </ui:CardExpander>
+
+                <!-- Почта (SMTP) -->
+                <ui:CardExpander Margin="0,0,0,8" Icon="{ui:SymbolIcon Mail24}">
+                    <ui:CardExpander.Header>
+                        <StackPanel>
+                            <TextBlock FontWeight="Medium" Text="Почта (SMTP)" />
+                            <TextBlock FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       Text="Подтверждение по email — опционально" />
+                        </StackPanel>
+                    </ui:CardExpander.Header>
+                    <StackPanel>
+                        <ui:InfoBar Margin="0,0,0,4" Severity="Informational" IsClosable="False" IsOpen="True"
+                                    Title="Опционально"
+                                    Message="Заполните все 4 поля, чтобы включить подтверждение по email. Если оставить пусто — работа без почты." />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="EMAIL_HOST" />
+                        <ui:TextBox Margin="0,0,0,6" PlaceholderText="smtp.example.com"
+                                    Text="{Binding EmailHost, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="EMAIL_PORT" />
+                        <ui:TextBox Margin="0,0,0,6" PlaceholderText="587"
+                                    Text="{Binding EmailPort, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="EMAIL_SENDER_EMAIL" />
+                        <ui:TextBox Margin="0,0,0,6" PlaceholderText="noreply@example.com"
+                                    Text="{Binding EmailSenderEmail, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="EMAIL_SENDER_PASSWORD" />
+                        <ui:TextBox Text="{Binding EmailSenderPassword, UpdateSourceTrigger=PropertyChanged}" />
+                    </StackPanel>
+                </ui:CardExpander>
+
                 <!-- Nginx / HTTPS -->
                 <ui:CardExpander Margin="0,0,0,8" Icon="{ui:SymbolIcon ShieldLock24}"
                                  Visibility="{Binding IsChecked, ElementName=NginxToggle, Converter={StaticResource BoolToVis}}">
