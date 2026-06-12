@@ -61,10 +61,14 @@ builder.Services.AddGrpcClient<DynamicFolderApi.DynamicFolderApiClient>(o => o.A
 // HttpClient для прокси-загрузки байтов в Files (на внутренний HTTP1-эндпоинт).
 builder.Services.AddHttpClient("files-upload");
 
-// Загрузка файлов до 512 МБ: снимаем дефолтные лимиты тела запроса и multipart-формы.
-const long maxUpload = 536_870_912; // 512 МБ
-builder.WebHost.ConfigureKestrel(o => o.Limits.MaxRequestBodySize = maxUpload);
-builder.Services.Configure<FormOptions>(o => o.MultipartBodyLengthLimit = maxUpload);
+// Загрузка файлов без лимита размера: снимаем лимиты тела запроса, multipart-формы и
+// минимальной скорости (иначе большой файл на медленном канале оборвётся до таймаута).
+builder.WebHost.ConfigureKestrel(o =>
+{
+    o.Limits.MaxRequestBodySize = null;
+    o.Limits.MinRequestBodyDataRate = null;
+});
+builder.Services.Configure<FormOptions>(o => o.MultipartBodyLengthLimit = long.MaxValue);
 
 // Серверные (inter-service) API. Авторизуются сервисным токеном, который Web
 // подписывает общим JWT-секретом (как Configuration): проверка занятости юзернейма/почты
