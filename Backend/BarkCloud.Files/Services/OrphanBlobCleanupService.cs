@@ -67,7 +67,7 @@ public class OrphanBlobCleanupService : BackgroundService
         {
             using var scope = _scopeFactory.CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<FilesContext>();
-            var purge = scope.ServiceProvider.GetRequiredService<TrashPurgeService>();
+            var purge = scope.ServiceProvider.GetRequiredService<ITrashPurgeService>();
 
             var batch = await context.UploadedFiles
                 .AsNoTracking()
