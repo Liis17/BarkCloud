@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import { PublicShareHeader, PublicShareShell, PublicStatus } from '../components/public/PublicShareShell';
 import { useDocumentHead } from '../hooks/useDocumentHead';
+import { persistVolumeRef } from '../lib/volume';
 
 interface PubFile {
   fileId: string;
@@ -171,7 +172,7 @@ export function PublicAlbumPage() {
         >
           <div onClick={(e) => e.stopPropagation()} className="public-viewer-body">
             {viewer.mediaKind === 'video' ? (
-              <video src={viewer.downloadUrl} controls autoPlay />
+              <video ref={persistVolumeRef} src={viewer.downloadUrl} controls autoPlay />
             ) : (
               <img src={viewer.downloadUrl} alt={viewer.name} />
             )}
