@@ -27,21 +27,23 @@ export function PublicShareShell({ children, centered }: PublicShareShellProps) 
 
 export interface PublicShareHeaderProps {
   icon: IconFn;
-  label: string;
+  label?: string;
+  /** Превью обложки в иконке hero (если задано — вместо иконки). */
+  coverUrl?: string;
   title: string;
   subtitle?: string;
   meta?: string;
   children?: React.ReactNode;
 }
 
-export function PublicShareHeader({ icon: HeaderIcon, label, title, subtitle, meta, children }: PublicShareHeaderProps) {
+export function PublicShareHeader({ icon: HeaderIcon, label, coverUrl, title, subtitle, meta, children }: PublicShareHeaderProps) {
   return (
     <section className="public-hero">
       <div className="public-hero-icon">
-        <HeaderIcon size={28} />
+        {coverUrl ? <img src={coverUrl} alt="" /> : <HeaderIcon size={28} />}
       </div>
       <div className="public-hero-copy">
-        <div className="public-label">{label}</div>
+        {label && <div className="public-label">{label}</div>}
         <h1>{title}</h1>
         {subtitle && <p>{subtitle}</p>}
         {meta && <div className="public-meta">{meta}</div>}

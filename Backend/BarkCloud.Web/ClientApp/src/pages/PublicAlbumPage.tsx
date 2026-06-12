@@ -119,9 +119,9 @@ export function PublicAlbumPage() {
     <PublicShareShell>
       <PublicShareHeader
         icon={Icon.photo}
-        label="Публичный альбом BarkCloud"
+        coverUrl={firstPreview || undefined}
         title={album?.name || 'Публичный альбом'}
-        subtitle={album?.description || 'Медиа открываются прямо по ссылке, без входа в аккаунт.'}
+        subtitle={album?.description || undefined}
         meta={`${items.length} ${items.length === 1 ? 'элемент' : 'элементов'}`}
       />
 
