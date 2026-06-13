@@ -4,7 +4,15 @@ import { Loading } from '../components/ui/EmptyState';
 import { usePageHeader } from '../hooks/usePageHeader';
 import { plural } from '../lib/format';
 import { applyTheme, getTheme, type Theme } from '../lib/theme';
+import { webauthnRegister, webauthnSupported } from '../lib/webauthn';
 import type { Privacy, Session, SettingsState } from '../lib/types';
+
+interface WebAuthnKey {
+  id: string;
+  name: string;
+  createdAt: string | null;
+  lastUsedAt: string | null;
+}
 
 // ─── HTTP к /api/settings/* (отдельный от lib/api: возвращает {ok,status,data}, не бросает) ───
 interface ApiResp<T = unknown> {
@@ -742,6 +750,52 @@ function SecurityTab({ security, flash }: { security: SettingsState['security'];
     } else flash('err', errMsg(res));
   }
 
+  const [keys, setKeys] = React.useState<WebAuthnKey[]>([]);
+  const [keyBusy, setKeyBusy] = React.useState(false);
+  const canWebAuthn = webauthnSupported();
+
+  async function loadKeys() {
+    const res = await sGet<{ keys: WebAuthnKey[] }>('/api/settings/security/webauthn');
+    if (res.ok && res.data) setKeys(res.data.keys);
+  }
+  React.useEffect(() => {
+    loadKeys();
+  }, []);
+
+  async function addKey() {
+    setKeyBusy(true);
+    try {
+      const begin = await sPost<{ optionsJson: string; challengeId: string }>('/api/settings/security/webauthn/register/begin');
+      if (!begin.ok || !begin.data) {
+        flash('err', errMsg(begin));
+        return;
+      }
+      const attestationJson = await webauthnRegister(begin.data.optionsJson);
+      const name = (window.prompt('Название ключа', 'Ключ безопасности') || 'Ключ безопасности').trim();
+      const complete = await sPost('/api/settings/security/webauthn/register/complete', {
+        challengeId: begin.data.challengeId,
+        attestation: JSON.parse(attestationJson),
+        name,
+      });
+      if (complete.ok) {
+        flash('ok', 'Ключ привязан');
+        loadKeys();
+      } else flash('err', errMsg(complete));
+    } catch (e) {
+      flash('err', e instanceof Error && e.name === 'NotAllowedError' ? 'Отменено' : 'Не удалось привязать ключ');
+    } finally {
+      setKeyBusy(false);
+    }
+  }
+
+  async function removeKey(id: string) {
+    const res = await sPost('/api/settings/security/webauthn/remove', { credentialId: id });
+    if (res.ok) {
+      flash('ok', 'Ключ удалён');
+      loadKeys();
+    } else flash('err', errMsg(res));
+  }
+
   return (
     <>
       <div className="set-card">
@@ -773,6 +827,35 @@ function SecurityTab({ security, flash }: { security: SettingsState['security'];
                 </button>
               </div>
             </div>
+          )}
+        </div>
+      </div>
+
+      <div className="set-card">
+        <div className="set-card-head">
+          <h3>Ключи безопасности</h3>
+          <div className="sub">Вход по аппаратному ключу (FIDO2/WebAuthn) без пароля</div>
+        </div>
+        <div className="set-card-body">
+          {keys.length === 0 && <div className="sub">Нет привязанных ключей</div>}
+          {keys.map((k) => (
+            <Field
+              key={k.id}
+              label={k.name}
+              help={k.lastUsedAt ? 'использован ' + new Date(k.lastUsedAt).toLocaleDateString() : 'не использовался'}
+              end={
+                <button className="btn text" onClick={() => removeKey(k.id)} disabled={keyBusy}>
+                  Удалить
+                </button>
+              }
+            />
+          ))}
+          {canWebAuthn ? (
+            <button className="btn" onClick={addKey} disabled={keyBusy} style={{ marginTop: 8 }}>
+              {keyBusy ? <span className="spin" /> : <Icon.key size={16} />} Добавить ключ
+            </button>
+          ) : (
+            <div className="sub">Браузер не поддерживает ключи безопасности</div>
           )}
         </div>
       </div>
