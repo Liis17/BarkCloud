@@ -267,6 +267,20 @@ public class ConfigurationDefaultsPopulator
         return existing?.Value ?? defaultValue;
     }
 
+    // Извлекает доменное имя (хост без схемы и порта) из URL вида https://example.com:7020.
+    private static string? ExtractHost(string? url)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+            return null;
+
+        if (Uri.TryCreate(url, UriKind.Absolute, out var uri))
+            return uri.Host;
+
+        // Без схемы: host[:port][/...]
+        var host = url.Split('/')[0].Split(':')[0].Trim();
+        return string.IsNullOrWhiteSpace(host) ? null : host;
+    }
+
     private string? ResolveDefault(ConfigurationItem config, string jwtSecret, string jwtIssuer, string jwtAudience)
     {
         // Пропускаем уже заполненные (могли быть заполнены в GetOrGenerate)
@@ -372,6 +386,22 @@ public class ConfigurationDefaultsPopulator
             // Development: допускаем плейсхолдер, чтобы локальный запуск не падал.
             if (SubdomainNames.TryGetValue(serviceId, out var subdomain))
                 return $"https://{subdomain}.example.com";
+        }
+
+        // --- WebAuthn (Identity): RP ID и origin выводим из публичного хоста Identity ---
+        // RP ID — это домен, на котором браузер/клиент открывают сервис; берём хост из
+        // ExternalEndpoint Identity (EXTERNAL_IDENTITY_HOST). Если он не задан (Development),
+        // оставляем пусто — Identity использует свой fallback (localhost).
+        if (config.Section == "WebAuthn" && serviceId == ServiceId.Identity)
+        {
+            var rpId = ExtractHost(_externalIdentityHost);
+            return config.Key switch
+            {
+                "RpId" => rpId,
+                "ServerName" => "BarkCloud",
+                "Origins" => string.IsNullOrEmpty(rpId) ? null : $"https://{rpId}",
+                _ => null
+            };
         }
 
         // --- UsersService (inter-service) ---

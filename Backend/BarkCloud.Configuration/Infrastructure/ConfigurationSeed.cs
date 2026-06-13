@@ -50,11 +50,14 @@ internal static class ConfigurationSeed
             item("ReservedNames", "Usernames", ServiceId.Unknown),
 
             // ─── Identity ───────────────────────────────────────────────────
-            item("RunSettings",       "Port",  ServiceId.Identity),
-            item("IdentityDb",        "",      ServiceId.Identity),
-            item("UsersService",      "Host",  ServiceId.Identity),
-            item("UsersService",      "Token", ServiceId.Identity),
-            item("ExternalEndpoint",  "Host",  ServiceId.Identity),
+            item("RunSettings",       "Port",       ServiceId.Identity),
+            item("IdentityDb",        "",           ServiceId.Identity),
+            item("UsersService",      "Host",       ServiceId.Identity),
+            item("UsersService",      "Token",      ServiceId.Identity),
+            item("ExternalEndpoint",  "Host",       ServiceId.Identity),
+            item("WebAuthn",          "RpId",       ServiceId.Identity),
+            item("WebAuthn",          "ServerName", ServiceId.Identity),
+            item("WebAuthn",          "Origins",    ServiceId.Identity),
 
             // ─── Notification (consumer email-уведомлений; SMTP-настройки — секреты, заполняются вручную) ─
             item("RunSettings", "Port",           ServiceId.Notification),
