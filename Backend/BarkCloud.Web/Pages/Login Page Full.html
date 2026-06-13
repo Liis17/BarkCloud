@@ -508,11 +508,68 @@ function OtpRow() {
   );
 }
 
+function bcB64urlToBuf(b64url) {
+  const pad = b64url.length % 4 === 0 ? '' : '='.repeat(4 - (b64url.length % 4));
+  const b64 = b64url.replace(/-/g, '+').replace(/_/g, '/') + pad;
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes.buffer;
+}
+function bcBufToB64url(buf) {
+  const bytes = new Uint8Array(buf);
+  let bin = '';
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+const WEBAUTHN_SUPPORTED = typeof window !== 'undefined' && !!window.PublicKeyCredential;
+
 function LoginCard({ state, showSSO }) {
   const [showPw, setShowPw] = React.useState(false);
   const [email, setEmail] = React.useState(state === 'error' ? '{{ form.email }}' : '');
   const [pw, setPw] = React.useState(state === 'error' ? '{{ form.password_masked }}' : '');
   const [shake] = React.useState(false);
+  const [keyBusy, setKeyBusy] = React.useState(false);
+
+  async function loginWithKey() {
+    const login = email.trim();
+    if (!login || keyBusy) return;
+    setKeyBusy(true);
+    try {
+      const b = await fetch('/login/webauthn/begin', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin',
+        body: JSON.stringify({ login })
+      });
+      if (!b.ok) { setKeyBusy(false); alert('Вход по ключу недоступен для этого аккаунта'); return; }
+      const data = await b.json();
+      const o = JSON.parse(data.optionsJson);
+      const pk = Object.assign({}, o, {
+        challenge: bcB64urlToBuf(o.challenge),
+        allowCredentials: (o.allowCredentials || []).map(c => Object.assign({}, c, { id: bcB64urlToBuf(c.id) }))
+      });
+      const cred = await navigator.credentials.get({ publicKey: pk });
+      const r = cred.response;
+      const assertion = {
+        id: cred.id, rawId: bcBufToB64url(cred.rawId), type: cred.type,
+        extensions: cred.getClientExtensionResults(),
+        response: {
+          authenticatorData: bcBufToB64url(r.authenticatorData),
+          clientDataJSON: bcBufToB64url(r.clientDataJSON),
+          signature: bcBufToB64url(r.signature),
+          userHandle: r.userHandle ? bcBufToB64url(r.userHandle) : null
+        }
+      };
+      const c = await fetch('/login/webauthn/complete', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin',
+        body: JSON.stringify({ challengeId: data.challengeId, assertion, remember: true })
+      });
+      if (c.ok) { window.location.href = '/photos'; }
+      else { setKeyBusy(false); alert('Не удалось войти по ключу'); }
+    } catch (e) {
+      setKeyBusy(false);
+      if (!(e && e.name === 'NotAllowedError')) alert('Не удалось войти по ключу');
+    }
+  }
 
   if (state === '2fa') {
     return (
@@ -602,6 +659,12 @@ function LoginCard({ state, showSSO }) {
           Войти <ArrowIcon/>
         </button>
       </form>
+
+      {WEBAUTHN_SUPPORTED && (
+        <button type="button" className="sso-btn" style={{width:'100%', marginTop:10}} onClick={loginWithKey} disabled={keyBusy}>
+          <KeyIcon/> {keyBusy ? 'Подождите…' : 'Войти ключом безопасности'}
+        </button>
+      )}
 
       {showSSO && (
         <>
