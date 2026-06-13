@@ -49,6 +49,10 @@ public sealed class BuilderModel
     public string FilesPort { get; set; } = "7025";
     public string FilesHttp1Port { get; set; } = "7026";
 
+    // Files: внешняя папка для временных ZIP-архивов (скачивание папок/альбомов).
+    // Пусто — named volume archive_temp (создаётся от root → files под uid 1654 не запишет).
+    public string ArchiveTempPath { get; set; } = "";
+
     // Seq
     public string SeqAdminPassword { get; set; } = "password";
     public string SeqWebPort { get; set; } = "8881";

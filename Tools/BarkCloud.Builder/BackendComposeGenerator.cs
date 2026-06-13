@@ -28,6 +28,16 @@ public static class BackendComposeGenerator
             return b.ToString();
         }
 
+        // SMTP-переменные в configuration имеют смысл только с notification (он шлёт письма).
+        // Без notification — не выводим блок, чтобы не тащить пустые EMAIL_* в configuration.
+        string emailEnv = m.IncludeNotification
+            ? "\n      # SMTP для подтверждений по email (опционально; пусто — режим без почты)"
+              + "\n      EMAIL_HOST: ${EMAIL_HOST}"
+              + "\n      EMAIL_PORT: ${EMAIL_PORT}"
+              + "\n      EMAIL_SENDER_EMAIL: ${EMAIL_SENDER_EMAIL}"
+              + "\n      EMAIL_SENDER_PASSWORD: ${EMAIL_SENDER_PASSWORD}"
+            : "";
+
         // Каждый блок-секция не содержит завершающего перевода строки; секции склеиваются
         // через пустую строку, что даёт ровно один разделитель между сервисами.
         var sections = new List<string>
@@ -63,12 +73,7 @@ services:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
-      # SMTP для подтверждений по email (опционально; пусто — режим без почты)
-      EMAIL_HOST: ${EMAIL_HOST}
-      EMAIL_PORT: ${EMAIL_PORT}
-      EMAIL_SENDER_EMAIL: ${EMAIL_SENDER_EMAIL}
-      EMAIL_SENDER_PASSWORD: ${EMAIL_SENDER_PASSWORD}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}{{emailEnv}}
       # Внешние адреса сервисов для клиентов (обязательны)
       EXTERNAL_IDENTITY_HOST: ${EXTERNAL_IDENTITY_HOST}
       EXTERNAL_USERS_HOST: ${EXTERNAL_USERS_HOST}
@@ -378,6 +383,9 @@ volumes:
         K("FILES_PORT", m.FilesPort);
         K("FILES_HTTP1PORT", m.FilesHttp1Port);
 
+        Section("Files — внешняя папка для временных ZIP-архивов (пусто — named volume archive_temp)");
+        K("ARCHIVE_TEMP_PATH", m.ArchiveTempPath);
+
         if (m.IncludeSeq)
         {
             Section("Seq (агрегатор логов)");
@@ -397,11 +405,14 @@ volumes:
         K("EXTERNAL_USERS_HOST", m.ExternalUsersHost);
         K("EXTERNAL_FILES_HOST", m.ExternalFilesHost);
 
-        Section("Почта SMTP (опционально; заполните все 4 поля, чтобы включить подтверждение по email)");
-        K("EMAIL_HOST", m.EmailHost);
-        K("EMAIL_PORT", m.EmailPort);
-        K("EMAIL_SENDER_EMAIL", m.EmailSenderEmail);
-        K("EMAIL_SENDER_PASSWORD", m.EmailSenderPassword);
+        if (m.IncludeNotification)
+        {
+            Section("Почта SMTP (опционально; заполните все 4 поля, чтобы включить подтверждение по email)");
+            K("EMAIL_HOST", m.EmailHost);
+            K("EMAIL_PORT", m.EmailPort);
+            K("EMAIL_SENDER_EMAIL", m.EmailSenderEmail);
+            K("EMAIL_SENDER_PASSWORD", m.EmailSenderPassword);
+        }
 
         return sb.ToString();
     }

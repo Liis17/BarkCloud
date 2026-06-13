@@ -50,7 +50,7 @@
                                    Text="Ядро (configuration, identity, users, files) и web включаются всегда. Остальное — по выбору." />
                         <UniformGrid Columns="2">
                             <ui:ToggleSwitch x:Name="NginxToggle" Margin="0,4" Content="nginx (reverse-proxy)" IsChecked="{Binding IncludeNginx}" />
-                            <ui:ToggleSwitch Margin="0,4" Content="notification (SMTP)" IsChecked="{Binding IncludeNotification}" />
+                            <ui:ToggleSwitch x:Name="NotificationToggle" Margin="0,4" Content="notification (SMTP)" IsChecked="{Binding IncludeNotification}" />
                             <ui:ToggleSwitch x:Name="MinioToggle" Margin="0,4" Content="minio (хранилище)" IsChecked="{Binding IncludeMinio}" />
                             <ui:ToggleSwitch x:Name="RabbitToggle" Margin="0,4" Content="rabbitmq (очередь)" IsChecked="{Binding IncludeRabbitmq}" />
                             <ui:ToggleSwitch x:Name="PostgresToggle" Margin="0,4" Content="postgres (БД)" IsChecked="{Binding IncludePostgres}" />
@@ -58,21 +58,25 @@
                         </UniformGrid>
 
                         <ui:InfoBar Margin="0,10,0,0" Severity="Warning" IsClosable="False"
+                                    IsOpen="{Binding IsChecked, ElementName=NginxToggle, Converter={StaticResource InverseBool}}"
+                                    Title="nginx отключён"
+                                    Message="Отключайте только если знаете, что делаете. nginx — единственный мост наружу и TLS-терминация; без него подключение клиентов может не работать, трафик идёт по h2c без шифрования, и этот режим не тестировался." />
+                        <ui:InfoBar Margin="0,10,0,0" Severity="Error" IsClosable="False"
                                     IsOpen="{Binding IsChecked, ElementName=MinioToggle, Converter={StaticResource InverseBool}}"
                                     Title="MinIO отключён"
-                                    Message="Хранилище нужно поднять отдельно и вручную прописать его параметры в базе Configuration." />
+                                    Message="Хранилище нужно поднять отдельно, вручную отредактировать .env и прописать его параметры в базе Configuration." />
                         <ui:InfoBar Margin="0,8,0,0" Severity="Warning" IsClosable="False"
                                     IsOpen="{Binding IsChecked, ElementName=RabbitToggle, Converter={StaticResource InverseBool}}"
                                     Title="RabbitMQ отключён"
                                     Message="Брокер нужно поднять отдельно и вручную прописать его параметры в базе Configuration." />
-                        <ui:InfoBar Margin="0,8,0,0" Severity="Warning" IsClosable="False"
+                        <ui:InfoBar Margin="0,8,0,0" Severity="Error" IsClosable="False"
                                     IsOpen="{Binding IsChecked, ElementName=PostgresToggle, Converter={StaticResource InverseBool}}"
                                     Title="PostgreSQL отключён"
-                                    Message="Базу нужно поднять отдельно и вручную прописать подключение в базе Configuration." />
-                        <ui:InfoBar Margin="0,8,0,0" Severity="Warning" IsClosable="False"
+                                    Message="Если отключить PostgreSQL, придётся вручную отредактировать .env и поднять/настроить базу данных, прописав подключение в Configuration." />
+                        <ui:InfoBar Margin="0,8,0,0" Severity="Error" IsClosable="False"
                                     IsOpen="{Binding IsChecked, ElementName=SeqToggle, Converter={StaticResource InverseBool}}"
                                     Title="Seq отключён"
-                                    Message="Агрегатор логов нужно поднять отдельно и вручную прописать его в базе Configuration." />
+                                    Message="Агрегатор логов нужно поднять отдельно, вручную отредактировать .env и прописать его в базе Configuration." />
                     </StackPanel>
                 </ui:Card>
 
@@ -132,7 +136,8 @@
                 </ui:CardExpander>
 
                 <!-- MinIO -->
-                <ui:CardExpander Margin="0,0,0,8" Icon="{ui:SymbolIcon Storage24}">
+                <ui:CardExpander Margin="0,0,0,8" Icon="{ui:SymbolIcon Storage24}"
+                                 Visibility="{Binding IsChecked, ElementName=MinioToggle, Converter={StaticResource BoolToVis}}">
                     <ui:CardExpander.Header>
                         <StackPanel>
                             <TextBlock FontWeight="Medium" Text="MinIO" />
@@ -170,6 +175,24 @@
                     </StackPanel>
                 </ui:CardExpander>
 
+                <!-- Files — временные архивы -->
+                <ui:CardExpander Margin="0,0,0,8" Icon="{ui:SymbolIcon FolderOpen24}">
+                    <ui:CardExpander.Header>
+                        <StackPanel>
+                            <TextBlock FontWeight="Medium" Text="Файлы — временные архивы" />
+                            <TextBlock FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       Text="Папка для сборки ZIP при скачивании папок/альбомов" />
+                        </StackPanel>
+                    </ui:CardExpander.Header>
+                    <StackPanel>
+                        <ui:InfoBar Margin="0,0,0,4" Severity="Warning" IsClosable="False" IsOpen="True"
+                                    Title="Нужны права на запись"
+                                    Message="Сервис files работает не от root (uid 1654). Named volume (пусто) создаётся под root и недоступен на запись — при скачивании архивом будет «Access denied». Укажите внешнюю папку, доступную на запись для uid 1654." />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="ARCHIVE_TEMP_PATH (пусто — named volume archive_temp)" />
+                        <ui:TextBox PlaceholderText="/d/barkcloud/archive-temp" Text="{Binding ArchiveTempPath, UpdateSourceTrigger=PropertyChanged}" />
+                    </StackPanel>
+                </ui:CardExpander>
+
                 <!-- RabbitMQ -->
                 <ui:CardExpander Margin="0,0,0,8" Icon="{ui:SymbolIcon Mail24}">
                     <ui:CardExpander.Header>
@@ -204,7 +227,8 @@
                 </ui:CardExpander>
 
                 <!-- PostgreSQL -->
-                <ui:CardExpander Margin="0,0,0,8" Icon="{ui:SymbolIcon Database24}">
+                <ui:CardExpander Margin="0,0,0,8" Icon="{ui:SymbolIcon Database24}"
+                                 Visibility="{Binding IsChecked, ElementName=PostgresToggle, Converter={StaticResource BoolToVis}}">
                     <ui:CardExpander.Header>
                         <StackPanel>
                             <TextBlock FontWeight="Medium" Text="PostgreSQL" />
@@ -268,7 +292,8 @@
                 </ui:CardExpander>
 
                 <!-- Seq -->
-                <ui:CardExpander Margin="0,0,0,8" Icon="{ui:SymbolIcon DocumentBulletList24}">
+                <ui:CardExpander Margin="0,0,0,8" Icon="{ui:SymbolIcon DocumentBulletList24}"
+                                 Visibility="{Binding IsChecked, ElementName=SeqToggle, Converter={StaticResource BoolToVis}}">
                     <ui:CardExpander.Header>
                         <StackPanel>
                             <TextBlock FontWeight="Medium" Text="Seq" />
@@ -349,7 +374,8 @@
                 </ui:CardExpander>
 
                 <!-- Почта (SMTP) -->
-                <ui:CardExpander Margin="0,0,0,8" Icon="{ui:SymbolIcon Mail24}">
+                <ui:CardExpander Margin="0,0,0,8" Icon="{ui:SymbolIcon Mail24}"
+                                 Visibility="{Binding IsChecked, ElementName=NotificationToggle, Converter={StaticResource BoolToVis}}">
                     <ui:CardExpander.Header>
                         <StackPanel>
                             <TextBlock FontWeight="Medium" Text="Почта (SMTP)" />
