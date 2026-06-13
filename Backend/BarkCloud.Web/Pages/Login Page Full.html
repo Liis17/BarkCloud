@@ -532,15 +532,11 @@ function LoginCard({ state, showSSO }) {
   const [keyBusy, setKeyBusy] = React.useState(false);
 
   async function loginWithKey() {
-    const login = email.trim();
-    if (!login || keyBusy) return;
+    if (keyBusy) return;
     setKeyBusy(true);
     try {
-      const b = await fetch('/login/webauthn/begin', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin',
-        body: JSON.stringify({ login })
-      });
-      if (!b.ok) { setKeyBusy(false); alert('Вход по ключу недоступен для этого аккаунта'); return; }
+      const b = await fetch('/login/webauthn/begin', { method: 'POST', credentials: 'same-origin' });
+      if (!b.ok) { setKeyBusy(false); alert('Вход по ключу временно недоступен'); return; }
       const data = await b.json();
       const o = JSON.parse(data.optionsJson);
       const pk = Object.assign({}, o, {

@@ -329,10 +329,8 @@ message CompleteWebAuthnRegistrationRequest {
 message CompleteWebAuthnRegistrationResponse { }
 
 message BeginWebAuthnAssertionRequest {
-  oneof login {
-    string username = 1; // имя пользователя
-    string email = 2;    // емейл
-  }
+  // Пусто: вход passwordless через discoverable credentials — пользователь определяется
+  // по самому ключу (user handle в assertion), логин вводить не нужно.
 }
 
 message BeginWebAuthnAssertionResponse {

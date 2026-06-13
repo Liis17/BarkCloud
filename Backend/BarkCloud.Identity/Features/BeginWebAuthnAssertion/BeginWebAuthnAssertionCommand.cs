@@ -6,7 +6,5 @@ namespace BarkCloud.Identity.Features.BeginWebAuthnAssertion;
 
 public class BeginWebAuthnAssertionCommand : IRequest<BeginWebAuthnAssertionResponse>
 {
-    public string? Username { get; set; }
-
-    public string? Email { get; set; }
+    // Логин не нужен: passwordless discoverable-вход.
 }

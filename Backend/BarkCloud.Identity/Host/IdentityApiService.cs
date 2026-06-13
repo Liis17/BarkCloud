@@ -231,11 +231,7 @@ public class IdentityApiService : BarkCloud.Proto.Identity.IdentityApi.IdentityA
     // Публичный (вход без токена), как Auth.
     public override Task<BeginWebAuthnAssertionResponse> BeginWebAuthnAssertion(BeginWebAuthnAssertionRequest request, ServerCallContext context)
     {
-        return _mediator.Send(new BeginWebAuthnAssertionCommand
-        {
-            Username = request.Username?.Trim(),
-            Email = request.Email?.Trim()
-        });
+        return _mediator.Send(new BeginWebAuthnAssertionCommand());
     }
 
     // Публичный (вход без токена), как Auth.

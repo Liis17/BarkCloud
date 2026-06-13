@@ -17,7 +17,6 @@ public static class WebEndpoints
 {
     private const string LoginPage = "Login Page Full.html";
 
-    public sealed record WebAuthnLoginBeginBody(string? Login);
     public sealed record WebAuthnLoginCompleteBody(string? ChallengeId, JsonElement Assertion, bool Remember);
 
     public static void MapWebEndpoints(this WebApplication app)
@@ -74,11 +73,11 @@ public static class WebEndpoints
 
         // ───────── Вход по ключу безопасности (WebAuthn) ─────────
 
-        app.MapPost("/login/webauthn/begin", async (HttpContext http, AuthGateway auth, WebAuthnLoginBeginBody body) =>
+        app.MapPost("/login/webauthn/begin", async (HttpContext http, AuthGateway auth) =>
         {
-            var result = await auth.BeginWebAuthnAsync(http, body.Login ?? string.Empty);
+            var result = await auth.BeginWebAuthnAsync(http);
             return result is null
-                ? Results.BadRequest(new { message = "Вход по ключу недоступен для этого аккаунта" })
+                ? Results.BadRequest(new { message = "Вход по ключу временно недоступен" })
                 : Results.Ok(new { optionsJson = result.Value.OptionsJson, challengeId = result.Value.ChallengeId });
         });
 

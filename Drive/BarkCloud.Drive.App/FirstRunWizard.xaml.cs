@@ -346,19 +346,13 @@ public partial class FirstRunWizard : FluentWindow
 
     private async void KeyLoginClick(object sender, RoutedEventArgs e)
     {
-        var login = UsernameBox.Text.Trim();
-        if (string.IsNullOrEmpty(login))
-        {
-            Fail(Loc.T("Wizard_EnterLogin"));
-            return;
-        }
-
+        // Passwordless: логин вводить не нужно — ключ сам определит пользователя.
         NextButton.IsEnabled = false;
         BackButton.IsEnabled = false;
         KeyLoginButton.IsEnabled = false;
         try
         {
-            var challenge = await _engine.BeginWebAuthnAsync(login);
+            var challenge = await _engine.BeginWebAuthnAsync();
             if (string.IsNullOrEmpty(challenge.ChallengeId))
             {
                 Fail(Loc.T("Wizard_KeyUnavailable"));

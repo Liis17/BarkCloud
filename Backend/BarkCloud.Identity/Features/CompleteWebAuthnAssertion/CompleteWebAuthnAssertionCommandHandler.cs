@@ -59,8 +59,9 @@ public class CompleteWebAuthnAssertionCommandHandler(
             throw new WebAuthnVerificationFailedException();
         }
 
+        // Passwordless: пользователь определяется самим ключом (challenge не привязан к userId).
         var credential = await webAuthnStorage.GetCredentialByCredentialId(assertion.RawId);
-        if (credential is null || credential.UserId != challenge.UserId)
+        if (credential is null)
         {
             throw new WebAuthnVerificationFailedException();
         }
@@ -98,8 +99,8 @@ public class CompleteWebAuthnAssertionCommandHandler(
 
         metrics.Increment("webauthn_login_success");
 
-        logger.LogInformation("Успешный вход по ключу для пользователя {UserId}", challenge.UserId);
+        logger.LogInformation("Успешный вход по ключу для пользователя {UserId}", credential.UserId);
 
-        return await sessionIssuer.IssueAsync(challenge.UserId, cancellationToken);
+        return await sessionIssuer.IssueAsync(credential.UserId, cancellationToken);
     }
 }

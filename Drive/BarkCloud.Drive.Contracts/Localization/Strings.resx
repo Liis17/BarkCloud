@@ -242,9 +242,6 @@
   <data name="Wizard_KeyLogin" xml:space="preserve">
     <value>Войти ключом безопасности</value>
   </data>
-  <data name="Wizard_EnterLogin" xml:space="preserve">
-    <value>Введите логин.</value>
-  </data>
   <data name="Wizard_KeyUnavailable" xml:space="preserve">
     <value>Вход по ключу недоступен для этого аккаунта.</value>
   </data>
