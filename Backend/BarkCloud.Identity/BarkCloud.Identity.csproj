@@ -15,9 +15,16 @@
           <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
         <PackageReference Include="BCrypt.Net-Next" Version="4.2.0" />
+        <PackageReference Include="Fido2" Version="4.0.1" />
         <PackageReference Include="MassTransit.RabbitMQ" Version="8.5.2" />
         <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.8" />
         <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="10.0.8">
+          <PrivateAssets>all</PrivateAssets>
+          <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
+        <!-- Выравниваем Design на версию рантайма EF Core (10.0.4): транзитивно Tools тянет
+             несовместимый Design 8.0.0, из-за чего падает `dotnet ef`. Только dev-time. -->
+        <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.4">
           <PrivateAssets>all</PrivateAssets>
           <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>

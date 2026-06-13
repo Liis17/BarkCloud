@@ -18,6 +18,10 @@ public class IdentityContext : DbContext
 
     public DbSet<UserPassword> UserPasswords { get; set; }
 
+    public DbSet<WebAuthnCredential> WebAuthnCredentials { get; set; }
+
+    public DbSet<WebAuthnChallenge> WebAuthnChallenges { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -25,5 +29,12 @@ public class IdentityContext : DbContext
         modelBuilder.Entity<RefreshToken>()
             .HasIndex(x => x.Value)
             .IsUnique();
+
+        modelBuilder.Entity<WebAuthnCredential>()
+            .HasIndex(x => x.CredentialId)
+            .IsUnique();
+
+        modelBuilder.Entity<WebAuthnCredential>()
+            .HasIndex(x => x.UserId);
     }
 }

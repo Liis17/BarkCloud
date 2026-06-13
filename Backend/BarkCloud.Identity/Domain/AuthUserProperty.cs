@@ -18,4 +18,8 @@ public class AuthUserProperty
     public OtpType SelectedOtpType { get; set; }
 
     public string? LastEmailAuthCode { get; set; }
+
+    // Случайный непубличный user handle WebAuthn (один на пользователя, общий для всех его ключей).
+    // Генерится при первой привязке ключа.
+    public byte[]? WebAuthnUserHandle { get; set; }
 }
