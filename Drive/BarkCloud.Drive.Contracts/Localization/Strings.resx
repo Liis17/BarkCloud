@@ -239,6 +239,18 @@
   <data name="Wizard_EnterLoginPassword" xml:space="preserve">
     <value>Введите логин и пароль.</value>
   </data>
+  <data name="Wizard_KeyLogin" xml:space="preserve">
+    <value>Войти ключом безопасности</value>
+  </data>
+  <data name="Wizard_EnterLogin" xml:space="preserve">
+    <value>Введите логин.</value>
+  </data>
+  <data name="Wizard_KeyUnavailable" xml:space="preserve">
+    <value>Вход по ключу недоступен для этого аккаунта.</value>
+  </data>
+  <data name="Wizard_KeyFailed" xml:space="preserve">
+    <value>Не удалось войти по ключу безопасности.</value>
+  </data>
   <data name="Wizard_LoginFailed" xml:space="preserve">
     <value>Не удалось войти.</value>
   </data>

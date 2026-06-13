@@ -1,6 +1,8 @@
 using System.IO;
+using System.Net;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Interop;
 
 using BarkCloud.Drive.Contracts;
 using BarkCloud.Drive.Contracts.Localization;
@@ -105,7 +107,17 @@ public partial class FirstRunWizard : FluentWindow
         BackButton.IsEnabled = _step > 0;
         NextButton.Content = Loc.T(_step == 4 ? "Common_Finish" : "Common_Next");
         WizardStatus.Visibility = Visibility.Collapsed;
+
+        // Кнопка входа по ключу: только на шаге входа, если поддерживается системой
+        // и сервер задан доменным именем (WebAuthn не работает на «голом» IP).
+        KeyLoginButton.Visibility =
+            _step == 1 && !_authenticated && WebAuthnClient.IsSupported && IsDomainHost(_appliedServer.Host)
+                ? Visibility.Visible
+                : Visibility.Collapsed;
     }
+
+    private static bool IsDomainHost(string? host)
+        => !string.IsNullOrWhiteSpace(host) && !IPAddress.TryParse(host, out _);
 
     private void BackClick(object sender, RoutedEventArgs e)
     {
@@ -329,6 +341,63 @@ public partial class FirstRunWizard : FluentWindow
         catch (Exception ex)
         {
             Fail(Loc.T("Wizard_CreateDriveErrorFmt", ex.Message));
+        }
+    }
+
+    private async void KeyLoginClick(object sender, RoutedEventArgs e)
+    {
+        var login = UsernameBox.Text.Trim();
+        if (string.IsNullOrEmpty(login))
+        {
+            Fail(Loc.T("Wizard_EnterLogin"));
+            return;
+        }
+
+        NextButton.IsEnabled = false;
+        BackButton.IsEnabled = false;
+        KeyLoginButton.IsEnabled = false;
+        try
+        {
+            var challenge = await _engine.BeginWebAuthnAsync(login);
+            if (string.IsNullOrEmpty(challenge.ChallengeId))
+            {
+                Fail(Loc.T("Wizard_KeyUnavailable"));
+                return;
+            }
+
+            var hwnd = new WindowInteropHelper(this).Handle;
+
+            string assertionJson;
+            try
+            {
+                // Системный диалог WebAuthn (PIN + касание) — на фоновом потоке, чтобы не морозить UI.
+                assertionJson = await Task.Run(() => WebAuthnClient.GetAssertion(hwnd, challenge.RpId, challenge.OptionsJson));
+            }
+            catch
+            {
+                // Отмена пользователем или ошибка ключа.
+                Fail(Loc.T("Wizard_KeyFailed"));
+                return;
+            }
+
+            var status = await _engine.CompleteWebAuthnAsync(challenge.ChallengeId, assertionJson);
+            if (!status.Authenticated)
+            {
+                Fail(string.IsNullOrEmpty(status.Error) ? Loc.T("Wizard_LoginFailed") : status.Error!);
+                return;
+            }
+
+            _authenticated = true;
+            PasswordBox.Password = string.Empty;
+            OtpBox.Text = string.Empty;
+            _step++;
+            ShowStep();
+        }
+        finally
+        {
+            NextButton.IsEnabled = true;
+            BackButton.IsEnabled = _step > 0;
+            KeyLoginButton.IsEnabled = true;
         }
     }
 

@@ -55,6 +55,8 @@
                     <ui:TextBox x:Name="UsernameBox" PlaceholderText="{loc:Tr Wizard_LoginPlaceholder}" Margin="0,2,0,8"/>
                     <ui:PasswordBox x:Name="PasswordBox" PlaceholderText="{loc:Tr Wizard_PasswordPlaceholder}" Margin="0,2,0,8"/>
                     <ui:TextBox x:Name="OtpBox" PlaceholderText="{loc:Tr Wizard_OtpPlaceholder}" Margin="0,2,0,8"/>
+                    <ui:Button x:Name="KeyLoginButton" Content="{loc:Tr Wizard_KeyLogin}" Appearance="Secondary"
+                               HorizontalAlignment="Stretch" Margin="0,6,0,0" Click="KeyLoginClick" Visibility="Collapsed"/>
                 </StackPanel>
                 <TextBlock x:Name="AlreadyLoggedIn" Visibility="Collapsed" TextWrapping="Wrap"/>
             </StackPanel>

@@ -239,6 +239,18 @@
   <data name="Wizard_EnterLoginPassword" xml:space="preserve">
     <value>Benutzername und Passwort eingeben.</value>
   </data>
+  <data name="Wizard_KeyLogin" xml:space="preserve">
+    <value>Mit Sicherheitsschlüssel anmelden</value>
+  </data>
+  <data name="Wizard_EnterLogin" xml:space="preserve">
+    <value>Benutzername eingeben.</value>
+  </data>
+  <data name="Wizard_KeyUnavailable" xml:space="preserve">
+    <value>Anmeldung per Sicherheitsschlüssel ist für dieses Konto nicht verfügbar.</value>
+  </data>
+  <data name="Wizard_KeyFailed" xml:space="preserve">
+    <value>Anmeldung mit dem Sicherheitsschlüssel fehlgeschlagen.</value>
+  </data>
   <data name="Wizard_LoginFailed" xml:space="preserve">
     <value>Anmeldung fehlgeschlagen.</value>
   </data>
