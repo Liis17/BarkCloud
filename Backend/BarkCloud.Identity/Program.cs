@@ -78,6 +78,7 @@ public class Program
             .AddInterceptor(() => new ExceptionClientInterceptor());
 
         builder.Services.AddTransient<IRefreshTokensStorage, RefreshTokensStorage>();
+        builder.Services.AddScoped<SessionIssuer>();
         builder.Services.AddTransient<JwtService>();
         builder.Services.AddTransient<IConfirmationCodesStorage, ConfirmationCodesStorage>();
         builder.Services.AddScoped<NotificationQueueSender>();
