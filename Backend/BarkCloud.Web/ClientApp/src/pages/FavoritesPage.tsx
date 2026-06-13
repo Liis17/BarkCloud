@@ -5,6 +5,7 @@ import { Lightbox } from '../components/media/Lightbox';
 import { EmptyState, Loading } from '../components/ui/EmptyState';
 import { useToast } from '../hooks/useToast';
 import { useMediaActions } from '../hooks/useMediaActions';
+import { useBulkMedia } from '../hooks/useBulkMedia';
 import { usePageHeader } from '../hooks/usePageHeader';
 import { apiGet, apiPost } from '../lib/api';
 import { GRID_SIZES, plural, groupByDate } from '../lib/format';
@@ -13,9 +14,19 @@ import type { Album, CardFile, Page } from '../lib/types';
 // Файл можно открыть в просмотрщике, только если это фото/видео с готовым превью.
 const viewable = (m: CardFile) => m.previews && m.previews.length > 0 && (m.kind === 'photo' || m.kind === 'video');
 
-function FavCard({ m, onOpen, onUnstar }: { m: CardFile; onOpen: (m: CardFile) => void; onUnstar: (m: CardFile) => void }) {
+function FavCard({ m, selecting, checked, onToggle, onOpen, onUnstar }: {
+  m: CardFile;
+  selecting: boolean;
+  checked: boolean;
+  onToggle: (shift: boolean) => void;
+  onOpen: (m: CardFile) => void;
+  onUnstar: (m: CardFile) => void;
+}) {
   return (
-    <div className="photo" onClick={() => onOpen(m)}>
+    <div
+      className={'photo' + (checked ? ' checked' : '')}
+      onClick={(e) => (e.shiftKey ? onToggle(true) : selecting ? onToggle(false) : onOpen(m))}
+    >
       {viewable(m) ? (
         <MediaThumb media={m} sizes={GRID_SIZES} />
       ) : (
@@ -25,6 +36,9 @@ function FavCard({ m, onOpen, onUnstar }: { m: CardFile; onOpen: (m: CardFile) =
           <span className="nm">{m.name}</span>
         </div>
       )}
+      <button className="selbox" onClick={(e) => { e.stopPropagation(); onToggle(e.shiftKey); }} title="Выбрать">
+        {checked ? <Icon.check size={14} /> : null}
+      </button>
       {m.kind === 'video' && (
         <div className="vbadge">
           <Icon.play size={10} /> видео
@@ -107,6 +121,17 @@ export function FavoritesPage() {
     }
   }
 
+  const bulk = useBulkMedia({
+    items: items || [],
+    albums,
+    toast,
+    onRemoved: (id) => {
+      setItems((list) => (list || []).filter((x) => x.id !== id));
+      setLightbox((lb) => (lb && lb.id === id ? null : lb));
+    },
+    onReloadAlbums: loadAlbums,
+  });
+
   const groups = React.useMemo(() => (items ? groupByDate(items) : []), [items]);
 
   usePageHeader(
@@ -127,6 +152,8 @@ export function FavoritesPage() {
     <>
       {toastNode}
       {actionsCtx.overlay}
+      {bulk.bar}
+      {bulk.overlay}
 
       {items === null ? (
         <Loading />
@@ -145,7 +172,15 @@ export function FavoritesPage() {
             </div>
             <div className="photo-grid">
               {g.items.map((m) => (
-                <FavCard key={m.id} m={m} onOpen={open} onUnstar={unstar} />
+                <FavCard
+                  key={m.id}
+                  m={m}
+                  selecting={bulk.active}
+                  checked={bulk.isSelected(m.id)}
+                  onToggle={(shift) => bulk.toggle(m.id, shift)}
+                  onOpen={(mm) => { bulk.setAnchor(mm.id); open(mm); }}
+                  onUnstar={unstar}
+                />
               ))}
             </div>
           </div>

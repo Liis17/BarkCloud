@@ -8,11 +8,13 @@ import { PickMediaModal } from './PickMediaModal';
 import { useContextMenu, type ContextItem } from '../ui/ContextMenu';
 import { PropertiesModal } from '../ui/PropertiesModal';
 import { ShareWithUserModal } from '../ui/ShareWithUserModal';
+import { SelectionBar } from '../ui/SelectionBar';
 import { apiGet, apiPost, downloadArchive } from '../../lib/api';
 import { createShare, createAlbumShare } from '../../lib/share';
 import { GRID_SIZES } from '../../lib/format';
 import { useDocumentHead } from '../../hooks/useDocumentHead';
 import { useMediaActions } from '../../hooks/useMediaActions';
+import { useSelection } from '../../hooks/useSelection';
 import type { Album, CardFile, Page } from '../../lib/types';
 import type { ToastPush } from '../../hooks/useToast';
 
@@ -37,6 +39,7 @@ export function AlbumDetail({ album, candidates, albums, gridSizes = GRID_SIZES,
   const [shareWith, setShareWith] = React.useState<CardFile | null>(null);
   const [archiving, setArchiving] = React.useState(false);
   const { menu, openAt } = useContextMenu();
+  const sel = useSelection();
 
   useDocumentHead(
     () => ({ title: album.name, iconUrl: album.coverUrl || null }),
@@ -46,6 +49,7 @@ export function AlbumDetail({ album, candidates, albums, gridSizes = GRID_SIZES,
 
   const load = React.useCallback(() => {
     setItems(null);
+    sel.clear();
     apiGet<Page<CardFile>>('/api/albums/items?album=' + encodeURIComponent(album.id))
       .then((d) => setItems(d.items || []))
       .catch((e) => {
@@ -125,6 +129,44 @@ export function AlbumDetail({ album, candidates, albums, gridSizes = GRID_SIZES,
       toast((e as Error).message, 'err');
     }
   }
+  async function bulkRemoveFromAlbum() {
+    const ids = sel.list;
+    if (!ids.length) return;
+    try {
+      await apiPost('/api/albums/items/remove', { album: album.id, fileIds: ids });
+      load();
+      onChanged();
+      toast(`Убрано из альбома: ${ids.length}`);
+    } catch (e) {
+      toast((e as Error).message, 'err');
+    }
+  }
+  async function bulkArchive() {
+    if (!sel.count || archiving) return;
+    setArchiving(true);
+    toast('Готовлю архив…');
+    try {
+      await downloadArchive({ fileIds: sel.list, name: album.name });
+      sel.clear();
+      toast('Архив готов, скачивание началось');
+    } catch (e) {
+      toast((e as Error).message, 'err');
+    } finally {
+      setArchiving(false);
+    }
+  }
+  async function bulkCopyLinks() {
+    const ids = sel.list;
+    try {
+      const d = await apiGet<{ urls: Record<string, string | null> }>('/api/files/download?ids=' + encodeURIComponent(ids.join(',')));
+      const urls = ids.map((id) => d.urls && d.urls[id]).filter((u): u is string => !!u);
+      if (!urls.length) throw new Error('Ссылки недоступны');
+      await navigator.clipboard.writeText(urls.join('\n'));
+      toast(`Скопировано ссылок: ${urls.length} (временные)`);
+    } catch (e) {
+      toast((e as Error).message || 'Не удалось скопировать', 'err');
+    }
+  }
   function itemMenu(m: CardFile): ContextItem[] {
     return [
       { label: 'Сделать обложкой', icon: 'photo', onClick: () => setCover(m.id) },
@@ -137,8 +179,19 @@ export function AlbumDetail({ album, candidates, albums, gridSizes = GRID_SIZES,
     ];
   }
 
+  const orderedIds = (items || []).map((i) => i.id);
+
   return (
     <div>
+      <SelectionBar
+        count={sel.count}
+        onClear={sel.clear}
+        actions={[
+          { label: 'Убрать из альбома', icon: 'x', danger: true, onClick: bulkRemoveFromAlbum },
+          { label: archiving ? 'Архивирую…' : 'Скачать архивом', icon: 'download', disabled: archiving, onClick: bulkArchive },
+          { label: 'Копировать ссылки', icon: 'link', onClick: bulkCopyLinks },
+        ]}
+      />
       <div className="date-head" style={{ marginBottom: 18 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <button className="icon-btn" onClick={onBack} title="Назад">
@@ -183,24 +236,39 @@ export function AlbumDetail({ album, candidates, albums, gridSizes = GRID_SIZES,
         />
       ) : (
         <div className="photo-grid">
-          {items.map((m, idx) => (
-            <div key={m.id} className="photo" onClick={() => setLightbox(idx)} onContextMenu={(e) => openAt(e, itemMenu(m))}>
-              <MediaThumb media={m} sizes={gridSizes} />
-              {m.kind === 'video' && (
-                <div className="vbadge">
-                  <Icon.play size={10} /> видео
+          {items.map((m, idx) => {
+            const checked = sel.has(m.id);
+            return (
+              <div
+                key={m.id}
+                className={'photo' + (checked ? ' checked' : '')}
+                onClick={(e) => {
+                  if (e.shiftKey) sel.select(m.id, orderedIds, true);
+                  else if (sel.active) sel.select(m.id, orderedIds, false);
+                  else { sel.setAnchor(m.id); setLightbox(idx); }
+                }}
+                onContextMenu={(e) => openAt(e, itemMenu(m))}
+              >
+                <MediaThumb media={m} sizes={gridSizes} />
+                <button className="selbox" onClick={(e) => { e.stopPropagation(); sel.select(m.id, orderedIds, e.shiftKey); }} title="Выбрать">
+                  {checked ? <Icon.check size={14} /> : null}
+                </button>
+                {m.kind === 'video' && (
+                  <div className="vbadge">
+                    <Icon.play size={10} /> видео
+                  </div>
+                )}
+                <div className="item-tools">
+                  <button title="Сделать обложкой" onClick={(e) => { e.stopPropagation(); setCover(m.id); }}>
+                    <Icon.star size={15} />
+                  </button>
+                  <button title="Убрать из альбома" onClick={(e) => { e.stopPropagation(); removeItem(m.id); }}>
+                    <Icon.x size={15} />
+                  </button>
                 </div>
-              )}
-              <div className="item-tools">
-                <button title="Сделать обложкой" onClick={(e) => { e.stopPropagation(); setCover(m.id); }}>
-                  <Icon.star size={15} />
-                </button>
-                <button title="Убрать из альбома" onClick={(e) => { e.stopPropagation(); removeItem(m.id); }}>
-                  <Icon.x size={15} />
-                </button>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

@@ -4,7 +4,7 @@ import { SelectionBar } from '../components/ui/SelectionBar';
 import { ConfirmModal } from '../components/ui/ConfirmModal';
 import { Modal } from '../components/ui/Modal';
 import { apiGet, apiPost, deleteMediaBatch, downloadArchive } from '../lib/api';
-import type { Album, MediaItem } from '../lib/types';
+import type { Album, CardFile } from '../lib/types';
 import type { ToastPush } from './useToast';
 
 interface DownloadResponse {
@@ -12,7 +12,7 @@ interface DownloadResponse {
 }
 
 interface UseBulkMediaArgs {
-  items: MediaItem[];
+  items: CardFile[];
   albums: Album[];
   toast: ToastPush;
   onRemoved: (id: string) => void;
@@ -128,5 +128,5 @@ export function useBulkMedia({ items, albums, toast, onRemoved, onReloadAlbums }
     </>
   );
 
-  return { isSelected: sel.has, toggle: select, active: sel.active, count: sel.count, clear: sel.clear, bar, overlay };
+  return { isSelected: sel.has, toggle: select, setAnchor: sel.setAnchor, active: sel.active, count: sel.count, clear: sel.clear, bar, overlay };
 }
