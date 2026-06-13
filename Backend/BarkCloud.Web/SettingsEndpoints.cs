@@ -9,6 +9,8 @@ using Google.Protobuf;
 
 using Grpc.Core;
 
+using System.Text.Json;
+
 namespace BarkCloud.Web;
 
 /// <summary>
@@ -29,6 +31,8 @@ public static class SettingsEndpoints
     public sealed record OtpDisableBody(int OtpType, string? OtpCode);
     public sealed record RenameBody(string? DeviceId, string? CustomName);
     public sealed record RevokeBody(string? DeviceId);
+    public sealed record WebAuthnRegisterCompleteBody(string? ChallengeId, JsonElement Attestation, string? Name);
+    public sealed record WebAuthnRemoveBody(string? CredentialId);
 
     public static void MapSettingsEndpoints(this WebApplication app)
     {
@@ -149,6 +153,48 @@ public static class SettingsEndpoints
                     OtpType = (OtpTypeId)body.OtpType,
                     OtpCode = body.OtpCode ?? ""
                 }, token);
+                return Results.Ok(new { ok = true });
+            }));
+
+        // ───────── Ключи безопасности (WebAuthn) ─────────
+
+        api.MapGet("/security/webauthn", (HttpContext http, AuthGateway auth, IdentityApi.IdentityApiClient identity) =>
+            Do(http, auth, async (_, token) =>
+            {
+                var resp = await identity.ListWebAuthnCredentialsAsync(new ListWebAuthnCredentialsRequest(), token);
+                var keys = resp.Credentials.Select(c => new
+                {
+                    id = c.Id,
+                    name = c.Name,
+                    createdAt = c.CreatedAt?.ToDateTimeOffset(),
+                    lastUsedAt = c.LastUsedAt?.ToDateTimeOffset()
+                });
+                return Results.Ok(new { keys });
+            }));
+
+        api.MapPost("/security/webauthn/register/begin", (HttpContext http, AuthGateway auth, IdentityApi.IdentityApiClient identity) =>
+            Do(http, auth, async (_, token) =>
+            {
+                var resp = await identity.BeginWebAuthnRegistrationAsync(new BeginWebAuthnRegistrationRequest(), token);
+                return Results.Ok(new { optionsJson = resp.OptionsJson, challengeId = resp.ChallengeId });
+            }));
+
+        api.MapPost("/security/webauthn/register/complete", (HttpContext http, AuthGateway auth, IdentityApi.IdentityApiClient identity, WebAuthnRegisterCompleteBody body) =>
+            Do(http, auth, async (_, token) =>
+            {
+                await identity.CompleteWebAuthnRegistrationAsync(new CompleteWebAuthnRegistrationRequest
+                {
+                    ChallengeId = body.ChallengeId ?? "",
+                    AttestationJson = body.Attestation.GetRawText(),
+                    CredentialName = body.Name ?? ""
+                }, token);
+                return Results.Ok(new { ok = true });
+            }));
+
+        api.MapPost("/security/webauthn/remove", (HttpContext http, AuthGateway auth, IdentityApi.IdentityApiClient identity, WebAuthnRemoveBody body) =>
+            Do(http, auth, async (_, token) =>
+            {
+                await identity.RemoveWebAuthnCredentialAsync(new RemoveWebAuthnCredentialRequest { CredentialId = body.CredentialId ?? "" }, token);
                 return Results.Ok(new { ok = true });
             }));
 
