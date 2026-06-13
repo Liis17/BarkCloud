@@ -1,0 +1,24 @@
+[
+  {
+    "Name": "запуск движка и клиента",
+    "Projects": [
+      {
+        "Path": "Drive\\BarkCloud.Drive.Engine\\BarkCloud.Drive.Engine.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "Drive\\BarkCloud.Drive.App\\BarkCloud.Drive.App.csproj",
+        "Action": "Start"
+      }
+    ]
+  },
+  {
+    "Name": "билдер конфигурации",
+    "Projects": [
+      {
+        "Path": "Tools\\BarkCloud.Builder\\BarkCloud.Builder.csproj",
+        "Action": "Start"
+      }
+    ]
+  }
+]

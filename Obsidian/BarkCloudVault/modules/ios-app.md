@@ -166,7 +166,9 @@ BarkCloud/
   `cloud.barkfluff.com:7025/web/download/{id}`.
   редактирование имени/юзернейма/bio (`ChangeName`/`ChangeUsername`+`CheckExistUsername`/`ChangeBio`),
   приватность (`Get/UpdatePrivacySettings`), устройства (`GetDevices`/`GetCurrentDevice`/`RenameDevice`/`DeleteDevice`),
-  хранилище (`GetUserStorageInfo`), выход и удаление аккаунта (`DeleteAccount`).
+  хранилище (`GetUserStorageInfo` — бар **сегментирован по физическому диску сервера**: тёмно-серый — не-S3 данные,
+  коричневый `#9A4F1E` — S3/облако, светло-серый — свободно, + легенда; поля `totalAvailableStorage/diskUsedStorage/s3UsedStorage`),
+  выход и удаление аккаунта (`DeleteAccount`).
   Sign-out проброшен `RootView → MainScreen → SettingsScreen` через `onSignOut`.
   **Выход** централизован в `AppEnvironment.signOut()`: серверный отзыв сессии `Identity.Logout`
   (best-effort, до очистки токенов) → `resetLocalState()`. **`resetLocalState()` — полный сброс до

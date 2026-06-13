@@ -264,6 +264,7 @@ public sealed class PageDataBuilder
     private async Task<(object Block, long Limit)> BuildStorageAsync(Metadata token, User? profile, int devicesCount)
     {
         long used = 0, limit = ResolveLimit(0, profile?.StorageLimitGb ?? 0);
+        long diskTotal = 0, diskOther = 0, diskS3 = 0;
         var breakdown = new List<object>();
 
         try
@@ -271,6 +272,9 @@ public sealed class PageDataBuilder
             var storage = await _files.GetUserStorageInfoAsync(new GetUserStorageInfoRequest(), token);
             used = storage.TotalUsedStorage;
             limit = ResolveLimit(storage.StorageLimit, profile?.StorageLimitGb ?? 0);
+            diskTotal = storage.TotalAvailableStorage;
+            diskOther = storage.DiskUsedStorage;
+            diskS3 = storage.S3UsedStorage;
 
             foreach (var byType in storage.StorageByTypes)
             {
@@ -297,6 +301,9 @@ public sealed class PageDataBuilder
             _logger.LogWarning("Settings/Storage: {Status}", ex.StatusCode);
         }
 
+        var diskUsed = diskOther + diskS3;
+        var diskFree = Math.Max(0, diskTotal - diskUsed);
+
         var block = new
         {
             used = Format.ToGb(used),
@@ -308,11 +315,26 @@ public sealed class PageDataBuilder
             freeLabel = Format.Size(Math.Max(0, limit - used)),
             autoUpload = true,
             devicesCount = $"{devicesCount} {Plural(devicesCount, "устройство", "устройства", "устройств")}",
-            trashLabel = "—"
+            trashLabel = "—",
+            disk = new
+            {
+                totalLabel = Format.Size(diskTotal),
+                usedLabel = Format.Size(diskUsed),
+                otherLabel = Format.Size(diskOther),
+                s3Label = Format.Size(diskS3),
+                freeLabel = Format.Size(diskFree),
+                usedPct = Format.Percent(diskUsed, diskTotal),
+                otherPct = PctOf(diskOther, diskTotal),
+                s3Pct = PctOf(diskS3, diskTotal)
+            }
         };
 
         return (block, limit);
     }
+
+    // Доля в процентах с одним знаком после запятой — для плавной ширины сегментов бара.
+    private static double PctOf(long part, long whole)
+        => whole <= 0 ? 0 : Math.Round(Math.Clamp(part * 100d / whole, 0, 100), 1);
 
     private static long ResolveLimit(long storageLimit, int limitGb)
     {

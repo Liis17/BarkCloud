@@ -194,25 +194,74 @@ struct SettingsScreen: View {
             }
     }
 
+    // Физический диск сервера: тёмно-серый — не-S3 данные, коричневый — S3 (облако),
+    // светло-серый — свободно. Цвет облака совпадает с веб-клиентом (#9A4F1E).
+    private static let storageOtherColor = AppColors.onSurfaceVariant
+    private static let storageS3Color = Color(red: 0.604, green: 0.310, blue: 0.118)
+    private static let storageFreeColor = AppColors.onSurface.opacity(0.12)
+
     @ViewBuilder
     private func storageCard(_ vm: ProfileViewModel) -> some View {
-        let used = vm.state.usedStorage
-        let limit = vm.state.storageLimit
-        let fraction = limit > 0 ? min(1.0, Double(used) / Double(limit)) : 0
+        let total = vm.state.diskTotal
+        let other = max(0, vm.state.diskOther)
+        let s3 = max(0, vm.state.diskS3)
+        let free = max(0, total - other - s3)
+        let used = other + s3
         VStack(alignment: .leading, spacing: 8) {
             Text("settings_storage")
                 .font(AppTypography.titleSmall)
                 .foregroundStyle(AppColors.onSurfaceVariant)
                 .textCase(.uppercase)
-            ProgressView(value: fraction)
-                .tint(AppColors.accent)
-            Text(verbatim: "\(FormatUtils.formatSize(used)) / \(FormatUtils.formatSize(limit))")
-                .font(AppTypography.bodySmall)
-                .foregroundStyle(AppColors.onSurfaceVariant)
+            if total > 0 {
+                GeometryReader { geo in
+                    let denom = Double(total)
+                    HStack(spacing: 0) {
+                        Rectangle().fill(Self.storageOtherColor)
+                            .frame(width: geo.size.width * Double(other) / denom)
+                        Rectangle().fill(Self.storageS3Color)
+                            .frame(width: geo.size.width * Double(s3) / denom)
+                        Spacer(minLength: 0)
+                    }
+                }
+                .frame(height: 8)
+                .background(Self.storageFreeColor)
+                .clipShape(Capsule())
+                Text(verbatim: "\(FormatUtils.formatSize(used)) / \(FormatUtils.formatSize(total))")
+                    .font(AppTypography.bodySmall)
+                    .foregroundStyle(AppColors.onSurfaceVariant)
+                VStack(alignment: .leading, spacing: 4) {
+                    storageLegendRow(color: Self.storageOtherColor, titleKey: "settings_storage_other", value: FormatUtils.formatSize(other))
+                    storageLegendRow(color: Self.storageS3Color, titleKey: "settings_storage_cloud", value: FormatUtils.formatSize(s3))
+                    storageLegendRow(color: Self.storageFreeColor, titleKey: "settings_storage_free", value: FormatUtils.formatSize(free))
+                }
+                .padding(.top, 4)
+            } else {
+                ProgressView(value: 0)
+                    .tint(AppColors.accent)
+                Text(verbatim: "—")
+                    .font(AppTypography.bodySmall)
+                    .foregroundStyle(AppColors.onSurfaceVariant)
+            }
         }
         .padding(16)
         .background(AppColors.onSurface.opacity(0.04))
         .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
+    @ViewBuilder
+    private func storageLegendRow(color: Color, titleKey: LocalizedStringKey, value: String) -> some View {
+        HStack(spacing: 8) {
+            RoundedRectangle(cornerRadius: 2)
+                .fill(color)
+                .frame(width: 10, height: 10)
+            Text(titleKey)
+                .font(AppTypography.bodySmall)
+                .foregroundStyle(AppColors.onSurfaceVariant)
+            Spacer(minLength: 8)
+            Text(verbatim: value)
+                .font(AppTypography.bodySmall)
+                .foregroundStyle(AppColors.onSurfaceVariant)
+        }
     }
 
     @ViewBuilder

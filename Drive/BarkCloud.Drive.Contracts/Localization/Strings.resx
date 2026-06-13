@@ -161,6 +161,18 @@
   <data name="Main_StorageUsageFmt" xml:space="preserve">
     <value>{0} из {1}</value>
   </data>
+  <data name="Main_StorageDiskUsageFmt" xml:space="preserve">
+    <value>{0} из {1} на диске</value>
+  </data>
+  <data name="Main_StorageOther" xml:space="preserve">
+    <value>Другие данные</value>
+  </data>
+  <data name="Main_StorageCloud" xml:space="preserve">
+    <value>Облако (S3)</value>
+  </data>
+  <data name="Main_StorageFree" xml:space="preserve">
+    <value>Свободно</value>
+  </data>
   <data name="Main_DriveMountedFmt" xml:space="preserve">
     <value>Диск {0}: примонтирован ({1})</value>
   </data>
