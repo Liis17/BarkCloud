@@ -13,6 +13,8 @@ using BarkCloud.Shared.Auth;
 using BarkCloud.Shared.Exceptions.Interceptors;
 using BarkCloud.Shared.Identity;
 
+using Fido2NetLib;
+
 using MassTransit;
 
 using Microsoft.EntityFrameworkCore;
@@ -40,6 +42,23 @@ public class Program
 
         builder.Services.AddSettings<JwtSettings>(builder.Configuration, "JwtSettings");
 
+        // WebAuthn / FIDO2. RP ID = домен сервера (self-hosted: свой на инстанс), origins —
+        // допустимые источники (Web-браузер и Drive через webauthn.dll шлют https://<RpId>).
+        var webAuthnRpId = builder.Configuration["WebAuthn:RpId"] ?? "localhost";
+        var webAuthnServerName = builder.Configuration["WebAuthn:ServerName"] ?? "BarkCloud";
+        var webAuthnOrigins = builder.Configuration.GetSection("WebAuthn:Origins").Get<string[]>();
+        if (webAuthnOrigins is null || webAuthnOrigins.Length == 0)
+        {
+            webAuthnOrigins = [$"https://{webAuthnRpId}"];
+        }
+
+        builder.Services.AddSingleton<IFido2>(_ => new Fido2(new Fido2Configuration
+        {
+            ServerDomain = webAuthnRpId,
+            ServerName = webAuthnServerName,
+            Origins = new HashSet<string>(webAuthnOrigins)
+        }));
+
         builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssemblyContaining<Program>());
 
         builder.Services.AddXAuth(builder.Configuration);
@@ -65,6 +84,7 @@ public class Program
         builder.Services.AddHttpClient<LocationClient>();
         builder.Services.AddScoped<LocationClient>();
         builder.Services.AddTransient<IAuthPropertiesStorage, AuthPropertiesStorage>();
+        builder.Services.AddTransient<IWebAuthnStorage, WebAuthnStorage>();
         builder.Services.AddTransient<IPasswordsStorage, PasswordsStorage>();
         builder.Services.AddTransient<IResetPasswordsStorage, ResetPasswordsStorage>();
 
