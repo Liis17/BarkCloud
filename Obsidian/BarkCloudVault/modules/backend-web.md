@@ -23,6 +23,14 @@ Parent: [[index]] · See also: [[api/identity-api]] · [[api/users-api]] · [[ap
 - Истёк access → автоматический refresh через `IdentityApi.CreateToken`.
 - Логин → `IdentityApi.Auth` (с device-заголовками `x-device-name`/`x-os-name`/`x-app-name`/`x-app-version`, base64). Поддержан 2FA-шаг.
 
+## Вход по ключу безопасности (WebAuthn / FIDO2)
+
+Web — тонкий релей к [[modules/backend-identity]] (валидация на сервере через `Fido2`; те же 4 метода переиспользуют Drive/Android/iOS). Хелпер `ClientApp/src/lib/webauthn.ts` (base64url↔ArrayBuffer, без внешних зависимостей; формат под `Fido2` raw response).
+
+- **Вход** (passwordless, публичный, без токена): `POST /login/webauthn/begin {login}` → `{optionsJson, challengeId}`; `navigator.credentials.get` → `POST /login/webauthn/complete {challengeId, assertion, remember}` → cookie сессии (как `LoginAsync`). Кнопка «Войти ключом» на серверной странице логина (`Login Page Full.html`, vanilla JS, скрыта если `!window.PublicKeyCredential`). `AuthGateway.BeginWebAuthnAsync`/`CompleteWebAuthnAsync`.
+- **Привязка/управление** (под токеном): `/api/settings/security/webauthn` (GET список), `…/register/begin`, `…/register/complete`, `…/remove` — проксируют в Identity. Карточка «Ключи безопасности» в `SettingsPage.tsx` (SecurityTab), `navigator.credentials.create`.
+- Username-first; пароль + Email-OTP остаются как fallback.
+
 ## Регистрация (с подтверждением кодом по почте)
 
 > **Режим без почты** (`Features:EmailEnabled=false`, см. [[modules/backend-configuration]]): Web читает флаг через `IConfiguration.EmailEnabled()`. Тогда `RegistrationGateway.BeginAsync` после `CreateAccount` (Identity сразу отдаёт `refresh_token`) выполняет общий хвост `CompleteAsync` (`CreateToken → SetPassword → IssueSession`) и возвращает `Success` — **без экрана ввода кода**. Маршруты `/forgot` и `/forgot/confirm` редиректят на `/login`. В страницу логина и в `/api/settings/full` (`system.emailEnabled`) прокинуты флаги `email.enabled`/`emailEnabled`: на логине скрыта ссылка «Забыли?», в «Обслуживании» — пометка по Notification.
@@ -152,7 +160,7 @@ UI: в сетке — превью (`MediaThumb`: `<img srcset sizes>` пове�
 
 - Профиль (UsersApi): `POST profile/name`, `POST profile/bio`, `GET profile/username-available?u=`, `POST profile/username`.
 - Приватность (UsersApi): `GET/POST privacy` (`UpdatePrivacySettings` целиком; 0=Всем,1=Контактам,2=Никому).
-- Безопасность (IdentityApi): `POST security/password` (`old_password` обязателен — пароль уже задан), `GET security/2fa`, `POST security/2fa/enable` (→ qr+code), `…/confirm`, `…/disable`.
+- Безопасность (IdentityApi): `POST security/password` (`old_password` обязателен — пароль уже задан), `GET security/2fa`, `POST security/2fa/enable` (→ qr+code), `…/confirm`, `…/disable`. Ключи безопасности: `GET security/webauthn`, `POST security/webauthn/register/begin`·`/register/complete`·`/remove` (см. «Вход по ключу безопасности»).
 - Устройства/сессии (Identity+Users): `GET sessions`, `POST devices/rename`, `POST sessions/revoke` (один `RemoveActiveSession` — он сам удаляет устройство в Users; текущую сессию завершать запрещено), `POST sessions/revoke-others`.
 - Аккаунт: `POST account/delete` (`DeleteAccount` + `ClearSession` → клиент уходит на `/login`).
 - Аватар: `POST avatar` (multipart `file` → `FilesServerApi.UploadAvatarServer` → `UsersServerApi.SetProfilePictureServer`), `POST avatar/remove` (тот же server-API с пустыми URL).

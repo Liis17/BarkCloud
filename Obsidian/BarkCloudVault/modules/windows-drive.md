@@ -154,6 +154,15 @@
 
 Запуск требует драйвера **Dokany 2.x** + бэкенда; адрес — в `Engine/appsettings.json`.
 
+## Вход по ключу безопасности (WebAuthn / FIDO2)
+
+**Только вход** (passwordless, username-first); привязка/удаление ключей — в вебе ([[modules/backend-web]]).
+
+- **App:** `WebAuthnClient.cs` — Windows WebAuthn API через managed-обёртку **`DSInternals.Win32.WebAuthn`** (3.2.0; не ручной P/Invoke). Системный диалог (PIN + касание) с HWND мастера. Парсит серверные options, собирает assertion в формат `Fido2` (`AuthenticatorAssertionRawResponse`, base64url через `System.Buffers.Text.Base64Url`). origin clientData = `https://<RpId>` (формирует webauthn.dll) — совпадает с `Origins` Identity.
+- **Кнопка** «Войти ключом» в `FirstRunWizard` (шаг входа). Скрыта, если хост сервера — IP (WebAuthn требует домен) или ОС < Windows 10 1903.
+- **Engine:** `IDriveEngine.BeginWebAuthnAsync(login)` → `WebAuthnChallenge{OptionsJson,ChallengeId,RpId}`; `CompleteWebAuthnAsync(challengeId, assertionJson)`. `TokenManager` проксирует в `Identity.BeginWebAuthnAssertion`/`CompleteWebAuthnAssertion`, сессию сохраняет общим `ApplyTokens` (как пароль). Пустой `ChallengeId` = вход по ключу недоступен.
+- Бэкенд — [[modules/backend-identity]] (общий на всех клиентов). Тестируется только на Windows с физическим ключом + доменным сервером.
+
 ## Локализация (RU + EN + DE)
 
 UI и сообщения статуса/ошибок движка локализованы; легко добавить язык.

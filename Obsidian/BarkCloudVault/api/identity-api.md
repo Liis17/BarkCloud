@@ -19,6 +19,9 @@ Package: `barkcloud.identity`
 | `EnableOtpVerification` / `ConfirmOtpVerification` / `DisableOtpVerification` / `ListOtpVerification` | ✅ | Управление 2FA |
 | `ResetPassword` / `ConfirmResetPassword` / `SetPassword` | ✅ | Пароль |
 | `Logout(LogoutRequest) → LogoutResponse` | ✅ | Завершить сессию (триггерит `SessionRevokedEvent`) |
+| `BeginWebAuthnRegistration` / `CompleteWebAuthnRegistration` | ✅ | Привязка ключа безопасности (под токеном) |
+| `BeginWebAuthnAssertion` / `CompleteWebAuthnAssertion` | ✅ | Вход по ключу (passwordless, **публичные** как `Auth`) → выдают `AuthResponse` |
+| `ListWebAuthnCredentials` / `RemoveWebAuthnCredential` | ✅ | Список/удаление ключей (под токеном) |
 
 ## Сервис: `IdentityServerApi` (служебный)
 
@@ -31,7 +34,7 @@ Package: `barkcloud.identity`
 
 ## Типизированные ошибки
 
-См. `Shared/BarkCloud.Shared.Exceptions/Identity/` ([[modules/shared-exceptions]]) — 22 исключения, в т.ч. `InvalidLoginOrPasswordException`, `InvalidRefreshTokenException`, `OtpCodeNeedException`, `EmailExistException`, `UsernameReservedException`, `XAppInfoIsRequiedException`, `XDeviceNameIsRequiredException`, `XOsNameIsRequiredException`.
+См. `Shared/BarkCloud.Shared.Exceptions/Identity/` ([[modules/shared-exceptions]]) — 25 исключений, в т.ч. `InvalidLoginOrPasswordException`, `InvalidRefreshTokenException`, `OtpCodeNeedException`, `EmailExistException`, `UsernameReservedException`, `XAppInfoIsRequiedException`, `XDeviceNameIsRequiredException`, `XOsNameIsRequiredException`, а также WebAuthn: `NoWebAuthnCredentialsException`, `WebAuthnChallengeExpiredException`, `WebAuthnVerificationFailedException`.
 
 ## Связанные потоки
 
