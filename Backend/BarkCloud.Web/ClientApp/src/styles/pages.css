@@ -584,8 +584,8 @@ tr.selected .row-actions { opacity: 1; }
   min-height: 240px;
   border-radius: 8px;
   overflow: hidden;
-  color: #d8e8e5;
-  background: #000;
+  color: var(--md-on-surface-variant);
+  background: transparent;
 }
 .public-preview img,
 .public-preview video {
