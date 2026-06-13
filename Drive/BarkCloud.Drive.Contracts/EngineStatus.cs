@@ -7,9 +7,6 @@ public sealed class EngineStatus
     public bool Authenticated { get; set; }
     public bool Mounted { get; set; }
     public string? DriveLetter { get; set; }
-    public long UsedBytes { get; set; }
-    public long LimitBytes { get; set; }
-
     // Физический диск сервера: всего, занято не-S3 данными, занято S3 (облаком).
     // Свободное = DiskTotalBytes - DiskOtherBytes - DiskS3Bytes.
     public long DiskTotalBytes { get; set; }

@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 
 using BarkCloud.GrpcServer;
@@ -67,6 +68,8 @@ public sealed class PageDataBuilder
             ["storage.used_label"] = "0 Б",
             ["storage.total_label"] = "0 Б",
             ["storage.percent"] = "0",
+            ["storage.other_pct"] = "0",
+            ["storage.s3_pct"] = "0",
             // навигационные счётчики опускаем — пустые значения скрывают бейджи
             ["nav.photos_count"] = "",
             ["nav.videos_count"] = "",
@@ -98,11 +101,15 @@ public sealed class PageDataBuilder
         try
         {
             var storage = await _files.GetUserStorageInfoAsync(new GetUserStorageInfoRequest(), token);
-            var limit = ResolveLimit(storage.StorageLimit, profile?.StorageLimitGb ?? 0);
 
-            vars["storage.used_label"] = Format.Size(storage.TotalUsedStorage);
-            vars["storage.total_label"] = Format.Size(limit);
-            vars["storage.percent"] = Format.Percent(storage.TotalUsedStorage, limit).ToString();
+            var diskTotal = storage.TotalAvailableStorage;
+            var diskUsed = storage.DiskUsedStorage + storage.S3UsedStorage;
+
+            vars["storage.used_label"] = Format.Size(diskUsed);
+            vars["storage.total_label"] = Format.Size(diskTotal);
+            vars["storage.percent"] = Format.Percent(diskUsed, diskTotal).ToString();
+            vars["storage.other_pct"] = PctOf(storage.DiskUsedStorage, diskTotal).ToString(CultureInfo.InvariantCulture);
+            vars["storage.s3_pct"] = PctOf(storage.S3UsedStorage, diskTotal).ToString(CultureInfo.InvariantCulture);
         }
         catch (RpcException ex)
         {
@@ -114,42 +121,34 @@ public sealed class PageDataBuilder
 
     /// <summary>
     /// Только блок хранилища для сайдбара (GET /api/storage) — без профиля.
-    /// GetUser дёргается лишь при отсутствии лимита в Files (фолбэк StorageLimitGb).
+    /// Показывает заполнение физического диска сервера (не-S3 + S3), как и вкладка настроек.
     /// </summary>
     public async Task<object> BuildStorageAsync(WebUser user)
     {
         var token = BrowserContext.UserToken(user.AccessToken);
 
-        long used = 0, limit = 0;
+        long diskTotal = 0, diskOther = 0, diskS3 = 0;
         try
         {
             var storage = await _files.GetUserStorageInfoAsync(new GetUserStorageInfoRequest(), token);
-            used = storage.TotalUsedStorage;
-            limit = storage.StorageLimit;
+            diskTotal = storage.TotalAvailableStorage;
+            diskOther = storage.DiskUsedStorage;
+            diskS3 = storage.S3UsedStorage;
         }
         catch (RpcException ex)
         {
             _logger.LogWarning("Storage/GetUserStorageInfo не выполнен: {Status}", ex.StatusCode);
         }
 
-        if (limit <= 0)
-        {
-            try
-            {
-                var profile = (await _users.GetUserAsync(new GetUserRequest { UserId = user.UserId }, token)).User;
-                limit = ResolveLimit(0, profile?.StorageLimitGb ?? 0);
-            }
-            catch (RpcException ex)
-            {
-                _logger.LogWarning("Storage/GetUser не выполнен: {Status}", ex.StatusCode);
-            }
-        }
+        var diskUsed = diskOther + diskS3;
 
         return new
         {
-            usedLabel = Format.Size(used),
-            totalLabel = Format.Size(limit),
-            percent = Format.Percent(used, limit)
+            usedLabel = Format.Size(diskUsed),
+            totalLabel = Format.Size(diskTotal),
+            percent = Format.Percent(diskUsed, diskTotal),
+            otherPct = PctOf(diskOther, diskTotal),
+            s3Pct = PctOf(diskS3, diskTotal)
         };
     }
 

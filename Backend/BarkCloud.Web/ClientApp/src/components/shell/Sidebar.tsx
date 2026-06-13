@@ -79,7 +79,10 @@ export function Sidebar() {
           </span>
         </div>
         <div className="bar">
-          <div className="bar-fill" style={{ width: (storage?.percent ?? 0) + '%' }} />
+          <div style={{ display: 'flex', height: '100%', width: '100%' }}>
+            <div style={{ width: (storage?.otherPct ?? 0) + '%', background: 'var(--md-on-surface-variant)' }} />
+            <div style={{ width: (storage?.s3Pct ?? 0) + '%', background: '#9A4F1E' }} />
+          </div>
         </div>
         <div className="sb-storage-foot">
           <span>{storage?.percent ?? 0}% использовано</span>

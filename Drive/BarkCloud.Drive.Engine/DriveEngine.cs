@@ -211,8 +211,6 @@ public sealed class DriveEngine : IDriveEngine
             try
             {
                 var storage = _gateway.GetStorage();
-                status.UsedBytes = storage.TotalUsedStorage;
-                status.LimitBytes = storage.StorageLimit;
                 status.DiskTotalBytes = storage.TotalAvailableStorage;
                 status.DiskOtherBytes = storage.DiskUsedStorage;
                 status.DiskS3Bytes = storage.S3UsedStorage;

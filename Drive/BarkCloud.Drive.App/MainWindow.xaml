@@ -67,7 +67,10 @@
             <!-- Хранилище -->
             <ui:Card Margin="0,12,0,0">
                 <StackPanel>
-                    <TextBlock Text="{loc:Tr Main_Storage}" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                    <Grid Margin="0,0,0,8">
+                        <TextBlock Text="{loc:Tr Main_Storage}" FontWeight="SemiBold" HorizontalAlignment="Left"/>
+                        <TextBlock x:Name="UsageText" Text="—" Opacity="0.7" HorizontalAlignment="Right"/>
+                    </Grid>
                     <Border Height="6" CornerRadius="3" ClipToBounds="True"
                             Background="{DynamicResource ControlFillColorSecondaryBrush}">
                         <Grid>
@@ -80,8 +83,7 @@
                             <Border Grid.Column="1" Background="#9A4F1E"/>
                         </Grid>
                     </Border>
-                    <TextBlock x:Name="UsageText" Margin="0,8,0,0" Text="—"/>
-                    <StackPanel x:Name="UsageLegend" Orientation="Horizontal" Margin="0,6,0,0" Visibility="Collapsed">
+                    <StackPanel x:Name="UsageLegend" Orientation="Horizontal" Margin="0,8,0,0" Visibility="Collapsed">
                         <Rectangle Width="10" Height="10" RadiusX="2" RadiusY="2" VerticalAlignment="Center"
                                    Fill="{DynamicResource TextFillColorSecondaryBrush}"/>
                         <TextBlock x:Name="LegendOtherText" Margin="6,0,16,0" FontSize="12" VerticalAlignment="Center"/>

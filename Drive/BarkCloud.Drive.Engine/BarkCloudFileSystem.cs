@@ -379,9 +379,12 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
         freeBytesAvailable = totalNumberOfBytes = totalNumberOfFreeBytes = 0;
         try
         {
+            // Проводник показывает заполнение физического диска сервера: занято = не-S3 + S3.
             var s = _gateway.GetStorage();
-            var free = Math.Max(0, s.StorageLimit - s.TotalUsedStorage);
-            totalNumberOfBytes = s.StorageLimit;
+            var total = s.TotalAvailableStorage;
+            var used = s.DiskUsedStorage + s.S3UsedStorage;
+            var free = Math.Max(0, total - used);
+            totalNumberOfBytes = total;
             freeBytesAvailable = free;
             totalNumberOfFreeBytes = free;
             return DokanResult.Success;
