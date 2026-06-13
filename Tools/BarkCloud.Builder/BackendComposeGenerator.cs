@@ -175,7 +175,6 @@ services:
     restart: always
     # Наружу выставлены только эти порты; микросервисы доступны лишь через прокси
     ports:
-      - "80:80"
       - "443:443"
       - "${IDENTITY_PORT}:${IDENTITY_PORT}"
       - "${USERS_PORT}:${USERS_PORT}"
@@ -547,13 +546,7 @@ server {
     }
 }
 
-# --- Веб-клиент (порт 443): HTTP→HTTPS редирект + прокси на cloud-web:8080 ---
-server {
-    listen 80;
-    server_name {{domain}};
-    return 301 https://$host$request_uri;
-}
-
+# --- Веб-клиент (порт 443): прокси на cloud-web:8080 ---
 server {
     listen 443 ssl;
     server_name {{domain}};
