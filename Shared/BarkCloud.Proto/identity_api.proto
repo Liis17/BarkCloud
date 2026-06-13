@@ -52,6 +52,24 @@ service IdentityApi {
 
   // Разлогиниться с текущего устройства
   rpc Logout(LogoutRequest) returns(LogoutResponse);
+
+  // Привязать ключ безопасности (FIDO2/WebAuthn) — начать регистрацию
+  rpc BeginWebAuthnRegistration(BeginWebAuthnRegistrationRequest) returns(BeginWebAuthnRegistrationResponse);
+
+  // Завершить привязку ключа безопасности
+  rpc CompleteWebAuthnRegistration(CompleteWebAuthnRegistrationRequest) returns(CompleteWebAuthnRegistrationResponse);
+
+  // Вход ключом безопасности — начать (вернуть challenge/allowCredentials)
+  rpc BeginWebAuthnAssertion(BeginWebAuthnAssertionRequest) returns(BeginWebAuthnAssertionResponse);
+
+  // Вход ключом безопасности — завершить (проверить assertion, выдать токены)
+  rpc CompleteWebAuthnAssertion(CompleteWebAuthnAssertionRequest) returns(AuthResponse);
+
+  // Список привязанных ключей безопасности
+  rpc ListWebAuthnCredentials(ListWebAuthnCredentialsRequest) returns(ListWebAuthnCredentialsResponse);
+
+  // Удалить привязанный ключ безопасности
+  rpc RemoveWebAuthnCredential(RemoveWebAuthnCredentialRequest) returns(RemoveWebAuthnCredentialResponse);
 }
 
 // Серверное API для админ-панели
@@ -289,3 +307,59 @@ message SetPasswordResponse { }
 message LogoutRequest { }
 
 message LogoutResponse { }
+
+// === WebAuthn / FIDO2 ===
+// options_json и *_json — это сериализованные структуры WebAuthn (PublicKeyCredentialCreationOptions,
+// PublicKeyCredentialRequestOptions и ответы authenticator'а). Передаём строкой: Fido2NetLib
+// сериализует/десериализует их штатно, браузер/webauthn.dll отдают JSON-совместимые объекты.
+
+message BeginWebAuthnRegistrationRequest { } // userId берётся из токена
+
+message BeginWebAuthnRegistrationResponse {
+  string options_json = 1; // CredentialCreateOptions (challenge, rp, user, pubKeyCredParams, excludeCredentials)
+  string challenge_id = 2; // идентификатор сохранённого на сервере challenge
+}
+
+message CompleteWebAuthnRegistrationRequest {
+  string challenge_id = 1;     // идентификатор challenge из begin
+  string attestation_json = 2; // AuthenticatorAttestationRawResponse
+  string credential_name = 3;  // отображаемое имя ключа ("Мой YubiKey")
+}
+
+message CompleteWebAuthnRegistrationResponse { }
+
+message BeginWebAuthnAssertionRequest {
+  oneof login {
+    string username = 1; // имя пользователя
+    string email = 2;    // емейл
+  }
+}
+
+message BeginWebAuthnAssertionResponse {
+  string options_json = 1; // AssertionOptions (challenge, allowCredentials)
+  string challenge_id = 2; // идентификатор сохранённого на сервере challenge
+}
+
+message CompleteWebAuthnAssertionRequest {
+  string challenge_id = 1;   // идентификатор challenge из begin
+  string assertion_json = 2; // AuthenticatorAssertionRawResponse
+}
+// ответ — AuthResponse (access_token + refresh_token)
+
+message ListWebAuthnCredentialsRequest { }
+
+message ListWebAuthnCredentialsResponse {
+  message Credential {
+    string id = 1;                              // идентификатор записи (для удаления)
+    string name = 2;                            // отображаемое имя ключа
+    google.protobuf.Timestamp created_at = 3;   // когда привязан
+    google.protobuf.Timestamp last_used_at = 4; // когда последний раз использовался
+  }
+  repeated Credential credentials = 1;
+}
+
+message RemoveWebAuthnCredentialRequest {
+  string credential_id = 1; // идентификатор записи (из List)
+}
+
+message RemoveWebAuthnCredentialResponse { }
