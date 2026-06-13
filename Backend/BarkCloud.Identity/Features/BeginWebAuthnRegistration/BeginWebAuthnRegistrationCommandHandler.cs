@@ -51,9 +51,9 @@ public class BeginWebAuthnRegistrationCommandHandler(
             ExcludeCredentials = excludeCredentials,
             AuthenticatorSelection = new AuthenticatorSelection
             {
-                // username-first: resident key не требуется
-                ResidentKey = ResidentKeyRequirement.Discouraged,
-                UserVerification = UserVerificationRequirement.Preferred
+                // passwordless: resident key обязателен, чтобы входить без ввода логина
+                ResidentKey = ResidentKeyRequirement.Required,
+                UserVerification = UserVerificationRequirement.Required
             },
             AttestationPreference = AttestationConveyancePreference.None,
             Extensions = new AuthenticationExtensionsClientInputs { CredProps = true }

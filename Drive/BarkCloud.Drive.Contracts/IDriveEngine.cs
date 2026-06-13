@@ -7,9 +7,9 @@ public interface IDriveEngine
     // Логин логином/паролем (+ опциональный OTP). Движок сам хранит и обновляет токен.
     Task<EngineStatus> LoginAsync(string login, string password, string? otpCode);
 
-    // Начать вход по ключу безопасности (WebAuthn): вернуть challenge/options и RP ID
-    // для системного вызова в UI. Пустой ChallengeId — вход по ключу недоступен.
-    Task<WebAuthnChallenge> BeginWebAuthnAsync(string login);
+    // Начать passwordless-вход по ключу (WebAuthn): вернуть challenge/options и RP ID
+    // для системного вызова в UI. Логин не нужен (discoverable). Пустой ChallengeId — недоступно.
+    Task<WebAuthnChallenge> BeginWebAuthnAsync();
 
     // Завершить вход по ключу: проверить assertion на сервере и сохранить сессию.
     Task<EngineStatus> CompleteWebAuthnAsync(string challengeId, string assertionJson);

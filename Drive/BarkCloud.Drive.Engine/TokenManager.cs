@@ -34,16 +34,10 @@ internal sealed class TokenManager(IdentityApi.IdentityApiClient identity, Token
         ApplyTokens(response.AccessToken, response.RefreshToken);
     }
 
-    // Вход по ключу безопасности — шаг 1: получить challenge/options от сервера.
-    public async Task<(string OptionsJson, string ChallengeId)> BeginWebAuthnAsync(string login)
+    // Вход по ключу безопасности — шаг 1: получить challenge/options от сервера (passwordless).
+    public async Task<(string OptionsJson, string ChallengeId)> BeginWebAuthnAsync()
     {
-        var request = new BeginWebAuthnAssertionRequest();
-        if (login.Contains('@'))
-            request.Email = login;
-        else
-            request.Username = login;
-
-        var response = await identity.BeginWebAuthnAssertionAsync(request);
+        var response = await identity.BeginWebAuthnAssertionAsync(new BeginWebAuthnAssertionRequest());
         return (response.OptionsJson, response.ChallengeId);
     }
 

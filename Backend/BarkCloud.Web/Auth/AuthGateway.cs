@@ -142,22 +142,16 @@ public sealed class AuthGateway
         }
     }
 
-    /// <summary>Начать вход по ключу безопасности: вернуть options и challengeId, либо null,
-    /// если у аккаунта нет ключей / пользователь не найден.</summary>
-    public async Task<(string OptionsJson, string ChallengeId)?> BeginWebAuthnAsync(HttpContext http, string login)
+    /// <summary>Начать passwordless-вход по ключу: вернуть options и challengeId (логин не нужен —
+    /// пользователь определяется самим ключом). null при ошибке сервиса.</summary>
+    public async Task<(string OptionsJson, string ChallengeId)?> BeginWebAuthnAsync(HttpContext http)
     {
         var deviceId = GetOrCreateDeviceId(http);
         var device = BrowserContext.BuildDeviceInfo(http, deviceId, _appName, _appVersion);
 
-        var request = new BeginWebAuthnAssertionRequest();
-        if (LooksLikeEmail(login))
-            request.Email = login;
-        else
-            request.Username = login;
-
         try
         {
-            var response = await _identity.BeginWebAuthnAssertionAsync(request, device.ToMetadata());
+            var response = await _identity.BeginWebAuthnAssertionAsync(new BeginWebAuthnAssertionRequest(), device.ToMetadata());
             return (response.OptionsJson, response.ChallengeId);
         }
         catch (RpcException ex)

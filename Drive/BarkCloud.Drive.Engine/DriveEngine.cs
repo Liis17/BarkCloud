@@ -51,14 +51,11 @@ public sealed class DriveEngine : IDriveEngine
         }
     }
 
-    public async Task<WebAuthnChallenge> BeginWebAuthnAsync(string login)
+    public async Task<WebAuthnChallenge> BeginWebAuthnAsync()
     {
-        if (string.IsNullOrWhiteSpace(login))
-            return new WebAuthnChallenge();
-
         try
         {
-            var (optionsJson, challengeId) = await _tokens.BeginWebAuthnAsync(login);
+            var (optionsJson, challengeId) = await _tokens.BeginWebAuthnAsync();
             return new WebAuthnChallenge
             {
                 OptionsJson = optionsJson,
