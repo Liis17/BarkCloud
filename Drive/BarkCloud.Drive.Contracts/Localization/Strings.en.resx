@@ -239,6 +239,18 @@
   <data name="Wizard_EnterLoginPassword" xml:space="preserve">
     <value>Enter username and password.</value>
   </data>
+  <data name="Wizard_KeyLogin" xml:space="preserve">
+    <value>Sign in with security key</value>
+  </data>
+  <data name="Wizard_EnterLogin" xml:space="preserve">
+    <value>Enter your username.</value>
+  </data>
+  <data name="Wizard_KeyUnavailable" xml:space="preserve">
+    <value>Security key sign-in is not available for this account.</value>
+  </data>
+  <data name="Wizard_KeyFailed" xml:space="preserve">
+    <value>Could not sign in with the security key.</value>
+  </data>
   <data name="Wizard_LoginFailed" xml:space="preserve">
     <value>Sign-in failed.</value>
   </data>

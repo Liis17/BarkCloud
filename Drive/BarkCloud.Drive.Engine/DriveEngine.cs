@@ -51,6 +51,56 @@ public sealed class DriveEngine : IDriveEngine
         }
     }
 
+    public async Task<WebAuthnChallenge> BeginWebAuthnAsync(string login)
+    {
+        if (string.IsNullOrWhiteSpace(login))
+            return new WebAuthnChallenge();
+
+        try
+        {
+            var (optionsJson, challengeId) = await _tokens.BeginWebAuthnAsync(login);
+            return new WebAuthnChallenge
+            {
+                OptionsJson = optionsJson,
+                ChallengeId = challengeId,
+                RpId = ExtractRpId(optionsJson)
+            };
+        }
+        catch (Exception ex)
+        {
+            // Нет ключей / ошибка — пустой ChallengeId сигнализирует UI о недоступности.
+            EngineLog.Error("BeginWebAuthn", ex);
+            return new WebAuthnChallenge();
+        }
+    }
+
+    public async Task<EngineStatus> CompleteWebAuthnAsync(string challengeId, string assertionJson)
+    {
+        try
+        {
+            await _tokens.CompleteWebAuthnAsync(challengeId, assertionJson);
+            await _profile.EnsureLoadedAsync();
+            return Status(Loc.T("Eng_AuthSuccess"));
+        }
+        catch (Exception ex)
+        {
+            return Error(ex);
+        }
+    }
+
+    private static string ExtractRpId(string optionsJson)
+    {
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(optionsJson);
+            return doc.RootElement.TryGetProperty("rpId", out var rp) ? rp.GetString() ?? string.Empty : string.Empty;
+        }
+        catch
+        {
+            return string.Empty;
+        }
+    }
+
     public Task<EngineStatus> LogoutAsync()
     {
         try

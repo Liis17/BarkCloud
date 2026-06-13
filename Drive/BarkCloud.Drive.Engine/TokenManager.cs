@@ -31,15 +31,44 @@ internal sealed class TokenManager(IdentityApi.IdentityApiClient identity, Token
             request.Username = login;
 
         var response = await identity.AuthAsync(request);
+        ApplyTokens(response.AccessToken, response.RefreshToken);
+    }
 
+    // Вход по ключу безопасности — шаг 1: получить challenge/options от сервера.
+    public async Task<(string OptionsJson, string ChallengeId)> BeginWebAuthnAsync(string login)
+    {
+        var request = new BeginWebAuthnAssertionRequest();
+        if (login.Contains('@'))
+            request.Email = login;
+        else
+            request.Username = login;
+
+        var response = await identity.BeginWebAuthnAssertionAsync(request);
+        return (response.OptionsJson, response.ChallengeId);
+    }
+
+    // Вход по ключу безопасности — шаг 2: отправить assertion, получить и сохранить токены.
+    public async Task CompleteWebAuthnAsync(string challengeId, string assertionJson)
+    {
+        var response = await identity.CompleteWebAuthnAssertionAsync(new CompleteWebAuthnAssertionRequest
+        {
+            ChallengeId = challengeId,
+            AssertionJson = assertionJson
+        });
+
+        ApplyTokens(response.AccessToken, response.RefreshToken);
+    }
+
+    private void ApplyTokens(Token access, Token refresh)
+    {
         lock (_lock)
         {
-            _accessToken = response.AccessToken.Value;
-            _refreshToken = response.RefreshToken.Value;
-            _accessExpiresUtc = response.AccessToken.ExpirationDate?.ToDateTime() ?? DateTime.UtcNow.AddMinutes(5);
+            _accessToken = access.Value;
+            _refreshToken = refresh.Value;
+            _accessExpiresUtc = access.ExpirationDate?.ToDateTime() ?? DateTime.UtcNow.AddMinutes(5);
         }
 
-        store.SaveRefreshToken(response.RefreshToken.Value);
+        store.SaveRefreshToken(refresh.Value);
         StartRefreshLoop();
     }
 
