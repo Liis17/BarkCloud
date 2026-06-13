@@ -99,7 +99,7 @@ function FileRow({ entry, selected, bulkChecked, onBulkToggle, onSelect, onOpen,
   return (
     <tr
       className={(selected ? 'selected' : '') + (bulkChecked ? ' checked' : '')}
-      onClick={() => onSelect(entry)}
+      onClick={(e) => (e.shiftKey ? onBulkToggle(entry, true) : onSelect(entry))}
       onDoubleClick={() => onOpen(entry)}
       onContextMenu={(e) => onMenu(e, entry)}
     >
@@ -725,7 +725,7 @@ export function FilesPage() {
                       selected={!!sel && sel.entryId === e.entryId}
                       bulkChecked={fsel.has(e.entryId)}
                       onBulkToggle={(t, shift) => fsel.select(t.entryId, files.map((f) => f.entryId), shift)}
-                      onSelect={setSel}
+                      onSelect={(t) => { setSel(t); fsel.setAnchor(t.entryId); }}
                       onOpen={openEntry}
                       onDownload={download}
                       onRename={(t) => startRename(t, false)}

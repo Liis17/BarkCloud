@@ -50,7 +50,11 @@ function VideoCard({ m, selecting, checked, onToggle, onOpen, onMenu }: {
 }) {
   const res = resLabel(m);
   return (
-    <div className={'vcard' + (checked ? ' checked' : '')} onClick={(e) => (selecting ? onToggle(e.shiftKey) : onOpen(m))} onContextMenu={(e) => onMenu(e, m)}>
+    <div
+      className={'vcard' + (checked ? ' checked' : '')}
+      onClick={(e) => (e.shiftKey ? onToggle(true) : selecting ? onToggle(false) : onOpen(m))}
+      onContextMenu={(e) => onMenu(e, m)}
+    >
       <div className="vthumb">
         <MediaThumb media={m} sizes="(max-width: 700px) 100vw, 320px" />
         <button className="selbox" onClick={(e) => { e.stopPropagation(); onToggle(e.shiftKey); }} title="Выбрать">
@@ -260,7 +264,7 @@ export function VideosPage() {
                       selecting={bulk.active}
                       checked={bulk.isSelected(m.id)}
                       onToggle={(shift) => bulk.toggle(m.id, shift)}
-                      onOpen={() => setLightbox(videos.findIndex((v) => v.id === m.id))}
+                      onOpen={(mm) => { bulk.setAnchor(mm.id); setLightbox(videos.findIndex((v) => v.id === mm.id)); }}
                       onMenu={actionsCtx.openMenu}
                     />
                   ))}

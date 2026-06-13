@@ -43,6 +43,11 @@ export function useSelection() {
     [selectRange, toggle],
   );
 
+  // Поставить якорь без изменения выбора — чтобы обычный клик/открытие задавали точку отсчёта для Shift.
+  const setAnchor = React.useCallback((id: string) => {
+    anchorRef.current = id;
+  }, []);
+
   const clear = React.useCallback(() => {
     anchorRef.current = null;
     setIds(new Set());
@@ -53,5 +58,5 @@ export function useSelection() {
     setIds(on ? new Set(all) : new Set());
   }, []);
 
-  return { ids, list: Array.from(ids), count: ids.size, active: ids.size > 0, toggle, select, selectRange, clear, has, setAll };
+  return { ids, list: Array.from(ids), count: ids.size, active: ids.size > 0, toggle, select, selectRange, setAnchor, clear, has, setAll };
 }

@@ -26,7 +26,11 @@ function Photo({ m, selecting, checked, onToggle, onOpen, onMenu }: {
   onMenu: (e: React.MouseEvent, m: MediaItem) => void;
 }) {
   return (
-    <div className={'photo' + (checked ? ' checked' : '')} onClick={(e) => (selecting ? onToggle(e.shiftKey) : onOpen(m))} onContextMenu={(e) => onMenu(e, m)}>
+    <div
+      className={'photo' + (checked ? ' checked' : '')}
+      onClick={(e) => (e.shiftKey ? onToggle(true) : selecting ? onToggle(false) : onOpen(m))}
+      onContextMenu={(e) => onMenu(e, m)}
+    >
       <MediaThumb media={m} sizes={GRID_SIZES} />
       <button className="selbox" onClick={(e) => { e.stopPropagation(); onToggle(e.shiftKey); }} title="Выбрать">
         {checked ? <Icon.check size={14} /> : null}
@@ -197,7 +201,7 @@ export function PhotosPage() {
                       selecting={bulk.active}
                       checked={bulk.isSelected(m.id)}
                       onToggle={(shift) => bulk.toggle(m.id, shift)}
-                      onOpen={() => setLightbox(photos.findIndex((p) => p.id === m.id))}
+                      onOpen={(mm) => { bulk.setAnchor(mm.id); setLightbox(photos.findIndex((p) => p.id === mm.id)); }}
                       onMenu={actionsCtx.openMenu}
                     />
                   ))}

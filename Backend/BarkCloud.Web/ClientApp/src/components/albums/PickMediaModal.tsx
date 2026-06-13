@@ -2,6 +2,7 @@ import React from 'react';
 import { Modal } from '../ui/Modal';
 import { MediaThumb } from '../media/MediaThumb';
 import { Icon } from '../Icon';
+import { useSelection } from '../../hooks/useSelection';
 import type { CardFile } from '../../lib/types';
 import type { ToastPush } from '../../hooks/useToast';
 
@@ -16,26 +17,19 @@ interface PickMediaModalProps {
 
 /** Выбор медиа для добавления в альбом. */
 export function PickMediaModal({ candidates, exclude, onClose, onAdd, toast, title = 'Добавить в альбом' }: PickMediaModalProps) {
-  const [sel, setSel] = React.useState<Set<string>>(() => new Set());
+  const sel = useSelection();
   const [busy, setBusy] = React.useState(false);
   const available = candidates.filter((p) => !exclude.has(p.id));
+  const orderedIds = available.map((p) => p.id);
 
-  function toggle(id: string) {
-    setSel((prev) => {
-      const n = new Set(prev);
-      if (n.has(id)) n.delete(id);
-      else n.add(id);
-      return n;
-    });
-  }
   async function add() {
-    if (!sel.size) {
+    if (!sel.count) {
       onClose();
       return;
     }
     setBusy(true);
     try {
-      await onAdd([...sel]);
+      await onAdd(sel.list);
     } catch (e) {
       toast((e as Error).message, 'err');
     } finally {
@@ -54,7 +48,7 @@ export function PickMediaModal({ candidates, exclude, onClose, onAdd, toast, tit
             Отмена
           </button>
           <button className="btn primary" onClick={add} disabled={busy}>
-            Добавить{sel.size ? ` (${sel.size})` : ''}
+            Добавить{sel.count ? ` (${sel.count})` : ''}
           </button>
         </>
       }
@@ -64,7 +58,7 @@ export function PickMediaModal({ candidates, exclude, onClose, onAdd, toast, tit
       ) : (
         <div className="pick-grid">
           {available.map((p) => (
-            <div key={p.id} className={'pick-cell' + (sel.has(p.id) ? ' on' : '')} onClick={() => toggle(p.id)}>
+            <div key={p.id} className={'pick-cell' + (sel.has(p.id) ? ' on' : '')} onClick={(e) => sel.select(p.id, orderedIds, e.shiftKey)}>
               <MediaThumb media={p} sizes="120px" />
               {sel.has(p.id) && (
                 <div className="pick-check">
