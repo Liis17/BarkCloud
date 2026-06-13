@@ -74,7 +74,7 @@ Parent: [[index]] · See also: [[api/identity-api]] · [[api/users-api]] · [[ap
 
 ### Rendering
 - `PageService.cs` — чтение и рендер файлов из `Pages/` (теперь только `Login Page Full.html`).
-- `PageDataBuilder.cs` — сбор серверных данных, отдаётся клиенту как JSON: каркас `BuildShellAsync` (`Users.GetUser` + `Files.GetUserStorageInfo`) → `GET /api/me`; `BuildSettingsJsonAsync` (профиль + bio + email через `UsersServerApi.GetUserContacts`, флаги 2FA `ListOtpVerification`, приватность `GetPrivacySettings`, сессии с `deviceId`, storage) → `GET /api/settings/full`.
+- `PageDataBuilder.cs` — сбор серверных данных, отдаётся клиенту как JSON: каркас `BuildShellAsync` (`Users.GetUser` + `Files.GetUserStorageInfo`) → `GET /api/me`; `BuildSettingsJsonAsync` (профиль + bio + email через `UsersServerApi.GetUserContacts`, флаги 2FA `ListOtpVerification`, приватность `GetPrivacySettings`, сессии с `deviceId`, storage) → `GET /api/settings/full`. Блок `storage.disk` (поля `totalAvailableStorage/diskUsedStorage/s3UsedStorage` из `GetUserStorageInfo`) питает **сегментированный бар физического диска сервера** в `StorageTab`: тёмно-серый — не-S3 данные, коричневый `#9A4F1E` — S3/облако, светло-серый — свободно.
 - `CloudJson.cs` — единый маппинг gRPC-типов Files → JSON-карточки (`Media`/`Dir`/`Album`/`Entry`/`Trash`), общий для `/api`. `Media` отдаёт `previews[]` (128/512/1024 с URL) для `srcset`; `Trash` добавляет `deletedAt`/`purgeAt`.
 - `Format.cs`, `FileKind.cs` — форматирование размеров/дат и классификация файлов.
 

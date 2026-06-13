@@ -257,6 +257,16 @@ export interface SettingsState {
     autoUpload: boolean;
     devicesCount: string;
     trashLabel: string;
+    disk: {
+      totalLabel: string;
+      usedLabel: string;
+      otherLabel: string;
+      s3Label: string;
+      freeLabel: string;
+      usedPct: number;
+      otherPct: number;
+      s3Pct: number;
+    };
   };
   sessions: Session[];
   sessionsHeader: string;

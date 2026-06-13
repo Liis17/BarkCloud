@@ -9,6 +9,10 @@ final class ProfileViewModel {
         var user: Barkcloud_Users_User?
         var usedStorage: Int64 = 0
         var storageLimit: Int64 = 0
+        // Физический диск сервера: всего, занято не-S3 данными, занято S3 (облаком).
+        var diskTotal: Int64 = 0
+        var diskOther: Int64 = 0
+        var diskS3: Int64 = 0
         var isLoading = true
         var isUpdatingAvatar = false
         var snackbar: String?
@@ -71,6 +75,9 @@ final class ProfileViewModel {
         if let storage = try? await transfer.storageInfo() {
             state.usedStorage = storage.used
             state.storageLimit = storage.limit
+            state.diskTotal = storage.diskTotal
+            state.diskOther = storage.diskOther
+            state.diskS3 = storage.diskS3
             StorageWidgetBridge.update(used: storage.used, limit: storage.limit)
         }
         state.isLoading = false

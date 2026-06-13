@@ -911,36 +911,42 @@ function PrivacyTab({ privacy, flash }: { privacy: Privacy; flash: Flash }) {
 
 // ─────────── Хранилище ───────────
 
+const DISK_OTHER_COLOR = 'var(--md-on-surface-variant)';
+const DISK_S3_COLOR = '#9A4F1E';
+
 function StorageTab({ storage }: { storage: SettingsState['storage'] }) {
+  const disk = storage.disk;
   return (
     <div className="set-card">
       <div className="set-card-head">
         <h3>Хранилище</h3>
         <div className="sub" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           <span>
-            {storage.used} из {storage.total} {storage.unit} использовано
+            {disk.usedLabel} из {disk.totalLabel} использовано на диске
           </span>
-          <span className="pill-info warn">{storage.percent}%</span>
+          <span className="pill-info warn">{disk.usedPct}%</span>
         </div>
       </div>
       <div className="set-card-body">
         <div className="stor-bar">
-          {storage.breakdown.map((b, i) => (
-            <span key={i} style={{ width: `${b.pct}%`, background: b.color }} />
-          ))}
+          <span style={{ width: `${disk.otherPct}%`, background: DISK_OTHER_COLOR }} />
+          <span style={{ width: `${disk.s3Pct}%`, background: DISK_S3_COLOR }} />
         </div>
         <div className="stor-legend">
-          {storage.breakdown.map((b, i) => (
-            <div key={i} className="item">
-              <span className="sw" style={{ background: b.color }} />
-              <span className="k">{b.k}</span>
-              <span className="v">{b.v}</span>
-            </div>
-          ))}
+          <div className="item">
+            <span className="sw" style={{ background: DISK_OTHER_COLOR }} />
+            <span className="k">Другие данные</span>
+            <span className="v">{disk.otherLabel}</span>
+          </div>
+          <div className="item">
+            <span className="sw" style={{ background: DISK_S3_COLOR }} />
+            <span className="k">Облако (S3)</span>
+            <span className="v">{disk.s3Label}</span>
+          </div>
           <div className="item">
             <span className="sw" style={{ background: 'var(--md-surface-container-high)', border: '1px solid var(--md-outline-variant)' }} />
             <span className="k">Свободно</span>
-            <span className="v">{storage.freeLabel}</span>
+            <span className="v">{disk.freeLabel}</span>
           </div>
         </div>
       </div>

@@ -1909,6 +1909,15 @@ public struct Barkcloud_Files_GetUserStorageInfoResponse: Sendable {
   /// Использованное пространство по типам файлов
   public var storageByTypes: [Barkcloud_Files_GetUserStorageInfoResponse.StorageByType] = []
 
+  /// Общий доступный размер диска/хранилища в байтах
+  public var totalAvailableStorage: Int64 = 0
+
+  /// Занято на диске без учета S3-данных в байтах
+  public var diskUsedStorage: Int64 = 0
+
+  /// Занято S3-данными в байтах
+  public var s3UsedStorage: Int64 = 0
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public struct StorageByType: Sendable {
@@ -6380,7 +6389,7 @@ extension Barkcloud_Files_PathResponse: SwiftProtobuf.Message, SwiftProtobuf._Me
 
 extension Barkcloud_Files_GetUserStorageInfoResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".GetUserStorageInfoResponse"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}total_used_storage\0\u{3}storage_limit\0\u{3}storage_by_types\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}total_used_storage\0\u{3}storage_limit\0\u{3}storage_by_types\0\u{3}total_available_storage\0\u{3}disk_used_storage\0\u{3}s3_used_storage\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -6391,6 +6400,9 @@ extension Barkcloud_Files_GetUserStorageInfoResponse: SwiftProtobuf.Message, Swi
       case 1: try { try decoder.decodeSingularInt64Field(value: &self.totalUsedStorage) }()
       case 2: try { try decoder.decodeSingularInt64Field(value: &self.storageLimit) }()
       case 3: try { try decoder.decodeRepeatedMessageField(value: &self.storageByTypes) }()
+      case 4: try { try decoder.decodeSingularInt64Field(value: &self.totalAvailableStorage) }()
+      case 5: try { try decoder.decodeSingularInt64Field(value: &self.diskUsedStorage) }()
+      case 6: try { try decoder.decodeSingularInt64Field(value: &self.s3UsedStorage) }()
       default: break
       }
     }
@@ -6406,6 +6418,15 @@ extension Barkcloud_Files_GetUserStorageInfoResponse: SwiftProtobuf.Message, Swi
     if !self.storageByTypes.isEmpty {
       try visitor.visitRepeatedMessageField(value: self.storageByTypes, fieldNumber: 3)
     }
+    if self.totalAvailableStorage != 0 {
+      try visitor.visitSingularInt64Field(value: self.totalAvailableStorage, fieldNumber: 4)
+    }
+    if self.diskUsedStorage != 0 {
+      try visitor.visitSingularInt64Field(value: self.diskUsedStorage, fieldNumber: 5)
+    }
+    if self.s3UsedStorage != 0 {
+      try visitor.visitSingularInt64Field(value: self.s3UsedStorage, fieldNumber: 6)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -6413,6 +6434,9 @@ extension Barkcloud_Files_GetUserStorageInfoResponse: SwiftProtobuf.Message, Swi
     if lhs.totalUsedStorage != rhs.totalUsedStorage {return false}
     if lhs.storageLimit != rhs.storageLimit {return false}
     if lhs.storageByTypes != rhs.storageByTypes {return false}
+    if lhs.totalAvailableStorage != rhs.totalAvailableStorage {return false}
+    if lhs.diskUsedStorage != rhs.diskUsedStorage {return false}
+    if lhs.s3UsedStorage != rhs.s3UsedStorage {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

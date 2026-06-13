@@ -161,6 +161,18 @@
   <data name="Main_StorageUsageFmt" xml:space="preserve">
     <value>{0} of {1}</value>
   </data>
+  <data name="Main_StorageDiskUsageFmt" xml:space="preserve">
+    <value>{0} of {1} on disk</value>
+  </data>
+  <data name="Main_StorageOther" xml:space="preserve">
+    <value>Other data</value>
+  </data>
+  <data name="Main_StorageCloud" xml:space="preserve">
+    <value>Cloud (S3)</value>
+  </data>
+  <data name="Main_StorageFree" xml:space="preserve">
+    <value>Free</value>
+  </data>
   <data name="Main_DriveMountedFmt" xml:space="preserve">
     <value>Drive {0}: mounted ({1})</value>
   </data>

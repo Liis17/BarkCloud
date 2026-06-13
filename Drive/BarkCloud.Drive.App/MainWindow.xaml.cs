@@ -202,15 +202,29 @@ public partial class MainWindow : FluentWindow
             AvatarEllipse.Visibility = Visibility.Collapsed;
         }
 
-        if (s.LimitBytes > 0)
+        if (s.DiskTotalBytes > 0)
         {
-            UsageBar.Value = s.UsedBytes * 100.0 / s.LimitBytes;
-            UsageText.Text = Loc.T("Main_StorageUsageFmt", Bytes(s.UsedBytes), Bytes(s.LimitBytes));
+            var other = Math.Max(0, s.DiskOtherBytes);
+            var s3 = Math.Max(0, s.DiskS3Bytes);
+            var free = Math.Max(0, s.DiskTotalBytes - other - s3);
+
+            UsageOtherCol.Width = new GridLength(other, GridUnitType.Star);
+            UsageS3Col.Width = new GridLength(s3, GridUnitType.Star);
+            UsageFreeCol.Width = new GridLength(free, GridUnitType.Star);
+
+            UsageText.Text = Loc.T("Main_StorageDiskUsageFmt", Bytes(other + s3), Bytes(s.DiskTotalBytes));
+            LegendOtherText.Text = $"{Loc.T("Main_StorageOther")} — {Bytes(other)}";
+            LegendS3Text.Text = $"{Loc.T("Main_StorageCloud")} — {Bytes(s3)}";
+            LegendFreeText.Text = $"{Loc.T("Main_StorageFree")} — {Bytes(free)}";
+            UsageLegend.Visibility = Visibility.Visible;
         }
         else
         {
-            UsageBar.Value = 0;
+            UsageOtherCol.Width = new GridLength(0, GridUnitType.Star);
+            UsageS3Col.Width = new GridLength(0, GridUnitType.Star);
+            UsageFreeCol.Width = new GridLength(1, GridUnitType.Star);
             UsageText.Text = "—";
+            UsageLegend.Visibility = Visibility.Collapsed;
         }
 
         DriveStateText.Text = s.Mounted

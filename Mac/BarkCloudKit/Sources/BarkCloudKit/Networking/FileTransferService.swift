@@ -43,11 +43,13 @@ public final class FileTransferService: Sendable {
         return result
     }
 
-    /// Информация о хранилище пользователя (использовано / лимит, в байтах).
-    public func storageInfo() async throws -> (used: Int64, limit: Int64) {
+    /// Информация о хранилище пользователя (всё в байтах): использовано / лимит,
+    /// а также разбивка физического диска сервера — всего, занято не-S3 данными,
+    /// занято S3 (облаком).
+    public func storageInfo() async throws -> (used: Int64, limit: Int64, diskTotal: Int64, diskOther: Int64, diskS3: Int64) {
         let stub = try await grpc.filesStub()
         let resp = try await stub.getUserStorageInfo(Barkcloud_Files_GetUserStorageInfoRequest())
-        return (resp.totalUsedStorage, resp.storageLimit)
+        return (resp.totalUsedStorage, resp.storageLimit, resp.totalAvailableStorage, resp.diskUsedStorage, resp.s3UsedStorage)
     }
 
     /// Свежий access-токен (через проактивный refresh) — для использования в

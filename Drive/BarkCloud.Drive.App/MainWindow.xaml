@@ -68,9 +68,31 @@
             <ui:Card Margin="0,12,0,0">
                 <StackPanel>
                     <TextBlock Text="{loc:Tr Main_Storage}" FontWeight="SemiBold" Margin="0,0,0,8"/>
-                    <ProgressBar x:Name="UsageBar" Minimum="0" Maximum="100" Height="6"/>
+                    <Border Height="6" CornerRadius="3" ClipToBounds="True"
+                            Background="{DynamicResource ControlFillColorSecondaryBrush}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition x:Name="UsageOtherCol" Width="0*"/>
+                                <ColumnDefinition x:Name="UsageS3Col" Width="0*"/>
+                                <ColumnDefinition x:Name="UsageFreeCol" Width="1*"/>
+                            </Grid.ColumnDefinitions>
+                            <Border Grid.Column="0" Background="{DynamicResource TextFillColorSecondaryBrush}"/>
+                            <Border Grid.Column="1" Background="#9A4F1E"/>
+                        </Grid>
+                    </Border>
                     <TextBlock x:Name="UsageText" Margin="0,8,0,0" Text="—"/>
-                    <TextBlock x:Name="DriveStateText" Opacity="0.7" Margin="0,2,0,0" Text="—"/>
+                    <StackPanel x:Name="UsageLegend" Orientation="Horizontal" Margin="0,6,0,0" Visibility="Collapsed">
+                        <Rectangle Width="10" Height="10" RadiusX="2" RadiusY="2" VerticalAlignment="Center"
+                                   Fill="{DynamicResource TextFillColorSecondaryBrush}"/>
+                        <TextBlock x:Name="LegendOtherText" Margin="6,0,16,0" FontSize="12" VerticalAlignment="Center"/>
+                        <Rectangle Width="10" Height="10" RadiusX="2" RadiusY="2" VerticalAlignment="Center" Fill="#9A4F1E"/>
+                        <TextBlock x:Name="LegendS3Text" Margin="6,0,16,0" FontSize="12" VerticalAlignment="Center"/>
+                        <Rectangle Width="10" Height="10" RadiusX="2" RadiusY="2" VerticalAlignment="Center"
+                                   Fill="{DynamicResource ControlFillColorSecondaryBrush}"
+                                   Stroke="{DynamicResource ControlStrokeColorDefaultBrush}" StrokeThickness="1"/>
+                        <TextBlock x:Name="LegendFreeText" Margin="6,0,0,0" FontSize="12" VerticalAlignment="Center"/>
+                    </StackPanel>
+                    <TextBlock x:Name="DriveStateText" Opacity="0.7" Margin="0,6,0,0" Text="—"/>
                 </StackPanel>
             </ui:Card>
 
