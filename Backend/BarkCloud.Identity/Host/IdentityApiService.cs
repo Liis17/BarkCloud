@@ -12,6 +12,12 @@ using BarkCloud.Identity.Features.ListOtpVerification;
 using BarkCloud.Identity.Features.Logout;
 using BarkCloud.Identity.Features.RemoveActiveSession;
 using BarkCloud.Identity.Features.ResetPassword;
+using BarkCloud.Identity.Features.BeginWebAuthnRegistration;
+using BarkCloud.Identity.Features.CompleteWebAuthnRegistration;
+using BarkCloud.Identity.Features.BeginWebAuthnAssertion;
+using BarkCloud.Identity.Features.CompleteWebAuthnAssertion;
+using BarkCloud.Identity.Features.ListWebAuthnCredentials;
+using BarkCloud.Identity.Features.RemoveWebAuthnCredential;
 using BarkCloud.Identity.Services;
 using BarkCloud.Proto.Identity;
 using BarkCloud.Shared.Identity;
@@ -203,5 +209,59 @@ public class IdentityApiService : BarkCloud.Proto.Identity.IdentityApi.IdentityA
     public override Task<LogoutResponse> Logout(LogoutRequest request, ServerCallContext context)
     {
         return _mediator.Send(new LogoutCommand());
+    }
+
+    [Authorize(Policy = nameof(TokenType.User))]
+    public override Task<BeginWebAuthnRegistrationResponse> BeginWebAuthnRegistration(BeginWebAuthnRegistrationRequest request, ServerCallContext context)
+    {
+        return _mediator.Send(new BeginWebAuthnRegistrationCommand());
+    }
+
+    [Authorize(Policy = nameof(TokenType.User))]
+    public override Task<CompleteWebAuthnRegistrationResponse> CompleteWebAuthnRegistration(CompleteWebAuthnRegistrationRequest request, ServerCallContext context)
+    {
+        return _mediator.Send(new CompleteWebAuthnRegistrationCommand
+        {
+            ChallengeId = request.ChallengeId,
+            AttestationJson = request.AttestationJson,
+            CredentialName = request.CredentialName
+        });
+    }
+
+    // Публичный (вход без токена), как Auth.
+    public override Task<BeginWebAuthnAssertionResponse> BeginWebAuthnAssertion(BeginWebAuthnAssertionRequest request, ServerCallContext context)
+    {
+        return _mediator.Send(new BeginWebAuthnAssertionCommand
+        {
+            Username = request.Username?.Trim(),
+            Email = request.Email?.Trim()
+        });
+    }
+
+    // Публичный (вход без токена), как Auth.
+    public override Task<AuthResponse> CompleteWebAuthnAssertion(CompleteWebAuthnAssertionRequest request, ServerCallContext context)
+    {
+        _metrics.Increment("webauthn_login_attempts");
+
+        return _mediator.Send(new CompleteWebAuthnAssertionCommand
+        {
+            ChallengeId = request.ChallengeId,
+            AssertionJson = request.AssertionJson
+        });
+    }
+
+    [Authorize(Policy = nameof(TokenType.User))]
+    public override Task<ListWebAuthnCredentialsResponse> ListWebAuthnCredentials(ListWebAuthnCredentialsRequest request, ServerCallContext context)
+    {
+        return _mediator.Send(new ListWebAuthnCredentialsCommand());
+    }
+
+    [Authorize(Policy = nameof(TokenType.User))]
+    public override Task<RemoveWebAuthnCredentialResponse> RemoveWebAuthnCredential(RemoveWebAuthnCredentialRequest request, ServerCallContext context)
+    {
+        return _mediator.Send(new RemoveWebAuthnCredentialCommand
+        {
+            CredentialId = request.CredentialId
+        });
     }
 }
