@@ -142,6 +142,59 @@ public sealed class AuthGateway
         }
     }
 
+    /// <summary>Начать вход по ключу безопасности: вернуть options и challengeId, либо null,
+    /// если у аккаунта нет ключей / пользователь не найден.</summary>
+    public async Task<(string OptionsJson, string ChallengeId)?> BeginWebAuthnAsync(HttpContext http, string login)
+    {
+        var deviceId = GetOrCreateDeviceId(http);
+        var device = BrowserContext.BuildDeviceInfo(http, deviceId, _appName, _appVersion);
+
+        var request = new BeginWebAuthnAssertionRequest();
+        if (LooksLikeEmail(login))
+            request.Email = login;
+        else
+            request.Username = login;
+
+        try
+        {
+            var response = await _identity.BeginWebAuthnAssertionAsync(request, device.ToMetadata());
+            return (response.OptionsJson, response.ChallengeId);
+        }
+        catch (RpcException ex)
+        {
+            _logger.LogInformation("WebAuthn begin не выполнен: {Status} {Detail}", ex.StatusCode, ex.Status.Detail);
+            return null;
+        }
+    }
+
+    /// <summary>Завершить вход по ключу безопасности: проверить assertion и выставить cookie сессии.</summary>
+    public async Task<LoginResult> CompleteWebAuthnAsync(HttpContext http, string challengeId, string assertionJson, bool remember)
+    {
+        var deviceId = GetOrCreateDeviceId(http);
+        var device = BrowserContext.BuildDeviceInfo(http, deviceId, _appName, _appVersion);
+
+        var request = new CompleteWebAuthnAssertionRequest
+        {
+            ChallengeId = challengeId,
+            AssertionJson = assertionJson
+        };
+
+        try
+        {
+            var response = await _identity.CompleteWebAuthnAssertionAsync(request, device.ToMetadata());
+
+            SetCookie(http, AccessCookie, response.AccessToken.Value, response.AccessToken.ExpirationDate, remember);
+            SetCookie(http, RefreshCookie, response.RefreshToken.Value, response.RefreshToken.ExpirationDate, remember);
+
+            return new LoginResult(LoginOutcome.Success);
+        }
+        catch (RpcException ex)
+        {
+            _logger.LogInformation("WebAuthn complete не выполнен: {Status} {Detail}", ex.StatusCode, ex.Status.Detail);
+            return new LoginResult(LoginOutcome.Error, ex.Status.Detail);
+        }
+    }
+
     public async Task LogoutAsync(HttpContext http, WebUser? user)
     {
         if (user is not null)

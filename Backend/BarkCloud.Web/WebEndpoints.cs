@@ -9,12 +9,16 @@ using BarkCloud.Web.Rendering;
 using Grpc.Core;
 
 using System.Net;
+using System.Text.Json;
 
 namespace BarkCloud.Web;
 
 public static class WebEndpoints
 {
     private const string LoginPage = "Login Page Full.html";
+
+    public sealed record WebAuthnLoginBeginBody(string? Login);
+    public sealed record WebAuthnLoginCompleteBody(string? ChallengeId, JsonElement Assertion, bool Remember);
 
     public static void MapWebEndpoints(this WebApplication app)
     {
@@ -66,6 +70,24 @@ public static class WebEndpoints
             var user = await auth.AuthenticateAsync(http);
             await auth.LogoutAsync(http, user);
             return Results.Redirect("/login");
+        });
+
+        // ───────── Вход по ключу безопасности (WebAuthn) ─────────
+
+        app.MapPost("/login/webauthn/begin", async (HttpContext http, AuthGateway auth, WebAuthnLoginBeginBody body) =>
+        {
+            var result = await auth.BeginWebAuthnAsync(http, body.Login ?? string.Empty);
+            return result is null
+                ? Results.BadRequest(new { message = "Вход по ключу недоступен для этого аккаунта" })
+                : Results.Ok(new { optionsJson = result.Value.OptionsJson, challengeId = result.Value.ChallengeId });
+        });
+
+        app.MapPost("/login/webauthn/complete", async (HttpContext http, AuthGateway auth, WebAuthnLoginCompleteBody body) =>
+        {
+            var result = await auth.CompleteWebAuthnAsync(http, body.ChallengeId ?? string.Empty, body.Assertion.GetRawText(), body.Remember);
+            return result.Outcome == LoginOutcome.Success
+                ? Results.Ok(new { ok = true })
+                : Results.BadRequest(new { message = result.Message ?? "Не удалось войти по ключу" });
         });
 
         // Same-origin прокси для favicon-превью: браузерный canvas не может надёжно
