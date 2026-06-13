@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net.Http.Headers;
 using System.Text.Json;
 
@@ -39,6 +40,8 @@ public static class CloudApiEndpoints
 
             var v = await data.BuildShellAsync(user, http);
             int.TryParse(v.GetValueOrDefault("storage.percent"), out var percent);
+            double.TryParse(v.GetValueOrDefault("storage.other_pct"), NumberStyles.Float, CultureInfo.InvariantCulture, out var otherPct);
+            double.TryParse(v.GetValueOrDefault("storage.s3_pct"), NumberStyles.Float, CultureInfo.InvariantCulture, out var s3Pct);
 
             return Results.Json(new
             {
@@ -53,7 +56,9 @@ public static class CloudApiEndpoints
                 {
                     usedLabel = v.GetValueOrDefault("storage.used_label"),
                     totalLabel = v.GetValueOrDefault("storage.total_label"),
-                    percent
+                    percent,
+                    otherPct,
+                    s3Pct
                 },
                 app = new
                 {
