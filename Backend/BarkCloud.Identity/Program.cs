@@ -46,11 +46,11 @@ public class Program
         // допустимые источники (Web-браузер и Drive через webauthn.dll шлют https://<RpId>).
         var webAuthnRpId = builder.Configuration["WebAuthn:RpId"] ?? "localhost";
         var webAuthnServerName = builder.Configuration["WebAuthn:ServerName"] ?? "BarkCloud";
-        var webAuthnOrigins = builder.Configuration.GetSection("WebAuthn:Origins").Get<string[]>();
-        if (webAuthnOrigins is null || webAuthnOrigins.Length == 0)
-        {
-            webAuthnOrigins = [$"https://{webAuthnRpId}"];
-        }
+        // Origins хранится одной строкой (через запятую). Если пусто — выводим из RP ID.
+        var webAuthnOriginsRaw = builder.Configuration["WebAuthn:Origins"];
+        var webAuthnOrigins = string.IsNullOrWhiteSpace(webAuthnOriginsRaw)
+            ? [$"https://{webAuthnRpId}"]
+            : webAuthnOriginsRaw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
         builder.Services.AddSingleton<IFido2>(_ => new Fido2(new Fido2Configuration
         {
