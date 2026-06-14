@@ -169,12 +169,19 @@ tr.selected .row-actions { opacity: 1; }
 .vcard:hover .vthumb .play { opacity: 1; border-radius: var(--r-full); }
 .vcard .vthumb .play svg { margin-left: 4px; }
 .vcard .v-badges { position: absolute; top: 10px; right: 10px; z-index: 2; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; pointer-events: none; }
-.vcard .vbadge { font-size: 11px; font-weight: 500; line-height: 1; padding: 4px 9px; border-radius: var(--r-full); display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
-.vcard .vbadge.res { background: rgba(255,255,255,.95); color: var(--md-on-surface); }
-.vcard .vbadge.codec { background: rgba(0,0,0,.6); color: #fff; font-variant-numeric: tabular-nums; }
-.vcard .vbadge.hdr { background: linear-gradient(135deg, #ffcf4a, #ff8a00); color: #3a1d00; font-weight: 700; letter-spacing: .4px; }
-.vcard .vbadge.dur { position: absolute; right: 10px; bottom: 10px; z-index: 2; background: rgba(0,0,0,.72); color: #fff; font-variant-numeric: tabular-nums; }
-.vcard .vbadge.bitrate { position: absolute; left: 10px; bottom: 10px; z-index: 2; background: rgba(0,0,0,.6); color: #fff; padding-left: 6px; }
+/* Единый «тёмный glass» для всех инфо-плашек — читается над любым кадром и не зависит от темы. */
+.vcard .vbadge {
+  font-size: 11px; font-weight: 500; line-height: 1; padding: 4px 9px; border-radius: var(--r-full);
+  display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;
+  background: rgba(0,0,0,.62); color: #fff;
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+}
+.vcard .vbadge.res { font-weight: 600; }
+.vcard .vbadge.codec { font-variant-numeric: tabular-nums; }
+/* HDR — единственный акцент: тёплый градиент с тёмным текстом, тоже одинаков в обеих темах. */
+.vcard .vbadge.hdr { background: linear-gradient(135deg, #ffcf4a, #ff8a00); color: #3a1d00; font-weight: 700; letter-spacing: .4px; backdrop-filter: none; -webkit-backdrop-filter: none; }
+.vcard .vbadge.dur { position: absolute; right: 10px; bottom: 10px; z-index: 2; font-variant-numeric: tabular-nums; }
+.vcard .vbadge.bitrate { position: absolute; left: 10px; bottom: 10px; z-index: 2; padding-left: 6px; }
 .vcard .vbadge.bitrate svg { flex-shrink: 0; }
 .vcard .vt { font-size: 15px; font-weight: 500; color: var(--md-on-surface); line-height: 22px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .vcard .vmeta { font-size: 12px; color: var(--md-on-surface-variant); display: flex; gap: 12px; }
