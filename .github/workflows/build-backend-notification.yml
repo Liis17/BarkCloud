@@ -8,6 +8,8 @@ on:
     paths:
       - 'Backend/BarkCloud.Notification/**'
       - 'Shared/**'
+      # proto: Notification его не использует — исключаем весь BarkCloud.Proto
+      - '!Shared/BarkCloud.Proto/**'
       - 'Tests/Backend/BarkCloud.Notification.Tests/**'
       - 'Tests/BarkCloud.TestKit/**'
       - 'Backend/rebuild.trigger'
