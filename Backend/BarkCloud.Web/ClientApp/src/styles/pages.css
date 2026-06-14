@@ -168,7 +168,7 @@ tr.selected .row-actions { opacity: 1; }
 }
 .vcard:hover .vthumb .play { opacity: 1; border-radius: var(--r-full); }
 .vcard .vthumb .play svg { margin-left: 4px; }
-.vcard .v-badges { position: absolute; top: 10px; right: 10px; z-index: 2; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; pointer-events: none; }
+.vcard .v-badges { position: absolute; top: 10px; left: 10px; z-index: 2; display: flex; flex-direction: row; flex-wrap: wrap; align-items: flex-start; gap: 6px; pointer-events: none; }
 /* Единый «тёмный glass» для всех инфо-плашек — читается над любым кадром и не зависит от темы. */
 .vcard .vbadge {
   font-size: 11px; font-weight: 500; line-height: 1; padding: 4px 9px; border-radius: var(--r-full);

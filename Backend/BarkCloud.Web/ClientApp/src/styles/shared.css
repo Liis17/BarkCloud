@@ -1357,6 +1357,8 @@ img.avatar { object-fit: cover; }
 .vcard.checked .vthumb .selbox { background: var(--md-primary); border-color: var(--md-primary); }
 .photo-grid .photo.checked { outline: 3px solid var(--md-primary); outline-offset: -3px; }
 .vcard.checked .vthumb { outline: 3px solid var(--md-primary); outline-offset: -3px; }
+/* У видео инфо-плашки заняли левый-верхний угол — чекбокс выбора уводим в свободный правый-верхний. */
+.vcard .vthumb .selbox { left: auto; right: 8px; }
 /* Shift+клик для выделения диапазона не должен подсвечивать текст/превью. */
 .photo-grid, .vid-grid, .ftable, .pick-grid { user-select: none; }
 
