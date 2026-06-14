@@ -935,7 +935,7 @@ public static class CloudApiEndpoints
                     http,
                     user.DeviceId ?? auth.GetOrCreateDeviceId(http),
                     config.Value("App:AppName", "BarkCloud Web"),
-                    config.Value("App:Version", "v1.0.0"));
+                    config.Value("App:Version", AppVersion.Current));
                 var uploadToken = BrowserContext.UserTokenWithDevice(user.AccessToken, device);
                 var upload = await files.GetUploadUrlAsync(new GetUploadUrlRequest { FileType = UploadFileType.CloudFile }, uploadToken);
 

@@ -41,7 +41,7 @@ public sealed class RegistrationGateway
         _identity = identity;
         _auth = auth;
         _appName = configuration.Value("App:AppName", "BarkCloud Web");
-        _appVersion = configuration.Value("App:Version", "v1.0.0");
+        _appVersion = configuration.Value("App:Version", AppVersion.Current);
         _emailEnabled = configuration.EmailEnabled();
         _logger = logger;
     }

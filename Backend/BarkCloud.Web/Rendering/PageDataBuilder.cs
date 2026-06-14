@@ -56,7 +56,7 @@ public sealed class PageDataBuilder
 
         var vars = new Dictionary<string, string?>
         {
-            ["app.version"] = _config.Value("App:Version", "v1.0.0"),
+            ["app.version"] = _config.Value("App:Version", AppVersion.Current),
             ["app.edition"] = _config.Value("App:Edition", "self-host"),
             ["server.host"] = _config.Value("App:PublicHost", http.Request.Host.Value),
             ["sync.status"] = "Синхронизировано",
@@ -249,7 +249,7 @@ public sealed class PageDataBuilder
             },
             system = new
             {
-                version = _config.Value("App:Version", "v1.0.0"),
+                version = _config.Value("App:Version", AppVersion.Current),
                 edition = _config.Value("App:Edition", "self-host"),
                 emailEnabled = _config.EmailEnabled()
             }
