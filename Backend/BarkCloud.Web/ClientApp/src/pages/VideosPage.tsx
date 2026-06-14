@@ -14,7 +14,7 @@ import { usePageHeader } from '../hooks/usePageHeader';
 import { useUploadActions } from '../hooks/useUploadManager';
 import { apiGet, pickFiles } from '../lib/api';
 import { plural, dateLabel, groupByDate } from '../lib/format';
-import type { Album, MediaItem } from '../lib/types';
+import type { Album, MediaItem, VideoMeta } from '../lib/types';
 
 function fmtSize(bytes: number): string {
   if (!bytes) return '0 Б';
@@ -28,16 +28,47 @@ function fmtSize(bytes: number): string {
   return (i === 0 ? v.toFixed(0) : v.toFixed(v < 10 ? 1 : 0)).replace('.', ',') + ' ' + u[i];
 }
 function resLabel(m: MediaItem): string {
+  // По меньшей стороне — корректно для вертикальных (портретных) роликов.
+  const w = m.width || 0;
   const h = m.height || 0;
-  if (h >= 2160) return '4K';
-  if (h >= 1440) return '1440p';
-  if (h >= 1080) return '1080p';
-  if (h >= 720) return '720p';
-  if (h > 0) return 'SD';
+  const lines = w && h ? Math.min(w, h) : h;
+  if (lines >= 2160) return '4K';
+  if (lines >= 1440) return '2K';
+  if (lines >= 1080) return '1080p';
+  if (lines >= 720) return '720p';
+  if (lines > 0) return 'SD';
   return '';
 }
 function shortDate(iso: string | null): string {
   return iso ? dateLabel(new Date(iso)) : '';
+}
+function fmtDuration(seconds: number): string {
+  const s = Math.round(seconds);
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  const pad = (n: number) => (n < 10 ? '0' + n : String(n));
+  return h > 0 ? `${h}:${pad(m)}:${pad(sec)}` : `${m}:${pad(sec)}`;
+}
+const CODEC_NAMES: Record<string, string> = {
+  hevc: 'H.265', h265: 'H.265', h264: 'H.264', avc: 'H.264', av1: 'AV1',
+  vp9: 'VP9', vp8: 'VP8', mpeg4: 'MPEG-4', mpeg2video: 'MPEG-2', prores: 'ProRes',
+  aac: 'AAC', mp3: 'MP3', opus: 'Opus', flac: 'FLAC', vorbis: 'Vorbis',
+  ac3: 'AC-3', eac3: 'E-AC-3', alac: 'ALAC', pcm_s16le: 'PCM', pcm_s24le: 'PCM',
+};
+function prettyCodec(c?: string): string {
+  if (!c) return '';
+  const k = c.toLowerCase();
+  return CODEC_NAMES[k] || c.toUpperCase();
+}
+/** «H.265 | AAC» — кодеки видео и аудио через вертикальную черту. */
+function codecLabel(v?: VideoMeta): string {
+  if (!v) return '';
+  return [prettyCodec(v.videoCodec), prettyCodec(v.audioCodec)].filter(Boolean).join(' | ');
+}
+const HIGH_BITRATE = 100_000_000; // 100 Мбит/с
+function fmtMbps(bps: number): string {
+  return Math.round(bps / 1_000_000) + ' Мбит/с';
 }
 
 function VideoCard({ m, selecting, checked, onToggle, onOpen, onMenu }: {
@@ -49,6 +80,11 @@ function VideoCard({ m, selecting, checked, onToggle, onOpen, onMenu }: {
   onMenu: (e: React.MouseEvent, m: MediaItem) => void;
 }) {
   const res = resLabel(m);
+  const v = m.video;
+  const dur = v?.duration ? fmtDuration(v.duration) : '';
+  const codecs = codecLabel(v);
+  const hdr = v?.hdr === true;
+  const highBitrate = (v?.bitrate || 0) > HIGH_BITRATE;
   return (
     <div
       className={'vcard' + (checked ? ' checked' : '')}
@@ -63,7 +99,26 @@ function VideoCard({ m, selecting, checked, onToggle, onOpen, onMenu }: {
         <button className="play">
           <Icon.play size={22} />
         </button>
-        {res && <div className="res">{res}</div>}
+
+        {/* верх-право: разрешение, HDR, кодеки — отдельными плашками */}
+        {(res || hdr || codecs) && (
+          <div className="v-badges tr">
+            {res && <span className="vbadge res">{res}</span>}
+            {hdr && <span className="vbadge hdr">HDR</span>}
+            {codecs && <span className="vbadge codec">{codecs}</span>}
+          </div>
+        )}
+
+        {/* низ-лево: высокий битрейт (> 100 Мбит/с) */}
+        {highBitrate && (
+          <div className="vbadge bitrate" title="Суммарный битрейт выше 100 Мбит/с">
+            <Icon.arrow size={12} style={{ transform: 'rotate(-90deg)' }} />
+            {fmtMbps(v!.bitrate!)}
+          </div>
+        )}
+
+        {/* низ-право: длительность */}
+        {dur && <div className="vbadge dur">{dur}</div>}
       </div>
       <div className="vt">{m.name}</div>
       <div className="vmeta">

@@ -14,7 +14,8 @@ public record VideoProbe(
     string? AudioCodec,
     long BitRate,
     double FrameRate,
-    IReadOnlyDictionary<string, string>? FormatTags);
+    IReadOnlyDictionary<string, string>? FormatTags,
+    string? ColorTransfer = null);
 
 /// <summary>
 /// Извлекает кадр-обложку и метаданные из видео через FFmpeg (FFMpegCore).
@@ -65,7 +66,8 @@ public class VideoThumbnailExtractor
             AudioCodec: audio?.CodecName,
             BitRate: bitRate,
             FrameRate: video?.FrameRate ?? 0,
-            FormatTags: info.Format?.Tags);
+            FormatTags: info.Format?.Tags,
+            ColorTransfer: video?.ColorTransfer);
     }
 
     /// <summary>

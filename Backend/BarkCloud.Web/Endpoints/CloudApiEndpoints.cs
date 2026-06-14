@@ -1310,6 +1310,7 @@ public static class CloudApiEndpoints
         if (m.HasAudioCodec) dict["audioCodec"] = m.AudioCodec;
         if (m.HasBitrate) dict["bitrate"] = m.Bitrate;
         if (m.HasFrameRate) dict["frameRate"] = m.FrameRate;
+        if (m.HasIsHdr) dict["isHdr"] = m.IsHdr;
 
         if (m.HasDocumentAuthor) dict["documentAuthor"] = m.DocumentAuthor;
         if (m.HasDocumentTitle) dict["documentTitle"] = m.DocumentTitle;

@@ -8,6 +8,15 @@ export interface Preview {
   url: string;
 }
 
+/** Тех-метаданные видео для тайла галереи (CloudJson.Card.video; только kind === 'video'). */
+export interface VideoMeta {
+  duration?: number; // секунды
+  videoCodec?: string;
+  audioCodec?: string;
+  bitrate?: number; // бит/с контейнера (≈ сумма аудио+видео)
+  hdr?: boolean;
+}
+
 /** Карточка файла-блоба (CloudJson.Card). */
 export interface CardFile {
   id: string;
@@ -24,6 +33,8 @@ export interface CardFile {
   uploadedAt: string | null;
   /** Полноразмерный JPEG для просмотра (HEIC и пр.); пусто/нет — показывать оригинал. */
   jpegViewUrl?: string;
+  /** Тех-метаданные видео для тайла (только kind === 'video'); присутствует, если извлечены. */
+  video?: VideoMeta;
 }
 
 /** Элемент галереи: карточка + записи каталога владельца (CloudJson.MediaItem). */
@@ -166,6 +177,7 @@ export interface FileMetadata {
   audioCodec?: string;
   bitrate?: number;
   frameRate?: number;
+  isHdr?: boolean;
 
   // Документ
   documentAuthor?: string;

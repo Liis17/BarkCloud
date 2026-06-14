@@ -17,7 +17,8 @@ public static class UploadFileMapping
     public static UploadFileInfo ToGrpc(
         this UploadFile file,
         string? publicBaseUrl = null,
-        IReadOnlyList<FilePreview>? previews = null)
+        IReadOnlyList<FilePreview>? previews = null,
+        FileMetadata? videoMetadata = null)
     {
         var info = new UploadFileInfo
         {
@@ -71,6 +72,18 @@ public static class UploadFileMapping
             info.JpegViewUrl = publicBaseUrl is null
                 ? string.Empty
                 : FileUrlHelper.GenerateDownloadUrl(publicBaseUrl, file.JpegViewFileId.Value);
+        }
+
+        // Тех-метаданные видео для тайла галереи — подмножество FileMetadata (только для VIDEO).
+        if (videoMetadata is not null && file.MediaKind == BarkCloud.Files.Domain.MediaKind.Video)
+        {
+            var vm = new VideoMeta();
+            if (videoMetadata.DurationSeconds.HasValue) vm.DurationSeconds = videoMetadata.DurationSeconds.Value;
+            if (videoMetadata.VideoCodec is not null) vm.VideoCodec = videoMetadata.VideoCodec;
+            if (videoMetadata.AudioCodec is not null) vm.AudioCodec = videoMetadata.AudioCodec;
+            if (videoMetadata.Bitrate.HasValue) vm.Bitrate = videoMetadata.Bitrate.Value;
+            if (videoMetadata.IsHdr.HasValue) vm.Hdr = videoMetadata.IsHdr.Value;
+            info.VideoMeta = vm;
         }
 
         return info;
