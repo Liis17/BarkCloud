@@ -135,6 +135,26 @@ interface ProgressState {
   finished: boolean;
 }
 
+/**
+ * Перезагрузка с обходом кеша — после обновления/перезапуска веб-клиента браузер иначе
+ * отдаёт старый index.html и бандлы (обычный reload не помогает, нужен Ctrl+F5).
+ * Чистим Cache Storage и переходим на тот же URL с cache-busting-параметром, чтобы
+ * гарантированно подтянуть свежий документ и новые хеши ассетов.
+ */
+async function hardReload() {
+  try {
+    if ('caches' in window) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map((k) => caches.delete(k)));
+    }
+  } catch {
+    /* не критично — продолжаем перезагрузку */
+  }
+  const url = new URL(window.location.href);
+  url.searchParams.set('_', Date.now().toString());
+  window.location.replace(url.toString());
+}
+
 function SystemSection({ admin, system }: { admin: SettingsState['admin']; system: SettingsState['system'] }) {
   const [unlocked, setUnlocked] = React.useState(admin.unlocked);
   const [password, setPassword] = React.useState('');
@@ -229,7 +249,7 @@ function SystemSection({ admin, system }: { admin: SettingsState['admin']; syste
           if (++success >= 2) {
             clearInterval(poll);
             clearInterval(tick);
-            setTimeout(() => window.location.reload(), 1500);
+            setTimeout(() => { void hardReload(); }, 1500);
           }
         } else success = 0;
       } catch {
