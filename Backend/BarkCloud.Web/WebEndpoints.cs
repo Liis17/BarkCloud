@@ -462,7 +462,7 @@ public static class WebEndpoints
         HttpContext http, IConfiguration config, string flashKind, string? email, string? login, string? password)
         => new()
         {
-            ["app.version"] = config.Value("App:Version", "v1.0.0"),
+            ["app.version"] = config.Value("App:Version", AppVersion.Current),
             ["server.host"] = config.Value("App:PublicHost", http.Request.Host.Value),
             ["server.tls"] = config.Value("App:TlsLabel", "TLS 1.3"),
             ["flash.kind"] = flashKind,
@@ -480,7 +480,7 @@ public static class WebEndpoints
         string firstName, string lastName, string username, string email)
         => new()
         {
-            ["app.version"] = config.Value("App:Version", "v1.0.0"),
+            ["app.version"] = config.Value("App:Version", AppVersion.Current),
             ["server.host"] = config.Value("App:PublicHost", http.Request.Host.Value),
             ["server.tls"] = config.Value("App:TlsLabel", "TLS 1.3"),
             ["flash.kind"] = "register",
@@ -497,7 +497,7 @@ public static class WebEndpoints
         HttpContext http, IConfiguration config, string codeId, string email, string password, string? error)
         => new()
         {
-            ["app.version"] = config.Value("App:Version", "v1.0.0"),
+            ["app.version"] = config.Value("App:Version", AppVersion.Current),
             ["server.host"] = config.Value("App:PublicHost", http.Request.Host.Value),
             ["server.tls"] = config.Value("App:TlsLabel", "TLS 1.3"),
             ["flash.kind"] = "register_confirm",
@@ -513,7 +513,7 @@ public static class WebEndpoints
         HttpContext http, IConfiguration config, string? error, string login)
         => new()
         {
-            ["app.version"] = config.Value("App:Version", "v1.0.0"),
+            ["app.version"] = config.Value("App:Version", AppVersion.Current),
             ["server.host"] = config.Value("App:PublicHost", http.Request.Host.Value),
             ["server.tls"] = config.Value("App:TlsLabel", "TLS 1.3"),
             ["flash.kind"] = "forgot",
@@ -527,7 +527,7 @@ public static class WebEndpoints
         HttpContext http, IConfiguration config, string resetId, string login, string? error)
         => new()
         {
-            ["app.version"] = config.Value("App:Version", "v1.0.0"),
+            ["app.version"] = config.Value("App:Version", AppVersion.Current),
             ["server.host"] = config.Value("App:PublicHost", http.Request.Host.Value),
             ["server.tls"] = config.Value("App:TlsLabel", "TLS 1.3"),
             ["flash.kind"] = "forgot_confirm",

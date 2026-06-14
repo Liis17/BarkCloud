@@ -42,7 +42,7 @@ public sealed class AuthGateway
         _logger = logger;
         _cookieSecure = configuration.Flag("App:CookieSecure");
         _appName = configuration.Value("App:AppName", "BarkCloud Web");
-        _appVersion = configuration.Value("App:Version", "v1.0.0");
+        _appVersion = configuration.Value("App:Version", AppVersion.Current);
 
         var secret = configuration["JwtSettings:SecretKey"];
         if (string.IsNullOrEmpty(secret))
