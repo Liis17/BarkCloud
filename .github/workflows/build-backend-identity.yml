@@ -8,6 +8,10 @@ on:
     paths:
       - 'Backend/BarkCloud.Identity/**'
       - 'Shared/**'
+      # proto-контракты: только свой (+ общий shared.proto), а не весь BarkCloud.Proto → не пересобирать весь бэкенд
+      - '!Shared/BarkCloud.Proto/**'
+      - 'Shared/BarkCloud.Proto/identity_api.proto'
+      - 'Shared/BarkCloud.Proto/shared.proto'
       - 'Tests/Backend/BarkCloud.Identity.Tests/**'
       - 'Tests/BarkCloud.TestKit/**'
       - 'Backend/rebuild.trigger'

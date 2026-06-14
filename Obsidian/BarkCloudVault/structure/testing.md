@@ -107,3 +107,9 @@ Drive (`Drive/*`, WPF/Windows, тестов нет) в CI не собирает�
 Триггеры:
 - `tests.yml`: pull_request в `dev`/`master`, workflow_dispatch.
 - `build-backend-*.yml`: push в `dev`/`master` по путям конкретного сервиса, `Shared/**`, его тестам, `Tests/BarkCloud.TestKit/**`, `Backend/rebuild.trigger`; также workflow_dispatch.
+
+Гранулярность proto (deploy-воркфлоу): чтобы правка одного `.proto` не пересобирала весь бэкенд, в `paths` каждого `build-backend-*.yml` весь `Shared/BarkCloud.Proto/**` исключён из общего `Shared/**` (`!Shared/BarkCloud.Proto/**`) и точечно возвращён только нужный контракт — по принципу «сервис-владелец» (тот, у кого `GrpcServices="Server"`):
+- `configuration_api.proto` → Configuration; `files_api.proto` → Files; `identity_api.proto` → Identity; `users_api.proto` → Users.
+- `shared.proto` владельца не имеет (общие типы, `GrpcServices="None"`) → триггерит всех потребителей: Files, Identity, Users, Web.
+- Notification proto не использует — для него возвращать нечего.
+- Клиентские зависимости (`GrpcServices="Client"`) сборку НЕ триггерят: например правка `files_api.proto` не пересоберёт Users/Web, хотя они его клиенты. Компромисс: их сгенерированные стабы останутся со старым контрактом до их же следующей пересборки. `tests.yml` это не затрагивает — там `Shared/**` по-прежнему гоняет все backend-тесты.
