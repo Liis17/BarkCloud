@@ -35,7 +35,7 @@ public static class CloudJson
     {
         var (iconKind, ext) = FileKind.Classify(f.FileName);
 
-        return new Dictionary<string, object?>
+        var card = new Dictionary<string, object?>
         {
             ["id"] = f.Id,
             ["name"] = f.FileName,
@@ -62,6 +62,21 @@ public static class CloudJson
             // Полноразмерный JPEG для просмотра (HEIC и пр. браузеро-недружелюбные); пусто — показывать оригинал.
             ["jpegViewUrl"] = f.JpegViewUrl
         };
+
+        // Тех-метаданные видео для тайла галереи (длительность/кодеки/битрейт/HDR) — только для VIDEO.
+        if (f.VideoMeta is { } vm)
+        {
+            card["video"] = new
+            {
+                duration = vm.HasDurationSeconds ? vm.DurationSeconds : (double?)null,
+                videoCodec = vm.HasVideoCodec ? vm.VideoCodec : null,
+                audioCodec = vm.HasAudioCodec ? vm.AudioCodec : null,
+                bitrate = vm.HasBitrate ? vm.Bitrate : (long?)null,
+                hdr = vm.HasHdr ? vm.Hdr : (bool?)null
+            };
+        }
+
+        return card;
     }
 
     public static object Dir(DirectoryInfo d) => new

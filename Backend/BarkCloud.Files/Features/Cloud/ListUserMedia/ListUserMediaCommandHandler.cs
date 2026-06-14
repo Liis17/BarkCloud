@@ -26,6 +26,7 @@ public class ListUserMediaCommandHandler : IRequestHandler<ListUserMediaCommand,
 
     private readonly IUploadedFilesStorage _uploadedFiles;
     private readonly ICloudHierarchyStorage _cloudHierarchy;
+    private readonly IFileMetadataStorage _metadataStorage;
     private readonly UserContext _userContext;
     private readonly RunSettings _runSettings;
     private readonly IConfiguration _configuration;
@@ -34,6 +35,7 @@ public class ListUserMediaCommandHandler : IRequestHandler<ListUserMediaCommand,
     public ListUserMediaCommandHandler(
         IUploadedFilesStorage uploadedFiles,
         ICloudHierarchyStorage cloudHierarchy,
+        IFileMetadataStorage metadataStorage,
         UserContext userContext,
         RunSettings runSettings,
         IConfiguration configuration,
@@ -41,6 +43,7 @@ public class ListUserMediaCommandHandler : IRequestHandler<ListUserMediaCommand,
     {
         _uploadedFiles = uploadedFiles;
         _cloudHierarchy = cloudHierarchy;
+        _metadataStorage = metadataStorage;
         _userContext = userContext;
         _runSettings = runSettings;
         _configuration = configuration;
@@ -69,6 +72,11 @@ public class ListUserMediaCommandHandler : IRequestHandler<ListUserMediaCommand,
         var previewsByOriginal = await _uploadedFiles.GetPreviewsForFiles(pageFileIds, cancellationToken);
         var baseUrl = FileUrlHelper.GetPublicBaseUrl(_configuration, _runSettings);
 
+        // Тех-метаданные видео (длительность/кодеки/битрейт/HDR) — для тайлов галереи видео.
+        var metaByFileId = kind == DomainMediaKind.Video
+            ? await _metadataStorage.GetForFiles(pageFileIds, cancellationToken)
+            : null;
+
         var entries = await _cloudHierarchy.GetLiveEntriesForFiles(ownerId, pageFileIds, cancellationToken);
 
         var entriesByFileId = entries
@@ -90,9 +98,11 @@ public class ListUserMediaCommandHandler : IRequestHandler<ListUserMediaCommand,
         foreach (var file in page)
         {
             previewsByOriginal.TryGetValue(file.Id, out var previews);
+            BarkCloud.Files.Domain.FileMetadata? videoMeta = null;
+            metaByFileId?.TryGetValue(file.Id, out videoMeta);
             var item = new UserImageItem
             {
-                File = file.ToGrpc(baseUrl, previews)
+                File = file.ToGrpc(baseUrl, previews, videoMeta)
             };
 
             if (entriesByFileId.TryGetValue(file.Id, out var meta))

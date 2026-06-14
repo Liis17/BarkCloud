@@ -84,6 +84,12 @@ public class FileMetadata
     /// <summary>Частота кадров.</summary>
     public double? FrameRate { get; set; }
 
+    /// <summary>
+    /// HDR-видео (выведено из color_transfer: PQ smpte2084 / HLG arib-std-b67).
+    /// null — цвет ещё не зондировался (легаси-записи до добавления признака); заполняется бэкафиллом.
+    /// </summary>
+    public bool? IsHdr { get; set; }
+
     // === Документ ===
 
     public string? DocumentAuthor { get; set; }

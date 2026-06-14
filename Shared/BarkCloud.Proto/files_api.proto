@@ -193,6 +193,16 @@ message UploadFileInfo {
   string upload_device_name = 15; // Имя устройства, с которого файл был загружен (первая успешная загрузка блоба)
   string jpeg_view_file_id = 16; // file_id полноразмерного JPEG-вида для просмотра (web/не-Apple); пусто — нет (видео/документ/легаси)
   string jpeg_view_url = 17; // Ссылка на скачивание JPEG-вида (для отображения в фуллвьювере). Оригинал — отдельной кнопкой «скачать»
+  VideoMeta video_meta = 18; // Тех-метаданные видео для тайла галереи (только media_kind=VIDEO); присутствие — через HasVideoMeta
+}
+
+// Краткие тех-параметры видео для отображения на тайле галереи (подмножество FileMetadataInfo).
+message VideoMeta {
+  optional double duration_seconds = 1; // Длительность, сек
+  optional string video_codec = 2;      // Кодек видео (h264, hevc, av1 …)
+  optional string audio_codec = 3;      // Кодек аудио (aac, opus …)
+  optional int64 bitrate = 4;           // Битрейт контейнера, бит/с (≈ сумма аудио+видео)
+  optional bool hdr = 5;                // HDR-видео
 }
 
 enum MediaKind {
@@ -252,6 +262,7 @@ message FileMetadataInfo {
   optional string audio_codec = 17;
   optional int64 bitrate = 18;                     // бит/с
   optional double frame_rate = 19;
+  optional bool is_hdr = 24;                       // HDR-видео (выведено из color_transfer: PQ smpte2084 / HLG arib-std-b67)
 
   // Документ
   optional string document_author = 20;

@@ -1,4 +1,5 @@
 using BarkCloud.Files.Domain;
+using BarkCloud.Files.Helpers;
 
 using DocumentFormat.OpenXml.Packaging;
 
@@ -140,6 +141,9 @@ public class FileMetadataExtractor
             AudioCodec = string.IsNullOrWhiteSpace(probe.AudioCodec) ? null : probe.AudioCodec,
             Bitrate = probe.BitRate > 0 ? probe.BitRate : null,
             FrameRate = probe.FrameRate > 0 ? probe.FrameRate : null,
+            // Видео проходит ffprobe всегда — фиксируем признак HDR явно (true/false),
+            // чтобы запись не считалась «не зондированной на цвет» (см. бэкафилл).
+            IsHdr = VideoHdr.IsHdr(probe.ColorTransfer),
         };
 
         var tags = probe.FormatTags;

@@ -469,6 +469,9 @@ namespace BarkCloud.Files.Persistence.Migrations
                     b.Property<double?>("FrameRate")
                         .HasColumnType("double precision");
 
+                    b.Property<bool?>("IsHdr")
+                        .HasColumnType("boolean");
+
                     b.Property<int?>("Iso")
                         .HasColumnType("integer");
 
