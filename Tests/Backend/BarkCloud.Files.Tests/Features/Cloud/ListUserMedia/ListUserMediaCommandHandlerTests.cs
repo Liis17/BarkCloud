@@ -16,9 +16,10 @@ public class ListUserMediaCommandHandlerTests
     private const long OwnerId = 42;
     private readonly Mock<IUploadedFilesStorage> _files = new();
     private readonly Mock<ICloudHierarchyStorage> _hierarchy = new();
+    private readonly Mock<IFileMetadataStorage> _metadata = new();
 
     private ListUserMediaCommandHandler CreateSut() => new(
-        _files.Object, _hierarchy.Object,
+        _files.Object, _hierarchy.Object, _metadata.Object,
         UserContextFactory.Create(OwnerId),
         new RunSettings { Host = "http://localhost", Http1Port = 7026 }, TestConfiguration.Empty(),
         NullLogger<ListUserMediaCommandHandler>.Instance);
@@ -57,6 +58,37 @@ public class ListUserMediaCommandHandlerTests
         item.EntriesCount.Should().Be(2);
         item.EntryNames.Should().HaveCount(2);
         item.EntryIds.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public async Task Handle_Video_IncludesVideoMeta()
+    {
+        var fileId = Guid.NewGuid();
+        _files.Setup(s => s.ListUserMediaPage(OwnerId, MediaKind.Video, It.IsAny<DateTime?>(), It.IsAny<Guid?>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<UploadFileEntity> { new() { Id = fileId, MediaKind = MediaKind.Video } });
+        _files.Setup(s => s.GetPreviewsForFiles(It.IsAny<IEnumerable<Guid>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<Guid, List<FilePreview>>());
+        _hierarchy.Setup(s => s.GetLiveEntriesForFiles(OwnerId, It.IsAny<IReadOnlyCollection<Guid>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<DomainFileEntry>());
+        _metadata.Setup(s => s.GetForFiles(It.IsAny<IReadOnlyCollection<Guid>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<Guid, FileMetadata>
+            {
+                [fileId] = new FileMetadata
+                {
+                    FileId = fileId, DurationSeconds = 12.5, VideoCodec = "hevc",
+                    AudioCodec = "aac", Bitrate = 120_000_000, IsHdr = true,
+                },
+            });
+
+        var response = await CreateSut().Handle(new ListUserMediaCommand { Kind = MediaKind.Video, Limit = 50 }, default);
+
+        var meta = response.Items.Should().ContainSingle().Subject.File.VideoMeta;
+        meta.Should().NotBeNull();
+        meta!.DurationSeconds.Should().Be(12.5);
+        meta.VideoCodec.Should().Be("hevc");
+        meta.AudioCodec.Should().Be("aac");
+        meta.Bitrate.Should().Be(120_000_000);
+        meta.Hdr.Should().BeTrue();
     }
 
     [Fact]
