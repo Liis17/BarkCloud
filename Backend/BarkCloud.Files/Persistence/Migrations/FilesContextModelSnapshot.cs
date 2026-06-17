@@ -424,6 +424,18 @@ namespace BarkCloud.Files.Persistence.Migrations
                     b.Property<string>("AudioCodec")
                         .HasColumnType("text");
 
+                    b.Property<string>("AudioAlbum")
+                        .HasColumnType("text");
+
+                    b.Property<string>("AudioArtist")
+                        .HasColumnType("text");
+
+                    b.Property<string>("AudioTitle")
+                        .HasColumnType("text");
+
+                    b.Property<int?>("AudioTrackNumber")
+                        .HasColumnType("integer");
+
                     b.Property<long?>("Bitrate")
                         .HasColumnType("bigint");
 
@@ -569,6 +581,143 @@ namespace BarkCloud.Files.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("FolderShareLinks");
+                });
+
+            modelBuilder.Entity("BarkCloud.Files.Domain.MusicPlaylist", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("CoverFileId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<long>("OwnerId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OwnerId", "Name")
+                        .IsUnique();
+
+                    b.HasIndex("OwnerId", "UpdatedAt");
+
+                    b.ToTable("MusicPlaylists");
+                });
+
+            modelBuilder.Entity("BarkCloud.Files.Domain.MusicPlaylistGrant", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("OwnerId")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("PlaylistId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("RecipientId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PlaylistId");
+
+                    b.HasIndex("RecipientId", "CreatedAt");
+
+                    b.HasIndex("OwnerId", "PlaylistId", "RecipientId")
+                        .IsUnique();
+
+                    b.ToTable("MusicPlaylistGrants");
+                });
+
+            modelBuilder.Entity("BarkCloud.Files.Domain.MusicPlaylistItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("AddedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("FileId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("OwnerId")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("PlaylistId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FileId");
+
+                    b.HasIndex("PlaylistId", "FileId")
+                        .IsUnique();
+
+                    b.HasIndex("PlaylistId", "Position");
+
+                    b.ToTable("MusicPlaylistItems");
+                });
+
+            modelBuilder.Entity("BarkCloud.Files.Domain.MusicPlaylistShareLink", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("ClickCount")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<long>("OwnerId")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("PlaylistId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Token")
+                        .IsUnique();
+
+                    b.HasIndex("OwnerId", "CreatedAt");
+
+                    b.HasIndex("OwnerId", "PlaylistId")
+                        .IsUnique();
+
+                    b.ToTable("MusicPlaylistShareLinks");
                 });
 
             modelBuilder.Entity("BarkCloud.Files.Domain.ShareLink", b =>

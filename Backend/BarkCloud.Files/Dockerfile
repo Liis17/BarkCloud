@@ -17,9 +17,12 @@ RUN --mount=type=cache,target=/root/.nuget/packages,sharing=locked \
     dotnet publish "BarkCloud.Files.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
 RUN mkdir -p /app/publish/logs
 
-FROM mcr.microsoft.com/dotnet/aspnet:10.0-noble-chiseled AS final
+FROM mcr.microsoft.com/dotnet/aspnet:10.0-noble AS final
 WORKDIR /app
-# Статические бинари ffmpeg/ffprobe для генерации превью видео (chiseled-образ без apt).
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libgssapi-krb5-2 \
+    && rm -rf /var/lib/apt/lists/*
+# Статические бинари ffmpeg/ffprobe для генерации превью видео и аудио-обложек.
 COPY --from=mwader/static-ffmpeg:latest /ffmpeg /ffprobe /usr/local/bin/
 COPY --chown=1654:1654 --from=build /app/publish .
 USER $APP_UID

@@ -154,4 +154,5 @@ Parent: [[index]] · See also: [[api/files-api]] · [[modules/backend-files-clou
 
 - Использует: `BarkCloud.Proto`, `BarkCloud.GrpcServer`, `BarkCloud.Shared.*`, EF Core, PostgreSQL, MinIO (S3 SDK), RabbitMQ, MediatR, **SixLabors.ImageSharp** (превью изображений), **FFMpegCore** (превью видео), **MetadataExtractor** (EXIF фото), **UglyToad.PdfPig** (метаданные PDF), **DocumentFormat.OpenXml** (метаданные DOCX/XLSX/PPTX)
 - Образ Files содержит бинарь `ffmpeg`/`ffprobe` (COPY из `mwader/static-ffmpeg` в `Dockerfile`/`Dockerfile.slim`)
+- Runtime-образ Files — `mcr.microsoft.com/dotnet/aspnet:10.0-noble` с установленным `libgssapi-krb5-2`: Npgsql/EF при миграциях может загружать GSSAPI, а `noble-chiseled` не содержит `libgssapi_krb5.so.2`
 - Тесно связан с MinIO (см. [[structure/infrastructure]])
