@@ -335,6 +335,7 @@ public class FileMetadataExtractor
            || m.Iso is not null || m.Orientation is not null || m.Flash is not null
            || m.DurationSeconds is not null || m.VideoCodec is not null || m.AudioCodec is not null
            || m.Bitrate is not null || m.FrameRate is not null
+           || m.AudioTitle is not null || m.AudioArtist is not null || m.AudioAlbum is not null || m.AudioTrackNumber is not null
            || m.DocumentAuthor is not null || m.DocumentTitle is not null
            || m.DocumentSubject is not null || m.DocumentPageCount is not null;
 

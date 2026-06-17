@@ -39,6 +39,14 @@ public class FilesContext : DbContext
 
     public DbSet<AlbumShareLink> AlbumShareLinks { get; set; }
 
+    public DbSet<MusicPlaylist> MusicPlaylists { get; set; }
+
+    public DbSet<MusicPlaylistItem> MusicPlaylistItems { get; set; }
+
+    public DbSet<MusicPlaylistShareLink> MusicPlaylistShareLinks { get; set; }
+
+    public DbSet<MusicPlaylistGrant> MusicPlaylistGrants { get; set; }
+
     public DbSet<FileGrant> FileGrants { get; set; }
 
     public DbSet<DirectoryGrant> DirectoryGrants { get; set; }
@@ -169,6 +177,33 @@ public class FilesContext : DbContext
             b.HasIndex(x => new { x.OwnerId, x.AlbumId }).IsUnique();
             // Cursor-пагинация списка публичных альбомов владельца по дате создания.
             b.HasIndex(x => new { x.OwnerId, x.CreatedAt });
+        });
+
+        modelBuilder.Entity<MusicPlaylist>(b =>
+        {
+            b.HasIndex(x => new { x.OwnerId, x.Name }).IsUnique();
+            b.HasIndex(x => new { x.OwnerId, x.UpdatedAt });
+        });
+
+        modelBuilder.Entity<MusicPlaylistItem>(b =>
+        {
+            b.HasIndex(x => new { x.PlaylistId, x.FileId }).IsUnique();
+            b.HasIndex(x => new { x.PlaylistId, x.Position });
+            b.HasIndex(x => x.FileId);
+        });
+
+        modelBuilder.Entity<MusicPlaylistShareLink>(b =>
+        {
+            b.HasIndex(x => x.Token).IsUnique();
+            b.HasIndex(x => new { x.OwnerId, x.PlaylistId }).IsUnique();
+            b.HasIndex(x => new { x.OwnerId, x.CreatedAt });
+        });
+
+        modelBuilder.Entity<MusicPlaylistGrant>(b =>
+        {
+            b.HasIndex(x => new { x.OwnerId, x.PlaylistId, x.RecipientId }).IsUnique();
+            b.HasIndex(x => new { x.RecipientId, x.CreatedAt });
+            b.HasIndex(x => x.PlaylistId);
         });
 
         modelBuilder.Entity<FileGrant>(b =>

@@ -5,6 +5,7 @@ using BarkCloud.Files.Features.GetFileData;
 using BarkCloud.Files.Features.GetFilesData;
 using BarkCloud.Files.Features.GetUserStorageInfoServer;
 using BarkCloud.Files.Features.UploadAvatarServer;
+using BarkCloud.Files.Services;
 using BarkCloud.Proto.Files;
 using BarkCloud.Shared.Identity;
 
@@ -20,10 +21,12 @@ namespace BarkCloud.Files.Host;
 public class FilesServerApiService : FilesServerApi.FilesServerApiBase
 {
     private readonly IMediator _mediator;
+    private readonly MusicLibraryService _music;
 
-    public FilesServerApiService(IMediator mediator)
+    public FilesServerApiService(IMediator mediator, MusicLibraryService music)
     {
         _mediator = mediator;
+        _music = music;
     }
 
     public override Task<GetFileDataResponse> GetFileData(GetFileDataRequest request, ServerCallContext context)
@@ -95,5 +98,10 @@ public class FilesServerApiService : FilesServerApi.FilesServerApiBase
             CursorAddedAt = cursorAddedAt,
             CursorFileId = cursorFileId
         });
+    }
+
+    public override Task<ResolveMusicPlaylistShareResponse> ResolveMusicPlaylistShare(ResolveMusicPlaylistShareRequest request, ServerCallContext context)
+    {
+        return _music.ResolvePublicPlaylist(request.Token, context.CancellationToken);
     }
 }

@@ -90,6 +90,13 @@ public class FileMetadata
     /// </summary>
     public bool? IsHdr { get; set; }
 
+    // === Аудио ===
+
+    public string? AudioTitle { get; set; }
+    public string? AudioArtist { get; set; }
+    public string? AudioAlbum { get; set; }
+    public int? AudioTrackNumber { get; set; }
+
     // === Документ ===
 
     public string? DocumentAuthor { get; set; }

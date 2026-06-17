@@ -54,6 +54,10 @@ public class UserDeletedConsumer(
         var dirs = await context.CloudDirectories.Where(x => x.OwnerId == userId).ExecuteDeleteAsync();
         var albumItems = await context.AlbumItems.Where(x => x.OwnerId == userId).ExecuteDeleteAsync();
         var albums = await context.Albums.Where(x => x.OwnerId == userId).ExecuteDeleteAsync();
+        var musicItems = await context.MusicPlaylistItems.Where(x => x.OwnerId == userId).ExecuteDeleteAsync();
+        var musicPlaylists = await context.MusicPlaylists.Where(x => x.OwnerId == userId).ExecuteDeleteAsync();
+        var musicShares = await context.MusicPlaylistShareLinks.Where(x => x.OwnerId == userId).ExecuteDeleteAsync();
+        var musicGrants = await context.MusicPlaylistGrants.Where(x => x.OwnerId == userId || x.RecipientId == userId).ExecuteDeleteAsync();
         var favorites = await context.FavoriteFiles.Where(x => x.OwnerId == userId).ExecuteDeleteAsync();
         var shares = await context.ShareLinks.Where(x => x.OwnerId == userId).ExecuteDeleteAsync();
         var folderShares = await context.FolderShareLinks.Where(x => x.OwnerId == userId).ExecuteDeleteAsync();
@@ -65,6 +69,6 @@ public class UserDeletedConsumer(
 
         logger.LogInformation(
             "Данные Files для пользователя {UserId} очищены: блобов откреплено {Files}, записей {Entries}, папок {Dirs}, альбомов {Albums} (элементов {AlbumItems}), избранного {Favorites}, ссылок {Shares}, публичных папок {FolderShares}, грантов файлов {Grants}, грантов папок {DirGrants}",
-            userId, files.Count, entries, dirs, albums, albumItems, favorites, shares, folderShares, grants, dirGrants);
+            userId, files.Count, entries, dirs, albums + musicPlaylists, albumItems + musicItems, favorites, shares + musicShares, folderShares, grants + musicGrants, dirGrants);
     }
 }

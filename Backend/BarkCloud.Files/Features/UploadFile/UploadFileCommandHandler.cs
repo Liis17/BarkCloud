@@ -22,6 +22,7 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
     private readonly S3BucketRegistry _bucketRegistry;
     private readonly ImageCompressor _imageCompressor;
     private readonly VideoThumbnailExtractor _videoThumbnailExtractor;
+    private readonly AudioMetadataExtractor? _audioMetadataExtractor;
     private readonly HeicImageConverter _heicConverter;
     private readonly FileMetadataExtractor _metadataExtractor;
     private readonly PreviewPersistenceService _previewPersistence;
@@ -32,6 +33,8 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
     /// Ширины превью для облачных изображений (по убыванию — самое крупное первым).
     /// </summary>
     private static readonly int[] CloudPreviewWidths = { 1024, 512, 128 };
+
+    private static readonly int[] AudioCoverWidths = { 512, 128 };
 
     /// <summary>
     /// Типы файлов, для которых нужно извлекать размеры изображения.
@@ -54,7 +57,8 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
         FileMetadataExtractor metadataExtractor,
         PreviewPersistenceService previewPersistence,
         ILogger<UploadFileCommandHandler> logger,
-        FileActivityWriter? activity = null)
+        FileActivityWriter? activity = null,
+        AudioMetadataExtractor? audioMetadataExtractor = null)
     {
         _filesStorage = filesStorage;
         _hashesStorage = hashesStorage;
@@ -63,6 +67,7 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
         _bucketRegistry = bucketRegistry;
         _imageCompressor = imageCompressor;
         _videoThumbnailExtractor = videoThumbnailExtractor;
+        _audioMetadataExtractor = audioMetadataExtractor;
         _heicConverter = heicConverter;
         _metadataExtractor = metadataExtractor;
         _previewPersistence = previewPersistence;
@@ -107,6 +112,7 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
 
         var isImageType = file.Type == UploadFileType.UserAvatar;
         var isVideoContent = contentType.StartsWith("video/");
+        var isAudioContent = contentType.StartsWith("audio/");
         // HEIC/HEIF ImageSharp не декодирует — перекодируем в JPEG через ffmpeg (по файлу на диске).
         var isHeic = contentType == "image/heic";
 
@@ -116,7 +122,7 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
         string? tempFilePath = null;
 
         // Видео и HEIC всегда кладём на диск (FFmpeg работает с файлом), как и большие не-картинки.
-        if (isVideoContent || isHeic || (!isImageType && fileSize > 100 * 1024 * 1024))
+        if (isVideoContent || isAudioContent || isHeic || (!isImageType && fileSize > 100 * 1024 * 1024))
         {
             tempFilePath = Path.GetTempFileName();
             _logger.LogInformation("Файл {FileId} ({Size} МБ) буферизуется через диск", request.FileId, fileSize / 1024 / 1024);
@@ -366,6 +372,38 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
                 catch (Exception ex)
                 {
                     _logger.LogWarning(ex, "Не удалось сгенерировать превью видео {FileId}", file.Id);
+                }
+                finally
+                {
+                    originalStream.Position = 0;
+                }
+            }
+
+            // 2b-audio) Аудио: длительность/теги + embedded artwork → квадратные обложки 512/128.
+            var needsAudioMetadata = file.Type == UploadFileType.CloudFile && isAudioContent && tempFilePath is not null && _audioMetadataExtractor is not null;
+            if (needsAudioMetadata)
+            {
+                try
+                {
+                    var audioExtractor = _audioMetadataExtractor!;
+                    var probe = await audioExtractor.ProbeAsync(tempFilePath!, cancellationToken);
+                    extractedMetadata ??= audioExtractor.ExtractMetadata(probe);
+
+                    var artworkBytes = await audioExtractor.ExtractArtworkJpegAsync(tempFilePath!, cancellationToken);
+                    if (artworkBytes is { Length: > 0 })
+                    {
+                        using var artworkStream = new MemoryStream(artworkBytes);
+                        generatedPreviews = await _imageCompressor.GenerateSquarePreviewsAsync(
+                            artworkStream, AudioCoverWidths, cancellationToken);
+                    }
+
+                    _logger.LogInformation(
+                        "Обработано аудио {FileId}: duration={Duration}, artwork={HasArtwork}",
+                        file.Id, probe.Duration, generatedPreviews is { Count: > 0 });
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Не удалось извлечь метаданные аудио {FileId}", file.Id);
                 }
                 finally
                 {

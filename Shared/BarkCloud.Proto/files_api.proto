@@ -108,6 +108,8 @@ service FilesServerApi {
   rpc ResolveFolderShare(ResolveFolderShareRequest) returns(ResolveFolderShareResponse); // Резолв публичной папки → листинг (подпапки + файлы с публичными URL)
 
   rpc ResolveAlbumShare(ResolveAlbumShareRequest) returns(ResolveAlbumShareResponse); // Резолв публичного альбома → элементы (фото/видео с публичными URL)
+
+  rpc ResolveMusicPlaylistShare(ResolveMusicPlaylistShareRequest) returns(ResolveMusicPlaylistShareResponse); // Резолв публичного музыкального плейлиста → треки с публичными URL
 }
 
 service AlbumApi {
@@ -118,6 +120,26 @@ service AlbumApi {
   rpc RemoveItemsFromAlbum(RemoveItemsFromAlbumRequest) returns (CloudEmpty);          // Убрать фото/видео из альбома
   rpc ListAlbums          (ListAlbumsRequest)          returns (ListAlbumsResponse);   // Список альбомов (обложка / описание / счётчик)
   rpc ListAlbumItems      (ListAlbumItemsRequest)      returns (ListAlbumItemsResponse); // Содержимое альбома (фото/видео с превью)
+}
+
+service MusicApi {
+  rpc ListTracks                 (ListMusicTracksRequest)                 returns (ListMusicTracksResponse);          // Список аудиотреков пользователя с поиском
+  rpc GetTrackDownloadUrl        (GetTrackDownloadUrlRequest)             returns (GetTrackDownloadUrlResponse);      // Временная ссылка для проигрывания трека
+  rpc CreatePlaylist             (CreateMusicPlaylistRequest)             returns (MusicPlaylistInfo);               // Создать плейлист
+  rpc UpdatePlaylist             (UpdateMusicPlaylistRequest)             returns (MusicPlaylistInfo);               // Изменить имя/описание/обложку
+  rpc DeletePlaylist             (DeleteMusicPlaylistRequest)             returns (CloudEmpty);                      // Удалить плейлист
+  rpc ListPlaylists              (ListMusicPlaylistsRequest)              returns (ListMusicPlaylistsResponse);       // Мои плейлисты
+  rpc ListPlaylistTracks         (ListMusicPlaylistTracksRequest)         returns (ListMusicPlaylistTracksResponse);  // Треки плейлиста
+  rpc AddPlaylistTracks          (AddMusicPlaylistTracksRequest)          returns (CloudEmpty);                      // Добавить треки
+  rpc RemovePlaylistTracks       (RemoveMusicPlaylistTracksRequest)       returns (CloudEmpty);                      // Убрать треки
+  rpc ReorderPlaylistTracks      (ReorderMusicPlaylistTracksRequest)      returns (CloudEmpty);                      // Ручной порядок треков
+  rpc CreatePlaylistShare        (CreateMusicPlaylistShareRequest)        returns (MusicPlaylistShareInfo);          // Публичная ссылка на плейлист
+  rpc ListMyPlaylistShares       (ListMyMusicPlaylistSharesRequest)       returns (ListMyMusicPlaylistSharesResponse);// Мои публичные плейлисты
+  rpc RevokePlaylistShare        (RevokeMusicPlaylistShareRequest)        returns (CloudEmpty);                      // Отозвать публичность
+  rpc SharePlaylistWithUser      (ShareMusicPlaylistWithUserRequest)      returns (CloudEmpty);                      // Поделиться плейлистом с пользователем
+  rpc RevokePlaylistUserShare    (RevokeMusicPlaylistUserShareRequest)    returns (CloudEmpty);                      // Отозвать грант
+  rpc ListMyOutgoingPlaylistShares(ListMyOutgoingMusicPlaylistSharesRequest) returns (ListMyOutgoingMusicPlaylistSharesResponse); // Кому доступны мои плейлисты
+  rpc ListSharedPlaylistsWithMe  (ListSharedMusicPlaylistsWithMeRequest)  returns (ListSharedMusicPlaylistsWithMeResponse); // Плейлисты, доступные мне
 }
 
 service DynamicFolderApi {
@@ -263,6 +285,12 @@ message FileMetadataInfo {
   optional int64 bitrate = 18;                     // бит/с
   optional double frame_rate = 19;
   optional bool is_hdr = 24;                       // HDR-видео (выведено из color_transfer: PQ smpte2084 / HLG arib-std-b67)
+
+  // Аудио
+  optional string audio_title = 25;
+  optional string audio_artist = 26;
+  optional string audio_album = 27;
+  optional int32 audio_track_number = 28;
 
   // Документ
   optional string document_author = 20;
@@ -663,6 +691,192 @@ message ListAlbumItemsResponse {
   repeated AlbumItemEntry items = 1;
   google.protobuf.Timestamp next_cursor_added_at = 2; // пусто = больше нет страниц
   string next_cursor_file_id = 3;
+}
+
+// ============ MusicApi messages ============
+
+message MusicTrackInfo {
+  UploadFileInfo file = 1;
+  FileMetadataInfo metadata = 2;
+  string title = 3;
+  string artist = 4;
+  string album = 5;
+  double duration_seconds = 6;
+  string cover_url = 7;       // малая обложка (~128)
+  string large_cover_url = 8; // крупная обложка (~512)
+}
+
+message ListMusicTracksRequest {
+  string query = 1;
+  int32 limit = 2;
+  google.protobuf.Timestamp cursor_created_at = 3;
+  string cursor_file_id = 4;
+}
+
+message ListMusicTracksResponse {
+  repeated MusicTrackInfo items = 1;
+  google.protobuf.Timestamp next_cursor_created_at = 2;
+  string next_cursor_file_id = 3;
+}
+
+message GetTrackDownloadUrlRequest {
+  string file_id = 1;
+}
+
+message GetTrackDownloadUrlResponse {
+  string download_url = 1;
+}
+
+message MusicPlaylistInfo {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  string cover_file_id = 4;
+  string cover_preview_url = 5;
+  int32 items_count = 6;
+  int64 owner_user_id = 7;
+  bool can_reorder = 8;
+  google.protobuf.Timestamp created_at = 9;
+  google.protobuf.Timestamp updated_at = 10;
+}
+
+message CreateMusicPlaylistRequest {
+  string name = 1;
+  string description = 2;
+}
+
+message UpdateMusicPlaylistRequest {
+  string playlist_id = 1;
+  optional string name = 2;
+  optional string description = 3;
+  optional string cover_file_id = 4; // пустая строка = сбросить кастомную обложку
+}
+
+message DeleteMusicPlaylistRequest {
+  string playlist_id = 1;
+}
+
+message ListMusicPlaylistsRequest {
+  int32 limit = 1;
+  google.protobuf.Timestamp cursor_updated_at = 2;
+  string cursor_playlist_id = 3;
+}
+
+message ListMusicPlaylistsResponse {
+  repeated MusicPlaylistInfo items = 1;
+  google.protobuf.Timestamp next_cursor_updated_at = 2;
+  string next_cursor_playlist_id = 3;
+}
+
+message MusicPlaylistTrackEntry {
+  MusicTrackInfo track = 1;
+  int32 position = 2;
+  google.protobuf.Timestamp added_at = 3;
+}
+
+message ListMusicPlaylistTracksRequest {
+  string playlist_id = 1;
+}
+
+message ListMusicPlaylistTracksResponse {
+  MusicPlaylistInfo playlist = 1;
+  repeated MusicPlaylistTrackEntry items = 2;
+}
+
+message AddMusicPlaylistTracksRequest {
+  string playlist_id = 1;
+  repeated string file_ids = 2;
+}
+
+message RemoveMusicPlaylistTracksRequest {
+  string playlist_id = 1;
+  repeated string file_ids = 2;
+}
+
+message ReorderMusicPlaylistTracksRequest {
+  string playlist_id = 1;
+  repeated string file_ids = 2; // полный новый порядок
+}
+
+message MusicPlaylistShareInfo {
+  string id = 1;
+  string token = 2;
+  string playlist_id = 3;
+  string name = 4;
+  google.protobuf.Timestamp created_at = 5;
+  int64 click_count = 6;
+  string cover_preview_url = 7;
+}
+
+message CreateMusicPlaylistShareRequest {
+  string playlist_id = 1;
+  string name = 2;
+}
+
+message ListMyMusicPlaylistSharesRequest {
+  int32 limit = 1;
+  google.protobuf.Timestamp cursor_created_at = 2;
+  string cursor_share_id = 3;
+}
+
+message ListMyMusicPlaylistSharesResponse {
+  repeated MusicPlaylistShareInfo shares = 1;
+  google.protobuf.Timestamp next_cursor_created_at = 2;
+  string next_cursor_share_id = 3;
+}
+
+message RevokeMusicPlaylistShareRequest {
+  string share_id = 1;
+}
+
+message ShareMusicPlaylistWithUserRequest {
+  string playlist_id = 1;
+  int64 recipient_user_id = 2;
+}
+
+message RevokeMusicPlaylistUserShareRequest {
+  string grant_id = 1;
+}
+
+message ListMyOutgoingMusicPlaylistSharesRequest {
+  string playlist_id = 1;
+}
+
+message OutgoingMusicPlaylistShare {
+  string grant_id = 1;
+  string playlist_id = 2;
+  string name = 3;
+  int64 recipient_user_id = 4;
+  google.protobuf.Timestamp shared_at = 5;
+}
+
+message ListMyOutgoingMusicPlaylistSharesResponse {
+  repeated OutgoingMusicPlaylistShare items = 1;
+}
+
+message ListSharedMusicPlaylistsWithMeRequest {}
+
+message SharedMusicPlaylistEntry {
+  string grant_id = 1;
+  MusicPlaylistInfo playlist = 2;
+  int64 owner_user_id = 3;
+  google.protobuf.Timestamp shared_at = 4;
+}
+
+message ListSharedMusicPlaylistsWithMeResponse {
+  repeated SharedMusicPlaylistEntry items = 1;
+}
+
+message ResolveMusicPlaylistShareRequest {
+  string token = 1;
+}
+
+message ResolveMusicPlaylistShareResponse {
+  bool found = 1;
+  string playlist_name = 2;
+  string description = 3;
+  string cover_preview_url = 4;
+  repeated MusicTrackInfo items = 5;
 }
 
 // ============ DynamicFolderApi messages ============
