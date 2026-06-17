@@ -227,6 +227,25 @@ export interface MusicTrack {
   metadata?: FileMetadata | null;
 }
 
+export interface MusicPlaylist {
+  id: string;
+  name: string;
+  description: string;
+  coverFileId: string;
+  coverUrl: string;
+  count: number;
+  ownerUserId: number;
+  canReorder: boolean;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+export interface MusicPlaylistTrack {
+  track: MusicTrack;
+  position: number;
+  addedAt: string | null;
+}
+
 // ───────────────────────── Каркас (GET /api/me) ─────────────────────────
 
 export interface Shell {
