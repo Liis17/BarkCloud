@@ -71,6 +71,10 @@ public class TrashPurgeService : ITrashPurgeService
             await _context.FileGrants
                 .Where(g => g.OwnerId == pair.OwnerId && g.FileId == pair.FileId)
                 .ExecuteDeleteAsync(cancellationToken);
+
+            await _context.MusicPlaylistItems
+                .Where(i => i.OwnerId == pair.OwnerId && i.FileId == pair.FileId)
+                .ExecuteDeleteAsync(cancellationToken);
         }
 
         await _context.CloudFileEntries

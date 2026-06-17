@@ -80,11 +80,13 @@ public class Program
         builder.Services.AddScoped<FileActivityWriter>();
         builder.Services.AddSingleton<ImageCompressor>();
         builder.Services.AddSingleton<VideoThumbnailExtractor>();
+        builder.Services.AddSingleton<AudioMetadataExtractor>();
         builder.Services.AddSingleton<HeicImageConverter>();
         builder.Services.AddSingleton<FileMetadataExtractor>();
         builder.Services.AddScoped<PreviewPersistenceService>();
         builder.Services.AddScoped<AlbumViewBuilder>();
         builder.Services.AddScoped<DynamicFolderViewBuilder>();
+        builder.Services.AddScoped<MusicLibraryService>();
         builder.Services.AddScoped<ITrashPurgeService, TrashPurgeService>();
         builder.Services.AddSingleton<IPhysicalStorageStatsProvider, PhysicalStorageStatsProvider>();
         builder.Services.AddHostedService<TempFileCleanupService>();
@@ -151,6 +153,7 @@ public class Program
         app.MapGrpcService<FilesServerApiService>();
         app.MapGrpcService<CloudApiService>();
         app.MapGrpcService<AlbumApiService>();
+        app.MapGrpcService<MusicApiService>();
         app.MapGrpcService<DynamicFolderApiService>();
 
         app.Lifetime.ApplicationStopped.Register(Log.CloseAndFlush);

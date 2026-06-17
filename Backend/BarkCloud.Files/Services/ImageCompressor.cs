@@ -258,4 +258,48 @@ public partial class ImageCompressor
 
         return result;
     }
+
+    /// <summary>
+    /// Генерация квадратных JPEG-обложек. Используется для embedded artwork аудиофайлов.
+    /// </summary>
+    public virtual async Task<List<MultiPreviewItem>> GenerateSquarePreviewsAsync(
+        Stream inputStream,
+        int[] targetWidths,
+        CancellationToken cancellationToken = default)
+    {
+        var result = new List<MultiPreviewItem>();
+        if (targetWidths is null || targetWidths.Length == 0)
+            return result;
+
+        using var image = await Image.LoadAsync(inputStream, cancellationToken);
+
+        var widths = targetWidths
+            .Where(w => w > 0)
+            .Distinct()
+            .OrderByDescending(w => w)
+            .ToArray();
+
+        foreach (var targetWidth in widths)
+        {
+            using var preview = image.Clone(x => x
+                .Resize(new ResizeOptions
+                {
+                    Mode = ResizeMode.Crop,
+                    Size = new Size(targetWidth, targetWidth),
+                    Position = AnchorPositionMode.Center
+                })
+                .BackgroundColor(Color.White));
+
+            using var ms = new MemoryStream();
+            await preview.SaveAsync(ms, new JpegEncoder { Quality = PreviewJpegQuality }, cancellationToken);
+
+            result.Add(new MultiPreviewItem(
+                TargetWidth: targetWidth,
+                ActualWidth: preview.Width,
+                ActualHeight: preview.Height,
+                Bytes: ms.ToArray()));
+        }
+
+        return result;
+    }
 }

@@ -41,6 +41,11 @@ public static class FileMetadataMapping
         if (m.FrameRate.HasValue) info.FrameRate = m.FrameRate.Value;
         if (m.IsHdr.HasValue) info.IsHdr = m.IsHdr.Value;
 
+        if (m.AudioTitle is not null) info.AudioTitle = m.AudioTitle;
+        if (m.AudioArtist is not null) info.AudioArtist = m.AudioArtist;
+        if (m.AudioAlbum is not null) info.AudioAlbum = m.AudioAlbum;
+        if (m.AudioTrackNumber.HasValue) info.AudioTrackNumber = m.AudioTrackNumber.Value;
+
         if (m.DocumentAuthor is not null) info.DocumentAuthor = m.DocumentAuthor;
         if (m.DocumentTitle is not null) info.DocumentTitle = m.DocumentTitle;
         if (m.DocumentSubject is not null) info.DocumentSubject = m.DocumentSubject;
