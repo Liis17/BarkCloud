@@ -367,6 +367,38 @@ public static class CloudApiEndpoints
                 return Results.Json(result, Json);
             }));
 
+        // ───────────────────────── Музыка ─────────────────────────
+
+        api.MapGet("/music/tracks", async (HttpContext http, AuthGateway auth, MusicApi.MusicApiClient music,
+            string? q, int? limit, string? cursorAt, string? cursorId) =>
+            await Guarded(http, auth, async token =>
+            {
+                var req = new ListMusicTracksRequest
+                {
+                    Query = q ?? "",
+                    Limit = limit is > 0 and <= 200 ? limit.Value : 60
+                };
+                if (DateTimeOffset.TryParse(cursorAt, out var dt))
+                    req.CursorCreatedAt = Timestamp.FromDateTimeOffset(dt.ToUniversalTime());
+                if (!string.IsNullOrWhiteSpace(cursorId))
+                    req.CursorFileId = cursorId;
+
+                var resp = await music.ListTracksAsync(req, token);
+                return Results.Json(new
+                {
+                    items = resp.Items.Select(MusicTrackJson).ToArray(),
+                    nextCursorAt = resp.NextCursorCreatedAt?.ToDateTimeOffset(),
+                    nextCursorId = resp.NextCursorFileId
+                }, Json);
+            }));
+
+        api.MapPost("/music/track/url", async (HttpContext http, AuthGateway auth, MusicApi.MusicApiClient music, FileIdReq body) =>
+            await Guarded(http, auth, async token =>
+            {
+                var resp = await music.GetTrackDownloadUrlAsync(new GetTrackDownloadUrlRequest { FileId = body.FileId }, token);
+                return Results.Json(new { url = resp.DownloadUrl }, Json);
+            }));
+
         // «Воспоминания — В этот день»: фото/видео за сегодняшнюю дату прошлых лет, по группам-годам.
         api.MapGet("/cloud/memories", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud,
             int? month, int? day, int? perYear) =>
@@ -1214,6 +1246,19 @@ public static class CloudApiEndpoints
         createdAt = item.CreatedAt?.ToDateTimeOffset()
     };
 
+    private static object MusicTrackJson(MusicTrackInfo item) => new
+    {
+        file = CloudJson.Media(item.File),
+        title = item.Title,
+        artist = item.Artist,
+        album = item.Album,
+        duration = item.DurationSeconds,
+        coverUrl = item.CoverUrl,
+        largeCoverUrl = item.LargeCoverUrl,
+        url = item.File.FileUrl,
+        metadata = item.Metadata is null ? null : FileMetadataJson(item.Metadata)
+    };
+
     /// <summary>Резолв id пользователей → User через UsersServerApi (имена «от кого / кому»).</summary>
     private static async Task<Dictionary<long, User>> ResolveUsers(
         UsersServerApi.UsersServerApiClient usersServer, IEnumerable<long> ids)
@@ -1311,6 +1356,11 @@ public static class CloudApiEndpoints
         if (m.HasBitrate) dict["bitrate"] = m.Bitrate;
         if (m.HasFrameRate) dict["frameRate"] = m.FrameRate;
         if (m.HasIsHdr) dict["isHdr"] = m.IsHdr;
+
+        if (m.HasAudioTitle) dict["audioTitle"] = m.AudioTitle;
+        if (m.HasAudioArtist) dict["audioArtist"] = m.AudioArtist;
+        if (m.HasAudioAlbum) dict["audioAlbum"] = m.AudioAlbum;
+        if (m.HasAudioTrackNumber) dict["audioTrackNumber"] = m.AudioTrackNumber;
 
         if (m.HasDocumentAuthor) dict["documentAuthor"] = m.DocumentAuthor;
         if (m.HasDocumentTitle) dict["documentTitle"] = m.DocumentTitle;

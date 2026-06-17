@@ -6,7 +6,9 @@ import { Footbar } from './Footbar';
 import { ShellContext } from '../../hooks/useShell';
 import { PageHeaderContext, type PageHeader } from '../../hooks/usePageHeader';
 import { UploadManagerProvider } from '../../hooks/useUploadManager';
+import { AudioPlayerProvider } from '../../hooks/useAudioPlayer';
 import { useDocumentHead } from '../../hooks/useDocumentHead';
+import { MiniPlayer } from '../music/MiniPlayer';
 import { apiGet } from '../../lib/api';
 import type { Shell } from '../../lib/types';
 
@@ -49,18 +51,21 @@ export function AppShell() {
   return (
     <ShellContext.Provider value={shell}>
       <UploadManagerProvider>
-        <PageHeaderContext.Provider value={headerCtx}>
-          <div className="app">
-            <Sidebar />
-            <div className="main">
-              <Topbar {...header} />
-              <div className={'content' + (header.contentClass ? ' ' + header.contentClass : '')}>
-                <Outlet />
+        <AudioPlayerProvider>
+          <PageHeaderContext.Provider value={headerCtx}>
+            <div className="app">
+              <Sidebar />
+              <div className="main">
+                <Topbar {...header} />
+                <div className={'content' + (header.contentClass ? ' ' + header.contentClass : '')}>
+                  <Outlet />
+                </div>
+                <Footbar />
               </div>
-              <Footbar />
             </div>
-          </div>
-        </PageHeaderContext.Provider>
+            <MiniPlayer />
+          </PageHeaderContext.Provider>
+        </AudioPlayerProvider>
       </UploadManagerProvider>
     </ShellContext.Provider>
   );

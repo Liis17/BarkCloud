@@ -16,6 +16,7 @@ import { useAlbumMembership } from '../hooks/useAlbumMembership';
 import { useFileDrop } from '../hooks/useFileDrop';
 import { useSelection } from '../hooks/useSelection';
 import { usePageHeader } from '../hooks/usePageHeader';
+import { useAudioPlayer } from '../hooks/useAudioPlayer';
 import { pickDocumentIcon } from '../hooks/useDocumentHead';
 import { useUploadActions } from '../hooks/useUploadManager';
 import { DynamicFoldersStrip } from '../components/dynamic-folders/DynamicFoldersStrip';
@@ -23,7 +24,7 @@ import { DynamicFolderDetail } from '../components/dynamic-folders/DynamicFolder
 import { DynamicFolderFormModal } from '../components/dynamic-folders/DynamicFolderFormModal';
 import { apiGet, apiPost, deleteEntriesBatch, downloadArchive, pickFiles } from '../lib/api';
 import { createShare, createFolderShare } from '../lib/share';
-import type { Album, CardFile, DirInfo, DynamicFolder, Entry, Listing } from '../lib/types';
+import type { Album, CardFile, DirInfo, DynamicFolder, Entry, Listing, MusicTrack } from '../lib/types';
 
 const ruDate = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' });
 function fmtDate(iso: string | null): string {
@@ -255,6 +256,7 @@ export function FilesPage() {
   const [searchMore, setSearchMore] = React.useState(false);
   const [toastNode, toast] = useToast();
   const { enqueue, attachVersion } = useUploadActions();
+  const audioPlayer = useAudioPlayer();
   const { menu, openAt } = useContextMenu();
   const membership = useAlbumMembership(albums);
   const { over, dropHandlers } = useFileDrop((f) => doUpload(f));
@@ -409,12 +411,45 @@ export function FilesPage() {
       toast((e as Error).message, 'err');
     }
   }
-  // Двойной клик: фото/видео — в просмотрщике, текст — inline во вкладке, прочее — скачать.
-  function openEntry(entry: Entry) {
+  // Двойной клик: фото/видео — в просмотрщике, аудио — в миниплеере, текст — inline, прочее — скачать.
+  async function openEntry(entry: Entry) {
     const m = entry.media;
     if (m && (m.kind === 'photo' || m.kind === 'video')) setLightbox(m);
+    else if (m?.kind === 'audio') await playAudioEntry(entry);
     else if (isTextFile(m)) window.open('/api/files/view?id=' + encodeURIComponent(entry.fileId), '_blank');
     else download(entry);
+  }
+
+  async function playAudioEntry(entry: Entry) {
+    if (!entry.media) return;
+    try {
+      const d = await apiPost<{ url?: string }>('/api/music/track/url', { fileId: entry.fileId });
+      if (!d.url) throw new Error('Ссылка недоступна');
+      const folderTracks: MusicTrack[] = (listing?.files || [])
+        .filter((e) => e.media?.kind === 'audio')
+        .map((e) => ({
+          file: e.media!,
+          title: e.name.replace(/\.[^.]+$/, ''),
+          artist: '',
+          album: '',
+          duration: 0,
+          coverUrl: '',
+          largeCoverUrl: '',
+          url: e.fileId === entry.fileId ? d.url! : '',
+        }));
+      audioPlayer.playQueue(folderTracks.length ? folderTracks : [{
+        file: entry.media,
+        title: entry.name.replace(/\.[^.]+$/, ''),
+        artist: '',
+        album: '',
+        duration: 0,
+        coverUrl: '',
+        largeCoverUrl: '',
+        url: d.url,
+      }], entry.fileId);
+    } catch (e) {
+      toast((e as Error).message, 'err');
+    }
   }
   async function copyLink(fileId: string) {
     try {
