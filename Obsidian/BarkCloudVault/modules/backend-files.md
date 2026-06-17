@@ -96,7 +96,7 @@ Parent: [[index]] · See also: [[api/files-api]] · [[modules/backend-files-clou
   - `20260528215548_AddShareLinks.cs` — таблица `ShareLinks` (уник. индекс `Token`, индекс `(OwnerId, CreatedAt)`)
   - `20260530132207_AddFileMetadata.cs` — таблица `FileMetadata` (PK = `FileId`, 24 nullable-колонки)
   - `20260611221205_AddFileActivityEvents.cs` — таблица `FileActivityEvents` + индексы `(OwnerId, CreatedAt)` и `(OwnerId, FileId, CreatedAt)`
-  - `20260617120000_AddMusicPlaylistsAndAudioMetadata.cs` — аудиометаданные в `FileMetadata`, таблицы музыкальных плейлистов, публичных ссылок и приватных грантов
+  - `20260617120000_AddMusicPlaylistsAndAudioMetadata.cs` — аудиометаданные в `FileMetadata`, таблицы музыкальных плейлистов, публичных ссылок и приватных грантов. Должна быть зарегистрирована через EF-атрибут `[Migration("20260617120000_AddMusicPlaylistsAndAudioMetadata")]`, иначе `Database.Migrate()` не добавит колонки `AudioAlbum`/`AudioArtist`/`AudioTitle`/`AudioTrackNumber`
 
 ### Exceptions (локальные)
 - `FileAlreadyUploadedException.cs`

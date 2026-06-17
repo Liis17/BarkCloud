@@ -1,11 +1,16 @@
 using System;
 
+using BarkCloud.Files.Persistence;
+
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
 namespace BarkCloud.Files.Persistence.Migrations
 {
+    [DbContext(typeof(FilesContext))]
+    [Migration("20260617120000_AddMusicPlaylistsAndAudioMetadata")]
     public partial class AddMusicPlaylistsAndAudioMetadata : Migration
     {
         protected override void Up(MigrationBuilder migrationBuilder)

@@ -77,7 +77,55 @@
 }
 
 .music-search {
-  min-width: min(420px, 42vw);
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  width: min(420px, 42vw);
+  min-width: 320px;
+  min-height: 56px;
+  padding: 0 18px;
+  border: 1px solid transparent;
+  border-radius: 28px;
+  background: var(--md-surface-container-high);
+  color: var(--md-on-surface-variant);
+  box-shadow: var(--shadow-1);
+  transition: background var(--d-short), border-color var(--d-short), box-shadow var(--d-short), transform var(--d-short) var(--m-emph);
+}
+
+.music-search:hover {
+  background: var(--md-surface-container-highest);
+}
+
+.music-search:focus-within {
+  border-color: var(--md-primary);
+  background: color-mix(in srgb, var(--md-primary) 6%, var(--md-surface-container-highest));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--md-primary) 18%, transparent);
+}
+
+.music-search svg {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  color: var(--md-on-surface-variant);
+}
+
+.music-search input {
+  width: 100%;
+  min-width: 0;
+  height: 54px;
+  border: 0;
+  outline: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--md-on-surface);
+  caret-color: var(--md-primary);
+  font: inherit;
+  font-size: 15px;
+}
+
+.music-search input::placeholder {
+  color: var(--md-on-surface-variant);
 }
 
 .track-list {
@@ -446,6 +494,14 @@
 }
 
 @media (max-width: 780px) {
+  .music-search {
+    width: 100%;
+    min-width: 0;
+    min-height: 52px;
+  }
+  .music-search input {
+    height: 50px;
+  }
   .track-row {
     grid-template-columns: minmax(0, 1fr) 34px;
   }
