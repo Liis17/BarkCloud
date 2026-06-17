@@ -399,6 +399,92 @@ public static class CloudApiEndpoints
                 return Results.Json(new { url = resp.DownloadUrl }, Json);
             }));
 
+        api.MapGet("/music/playlists", async (HttpContext http, AuthGateway auth, MusicApi.MusicApiClient music,
+            int? limit, string? cursorAt, string? cursorId) =>
+            await Guarded(http, auth, async token =>
+            {
+                var req = new ListMusicPlaylistsRequest { Limit = limit is > 0 and <= 200 ? limit.Value : 60 };
+                if (DateTimeOffset.TryParse(cursorAt, out var dt))
+                    req.CursorUpdatedAt = Timestamp.FromDateTimeOffset(dt.ToUniversalTime());
+                if (!string.IsNullOrWhiteSpace(cursorId))
+                    req.CursorPlaylistId = cursorId;
+                var resp = await music.ListPlaylistsAsync(req, token);
+                return Results.Json(new
+                {
+                    items = resp.Items.Select(MusicPlaylistJson).ToArray(),
+                    nextCursorAt = resp.NextCursorUpdatedAt?.ToDateTimeOffset(),
+                    nextCursorId = resp.NextCursorPlaylistId
+                }, Json);
+            }));
+
+        api.MapPost("/music/playlists", async (HttpContext http, AuthGateway auth, MusicApi.MusicApiClient music, MusicPlaylistCreate body) =>
+            await Guarded(http, auth, async token =>
+            {
+                var resp = await music.CreatePlaylistAsync(new CreateMusicPlaylistRequest { Name = body.Name, Description = body.Description ?? "" }, token);
+                return Results.Json(MusicPlaylistJson(resp), Json);
+            }));
+
+        api.MapPost("/music/playlists/update", async (HttpContext http, AuthGateway auth, MusicApi.MusicApiClient music, MusicPlaylistUpdate body) =>
+            await Guarded(http, auth, async token =>
+            {
+                var req = new UpdateMusicPlaylistRequest { PlaylistId = body.PlaylistId };
+                if (body.Name is not null) req.Name = body.Name;
+                if (body.Description is not null) req.Description = body.Description;
+                if (body.CoverFileId is not null) req.CoverFileId = body.CoverFileId;
+                var resp = await music.UpdatePlaylistAsync(req, token);
+                return Results.Json(MusicPlaylistJson(resp), Json);
+            }));
+
+        api.MapPost("/music/playlists/delete", async (HttpContext http, AuthGateway auth, MusicApi.MusicApiClient music, MusicPlaylistIdReq body) =>
+            await Guarded(http, auth, async token =>
+            {
+                await music.DeletePlaylistAsync(new DeleteMusicPlaylistRequest { PlaylistId = body.PlaylistId }, token);
+                return Results.Json(new { ok = true }, Json);
+            }));
+
+        api.MapGet("/music/playlists/tracks", async (HttpContext http, AuthGateway auth, MusicApi.MusicApiClient music, string playlistId) =>
+            await Guarded(http, auth, async token =>
+            {
+                var resp = await music.ListPlaylistTracksAsync(new ListMusicPlaylistTracksRequest { PlaylistId = playlistId }, token);
+                return Results.Json(new
+                {
+                    playlist = MusicPlaylistJson(resp.Playlist),
+                    items = resp.Items.Select(i => new
+                    {
+                        track = MusicTrackJson(i.Track),
+                        position = i.Position,
+                        addedAt = i.AddedAt?.ToDateTimeOffset()
+                    }).ToArray()
+                }, Json);
+            }));
+
+        api.MapPost("/music/playlists/tracks/add", async (HttpContext http, AuthGateway auth, MusicApi.MusicApiClient music, MusicPlaylistItemsReq body) =>
+            await Guarded(http, auth, async token =>
+            {
+                var req = new AddMusicPlaylistTracksRequest { PlaylistId = body.PlaylistId };
+                req.FileIds.AddRange(body.FileIds ?? Array.Empty<string>());
+                await music.AddPlaylistTracksAsync(req, token);
+                return Results.Json(new { ok = true }, Json);
+            }));
+
+        api.MapPost("/music/playlists/tracks/remove", async (HttpContext http, AuthGateway auth, MusicApi.MusicApiClient music, MusicPlaylistItemsReq body) =>
+            await Guarded(http, auth, async token =>
+            {
+                var req = new RemoveMusicPlaylistTracksRequest { PlaylistId = body.PlaylistId };
+                req.FileIds.AddRange(body.FileIds ?? Array.Empty<string>());
+                await music.RemovePlaylistTracksAsync(req, token);
+                return Results.Json(new { ok = true }, Json);
+            }));
+
+        api.MapPost("/music/playlists/tracks/reorder", async (HttpContext http, AuthGateway auth, MusicApi.MusicApiClient music, MusicPlaylistItemsReq body) =>
+            await Guarded(http, auth, async token =>
+            {
+                var req = new ReorderMusicPlaylistTracksRequest { PlaylistId = body.PlaylistId };
+                req.FileIds.AddRange(body.FileIds ?? Array.Empty<string>());
+                await music.ReorderPlaylistTracksAsync(req, token);
+                return Results.Json(new { ok = true }, Json);
+            }));
+
         // «Воспоминания — В этот день»: фото/видео за сегодняшнюю дату прошлых лет, по группам-годам.
         api.MapGet("/cloud/memories", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud,
             int? month, int? day, int? perYear) =>
@@ -1259,6 +1345,20 @@ public static class CloudApiEndpoints
         metadata = item.Metadata is null ? null : FileMetadataJson(item.Metadata)
     };
 
+    private static object MusicPlaylistJson(MusicPlaylistInfo item) => new
+    {
+        id = item.Id,
+        name = item.Name,
+        description = item.Description,
+        coverFileId = item.CoverFileId,
+        coverUrl = item.CoverPreviewUrl,
+        count = item.ItemsCount,
+        ownerUserId = item.OwnerUserId,
+        canReorder = item.CanReorder,
+        createdAt = item.CreatedAt?.ToDateTimeOffset(),
+        updatedAt = item.UpdatedAt?.ToDateTimeOffset()
+    };
+
     /// <summary>Резолв id пользователей → User через UsersServerApi (имена «от кого / кому»).</summary>
     private static async Task<Dictionary<long, User>> ResolveUsers(
         UsersServerApi.UsersServerApiClient usersServer, IEnumerable<long> ids)
@@ -1441,4 +1541,8 @@ public static class CloudApiEndpoints
     private sealed record FolderShareIdReq(string FolderShareId);
     private sealed record AlbumShareCreateReq(string AlbumId, string? Name);
     private sealed record AlbumShareIdReq(string AlbumShareId);
+    private sealed record MusicPlaylistCreate(string Name, string? Description);
+    private sealed record MusicPlaylistUpdate(string PlaylistId, string? Name, string? Description, string? CoverFileId);
+    private sealed record MusicPlaylistIdReq(string PlaylistId);
+    private sealed record MusicPlaylistItemsReq(string PlaylistId, string[]? FileIds);
 }
