@@ -683,17 +683,18 @@ img.avatar { object-fit: cover; }
 /* Modal */
 .modal-backdrop {
   position: fixed; inset: 0; z-index: 1150; /* выше .lightbox (1100): модалки открываются и из панели Lightbox */
-  background: rgba(0,0,0,.5);
+  background: color-mix(in srgb, var(--md-scrim, #000) 50%, transparent);
   display: flex; align-items: center; justify-content: center;
   padding: 24px;
   animation: bc-fade var(--d-short) ease;
 }
 @keyframes bc-fade { from { opacity: 0; } to { opacity: 1; } }
 .modal {
-  width: 100%; max-width: 460px;
-  background: var(--md-surface-container-high);
-  border-radius: var(--r-xl);
-  box-shadow: 0 16px 48px rgba(0,0,0,.28);
+  width: 100%; max-width: 560px;
+  background: color-mix(in srgb, var(--md-primary) 4%, var(--md-surface-container-high));
+  border: 1px solid var(--md-outline-variant);
+  border-radius: 28px;
+  box-shadow: 0 18px 54px rgba(0,0,0,.30);
   display: flex; flex-direction: column;
   max-height: 88vh;
   animation: bc-pop var(--d-med) var(--m-emph);
@@ -702,31 +703,43 @@ img.avatar { object-fit: cover; }
 @keyframes bc-pop { from { transform: translateY(12px) scale(.98); opacity: 0; } to { transform: none; opacity: 1; } }
 .modal-head {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 20px 20px 12px;
+  padding: 24px 24px 12px;
+  gap: 16px;
 }
-.modal-head h3 { font-size: 20px; font-weight: 500; color: var(--md-on-surface); }
-.modal-body { padding: 4px 20px 8px; overflow-y: auto; }
+.modal-head h3 { font-size: 22px; line-height: 28px; font-weight: 700; color: var(--md-on-surface); }
+.modal-body { padding: 4px 24px 8px; overflow-y: auto; }
 .modal-actions {
   display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap;
-  padding: 14px 20px 20px;
+  padding: 16px 24px 24px;
 }
 .modal label.field-label {
-  display: block; font-size: 12px; font-weight: 500;
+  display: block; font-size: 12px; font-weight: 650;
   color: var(--md-on-surface-variant); margin: 12px 0 6px;
 }
 .modal input[type=text], .modal textarea {
   width: 100%;
+  min-height: 56px;
   background: var(--md-surface-container-low);
-  border: 1px solid var(--md-outline);
-  border-radius: var(--r-sm);
-  padding: 12px 14px;
+  border: 1px solid var(--md-outline-variant);
+  border-radius: 16px;
+  padding: 14px 16px;
   font-family: inherit; font-size: 14px;
   color: var(--md-on-surface);
   outline: none;
-  transition: border-color var(--d-short);
+  transition: border-color var(--d-short), box-shadow var(--d-short);
 }
-.modal input[type=text]:focus, .modal textarea:focus { border-color: var(--md-primary); }
+.modal input[type=text]:focus, .modal textarea:focus {
+  border-color: var(--md-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--md-primary) 18%, transparent);
+}
 .modal textarea { resize: vertical; min-height: 72px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .modal-backdrop,
+  .modal {
+    animation-duration: 80ms;
+  }
+}
 
 /* Picker grid (выбор файлов для альбома / обложки) */
 .pick-grid {
