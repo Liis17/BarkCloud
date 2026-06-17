@@ -179,6 +179,12 @@ export interface FileMetadata {
   frameRate?: number;
   isHdr?: boolean;
 
+  // Аудио
+  audioTitle?: string;
+  audioArtist?: string;
+  audioAlbum?: string;
+  audioTrackNumber?: number;
+
   // Документ
   documentAuthor?: string;
   documentTitle?: string;
@@ -207,6 +213,18 @@ export interface Page<T> {
   items: T[];
   nextCursorAt: string | null;
   nextCursorId: string | null;
+}
+
+export interface MusicTrack {
+  file: CardFile;
+  title: string;
+  artist: string;
+  album: string;
+  duration: number;
+  coverUrl: string;
+  largeCoverUrl: string;
+  url: string;
+  metadata?: FileMetadata | null;
 }
 
 // ───────────────────────── Каркас (GET /api/me) ─────────────────────────

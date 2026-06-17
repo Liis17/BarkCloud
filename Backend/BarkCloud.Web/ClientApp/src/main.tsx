@@ -8,6 +8,7 @@ import './styles/pages.css';
 import { AppShell } from './components/shell/AppShell';
 import { PhotosPage } from './pages/PhotosPage';
 import { VideosPage } from './pages/VideosPage';
+import { MusicPage } from './pages/MusicPage';
 import { AlbumsPage } from './pages/AlbumsPage';
 import { FilesPage } from './pages/FilesPage';
 import { FavoritesPage } from './pages/FavoritesPage';
@@ -31,6 +32,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             <Route index element={<Navigate to="/photos" replace />} />
             <Route path="photos" element={<PhotosPage />} />
             <Route path="videos" element={<VideosPage />} />
+            <Route path="music" element={<MusicPage />} />
             <Route path="albums" element={<AlbumsPage />} />
             <Route path="files" element={<FilesPage />} />
             <Route path="favorites" element={<FavoritesPage />} />
