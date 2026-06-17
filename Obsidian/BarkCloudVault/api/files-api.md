@@ -6,7 +6,7 @@ Parent: [[index]] · Module: [[modules/backend-files]] · Cloud: [[modules/backe
 Namespace C#: `BarkCloud.Proto.Files`
 Package: `barkcloud.files`
 
-В proto-файле определены сервисы: `FilesApi` (клиент), `CloudApi` (клиент, облачная иерархия + галерея), `DynamicFolderApi` (клиент, умные папки), `FilesServerApi` (служебный), `AlbumApi` (клиент, альбомы фото/видео).
+В proto-файле определены сервисы: `FilesApi` (клиент), `CloudApi` (клиент, облачная иерархия + галерея), `DynamicFolderApi` (клиент, умные папки), `FilesServerApi` (служебный), `AlbumApi` (клиент, альбомы фото/видео), `MusicApi` (клиент, аудиотека и музыкальные плейлисты).
 
 ## Сервис: `FilesApi` (клиентский)
 
@@ -73,6 +73,8 @@ Package: `barkcloud.files`
 
 > **Шаринг папки между пользователями**: гранты `DirectoryGrant` (владелец→получатель→папка, рекурсивно). RPC `ShareFolderWithUser`/`RevokeFolderUserShare`/`ListMyOutgoingFolderShares` (владелец, «я поделился» — папки)/`ListSharedFoldersWithMe` (получатель, «мне доступны» — папки)/`ListSharedDirectory(directory_id)` (навигация по доступному поддереву — listing с публичными temp-URL и превью). Доступ получателя считает `FolderGrantAccessService`: файл/папка доступны, если входят в поддерево любого гранта получателя (через `GetSubtree`). Этим же сервисом расширен `GetSharedFileDownloadUrl` (доступ по прямому гранту ИЛИ через папку). Гранты папок чистятся при удалении папки (`DeleteDirectory`) и аккаунта (`UserDeleted`).
 
+> **Музыкальные плейлисты**: см. `MusicApi`. Плейлист приватный по умолчанию, публичность включается отдельным `CreatePlaylistShare`, приватный доступ — `SharePlaylistWithUser`. Получатель видит плейлист через `ListSharedPlaylistsWithMe` и может читать треки через `ListPlaylistTracks`; ручной порядок/обложка/состав доступны только владельцу.
+
 ### Messages CloudApi
 
 - `CloudEmpty {}` — пустой ответ
@@ -130,6 +132,7 @@ Package: `barkcloud.files`
 | `GetUserStorageInfoServer(GetUserStorageInfoServerRequest) → GetUserStorageInfoResponse` | Storage info (админка) + физический snapshot диска |
 | `UploadAvatarServer(UploadAvatarServerRequest) → UploadAvatarServerResponse` | Загрузка аватарки пользователя (служебно) |
 | `ResolveShare(ResolveShareRequest) → ResolveShareResponse` | Резолв публичного токена (без `UserContext`): `found` + `file_id`/`name`/`download_url`. Внутри создаёт `TempFile` для оригинала (прямой `/download/{fileId}` для `CloudFile` запрещён в `DownloadFileCommandHandler`) и инкрементит `click_count`. Зовётся из Web-роута `/s/{token}` сервисным токеном |
+| `ResolveMusicPlaylistShare(ResolveMusicPlaylistShareRequest) → ResolveMusicPlaylistShareResponse` | Резолв публичного музыкального плейлиста для `/mpl/{token}`: имя/описание/обложка + треки с публичными temp-URL |
 
 Messages: `ResolveShareRequest { token; }` → `ResolveShareResponse { found; file_id; name; download_url; media_kind; preview_url; image_width; image_height; file_size; }`.
 
@@ -156,6 +159,34 @@ Messages: `ResolveShareRequest { token; }` → `ResolveShareResponse { found; fi
 - `ListAlbumsRequest { limit; cursor_updated_at; cursor_album_id; }` → `ListAlbumsResponse { albums; next_cursor_updated_at; next_cursor_album_id; }`
 - `ListAlbumItemsRequest { album_id; limit; cursor_added_at; cursor_file_id; optional MediaKind kind_filter; }` → `ListAlbumItemsResponse { items; next_cursor_added_at; next_cursor_file_id; }`
 - `AlbumItemEntry { UploadFileInfo file; added_at; }`
+
+## Сервис: `MusicApi` (клиентский, аудиотека и плейлисты)
+
+Хост — `MusicApiService` с пользовательской авторизацией. Треки — это `UploadFile` с `media_kind=AUDIO`; сервер при загрузке вытаскивает аудиотеги и embedded artwork, а `MusicApi` отдаёт temp-URL для воспроизведения.
+
+| RPC | Назначение |
+|-----|-----------|
+| `ListTracks(ListMusicTracksRequest) → ListMusicTracksResponse` | Список аудиотреков владельца от новых к старым, поиск по названию/исполнителю/альбому, cursor `(cursor_created_at + cursor_file_id)` |
+| `GetTrackDownloadUrl(GetTrackDownloadUrlRequest) → GetTrackDownloadUrlResponse` | Выдать свежий temp-URL трека |
+| `CreatePlaylist(CreateMusicPlaylistRequest) → MusicPlaylistInfo` | Создать приватный плейлист |
+| `UpdatePlaylist(UpdateMusicPlaylistRequest) → MusicPlaylistInfo` | Изменить имя/описание/обложку (`cover_file_id`; пустая строка = сброс) |
+| `DeletePlaylist(DeleteMusicPlaylistRequest) → CloudEmpty` | Удалить плейлист, его элементы, публичные ссылки и гранты |
+| `ListPlaylists(ListMusicPlaylistsRequest) → ListMusicPlaylistsResponse` | Собственные плейлисты владельца, cursor `(cursor_updated_at + cursor_playlist_id)` |
+| `ListPlaylistTracks(ListMusicPlaylistTracksRequest) → ListMusicPlaylistTracksResponse` | Треки плейлиста; доступ владельцу или получателю приватного гранта |
+| `AddPlaylistTracks` / `RemovePlaylistTracks` | Изменить состав плейлиста владельца |
+| `ReorderPlaylistTracks(ReorderMusicPlaylistTracksRequest) → CloudEmpty` | Полный новый порядок `file_ids`; только владелец |
+| `CreatePlaylistShare` / `ListMyPlaylistShares` / `RevokePlaylistShare` | Публичная ссылка на плейлист (`/mpl/{token}`), список и отзыв |
+| `SharePlaylistWithUser` / `RevokePlaylistUserShare` | Приватный грант доступа пользователю |
+| `ListMyOutgoingPlaylistShares` | Кому доступен конкретный мой плейлист |
+| `ListSharedPlaylistsWithMe` | Плейлисты, которыми поделились со мной |
+
+### Messages MusicApi
+
+- `MusicTrackInfo { file; metadata; title; artist; album; duration_seconds; cover_url; large_cover_url; }` — `file.file_url` содержит temp-URL для воспроизведения, `cover_url` примерно 128px, `large_cover_url` примерно 512px.
+- `MusicPlaylistInfo { id; name; description; cover_file_id; cover_preview_url; items_count; owner_user_id; can_reorder; created_at; updated_at; }`
+- `MusicPlaylistShareInfo { id; token; playlist_id; name; created_at; click_count; cover_preview_url; }`
+- `SharedMusicPlaylistEntry { grant_id; playlist; owner_user_id; shared_at; }`
+- `ResolveMusicPlaylistShareResponse { found; playlist_name; description; cover_preview_url; repeated MusicTrackInfo items; }`
 
 ## Что отсутствует в proto и коде
 

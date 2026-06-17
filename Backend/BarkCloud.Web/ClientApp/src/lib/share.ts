@@ -37,3 +37,14 @@ export async function createAlbumShare(albumId: string, name: string, toast: Toa
     toast((e as Error).message || 'Не удалось сделать альбом публичным', 'err');
   }
 }
+
+/** Сделать музыкальный плейлист публичным (идемпотентно) и скопировать ссылку /mpl/{token} в буфер. */
+export async function createMusicPlaylistShare(playlistId: string, name: string, toast: ToastPush): Promise<void> {
+  try {
+    const link = await apiPost<{ url: string }>('/api/music/playlist-shares', { playlistId, name });
+    await navigator.clipboard.writeText(link.url);
+    toast('Ссылка на плейлист скопирована');
+  } catch (e) {
+    toast((e as Error).message || 'Не удалось сделать плейлист публичным', 'err');
+  }
+}

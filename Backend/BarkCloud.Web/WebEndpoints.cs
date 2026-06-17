@@ -404,6 +404,40 @@ public static class WebEndpoints
             }
         });
 
+        // Анонимный JSON для публичной страницы музыкального плейлиста (/mpl/{token}).
+        app.MapGet("/mpl/{token}/list", async (string token, FilesServerApi.FilesServerApiClient filesServer) =>
+        {
+            try
+            {
+                var resp = await filesServer.ResolveMusicPlaylistShareAsync(new ResolveMusicPlaylistShareRequest { Token = token });
+                if (!resp.Found)
+                    return Results.NotFound(new { found = false });
+
+                return Results.Json(new
+                {
+                    found = true,
+                    playlistName = resp.PlaylistName,
+                    description = resp.Description,
+                    coverUrl = resp.CoverPreviewUrl,
+                    items = resp.Items.Select(t => new
+                    {
+                        file = CloudJson.Media(t.File),
+                        title = t.Title,
+                        artist = t.Artist,
+                        album = t.Album,
+                        duration = t.DurationSeconds,
+                        coverUrl = t.CoverUrl,
+                        largeCoverUrl = t.LargeCoverUrl,
+                        url = t.File.FileUrl
+                    }).ToArray()
+                });
+            }
+            catch (RpcException)
+            {
+                return Results.NotFound(new { found = false });
+            }
+        });
+
         // ───────── Защищённые страницы ─────────
         // Страницы приложения (/photos, /videos, /files, /favorites, /trash, /settings, /shared)
         // отдаёт React-SPA через SPA-fallback в Program.cs (UseStaticFiles + MapFallback).
