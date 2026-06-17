@@ -2,11 +2,14 @@ import React from 'react';
 import { Icon } from '../components/Icon';
 import { EmptyState, Loading } from '../components/ui/EmptyState';
 import { Modal } from '../components/ui/Modal';
+import { ShareWithUserModal } from '../components/ui/ShareWithUserModal';
 import { useAudioPlayer } from '../hooks/useAudioPlayer';
 import { usePageHeader } from '../hooks/usePageHeader';
+import { useToast } from '../hooks/useToast';
 import { apiGet, apiPost, pickFiles, uploadFile } from '../lib/api';
 import { formatDuration } from '../lib/format';
-import type { MediaItem, MusicPlaylist, MusicPlaylistTrack, MusicTrack, Page } from '../lib/types';
+import { createMusicPlaylistShare } from '../lib/share';
+import type { MediaItem, MusicPlaylist, MusicPlaylistTrack, MusicTrack, Page, SharedMusicPlaylist } from '../lib/types';
 
 type Tab = 'tracks' | 'playlists';
 
@@ -14,6 +17,7 @@ export function MusicPage() {
   const [tab, setTab] = React.useState<Tab>('tracks');
   const [tracks, setTracks] = React.useState<MusicTrack[]>([]);
   const [playlists, setPlaylists] = React.useState<MusicPlaylist[]>([]);
+  const [sharedPlaylists, setSharedPlaylists] = React.useState<SharedMusicPlaylist[]>([]);
   const [detail, setDetail] = React.useState<{ playlist: MusicPlaylist; items: MusicPlaylistTrack[] } | null>(null);
   const [query, setQuery] = React.useState('');
   const [nextCursorAt, setNextCursorAt] = React.useState<string | null>(null);
@@ -24,7 +28,9 @@ export function MusicPage() {
   const [name, setName] = React.useState('');
   const [addTrack, setAddTrack] = React.useState<MusicTrack | null>(null);
   const [coverTarget, setCoverTarget] = React.useState<MusicPlaylist | null>(null);
+  const [shareWith, setShareWith] = React.useState<MusicPlaylist | null>(null);
   const [photos, setPhotos] = React.useState<MediaItem[]>([]);
+  const [toastNode, toast] = useToast();
   const player = useAudioPlayer();
 
   usePageHeader(() => ({
@@ -65,8 +71,12 @@ export function MusicPage() {
   }, [nextCursorAt, nextCursorId, query]);
 
   const loadPlaylists = React.useCallback(async () => {
-    const resp = await apiGet<Page<MusicPlaylist>>('/api/music/playlists?limit=100');
-    setPlaylists(resp.items || []);
+    const [own, shared] = await Promise.all([
+      apiGet<Page<MusicPlaylist>>('/api/music/playlists?limit=100'),
+      apiGet<{ items: SharedMusicPlaylist[] }>('/api/music/shared/with-me'),
+    ]);
+    setPlaylists(own.items || []);
+    setSharedPlaylists(shared.items || []);
   }, []);
 
   React.useEffect(() => {
@@ -142,6 +152,10 @@ export function MusicPage() {
     await chooseCover(uploaded.fileId);
   }
 
+  function createPublicShare(playlist: MusicPlaylist) {
+    createMusicPlaylistShare(playlist.id, playlist.name, toast);
+  }
+
   return (
     <div className="music-page">
       <div className="music-tabs">
@@ -173,9 +187,18 @@ export function MusicPage() {
           onRemove={removeFromPlaylist}
           onMove={moveTrack}
           onCover={() => openCoverPicker(detail.playlist)}
+          onPublicShare={() => createPublicShare(detail.playlist)}
+          onShareWith={() => setShareWith(detail.playlist)}
         />
       ) : (
-        <PlaylistsView playlists={playlists} onOpen={openPlaylist} onCover={openCoverPicker} />
+        <PlaylistsView
+          playlists={playlists}
+          shared={sharedPlaylists}
+          onOpen={openPlaylist}
+          onCover={openCoverPicker}
+          onPublicShare={createPublicShare}
+          onShareWith={setShareWith}
+        />
       )}
 
       {creating && (
@@ -220,6 +243,17 @@ export function MusicPage() {
           </div>
         </Modal>
       )}
+
+      {shareWith && (
+        <ShareWithUserModal
+          playlistId={shareWith.id}
+          fileName={shareWith.name}
+          onClose={() => setShareWith(null)}
+          toast={toast}
+        />
+      )}
+
+      {toastNode}
     </div>
   );
 }
@@ -299,29 +333,76 @@ function TrackRow({ track, index, active, playing, onPlay, onAdd }: {
   );
 }
 
-function PlaylistsView({ playlists, onOpen, onCover }: {
+function PlaylistsView({ playlists, shared, onOpen, onCover, onPublicShare, onShareWith }: {
   playlists: MusicPlaylist[];
+  shared: SharedMusicPlaylist[];
   onOpen: (playlist: MusicPlaylist) => void;
   onCover: (playlist: MusicPlaylist) => void;
+  onPublicShare: (playlist: MusicPlaylist) => void;
+  onShareWith: (playlist: MusicPlaylist) => void;
 }) {
-  if (!playlists.length) return <EmptyState icon="music" title="Плейлистов пока нет" hint="Создайте первый плейлист и добавьте в него треки." />;
+  if (!playlists.length && !shared.length) return <EmptyState icon="music" title="Плейлистов пока нет" hint="Создайте первый плейлист и добавьте в него треки." />;
   return (
-    <div className="music-playlist-grid">
-      {playlists.map((p) => (
-        <div className="music-playlist-card" key={p.id}>
-          <button className="music-playlist-cover" onClick={() => onOpen(p)}>
-            {p.coverUrl ? <img src={p.coverUrl} alt="" /> : <Icon.music size={34} />}
-          </button>
-          <button className="music-playlist-name" onClick={() => onOpen(p)}>{p.name}</button>
-          <div className="music-playlist-meta">{p.count} треков</div>
-          <button className="btn outlined" onClick={() => onCover(p)}>Обложка</button>
-        </div>
-      ))}
+    <>
+      {playlists.length > 0 && (
+        <>
+          <div className="music-section-title">Мои плейлисты</div>
+          <div className="music-playlist-grid">
+            {playlists.map((p) => (
+              <PlaylistCard
+                key={p.id}
+                playlist={p}
+                onOpen={onOpen}
+                actions={
+                  <>
+                    <button className="icon-btn" title="Публичная ссылка" onClick={() => onPublicShare(p)}><Icon.link size={16} /></button>
+                    <button className="icon-btn" title="Поделиться с пользователем" onClick={() => onShareWith(p)}><Icon.share size={16} /></button>
+                    <button className="icon-btn" title="Обложка" onClick={() => onCover(p)}><Icon.photo size={16} /></button>
+                  </>
+                }
+              />
+            ))}
+          </div>
+        </>
+      )}
+      {shared.length > 0 && (
+        <>
+          <div className="music-section-title">Доступные мне</div>
+          <div className="music-playlist-grid">
+            {shared.map((item) => (
+              <PlaylistCard
+                key={item.grantId}
+                playlist={item.playlist}
+                onOpen={onOpen}
+                meta={`от пользователя #${item.ownerUserId}`}
+              />
+            ))}
+          </div>
+        </>
+      )}
+    </>
+  );
+}
+
+function PlaylistCard({ playlist, onOpen, actions, meta }: {
+  playlist: MusicPlaylist;
+  onOpen: (playlist: MusicPlaylist) => void;
+  actions?: React.ReactNode;
+  meta?: string;
+}) {
+  return (
+    <div className="music-playlist-card">
+      <button className="music-playlist-cover" onClick={() => onOpen(playlist)}>
+        {playlist.coverUrl ? <img src={playlist.coverUrl} alt="" /> : <Icon.music size={34} />}
+      </button>
+      <button className="music-playlist-name" onClick={() => onOpen(playlist)}>{playlist.name}</button>
+      <div className="music-playlist-meta">{meta || `${playlist.count} треков`}</div>
+      {actions && <div className="music-playlist-actions">{actions}</div>}
     </div>
   );
 }
 
-function PlaylistDetail({ detail, currentId, isPlaying, onBack, onPlay, onRemove, onMove, onCover }: {
+function PlaylistDetail({ detail, currentId, isPlaying, onBack, onPlay, onRemove, onMove, onCover, onPublicShare, onShareWith }: {
   detail: { playlist: MusicPlaylist; items: MusicPlaylistTrack[] };
   currentId?: string;
   isPlaying: boolean;
@@ -330,7 +411,10 @@ function PlaylistDetail({ detail, currentId, isPlaying, onBack, onPlay, onRemove
   onRemove: (fileId: string) => void;
   onMove: (fileId: string, direction: -1 | 1) => void;
   onCover: () => void;
+  onPublicShare: () => void;
+  onShareWith: () => void;
 }) {
+  const own = detail.playlist.canReorder;
   return (
     <div className="playlist-detail">
       <div className="playlist-head">
@@ -340,15 +424,25 @@ function PlaylistDetail({ detail, currentId, isPlaying, onBack, onPlay, onRemove
           <h2>{detail.playlist.name}</h2>
           <p>{detail.playlist.count} треков</p>
         </div>
-        <button className="btn outlined" onClick={onCover}>Обложка</button>
+        {own && (
+          <div className="playlist-head-actions">
+            <button className="btn outlined" onClick={onPublicShare}><Icon.link size={16} /> Ссылка</button>
+            <button className="btn outlined" onClick={onShareWith}><Icon.share size={16} /> Поделиться</button>
+            <button className="btn outlined" onClick={onCover}>Обложка</button>
+          </div>
+        )}
       </div>
       <div className="track-list">
         {detail.items.map((item, idx) => (
-          <div className="playlist-track-line" key={item.track.file.id}>
+          <div className={'playlist-track-line' + (own ? '' : ' readonly')} key={item.track.file.id}>
             <TrackRow track={item.track} index={idx} active={currentId === item.track.file.id} playing={isPlaying} onPlay={() => onPlay(item.track)} />
-            <button className="icon-btn" disabled={idx === 0} onClick={() => onMove(item.track.file.id, -1)}>↑</button>
-            <button className="icon-btn" disabled={idx === detail.items.length - 1} onClick={() => onMove(item.track.file.id, 1)}>↓</button>
-            <button className="icon-btn" onClick={() => onRemove(item.track.file.id)}><Icon.x size={16} /></button>
+            {own && (
+              <>
+                <button className="icon-btn" disabled={idx === 0} onClick={() => onMove(item.track.file.id, -1)}>↑</button>
+                <button className="icon-btn" disabled={idx === detail.items.length - 1} onClick={() => onMove(item.track.file.id, 1)}>↓</button>
+                <button className="icon-btn" onClick={() => onRemove(item.track.file.id)}><Icon.x size={16} /></button>
+              </>
+            )}
           </div>
         ))}
       </div>

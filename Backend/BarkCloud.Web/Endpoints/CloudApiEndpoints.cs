@@ -485,6 +485,92 @@ public static class CloudApiEndpoints
                 return Results.Json(new { ok = true }, Json);
             }));
 
+        api.MapGet("/music/playlist-shares", async (HttpContext http, AuthGateway auth, MusicApi.MusicApiClient music,
+            int? limit, string? cursorAt, string? cursorId) =>
+            await Guarded(http, auth, async token =>
+            {
+                var req = new ListMyMusicPlaylistSharesRequest { Limit = limit is > 0 and <= 200 ? limit.Value : 60 };
+                if (DateTimeOffset.TryParse(cursorAt, out var dt))
+                    req.CursorCreatedAt = Timestamp.FromDateTimeOffset(dt.ToUniversalTime());
+                if (!string.IsNullOrEmpty(cursorId))
+                    req.CursorShareId = cursorId;
+
+                var resp = await music.ListMyPlaylistSharesAsync(req, token);
+                return Results.Json(new
+                {
+                    items = resp.Shares.Select(s => MusicPlaylistShareJson(http, s)).ToArray(),
+                    nextCursorAt = resp.NextCursorCreatedAt?.ToDateTimeOffset(),
+                    nextCursorId = resp.NextCursorShareId
+                }, Json);
+            }));
+
+        api.MapPost("/music/playlist-shares", async (HttpContext http, AuthGateway auth, MusicApi.MusicApiClient music, MusicPlaylistShareCreate body) =>
+            await Guarded(http, auth, async token =>
+            {
+                var info = await music.CreatePlaylistShareAsync(
+                    new CreateMusicPlaylistShareRequest { PlaylistId = body.PlaylistId, Name = body.Name ?? "" }, token);
+                return Results.Json(MusicPlaylistShareJson(http, info), Json);
+            }));
+
+        api.MapPost("/music/playlist-shares/revoke", async (HttpContext http, AuthGateway auth, MusicApi.MusicApiClient music, MusicPlaylistShareIdReq body) =>
+            await Guarded(http, auth, async token =>
+            {
+                await music.RevokePlaylistShareAsync(new RevokeMusicPlaylistShareRequest { ShareId = body.ShareId }, token);
+                return Results.Json(new { ok = true }, Json);
+            }));
+
+        api.MapPost("/music/shared/grant", async (HttpContext http, AuthGateway auth, MusicApi.MusicApiClient music, MusicPlaylistUserGrant body) =>
+            await Guarded(http, auth, async token =>
+            {
+                await music.SharePlaylistWithUserAsync(new ShareMusicPlaylistWithUserRequest
+                {
+                    PlaylistId = body.PlaylistId,
+                    RecipientUserId = body.RecipientUserId
+                }, token);
+                return Results.Json(new { ok = true }, Json);
+            }));
+
+        api.MapPost("/music/shared/revoke-grant", async (HttpContext http, AuthGateway auth, MusicApi.MusicApiClient music, MusicPlaylistGrantIdReq body) =>
+            await Guarded(http, auth, async token =>
+            {
+                await music.RevokePlaylistUserShareAsync(new RevokeMusicPlaylistUserShareRequest { GrantId = body.GrantId }, token);
+                return Results.Json(new { ok = true }, Json);
+            }));
+
+        api.MapGet("/music/shared/outgoing", async (HttpContext http, AuthGateway auth, MusicApi.MusicApiClient music, string playlistId) =>
+            await Guarded(http, auth, async token =>
+            {
+                var resp = await music.ListMyOutgoingPlaylistSharesAsync(
+                    new ListMyOutgoingMusicPlaylistSharesRequest { PlaylistId = playlistId }, token);
+                return Results.Json(new
+                {
+                    items = resp.Items.Select(i => new
+                    {
+                        grantId = i.GrantId,
+                        playlistId = i.PlaylistId,
+                        name = i.Name,
+                        recipientUserId = i.RecipientUserId,
+                        sharedAt = i.SharedAt?.ToDateTimeOffset()
+                    }).ToArray()
+                }, Json);
+            }));
+
+        api.MapGet("/music/shared/with-me", async (HttpContext http, AuthGateway auth, MusicApi.MusicApiClient music) =>
+            await Guarded(http, auth, async token =>
+            {
+                var resp = await music.ListSharedPlaylistsWithMeAsync(new ListSharedMusicPlaylistsWithMeRequest(), token);
+                return Results.Json(new
+                {
+                    items = resp.Items.Select(i => new
+                    {
+                        grantId = i.GrantId,
+                        playlist = MusicPlaylistJson(i.Playlist),
+                        ownerUserId = i.OwnerUserId,
+                        sharedAt = i.SharedAt?.ToDateTimeOffset()
+                    }).ToArray()
+                }, Json);
+            }));
+
         // «Воспоминания — В этот день»: фото/видео за сегодняшнюю дату прошлых лет, по группам-годам.
         api.MapGet("/cloud/memories", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud,
             int? month, int? day, int? perYear) =>
@@ -1359,6 +1445,23 @@ public static class CloudApiEndpoints
         updatedAt = item.UpdatedAt?.ToDateTimeOffset()
     };
 
+    private static object MusicPlaylistShareJson(HttpContext http, MusicPlaylistShareInfo s)
+    {
+        var origin = ResolveOrigin(http);
+        return new
+        {
+            id = s.Id,
+            token = s.Token,
+            kind = "musicPlaylist",
+            url = $"{origin}/mpl/{s.Token}",
+            playlistId = s.PlaylistId,
+            name = s.Name,
+            createdAt = s.CreatedAt?.ToDateTimeOffset(),
+            clickCount = s.ClickCount,
+            previewUrl = s.CoverPreviewUrl
+        };
+    }
+
     /// <summary>Резолв id пользователей → User через UsersServerApi (имена «от кого / кому»).</summary>
     private static async Task<Dictionary<long, User>> ResolveUsers(
         UsersServerApi.UsersServerApiClient usersServer, IEnumerable<long> ids)
@@ -1545,4 +1648,8 @@ public static class CloudApiEndpoints
     private sealed record MusicPlaylistUpdate(string PlaylistId, string? Name, string? Description, string? CoverFileId);
     private sealed record MusicPlaylistIdReq(string PlaylistId);
     private sealed record MusicPlaylistItemsReq(string PlaylistId, string[]? FileIds);
+    private sealed record MusicPlaylistShareCreate(string PlaylistId, string? Name);
+    private sealed record MusicPlaylistShareIdReq(string ShareId);
+    private sealed record MusicPlaylistUserGrant(string PlaylistId, long RecipientUserId);
+    private sealed record MusicPlaylistGrantIdReq(string GrantId);
 }

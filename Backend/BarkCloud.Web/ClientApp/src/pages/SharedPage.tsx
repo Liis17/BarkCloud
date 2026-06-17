@@ -105,6 +105,8 @@ function LinkCard({ link, onCopy, onRevoke }: { link: ShareLink; onCopy: (l: Sha
           <Icon.folder size={22} />
         ) : link.kind === 'album' ? (
           <Icon.photo size={22} />
+        ) : link.kind === 'musicPlaylist' ? (
+          <Icon.music size={22} />
         ) : (
           <Icon.link size={22} />
         )}
@@ -293,8 +295,13 @@ export function SharedPage() {
   const [shared, setShared] = React.useState<SharedItem[] | null>(null);
   const [sharedFolders, setSharedFolders] = React.useState<SharedFolderItem[] | null>(null);
   const [openFolder, setOpenFolder] = React.useState<{ id: string; name: string } | null>(null);
-  // Курсоры пагинации: «Мои публичные» — три источника, у грантов курсор только у файлов.
-  const [pubCursors, setPubCursors] = React.useState<{ file: Cursor; folder: Cursor; album: Cursor }>({ file: null, folder: null, album: null });
+  // Курсоры пагинации: «Мои публичные» — несколько источников, у грантов курсор только у файлов.
+  const [pubCursors, setPubCursors] = React.useState<{ file: Cursor; folder: Cursor; album: Cursor; musicPlaylist: Cursor }>({
+    file: null,
+    folder: null,
+    album: null,
+    musicPlaylist: null,
+  });
   const [iSharedCursor, setISharedCursor] = React.useState<Cursor>(null);
   const [sharedCursor, setSharedCursor] = React.useState<Cursor>(null);
   const [moreBusy, setMoreBusy] = React.useState(false);
@@ -306,15 +313,22 @@ export function SharedPage() {
       apiGet<Page<ShareLink>>('/api/shares'),
       apiGet<Page<ShareLink>>('/api/folder-shares'),
       apiGet<Page<ShareLink>>('/api/album-shares'),
+      apiGet<Page<ShareLink>>('/api/music/playlist-shares'),
     ])
-      .then(([files, folders, albums]) => {
+      .then(([files, folders, albums, musicPlaylists]) => {
         const all = [
           ...(files.items || []).map((l) => ({ ...l, kind: 'file' as const })),
           ...(folders.items || []).map((l) => ({ ...l, kind: 'folder' as const })),
           ...(albums.items || []).map((l) => ({ ...l, kind: 'album' as const })),
+          ...(musicPlaylists.items || []).map((l) => ({ ...l, kind: 'musicPlaylist' as const })),
         ].sort(byCreatedDesc);
         setLinks(all);
-        setPubCursors({ file: cursorOf(files), folder: cursorOf(folders), album: cursorOf(albums) });
+        setPubCursors({
+          file: cursorOf(files),
+          folder: cursorOf(folders),
+          album: cursorOf(albums),
+          musicPlaylist: cursorOf(musicPlaylists),
+        });
       })
       .catch((e) => {
         toast((e as Error).message, 'err');
@@ -361,7 +375,7 @@ export function SharedPage() {
     loadShared();
   }, [loadPublic, loadIShared, loadShared]);
 
-  const hasPubMore = !!(pubCursors.file || pubCursors.folder || pubCursors.album);
+  const hasPubMore = !!(pubCursors.file || pubCursors.folder || pubCursors.album || pubCursors.musicPlaylist);
 
   function loadMorePublic() {
     if (!hasPubMore || moreBusy) return;
@@ -377,13 +391,15 @@ export function SharedPage() {
       fetchNext('/api/shares', pubCursors.file, 'file'),
       fetchNext('/api/folder-shares', pubCursors.folder, 'folder'),
       fetchNext('/api/album-shares', pubCursors.album, 'album'),
+      fetchNext('/api/music/playlist-shares', pubCursors.musicPlaylist, 'musicPlaylist'),
     ])
-      .then(([files, folders, albums]) => {
-        setLinks((prev) => [...(prev || []), ...files.items, ...folders.items, ...albums.items].sort(byCreatedDesc));
+      .then(([files, folders, albums, musicPlaylists]) => {
+        setLinks((prev) => [...(prev || []), ...files.items, ...folders.items, ...albums.items, ...musicPlaylists.items].sort(byCreatedDesc));
         setPubCursors({
           file: pubCursors.file ? files.cursor : null,
           folder: pubCursors.folder ? folders.cursor : null,
           album: pubCursors.album ? albums.cursor : null,
+          musicPlaylist: pubCursors.musicPlaylist ? musicPlaylists.cursor : null,
         });
       })
       .catch((e) => toast((e as Error).message, 'err'))
@@ -429,15 +445,17 @@ export function SharedPage() {
   async function revoke(link: ShareLink) {
     const isFolder = link.kind === 'folder';
     const isAlbum = link.kind === 'album';
-    const what = isFolder ? 'папку' : isAlbum ? 'альбом' : 'файл';
+    const isMusicPlaylist = link.kind === 'musicPlaylist';
+    const what = isFolder ? 'папку' : isAlbum ? 'альбом' : isMusicPlaylist ? 'плейлист' : 'файл';
     const extra = isFolder ? ' Публичные ссылки на файлы внутри тоже будут сняты.' : '';
     if (!window.confirm(`Отозвать ссылку на «${link.name || what}»? Ссылка перестанет работать.${extra}`)) return;
     try {
       if (isFolder) await apiPost('/api/folder-shares/revoke', { folderShareId: link.id });
       else if (isAlbum) await apiPost('/api/album-shares/revoke', { albumShareId: link.id });
+      else if (isMusicPlaylist) await apiPost('/api/music/playlist-shares/revoke', { shareId: link.id });
       else await apiPost('/api/shares/revoke', { shareId: link.id });
       setLinks((prev) => (prev ? prev.filter((l) => l.id !== link.id) : prev));
-      toast(isFolder ? 'Папка снова приватна' : isAlbum ? 'Альбом снова приватный' : 'Ссылка отозвана');
+      toast(isFolder ? 'Папка снова приватна' : isAlbum ? 'Альбом снова приватный' : isMusicPlaylist ? 'Плейлист снова приватный' : 'Ссылка отозвана');
     } catch (e) {
       toast((e as Error).message, 'err');
     }

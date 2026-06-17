@@ -200,10 +200,11 @@ export interface ShareLink {
   fileId?: string;
   directoryId?: string;
   albumId?: string;
+  playlistId?: string;
   name: string;
   createdAt: string | null;
   clickCount: number;
-  kind?: 'file' | 'folder' | 'album';
+  kind?: 'file' | 'folder' | 'album' | 'musicPlaylist';
   mediaKind?: string;
   previewUrl?: string;
 }
@@ -244,6 +245,13 @@ export interface MusicPlaylistTrack {
   track: MusicTrack;
   position: number;
   addedAt: string | null;
+}
+
+export interface SharedMusicPlaylist {
+  grantId: string;
+  playlist: MusicPlaylist;
+  ownerUserId: number;
+  sharedAt: string | null;
 }
 
 // ───────────────────────── Каркас (GET /api/me) ─────────────────────────

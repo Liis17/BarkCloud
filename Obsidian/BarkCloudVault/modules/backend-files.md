@@ -7,7 +7,7 @@ Parent: [[index]] · See also: [[api/files-api]] · [[modules/backend-files-clou
 Сервис файлов. Основные ответственности:
 1. **Загрузка/скачивание**: presigned URL в MinIO, квоты, временные файлы, сжатие изображений, превью видео (FFmpeg). **Оригинал хранится как есть** (с 2026-06: HEIC больше НЕ подменяется на JPEG — иначе серверный SHA256 не совпадал с клиентским и ломались дедуп автозагрузки/индикатор «уже в облаке»). Для изображений генерируется **полноразмерный JPEG 90% — `JpegView`** (HEIC через ffmpeg, прочие, **включая сам JPEG**, через ImageSharp): отдельный блоб, связан как превью с `TargetWidth=0` → исключён из галереи и чистится при удалении; file_id хранится в колонке `UploadFile.JpegViewFileId`, отдаётся клиентам как `jpeg_view_file_id/jpeg_view_url` для просмотра, оригинал — для скачивания. ⚠️ С 2026-06 JPEG-оригинал **больше не ссылается сам на себя**: раньше `JpegViewUrl` указывал на `/download/{оригинал}`, но `DownloadFile` отдаёт по прямому id только аватарки и превью-файлы (`IsPreviewFile`) → для JPEG-фото вьювер получал **404**. Теперь для всех изображений создаётся отдельный JpegView-блоб (он зарегистрирован как превью → раздаётся; оригинал остаётся за временными ссылками). Легаси-файлы добирает [[#Services|`LegacyJpegViewBackfillService`]]. **Дедупликация контента по хешу снята** — одинаковые файлы сохраняются как отдельные блобы (хеш пишется для проверок наличия; превью по-прежнему дедуплицируются по SHA256). ⚠️ `LegacyPreviewBackfillService` всё ещё перекодирует HEIC-оригинал в JPEG (старая логика) — новые загрузки он не трогает (у них есть превью), но согласовать с JpegView-подходом стоит отдельным шагом
 2. **Облачная иерархия** (NextCloud-подобная): папки + записи о файлах — см. дочернюю заметку [[modules/backend-files-cloud]]
-3. **Галерея и альбомы**: классификация медиа (`MediaKind`), раздельные списки фото/видео (`ListUserMedia`), универсальные альбомы фото/видео (`AlbumApi`)
+3. **Галерея, альбомы и музыка**: классификация медиа (`MediaKind`), раздельные списки фото/видео (`ListUserMedia`), универсальные альбомы фото/видео (`AlbumApi`), аудиотека и музыкальные плейлисты (`MusicApi`)
 
 ## Расположение
 
@@ -26,6 +26,8 @@ Parent: [[index]] · See also: [[api/files-api]] · [[modules/backend-files-clou
 - `CloudFileEntry.cs` — запись о файле в иерархии → [[modules/backend-files-cloud]]
 - `Album.cs` — альбом (универсальная коллекция фото/видео): `Name`, `Description`, `CoverFileId`
 - `AlbumItem.cs` — привязка файла к альбому (many-to-many). При безвозвратном удалении файла (`TrashPurge`, `UserDeleted`) членство чистится явно, обложки переустанавливаются на первый оставшийся элемент
+- `MusicPlaylist.cs` / `MusicPlaylistItem.cs` — пользовательские музыкальные плейлисты: `Name`, `Description`, optional `CoverFileId`, элементы аудиофайлов с ручным `Position`. Собственные плейлисты можно переупорядочивать; получатели приватного шаринга — только слушать
+- `MusicPlaylistShareLink.cs` / `MusicPlaylistGrant.cs` — публичная ссылка на музыкальный плейлист и приватный грант доступа пользователю
 - `FavoriteFile.cs` — отметка «избранное» на уровне пользователя (`OwnerId`+`FileId`, уникальна). Привязка к блобу, а не к записи иерархии → покрывает и фото/видео из галереи, и файлы/документы из папок
 - `ShareLink.cs` — постоянная публичная ссылка на блоб (`OwnerId`, `FileId`, уникальный `Token`, `Name`, `CreatedAt`, `ClickCount`). Названа `ShareLink` (не `FileShare`) во избежание коллизии с `System.IO.FileShare`
 - `FileGrant.cs` — приватный грант доступа к блобу конкретному пользователю (`OwnerId`→`RecipientId`→`FileId`, уникальная тройка). Получатель видит файл в «мне доступны», смотрит/скачивает (без редактирования/ре-шаринга); чистится при удалении файла/аккаунта
@@ -37,11 +39,13 @@ Parent: [[index]] · See also: [[api/files-api]] · [[modules/backend-files-clou
 - `FilesServerApiService.cs` — серверный gRPC `FilesServerApi`
 - `CloudApiService.cs` — gRPC `CloudApi` (иерархия + галерея `ListUserMedia` + `SetVideoThumbnail`) → [[modules/backend-files-cloud]]
 - `AlbumApiService.cs` — gRPC `AlbumApi` (альбомы)
+- `MusicApiService.cs` — gRPC `MusicApi`: список аудиотреков, temp-URL трека, CRUD плейлистов, ручной порядок, публичные ссылки и приватные гранты
 - `FilesController.cs` — HTTP-контроллер (прямые upload/download)
 
 ### Services
 - `ImageCompressor.cs` — сжатие изображений (на **SixLabors.ImageSharp**; HEIC/HEIF **не декодирует** — для них см. `HeicImageConverter`)
 - `VideoThumbnailExtractor.cs` — извлечение кадра-обложки и размеров видео через FFMpegCore (кадр на 5-й секунде). Метод `ProbeFullAsync` возвращает `VideoProbe` (размеры, длительность, кодеки, битрейт, fps, теги контейнера) — используется и для превью, и для метаданных
+- `AudioMetadataExtractor.cs` — извлечение аудиотегов через `ffprobe` (`title`/`artist`/`album`/`track`, длительность) и embedded artwork через `ffmpeg`; при загрузке аудио обложка сохраняется как квадратные превью 128/512 через `ImageCompressor.GenerateSquarePreviewsAsync`
 - `FileMetadataExtractor.cs` — извлекатор метаданных под все типы (синглтон):
   - `ExtractFromImage(Stream)` — EXIF IFD0/SubIfd/GPS через **MetadataExtractor** (JPEG/HEIC/PNG/TIFF)
   - `ExtractFromVideo(VideoProbe)` — ffprobe + теги контейнера QuickTime/MP4: дата (`com.apple.quicktime.creationdate`/`creation_time`), GPS (`com.apple.quicktime.location.ISO6709`), устройство (`com.apple.quicktime.make/model/software`). Парсер ISO 6709 для координат
@@ -51,6 +55,7 @@ Parent: [[index]] · See also: [[api/files-api]] · [[modules/backend-files-clou
 - `PreviewPersistenceService.cs` — сохранение превью (дедуп по SHA256 + S3 + `FilePreview`); общий для загрузки и `SetVideoThumbnail`
 - `LegacyPreviewBackfillService.cs` — фоновый разовый бэкафилл при старте контейнера (BackgroundService): находит фото-оригиналы (`MediaKind.Photo`) без превью, перекодирует HEIC→JPEG (замена блоба в S3 под тем же ключом + обновление имени/размера/хеша) и генерирует превью 1024/512/128. Курсор по `Id` по возрастанию; дёшев на повторных стартах (файлы с превью выпадают из выборки). Видео не покрывает
 - `AlbumViewBuilder.cs` — сборка `AlbumInfo` (счётчик элементов + URL превью обложки) батчем
+- `MusicLibraryService.cs` — бизнес-логика аудиотеки: `ListTracks` по `MediaKind.Audio`, `GetTrackDownloadUrl`, плейлисты, `ResolvePublicPlaylist`, публичные `MusicPlaylistShareLink` и приватные `MusicPlaylistGrant`
 - `TempFileCleanupService.cs` — фоновая очистка временных файлов (BackgroundService)
 - `TrashPurgeService.cs` — окончательная зачистка корзины: снятие `Uploaders`, удаление из альбомов (`AlbumItems`), избранного (`FavoriteFiles`) и публичных ссылок (`ShareLinks`) владельца, удаление записей. ⚠️ **Превью дедуплицируются по SHA256** (один превью-блоб может быть привязан к нескольким оригиналам через разные строки `FilePreview`), поэтому при снятии `Uploaders` с превью владелец убирается **только если у него не осталось другого (не удаляемого сейчас) оригинала, ссылающегося на тот же превью-блоб** — иначе оставшийся файл лишился бы превью (блоб с пустым `Uploaders` добивается воркером, а строки `FilePreview` чистятся в `PurgeOrphanBlobsAsync` по `PreviewFileId`). Физическое удаление осиротевших блобов вынесено в публичный `PurgeOrphanBlobsAsync` (S3 + хеш + связки `FilePreview` + строка `UploadedFiles`); **строка БД удаляется только при успешном удалении объекта из S3** — иначе блоб остаётся осиротевшим и его добивает воркер (объект не «протекает» в S3). Общий для ручных RPC и воркеров. Константа `Retention = 14 дней`
 - `TrashCleanupService.cs` — фоновый воркер (BackgroundService, раз в 6 ч): зачищает записи корзины с истёкшим `PurgeAt` через `TrashPurgeService`
@@ -69,7 +74,7 @@ Parent: [[index]] · See also: [[api/files-api]] · [[modules/backend-files-clou
 - `BucketS3Options.cs` — настройки S3-бакета
 
 ### Persistence
-- `FilesContext.cs`, `FilesContextFactory.cs` — EF Core DbContext (содержит `UploadedFiles`, `FileHashes`, `TempFiles`, `CloudDirectories`, `CloudFileEntries`, `FilePreviews`, `Albums`, `AlbumItems`, `DynamicFolders`, `FavoriteFiles`, `ShareLinks`, `FolderShareLinks`, `FileGrants`, `DirectoryGrants`, `FileMetadata`, `FileActivityEvents`). Миграция `20260602120000_AddUploadedFilesUploadersIndex.cs` — raw-SQL GIN-индекс на массив `UploadedFiles."Uploaders"` (`array_ops`): галерея `ListUserMedia` и подсчёт квоты фильтруют `Uploaders.Contains(ownerId)` → `@>`, ранее seq-scan
+- `FilesContext.cs`, `FilesContextFactory.cs` — EF Core DbContext (содержит `UploadedFiles`, `FileHashes`, `TempFiles`, `CloudDirectories`, `CloudFileEntries`, `FilePreviews`, `Albums`, `AlbumItems`, `MusicPlaylists`, `MusicPlaylistItems`, `MusicPlaylistShareLinks`, `MusicPlaylistGrants`, `DynamicFolders`, `FavoriteFiles`, `ShareLinks`, `FolderShareLinks`, `FileGrants`, `DirectoryGrants`, `FileMetadata`, `FileActivityEvents`). Миграция `20260602120000_AddUploadedFilesUploadersIndex.cs` — raw-SQL GIN-индекс на массив `UploadedFiles."Uploaders"` (`array_ops`): галерея `ListUserMedia` и подсчёт квоты фильтруют `Uploaders.Contains(ownerId)` → `@>`, ранее seq-scan
 - `UploadedFilesStorage.cs`
 - `FileHashesStorage.cs`
 - `TempFilesStorage.cs`
@@ -91,6 +96,7 @@ Parent: [[index]] · See also: [[api/files-api]] · [[modules/backend-files-clou
   - `20260528215548_AddShareLinks.cs` — таблица `ShareLinks` (уник. индекс `Token`, индекс `(OwnerId, CreatedAt)`)
   - `20260530132207_AddFileMetadata.cs` — таблица `FileMetadata` (PK = `FileId`, 24 nullable-колонки)
   - `20260611221205_AddFileActivityEvents.cs` — таблица `FileActivityEvents` + индексы `(OwnerId, CreatedAt)` и `(OwnerId, FileId, CreatedAt)`
+  - `20260617120000_AddMusicPlaylistsAndAudioMetadata.cs` — аудиометаданные в `FileMetadata`, таблицы музыкальных плейлистов, публичных ссылок и приватных грантов
 
 ### Exceptions (локальные)
 - `FileAlreadyUploadedException.cs`
@@ -139,6 +145,10 @@ Parent: [[index]] · See also: [[api/files-api]] · [[modules/backend-files-clou
 7 фич: `CreateAlbum`, `UpdateAlbum`, `DeleteAlbum`, `AddItemsToAlbum`, `RemoveItemsFromAlbum`, `ListAlbums`, `ListAlbumItems`. См. [[api/files-api]] · `AlbumApi`.
 
 > **Не реализовано**: стикеры, бейджи, постеры — нет ни в `Features/`, ни в `Shared/BarkCloud.Proto/files_api.proto`.
+
+### Музыка (`MusicApi`)
+
+`MusicApiService` опирается на `MusicLibraryService`, а не на MediatR-slices. Аудиофайлы определяются по `MediaKind.Audio`; при загрузке сервер вытаскивает теги/длительность и embedded artwork, а для обложки создаёт превью 128/512. Треки возвращаются с temp-URL оригинала и URL обложек. Плейлисты владельца приватные по умолчанию, поддерживают ручной порядок только для владельца (`can_reorder=true`), кастомную обложку из фото и динамическую fallback-обложку по первому треку. Доступ: публичный токен (`ResolveMusicPlaylistShare`, страница `/mpl/{token}`) или приватный грант пользователю (`ListSharedPlaylistsWithMe`).
 
 ## Зависимости
 
