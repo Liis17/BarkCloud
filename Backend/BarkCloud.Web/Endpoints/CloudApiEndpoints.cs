@@ -399,6 +399,50 @@ public static class CloudApiEndpoints
                 return Results.Json(new { url = resp.DownloadUrl }, Json);
             }));
 
+        api.MapGet("/music/track/stream/{fileId}", async (HttpContext http, AuthGateway auth, MusicApi.MusicApiClient music,
+            IHttpClientFactory httpFactory, IConfiguration config, string fileId) =>
+            await Guarded(http, auth, async token =>
+            {
+                if (!Guid.TryParse(fileId, out _))
+                    return Results.Json(new { error = "Некорректный id файла" }, Json, statusCode: 400);
+
+                var resp = await music.GetTrackDownloadUrlAsync(new GetTrackDownloadUrlRequest { FileId = fileId }, token);
+                if (!Uri.TryCreate(resp.DownloadUrl, UriKind.Absolute, out var uri)
+                    || !uri.AbsolutePath.Contains("/download/", StringComparison.OrdinalIgnoreCase))
+                    return Results.StatusCode(StatusCodes.Status502BadGateway);
+
+                var tempId = uri.Segments[^1].Trim('/');
+                if (!Guid.TryParse(tempId, out _))
+                    return Results.StatusCode(StatusCodes.Status502BadGateway);
+
+                var http1Base = config["FilesService:Http1Base"];
+                var fetchUrl = string.IsNullOrEmpty(http1Base) ? resp.DownloadUrl : $"{http1Base}/download/{tempId}";
+
+                var client = httpFactory.CreateClient("files-upload");
+                using var request = new HttpRequestMessage(HttpMethod.Get, fetchUrl);
+                if (http.Request.Headers.TryGetValue("Range", out var range))
+                    request.Headers.TryAddWithoutValidation("Range", range.ToArray());
+
+                using var upstream = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, http.RequestAborted);
+                if (!upstream.IsSuccessStatusCode)
+                    return Results.StatusCode((int)upstream.StatusCode);
+
+                http.Response.StatusCode = (int)upstream.StatusCode;
+                http.Response.ContentType = upstream.Content.Headers.ContentType?.ToString() ?? "audio/mpeg";
+                http.Response.Headers.CacheControl = "private, max-age=300";
+                http.Response.Headers["Accept-Ranges"] = upstream.Headers.AcceptRanges.Any()
+                    ? string.Join(", ", upstream.Headers.AcceptRanges)
+                    : "bytes";
+
+                if (upstream.Content.Headers.ContentRange is not null)
+                    http.Response.Headers["Content-Range"] = upstream.Content.Headers.ContentRange.ToString();
+                if (upstream.Content.Headers.ContentLength is long length)
+                    http.Response.ContentLength = length;
+
+                await upstream.Content.CopyToAsync(http.Response.Body, http.RequestAborted);
+                return Results.Empty;
+            }));
+
         api.MapGet("/music/playlists", async (HttpContext http, AuthGateway auth, MusicApi.MusicApiClient music,
             int? limit, string? cursorAt, string? cursorId) =>
             await Guarded(http, auth, async token =>
