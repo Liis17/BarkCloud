@@ -277,6 +277,115 @@
   width: 110px;
 }
 
+.mp-eq-panel {
+  position: absolute;
+  right: 16px;
+  bottom: calc(100% + 10px);
+  width: min(430px, calc(100vw - 32px));
+  padding: 16px;
+  border: 1px solid var(--md-outline-variant);
+  border-radius: 24px;
+  background: var(--md-surface-container-high);
+  color: var(--md-on-surface);
+  box-shadow: 0 16px 40px rgba(0,0,0,.22);
+}
+
+.mp-eq-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.mp-eq-title {
+  font-size: 16px;
+  font-weight: 720;
+}
+
+.mp-eq-sub {
+  margin-top: 2px;
+  color: var(--md-on-surface-variant);
+  font-size: 12px;
+}
+
+.mp-eq-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--md-on-surface-variant);
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.mp-eq-switch input {
+  accent-color: var(--md-primary);
+}
+
+.mp-eq-presets {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.mp-eq-presets button {
+  min-width: 0;
+  height: 34px;
+  border: 0;
+  border-radius: 999px;
+  padding: 0 10px;
+  background: color-mix(in srgb, var(--md-on-surface) 6%, transparent);
+  color: var(--md-on-surface-variant);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.mp-eq-presets button:hover,
+.mp-eq-presets button.active {
+  background: var(--md-primary-container);
+  color: var(--md-on-primary-container);
+}
+
+.mp-eq-sliders {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(44px, 1fr));
+  gap: 10px;
+}
+
+.mp-eq-band {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: var(--md-on-surface-variant);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.mp-eq-gain {
+  min-height: 18px;
+  color: var(--md-on-surface);
+  font-variant-numeric: tabular-nums;
+}
+
+.mp-eq-band input {
+  width: 34px;
+  height: 112px;
+  accent-color: var(--md-primary);
+  writing-mode: vertical-lr;
+  direction: rtl;
+}
+
+.mp-eq-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+
 .icon-btn.active {
   color: var(--md-primary);
   background: color-mix(in srgb, var(--md-primary) 12%, transparent);
@@ -529,6 +638,22 @@
   }
   .mp-progress span {
     display: none;
+  }
+  .mp-eq-panel {
+    left: 0;
+    right: 0;
+    bottom: calc(100% + 8px);
+    width: auto;
+    padding: 14px;
+  }
+  .mp-eq-presets {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .mp-eq-sliders {
+    gap: 6px;
+  }
+  .mp-eq-band input {
+    height: 96px;
   }
   .playlist-head {
     grid-template-columns: auto 64px minmax(0, 1fr);
