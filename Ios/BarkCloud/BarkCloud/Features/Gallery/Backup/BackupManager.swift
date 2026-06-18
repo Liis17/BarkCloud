@@ -10,7 +10,7 @@ extension Notification.Name {
     static let backupAssetUploaded = Notification.Name("BarkCloud.backupAssetUploaded")
 }
 
-/// Управляет резервным копированием медиатеки устройства в облако: показывает квоту,
+/// Управляет резервным копированием медиатеки устройства в облако: показывает хранилище,
 /// ведёт прогрессивный скан (что уже в облаке — по SHA256 оригиналов), автозагрузку
 /// недостающего и освобождение места.
 ///
@@ -24,6 +24,9 @@ final class BackupManager {
     // Хранилище (байты).
     var usedStorage: Int64 = 0
     var storageLimit: Int64 = 0
+    var diskTotal: Int64 = 0
+    var diskOther: Int64 = 0
+    var diskS3: Int64 = 0
 
     // Скан медиатеки.
     var isScanning = false
@@ -104,7 +107,7 @@ final class BackupManager {
 
     // MARK: - Открытие модалки / возобновление при старте
 
-    /// Вызывать при открытии модалки: подтянуть квоту и запустить скан. Если
+    /// Вызывать при открытии модалки: подтянуть хранилище и запустить скан. Если
     /// первый скан уже был — лёгкий повторный (новые ассеты), чтобы числа и
     /// кнопка «Освободить место» отражали актуальное состояние, а не снимок
     /// на момент прошлого открытия.
@@ -172,7 +175,16 @@ final class BackupManager {
         if let info = try? await cloud.transfer.storageInfo() {
             usedStorage = info.used
             storageLimit = info.limit
-            StorageWidgetBridge.update(used: info.used, limit: info.limit)
+            diskTotal = info.diskTotal
+            diskOther = info.diskOther
+            diskS3 = info.diskS3
+            StorageWidgetBridge.update(
+                used: info.used,
+                limit: info.limit,
+                diskTotal: info.diskTotal,
+                diskOther: info.diskOther,
+                diskS3: info.diskS3
+            )
         }
     }
 
