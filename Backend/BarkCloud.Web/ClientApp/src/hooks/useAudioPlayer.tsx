@@ -197,6 +197,77 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
   const pause = React.useCallback(() => setIsPlaying(false), []);
   const resume = React.useCallback(() => setIsPlaying(true), []);
 
+  React.useEffect(() => {
+    if (!('mediaSession' in navigator)) return;
+
+    navigator.mediaSession.metadata = current ? new MediaMetadata({
+      title: current.title || current.file.name,
+      artist: current.artist || 'Неизвестный исполнитель',
+      album: current.album || '',
+      artwork: buildMediaSessionArtwork(current),
+    }) : null;
+  }, [current]);
+
+  React.useEffect(() => {
+    if (!('mediaSession' in navigator)) return;
+    navigator.mediaSession.playbackState = current ? (isPlaying ? 'playing' : 'paused') : 'none';
+  }, [current, isPlaying]);
+
+  React.useEffect(() => {
+    if (!('mediaSession' in navigator) || !current || !navigator.mediaSession.setPositionState) return;
+    const audio = audioRef.current;
+    const mediaDuration = Number.isFinite(duration) && duration > 0 ? duration : current.duration;
+    if (!Number.isFinite(mediaDuration) || mediaDuration <= 0) return;
+
+    try {
+      navigator.mediaSession.setPositionState({
+        duration: mediaDuration,
+        playbackRate: audio?.playbackRate || 1,
+        position: Math.min(currentTime, mediaDuration),
+      });
+    } catch {
+      // Некоторые браузеры кидают исключение на неготовой media session; это не должно ломать плеер.
+    }
+  }, [current, currentTime, duration]);
+
+  React.useEffect(() => {
+    if (!('mediaSession' in navigator)) return;
+
+    const seekBy = (offset: number) => {
+      const audio = audioRef.current;
+      if (!audio) return;
+      const nextTime = Math.max(0, Math.min(audio.duration || Number.MAX_SAFE_INTEGER, audio.currentTime + offset));
+      audio.currentTime = nextTime;
+      setCurrentTime(nextTime);
+    };
+
+    const seekTo = (details: MediaSessionActionDetails) => {
+      const audio = audioRef.current;
+      if (!audio || typeof details.seekTime !== 'number') return;
+      if (details.fastSeek && 'fastSeek' in audio) audio.fastSeek(details.seekTime);
+      else audio.currentTime = details.seekTime;
+      setCurrentTime(details.seekTime);
+    };
+
+    setMediaSessionHandler('play', resume);
+    setMediaSessionHandler('pause', pause);
+    setMediaSessionHandler('previoustrack', previous);
+    setMediaSessionHandler('nexttrack', next);
+    setMediaSessionHandler('seekbackward', (details) => seekBy(-(details.seekOffset || 10)));
+    setMediaSessionHandler('seekforward', (details) => seekBy(details.seekOffset || 10));
+    setMediaSessionHandler('seekto', seekTo);
+
+    return () => {
+      setMediaSessionHandler('play', null);
+      setMediaSessionHandler('pause', null);
+      setMediaSessionHandler('previoustrack', null);
+      setMediaSessionHandler('nexttrack', null);
+      setMediaSessionHandler('seekbackward', null);
+      setMediaSessionHandler('seekforward', null);
+      setMediaSessionHandler('seekto', null);
+    };
+  }, [next, pause, previous, resume]);
+
   const value = React.useMemo<AudioPlayerContextValue>(() => ({
     queue,
     current,
@@ -269,6 +340,33 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
 
 function trackStreamUrl(fileId: string): string {
   return `/api/music/track/stream/${encodeURIComponent(fileId)}`;
+}
+
+function buildMediaSessionArtwork(track: MusicTrack): MediaImage[] {
+  const large = track.largeCoverUrl || track.coverUrl;
+  const small = track.coverUrl;
+  const artwork: MediaImage[] = [];
+
+  if (small) artwork.push({ src: toAbsoluteUrl(small), sizes: '128x128' });
+  if (large && large !== small) artwork.push({ src: toAbsoluteUrl(large), sizes: '512x512' });
+
+  return artwork;
+}
+
+function toAbsoluteUrl(url: string): string {
+  try {
+    return new URL(url, window.location.href).href;
+  } catch {
+    return url;
+  }
+}
+
+function setMediaSessionHandler(action: MediaSessionAction, handler: MediaSessionActionHandler | null) {
+  try {
+    navigator.mediaSession.setActionHandler(action, handler);
+  } catch {
+    // Браузер может поддерживать Media Session частично и не принять отдельный action.
+  }
 }
 
 function readAudioVolume(): AudioVolume {
