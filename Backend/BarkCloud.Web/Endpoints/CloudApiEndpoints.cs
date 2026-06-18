@@ -386,7 +386,7 @@ public static class CloudApiEndpoints
                 var resp = await music.ListTracksAsync(req, token);
                 return Results.Json(new
                 {
-                    items = resp.Items.Select(MusicTrackJson).ToArray(),
+                    items = resp.Items.Select(i => MusicTrackJson(i, includeEntries: true)).ToArray(),
                     nextCursorAt = resp.NextCursorCreatedAt?.ToDateTimeOffset(),
                     nextCursorId = resp.NextCursorFileId
                 }, Json);
@@ -451,7 +451,7 @@ public static class CloudApiEndpoints
                     playlist = MusicPlaylistJson(resp.Playlist),
                     items = resp.Items.Select(i => new
                     {
-                        track = MusicTrackJson(i.Track),
+                        track = MusicTrackJson(i.Track, resp.Playlist.CanReorder),
                         position = i.Position,
                         addedAt = i.AddedAt?.ToDateTimeOffset()
                     }).ToArray()
@@ -1345,17 +1345,19 @@ public static class CloudApiEndpoints
     private static object ShareJson(HttpContext http, ShareInfo s)
     {
         var origin = ResolveOrigin(http);
+        var mediaKind = CloudJson.MediaKindName(s.MediaKind);
+        var route = mediaKind == "audio" ? "m" : "v";
         return new
         {
             id = s.Id,
             token = s.Token,
-            url = $"{origin}/v/{s.Token}",
+            url = $"{origin}/{route}/{s.Token}",
             downloadUrl = $"{origin}/s/{s.Token}",
             fileId = s.FileId,
             name = s.Name,
             createdAt = s.CreatedAt?.ToDateTimeOffset(),
             clickCount = s.ClickCount,
-            mediaKind = CloudJson.MediaKindName(s.MediaKind),
+            mediaKind,
             previewUrl = s.PreviewUrl
         };
     }
@@ -1418,9 +1420,9 @@ public static class CloudApiEndpoints
         createdAt = item.CreatedAt?.ToDateTimeOffset()
     };
 
-    private static object MusicTrackJson(MusicTrackInfo item) => new
+    private static object MusicTrackJson(MusicTrackInfo item, bool includeEntries = false) => new
     {
-        file = CloudJson.Media(item.File),
+        file = MusicTrackFileJson(item, includeEntries),
         title = item.Title,
         artist = item.Artist,
         album = item.Album,
@@ -1430,6 +1432,18 @@ public static class CloudApiEndpoints
         url = item.File.FileUrl,
         metadata = item.Metadata is null ? null : FileMetadataJson(item.Metadata)
     };
+
+    private static object MusicTrackFileJson(MusicTrackInfo item, bool includeEntries)
+    {
+        var file = (Dictionary<string, object?>)CloudJson.Media(item.File);
+        if (includeEntries)
+        {
+            file["entryIds"] = item.EntryIds.ToArray();
+            file["entryNames"] = item.EntryNames.ToArray();
+        }
+
+        return file;
+    }
 
     private static object MusicPlaylistJson(MusicPlaylistInfo item) => new
     {

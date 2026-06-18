@@ -298,7 +298,7 @@ public static class WebEndpoints
             }
         });
 
-        // Анонимный JSON для публичной страницы просмотра (/v/{token}): метаданные + превью.
+        // Анонимный JSON для публичной страницы просмотра (/v/{token}, /m/{token}): метаданные + превью.
         app.MapGet("/s/{token}/info", async (string token, FilesServerApi.FilesServerApiClient filesServer) =>
         {
             try

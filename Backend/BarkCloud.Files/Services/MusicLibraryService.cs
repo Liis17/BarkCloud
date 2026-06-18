@@ -88,7 +88,7 @@ public class MusicLibraryService
             page.RemoveAt(page.Count - 1);
 
         var response = new ListMusicTracksResponse();
-        foreach (var track in await BuildTracks(page, cancellationToken))
+        foreach (var track in await BuildTracks(page, ownerId, cancellationToken))
             response.Items.Add(track);
 
         if (hasMore && page.Count > 0)
@@ -229,7 +229,7 @@ public class MusicLibraryService
             .ToListAsync(cancellationToken);
 
         var files = await _filesStorage.GetFiles(items.Select(x => x.FileId).Distinct().ToList());
-        var tracks = (await BuildTracks(files, cancellationToken)).ToDictionary(x => Guid.Parse(x.File.Id));
+        var tracks = (await BuildTracks(files, playlist.OwnerId, cancellationToken)).ToDictionary(x => Guid.Parse(x.File.Id));
 
         var response = new ListMusicPlaylistTracksResponse
         {
@@ -519,7 +519,7 @@ public class MusicLibraryService
             .OrderBy(x => x.Position)
             .ToListAsync(cancellationToken);
         var files = await _filesStorage.GetFiles(items.Select(x => x.FileId).Distinct().ToList());
-        var tracks = await BuildTracks(files, cancellationToken);
+        var tracks = await BuildTracks(files, playlist.OwnerId, cancellationToken);
 
         var response = new ResolveMusicPlaylistShareResponse
         {
@@ -544,13 +544,38 @@ public class MusicLibraryService
                              && !_context.CloudFileEntries.Any(e => e.OwnerId == ownerId && e.FileId == f.Id && !e.IsDeleted)));
     }
 
-    private async Task<List<MusicTrackInfo>> BuildTracks(IReadOnlyCollection<UploadFile> files, CancellationToken cancellationToken)
+    private async Task<List<MusicTrackInfo>> BuildTracks(
+        IReadOnlyCollection<UploadFile> files,
+        long? entryOwnerId,
+        CancellationToken cancellationToken)
     {
         if (files.Count == 0)
             return new List<MusicTrackInfo>();
 
         var baseUrl = BaseUrl();
         var ids = files.Select(x => x.Id).ToList();
+        var liveEntriesByFile = new Dictionary<Guid, List<(Guid Id, string Name)>>();
+        var deletedEntryFileIds = new HashSet<Guid>();
+        if (entryOwnerId.HasValue)
+        {
+            var entries = await _context.CloudFileEntries
+                .AsNoTracking()
+                .Where(x => x.OwnerId == entryOwnerId.Value && ids.Contains(x.FileId))
+                .OrderBy(x => x.CreatedAt)
+                .Select(x => new { x.FileId, x.Id, x.Name, x.IsDeleted })
+                .ToListAsync(cancellationToken);
+
+            liveEntriesByFile = entries
+                .Where(x => !x.IsDeleted)
+                .GroupBy(x => x.FileId)
+                .ToDictionary(
+                    x => x.Key,
+                    x => x.Select(e => (e.Id, e.Name)).ToList());
+            deletedEntryFileIds = entries
+                .Where(x => x.IsDeleted)
+                .Select(x => x.FileId)
+                .ToHashSet();
+        }
         var metadata = await _context.FileMetadata
             .AsNoTracking()
             .Where(x => ids.Contains(x.FileId))
@@ -563,16 +588,19 @@ public class MusicLibraryService
 
         return files
             .Where(f => f.MediaKind == DomainMediaKind.Audio)
+            .Where(f => !deletedEntryFileIds.Contains(f.Id) || liveEntriesByFile.ContainsKey(f.Id))
             .Select(file =>
             {
                 metadata.TryGetValue(file.Id, out var meta);
                 previews.TryGetValue(file.Id, out var filePreviews);
+                liveEntriesByFile.TryGetValue(file.Id, out var fileEntries);
+                var fallbackName = fileEntries?.FirstOrDefault().Name ?? file.Filename ?? string.Empty;
 
                 var track = new MusicTrackInfo
                 {
                     File = file.ToGrpc(baseUrl, filePreviews),
                     Title = string.IsNullOrWhiteSpace(meta?.AudioTitle)
-                        ? Path.GetFileNameWithoutExtension(file.Filename ?? string.Empty)
+                        ? Path.GetFileNameWithoutExtension(fallbackName)
                         : meta!.AudioTitle!,
                     Artist = meta?.AudioArtist ?? string.Empty,
                     Album = meta?.AudioAlbum ?? string.Empty,
@@ -582,6 +610,12 @@ public class MusicLibraryService
                 };
                 if (meta is not null)
                     track.Metadata = meta.ToGrpc();
+
+                if (fileEntries is not null)
+                {
+                    track.EntryIds.AddRange(fileEntries.Select(x => x.Id.ToString()));
+                    track.EntryNames.AddRange(fileEntries.Select(x => x.Name));
+                }
 
                 if (tempByFile.TryGetValue(file.Id, out var tempId))
                     track.File.FileUrl = FileUrlHelper.GenerateDownloadUrl(baseUrl, tempId);
@@ -593,7 +627,11 @@ public class MusicLibraryService
 
     private async Task<MusicPlaylistInfo> ToPlaylistInfo(MusicPlaylist playlist, CancellationToken cancellationToken)
     {
-        var count = await _context.MusicPlaylistItems.CountAsync(x => x.PlaylistId == playlist.Id, cancellationToken);
+        var count = await _context.MusicPlaylistItems
+            .CountAsync(x => x.PlaylistId == playlist.Id
+                             && !(_context.CloudFileEntries.Any(e => e.OwnerId == playlist.OwnerId && e.FileId == x.FileId && e.IsDeleted)
+                                  && !_context.CloudFileEntries.Any(e => e.OwnerId == playlist.OwnerId && e.FileId == x.FileId && !e.IsDeleted)),
+                cancellationToken);
         return new MusicPlaylistInfo
         {
             Id = playlist.Id.ToString(),

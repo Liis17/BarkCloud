@@ -35,6 +35,10 @@ function persistAudioVolumeRef(audio: HTMLAudioElement | null): void {
   });
 }
 
+function trackDurationLabel(seconds: number): string {
+  return seconds > 0 ? formatDuration(seconds) : '—';
+}
+
 export function PublicMusicPlaylistPage() {
   const { token } = useParams<{ token: string }>();
   const [name, setName] = React.useState('');
@@ -121,7 +125,7 @@ export function PublicMusicPlaylistPage() {
                   <span className="track-sub">{track.artist || 'Неизвестный исполнитель'}</span>
                 </span>
                 <span className="track-album">{track.album}</span>
-                <span className="track-duration">{formatDuration(track.duration)}</span>
+                <span className="track-duration">{trackDurationLabel(track.duration)}</span>
               </button>
             );
           })}

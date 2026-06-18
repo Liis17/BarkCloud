@@ -15,7 +15,7 @@ namespace BarkCloud.Files.Services;
 /// <c>FileMetadata</c>, он выпадает из выборки кандидатов. Идёт по курсору <c>UploadFile.Id</c>
 /// по возрастанию — гарантирует продвижение вперёд даже если отдельный файл не обработался.
 /// Скачивает оригинал из S3 во временный файл (нужно для ffprobe), затем стримит в нужный
-/// extractor по content-type. Аватары пропускаем — их метаданные не показываем.
+/// extractor по content-type/media-kind. Аватары пропускаем — их метаданные не показываем.
 /// </remarks>
 public class LegacyMetadataBackfillService : BackgroundService
 {
@@ -108,6 +108,7 @@ public class LegacyMetadataBackfillService : BackgroundService
         var s3 = sp.GetRequiredService<S3Uploader>();
         var bucketRegistry = sp.GetRequiredService<S3BucketRegistry>();
         var extractor = sp.GetRequiredService<FileMetadataExtractor>();
+        var audioExtractor = sp.GetRequiredService<AudioMetadataExtractor>();
         var videoProbe = sp.GetRequiredService<VideoThumbnailExtractor>();
 
         var file = await filesStorage.GetFile(fileId);
@@ -122,10 +123,11 @@ public class LegacyMetadataBackfillService : BackgroundService
 
         var isVideo = contentType.StartsWith("video/");
         var isImage = contentType.StartsWith("image/");
+        var isAudio = contentType.StartsWith("audio/") || file.MediaKind == MediaKind.Audio;
         var isPdf = contentType == "application/pdf";
         var isOffice = contentType.StartsWith("application/vnd.openxmlformats-officedocument.");
 
-        if (!isVideo && !isImage && !isPdf && !isOffice)
+        if (!isVideo && !isImage && !isAudio && !isPdf && !isOffice)
             return false;
 
         FileMetadata? extracted = null;
@@ -148,6 +150,11 @@ public class LegacyMetadataBackfillService : BackgroundService
             {
                 await using var fs = new FileStream(tempPath, FileMode.Open, FileAccess.Read);
                 extracted = extractor.ExtractFromImage(fs);
+            }
+            else if (isAudio)
+            {
+                var probe = await audioExtractor.ProbeAsync(tempPath, ct);
+                extracted = audioExtractor.ExtractMetadata(probe);
             }
             else if (isPdf)
             {

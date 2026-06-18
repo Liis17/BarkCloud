@@ -1,5 +1,5 @@
 import React from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import { PublicShareHeader, PublicShareShell, PublicStatus } from '../components/public/PublicShareShell';
 import { PublicViewerActions } from '../components/public/PublicViewerActions';
@@ -33,6 +33,7 @@ function fmtSize(bytes: number): string {
 /** Публичная страница просмотра файла по шаринг-ссылке (/v/:token). Без авторизации. */
 export function PublicViewPage() {
   const { token } = useParams<{ token: string }>();
+  const navigate = useNavigate();
   const [state, setState] = React.useState<'loading' | 'notfound' | ShareInfo>('loading');
   const headInfo = typeof state === 'object' ? state : null;
   const headTitle = headInfo ? headInfo.name : state === 'notfound' ? 'Ссылка недоступна' : 'Публичный файл';
@@ -48,12 +49,19 @@ export function PublicViewPage() {
     // Намеренно plain fetch (не авторизованный api(), который редиректит на /login при 401).
     fetch(`/s/${token}/info`)
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error('not found'))))
-      .then((d: ShareInfo) => alive && setState(d.found ? d : 'notfound'))
+      .then((d: ShareInfo) => {
+        if (!alive) return;
+        if (d.found && d.mediaKind === 'audio') {
+          navigate(`/m/${token}`, { replace: true });
+          return;
+        }
+        setState(d.found ? d : 'notfound');
+      })
       .catch(() => alive && setState('notfound'));
     return () => {
       alive = false;
     };
-  }, [token]);
+  }, [navigate, token]);
 
   if (state === 'loading') {
     return <PublicStatus icon={Icon.cloud} title="Открываем файл" loading />;

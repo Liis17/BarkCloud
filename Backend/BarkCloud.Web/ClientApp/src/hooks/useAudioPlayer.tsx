@@ -21,6 +21,8 @@ interface AudioPlayerContextValue {
   duration: number;
   playQueue: (tracks: MusicTrack[], startId?: string) => void;
   playTrack: (track: MusicTrack) => void;
+  pause: () => void;
+  resume: () => void;
   toggle: () => void;
   next: () => void;
   previous: () => void;
@@ -36,6 +38,10 @@ export function useAudioPlayer() {
   const ctx = React.useContext(AudioPlayerContext);
   if (!ctx) throw new Error('useAudioPlayer must be used inside AudioPlayerProvider');
   return ctx;
+}
+
+export function useOptionalAudioPlayer() {
+  return React.useContext(AudioPlayerContext);
 }
 
 export function AudioPlayerProvider({ children }: { children: React.ReactNode }) {
@@ -108,6 +114,9 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
     setIsPlaying(true);
   }, [queue.length]);
 
+  const pause = React.useCallback(() => setIsPlaying(false), []);
+  const resume = React.useCallback(() => setIsPlaying(true), []);
+
   const value = React.useMemo<AudioPlayerContextValue>(() => ({
     queue,
     current,
@@ -129,6 +138,8 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
       setIndex(0);
       setIsPlaying(true);
     },
+    pause,
+    resume,
     toggle: () => setIsPlaying((v) => !v),
     next,
     previous,
@@ -141,7 +152,7 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
       audio.currentTime = v;
       setCurrentTime(v);
     },
-  }), [current, currentTime, duration, isPlaying, muted, next, previous, queue, shuffle, volume]);
+  }), [current, currentTime, duration, isPlaying, muted, next, pause, previous, queue, resume, shuffle, volume]);
 
   return (
     <AudioPlayerContext.Provider value={value}>

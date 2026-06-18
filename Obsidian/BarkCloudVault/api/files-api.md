@@ -182,7 +182,7 @@ Messages: `ResolveShareRequest { token; }` → `ResolveShareResponse { found; fi
 
 ### Messages MusicApi
 
-- `MusicTrackInfo { file; metadata; title; artist; album; duration_seconds; cover_url; large_cover_url; }` — `file.file_url` содержит temp-URL для воспроизведения, `cover_url` примерно 128px, `large_cover_url` примерно 512px.
+- `MusicTrackInfo { file; metadata; title; artist; album; duration_seconds; cover_url; large_cover_url; repeated entry_ids; repeated entry_names; }` — `file.file_url` содержит temp-URL для воспроизведения, `cover_url` примерно 128px, `large_cover_url` примерно 512px. `entry_ids`/`entry_names` — живые записи аудиофайла в папках владельца, нужны Web-контекстному меню для переименования, перехода в папку и удаления файла из списка.
 - `MusicPlaylistInfo { id; name; description; cover_file_id; cover_preview_url; items_count; owner_user_id; can_reorder; created_at; updated_at; }`
 - `MusicPlaylistShareInfo { id; token; playlist_id; name; created_at; click_count; cover_preview_url; }`
 - `SharedMusicPlaylistEntry { grant_id; playlist; owner_user_id; shared_at; }`

@@ -704,6 +704,8 @@ message MusicTrackInfo {
   double duration_seconds = 6;
   string cover_url = 7;       // малая обложка (~128)
   string large_cover_url = 8; // крупная обложка (~512)
+  repeated string entry_ids = 9;   // живые записи файла в папках владельца
+  repeated string entry_names = 10; // имена этих записей в папках
 }
 
 message ListMusicTracksRequest {
