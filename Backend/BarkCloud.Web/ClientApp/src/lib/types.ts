@@ -33,6 +33,8 @@ export interface CardFile {
   uploadedAt: string | null;
   /** Полноразмерный JPEG для просмотра (HEIC и пр.); пусто/нет — показывать оригинал. */
   jpegViewUrl?: string;
+  entryNames?: string[];
+  entryIds?: string[];
   /** Тех-метаданные видео для тайла (только kind === 'video'); присутствует, если извлечены. */
   video?: VideoMeta;
 }

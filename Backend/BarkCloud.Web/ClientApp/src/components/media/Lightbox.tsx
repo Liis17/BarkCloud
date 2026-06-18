@@ -1,6 +1,7 @@
 import React from 'react';
 import { Icon } from '../Icon';
 import { useContextMenu } from '../ui/ContextMenu';
+import { useOptionalAudioPlayer } from '../../hooks/useAudioPlayer';
 import { apiGet, proxiedImageUrl } from '../../lib/api';
 import { persistVolumeRef } from '../../lib/volume';
 import { pickDocumentIcon, useDocumentHead } from '../../hooks/useDocumentHead';
@@ -33,11 +34,29 @@ export function Lightbox({ items, index = 0, media, onClose, actions }: Lightbox
   const videoRef = React.useRef<HTMLVideoElement | null>(null);
   const stageRef = React.useRef<HTMLDivElement | null>(null);
   const dragRef = React.useRef<{ x: number; y: number; px: number; py: number } | null>(null);
+  const pausedMusicRef = React.useRef(false);
   const { menu, openAt } = useContextMenu();
+  const musicPlayer = useOptionalAudioPlayer();
 
   const cur = list[i] || null;
   const fileId = cur && cur.id;
   const isVideo = !!cur && cur.kind === 'video';
+
+  React.useEffect(() => {
+    if (!isVideo || !musicPlayer) return;
+    if (musicPlayer.isPlaying) {
+      pausedMusicRef.current = true;
+      musicPlayer.pause();
+    }
+    return () => {
+      if (pausedMusicRef.current) {
+        pausedMusicRef.current = false;
+        musicPlayer.resume();
+      }
+    };
+    // Запускать только при входе/выходе из video-режима: изменения времени аудио не должны перезапускать эффект.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isVideo]);
 
   useDocumentHead(
     () => ({ title: cur?.name || null, iconUrl: pickDocumentIcon(cur) }),

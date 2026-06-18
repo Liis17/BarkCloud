@@ -18,6 +18,7 @@ import { SettingsPage } from './pages/SettingsPage';
 import { PublicViewPage } from './pages/PublicViewPage';
 import { PublicFolderPage } from './pages/PublicFolderPage';
 import { PublicAlbumPage } from './pages/PublicAlbumPage';
+import { PublicMusicTrackPage } from './pages/PublicMusicTrackPage';
 import { PublicMusicPlaylistPage } from './pages/PublicMusicPlaylistPage';
 import { DocumentHeadProvider } from './hooks/useDocumentHead';
 
@@ -27,6 +28,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       <DocumentHeadProvider>
         <Routes>
           <Route path="v/:token" element={<PublicViewPage />} />
+          <Route path="m/:token" element={<PublicMusicTrackPage />} />
           <Route path="f/:token" element={<PublicFolderPage />} />
           <Route path="al/:token" element={<PublicAlbumPage />} />
           <Route path="mpl/:token" element={<PublicMusicPlaylistPage />} />
