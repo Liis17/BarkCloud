@@ -1,9 +1,11 @@
+import React from 'react';
 import { Icon } from '../Icon';
-import { useAudioPlayer } from '../../hooks/useAudioPlayer';
+import { EQUALIZER_BANDS, EQUALIZER_PRESETS, useAudioPlayer } from '../../hooks/useAudioPlayer';
 import { formatDuration } from '../../lib/format';
 
 export function MiniPlayer() {
   const player = useAudioPlayer();
+  const [eqOpen, setEqOpen] = React.useState(false);
   const track = player.current;
   if (!track) return null;
 
@@ -41,6 +43,9 @@ export function MiniPlayer() {
         <button className="icon-btn" onClick={player.next} title="Следующий">
           <Icon.skipForward size={18} />
         </button>
+        <button className={'icon-btn mp-eq-toggle' + (player.equalizer.enabled ? ' active' : '')} onClick={() => setEqOpen((v) => !v)} title="Эквалайзер">
+          <Icon.sliders size={18} />
+        </button>
       </div>
       <div className="mp-volume">
         <button className="icon-btn" onClick={() => player.setMuted(!player.muted)} title={player.muted ? 'Включить звук' : 'Выключить звук'}>
@@ -59,6 +64,58 @@ export function MiniPlayer() {
           aria-label="Громкость музыки"
         />
       </div>
+      {eqOpen && (
+        <div className="mp-eq-panel" role="dialog" aria-label="Эквалайзер">
+          <div className="mp-eq-head">
+            <div>
+              <div className="mp-eq-title">Эквалайзер</div>
+              <div className="mp-eq-sub">{player.equalizer.enabled ? 'Активен' : 'Отключён'}</div>
+            </div>
+            <label className="mp-eq-switch">
+              <input
+                type="checkbox"
+                checked={player.equalizer.enabled}
+                onChange={(e) => player.setEqualizerEnabled(e.currentTarget.checked)}
+              />
+              <span>Вкл</span>
+            </label>
+          </div>
+          <div className="mp-eq-presets">
+            {EQUALIZER_PRESETS.map((preset) => (
+              <button
+                key={preset.id}
+                className={player.equalizer.preset === preset.id ? 'active' : ''}
+                onClick={() => player.applyEqualizerPreset(preset.id)}
+              >
+                {preset.label}
+              </button>
+            ))}
+          </div>
+          <div className="mp-eq-sliders">
+            {EQUALIZER_BANDS.map((band, i) => {
+              const gain = player.equalizer.gains[i] ?? 0;
+              return (
+                <label key={band.frequency} className="mp-eq-band">
+                  <span className="mp-eq-gain">{gain > 0 ? `+${gain}` : gain}</span>
+                  <input
+                    type="range"
+                    min={-12}
+                    max={12}
+                    step={1}
+                    value={gain}
+                    onChange={(e) => player.setEqualizerGain(i, Number(e.currentTarget.value))}
+                    aria-label={`${band.label} Гц`}
+                  />
+                  <span>{band.label}</span>
+                </label>
+              );
+            })}
+          </div>
+          <div className="mp-eq-actions">
+            <button className="btn text" onClick={player.resetEqualizer}>Сбросить</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
