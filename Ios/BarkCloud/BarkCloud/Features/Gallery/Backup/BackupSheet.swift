@@ -2,6 +2,10 @@ import SwiftUI
 import UIKit
 import Photos
 
+private let backupStorageOtherColor = AppColors.onSurfaceVariant
+private let backupStorageS3Color = Color(red: 0.604, green: 0.310, blue: 0.118)
+private let backupStorageFreeColor = AppColors.onSurface.opacity(0.12)
+
 /// Модалка резервного копирования: hero-донат с занятым объёмом, тогл автозагрузки
 /// с прогрессом и превью очереди (как Google Photos) и filled-кнопка «Освободить
 /// место» с анимацией благодарности. Плавающая карточка с отступами со всех сторон.
@@ -76,32 +80,70 @@ struct BackupSheet: View {
     // MARK: - Hero: хранилище донатом
 
     private var heroStorage: some View {
-        let used = manager.usedStorage
-        let limit = manager.storageLimit
-        let fraction = limit > 0 ? min(1.0, Double(used) / Double(limit)) : 0
+        let total = manager.diskTotal > 0 ? manager.diskTotal : manager.storageLimit
+        let other = manager.diskTotal > 0 ? max(0, manager.diskOther) : 0
+        let s3 = manager.diskTotal > 0 ? max(0, manager.diskS3) : max(0, manager.usedStorage)
+        let used = other + s3
+        let free = max(0, total - used)
+        let fraction = total > 0 ? min(1.0, Double(used) / Double(total)) : 0
         let percent = Int((fraction * 100).rounded())
-        return HStack(alignment: .center, spacing: 18) {
-            StorageDonut(fraction: fraction, percent: percent)
-                .frame(width: 104, height: 104)
-            VStack(alignment: .leading, spacing: 4) {
-                Text("settings_storage")
-                    .font(AppTypography.titleSmall)
-                    .foregroundStyle(AppColors.onSurfaceVariant)
-                    .textCase(.uppercase)
-                Text(verbatim: FormatUtils.formatSize(used))
-                    .font(.system(size: 26, weight: .semibold))
-                    .foregroundStyle(AppColors.onSurface)
-                Text(verbatim: "из \(FormatUtils.formatSize(limit))")
-                    .font(AppTypography.bodyMedium)
-                    .foregroundStyle(AppColors.onSurfaceVariant)
+        return VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .center, spacing: 18) {
+                StorageDonut(fraction: fraction, percent: percent)
+                    .frame(width: 104, height: 104)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("settings_storage")
+                        .font(AppTypography.titleSmall)
+                        .foregroundStyle(AppColors.onSurfaceVariant)
+                        .textCase(.uppercase)
+                    if total > 0 {
+                        Text(verbatim: FormatUtils.formatSize(used))
+                            .font(.system(size: 26, weight: .semibold))
+                            .foregroundStyle(AppColors.onSurface)
+                        Text(verbatim: "из \(FormatUtils.formatSize(total)) на диске")
+                            .font(AppTypography.bodyMedium)
+                            .foregroundStyle(AppColors.onSurfaceVariant)
+                    } else {
+                        Text(verbatim: "—")
+                            .font(.system(size: 26, weight: .semibold))
+                            .foregroundStyle(AppColors.onSurface)
+                    }
+                }
+                Spacer(minLength: 0)
             }
-            Spacer(minLength: 0)
+            if total > 0 {
+                StorageSegmentedBar(total: total, other: other, s3: s3)
+                    .frame(height: 8)
+                VStack(alignment: .leading, spacing: 4) {
+                    storageLegendRow(color: backupStorageOtherColor, titleKey: "settings_storage_other", value: FormatUtils.formatSize(other))
+                    storageLegendRow(color: backupStorageS3Color, titleKey: "settings_storage_cloud", value: FormatUtils.formatSize(s3))
+                    storageLegendRow(color: backupStorageFreeColor, titleKey: "settings_storage_free", value: FormatUtils.formatSize(free))
+                }
+            }
         }
         .padding(18)
         .background(
             RoundedRectangle(cornerRadius: 20)
                 .fill(AppColors.accent.opacity(0.10))
         )
+    }
+
+    @ViewBuilder
+    private func storageLegendRow(color: Color, titleKey: LocalizedStringKey, value: String) -> some View {
+        HStack(spacing: 8) {
+            RoundedRectangle(cornerRadius: 2)
+                .fill(color)
+                .frame(width: 10, height: 10)
+            Text(titleKey)
+                .font(AppTypography.bodySmall)
+                .foregroundStyle(AppColors.onSurfaceVariant)
+            Spacer(minLength: 8)
+            Text(verbatim: value)
+                .font(AppTypography.bodySmall.weight(.semibold))
+                .foregroundStyle(AppColors.onSurface)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
     }
 
     // MARK: - Автозагрузка
@@ -278,7 +320,7 @@ struct BackupSheet: View {
 
 // MARK: - Донат хранилища
 
-/// Круговой прогресс «использовано в облаке»: фон-кольцо + дуга поверх; в центре —
+/// Круговой прогресс «использовано на диске»: фон-кольцо + дуга поверх; в центре —
 /// крупный процент. Дуга стартует сверху (повёрнута на -90°).
 private struct StorageDonut: View {
     let fraction: Double
@@ -300,6 +342,33 @@ private struct StorageDonut: View {
                 .font(.system(size: 24, weight: .semibold))
                 .foregroundStyle(AppColors.onSurface)
         }
+    }
+}
+
+private struct StorageSegmentedBar: View {
+    let total: Int64
+    let other: Int64
+    let s3: Int64
+
+    private var denominator: Double {
+        Double(max(total, other + s3, 1))
+    }
+
+    var body: some View {
+        GeometryReader { geo in
+            let full = geo.size.width
+            HStack(spacing: 0) {
+                Rectangle()
+                    .fill(backupStorageOtherColor)
+                    .frame(width: full * CGFloat(max(0.0, Double(other)) / denominator))
+                Rectangle()
+                    .fill(backupStorageS3Color)
+                    .frame(width: full * CGFloat(max(0.0, Double(s3)) / denominator))
+                Spacer(minLength: 0)
+            }
+        }
+        .background(backupStorageFreeColor)
+        .clipShape(Capsule())
     }
 }
 

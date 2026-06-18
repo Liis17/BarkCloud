@@ -9,10 +9,13 @@ Parent: [[ios-app]]
 
 ## Что было до расширения
 
-- **`StorageWidget`** — квота облака (`.systemSmall`/`.systemMedium`). Данные кладёт
+- **`StorageWidget`** — заполнение физического диска сервера (`.systemSmall`/`.systemMedium`). Данные кладёт
   main app через `StorageWidgetBridge` в App Group `group.com.barkfluff.BarkCloud`,
-  виджет только читает. Кнопка обновления — `RefreshStorageIntent` (поднимает gRPC
-  прямо в процессе виджета).
+  виджет только читает. Snapshot содержит legacy `used/limit` и основной разрез
+  `diskTotal/diskOther/diskS3`; свободное считается как `diskTotal - diskOther - diskS3`.
+  UI: сегментированный бар (другие данные / S3 / свободно), компактные метрики;
+  кнопка обновления — `RefreshStorageIntent` (поднимает gRPC прямо в процессе виджета
+  и пишет тот же snapshot).
 - **`UploadLiveActivity`** — Live Activity фоновой загрузки (см. [[ios-background-upload]]).
 
 Базовые паттерны, которые переиспользуются всеми новыми виджетами:
@@ -32,7 +35,7 @@ Parent: [[ios-app]]
 ### #6 — Storage на Lock Screen + Control Center (готово первым)
 - В `StorageWidget` добавлены `.accessoryCircular/.accessoryRectangular/.accessoryInline`.
 - `StorageControl` (`ControlWidget`, iOS 18) — кнопка в Пункте управления, переиспользует
-  `RefreshStorageIntent`. Данных новых не требует.
+  `RefreshStorageIntent`; показывает процент занятого физического диска.
 
 ### #5 — Корзина
 - Данные виджета — из нового лёгкого RPC **`CloudApi.GetTrashSummary`** (`COUNT` +

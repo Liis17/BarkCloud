@@ -25,7 +25,7 @@ struct BarkCloudApp: App {
                     await env.backgroundUploads.attachAndResubmitOrphans()
                     await env.backupManager.resumeOnForeground()
                     await UploadLiveActivityController.shared.setForegroundActive(true)
-                    // Освежить квоту для виджета хранилища (best-effort, без авторизации
+                    // Освежить виджет хранилища (best-effort, без авторизации
                     // тихо отвалится).
                     await env.backupManager.loadStorageInfo()
                 }

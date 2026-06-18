@@ -240,7 +240,9 @@ BarkCloud/
   `.animation(.easeOut(0.4), value: progress)`; `progress = uploadDone / (uploadDone + uploadFailed + remainingCount)`;
   пока кольцо показано, сама иконка облака уменьшается (`.font(.system(size:15))`), чтобы дуга на неё не налезала.
   Внутри модалки: **hero-донат хранилища** (`StorageDonut`, 104pt — `Circle().stroke` фоном + `Circle().trim(0,fraction)` дугой,
-  по центру крупный `%`) на фоне `accent.opacity(0.10)` + текстовый блок сбоку (используется `FileTransferService.storageInfo()`);
+  по центру крупный `%`) на фоне `accent.opacity(0.10)` + текстовый блок сбоку и сегментированный бар физического
+  диска сервера (другие данные / S3 / свободно; поля `diskTotal/diskOther/diskS3` из `FileTransferService.storageInfo()`,
+  fallback — старые `used/limit`);
   тогл автозагрузки фото/видео в карточке с фоном `onSurface.opacity(0.05)` и круглой иконкой `icloud.and.arrow.up.fill`
   в `accent.opacity(0.18)` кружке; при включении — статус скана, прогресс-бар загружено/осталось, статус «Всё загружено»
   с зелёной галкой и ряд превью очереди (текущий + 3 следующих = 4 в ряду; `HStack` flexible aspect-ratio квадратами
@@ -806,34 +808,36 @@ gRPC/Networking/Generated файлы в Share Extension target + линкует 
 (`ShareInbox/<uuid>/<file>`) — переоформляет файлы в UploadJob через
 `cloud.enqueueBackgroundUpload(sourceFile:)` при старте app.
 
-## Widget — заполнение облачного диска
+## Widget — заполнение физического диска
 
 Home Screen виджет «Хранилище BarkCloud» (`.systemSmall` + `.systemMedium`) в
 том же extension, что и Live Activity. Виджет в gRPC не ходит — main app кладёт
-снимок квоты в App Group `UserDefaults`, виджет читает.
+снимок хранилища в App Group `UserDefaults`, виджет читает.
 
-- `Networking/StorageWidgetBridge.swift` (main app) — `update(used:limit:)`
-  пишет три ключа (`storage_widget.used/limit/updatedAt`) в App Group
+- `Networking/StorageWidgetBridge.swift` (main app) — `update(used:limit:diskTotal:diskOther:diskS3:)`
+  пишет legacy-ключи (`storage_widget.used/limit`) и физический snapshot
+  (`storage_widget.diskTotal/diskOther/diskS3/updatedAt`) в App Group
   `UserDefaults(suiteName: group.com.barkfluff.BarkCloud)` и дёргает
   `WidgetCenter.reloadTimelines(ofKind: "StorageWidget")`. Зовётся там же, где
-  приложение получает квоту: `ProfileViewModel.load()` и
+  приложение получает хранилище: `ProfileViewModel.load()` и
   `BackupManager.loadStorageInfo()` (после `transfer.storageInfo()`). Последний
   дёргается и на каждом выходе app на передний план (`scenePhase == .active` в
   `BarkCloudApp`) — освежает виджет при старте/возврате (best-effort).
 - `BarkCloudWidgets/StorageWidget.swift` — `StaticConfiguration` (kind
   `StorageWidget`), `TimelineProvider` читает `StorageSnapshot.current()` из тех
   же ключей (контракт — строковые ключи, общего типа между таргетами нет),
-  политика обновления `.after(+1h)`. UI: капсульный прогресс-бар (`CapsuleProgressBar`,
-  градиентная заливка, оранжевый → красный при ≥ 90 %), процент, занято/свободно/
-  всего (`ByteCountFormatter` `.binary`). Нет данных (`limit ≤ 0`) → заглушка
+  политика обновления `.after(+1h)`. UI: сегментированный бар (`SegmentedStorageBar`):
+  другие данные, S3 (`#9A4F1E`) и свободное место; процент занятого физического диска,
+  метрики `Другие`/`S3`/`Свободно` (`ByteCountFormatter` `.binary`). Если новых ключей
+  ещё нет, `StorageSnapshot` использует старые `used/limit` как fallback. Нет данных → заглушка
   «Откройте приложение». В правом верхнем углу обоих размеров — полупрозрачная
   кнопка ручного обновления (`RefreshButton` → `Button(intent:)`). Зарегистрирован
   в `BarkCloudWidgetsBundle.swift`.
 - `BarkCloudWidgets/RefreshStorageIntent.swift` — интерактивный `AppIntent`
   (iOS 17+, `openAppWhenRun = false`). В отличие от простого reload **реально
-  тянет** свежую квоту прямо в процессе виджета: поднимает временный
+  тянет** свежий снимок диска прямо в процессе виджета: поднимает временный
   `GrpcManager(session: SessionStore()) → FileTransferService`, зовёт
-  `storageInfo()`, пишет те же три ключа App Group, `grpc.shutdown()` и
+  `storageInfo()`, пишет те же ключи App Group, `grpc.shutdown()` и
   `reloadTimelines`. Адреса берутся из `ServerConfig` (App Group), токены — из
   общего keychain.
 - **Для фетча из виджета** widget extension теперь линкует `BarkCloudKit`

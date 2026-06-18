@@ -78,7 +78,13 @@ final class ProfileViewModel {
             state.diskTotal = storage.diskTotal
             state.diskOther = storage.diskOther
             state.diskS3 = storage.diskS3
-            StorageWidgetBridge.update(used: storage.used, limit: storage.limit)
+            StorageWidgetBridge.update(
+                used: storage.used,
+                limit: storage.limit,
+                diskTotal: storage.diskTotal,
+                diskOther: storage.diskOther,
+                diskS3: storage.diskS3
+            )
         }
         state.isLoading = false
     }
