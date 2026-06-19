@@ -12,6 +12,8 @@ using BarkCloud.TestKit;
 
 using MassTransit;
 
+using Microsoft.Extensions.Configuration;
+
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -35,9 +37,16 @@ public class ConfirmAccountCommandHandlerTests
         _location.Setup(c => c.GetLocation(It.IsAny<string>())).ReturnsAsync((IpLocation?)null);
     }
 
-    private ConfirmAccountCommandHandler CreateSut(RequestContext? ctx = null) => new(
+    private ConfirmAccountCommandHandler CreateSut(RequestContext? ctx = null, bool registrationEnabled = true) => new(
         _codes.Object, _usersClient.Object, _refreshTokens.Object, ctx ?? FullContext(),
-        _notifications.Object, _location.Object, _metrics, _logger);
+        _notifications.Object, _location.Object, _metrics, FeatureConfig(registrationEnabled), _logger);
+
+    private static IConfiguration FeatureConfig(bool registrationEnabled) => new ConfigurationBuilder()
+        .AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Features:RegistrationEnabled"] = registrationEnabled ? "true" : "false"
+        })
+        .Build();
 
     private static RequestContext FullContext() => new()
     {
@@ -57,6 +66,23 @@ public class ConfirmAccountCommandHandlerTests
         var act = () => CreateSut(ctx).Handle(new ConfirmAccountCommand { CodeId = Guid.NewGuid().ToString(), Code = "0" }, default);
 
         await act.Should().ThrowAsync<XDeviceNameIsRequiredException>();
+    }
+
+    [Fact]
+    public async Task Handle_RegistrationDisabled_ThrowsWithoutConfirming()
+    {
+        var act = () => CreateSut(registrationEnabled: false).Handle(new ConfirmAccountCommand
+        {
+            CodeId = Guid.NewGuid().ToString(),
+            Code = "123456"
+        }, default);
+
+        await act.Should().ThrowAsync<RegistrationDisabledException>();
+
+        _codes.Verify(s => s.GetCode(It.IsAny<Guid>()), Times.Never);
+        _usersClient.Verify(c => c.ConfirmUserAsync(It.IsAny<ConfirmUserRequest>(), null, null, default), Times.Never);
+        _refreshTokens.Verify(s => s.CreateNewRefreshToken(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<int>()), Times.Never);
+        _notifications.Verify(n => n.SendNotification(It.IsAny<Notification>()), Times.Never);
     }
 
     [Fact]
