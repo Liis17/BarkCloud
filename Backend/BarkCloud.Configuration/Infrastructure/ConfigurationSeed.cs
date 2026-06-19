@@ -48,6 +48,7 @@ internal static class ConfigurationSeed
             item("Seq", "ServerUrl", ServiceId.Unknown),
 
             item("ReservedNames", "Usernames", ServiceId.Unknown),
+            item("Features", "RegistrationEnabled", ServiceId.Unknown),
 
             // ─── Identity ───────────────────────────────────────────────────
             item("RunSettings",       "Port",       ServiceId.Identity),
