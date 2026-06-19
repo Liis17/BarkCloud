@@ -36,6 +36,7 @@ Parent: [[index]] · See also: [[api/identity-api]] · [[modules/shared-identity
 
 ### Infrastructure
 - `LocationClient.cs`, `LocationClientExtensions.cs` — определение IP-локации
+- `RegistrationPolicy.cs` — runtime-проверка `Features:RegistrationEnabled` через Configuration API с fallback на стартовую конфигурацию
 - `IpLocation.cs` — DTO результата
 - `NotificationQueueSender.cs` — отправка `EmailNotification` через RabbitMQ ([[modules/shared-queue]])
 
@@ -99,6 +100,12 @@ Parent: [[index]] · See also: [[api/identity-api]] · [[modules/shared-identity
 ## Окружение
 
 `ASPNETCORE_ENVIRONMENT`, `CONFIGURATION_SERVICE_URL`. БД/JWT-настройки берутся из [[modules/backend-configuration]] при старте.
+
+## Запрет регистрации (Features:RegistrationEnabled)
+
+`CreateAccountCommandHandler` и `ConfirmAccountCommandHandler` вызывают `RegistrationPolicy.EnsureRegistrationEnabledAsync` до создания/подтверждения пользователя. При `false` бросается `RegistrationDisabledException`: новые аккаунты не создаются и ранее начатая регистрация не подтверждается.
+
+Политика читает флаг из [[modules/backend-configuration]] на каждый регистрационный запрос, поэтому переключатель в Web-настройках действует без перезапуска Identity. Если Configuration временно недоступен, используется последнее известное значение с fallback на стартовую конфигурацию.
 
 ## Режим без почты (email-less)
 

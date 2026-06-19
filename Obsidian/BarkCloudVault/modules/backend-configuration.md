@@ -17,7 +17,7 @@ Parent: [[index]] · See also: [[api/configuration-api]]
 - `Host/ConfigurationApiService.cs` — реализация gRPC `ConfigurationApi`
 - `Infrastructure/ConfigurationContext.cs` — EF Core DbContext
 - `Infrastructure/ConfigurationContextFactory.cs` — фабрика контекста (для EF Tools)
-- `Infrastructure/ConfigurationSeed.cs` — эталонный список всех ожидаемых ключей (`Section`/`Key`/`ServiceId`), включая SMTP-поля `Email:*` для Notification
+- `Infrastructure/ConfigurationSeed.cs` — эталонный список всех ожидаемых ключей (`Section`/`Key`/`ServiceId`), включая SMTP-поля `Email:*` для Notification и общий флаг `Features:RegistrationEnabled`
 - `Infrastructure/ConfigurationDefaultsPopulator.cs` — заливка дефолтных значений. `EnsureSeedAsync` при **каждом** старте сверяет таблицу с `ConfigurationSeed` и досевает только недостающие ключи (по тройке `Section/Key/ServiceId`), без дубликатов — новые ключи доезжают и в уже существующую БД. `PopulateDefaultsAsync` заполняет **пустые** записи дефолтами. SMTP-поля `Email:*` (Notification) и `ExternalEndpoint:Host` (Identity/Users/Files) берутся из env (`.env`): email опционален (пусто → не трогаем, режим без почты), внешние адреса обязательны — вне Development пустой env даёт `InvalidOperationException` при старте (проброшен в `Program.cs`, контейнер падает). В Development внешние адреса фолбэчат на `https://{subdomain}.example.com`. Конструктор получает эти значения из `Program.cs` (`EMAIL_*`, `EXTERNAL_{IDENTITY,USERS,FILES}_HOST`) + флаг `requireExternalEndpoints = !IsDevelopment()`
 - `Infrastructure/ConfigurationStorage.cs` — слой доступа к данным
 - `Persistence/Migrations/20260518172647_InitialCreate.cs` — единственная миграция
@@ -61,3 +61,9 @@ ENV переменные: `CONFIGURATION_HOST`, `CONFIGURATION_DATABASE`, `CONFI
 `ConfigurationDefaultsPopulator` заполняет секцию `Email` из env (`EMAIL_*`): если все 4 заданы — почта
 включается, если env пуст — поля остаются пустыми и деплой работает в режиме без почты (дефолт).
 Потребители флага — [[modules/backend-identity]] и [[modules/backend-web]].
+
+## Запрет регистрации (Features:RegistrationEnabled)
+
+`Features:RegistrationEnabled` хранится в БД как общий ключ `ServiceId.Unknown`. Миграция `AddRegistrationEnabledFlag` и `ConfigurationSeed` добавляют значение по умолчанию `true`, чтобы существующие инстансы не потеряли возможность регистрации после обновления.
+
+Флаг меняется из Web-настроек через `ConfigurationApi.UpdateConfiguration`. При `false` [[modules/backend-identity]] запрещает создание и подтверждение новых аккаунтов для всех клиентов; Web дополнительно скрывает UI регистрации на странице входа.
