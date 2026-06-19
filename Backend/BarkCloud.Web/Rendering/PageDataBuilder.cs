@@ -28,6 +28,7 @@ public sealed class PageDataBuilder
     private readonly IdentityApi.IdentityApiClient _identity;
     private readonly AdminGate _admin;
     private readonly IConfiguration _config;
+    private readonly FeatureConfigurationGateway _features;
     private readonly ILogger<PageDataBuilder> _logger;
 
     public PageDataBuilder(
@@ -37,6 +38,7 @@ public sealed class PageDataBuilder
         IdentityApi.IdentityApiClient identity,
         AdminGate admin,
         IConfiguration config,
+        FeatureConfigurationGateway features,
         ILogger<PageDataBuilder> logger)
     {
         _users = users;
@@ -45,6 +47,7 @@ public sealed class PageDataBuilder
         _identity = identity;
         _admin = admin;
         _config = config;
+        _features = features;
         _logger = logger;
     }
 
@@ -215,6 +218,7 @@ public sealed class PageDataBuilder
         catch (RpcException ex) { _logger.LogWarning("Settings/GetDevices: {Status}", ex.StatusCode); }
 
         var (storageBlock, _) = await BuildStorageAsync(token, profile, devicesCount);
+        var registrationEnabled = await _features.RegistrationEnabledAsync(http.RequestAborted);
 
         var displayName = $"{profile?.FirstName} {profile?.LastName}".Trim();
 
@@ -251,7 +255,8 @@ public sealed class PageDataBuilder
             {
                 version = _config.Value("App:Version", AppVersion.Current),
                 edition = _config.Value("App:Edition", "self-host"),
-                emailEnabled = _config.EmailEnabled()
+                emailEnabled = _config.EmailEnabled(),
+                registrationEnabled
             }
         };
 

@@ -33,6 +33,7 @@ public static class SettingsEndpoints
     public sealed record RevokeBody(string? DeviceId);
     public sealed record WebAuthnRegisterCompleteBody(string? ChallengeId, JsonElement Attestation, string? Name);
     public sealed record WebAuthnRemoveBody(string? CredentialId);
+    public sealed record RegistrationBody(bool Enabled);
 
     public static void MapSettingsEndpoints(this WebApplication app)
     {
@@ -51,6 +52,22 @@ public static class SettingsEndpoints
             return Results.Content(json, "application/json; charset=utf-8");
         });
 
+
+        api.MapPost("/system/registration", (HttpContext http, AuthGateway auth, AdminGate admin, FeatureConfigurationGateway features, RegistrationBody body) =>
+            Do(http, auth, async (user, _) =>
+            {
+                if (!admin.IsUnlocked(http)) return Results.Forbid();
+
+                var response = await features.SetRegistrationEnabledAsync(
+                    body.Enabled,
+                    $"user:{user.UserId}",
+                    "web-settings",
+                    http.RequestAborted);
+
+                return response.Success
+                    ? Results.Ok(new { enabled = body.Enabled })
+                    : Results.BadRequest(new { message = response.Message });
+            }));
         // ───────── Профиль ─────────
 
         api.MapPost("/profile/name", (HttpContext http, AuthGateway auth, UsersApi.UsersApiClient users, NameBody body) =>
