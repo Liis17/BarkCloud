@@ -11,4 +11,11 @@ public static class ConfigurationFeatureExtensions
     /// </summary>
     public static bool EmailEnabled(this IConfiguration configuration)
         => configuration.GetValue("Features:EmailEnabled", true);
+
+    /// <summary>
+    /// Разрешена ли регистрация новых аккаунтов. Хранится в Configuration как
+    /// Features:RegistrationEnabled и по умолчанию включена для обратной совместимости.
+    /// </summary>
+    public static bool RegistrationEnabled(this IConfiguration configuration)
+        => configuration.GetValue("Features:RegistrationEnabled", true);
 }
