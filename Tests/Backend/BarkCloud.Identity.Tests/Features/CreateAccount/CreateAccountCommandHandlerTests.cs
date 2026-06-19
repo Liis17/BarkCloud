@@ -38,19 +38,29 @@ public class CreateAccountCommandHandlerTests
         _location.Setup(c => c.GetLocation(It.IsAny<string>())).ReturnsAsync((IpLocation?)null);
     }
 
-    private static IConfiguration FeatureConfig(bool emailEnabled, bool registrationEnabled = true) => new ConfigurationBuilder()
+    private static IConfiguration FeatureConfig(bool emailEnabled) => new ConfigurationBuilder()
         .AddInMemoryCollection(new Dictionary<string, string?>
         {
-            ["Features:EmailEnabled"] = emailEnabled ? "true" : "false",
-            ["Features:RegistrationEnabled"] = registrationEnabled ? "true" : "false"
+            ["Features:EmailEnabled"] = emailEnabled ? "true" : "false"
         })
         .Build();
+
+    private static IRegistrationPolicy RegistrationPolicy(bool enabled)
+    {
+        var policy = new Mock<IRegistrationPolicy>();
+        if (enabled)
+            policy.Setup(p => p.EnsureRegistrationEnabledAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        else
+            policy.Setup(p => p.EnsureRegistrationEnabledAsync(It.IsAny<CancellationToken>())).ThrowsAsync(new RegistrationDisabledException());
+
+        return policy.Object;
+    }
 
     private CreateAccountCommandHandler CreateSut(
         RequestContext? ctx = null, bool emailEnabled = true, bool registrationEnabled = true) => new(
         _usersClient.Object, _codes.Object, _notifications.Object,
         ctx ?? FullContext(), _location.Object, _metrics, _refreshTokens.Object,
-        FeatureConfig(emailEnabled, registrationEnabled), _logger);
+        FeatureConfig(emailEnabled), RegistrationPolicy(registrationEnabled), _logger);
 
     private static RequestContext FullContext() => new()
     {
