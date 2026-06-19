@@ -24,7 +24,7 @@ namespace BarkCloud.Identity.Features.CreateAccount;
 public class CreateAccountCommandHandler(UsersServerApi.UsersServerApiClient usersClient,
     IConfirmationCodesStorage confirationCodesStorage, NotificationQueueSender notificationQueueSender,
     RequestContext requestContext, LocationClient locationClient, MetricsCollector metrics,
-    IRefreshTokensStorage refreshTokensStorage, IConfiguration configuration,
+    IRefreshTokensStorage refreshTokensStorage, IConfiguration configuration, IRegistrationPolicy registrationPolicy,
     ILogger<CreateAccountCommandHandler> logger)
     : IRequestHandler<CreateAccountCommand, CreateAccountResponse>
 {
@@ -57,11 +57,8 @@ public class CreateAccountCommandHandler(UsersServerApi.UsersServerApiClient use
             throw new XAppInfoIsRequiedException();
         }
 
-        if (!configuration.RegistrationEnabled())
-        {
-            logger.LogInformation("Регистрация новых аккаунтов отключена конфигурацией");
-            throw new RegistrationDisabledException();
-        }
+        await registrationPolicy.EnsureRegistrationEnabledAsync(cancellationToken);
+
         var createAccountRequest = new AddDraftUserRequest()
         {
             Email = request.Email?.Trim(),

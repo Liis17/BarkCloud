@@ -8,6 +8,7 @@ using BarkCloud.Identity.Persistence.Contexts;
 using BarkCloud.Identity.Persistence.Services;
 using BarkCloud.Identity.Services;
 using BarkCloud.Identity.Settings;
+using BarkCloud.Proto.Configuration;
 using BarkCloud.Proto.Users;
 using BarkCloud.Shared.Auth;
 using BarkCloud.Shared.Exceptions.Interceptors;
@@ -71,6 +72,14 @@ public class Program
              .WithExposedHeaders("grpc-status", "grpc-message", "grpc-status-details-bin", "x-error-code");
         }));
 
+        var configurationAddress = builder.Configuration["ConfigurationServiceAddr"]
+                                   ?? Environment.GetEnvironmentVariable("CONFIGURATION_SERVICE_URL")
+                                   ?? "http://localhost:7003";
+
+        builder.Services.AddGrpcClient<ConfigurationApi.ConfigurationApiClient>(o =>
+        {
+            o.Address = new Uri(configurationAddress);
+        });
         builder.Services.AddGrpcClient<UsersServerApi.UsersServerApiClient>(o =>
             {
                 o.Address = new Uri(builder.Configuration["UsersService:Host"]);
@@ -78,6 +87,7 @@ public class Program
             .AddInterceptor(() => new ExceptionClientInterceptor());
 
         builder.Services.AddTransient<IRefreshTokensStorage, RefreshTokensStorage>();
+        builder.Services.AddSingleton<IRegistrationPolicy, RegistrationPolicy>();
         builder.Services.AddScoped<SessionIssuer>();
         builder.Services.AddTransient<JwtService>();
         builder.Services.AddTransient<IConfirmationCodesStorage, ConfirmationCodesStorage>();

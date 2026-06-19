@@ -12,8 +12,6 @@ using BarkCloud.TestKit;
 
 using MassTransit;
 
-using Microsoft.Extensions.Configuration;
-
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -39,14 +37,18 @@ public class ConfirmAccountCommandHandlerTests
 
     private ConfirmAccountCommandHandler CreateSut(RequestContext? ctx = null, bool registrationEnabled = true) => new(
         _codes.Object, _usersClient.Object, _refreshTokens.Object, ctx ?? FullContext(),
-        _notifications.Object, _location.Object, _metrics, FeatureConfig(registrationEnabled), _logger);
+        _notifications.Object, _location.Object, _metrics, RegistrationPolicy(registrationEnabled), _logger);
 
-    private static IConfiguration FeatureConfig(bool registrationEnabled) => new ConfigurationBuilder()
-        .AddInMemoryCollection(new Dictionary<string, string?>
-        {
-            ["Features:RegistrationEnabled"] = registrationEnabled ? "true" : "false"
-        })
-        .Build();
+    private static IRegistrationPolicy RegistrationPolicy(bool enabled)
+    {
+        var policy = new Mock<IRegistrationPolicy>();
+        if (enabled)
+            policy.Setup(p => p.EnsureRegistrationEnabledAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        else
+            policy.Setup(p => p.EnsureRegistrationEnabledAsync(It.IsAny<CancellationToken>())).ThrowsAsync(new RegistrationDisabledException());
+
+        return policy.Object;
+    }
 
     private static RequestContext FullContext() => new()
     {
