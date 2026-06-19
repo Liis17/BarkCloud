@@ -1,4 +1,5 @@
 using BarkCloud.GrpcServer;
+using BarkCloud.Proto.Configuration;
 using BarkCloud.Proto.Files;
 using BarkCloud.Proto.Identity;
 using BarkCloud.Proto.Users;
@@ -46,11 +47,15 @@ static string EnvPort(string name, int fallback)
 var identityAddress = builder.Configuration["IdentityService:Host"] ?? $"http://cloud-identity:{EnvPort("IDENTITY_PORT", 7020)}";
 var usersAddress = builder.Configuration["UsersService:Host"] ?? $"http://cloud-users:{EnvPort("USERS_PORT", 7021)}";
 var filesAddress = builder.Configuration["FilesService:Host"] ?? $"http://cloud-files:{EnvPort("FILES_PORT", 7025)}";
+var configurationAddress = builder.Configuration["ConfigurationServiceAddr"]
+    ?? Environment.GetEnvironmentVariable("CONFIGURATION_SERVICE_URL")
+    ?? "http://localhost:7003";
 
 // Внутренний HTTP1-эндпоинт Files (тот же хост, что и gRPC, но порт Http1Port) для прокси-загрузки
 // байтов внутри docker-сети — минуя nginx/TLS и зависимость от ExternalEndpoint:Host.
 builder.Configuration["FilesService:Http1Base"] = $"http://{new Uri(filesAddress).Host}:{EnvPort("FILES_HTTP1PORT", 7026)}";
 
+builder.Services.AddGrpcClient<ConfigurationApi.ConfigurationApiClient>(o => o.Address = new Uri(configurationAddress));
 builder.Services.AddGrpcClient<IdentityApi.IdentityApiClient>(o => o.Address = new Uri(identityAddress));
 builder.Services.AddGrpcClient<UsersApi.UsersApiClient>(o => o.Address = new Uri(usersAddress));
 builder.Services.AddGrpcClient<FilesApi.FilesApiClient>(o => o.Address = new Uri(filesAddress));
@@ -85,6 +90,7 @@ builder.Services.AddSingleton<TemplateRenderer>();
 builder.Services.AddSingleton<PageService>();
 builder.Services.AddSingleton<AdminGate>();
 builder.Services.AddSingleton<DockerService>();
+builder.Services.AddSingleton<FeatureConfigurationGateway>();
 builder.Services.AddScoped<AuthGateway>();
 builder.Services.AddScoped<RegistrationGateway>();
 builder.Services.AddScoped<PasswordResetGateway>();

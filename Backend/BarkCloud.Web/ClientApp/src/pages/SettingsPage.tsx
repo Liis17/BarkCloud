@@ -166,6 +166,8 @@ function SystemSection({ admin, system }: { admin: SettingsState['admin']; syste
   const [toast, setToast] = React.useState<{ kind: 'ok' | 'err'; msg: string } | null>(null);
   const [progress, setProgress] = React.useState<ProgressState | null>(null);
   const [overlay, setOverlay] = React.useState<{ title: string; seconds: number } | null>(null);
+  const [registrationEnabled, setRegistrationEnabled] = React.useState(system.registrationEnabled);
+  const [registrationBusy, setRegistrationBusy] = React.useState(false);
 
   const flash = (kind: 'ok' | 'err', msg: string) => {
     setToast({ kind, msg });
@@ -215,6 +217,19 @@ function SystemSection({ admin, system }: { admin: SettingsState['admin']; syste
     setServices(null);
   }
 
+
+  async function toggleRegistration(next: boolean) {
+    setRegistrationBusy(true);
+    const { ok, data } = await sPost<{ enabled?: boolean; message?: string }>('/api/settings/system/registration', { enabled: next });
+    setRegistrationBusy(false);
+
+    if (ok) {
+      setRegistrationEnabled(data?.enabled ?? next);
+      flash('ok', (data?.enabled ?? next) ? 'Регистрация включена' : 'Регистрация отключена');
+    } else {
+      flash('err', data?.message || 'Не удалось изменить регистрацию');
+    }
+  }
   async function svcAction(svc: string, kind: string) {
     setBusy((b) => ({ ...b, [svc]: true }));
     const { ok, data } = await sPost<{ message?: string }>(`/api/system/services/${svc}/${kind}`);
@@ -324,6 +339,23 @@ function SystemSection({ admin, system }: { admin: SettingsState['admin']; syste
 
     body = (
       <>
+        <div className="sys-section-label">Доступ</div>
+        <Field
+          label="Регистрация новых аккаунтов"
+          help="Влияет на все клиенты облака"
+          end={
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
+              {registrationBusy && <span className="spin" />}
+              <Toggle on={registrationEnabled} onChange={toggleRegistration} disabled={registrationBusy} />
+            </div>
+          }
+        >
+          <span className={'pill-info ' + (registrationEnabled ? 'ok' : 'warn')}>
+            {registrationEnabled ? 'Разрешена' : 'Запрещена'}
+          </span>
+        </Field>
+
+        <hr className="divider" />
         {dockerErr && (
           <div className="sys-banner err">
             <Icon.x size={18} />

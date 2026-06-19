@@ -330,5 +330,5 @@ export interface SettingsState {
   sessions: Session[];
   sessionsHeader: string;
   admin: { enabled: boolean; unlocked: boolean };
-  system: { version: string; edition: string; emailEnabled: boolean };
+  system: { version: string; edition: string; emailEnabled: boolean; registrationEnabled: boolean };
 }
