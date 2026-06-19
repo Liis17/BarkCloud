@@ -29,16 +29,17 @@ public static class WebEndpoints
 
         // ───────── Логин ─────────
 
-        app.MapGet("/login", async (HttpContext http, AuthGateway auth, PageService pages, IConfiguration config) =>
+        app.MapGet("/login", async (HttpContext http, AuthGateway auth, PageService pages, IConfiguration config, FeatureConfigurationGateway features) =>
         {
             if (await auth.AuthenticateAsync(http) is not null)
                 return Results.Redirect("/photos");
 
-            var html = await pages.RenderAsync(LoginPage, LoginVars(http, config, "default", null, null, null));
+            var registrationEnabled = await features.RegistrationEnabledAsync(http.RequestAborted);
+            var html = await pages.RenderAsync(LoginPage, LoginVars(http, config, registrationEnabled, "default", null, null, null));
             return Results.Content(html, "text/html; charset=utf-8");
         });
 
-        app.MapPost("/login", async (HttpContext http, AuthGateway auth, PageService pages, IConfiguration config) =>
+        app.MapPost("/login", async (HttpContext http, AuthGateway auth, PageService pages, IConfiguration config, FeatureConfigurationGateway features) =>
         {
             var form = await http.Request.ReadFormAsync();
             var login = form["login"].ToString();
@@ -47,6 +48,7 @@ public static class WebEndpoints
             var remember = form.ContainsKey("remember");
 
             var result = await auth.LoginAsync(http, login, password, string.IsNullOrWhiteSpace(otp) ? null : otp, remember);
+            var registrationEnabled = await features.RegistrationEnabledAsync(http.RequestAborted);
 
             switch (result.Outcome)
             {
@@ -55,11 +57,11 @@ public static class WebEndpoints
 
                 case LoginOutcome.NeedsOtp:
                 case LoginOutcome.WrongOtp:
-                    var twoFa = await pages.RenderAsync(LoginPage, LoginVars(http, config, "2fa", login, login, password));
+                    var twoFa = await pages.RenderAsync(LoginPage, LoginVars(http, config, registrationEnabled, "2fa", login, login, password));
                     return Results.Content(twoFa, "text/html; charset=utf-8");
 
                 default:
-                    var error = await pages.RenderAsync(LoginPage, LoginVars(http, config, "error", login, login, password));
+                    var error = await pages.RenderAsync(LoginPage, LoginVars(http, config, registrationEnabled, "error", login, login, password));
                     return Results.Content(error, "text/html; charset=utf-8");
             }
         });
@@ -165,18 +167,26 @@ public static class WebEndpoints
 
         // ───────── Регистрация (с подтверждением кодом по почте) ─────────
 
-        app.MapGet("/register", async (HttpContext http, AuthGateway auth, PageService pages, IConfiguration config) =>
+        app.MapGet("/register", async (HttpContext http, AuthGateway auth, PageService pages, IConfiguration config, FeatureConfigurationGateway features) =>
         {
             if (await auth.AuthenticateAsync(http) is not null)
                 return Results.Redirect("/photos");
 
-            var html = await pages.RenderAsync(LoginPage, RegisterVars(http, config, null, "", "", "", ""));
+            var registrationEnabled = await features.RegistrationEnabledAsync(http.RequestAborted);
+            if (!registrationEnabled)
+                return Results.Redirect("/login");
+
+            var html = await pages.RenderAsync(LoginPage, RegisterVars(http, config, registrationEnabled, null, "", "", "", ""));
             return Results.Content(html, "text/html; charset=utf-8");
         });
 
         // Шаг 1: создаёт черновик и отправляет код на почту → экран ввода кода.
-        app.MapPost("/register", async (HttpContext http, RegistrationGateway registration, PageService pages, IConfiguration config) =>
+        app.MapPost("/register", async (HttpContext http, RegistrationGateway registration, PageService pages, IConfiguration config, FeatureConfigurationGateway features) =>
         {
+            var registrationEnabled = await features.RegistrationEnabledAsync(http.RequestAborted);
+            if (!registrationEnabled)
+                return Results.Redirect("/login");
+
             var form = await http.Request.ReadFormAsync();
             var firstName = form["first_name"].ToString();
             var lastName = form["last_name"].ToString();
@@ -193,18 +203,22 @@ public static class WebEndpoints
             if (result.Outcome == RegistrationOutcome.PendingConfirmation)
             {
                 var confirm = await pages.RenderAsync(LoginPage,
-                    RegisterConfirmVars(http, config, result.CodeId!, email, password, null));
+                    RegisterConfirmVars(http, config, registrationEnabled, result.CodeId!, email, password, null));
                 return Results.Content(confirm, "text/html; charset=utf-8");
             }
 
             var html = await pages.RenderAsync(LoginPage,
-                RegisterVars(http, config, result.Message, firstName, lastName, username, email));
+                RegisterVars(http, config, registrationEnabled, result.Message, firstName, lastName, username, email));
             return Results.Content(html, "text/html; charset=utf-8");
         });
 
         // Шаг 2: проверяет код, ставит пароль и открывает сессию.
-        app.MapPost("/register/confirm", async (HttpContext http, RegistrationGateway registration, PageService pages, IConfiguration config) =>
+        app.MapPost("/register/confirm", async (HttpContext http, RegistrationGateway registration, PageService pages, IConfiguration config, FeatureConfigurationGateway features) =>
         {
+            var registrationEnabled = await features.RegistrationEnabledAsync(http.RequestAborted);
+            if (!registrationEnabled)
+                return Results.Redirect("/login");
+
             var form = await http.Request.ReadFormAsync();
             var codeId = form["code_id"].ToString();
             var code = form["otp"].ToString();
@@ -217,13 +231,13 @@ public static class WebEndpoints
                 return Results.Redirect("/photos");
 
             var html = await pages.RenderAsync(LoginPage,
-                RegisterConfirmVars(http, config, codeId, email, password, result.Message ?? "Не удалось подтвердить код."));
+                RegisterConfirmVars(http, config, registrationEnabled, codeId, email, password, result.Message ?? "Не удалось подтвердить код."));
             return Results.Content(html, "text/html; charset=utf-8");
         });
 
         // ───────── Восстановление пароля «Забыли пароль?» (код по почте) ─────────
 
-        app.MapGet("/forgot", async (HttpContext http, AuthGateway auth, PageService pages, IConfiguration config) =>
+        app.MapGet("/forgot", async (HttpContext http, AuthGateway auth, PageService pages, IConfiguration config, FeatureConfigurationGateway features) =>
         {
             // Режим без почты: сброс пароля недоступен (доставить код некуда).
             if (!config.EmailEnabled())
@@ -232,12 +246,13 @@ public static class WebEndpoints
             if (await auth.AuthenticateAsync(http) is not null)
                 return Results.Redirect("/photos");
 
-            var html = await pages.RenderAsync(LoginPage, ForgotVars(http, config, null, ""));
+            var registrationEnabled = await features.RegistrationEnabledAsync(http.RequestAborted);
+            var html = await pages.RenderAsync(LoginPage, ForgotVars(http, config, registrationEnabled, null, ""));
             return Results.Content(html, "text/html; charset=utf-8");
         });
 
         // Шаг 1: отправляет код сброса на почту → экран ввода кода и нового пароля.
-        app.MapPost("/forgot", async (HttpContext http, PasswordResetGateway reset, PageService pages, IConfiguration config) =>
+        app.MapPost("/forgot", async (HttpContext http, PasswordResetGateway reset, PageService pages, IConfiguration config, FeatureConfigurationGateway features) =>
         {
             if (!config.EmailEnabled())
                 return Results.Redirect("/login");
@@ -246,20 +261,21 @@ public static class WebEndpoints
             var login = form["login"].ToString();
 
             var result = await reset.BeginAsync(http, login);
+            var registrationEnabled = await features.RegistrationEnabledAsync(http.RequestAborted);
 
             if (result.Outcome == PasswordResetOutcome.PendingConfirmation)
             {
                 var confirm = await pages.RenderAsync(LoginPage,
-                    ForgotConfirmVars(http, config, result.ResetId!, login, null));
+                    ForgotConfirmVars(http, config, registrationEnabled, result.ResetId!, login, null));
                 return Results.Content(confirm, "text/html; charset=utf-8");
             }
 
-            var html = await pages.RenderAsync(LoginPage, ForgotVars(http, config, result.Message, login));
+            var html = await pages.RenderAsync(LoginPage, ForgotVars(http, config, registrationEnabled, result.Message, login));
             return Results.Content(html, "text/html; charset=utf-8");
         });
 
         // Шаг 2: проверяет код, ставит новый пароль и открывает сессию.
-        app.MapPost("/forgot/confirm", async (HttpContext http, PasswordResetGateway reset, PageService pages, IConfiguration config) =>
+        app.MapPost("/forgot/confirm", async (HttpContext http, PasswordResetGateway reset, PageService pages, IConfiguration config, FeatureConfigurationGateway features) =>
         {
             if (!config.EmailEnabled())
                 return Results.Redirect("/login");
@@ -271,12 +287,13 @@ public static class WebEndpoints
             var login = form["login"].ToString();
 
             var result = await reset.ConfirmAsync(http, resetId, code, password);
+            var registrationEnabled = await features.RegistrationEnabledAsync(http.RequestAborted);
 
             if (result.Outcome == PasswordResetOutcome.Success)
                 return Results.Redirect("/photos");
 
             var html = await pages.RenderAsync(LoginPage,
-                ForgotConfirmVars(http, config, resetId, login, result.Message ?? "Не удалось подтвердить код."));
+                ForgotConfirmVars(http, config, registrationEnabled, resetId, login, result.Message ?? "Не удалось подтвердить код."));
             return Results.Content(html, "text/html; charset=utf-8");
         });
 
@@ -493,7 +510,7 @@ public static class WebEndpoints
     }
 
     private static Dictionary<string, string?> LoginVars(
-        HttpContext http, IConfiguration config, string flashKind, string? email, string? login, string? password)
+        HttpContext http, IConfiguration config, bool registrationEnabled, string flashKind, string? email, string? login, string? password)
         => new()
         {
             ["app.version"] = config.Value("App:Version", AppVersion.Current),
@@ -501,6 +518,7 @@ public static class WebEndpoints
             ["server.tls"] = config.Value("App:TlsLabel", "TLS 1.3"),
             ["flash.kind"] = flashKind,
             ["email.enabled"] = config.EmailEnabled() ? "true" : "false",
+            ["registration.enabled"] = registrationEnabled ? "true" : "false",
             ["form.email"] = email ?? "",
             ["form.password_masked"] = "",
             ["form.attempts_left"] = "—",
@@ -510,7 +528,7 @@ public static class WebEndpoints
         };
 
     private static Dictionary<string, string?> RegisterVars(
-        HttpContext http, IConfiguration config, string? error,
+        HttpContext http, IConfiguration config, bool registrationEnabled, string? error,
         string firstName, string lastName, string username, string email)
         => new()
         {
@@ -519,6 +537,7 @@ public static class WebEndpoints
             ["server.tls"] = config.Value("App:TlsLabel", "TLS 1.3"),
             ["flash.kind"] = "register",
             ["email.enabled"] = config.EmailEnabled() ? "true" : "false",
+            ["registration.enabled"] = registrationEnabled ? "true" : "false",
             ["form.error"] = error ?? "",
             ["form.first_name"] = firstName,
             ["form.last_name"] = lastName,
@@ -528,7 +547,7 @@ public static class WebEndpoints
         };
 
     private static Dictionary<string, string?> RegisterConfirmVars(
-        HttpContext http, IConfiguration config, string codeId, string email, string password, string? error)
+        HttpContext http, IConfiguration config, bool registrationEnabled, string codeId, string email, string password, string? error)
         => new()
         {
             ["app.version"] = config.Value("App:Version", AppVersion.Current),
@@ -536,6 +555,7 @@ public static class WebEndpoints
             ["server.tls"] = config.Value("App:TlsLabel", "TLS 1.3"),
             ["flash.kind"] = "register_confirm",
             ["email.enabled"] = config.EmailEnabled() ? "true" : "false",
+            ["registration.enabled"] = registrationEnabled ? "true" : "false",
             ["form.error"] = error ?? "",
             ["form.code_id"] = codeId,
             ["form.email"] = email,
@@ -544,7 +564,7 @@ public static class WebEndpoints
         };
 
     private static Dictionary<string, string?> ForgotVars(
-        HttpContext http, IConfiguration config, string? error, string login)
+        HttpContext http, IConfiguration config, bool registrationEnabled, string? error, string login)
         => new()
         {
             ["app.version"] = config.Value("App:Version", AppVersion.Current),
@@ -552,13 +572,14 @@ public static class WebEndpoints
             ["server.tls"] = config.Value("App:TlsLabel", "TLS 1.3"),
             ["flash.kind"] = "forgot",
             ["email.enabled"] = config.EmailEnabled() ? "true" : "false",
+            ["registration.enabled"] = registrationEnabled ? "true" : "false",
             ["form.error"] = error ?? "",
             ["form.login"] = login,
             ["year"] = DateTime.UtcNow.Year.ToString()
         };
 
     private static Dictionary<string, string?> ForgotConfirmVars(
-        HttpContext http, IConfiguration config, string resetId, string login, string? error)
+        HttpContext http, IConfiguration config, bool registrationEnabled, string resetId, string login, string? error)
         => new()
         {
             ["app.version"] = config.Value("App:Version", AppVersion.Current),
@@ -566,6 +587,7 @@ public static class WebEndpoints
             ["server.tls"] = config.Value("App:TlsLabel", "TLS 1.3"),
             ["flash.kind"] = "forgot_confirm",
             ["email.enabled"] = config.EmailEnabled() ? "true" : "false",
+            ["registration.enabled"] = registrationEnabled ? "true" : "false",
             ["form.error"] = error ?? "",
             ["form.reset_id"] = resetId,
             ["form.login"] = login,

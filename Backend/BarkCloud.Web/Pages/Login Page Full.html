@@ -450,6 +450,7 @@
 // Режим без почты: сервер подставляет email.enabled. Если false — прячем «Забыли пароль?»
 // и экраны сброса/подтверждения кода (на бэкенде они и так заблокированы).
 const EMAIL_ENABLED = '{{ email.enabled | default("true") }}' === 'true';
+const REGISTRATION_ENABLED = '{{ registration.enabled | default("true") }}' === 'true';
 const CloudIcon = ({ size = 22 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
     <path d="M17.5 19a4.5 4.5 0 0 0 0-9 .5.5 0 0 1-.5-.5 5 5 0 0 0-9.9-1 4 4 0 0 0-3.6 4 4 4 0 0 0 4 4.5h10z"/>
@@ -888,16 +889,18 @@ function App() {
           <div style={{display:'flex', flexDirection:'column', alignItems:'center'}}>
             {(() => {
               switch (t.state) {
-                case 'register':         return <RegisterCard error={'{{ form.error }}'}/>;
-                case 'register_confirm': return <RegisterConfirmCard error={'{{ form.error }}'}/>;
+                case 'register':         return REGISTRATION_ENABLED ? <RegisterCard error={'{{ form.error }}'}/> : <LoginCard state="default" showSSO={t.showSSO}/>;
+                case 'register_confirm': return REGISTRATION_ENABLED ? <RegisterConfirmCard error={'{{ form.error }}'}/> : <LoginCard state="default" showSSO={t.showSSO}/>;
                 case 'forgot':           return <ForgotCard error={'{{ form.error }}'}/>;
                 case 'forgot_confirm':   return <ForgotConfirmCard error={'{{ form.error }}'}/>;
                 default:                 return <LoginCard state={t.state} showSSO={t.showSSO}/>;
               }
             })()}
-            {t.state === 'register' || t.state === 'register_confirm'
+            {REGISTRATION_ENABLED && (t.state === 'register' || t.state === 'register_confirm')
               ? <p className="below-card">Уже есть аккаунт? <a href="/login">Войти →</a></p>
-              : <p className="below-card">Нет аккаунта? <a href="/register">Создать аккаунт →</a></p>}
+              : REGISTRATION_ENABLED
+                ? <p className="below-card">Нет аккаунта? <a href="/register">Создать аккаунт →</a></p>
+                : null}
           </div>
         </main>
 
