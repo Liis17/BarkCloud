@@ -38,13 +38,19 @@ public class CreateAccountCommandHandlerTests
         _location.Setup(c => c.GetLocation(It.IsAny<string>())).ReturnsAsync((IpLocation?)null);
     }
 
-    private static IConfiguration EmailConfig(bool enabled) => new ConfigurationBuilder()
-        .AddInMemoryCollection(new Dictionary<string, string?> { ["Features:EmailEnabled"] = enabled ? "true" : "false" })
+    private static IConfiguration FeatureConfig(bool emailEnabled, bool registrationEnabled = true) => new ConfigurationBuilder()
+        .AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Features:EmailEnabled"] = emailEnabled ? "true" : "false",
+            ["Features:RegistrationEnabled"] = registrationEnabled ? "true" : "false"
+        })
         .Build();
 
-    private CreateAccountCommandHandler CreateSut(RequestContext? ctx = null, bool emailEnabled = true) => new(
+    private CreateAccountCommandHandler CreateSut(
+        RequestContext? ctx = null, bool emailEnabled = true, bool registrationEnabled = true) => new(
         _usersClient.Object, _codes.Object, _notifications.Object,
-        ctx ?? FullContext(), _location.Object, _metrics, _refreshTokens.Object, EmailConfig(emailEnabled), _logger);
+        ctx ?? FullContext(), _location.Object, _metrics, _refreshTokens.Object,
+        FeatureConfig(emailEnabled, registrationEnabled), _logger);
 
     private static RequestContext FullContext() => new()
     {
@@ -109,6 +115,16 @@ public class CreateAccountCommandHandlerTests
         await act.Should().ThrowAsync<XAppInfoIsRequiedException>();
     }
 
+    [Fact]
+    public async Task Handle_RegistrationDisabled_ThrowsWithoutCreatingDraft()
+    {
+        var act = () => CreateSut(registrationEnabled: false).Handle(ValidCommand(), default);
+
+        await act.Should().ThrowAsync<RegistrationDisabledException>();
+        _usersClient.Verify(c => c.AddDraftUserAsync(It.IsAny<AddDraftUserRequest>(), null, null, default), Times.Never);
+        _codes.Verify(s => s.AddCode(It.IsAny<ConfirmationCode>()), Times.Never);
+        _notifications.Verify(n => n.SendNotification(It.IsAny<Notification>()), Times.Never);
+    }
     [Fact]
     public async Task Handle_HappyPath_AddsCodeAndReturnsCodeId()
     {

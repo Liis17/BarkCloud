@@ -57,6 +57,11 @@ public class CreateAccountCommandHandler(UsersServerApi.UsersServerApiClient use
             throw new XAppInfoIsRequiedException();
         }
 
+        if (!configuration.RegistrationEnabled())
+        {
+            logger.LogInformation("Регистрация новых аккаунтов отключена конфигурацией");
+            throw new RegistrationDisabledException();
+        }
         var createAccountRequest = new AddDraftUserRequest()
         {
             Email = request.Email?.Trim(),
