@@ -1,3 +1,4 @@
+using BarkCloud.GrpcServer;
 using BarkCloud.GrpcServer.Metrics;
 using BarkCloud.GrpcServer.Tracker;
 using BarkCloud.Identity.Domain;
@@ -14,12 +15,15 @@ using Google.Protobuf.WellKnownTypes;
 
 using MediatR;
 
+using Microsoft.Extensions.Configuration;
+
 
 namespace BarkCloud.Identity.Features.ConfirmAccount;
 
 public class ConfirmAccountCommandHandler(IConfirmationCodesStorage confirmationCodesStorage,
     UsersServerApi.UsersServerApiClient usersClient, IRefreshTokensStorage refreshTokensStorage, RequestContext requestContext,
     NotificationQueueSender notificationQueueSender, LocationClient locationClient, MetricsCollector metrics,
+    IConfiguration configuration,
     ILogger<ConfirmAccountCommandHandler> logger)
     : IRequestHandler<ConfirmAccountCommand, ConfirmAccountResponse>
 {
@@ -36,6 +40,12 @@ public class ConfirmAccountCommandHandler(IConfirmationCodesStorage confirmation
         if (string.IsNullOrEmpty(requestContext.DeviceName))
         {
             throw new XDeviceNameIsRequiredException();
+        }
+
+        if (!configuration.RegistrationEnabled())
+        {
+            logger.LogInformation("Подтверждение регистрации отключено конфигурацией");
+            throw new RegistrationDisabledException();
         }
 
         var codeId = Guid.Parse(request.CodeId);
