@@ -24,24 +24,31 @@ public sealed class PhysicalStorageStatsProvider : IPhysicalStorageStatsProvider
 
     public async Task<PhysicalStorageStats> GetStatsAsync(CancellationToken cancellationToken = default)
     {
-        var now = DateTimeOffset.UtcNow;
-        if (_cachedStats is not null && now - _cachedAt < CacheDuration)
+        var cached = _cachedStats;
+        if (cached is not null)
         {
-            return _cachedStats;
+            // Значение есть (пусть и протухшее) — отдаём мгновенно, скан папки гоним в фоне.
+            // Пока облако простаивает, объём диска не меняется, поэтому stale-значение точно.
+            if (DateTimeOffset.UtcNow - _cachedAt >= CacheDuration)
+            {
+                TriggerBackgroundRefresh();
+            }
+
+            return cached;
         }
 
+        // Холодный старт процесса: кэша ещё нет — считаем синхронно один раз.
         await _refreshLock.WaitAsync(cancellationToken);
         try
         {
-            now = DateTimeOffset.UtcNow;
-            if (_cachedStats is not null && now - _cachedAt < CacheDuration)
+            if (_cachedStats is not null)
             {
                 return _cachedStats;
             }
 
             var stats = CalculateStats(cancellationToken);
             _cachedStats = stats;
-            _cachedAt = now;
+            _cachedAt = DateTimeOffset.UtcNow;
 
             return stats;
         }
@@ -49,6 +56,32 @@ public sealed class PhysicalStorageStatsProvider : IPhysicalStorageStatsProvider
         {
             _refreshLock.Release();
         }
+    }
+
+    private void TriggerBackgroundRefresh()
+    {
+        if (!_refreshLock.Wait(0))
+        {
+            return; // обновление уже идёт
+        }
+
+        _ = Task.Run(() =>
+        {
+            try
+            {
+                var stats = CalculateStats(CancellationToken.None);
+                _cachedStats = stats;
+                _cachedAt = DateTimeOffset.UtcNow;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Фоновое обновление статистики хранилища не выполнено");
+            }
+            finally
+            {
+                _refreshLock.Release();
+            }
+        });
     }
 
     private PhysicalStorageStats CalculateStats(CancellationToken cancellationToken)

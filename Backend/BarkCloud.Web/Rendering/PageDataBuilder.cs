@@ -81,11 +81,15 @@ public sealed class PageDataBuilder
             ["nav.links_count"] = ""
         };
 
+        // Оба gRPC-вызова запускаем сразу, ждём параллельно — профиль не блокируется storage.
+        var profileTask = _users.GetUserAsync(new GetUserRequest { UserId = user.UserId }, token);
+        var storageTask = _files.GetUserStorageInfoAsync(new GetUserStorageInfoRequest(), token);
+
         User? profile = null;
 
         try
         {
-            var response = await _users.GetUserAsync(new GetUserRequest { UserId = user.UserId }, token);
+            var response = await profileTask;
             profile = response.User;
 
             var name = $"{profile.FirstName} {profile.LastName}".Trim();
@@ -103,7 +107,7 @@ public sealed class PageDataBuilder
 
         try
         {
-            var storage = await _files.GetUserStorageInfoAsync(new GetUserStorageInfoRequest(), token);
+            var storage = await storageTask;
 
             var diskTotal = storage.TotalAvailableStorage;
             var diskUsed = storage.DiskUsedStorage + storage.S3UsedStorage;
