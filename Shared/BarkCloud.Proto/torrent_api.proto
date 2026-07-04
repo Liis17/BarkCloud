@@ -1,0 +1,134 @@
+syntax = "proto3";
+
+option csharp_namespace = "BarkCloud.Proto.Torrent";
+
+import "google/protobuf/timestamp.proto";
+
+package barkcloud.torrent;
+
+// Пользовательское API торрент-сервиса (per-user, TokenType.User).
+// Качает торренты на хост-диск, отдаёт прогресс/статистику и импорт готовых файлов в облако.
+service TorrentApi {
+  rpc AddMagnet       (AddMagnetRequest)      returns (TorrentInfo);          // Добавить торрент по magnet-ссылке
+  rpc AddTorrentFile  (AddTorrentFileRequest) returns (TorrentInfo);          // Добавить торрент из .torrent-файла
+
+  rpc ListTorrents    (ListTorrentsRequest)   returns (ListTorrentsResponse); // Список торрентов пользователя
+  rpc GetTorrent      (TorrentIdRequest)      returns (TorrentInfo);          // Один торрент
+  rpc ListFiles       (TorrentIdRequest)      returns (ListFilesResponse);    // Файлы внутри торрента
+
+  rpc PauseTorrent    (TorrentIdRequest)      returns (TorrentEmpty);         // Приостановить
+  rpc ResumeTorrent   (TorrentIdRequest)      returns (TorrentEmpty);         // Возобновить
+  rpc RemoveTorrent   (RemoveTorrentRequest)  returns (TorrentEmpty);         // Удалить (опц. с файлами)
+
+  rpc SetFilePriority (SetFilePriorityRequest) returns (TorrentEmpty);        // Приоритет/пропуск файла
+
+  rpc ImportToCloud   (ImportToCloudRequest)  returns (ImportToCloudResponse); // Импорт готового файла(ов) в облако (Files/S3)
+
+  // Живой прогресс: server-streaming снапшотов активных торрентов пользователя (тик ~1-2 c).
+  // Веб-слой (BFF) транслирует это в SSE для браузера.
+  rpc StreamProgress  (StreamProgressRequest) returns (stream TorrentProgressSnapshot);
+}
+
+enum TorrentStatus {
+  TORRENT_STATUS_UNKNOWN     = 0;
+  TORRENT_STATUS_METADATA    = 1; // Скачивается метаданные (magnet без .torrent)
+  TORRENT_STATUS_DOWNLOADING = 2;
+  TORRENT_STATUS_SEEDING     = 3; // Скачан, раздаётся
+  TORRENT_STATUS_PAUSED      = 4;
+  TORRENT_STATUS_COMPLETED   = 5; // Скачан, раздача остановлена
+  TORRENT_STATUS_ERROR       = 6;
+}
+
+// Приоритет файла внутри торрента. SKIP — не качать вовсе.
+enum TorrentFilePriority {
+  TORRENT_FILE_PRIORITY_SKIP   = 0;
+  TORRENT_FILE_PRIORITY_LOW    = 1;
+  TORRENT_FILE_PRIORITY_NORMAL = 2;
+  TORRENT_FILE_PRIORITY_HIGH   = 3;
+}
+
+message TorrentInfo {
+  string id            = 1;  // Внутренний id (guid)
+  string info_hash     = 2;  // BitTorrent info-hash (hex)
+  string name          = 3;  // Имя торрента
+  TorrentStatus status = 4;
+  double progress      = 5;  // 0..1
+  int64 total_size     = 6;  // Байт (0 пока нет метаданных)
+  int64 downloaded     = 7;  // Скачано, байт
+  int64 uploaded       = 8;  // Отдано, байт
+  int64 download_speed = 9;  // Байт/с
+  int64 upload_speed   = 10; // Байт/с
+  int32 seeds          = 11; // Подключённые сиды
+  int32 leechers       = 12; // Подключённые личи
+  double ratio         = 13; // uploaded / downloaded
+  int64 eta_seconds    = 14; // Оценка до завершения (-1 = неизвестно)
+  google.protobuf.Timestamp added_at     = 15;
+  google.protobuf.Timestamp completed_at = 16; // Пусто, если не завершён
+  string error         = 17; // Текст ошибки при status=ERROR
+}
+
+message TorrentFileInfo {
+  int32 index                   = 1; // Индекс файла в торренте
+  string path                   = 2; // Относительный путь внутри торрента
+  int64 size                    = 3; // Байт
+  int64 downloaded              = 4; // Байт
+  double progress               = 5; // 0..1
+  TorrentFilePriority priority  = 6;
+}
+
+message AddMagnetRequest {
+  string magnet_uri = 1;
+}
+
+message AddTorrentFileRequest {
+  bytes torrent_file = 1; // Содержимое .torrent
+}
+
+message ListTorrentsRequest {}
+
+message ListTorrentsResponse {
+  repeated TorrentInfo torrents = 1;
+}
+
+message TorrentIdRequest {
+  string id = 1;
+}
+
+message ListFilesResponse {
+  repeated TorrentFileInfo files = 1;
+}
+
+message RemoveTorrentRequest {
+  string id           = 1;
+  bool delete_files   = 2; // true → удалить скачанные файлы с диска
+}
+
+message SetFilePriorityRequest {
+  string id                     = 1;
+  int32 file_index              = 2;
+  TorrentFilePriority priority  = 3;
+}
+
+message ImportToCloudRequest {
+  string id                = 1;
+  optional int32 file_index = 2; // Не задан → импортировать все завершённые файлы торрента
+  string directory_id      = 3;  // Папка облака (пусто = корень)
+}
+
+message ImportedFile {
+  string file_id = 1;
+  string name    = 2;
+}
+
+message ImportToCloudResponse {
+  repeated ImportedFile files = 1;
+}
+
+message StreamProgressRequest {}
+
+// Полный снапшот активных торрентов пользователя на момент тика.
+message TorrentProgressSnapshot {
+  repeated TorrentInfo torrents = 1;
+}
+
+message TorrentEmpty {}
