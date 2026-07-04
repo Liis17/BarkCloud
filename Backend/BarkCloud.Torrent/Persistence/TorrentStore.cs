@@ -1,0 +1,39 @@
+using BarkCloud.Torrent.Domain;
+
+using Microsoft.EntityFrameworkCore;
+
+namespace BarkCloud.Torrent.Persistence;
+
+public class TorrentStore : ITorrentStore
+{
+    private readonly TorrentContext _context;
+
+    public TorrentStore(TorrentContext context) => _context = context;
+
+    public Task<List<TorrentEntity>> ListByUser(long userId) =>
+        _context.Torrents.Include(t => t.Files)
+            .Where(t => t.UserId == userId)
+            .OrderByDescending(t => t.AddedAt)
+            .ToListAsync();
+
+    public Task<List<TorrentEntity>> ListAll() =>
+        _context.Torrents.Include(t => t.Files).ToListAsync();
+
+    public Task<TorrentEntity?> Get(Guid id, long userId) =>
+        _context.Torrents.Include(t => t.Files)
+            .FirstOrDefaultAsync(t => t.Id == id && t.UserId == userId);
+
+    public async Task Add(TorrentEntity entity)
+    {
+        await _context.Torrents.AddAsync(entity);
+        await _context.SaveChangesAsync();
+    }
+
+    public async Task Remove(TorrentEntity entity)
+    {
+        _context.Torrents.Remove(entity);
+        await _context.SaveChangesAsync();
+    }
+
+    public Task SaveChanges() => _context.SaveChangesAsync();
+}
