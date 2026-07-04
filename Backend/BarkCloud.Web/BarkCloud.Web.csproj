@@ -29,6 +29,7 @@
     <Protobuf Include="..\..\Shared\BarkCloud.Proto\identity_api.proto" GrpcServices="Client" />
     <Protobuf Include="..\..\Shared\BarkCloud.Proto\users_api.proto" GrpcServices="Client" />
     <Protobuf Include="..\..\Shared\BarkCloud.Proto\files_api.proto" GrpcServices="Client" />
+    <Protobuf Include="..\..\Shared\BarkCloud.Proto\torrent_api.proto" GrpcServices="Client" />
   </ItemGroup>
 
   <!-- HTML/CSS/JSX страницы отдаются клиенту в рантайме — копируем их в output и publish -->

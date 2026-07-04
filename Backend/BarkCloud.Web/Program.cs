@@ -2,6 +2,7 @@ using BarkCloud.GrpcServer;
 using BarkCloud.Proto.Configuration;
 using BarkCloud.Proto.Files;
 using BarkCloud.Proto.Identity;
+using BarkCloud.Proto.Torrent;
 using BarkCloud.Proto.Users;
 using BarkCloud.Shared.Auth;
 using BarkCloud.Shared.Identity;
@@ -47,6 +48,7 @@ static string EnvPort(string name, int fallback)
 var identityAddress = builder.Configuration["IdentityService:Host"] ?? $"http://cloud-identity:{EnvPort("IDENTITY_PORT", 7020)}";
 var usersAddress = builder.Configuration["UsersService:Host"] ?? $"http://cloud-users:{EnvPort("USERS_PORT", 7021)}";
 var filesAddress = builder.Configuration["FilesService:Host"] ?? $"http://cloud-files:{EnvPort("FILES_PORT", 7025)}";
+var torrentAddress = builder.Configuration["TorrentService:Host"] ?? $"http://cloud-torrent:{EnvPort("TORRENT_PORT", 7027)}";
 var configurationAddress = builder.Configuration["ConfigurationServiceAddr"]
     ?? Environment.GetEnvironmentVariable("CONFIGURATION_SERVICE_URL")
     ?? "http://localhost:7003";
@@ -54,6 +56,9 @@ var configurationAddress = builder.Configuration["ConfigurationServiceAddr"]
 // Внутренний HTTP1-эндпоинт Files (тот же хост, что и gRPC, но порт Http1Port) для прокси-загрузки
 // байтов внутри docker-сети — минуя nginx/TLS и зависимость от ExternalEndpoint:Host.
 builder.Configuration["FilesService:Http1Base"] = $"http://{new Uri(filesAddress).Host}:{EnvPort("FILES_HTTP1PORT", 7026)}";
+
+// Внутренний HTTP1-эндпоинт торрент-сервиса для проксирования скачивания файлов с диска (Range).
+builder.Configuration["TorrentService:Http1Base"] = $"http://{new Uri(torrentAddress).Host}:{EnvPort("TORRENT_HTTP1PORT", 7028)}";
 
 builder.Services.AddGrpcClient<ConfigurationApi.ConfigurationApiClient>(o => o.Address = new Uri(configurationAddress));
 builder.Services.AddGrpcClient<IdentityApi.IdentityApiClient>(o => o.Address = new Uri(identityAddress));
@@ -63,9 +68,12 @@ builder.Services.AddGrpcClient<CloudApi.CloudApiClient>(o => o.Address = new Uri
 builder.Services.AddGrpcClient<AlbumApi.AlbumApiClient>(o => o.Address = new Uri(filesAddress));
 builder.Services.AddGrpcClient<MusicApi.MusicApiClient>(o => o.Address = new Uri(filesAddress));
 builder.Services.AddGrpcClient<DynamicFolderApi.DynamicFolderApiClient>(o => o.Address = new Uri(filesAddress));
+builder.Services.AddGrpcClient<TorrentApi.TorrentApiClient>(o => o.Address = new Uri(torrentAddress));
 
 // HttpClient для прокси-загрузки байтов в Files (на внутренний HTTP1-эндпоинт).
 builder.Services.AddHttpClient("files-upload");
+// HttpClient для прокси-скачивания файлов торрентов с диска (Range).
+builder.Services.AddHttpClient("torrent");
 
 // Загрузка файлов без лимита размера: снимаем лимиты тела запроса, multipart-формы и
 // минимальной скорости (иначе большой файл на медленном канале оборвётся до таймаута).
@@ -115,6 +123,7 @@ app.UseStaticFiles();
 
 app.MapWebEndpoints();
 app.MapCloudApiEndpoints();
+app.MapTorrentApiEndpoints();
 app.MapSystemEndpoints();
 app.MapSettingsEndpoints();
 
