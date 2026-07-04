@@ -127,6 +127,7 @@ public class Program
                         var externalIdentityHost = builder.Configuration["EXTERNAL_IDENTITY_HOST"] ?? "";
                         var externalUsersHost = builder.Configuration["EXTERNAL_USERS_HOST"] ?? "";
                         var externalFilesHost = builder.Configuration["EXTERNAL_FILES_HOST"] ?? "";
+                        var externalTorrentHost = builder.Configuration["EXTERNAL_TORRENT_HOST"] ?? "";
 
                         var populatorLogger = scope.ServiceProvider.GetRequiredService<ILogger<ConfigurationDefaultsPopulator>>();
                         var populator = new ConfigurationDefaultsPopulator(
@@ -134,7 +135,7 @@ public class Program
                             rabbitUsername, rabbitPassword,
                             minioHost, minioPort, minioAccessKey, minioSecretKey,
                             emailHost, emailPort, emailSenderEmail, emailSenderPassword,
-                            externalIdentityHost, externalUsersHost, externalFilesHost,
+                            externalIdentityHost, externalUsersHost, externalFilesHost, externalTorrentHost,
                             requireExternalEndpoints: !app.Environment.IsDevelopment(),
                             metrics);
 

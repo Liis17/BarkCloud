@@ -13,4 +13,6 @@ public enum ServiceId
     Files = 5,
 
     Web = 6,
+
+    Torrent = 7,
 }
