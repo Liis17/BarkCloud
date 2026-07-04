@@ -37,6 +37,7 @@ public class ConfigurationDefaultsPopulator
     private readonly string _externalIdentityHost;
     private readonly string _externalUsersHost;
     private readonly string _externalFilesHost;
+    private readonly string _externalTorrentHost;
     private readonly bool _requireExternalEndpoints;
 
     /// <summary>
@@ -47,6 +48,7 @@ public class ConfigurationDefaultsPopulator
         { ServiceId.Identity, "cloud-identity" },
         { ServiceId.Users, "cloud-users" },
         { ServiceId.Files, "cloud-files" },
+        { ServiceId.Torrent, "cloud-torrent" },
     };
 
     /// <summary>
@@ -61,6 +63,7 @@ public class ConfigurationDefaultsPopulator
         { ServiceId.Users, ("USERS_PORT", 7021) },
         { ServiceId.Notification, (null, 7022) },
         { ServiceId.Files, ("FILES_PORT", 7025) },
+        { ServiceId.Torrent, ("TORRENT_PORT", 7027) },
     };
 
     private static int ResolveServicePort(ServiceId serviceId)
@@ -76,6 +79,12 @@ public class ConfigurationDefaultsPopulator
     private static int ResolveFilesHttp1Port()
         => int.TryParse(Environment.GetEnvironmentVariable("FILES_HTTP1PORT"), out var v) && v > 0 ? v : 7026;
 
+    private static int ResolveTorrentHttp1Port()
+        => int.TryParse(Environment.GetEnvironmentVariable("TORRENT_HTTP1PORT"), out var v) && v > 0 ? v : 7028;
+
+    private static int ResolveTorrentPeerPort()
+        => int.TryParse(Environment.GetEnvironmentVariable("TORRENT_PEER_PORT"), out var v) && v > 0 ? v : 6881;
+
     /// <summary>
     /// Маппинг ServiceId → субдомен для внешнего доступа
     /// </summary>
@@ -84,6 +93,7 @@ public class ConfigurationDefaultsPopulator
         { ServiceId.Identity, "identity" },
         { ServiceId.Users, "users" },
         { ServiceId.Files, "files" },
+        { ServiceId.Torrent, "torrent" },
     };
 
     /// <summary>
@@ -94,6 +104,7 @@ public class ConfigurationDefaultsPopulator
         { ServiceId.Identity, ("IdentityDb", "identity") },
         { ServiceId.Users, ("UsersDb", "users") },
         { ServiceId.Files, ("FilesDb", "files") },
+        { ServiceId.Torrent, ("TorrentDb", "torrent") },
     };
 
     public ConfigurationDefaultsPopulator(
@@ -115,6 +126,7 @@ public class ConfigurationDefaultsPopulator
         string externalIdentityHost,
         string externalUsersHost,
         string externalFilesHost,
+        string externalTorrentHost,
         bool requireExternalEndpoints,
         MetricsCollector? metrics = null)
     {
@@ -137,6 +149,7 @@ public class ConfigurationDefaultsPopulator
         _externalIdentityHost = externalIdentityHost;
         _externalUsersHost = externalUsersHost;
         _externalFilesHost = externalFilesHost;
+        _externalTorrentHost = externalTorrentHost;
         _requireExternalEndpoints = requireExternalEndpoints;
     }
 
@@ -297,11 +310,13 @@ public class ConfigurationDefaultsPopulator
                 return port.ToString();
         }
 
-        // --- RunSettings:Http1Port (Files) ---
+        // --- RunSettings:Http1Port (Files / Torrent) ---
         if (config.Section == "RunSettings" && config.Key == "Http1Port")
         {
             if (serviceId == ServiceId.Files)
                 return ResolveFilesHttp1Port().ToString();
+            if (serviceId == ServiceId.Torrent)
+                return ResolveTorrentHttp1Port().ToString();
         }
 
         // --- JwtSettings ---
@@ -371,6 +386,7 @@ public class ConfigurationDefaultsPopulator
                 ServiceId.Identity => _externalIdentityHost,
                 ServiceId.Users => _externalUsersHost,
                 ServiceId.Files => _externalFilesHost,
+                ServiceId.Torrent => _externalTorrentHost,
                 _ => null
             };
 
@@ -433,6 +449,28 @@ public class ConfigurationDefaultsPopulator
             {
                 "Host" => $"http://{ContainerNames[ServiceId.Identity]}:{ResolveServicePort(ServiceId.Identity)}",
                 "Token" => GenerateServiceToken(jwtSecret, jwtIssuer, jwtAudience, "IdentityServiceClient"),
+                _ => null
+            };
+        }
+
+        // --- TorrentService (inter-service; Web зовёт торрент-сервис) ---
+        if (config.Section == "TorrentService")
+        {
+            return config.Key switch
+            {
+                "Host" => $"http://{ContainerNames[ServiceId.Torrent]}:{ResolveServicePort(ServiceId.Torrent)}",
+                "Token" => GenerateServiceToken(jwtSecret, jwtIssuer, jwtAudience, "TorrentServiceClient"),
+                _ => null
+            };
+        }
+
+        // --- Torrent (путь к диску закачки + peer-порт BitTorrent) ---
+        if (config.Section == "Torrent")
+        {
+            return config.Key switch
+            {
+                "DownloadPath" => "/mnt/torrents", // внутриконтейнерный путь; хост-папка монтируется томом
+                "PeerPort" => ResolveTorrentPeerPort().ToString(),
                 _ => null
             };
         }

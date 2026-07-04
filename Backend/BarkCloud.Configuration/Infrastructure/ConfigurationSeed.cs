@@ -96,10 +96,23 @@ internal static class ConfigurationSeed
             item("S3Buckets:cloud-files",  "BucketName",     ServiceId.Files),
             item("S3Buckets:cloud-files",  "ForcePathStyle", ServiceId.Files),
 
+            // ─── Torrent (качает торренты на хост-диск; зовёт Users для валидации и Files для импорта) ─
+            item("RunSettings",       "Port",         ServiceId.Torrent),
+            item("RunSettings",       "Http1Port",    ServiceId.Torrent),
+            item("TorrentDb",         "",             ServiceId.Torrent),
+            item("UsersService",      "Host",         ServiceId.Torrent),
+            item("UsersService",      "Token",        ServiceId.Torrent),
+            item("FilesService",      "Host",         ServiceId.Torrent),
+            item("FilesService",      "Token",        ServiceId.Torrent),
+            item("ExternalEndpoint",  "Host",         ServiceId.Torrent),
+            item("Torrent",           "DownloadPath", ServiceId.Torrent),
+            item("Torrent",           "PeerPort",     ServiceId.Torrent),
+
             // ─── Web (веб-клиент → адреса микросервисов; JwtSettings берёт из общих) ─
             item("IdentityService", "Host", ServiceId.Web),
             item("UsersService",    "Host", ServiceId.Web),
             item("FilesService",    "Host", ServiceId.Web),
+            item("TorrentService",  "Host", ServiceId.Web),
         };
 
         return items;
