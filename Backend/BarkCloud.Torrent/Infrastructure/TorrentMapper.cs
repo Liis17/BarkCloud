@@ -1,0 +1,87 @@
+using BarkCloud.Proto.Torrent;
+using BarkCloud.Torrent.Domain;
+
+using Google.Protobuf.WellKnownTypes;
+
+using MonoTorrent;
+using MonoTorrent.Client;
+
+namespace BarkCloud.Torrent.Infrastructure;
+
+/// <summary>Сборка proto-ответов из БД-сущности и живого состояния движка.</summary>
+public static class TorrentMapper
+{
+    public static TorrentInfo ToInfo(TorrentEntity entity, TorrentEngineService.ManagedTorrent? managed)
+    {
+        var info = new TorrentInfo
+        {
+            Id = entity.Id.ToString(),
+            InfoHash = entity.InfoHash,
+            Name = entity.Name,
+            TotalSize = entity.TotalSize,
+            Downloaded = entity.Downloaded,
+            Uploaded = entity.Uploaded,
+            Progress = entity.Progress,
+            Ratio = entity.Downloaded > 0 ? (double)entity.Uploaded / entity.Downloaded : 0,
+            AddedAt = Timestamp.FromDateTime(DateTime.SpecifyKind(entity.AddedAt, DateTimeKind.Utc)),
+            EtaSeconds = -1,
+            Status = (TorrentStatus)entity.Status,
+        };
+
+        if (entity.CompletedAt.HasValue)
+            info.CompletedAt = Timestamp.FromDateTime(DateTime.SpecifyKind(entity.CompletedAt.Value, DateTimeKind.Utc));
+
+        if (managed != null)
+        {
+            var m = managed.Manager;
+            info.Status = MapStatus(m.State, m.Complete, entity.Paused);
+            info.Progress = m.Progress / 100.0;
+            info.DownloadSpeed = m.Monitor.DownloadRate;
+            info.UploadSpeed = m.Monitor.UploadRate;
+            info.Seeds = managed.Seeds;
+            info.Leechers = managed.Leechers;
+            if (m.HasMetadata && m.Torrent != null)
+                info.TotalSize = m.Torrent.Size;
+
+            // ETA по текущей скорости и остатку.
+            var remaining = info.TotalSize - (long)(info.TotalSize * info.Progress);
+            info.EtaSeconds = m.Monitor.DownloadRate > 0 && remaining > 0
+                ? remaining / m.Monitor.DownloadRate
+                : -1;
+        }
+
+        return info;
+    }
+
+    public static TorrentFileInfo ToFileInfo(ITorrentManagerFile file, int index)
+    {
+        var downloaded = file.BytesDownloaded();
+        return new TorrentFileInfo
+        {
+            Index = index,
+            Path = file.Path.ToString(),
+            Size = file.Length,
+            Downloaded = downloaded,
+            Progress = file.Length > 0 ? (double)downloaded / file.Length : 0,
+            Priority = (TorrentFilePriority)(int)file.Priority,
+        };
+    }
+
+    public static TorrentStatus MapStatus(TorrentState state, bool complete, bool paused)
+    {
+        if (paused && state is TorrentState.Paused or TorrentState.Stopped or TorrentState.Stopping)
+            return complete ? TorrentStatus.Completed : TorrentStatus.Paused;
+
+        return state switch
+        {
+            TorrentState.Metadata => TorrentStatus.Metadata,
+            TorrentState.Downloading or TorrentState.Hashing
+                or TorrentState.Starting => TorrentStatus.Downloading,
+            TorrentState.Seeding => TorrentStatus.Seeding,
+            TorrentState.Paused => TorrentStatus.Paused,
+            TorrentState.Stopped or TorrentState.Stopping => complete ? TorrentStatus.Completed : TorrentStatus.Paused,
+            TorrentState.Error => TorrentStatus.Error,
+            _ => TorrentStatus.Unknown,
+        };
+    }
+}
