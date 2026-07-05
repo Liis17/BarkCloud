@@ -38,8 +38,18 @@ public static class TorrentMapper
             info.Progress = m.Progress / 100.0;
             info.DownloadSpeed = m.Monitor.DownloadRate;
             info.UploadSpeed = m.Monitor.UploadRate;
-            info.Seeds = managed.Seeds;
-            info.Leechers = managed.Leechers;
+
+            // Живые значения прямо из движка (не из 5-секундного кеша ManagedTorrent).
+            info.Seeds = m.Peers.Seeds;
+            info.Leechers = m.Peers.Leechs;
+
+            // Живой трафик: накопленная база в DB + дельта текущей сессии, ещё не сброшенная.
+            var downDelta = Math.Max(0, m.Monitor.DataBytesDownloaded - managed.LastSessionDownloaded);
+            var upDelta = Math.Max(0, m.Monitor.DataBytesUploaded - managed.LastSessionUploaded);
+            info.Downloaded = entity.Downloaded + downDelta;
+            info.Uploaded = entity.Uploaded + upDelta;
+            info.Ratio = info.Downloaded > 0 ? (double)info.Uploaded / info.Downloaded : 0;
+
             if (m.HasMetadata && m.Torrent != null)
                 info.TotalSize = m.Torrent.Size;
 
