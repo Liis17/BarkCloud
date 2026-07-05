@@ -37,6 +37,7 @@ public sealed class DockerService
         ("users", "cloud-users"),
         ("files", "cloud-files"),
         ("notification", "cloud-notification"),
+        ("torrent", "cloud-torrent"),
         (WebService, WebContainer),
     ];
 
