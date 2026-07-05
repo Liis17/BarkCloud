@@ -62,7 +62,15 @@ public class TorrentEngineService : IAsyncDisposable
     {
         Directory.CreateDirectory(savePath);
         var link = MagnetLink.Parse(magnetUri);
-        var manager = await Engine.AddAsync(link, savePath);
+        TorrentManager manager;
+        try
+        {
+            manager = await Engine.AddAsync(link, savePath);
+        }
+        catch (TorrentException ex) when (ex.Message.Contains("already been registered"))
+        {
+            throw new DuplicateTorrentException(ex);
+        }
         var managed = Track(id, manager);
         if (start)
             await manager.StartAsync();
@@ -73,12 +81,15 @@ public class TorrentEngineService : IAsyncDisposable
     {
         Directory.CreateDirectory(savePath);
         var torrent = await MonoTorrent.Torrent.LoadAsync(torrentBytes);
-
-        var existing = _managed.Values.FirstOrDefault(m => m.Manager.InfoHashes == torrent.InfoHashes);
-        if (existing != null)
-            throw new InvalidOperationException($"Движок уже содержит торрент с этим infohash (id={existing.Id})");
-
-        var manager = await Engine.AddAsync(torrent, savePath);
+        TorrentManager manager;
+        try
+        {
+            manager = await Engine.AddAsync(torrent, savePath);
+        }
+        catch (TorrentException ex) when (ex.Message.Contains("already been registered"))
+        {
+            throw new DuplicateTorrentException(ex);
+        }
         var managed = Track(id, manager);
         if (start)
             await manager.StartAsync();

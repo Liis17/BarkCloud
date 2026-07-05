@@ -62,8 +62,8 @@ public class TorrentPersistenceService : BackgroundService
             managed.Leechers = m.Peers.Leechs;
 
             // Накопительный трафик: приращение сессионного счётчика движка.
-            var sessionDown = m.Monitor.DataBytesDownloaded;
-            var sessionUp = m.Monitor.DataBytesUploaded;
+            var sessionDown = m.Monitor.DataBytesReceived;
+            var sessionUp = m.Monitor.DataBytesSent;
             entity.Downloaded += Math.Max(0, sessionDown - managed.LastSessionDownloaded);
             entity.Uploaded += Math.Max(0, sessionUp - managed.LastSessionUploaded);
             managed.LastSessionDownloaded = sessionDown;
