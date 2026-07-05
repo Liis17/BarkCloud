@@ -69,9 +69,17 @@ public class TorrentApiService : TorrentApi.TorrentApiBase
         };
 
         await _store.Add(entity);
-        var managed = await _engine.AddMagnetAsync(id, request.MagnetUri, entity.SavePath, start: true);
-        _metrics.Increment("torrents_added");
-        return TorrentMapper.ToInfo(entity, managed);
+        try
+        {
+            var managed = await _engine.AddMagnetAsync(id, request.MagnetUri, entity.SavePath, start: true);
+            _metrics.Increment("torrents_added");
+            return TorrentMapper.ToInfo(entity, managed);
+        }
+        catch
+        {
+            await _store.Remove(entity);
+            throw;
+        }
     }
 
     public override async Task<TorrentInfo> AddTorrentFile(AddTorrentFileRequest request, ServerCallContext context)
@@ -110,9 +118,17 @@ public class TorrentApiService : TorrentApi.TorrentApiBase
         }
 
         await _store.Add(entity);
-        var managed = await _engine.AddTorrentFileAsync(id, bytes, entity.SavePath, start: true);
-        _metrics.Increment("torrents_added");
-        return TorrentMapper.ToInfo(entity, managed);
+        try
+        {
+            var managed = await _engine.AddTorrentFileAsync(id, bytes, entity.SavePath, start: true);
+            _metrics.Increment("torrents_added");
+            return TorrentMapper.ToInfo(entity, managed);
+        }
+        catch
+        {
+            await _store.Remove(entity);
+            throw;
+        }
     }
 
     public override async Task<ListTorrentsResponse> ListTorrents(ListTorrentsRequest request, ServerCallContext context)
