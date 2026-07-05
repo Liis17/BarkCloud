@@ -15,6 +15,7 @@ const NAV_PRIMARY: NavItem[] = [
   { key: 'music', to: '/music', label: 'Музыка', icon: 'music' },
   { key: 'albums', to: '/albums', label: 'Альбомы', icon: 'grid' },
   { key: 'files', to: '/files', label: 'Файлы', icon: 'folder' },
+  { key: 'torrents', to: '/torrents', label: 'Торренты', icon: 'torrent' },
 ];
 const NAV_SHARE: NavItem[] = [
   { key: 'shared', to: '/shared', label: 'Общие', icon: 'share' },
