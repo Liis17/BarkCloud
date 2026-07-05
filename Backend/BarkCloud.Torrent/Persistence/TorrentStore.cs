@@ -32,11 +32,8 @@ public class TorrentStore : ITorrentStore
         await _context.SaveChangesAsync();
     }
 
-    public async Task Remove(TorrentEntity entity)
-    {
-        _context.Torrents.Remove(entity);
-        await _context.SaveChangesAsync();
-    }
+    public Task Remove(TorrentEntity entity) =>
+        _context.Torrents.Where(t => t.Id == entity.Id).ExecuteDeleteAsync();
 
     public Task SaveChanges() => _context.SaveChangesAsync();
 }
