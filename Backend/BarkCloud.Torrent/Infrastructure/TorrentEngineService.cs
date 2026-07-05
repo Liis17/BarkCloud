@@ -104,6 +104,9 @@ public class TorrentEngineService : IAsyncDisposable
         if (!_managed.TryRemove(id, out var m))
             return;
 
+        if (m.Manager.State != TorrentState.Stopped && m.Manager.State != TorrentState.Error)
+            await m.Manager.StopAsync();
+
         var mode = deleteData ? RemoveMode.CacheDataAndDownloadedData : RemoveMode.CacheDataOnly;
         await Engine.RemoveAsync(m.Manager, mode);
     }
