@@ -3,6 +3,7 @@ using System.Net;
 
 using MonoTorrent;
 using MonoTorrent.Client;
+using MonoTorrent.Connections;
 
 namespace BarkCloud.Torrent.Infrastructure;
 
@@ -40,11 +41,26 @@ public class TorrentEngineService : IAsyncDisposable
             CacheDirectory = cacheDirectory,
             AutoSaveLoadFastResume = true,
             AutoSaveLoadMagnetLinkMetadata = true,
+            AutoSaveLoadDhtCache = true,
+
             ListenEndPoints = new Dictionary<string, IPEndPoint>
             {
                 { "ipv4", new IPEndPoint(IPAddress.Any, peerPort) },
                 { "ipv6", new IPEndPoint(IPAddress.IPv6Any, peerPort) },
             },
+
+            // DHT на том же UDP-порту — больше пиров без трекера.
+            DhtEndPoint = new IPEndPoint(IPAddress.Any, peerPort),
+
+            // Выше лимиты соединений — больше пиров одновременно.
+            MaximumConnections = 500,
+            MaximumHalfOpenConnections = 50,
+
+            // RC4-шифрование первым — обход DPI-throttling у некоторых провайдеров.
+            AllowedEncryption = [EncryptionType.RC4Full, EncryptionType.RC4Header, EncryptionType.PlainText],
+
+            // 32 МБ дискового кеша снижает I/O задержки при записи частей.
+            DiskCacheBytes = 32 * 1024 * 1024,
         }.ToSettings();
 
         _engine = new ClientEngine(settings);
