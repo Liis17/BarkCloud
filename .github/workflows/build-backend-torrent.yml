@@ -1,0 +1,34 @@
+name: "🚀 BarkCloud.Torrent CI/CD"
+
+on:
+  push:
+    branches:
+      - dev
+      - master
+    paths:
+      - 'Backend/BarkCloud.Torrent/**'
+      - 'Shared/**'
+      # proto-контракты: только свои (torrent_api + files_api для импорта в облако + shared), а не весь BarkCloud.Proto
+      - '!Shared/BarkCloud.Proto/**'
+      - 'Shared/BarkCloud.Proto/torrent_api.proto'
+      - 'Shared/BarkCloud.Proto/files_api.proto'
+      - 'Shared/BarkCloud.Proto/shared.proto'
+      - 'Backend/rebuild.trigger'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  ci:
+    uses: ./.github/workflows/backend-service-ci.yml
+    with:
+      service-name: BarkCloud.Torrent
+      service-key: torrent
+      service-path: Backend/BarkCloud.Torrent
+      project-path: Backend/BarkCloud.Torrent/BarkCloud.Torrent.csproj
+      dockerfile: Backend/BarkCloud.Torrent/Dockerfile
+      image-name: barkcloud-torrent
+      force-run: ${{ github.event_name == 'workflow_dispatch' }}
+    secrets: inherit
