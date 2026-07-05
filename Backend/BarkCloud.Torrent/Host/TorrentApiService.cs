@@ -75,6 +75,11 @@ public class TorrentApiService : TorrentApi.TorrentApiBase
             _metrics.Increment("torrents_added");
             return TorrentMapper.ToInfo(entity, managed);
         }
+        catch (DuplicateTorrentException ex)
+        {
+            await _store.Remove(entity);
+            throw new RpcException(new Status(StatusCode.AlreadyExists, ex.Message));
+        }
         catch
         {
             await _store.Remove(entity);
@@ -123,6 +128,11 @@ public class TorrentApiService : TorrentApi.TorrentApiBase
             var managed = await _engine.AddTorrentFileAsync(id, bytes, entity.SavePath, start: true);
             _metrics.Increment("torrents_added");
             return TorrentMapper.ToInfo(entity, managed);
+        }
+        catch (DuplicateTorrentException ex)
+        {
+            await _store.Remove(entity);
+            throw new RpcException(new Status(StatusCode.AlreadyExists, ex.Message));
         }
         catch
         {
