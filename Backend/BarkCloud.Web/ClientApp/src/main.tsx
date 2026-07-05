@@ -11,6 +11,7 @@ import { VideosPage } from './pages/VideosPage';
 import { MusicPage } from './pages/MusicPage';
 import { AlbumsPage } from './pages/AlbumsPage';
 import { FilesPage } from './pages/FilesPage';
+import { TorrentsPage } from './pages/TorrentsPage';
 import { FavoritesPage } from './pages/FavoritesPage';
 import { TrashPage } from './pages/TrashPage';
 import { SharedPage } from './pages/SharedPage';
@@ -39,6 +40,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             <Route path="music" element={<MusicPage />} />
             <Route path="albums" element={<AlbumsPage />} />
             <Route path="files" element={<FilesPage />} />
+            <Route path="torrents" element={<TorrentsPage />} />
             <Route path="favorites" element={<FavoritesPage />} />
             <Route path="trash" element={<TrashPage />} />
             <Route path="shared" element={<SharedPage />} />
