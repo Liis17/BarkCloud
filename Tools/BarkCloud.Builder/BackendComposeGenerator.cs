@@ -78,6 +78,11 @@ services:
       EXTERNAL_IDENTITY_HOST: ${EXTERNAL_IDENTITY_HOST}
       EXTERNAL_USERS_HOST: ${EXTERNAL_USERS_HOST}
       EXTERNAL_FILES_HOST: ${EXTERNAL_FILES_HOST}
+      EXTERNAL_TORRENT_HOST: ${EXTERNAL_TORRENT_HOST}
+      # Порты торрент-сервиса нужны configuration для вычисления TorrentService:Host/RunSettings
+      TORRENT_PORT: ${TORRENT_PORT}
+      TORRENT_HTTP1PORT: ${TORRENT_HTTP1PORT}
+      TORRENT_PEER_PORT: ${TORRENT_PEER_PORT}
     networks:
       - barkcloud-network
 
@@ -139,6 +144,39 @@ services:
     depends_on:
       - configuration
 """);
+
+        if (m.IncludeTorrent)
+        {
+            // Peer-порт BitTorrent публикуется на хост всегда (nginx его не проксирует).
+            // gRPC/HTTP1-порты публикуем только без nginx (иначе их пробрасывает прокси).
+            var torrentPorts = new StringBuilder()
+                .Append("\n    ports:")
+                .Append("\n      - \"${TORRENT_PEER_PORT}:${TORRENT_PEER_PORT}\"")
+                .Append("\n      - \"${TORRENT_PEER_PORT}:${TORRENT_PEER_PORT}/udp\"");
+            if (!m.IncludeNginx)
+                torrentPorts.Append("\n      - \"${TORRENT_PORT}:${TORRENT_PORT}\"")
+                            .Append("\n      - \"${TORRENT_HTTP1PORT}:${TORRENT_HTTP1PORT}\"");
+
+            sections.Add($$"""
+  # Торрент-сервис: качает торренты на хост-диск ({TORRENT_DOWNLOAD_PATH} → /mnt/torrents)
+  torrent:
+    image: {{Img("torrent")}}
+    container_name: cloud-torrent
+    restart: always
+    environment:
+      <<: *common-variables
+      SERVICE_PORT: ${TORRENT_PORT}
+      SERVICE_HTTP1PORT: ${TORRENT_HTTP1PORT}
+      Torrent__DownloadPath: "/mnt/torrents"
+      Torrent__PeerPort: ${TORRENT_PEER_PORT}
+    volumes:
+      - ${TORRENT_DOWNLOAD_PATH:-torrent_data}:/mnt/torrents{{torrentPorts}}
+    networks:
+      - barkcloud-network
+    depends_on:
+      - configuration
+""");
+        }
 
         // Веб-клиент — всегда (отключить нельзя).
         sections.Add($$"""
@@ -321,6 +359,7 @@ volumes:
         if (m.IncludePostgres) sb.Append("  backup_volume:\n");
         if (m.IncludeSeq) sb.Append("  seq_data:\n");
         sb.Append("  archive_temp:\n");
+        if (m.IncludeTorrent) sb.Append("  torrent_data:\n");
 
         return sb.ToString();
     }
@@ -382,6 +421,12 @@ volumes:
         K("CONFIGURATION_PORT", m.ConfigurationPort);
         K("FILES_PORT", m.FilesPort);
         K("FILES_HTTP1PORT", m.FilesHttp1Port);
+        K("TORRENT_PORT", m.TorrentPort);
+        K("TORRENT_HTTP1PORT", m.TorrentHttp1Port);
+        K("TORRENT_PEER_PORT", m.TorrentPeerPort);
+
+        Section("Torrent — папка на хосте для скачанных торрентов (пусто — named volume torrent_data)");
+        K("TORRENT_DOWNLOAD_PATH", m.TorrentDownloadPath);
 
         Section("Files — внешняя папка для временных ZIP-архивов (пусто — named volume archive_temp)");
         K("ARCHIVE_TEMP_PATH", m.ArchiveTempPath);
@@ -404,6 +449,7 @@ volumes:
         K("EXTERNAL_IDENTITY_HOST", m.ExternalIdentityHost);
         K("EXTERNAL_USERS_HOST", m.ExternalUsersHost);
         K("EXTERNAL_FILES_HOST", m.ExternalFilesHost);
+        K("EXTERNAL_TORRENT_HOST", m.ExternalTorrentHost);
 
         if (m.IncludeNotification)
         {
@@ -426,6 +472,67 @@ volumes:
         string domain = string.IsNullOrWhiteSpace(m.NginxDomain) ? "cloud.barkfluff.com" : m.NginxDomain.Trim();
         string crt = string.IsNullOrWhiteSpace(m.CertCrtPath) ? "barkfluff.com-crt.pem" : Path.GetFileName(m.CertCrtPath);
         string key = string.IsNullOrWhiteSpace(m.CertKeyPath) ? "barkfluff.com-key.pem" : Path.GetFileName(m.CertKeyPath);
+
+        // Торрент-сервис маршрутизируется только если включён: gRPC на своём порту + HTTP1
+        // (/web/download/{id}) для стриминга файлов внешним клиентам (веб ходит напрямую в docker-сеть).
+        string torrentServer = !m.IncludeTorrent ? "" : $$"""
+
+# --- Пулы торрент-сервиса ---
+upstream barkcloud_torrent {
+    server cloud-torrent:{{m.TorrentPort}};
+    keepalive 32;
+    keepalive_requests 1000;
+    keepalive_timeout 60s;
+}
+
+upstream barkcloud_torrent_http {
+    server cloud-torrent:{{m.TorrentHttp1Port}};
+    keepalive 16;
+    keepalive_timeout 60s;
+}
+
+# --- Torrent (порт {{m.TorrentPort}}): gRPC + HTTP1 стриминг файлов ---
+server {
+    listen {{m.TorrentPort}} ssl;
+    http2 on;
+    server_name {{domain}};
+
+    ssl_certificate     /etc/nginx/certs/{{crt}};
+    ssl_certificate_key /etc/nginx/certs/{{key}};
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    ssl_ciphers         HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+    ssl_session_cache   shared:SSL:10m;
+    ssl_session_timeout 10m;
+
+    client_max_body_size 0;
+
+    location / {
+        grpc_pass grpc://barkcloud_torrent;
+        grpc_set_header Host $host;
+        grpc_set_header X-Real-IP $remote_addr;
+        grpc_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        grpc_set_header X-Forwarded-Proto $scheme;
+        grpc_read_timeout 300s;
+        grpc_send_timeout 300s;
+    }
+
+    # HTTP-веб: /web/download/{id} -> cloud-torrent:{{m.TorrentHttp1Port}}/download/{id}
+    location /web/ {
+        rewrite ^/web/(.*) /$1 break;
+        proxy_pass http://barkcloud_torrent_http;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_buffering off;
+        proxy_read_timeout 7200s;
+        proxy_send_timeout 7200s;
+    }
+}
+""";
 
         return $$"""
 # BarkCloud — единый субдомен {{domain}}, маршрутизация по порту.
@@ -557,6 +664,7 @@ server {
     }
 }
 
+{{torrentServer}}
 # --- Веб-клиент (порт 443): прокси на cloud-web:8080 ---
 server {
     listen 443 ssl;
