@@ -55,6 +55,7 @@
                             <ui:ToggleSwitch x:Name="RabbitToggle" Margin="0,4" Content="rabbitmq (очередь)" IsChecked="{Binding IncludeRabbitmq}" />
                             <ui:ToggleSwitch x:Name="PostgresToggle" Margin="0,4" Content="postgres (БД)" IsChecked="{Binding IncludePostgres}" />
                             <ui:ToggleSwitch x:Name="SeqToggle" Margin="0,4" Content="seq (логи)" IsChecked="{Binding IncludeSeq}" />
+                            <ui:ToggleSwitch x:Name="TorrentToggle" Margin="0,4" Content="torrent (загрузка торрентов)" IsChecked="{Binding IncludeTorrent}" />
                         </UniformGrid>
 
                         <ui:InfoBar Margin="0,10,0,0" Severity="Warning" IsClosable="False"
@@ -316,6 +317,30 @@
                         <ui:TextBox Margin="0,0,0,6" Text="{Binding SeqWebPort, UpdateSourceTrigger=PropertyChanged}" />
                         <TextBlock Style="{StaticResource FieldLabel}" Text="SEQ_DATA_PATH (пусто — named volume)" />
                         <ui:TextBox PlaceholderText="/d/barkcloud/seq" Text="{Binding SeqDataPath, UpdateSourceTrigger=PropertyChanged}" />
+                    </StackPanel>
+                </ui:CardExpander>
+
+                <!-- Torrent -->
+                <ui:CardExpander Margin="0,0,0,8" Icon="{ui:SymbolIcon ArrowDownload24}"
+                                 Visibility="{Binding IsChecked, ElementName=TorrentToggle, Converter={StaticResource BoolToVis}}">
+                    <ui:CardExpander.Header>
+                        <StackPanel>
+                            <TextBlock FontWeight="Medium" Text="Torrent" />
+                            <TextBlock FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       Text="Загрузка торрентов на хост-диск" />
+                        </StackPanel>
+                    </ui:CardExpander.Header>
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="TORRENT_PORT (gRPC)" />
+                        <ui:TextBox Margin="0,0,0,6" Text="{Binding TorrentPort, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="TORRENT_HTTP1PORT (стриминг файлов)" />
+                        <ui:TextBox Margin="0,0,0,6" Text="{Binding TorrentHttp1Port, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="TORRENT_PEER_PORT (BitTorrent, TCP+UDP; публикуется на хост)" />
+                        <ui:TextBox Margin="0,0,0,6" Text="{Binding TorrentPeerPort, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="TORRENT_DOWNLOAD_PATH (папка на хосте; пусто — named volume)" />
+                        <ui:TextBox Margin="0,0,0,6" PlaceholderText="/d/barkcloud/torrents" Text="{Binding TorrentDownloadPath, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="EXTERNAL_TORRENT_HOST (внешний адрес для клиентов)" />
+                        <ui:TextBox Text="{Binding ExternalTorrentHost, UpdateSourceTrigger=PropertyChanged}" />
                     </StackPanel>
                 </ui:CardExpander>
 

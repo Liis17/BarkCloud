@@ -14,6 +14,7 @@ public sealed class BuilderModel
     public bool IncludeRabbitmq { get; set; } = true;
     public bool IncludePostgres { get; set; } = true;
     public bool IncludeSeq { get; set; } = true;
+    public bool IncludeTorrent { get; set; } = false;
 
     // Образы: реестр фиксирован, выбирается только канал (Release/Dev).
     public const string ImageRegistry = "docker.barkfluff.com:5000";
@@ -48,6 +49,12 @@ public sealed class BuilderModel
     public string ConfigurationPort { get; set; } = "7023";
     public string FilesPort { get; set; } = "7025";
     public string FilesHttp1Port { get; set; } = "7026";
+    public string TorrentPort { get; set; } = "7027";
+    public string TorrentHttp1Port { get; set; } = "7028";
+    public string TorrentPeerPort { get; set; } = "6881";
+
+    // Torrent: папка на хосте, куда качаются торренты (монтируется в /mnt/torrents).
+    public string TorrentDownloadPath { get; set; } = "";
 
     // Files: внешняя папка для временных ZIP-архивов (скачивание папок/альбомов).
     // Пусто — named volume archive_temp (создаётся от root → files под uid 1654 не запишет).
@@ -69,6 +76,7 @@ public sealed class BuilderModel
     public string ExternalIdentityHost { get; set; } = "https://cloud.barkfluff.com:7020";
     public string ExternalUsersHost { get; set; } = "https://cloud.barkfluff.com:7021";
     public string ExternalFilesHost { get; set; } = "https://cloud.barkfluff.com:7025";
+    public string ExternalTorrentHost { get; set; } = "https://cloud.barkfluff.com:7027";
 
     // Почта (SMTP) — опционально. Все 4 поля непусты → подтверждение по email включено; иначе выключено.
     public string EmailHost { get; set; } = "";
