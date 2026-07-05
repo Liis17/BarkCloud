@@ -23,6 +23,9 @@ public class TorrentStore : ITorrentStore
         _context.Torrents.Include(t => t.Files)
             .FirstOrDefaultAsync(t => t.Id == id && t.UserId == userId);
 
+    public Task<bool> ExistsByInfoHash(long userId, string infoHash) =>
+        _context.Torrents.AnyAsync(t => t.UserId == userId && t.InfoHash == infoHash);
+
     public async Task Add(TorrentEntity entity)
     {
         await _context.Torrents.AddAsync(entity);

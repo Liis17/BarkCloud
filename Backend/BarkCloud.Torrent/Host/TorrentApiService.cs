@@ -51,6 +51,10 @@ public class TorrentApiService : TorrentApi.TorrentApiBase
     public override async Task<TorrentInfo> AddMagnet(AddMagnetRequest request, ServerCallContext context)
     {
         var link = MagnetLink.Parse(request.MagnetUri);
+        var infoHash = link.InfoHashes.V1OrV2.ToHex();
+        if (await _store.ExistsByInfoHash(UserId, infoHash))
+            throw new RpcException(new Status(StatusCode.AlreadyExists, "Торрент с таким infohash уже добавлен"));
+
         var id = Guid.NewGuid();
         var entity = new TorrentEntity
         {
@@ -74,6 +78,10 @@ public class TorrentApiService : TorrentApi.TorrentApiBase
     {
         var bytes = request.TorrentFile.ToByteArray();
         var torrent = await MonoTorrent.Torrent.LoadAsync(bytes);
+
+        var infoHash = torrent.InfoHashes.V1OrV2.ToHex();
+        if (await _store.ExistsByInfoHash(UserId, infoHash))
+            throw new RpcException(new Status(StatusCode.AlreadyExists, "Торрент с таким infohash уже добавлен"));
 
         var id = Guid.NewGuid();
         var entity = new TorrentEntity
