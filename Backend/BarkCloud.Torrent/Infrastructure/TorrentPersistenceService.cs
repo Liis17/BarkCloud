@@ -25,6 +25,7 @@ public class TorrentPersistenceService : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        var tick = 0;
         while (!stoppingToken.IsCancellationRequested)
         {
             try
@@ -36,7 +37,35 @@ public class TorrentPersistenceService : BackgroundService
                 _logger.LogWarning(ex, "Ошибка при сохранении статистики торрентов");
             }
 
+            // Диагностический лог раз в 30 с (каждые 6 тиков по 5 с).
+            if (++tick % 6 == 0)
+                LogEngineState();
+
             await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
+        }
+    }
+
+    private void LogEngineState()
+    {
+        var all = _engine.All.ToList();
+        if (all.Count == 0)
+            return;
+
+        foreach (var managed in all)
+        {
+            var m = managed.Manager;
+            _logger.LogInformation(
+                "[Torrent] {Name} | State={State} Progress={Progress:P0} " +
+                "Down={DownKB:F0}KB/s Up={UpKB:F0}KB/s | " +
+                "Seeds={Seeds} Leeches={Leeches} Available={Available}",
+                string.IsNullOrEmpty(m.Torrent?.Name) ? managed.Id.ToString()[..8] : m.Torrent!.Name,
+                m.State,
+                m.Progress / 100.0,
+                m.Monitor.DownloadRate / 1024.0,
+                m.Monitor.UploadRate / 1024.0,
+                m.Peers.Seeds,
+                m.Peers.Leechs,
+                m.Peers.Available);
         }
     }
 
