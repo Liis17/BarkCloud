@@ -10,6 +10,8 @@ public interface ITorrentStore
 
     Task<TorrentEntity?> Get(Guid id, long userId);
 
+    Task<bool> ExistsByInfoHash(long userId, string infoHash);
+
     Task Add(TorrentEntity entity);
 
     Task Remove(TorrentEntity entity);

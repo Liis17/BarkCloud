@@ -73,6 +73,11 @@ public class TorrentEngineService : IAsyncDisposable
     {
         Directory.CreateDirectory(savePath);
         var torrent = await MonoTorrent.Torrent.LoadAsync(torrentBytes);
+
+        var existing = _managed.Values.FirstOrDefault(m => m.Manager.InfoHashes == torrent.InfoHashes);
+        if (existing != null)
+            throw new InvalidOperationException($"Движок уже содержит торрент с этим infohash (id={existing.Id})");
+
         var manager = await Engine.AddAsync(torrent, savePath);
         var managed = Track(id, manager);
         if (start)
