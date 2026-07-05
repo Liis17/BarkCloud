@@ -171,7 +171,7 @@ jobs:
     needs:
       - changes
       - test
-    if: ${{ needs.changes.outputs.should_build == 'true' && (needs.test.result == 'success' || needs.test.result == 'skipped') }}
+    if: ${{ !cancelled() && needs.changes.result == 'success' && needs.changes.outputs.should_build == 'true' && needs.test.result != 'failure' }}
     runs-on: [self-hosted, linux]
     steps:
       - uses: actions/checkout@v4
