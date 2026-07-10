@@ -4,7 +4,7 @@ Parent: [[index]] · See also: [[modules/shared-proto]] · [[api/identity-api]] 
 
 ## Назначение
 
-Нативный Android-клиент BarkCloud (Kotlin, Jetpack Compose, **Material 3 Expressive**). Достигнут функциональный паритет с [[modules/ios-app]]: вход+OTP, 5 табов как в iOS (**Галерея / Файлы / Альбомы(по умолчанию) / Корзина / Настройки**), облачные медиа с пагинацией, альбомы (CRUD), облачный файл-браузер (CRUD/перемещение/загрузка), умные разделы (`DynamicFolderApi`), управляемый кеш оригиналов, foreground upload queue с Android 16 `Notification.ProgressStyle`, автозагрузка медиатеки через WorkManager, очистка локальных копий, Storage widget, deep links, системный share target, корзина, профиль/аватар/приватность/устройства, избранное. gRPC-связь со всеми микросервисами (Identity :7020, Users :7021, Files/Cloud/Album/DynamicFolder :7025) + HTTP-слой для upload/download/превью по self-signed TLS.
+Нативный Android-клиент BarkCloud (Kotlin, Jetpack Compose, **Material 3 Expressive**). Достигнут функциональный паритет с [[modules/ios-app]]: вход+OTP, 5 табов как в iOS (**Галерея / Файлы / Альбомы(по умолчанию) / Корзина / Настройки**), облачные медиа с пагинацией, альбомы (CRUD), облачный файл-браузер (CRUD/перемещение/загрузка), умные разделы (`DynamicFolderApi`), Shared Files Hub (публичные ссылки/исходящие/входящие гранты), управляемый кеш оригиналов, foreground upload queue с Android 16 `Notification.ProgressStyle`, автозагрузка медиатеки через WorkManager, очистка локальных копий, Storage widget, deep links, системный share target, корзина, профиль/аватар/приватность/устройства, избранное. gRPC-связь со всеми микросервисами (Identity :7020, Users :7021, Files/Cloud/Album/DynamicFolder :7025) + HTTP-слой для upload/download/превью по self-signed TLS.
 
 ## Реализованный функционал (паритет с iOS)
 
@@ -25,7 +25,7 @@ Parent: [[index]] · See also: [[modules/shared-proto]] · [[api/identity-api]] 
 - **Widgets/deep links**: `widgets/StorageWidgetProvider` + `StorageWidgetBridge` (RemoteViews, snapshot used/limit из `ProfileViewModel`), deep links `barkcloud://gallery|files|albums|media|trash|settings`.
 - **Share target**: `ShareActivity` принимает `ACTION_SEND`/`ACTION_SEND_MULTIPLE` из системного Sharesheet и ставит переданные `EXTRA_STREAM` URI в foreground upload queue.
 - **Навигация** (`ui/main/`): 5 табов через вложенные графы (per-tab back-stack), pill-NavigationBar; sign-out проброшен `RootNavGraph → MainScreen → SettingsScreen`.
-- «Общие файлы» → `ComingSoonScreen` (бэкенд не поддерживает расшаривание), как и на iOS.
+- **Shared Files Hub** (`ui/shared/`): 3 сегмента на роуте `files/shared` — «Мои публичные» (`ListMyShares`/`ListMyFolderShares`/`ListMyAlbumShares`, без пагинации, revoke оптимистичен, «Поделиться ссылкой» строит `{filesHost}/s|f|al/{token}` и открывает system share sheet), «Я поделился» (`ListMyOutgoingSharesAll` cursor-paginated + `ListMyOutgoingFolderShares` best-effort, группировка по файлу/папке, резолв получателей через `UserRepository.listByIds`), «Мне доступны» (`ListSharedWithMe` cursor-paginated + `ListSharedFoldersWithMe` best-effort, скачивание во временный кэш + `ACTION_VIEW`, без revoke). Навигация по чужой папке — отдельный read-only экран `SharedFolderBrowserScreen` (роут `files/shared/folder`, `ListSharedDirectory`). `SharedRepository` — обёртка над шаринг-RPC `CloudApi`, отдельно от `CloudRepository`. `UserRepository.listByIds` резолвит батч параллельными `GetUser` — `ListByIds` в `UsersServerApi` (inter-service), клиенту недоступен.
 
 ⚠️ Не проверено в рантайме на устройстве (forward-совместимость material3-alpha с Compose из BOM; реальное поведение self-signed превью/upload). Ниже — описание исходного каркаса (вход + локальный браузер), частично устарело.
 
@@ -48,7 +48,9 @@ app/src/main/java/com/barkfluff/BarkCloud/
 │   │   └── FileCacheService.kt  — кеш оригиналов в cache/BarkCloudFiles/originals, LRU/age очистка
 │   └── cloud/
 │       ├── DynamicFolderModels.kt     — модели умных разделов и страниц элементов
-│       └── DynamicFolderRepository.kt — DynamicFolderApi: list/create/update/delete/listItems
+│       ├── DynamicFolderRepository.kt — DynamicFolderApi: list/create/update/delete/listItems
+│       ├── SharedModels.kt            — модели шаринга (PublicShareItem/OutgoingShareGroup/SharedWithMeEntry/…)
+│       └── SharedRepository.kt        — CloudApi: публичные ссылки/гранты пользователям/чужая папка
 │   └── gallery/
 │       ├── AutoUploadSettings.kt  — SharedPreferences-флаг автозагрузки + последний результат
 │       ├── AutoUploadScheduler.kt — WorkManager unique periodic/one-time jobs
@@ -69,6 +71,7 @@ app/src/main/java/com/barkfluff/BarkCloud/
 │   ├── login/                 — LoginScreen, LoginUiState, LoginViewModel (логин/пароль + OTP)
 │   ├── main/                  — MainScreen (Scaffold + вложенный NavHost), MainDestination (5 табов), MainBottomBar
 │   ├── settings/              — настройки профиля/приватности/устройств + CacheSettingsScreen
+│   ├── shared/                 — Shared Files Hub: SharedHubScreen + 3 таба + SharedFolderBrowserScreen
 │   ├── smartfolders/           — содержимое умного раздела и форма правил
 │   ├── screens/PlaceholderScreen.kt — заглушка табов Photos/Videos/Shared/Settings
 │   └── theme/                 — Color, Shape, Theme, Type (Material 3)
