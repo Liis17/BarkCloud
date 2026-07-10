@@ -21,12 +21,13 @@ import com.barkfluff.BarkCloud.R
 import com.barkfluff.BarkCloud.files.ui.FilesRootScreen
 import com.barkfluff.BarkCloud.files.ui.LocalBrowserScreen
 import com.barkfluff.BarkCloud.ui.albums.AlbumDetailScreen
-import com.barkfluff.BarkCloud.ui.components.ComingSoonScreen
 import com.barkfluff.BarkCloud.ui.favorites.FavoritesScreen
 import com.barkfluff.BarkCloud.ui.files.CloudBrowserScreen
 import com.barkfluff.BarkCloud.ui.gallery.GalleryScreen
 import com.barkfluff.BarkCloud.ui.media.MediaTabScreen
 import com.barkfluff.BarkCloud.ui.settings.DevicesScreen
+import com.barkfluff.BarkCloud.ui.shared.SharedFolderBrowserScreen
+import com.barkfluff.BarkCloud.ui.shared.SharedHubScreen
 import com.barkfluff.BarkCloud.ui.trash.TrashScreen
 import com.barkfluff.BarkCloud.ui.settings.CacheSettingsScreen
 import com.barkfluff.BarkCloud.ui.settings.EditProfileScreen
@@ -132,7 +133,27 @@ fun MainScreen(
                     )
                 }
                 composable("files/shared") {
-                    ComingSoonScreen(title = stringResource(R.string.files_shared_title))
+                    SharedHubScreen(
+                        onOpenSharedFolder = { id, name ->
+                            navController.navigate("files/shared/folder?dir=$id&title=${Uri.encode(name)}")
+                        },
+                    )
+                }
+                composable(
+                    route = "files/shared/folder?dir={dir}&title={title}",
+                    arguments = listOf(
+                        navArgument("dir") { type = NavType.StringType },
+                        navArgument("title") { type = NavType.StringType; defaultValue = "" },
+                    ),
+                ) { entry ->
+                    SharedFolderBrowserScreen(
+                        directoryId = entry.arguments?.getString("dir").orEmpty(),
+                        title = entry.arguments?.getString("title").orEmpty(),
+                        onOpenFolder = { id, name ->
+                            navController.navigate("files/shared/folder?dir=$id&title=${Uri.encode(name)}")
+                        },
+                        onNavigateUp = { navController.popBackStack() },
+                    )
                 }
                 composable(
                     route = "files/smart/{folderId}?title={title}",
