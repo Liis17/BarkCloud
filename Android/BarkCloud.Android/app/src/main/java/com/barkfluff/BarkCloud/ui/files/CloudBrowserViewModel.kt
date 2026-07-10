@@ -12,11 +12,14 @@ import com.barkfluff.BarkCloud.data.cloud.CloudFileEntry
 import com.barkfluff.BarkCloud.data.cloud.CloudRepository
 import com.barkfluff.BarkCloud.data.cloud.PathCrumb
 import com.barkfluff.BarkCloud.data.upload.UploadScheduler
+import com.barkfluff.BarkCloud.data.upload.UploadDestination
+import com.barkfluff.BarkCloud.data.upload.UploadPhase
 import com.barkfluff.BarkCloud.net.queryFileName
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 data class CloudBrowserUiState(
@@ -40,6 +43,22 @@ class CloudBrowserViewModel(
 
     private var directoryId: String = ""
     private var started = false
+    private val observedCompleted = mutableSetOf<String>()
+
+    init {
+        val app = appContext as BarkCloudApplication
+        viewModelScope.launch {
+            app.uploadQueue.recentJobs.collectLatest { jobs ->
+                val affectsCurrentFolder = jobs.any { job ->
+                    job.phase == UploadPhase.COMPLETED &&
+                        observedCompleted.add(job.id) &&
+                        (job.destination == UploadDestination.SYSTEM_BY_MEDIA_KIND && directoryId.isEmpty() ||
+                            job.destination == UploadDestination.DIRECTORY && job.directoryId == directoryId)
+                }
+                if (started && affectsCurrentFolder) reload()
+            }
+        }
+    }
 
     fun start(directoryId: String) {
         if (started) return
@@ -84,7 +103,12 @@ class CloudBrowserViewModel(
             var failures = 0
             uris.forEach { uri ->
                 runCatching {
-                    (appContext as BarkCloudApplication).uploadQueue.enqueue(uri, queryFileName(appContext, uri), directoryId)
+                    (appContext as BarkCloudApplication).uploadQueue.enqueue(
+                        uri,
+                        queryFileName(appContext, uri),
+                        destination = com.barkfluff.BarkCloud.data.upload.UploadDestination.DIRECTORY,
+                        directoryId = directoryId,
+                    )
                 }
                     .onFailure { failures++ }
             }

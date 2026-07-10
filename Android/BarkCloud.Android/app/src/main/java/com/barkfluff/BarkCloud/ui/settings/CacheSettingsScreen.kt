@@ -107,6 +107,17 @@ fun CacheSettingsScreen(
             }
 
             ElevatedCard(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("Превью и аватары", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "${formatSize(context, state.previewCacheSize)} · записей: ${state.previewEntryCount}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
+            ElevatedCard(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(stringResource(R.string.cache_limit), style = MaterialTheme.typography.titleMedium)
                     ChipRow(

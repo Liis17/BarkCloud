@@ -3,6 +3,7 @@ import com.google.protobuf.gradle.id
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
+    id("kotlin-kapt")
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.protobuf)
 }
@@ -164,6 +165,9 @@ dependencies {
 
     implementation(libs.androidx.graphics.shapes)
     implementation(libs.androidx.work.runtime.ktx)
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
+    kapt(libs.androidx.room.compiler)
 
     testImplementation(libs.junit)
     testImplementation(libs.mockk)

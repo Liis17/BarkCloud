@@ -20,6 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.outlined.ChevronRight
+import androidx.compose.material.icons.outlined.CloudUpload
 import androidx.compose.material.icons.outlined.Devices
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Lock
@@ -67,6 +68,7 @@ fun SettingsScreen(
     onEditProfile: () -> Unit,
     onPrivacy: () -> Unit,
     onDevices: () -> Unit,
+    onUploadSettings: () -> Unit,
     onCache: () -> Unit,
     onSignedOut: () -> Unit,
     viewModel: ProfileViewModel = viewModel(factory = ProfileViewModel.factory()),
@@ -130,6 +132,8 @@ fun SettingsScreen(
                     SettingsRow(Icons.Outlined.Lock, stringResource(R.string.settings_privacy), onPrivacy)
                     HorizontalDivider()
                     SettingsRow(Icons.Outlined.Devices, stringResource(R.string.settings_devices), onDevices)
+                    HorizontalDivider()
+                    SettingsRow(Icons.Outlined.CloudUpload, "Загрузки", onUploadSettings)
                     HorizontalDivider()
                     SettingsRow(Icons.Outlined.Storage, stringResource(R.string.cache_title), onCache)
                 }

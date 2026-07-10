@@ -12,6 +12,7 @@ class FileCacheService(
     private val settings: FileCacheSettings,
 ) {
     private val originalsDir = File(context.cacheDir, "BarkCloudFiles/originals")
+    private val previewsDir = File(context.cacheDir, "BarkCloudFiles/previews")
 
     suspend fun loadOriginal(fileId: String, fileName: String): File = withContext(Dispatchers.IO) {
         originalsDir.mkdirs()
@@ -37,6 +38,14 @@ class FileCacheService(
 
     suspend fun entryCount(): Int = withContext(Dispatchers.IO) {
         cacheFiles().size
+    }
+
+    suspend fun previewSize(): Long = withContext(Dispatchers.IO) {
+        previewsDir.walkTopDown().filter { it.isFile }.sumOf { it.length() }
+    }
+
+    suspend fun previewEntryCount(): Int = withContext(Dispatchers.IO) {
+        previewsDir.walkTopDown().count { it.isFile }
     }
 
     suspend fun clearAll() = withContext(Dispatchers.IO) {

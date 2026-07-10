@@ -8,6 +8,14 @@ Parent: [[index]] · See also: [[modules/shared-proto]] · [[api/identity-api]] 
 
 ## Реализованный функционал (паритет с iOS)
 
+### Обновление: сессия, очередь и автозагрузка
+
+- **Сессия**: `GlobalParam` использует `TokenStore` — единый зашифрованный blob в credential-protected storage, ключ AES-GCM хранится в Android Keystore. На первом запуске мигрируются прежние `EncryptedSharedPreferences`; `TokenRefresher` обновляет access-token за 60 секунд до истечения и сериализует параллельные refresh-запросы. `Auth` и `CreateToken` уходят без старого auth-header; невалидный refresh очищает сессию и возвращает приложение на login.
+- **Очередь загрузок**: Room-база `barkcloud-local.db` хранит `UploadJob` и `MediaCloudState`. Очередь восстанавливает прерванные фазы (`UPLOADING`/`ATTACHING`), сохраняет байтовый прогресс, `file_id` и upload URL, поэтому повторяет незавершённый шаг, а не создаёт новый файл. Ручные, gallery, album, share и backup-загрузки обслуживает один foreground `UploadWorker`.
+- **Маршрутизация**: gallery, media picker, backup и системный Share target используют `route_by_media_kind` → серверные «Фото»/«Видео»/«Другие документы». Upload из облачного браузера остаётся в выбранной папке; upload в альбом сначала размещается в системной папке, затем добавляется в альбом.
+- **Автозагрузка**: `AutoUploadWorker` только сканирует MediaStore, кеширует SHA-256 и версию (`id`, тип, размер, дата изменения) в Room и подаёт максимум 20 backup-задач в общую очередь. Политика в настройках: Wi‑Fi (по умолчанию), любая сеть или off; off ставит backup-задачи на паузу, не трогая ручные. При открытом приложении MediaStore observer с debounce запускает повторный scan; в фоне действует hourly WorkManager.
+- **Галерея/кеш**: статусы файлов устройства разделены на checking/not-in-cloud/queued/uploading/in-cloud/error; бейдж «в облаке» появляется только после upload+attach. Перед `MediaStore.createDeleteRequest` наличие перепроверяется на сервере. Device и cloud grids сгруппированы по дате съёмки/создания. Coil имеет выделенный 256 MiB disk cache для preview/аватаров; originals остались в управляемом LRU-кеше.
+
 > Реализовано фазами 1–4F (2026-05-27). Весь код компилируется (`./gradlew :app:assembleDebug`). Подробности и решения — в авто-памяти `android-ios-parity` и плане `bubbly-coalescing-hedgehog.md`.
 
 - **Material 3 Expressive** (`ui/theme/`): `MaterialExpressiveTheme` + `MotionScheme.expressive()`, фирменный seed поверх expressive-схемы + dynamic color (Android 12+). Требует material3 **1.4.0-alpha18** (форс в `app/build.gradle.kts` через `resolutionStrategy`; в стабильной 1.4.0 Expressive-API `internal`).

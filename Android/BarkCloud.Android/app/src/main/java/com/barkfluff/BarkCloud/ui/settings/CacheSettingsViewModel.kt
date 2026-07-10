@@ -18,6 +18,8 @@ data class CacheSettingsUiState(
     val isLoading: Boolean = true,
     val cacheSize: Long = 0,
     val entryCount: Int = 0,
+    val previewCacheSize: Long = 0,
+    val previewEntryCount: Int = 0,
     val maxCacheBytes: Long = FileCacheSettings.DEFAULT_MAX_BYTES,
     val staleMaxAgeMillis: Long = FileCacheSettings.DEFAULT_STALE_AGE_MILLIS,
     val snackbar: String? = null,
@@ -40,6 +42,8 @@ class CacheSettingsViewModel(
                     isLoading = false,
                     cacheSize = fileCache.totalSize(),
                     entryCount = fileCache.entryCount(),
+                    previewCacheSize = fileCache.previewSize(),
+                    previewEntryCount = fileCache.previewEntryCount(),
                     maxCacheBytes = settings.maxCacheBytes,
                     staleMaxAgeMillis = settings.staleMaxAgeMillis,
                 )

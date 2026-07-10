@@ -11,11 +11,13 @@ import com.barkfluff.BarkCloud.data.cloud.CloudMediaKind
 import com.barkfluff.BarkCloud.data.cloud.CloudRepository
 import com.barkfluff.BarkCloud.data.cloud.MediaAsset
 import com.barkfluff.BarkCloud.data.upload.UploadScheduler
+import com.barkfluff.BarkCloud.data.upload.UploadPhase
 import com.barkfluff.BarkCloud.net.queryFileName
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 data class MediaGridUiState(
@@ -39,6 +41,16 @@ class MediaGridViewModel(
 
     private var cursorCreatedAt: Long? = null
     private var cursorFileId: String = ""
+    private val observedCompleted = mutableSetOf<String>()
+
+    init {
+        val app = appContext as BarkCloudApplication
+        viewModelScope.launch {
+            app.uploadQueue.recentJobs.collectLatest { jobs ->
+                if (jobs.any { it.phase == UploadPhase.COMPLETED && observedCompleted.add(it.id) }) reload()
+            }
+        }
+    }
 
     fun loadIfNeeded() {
         if (_state.value.items.isEmpty() && _state.value.isLoading) reload()
@@ -101,7 +113,11 @@ class MediaGridViewModel(
             var failures = 0
             uris.forEach { uri ->
                 runCatching {
-                    (appContext as BarkCloudApplication).uploadQueue.enqueue(uri, queryFileName(appContext, uri))
+                    (appContext as BarkCloudApplication).uploadQueue.enqueue(
+                        uri,
+                        queryFileName(appContext, uri),
+                        source = com.barkfluff.BarkCloud.data.upload.UploadSource.MANUAL,
+                    )
                 }
                     .onFailure { failures++ }
             }

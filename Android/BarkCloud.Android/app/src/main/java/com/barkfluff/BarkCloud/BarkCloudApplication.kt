@@ -1,9 +1,14 @@
 package com.barkfluff.BarkCloud
 
 import android.app.Application
+import android.database.ContentObserver
+import android.os.Handler
+import android.os.Looper
+import android.provider.MediaStore
 import coil3.ImageLoader
 import coil3.PlatformContext
 import coil3.SingletonImageLoader
+import coil3.disk.DiskCache
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.request.crossfade
 import coil3.video.VideoFrameDecoder
@@ -26,9 +31,18 @@ import com.barkfluff.BarkCloud.net.FileTransferService
 import com.barkfluff.BarkCloud.net.InsecureHttp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.io.File
+import okio.Path.Companion.toOkioPath
 
 class BarkCloudApplication : Application(), SingletonImageLoader.Factory {
+
+    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private var mediaChangeJob: Job? = null
+    private var mediaObserver: ContentObserver? = null
 
     lateinit var globalParam: GlobalParam
         private set
@@ -88,12 +102,14 @@ class BarkCloudApplication : Application(), SingletonImageLoader.Factory {
         autoUploadSettings = AutoUploadSettings(this)
         uploadQueue = UploadQueueStore(this)
         sessionManager = SessionManager(this, authRepository, globalParam, grpcManager, fileCache, uploadQueue)
-        CoroutineScope(Dispatchers.IO).launch {
+        appScope.launch {
             fileCache.runStartupSweepIfNeeded()
+            uploadQueue.initialize()
         }
         if (autoUploadSettings.enabled) {
-            AutoUploadScheduler.enable(this)
+            AutoUploadScheduler.apply(this, autoUploadSettings.policy)
         }
+        observeMediaStoreChanges()
     }
 
     override fun newImageLoader(context: PlatformContext): ImageLoader =
@@ -104,11 +120,40 @@ class BarkCloudApplication : Application(), SingletonImageLoader.Factory {
                 add(OkHttpNetworkFetcherFactory(callFactory = { InsecureHttp.client }))
                 add(VideoFrameDecoder.Factory())
             }
+            .diskCache {
+                DiskCache.Builder()
+                    .directory(File(context.cacheDir, "BarkCloudFiles/previews").toOkioPath())
+                    .maxSizeBytes(PREVIEW_CACHE_MAX_BYTES)
+                    .build()
+            }
             .crossfade(true)
             .build()
 
     override fun onTerminate() {
+        mediaObserver?.let(contentResolver::unregisterContentObserver)
         grpcManager.shutdown()
         super.onTerminate()
+    }
+
+    private fun observeMediaStoreChanges() {
+        val observer = object : ContentObserver(Handler(Looper.getMainLooper())) {
+            override fun onChange(selfChange: Boolean) {
+                super.onChange(selfChange)
+                mediaChangeJob?.cancel()
+                mediaChangeJob = appScope.launch {
+                    delay(2_000)
+                    if (autoUploadSettings.enabled) {
+                        AutoUploadScheduler.runOnce(this@BarkCloudApplication, autoUploadSettings.policy)
+                    }
+                }
+            }
+        }
+        mediaObserver = observer
+        contentResolver.registerContentObserver(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, true, observer)
+        contentResolver.registerContentObserver(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, true, observer)
+    }
+
+    private companion object {
+        const val PREVIEW_CACHE_MAX_BYTES = 256L * 1024L * 1024L
     }
 }

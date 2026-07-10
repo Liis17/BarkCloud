@@ -86,7 +86,11 @@ class ShareActivity : ComponentActivity() {
         lifecycleScope.launch {
             uris.forEach { uri ->
                 runCatching {
-                    app.uploadQueue.enqueue(uri, queryFileName(this@ShareActivity, uri))
+                    app.uploadQueue.enqueue(
+                        uri,
+                        queryFileName(this@ShareActivity, uri),
+                        source = com.barkfluff.BarkCloud.data.upload.UploadSource.SHARE,
+                    )
                 }.onFailure {
                     failed++
                 }

@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
@@ -44,6 +45,7 @@ import com.barkfluff.BarkCloud.data.cloud.MediaAsset
 import com.barkfluff.BarkCloud.ui.components.CloudMediaViewer
 import com.barkfluff.BarkCloud.ui.components.MediaThumb
 import com.barkfluff.BarkCloud.ui.components.rememberRemoteOpener
+import com.barkfluff.BarkCloud.ui.components.mediaDateSections
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -59,6 +61,7 @@ fun MediaGridScreen(
     val gridState = rememberLazyGridState()
     var viewer by remember { mutableStateOf<MediaAsset?>(null) }
     val openRemote = rememberRemoteOpener()
+    val dateSections = remember(state.items) { mediaDateSections(state.items) { it.createdAtMillis } }
 
     val picker = rememberLauncherForActivityResult(
         ActivityResultContracts.PickMultipleVisualMedia(),
@@ -90,12 +93,21 @@ fun MediaGridScreen(
                 state = gridState,
                 modifier = Modifier.fillMaxSize(),
             ) {
-                items(state.items, key = { it.id }) { asset ->
-                    MediaCell(
-                        asset = asset,
-                        onTap = { viewer = asset },
-                        onFavorite = { viewModel.addFavorite(asset.id) },
-                    )
+                dateSections.forEach { section ->
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        Text(
+                            section.title,
+                            style = MaterialTheme.typography.titleSmall,
+                            modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 4.dp),
+                        )
+                    }
+                    items(section.items, key = { it.id }) { asset ->
+                        MediaCell(
+                            asset = asset,
+                            onTap = { viewer = asset },
+                            onFavorite = { viewModel.addFavorite(asset.id) },
+                        )
+                    }
                 }
             }
         }
