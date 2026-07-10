@@ -2,9 +2,11 @@ package com.barkfluff.BarkCloud.ui.main
 
 import android.net.Uri
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.navigation.NavType
@@ -13,6 +15,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.barkfluff.BarkCloud.R
 import com.barkfluff.BarkCloud.files.ui.FilesRootScreen
 import com.barkfluff.BarkCloud.files.ui.LocalBrowserScreen
@@ -28,7 +32,11 @@ import com.barkfluff.BarkCloud.ui.settings.CacheSettingsScreen
 import com.barkfluff.BarkCloud.ui.settings.EditProfileScreen
 import com.barkfluff.BarkCloud.ui.settings.PrivacySettingsScreen
 import com.barkfluff.BarkCloud.ui.settings.SettingsScreen
+import com.barkfluff.BarkCloud.ui.settings.UploadSettingsScreen
 import com.barkfluff.BarkCloud.ui.smartfolders.SmartFolderDetailScreen
+import com.barkfluff.BarkCloud.ui.upload.GlobalUploadBanner
+import com.barkfluff.BarkCloud.ui.upload.UploadQueueScreen
+import com.barkfluff.BarkCloud.ui.upload.UploadQueueViewModel
 
 /**
  * Главный экран с нижней навигацией из 5 вкладок (как в iOS). Каждая вкладка — свой
@@ -42,6 +50,8 @@ fun MainScreen(
 ) {
     val navController = rememberNavController()
     val rootCloudTitle = stringResource(R.string.cloud_storage_title)
+    val uploadViewModel: UploadQueueViewModel = viewModel(factory = UploadQueueViewModel.factory())
+    val uploadState by uploadViewModel.state.collectAsStateWithLifecycle()
 
     LaunchedEffect(deepLink) {
         val target = deepLink?.host ?: return@LaunchedEffect
@@ -60,7 +70,14 @@ fun MainScreen(
     }
 
     Scaffold(
-        bottomBar = { MainBottomBar(navController) },
+        bottomBar = {
+            Column {
+                if (uploadState.isActive) {
+                    GlobalUploadBanner(uploadState) { navController.navigate("uploads/root") }
+                }
+                MainBottomBar(navController)
+            }
+        },
     ) { padding ->
         NavHost(
             navController = navController,
@@ -171,6 +188,7 @@ fun MainScreen(
                         onEditProfile = { navController.navigate("settings/editProfile") },
                         onPrivacy = { navController.navigate("settings/privacy") },
                         onDevices = { navController.navigate("settings/devices") },
+                        onUploadSettings = { navController.navigate("settings/uploads") },
                         onCache = { navController.navigate("settings/cache") },
                         onSignedOut = onSignOut,
                     )
@@ -187,6 +205,13 @@ fun MainScreen(
                 composable("settings/cache") {
                     CacheSettingsScreen(onNavigateUp = { navController.popBackStack() })
                 }
+                composable("settings/uploads") {
+                    UploadSettingsScreen(onNavigateUp = { navController.popBackStack() })
+                }
+            }
+
+            composable("uploads/root") {
+                UploadQueueScreen(onNavigateUp = { navController.popBackStack() })
             }
         }
     }

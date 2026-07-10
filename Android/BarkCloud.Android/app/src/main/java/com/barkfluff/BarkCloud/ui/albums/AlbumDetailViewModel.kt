@@ -101,7 +101,12 @@ class AlbumDetailViewModel(
             try {
                 val app = appContext as BarkCloudApplication
                 uris.forEach { uri ->
-                    app.uploadQueue.enqueue(uri, queryFileName(appContext, uri), albumId = albumId)
+                    app.uploadQueue.enqueue(
+                        uri,
+                        queryFileName(appContext, uri),
+                        source = com.barkfluff.BarkCloud.data.upload.UploadSource.ALBUM,
+                        albumId = albumId,
+                    )
                 }
                 UploadScheduler.enqueue(appContext)
                 _state.update {

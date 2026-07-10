@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
@@ -60,7 +61,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.barkfluff.BarkCloud.R
 import com.barkfluff.BarkCloud.data.gallery.DeviceMedia
+import com.barkfluff.BarkCloud.data.gallery.MediaCloudStatus
 import com.barkfluff.BarkCloud.ui.components.MediaThumb
+import com.barkfluff.BarkCloud.ui.components.mediaDateSections
 
 private fun requiredMediaPermissions(): Array<String> =
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -79,7 +82,8 @@ fun GalleryScreen(
     val context = LocalContext.current
     val permissions = remember { requiredMediaPermissions() }
     var viewer by remember { mutableStateOf<DeviceMedia?>(null) }
-    var pendingDeleteCount by remember { mutableStateOf(0) }
+    var pendingDeleteKeys by remember { mutableStateOf<List<String>>(emptyList()) }
+    val dateSections = remember(state.items) { mediaDateSections(state.items) { it.dateTakenMillis } }
 
     val launcher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
@@ -87,10 +91,10 @@ fun GalleryScreen(
     val deleteLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartIntentSenderForResult(),
     ) { result ->
-        if (result.resultCode == Activity.RESULT_OK && pendingDeleteCount > 0) {
-            viewModel.onDeviceCopiesDeleted(pendingDeleteCount)
+        if (result.resultCode == Activity.RESULT_OK && pendingDeleteKeys.isNotEmpty()) {
+            viewModel.onDeviceCopiesDeleted(pendingDeleteKeys)
         }
-        pendingDeleteCount = 0
+        pendingDeleteKeys = emptyList()
     }
 
     LaunchedEffect(Unit) {
@@ -111,8 +115,13 @@ fun GalleryScreen(
                 title = { Text(stringResource(R.string.tab_gallery)) },
                 actions = {
                     Switch(
-                        checked = state.autoUploadEnabled,
-                        onCheckedChange = viewModel::setAutoUpload,
+                        checked = state.autoUploadPolicy != com.barkfluff.BarkCloud.data.gallery.AutoUploadNetworkPolicy.OFF,
+                        onCheckedChange = {
+                            viewModel.setAutoUploadPolicy(
+                                if (it) com.barkfluff.BarkCloud.data.gallery.AutoUploadNetworkPolicy.WIFI_ONLY
+                                else com.barkfluff.BarkCloud.data.gallery.AutoUploadNetworkPolicy.OFF,
+                            )
+                        },
                     )
                     if (state.items.isNotEmpty()) {
                         IconButton(onClick = viewModel::toggleSelecting) {
@@ -129,7 +138,7 @@ fun GalleryScreen(
             if (state.selecting && state.selected.isNotEmpty()) {
                 Button(
                     onClick = viewModel::uploadSelected,
-                    enabled = !state.isUploading,
+                    enabled = !state.isQueueing,
                     modifier = Modifier.fillMaxWidth().padding(16.dp),
                 ) {
                     Text(stringResource(R.string.gallery_upload_selected, state.selected.size))
@@ -137,12 +146,11 @@ fun GalleryScreen(
             } else if (state.reclaimableCount > 0) {
                 OutlinedButton(
                     onClick = {
-                        val uris = state.items
-                            .filter { state.cloudPresence[it.id] == true }
-                            .map { it.uri }
-                        pendingDeleteCount = uris.size
-                        val request = MediaStore.createDeleteRequest(context.contentResolver, uris)
-                        deleteLauncher.launch(IntentSenderRequest.Builder(request.intentSender).build())
+                        viewModel.prepareDeviceCopyDeletion { uris, mediaKeys ->
+                            pendingDeleteKeys = mediaKeys
+                            val request = MediaStore.createDeleteRequest(context.contentResolver, uris)
+                            deleteLauncher.launch(IntentSenderRequest.Builder(request.intentSender).build())
+                        }
                     },
                     modifier = Modifier.fillMaxWidth().padding(16.dp),
                 ) {
@@ -160,34 +168,39 @@ fun GalleryScreen(
                     columns = GridCells.Fixed(3),
                     modifier = Modifier.fillMaxSize(),
                 ) {
-                    items(state.items, key = { it.id }) { media ->
-                        GalleryCell(
-                            media = media,
-                            selecting = state.selecting,
-                            selected = state.selected.contains(media.id),
-                            inCloud = state.cloudPresence[media.id] == true,
-                            onAppear = { viewModel.observeCloudPresence(media) },
-                            onTap = {
-                                if (state.selecting) viewModel.toggle(media.id) else viewer = media
-                            },
-                            onLongPress = { viewModel.startSelecting(media.id) },
-                        )
+                    dateSections.forEach { section ->
+                        item(span = { GridItemSpan(maxLineSpan) }) {
+                            Text(
+                                section.title,
+                                style = MaterialTheme.typography.titleSmall,
+                                modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 4.dp),
+                            )
+                        }
+                        items(section.items, key = { it.id }) { media ->
+                            GalleryCell(
+                                media = media,
+                                selecting = state.selecting,
+                                selected = state.selected.contains(media.mediaKey),
+                                cloudStatus = state.cloudStates[media.mediaKey],
+                                onAppear = { viewModel.observeCloudPresence(media) },
+                                onTap = {
+                                    if (state.selecting) viewModel.toggle(media.mediaKey) else viewer = media
+                                },
+                                onLongPress = { viewModel.startSelecting(media.mediaKey) },
+                            )
+                        }
                     }
                 }
             }
 
-            if (state.isUploading) {
+            if (state.isQueueing) {
                 Box(
                     Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.35f)),
                     contentAlignment = Alignment.Center,
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         CircularProgressIndicator()
-                        Text(
-                            text = "${state.uploadDone}/${state.uploadTotal}",
-                            color = Color.White,
-                            modifier = Modifier.padding(top = 12.dp),
-                        )
+                        Text(text = stringResource(R.string.share_staging), color = Color.White, modifier = Modifier.padding(top = 12.dp))
                     }
                 }
             }
@@ -214,7 +227,7 @@ private fun GalleryCell(
     media: DeviceMedia,
     selecting: Boolean,
     selected: Boolean,
-    inCloud: Boolean,
+    cloudStatus: MediaCloudStatus?,
     onAppear: () -> Unit,
     onTap: () -> Unit,
     onLongPress: () -> Unit,
@@ -233,12 +246,19 @@ private fun GalleryCell(
             contentDescription = media.name,
             modifier = Modifier.fillMaxSize(),
         )
-        if (inCloud) {
+        if (cloudStatus == MediaCloudStatus.IN_CLOUD) {
             Icon(
                 Icons.Filled.CloudDone,
                 contentDescription = null,
                 tint = Color.White,
                 modifier = Modifier.align(Alignment.TopStart).padding(4.dp).size(18.dp),
+            )
+        }
+        if (cloudStatus in setOf(MediaCloudStatus.CHECKING, MediaCloudStatus.QUEUED, MediaCloudStatus.UPLOADING)) {
+            CircularProgressIndicator(
+                modifier = Modifier.align(Alignment.TopStart).padding(5.dp).size(16.dp),
+                color = Color.White,
+                strokeWidth = 2.dp,
             )
         }
         if (selecting) {

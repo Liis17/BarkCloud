@@ -66,12 +66,20 @@ class FileTransferService(
     // MARK: HTTP
 
     /** Залить содержимое [uri] (стримингом). Возвращает file_id ИЗ ОТВЕТА (учёт дедупликации). */
-    suspend fun upload(uri: Uri, fileName: String, urlString: String): String =
-        upload(uriRequestBody(uri), fileName, urlString)
+    suspend fun upload(
+        uri: Uri,
+        fileName: String,
+        urlString: String,
+        onProgress: (sent: Long, total: Long) -> Unit = { _, _ -> },
+    ): String = upload(uriRequestBody(uri, onProgress), fileName, urlString)
 
     /** Залить локальный staged-файл из app storage. */
-    suspend fun upload(file: File, fileName: String, urlString: String): String =
-        upload(fileRequestBody(file), fileName, urlString)
+    suspend fun upload(
+        file: File,
+        fileName: String,
+        urlString: String,
+        onProgress: (sent: Long, total: Long) -> Unit = { _, _ -> },
+    ): String = upload(fileRequestBody(file, onProgress), fileName, urlString)
 
     /** Залить готовые байты (например, аватар). */
     suspend fun upload(bytes: ByteArray, fileName: String, urlString: String): String =
@@ -84,7 +92,7 @@ class FileTransferService(
                 .addFormDataPart("file", fileName, body)
                 .build()
             val builder = Request.Builder().url(urlString).post(multipart)
-            globalParam.accessToken?.takeIf { it.isNotBlank() }?.let { builder.header("x-auth-token", it) }
+            grpc.validAccessToken()?.takeIf { it.isNotBlank() }?.let { builder.header("x-auth-token", it) }
             http.newCall(builder.build()).execute().use { resp ->
                 if (!resp.isSuccessful) throw IOException("Upload failed: HTTP ${resp.code}")
                 val text = resp.body?.string().orEmpty()
@@ -108,21 +116,38 @@ class FileTransferService(
             }
         }
 
-    private fun uriRequestBody(uri: Uri): RequestBody = object : RequestBody() {
+    private fun uriRequestBody(uri: Uri, onProgress: (Long, Long) -> Unit): RequestBody = object : RequestBody() {
         override fun contentType() = OCTET_STREAM
         override fun contentLength(): Long = querySize(uri)
         override fun writeTo(sink: BufferedSink) {
             appContext.contentResolver.openInputStream(uri)?.use { input ->
-                sink.writeAll(input.source())
+                copyWithProgress(input, sink, contentLength(), onProgress)
             } ?: throw IOException("Cannot open $uri")
         }
     }
 
-    private fun fileRequestBody(file: File): RequestBody = object : RequestBody() {
+    private fun fileRequestBody(file: File, onProgress: (Long, Long) -> Unit): RequestBody = object : RequestBody() {
         override fun contentType() = OCTET_STREAM
         override fun contentLength(): Long = file.length()
         override fun writeTo(sink: BufferedSink) {
-            file.inputStream().use { input -> sink.writeAll(input.source()) }
+            file.inputStream().use { input -> copyWithProgress(input, sink, contentLength(), onProgress) }
+        }
+    }
+
+    private fun copyWithProgress(
+        input: java.io.InputStream,
+        sink: BufferedSink,
+        total: Long,
+        onProgress: (Long, Long) -> Unit,
+    ) {
+        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+        var sent = 0L
+        var read = input.read(buffer)
+        while (read >= 0) {
+            sink.write(buffer, 0, read)
+            sent += read
+            onProgress(sent, total)
+            read = input.read(buffer)
         }
     }
 

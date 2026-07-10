@@ -1,6 +1,5 @@
 package com.barkfluff.BarkCloud.grpc
 
-import com.barkfluff.BarkCloud.data.GlobalParam
 import io.grpc.CallOptions
 import io.grpc.Channel
 import io.grpc.ClientCall
@@ -17,18 +16,16 @@ class AuthInterceptorTest {
     private val authKey: Metadata.Key<String> =
         Metadata.Key.of("x-auth-token", Metadata.ASCII_STRING_MARSHALLER)
 
-    private fun setup(token: String?): Metadata {
-        val globalParam = mockk<GlobalParam>()
-        every { globalParam.accessToken } returns token
-
+    private fun setup(token: String?, methodName: String = "barkcloud.files.CloudApi/ListDirectory"): Metadata {
         val mockCall = mockk<ClientCall<Any, Any>>(relaxed = true)
         val mockChannel = mockk<Channel>()
         every { mockChannel.newCall<Any, Any>(any(), any()) } returns mockCall
 
-        val method = mockk<MethodDescriptor<Any, Any>>(relaxed = true)
+        val method = mockk<MethodDescriptor<Any, Any>>()
+        every { method.fullMethodName } returns methodName
         val listener = mockk<ClientCall.Listener<Any>>(relaxed = true)
 
-        val interceptor = AuthInterceptor(globalParam)
+        val interceptor = AuthInterceptor { token }
         val call = interceptor.interceptCall(method, CallOptions.DEFAULT, mockChannel)
         val headers = Metadata()
         call.start(listener, headers)
@@ -36,20 +33,18 @@ class AuthInterceptorTest {
     }
 
     @Test
-    fun `adds x-auth-token when token is present`() {
-        val headers = setup("ACCESS-123")
-        assertEquals("ACCESS-123", headers.get(authKey))
+    fun `adds refreshed token to authenticated call`() {
+        assertEquals("ACCESS-123", setup("ACCESS-123").get(authKey))
     }
 
     @Test
-    fun `does not add x-auth-token when token is null`() {
-        val headers = setup(null)
-        assertNull(headers.get(authKey))
+    fun `does not add header when token provider has no session`() {
+        assertNull(setup(null).get(authKey))
     }
 
     @Test
-    fun `does not add x-auth-token when token is blank`() {
-        val headers = setup("   ")
-        assertNull(headers.get(authKey))
+    fun `Auth and CreateToken never receive a stale token`() {
+        assertNull(setup("STALE", "barkcloud.identity.IdentityApi/Auth").get(authKey))
+        assertNull(setup("STALE", "barkcloud.identity.IdentityApi/CreateToken").get(authKey))
     }
 }

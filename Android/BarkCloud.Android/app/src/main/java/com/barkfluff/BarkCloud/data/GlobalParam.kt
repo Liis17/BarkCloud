@@ -1,44 +1,44 @@
 package com.barkfluff.BarkCloud.data
 
 import android.content.Context
-import android.content.SharedPreferences
-import androidx.security.crypto.EncryptedSharedPreferences
-import androidx.security.crypto.MasterKey
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
-@Suppress("DEPRECATION")
 class GlobalParam(context: Context) {
-
-    private val appContext = context.applicationContext
-
-    private val prefs: SharedPreferences by lazy {
-        val masterKey = MasterKey.Builder(appContext)
-            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-            .build()
-
-        EncryptedSharedPreferences.create(
-            appContext,
-            PREFS_NAME,
-            masterKey,
-            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-        )
-    }
+    private val store = TokenStore(context)
+    private val _sessionActive = MutableStateFlow(hasValidRefreshToken())
+    val sessionActive: StateFlow<Boolean> = _sessionActive.asStateFlow()
 
     var accessToken: String?
-        get() = prefs.getString(KEY_ACCESS_TOKEN, null)
-        set(value) = prefs.edit().putString(KEY_ACCESS_TOKEN, value).apply()
+        get() = store.read()?.accessToken?.takeIf { it.isNotBlank() }
+        set(value) = update { it.copy(accessToken = value.orEmpty()) }
 
     var accessTokenExpiresAt: Long
-        get() = prefs.getLong(KEY_ACCESS_TOKEN_EXPIRES_AT, 0L)
-        set(value) = prefs.edit().putLong(KEY_ACCESS_TOKEN_EXPIRES_AT, value).apply()
+        get() = store.read()?.accessTokenExpiresAt ?: 0L
+        set(value) = update { it.copy(accessTokenExpiresAt = value) }
 
     var refreshToken: String?
-        get() = prefs.getString(KEY_REFRESH_TOKEN, null)
-        set(value) = prefs.edit().putString(KEY_REFRESH_TOKEN, value).apply()
+        get() = store.read()?.refreshToken?.takeIf { it.isNotBlank() }
+        set(value) = update { it.copy(refreshToken = value.orEmpty()) }
 
     var refreshTokenExpiresAt: Long
-        get() = prefs.getLong(KEY_REFRESH_TOKEN_EXPIRES_AT, 0L)
-        set(value) = prefs.edit().putLong(KEY_REFRESH_TOKEN_EXPIRES_AT, value).apply()
+        get() = store.read()?.refreshTokenExpiresAt ?: 0L
+        set(value) = update { it.copy(refreshTokenExpiresAt = value) }
+
+    fun saveTokens(
+        accessToken: String,
+        accessTokenExpiresAt: Long,
+        refreshToken: String,
+        refreshTokenExpiresAt: Long,
+    ) {
+        store.save(TokenBundle(accessToken, accessTokenExpiresAt, refreshToken, refreshTokenExpiresAt))
+        publishSessionState()
+    }
+
+    fun saveRefreshedAccessToken(accessToken: String, accessTokenExpiresAt: Long) {
+        update { it.copy(accessToken = accessToken, accessTokenExpiresAt = accessTokenExpiresAt) }
+    }
 
     fun hasValidRefreshToken(): Boolean {
         val token = refreshToken ?: return false
@@ -48,19 +48,17 @@ class GlobalParam(context: Context) {
     }
 
     fun clearSession() {
-        prefs.edit()
-            .remove(KEY_ACCESS_TOKEN)
-            .remove(KEY_ACCESS_TOKEN_EXPIRES_AT)
-            .remove(KEY_REFRESH_TOKEN)
-            .remove(KEY_REFRESH_TOKEN_EXPIRES_AT)
-            .apply()
+        store.clear()
+        publishSessionState()
     }
 
-    private companion object {
-        const val PREFS_NAME = "barkcloud_secure_prefs"
-        const val KEY_ACCESS_TOKEN = "access_token"
-        const val KEY_ACCESS_TOKEN_EXPIRES_AT = "access_token_expires_at"
-        const val KEY_REFRESH_TOKEN = "refresh_token"
-        const val KEY_REFRESH_TOKEN_EXPIRES_AT = "refresh_token_expires_at"
+    private fun update(transform: (TokenBundle) -> TokenBundle) {
+        val current = store.read() ?: TokenBundle("", 0L, "", 0L)
+        store.save(transform(current))
+        publishSessionState()
+    }
+
+    private fun publishSessionState() {
+        _sessionActive.value = hasValidRefreshToken()
     }
 }

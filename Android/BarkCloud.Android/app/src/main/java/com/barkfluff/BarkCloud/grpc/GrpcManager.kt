@@ -5,9 +5,11 @@ import barkcloud.files.CloudApiGrpcKt
 import barkcloud.files.DynamicFolderApiGrpcKt
 import barkcloud.files.FilesApiGrpcKt
 import barkcloud.identity.IdentityApiGrpcKt
+import barkcloud.identity.IdentityApiOuterClass.CreateTokenRequest
 import barkcloud.users.UsersApiGrpcKt
 import com.barkfluff.BarkCloud.BuildConfig
 import com.barkfluff.BarkCloud.data.GlobalParam
+import com.barkfluff.BarkCloud.data.TokenRefresher
 import com.barkfluff.BarkCloud.net.InsecureTls
 import io.grpc.Channel
 import io.grpc.ClientInterceptors
@@ -27,7 +29,18 @@ class GrpcManager(
 ) {
 
     private val interceptedChannels = ConcurrentHashMap<String, Channel>()
+    private val publicChannels = ConcurrentHashMap<String, Channel>()
     private val managedChannels = ConcurrentHashMap<String, ManagedChannel>()
+
+    private val tokenRefresher = TokenRefresher(globalParam) { refreshToken ->
+        val response = publicIdentityStub().createToken(
+            CreateTokenRequest.newBuilder().setRefreshToken(refreshToken).build(),
+        )
+        TokenRefresher.RefreshedAccessToken(
+            value = response.accessToken.value,
+            expiresAtMillis = response.accessToken.expirationDate.seconds * 1000L,
+        )
+    }
 
     fun identityStub(): IdentityApiGrpcKt.IdentityApiCoroutineStub =
         IdentityApiGrpcKt.IdentityApiCoroutineStub(channelFor(BuildConfig.IDENTITY_API_ADDRESS))
@@ -47,17 +60,30 @@ class GrpcManager(
     fun dynamicFolderStub(): DynamicFolderApiGrpcKt.DynamicFolderApiCoroutineStub =
         DynamicFolderApiGrpcKt.DynamicFolderApiCoroutineStub(channelFor(BuildConfig.FILES_API_ADDRESS))
 
+    suspend fun validAccessToken(): String? = tokenRefresher.validAccessToken()
+
     private fun channelFor(address: String): Channel =
         interceptedChannels.computeIfAbsent(address) {
             val managed = createChannel(it)
             managedChannels[it] = managed
-            ClientInterceptors.intercept(managed, AuthInterceptor(globalParam), metadataInterceptor)
+            ClientInterceptors.intercept(managed, AuthInterceptor { tokenRefresher.validAccessToken() }, metadataInterceptor)
+        }
+
+    private fun publicIdentityStub(): IdentityApiGrpcKt.IdentityApiCoroutineStub =
+        IdentityApiGrpcKt.IdentityApiCoroutineStub(publicChannelFor(BuildConfig.IDENTITY_API_ADDRESS))
+
+    private fun publicChannelFor(address: String): Channel =
+        publicChannels.computeIfAbsent(address) {
+            val managed = createChannel(it)
+            managedChannels["public:$it"] = managed
+            ClientInterceptors.intercept(managed, metadataInterceptor)
         }
 
     fun shutdown() {
         managedChannels.values.forEach { it.shutdownNow() }
         managedChannels.clear()
         interceptedChannels.clear()
+        publicChannels.clear()
     }
 
     private fun createChannel(address: String): ManagedChannel {

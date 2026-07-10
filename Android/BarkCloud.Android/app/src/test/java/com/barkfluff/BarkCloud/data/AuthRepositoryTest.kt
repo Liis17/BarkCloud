@@ -95,9 +95,14 @@ class AuthRepositoryTest {
         val result = repository.auth("john", "pwd")
 
         assertEquals(AuthResult.Success, result)
-        verify { globalParam.accessToken = "ACCESS" }
-        verify { globalParam.refreshToken = "REFRESH" }
-        verify { globalParam.accessTokenExpiresAt = 1_700_000_000_000L }
+        verify {
+            globalParam.saveTokens(
+                accessToken = "ACCESS",
+                accessTokenExpiresAt = 1_700_000_000_000L,
+                refreshToken = "REFRESH",
+                refreshTokenExpiresAt = 1_700_010_000_000L,
+            )
+        }
     }
 
     @Test

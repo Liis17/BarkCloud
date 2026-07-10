@@ -113,9 +113,19 @@ class CloudRepository(
 
     // MARK: Записи о файлах
 
-    suspend fun attachFile(fileId: String, directoryId: String, name: String) {
+    suspend fun attachFile(
+        fileId: String,
+        directoryId: String,
+        name: String,
+        routeByMediaKind: Boolean = false,
+    ) {
         grpc.cloudStub().attachFile(
-            AttachFileRequest.newBuilder().setFileId(fileId).setDirectoryId(directoryId).setName(name).build()
+            AttachFileRequest.newBuilder()
+                .setFileId(fileId)
+                .setDirectoryId(directoryId)
+                .setName(name)
+                .setRouteByMediaKind(routeByMediaKind)
+                .build(),
         )
     }
 
@@ -201,17 +211,29 @@ class CloudRepository(
      * Загрузить файл в облако. Если задан [directoryId] — привязать к папке.
      * Возвращает `file_id` блоба (из ответа сервера; учитывает дедупликацию).
      */
-    suspend fun uploadFile(uri: Uri, fileName: String, directoryId: String? = null): String {
+    suspend fun uploadFile(
+        uri: Uri,
+        fileName: String,
+        directoryId: String? = null,
+        routeByMediaKind: Boolean = false,
+        onProgress: (Long, Long) -> Unit = { _, _ -> },
+    ): String {
         val target = transfer.getUploadUrl(UploadFileType.CLOUD_FILE)
-        val fileId = transfer.upload(uri, fileName, target.url)
-        if (directoryId != null) attachFile(fileId, directoryId, fileName)
+        val fileId = transfer.upload(uri, fileName, target.url, onProgress)
+        if (routeByMediaKind || directoryId != null) attachFile(fileId, directoryId.orEmpty(), fileName, routeByMediaKind)
         return fileId
     }
 
-    suspend fun uploadFile(file: File, fileName: String, directoryId: String? = null): String {
+    suspend fun uploadFile(
+        file: File,
+        fileName: String,
+        directoryId: String? = null,
+        routeByMediaKind: Boolean = false,
+        onProgress: (Long, Long) -> Unit = { _, _ -> },
+    ): String {
         val target = transfer.getUploadUrl(UploadFileType.CLOUD_FILE)
-        val fileId = transfer.upload(file, fileName, target.url)
-        if (directoryId != null) attachFile(fileId, directoryId, fileName)
+        val fileId = transfer.upload(file, fileName, target.url, onProgress)
+        if (routeByMediaKind || directoryId != null) attachFile(fileId, directoryId.orEmpty(), fileName, routeByMediaKind)
         return fileId
     }
 }

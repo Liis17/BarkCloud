@@ -70,9 +70,11 @@ class AuthRepository(
     private fun persist(response: AuthResponse) {
         val access = response.accessToken
         val refresh = response.refreshToken
-        globalParam.accessToken = access.value
-        globalParam.accessTokenExpiresAt = access.expirationDate.seconds * 1000L
-        globalParam.refreshToken = refresh.value
-        globalParam.refreshTokenExpiresAt = refresh.expirationDate.seconds * 1000L
+        globalParam.saveTokens(
+            accessToken = access.value,
+            accessTokenExpiresAt = access.expirationDate.seconds * 1000L,
+            refreshToken = refresh.value,
+            refreshTokenExpiresAt = refresh.expirationDate.seconds * 1000L,
+        )
     }
 }

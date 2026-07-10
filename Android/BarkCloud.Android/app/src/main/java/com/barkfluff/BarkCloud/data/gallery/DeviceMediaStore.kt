@@ -13,8 +13,12 @@ data class DeviceMedia(
     val uri: Uri,
     val isVideo: Boolean,
     val name: String,
-    val dateAdded: Long,
-)
+    val dateTakenMillis: Long,
+    val dateModifiedSeconds: Long,
+    val sizeBytes: Long,
+) {
+    val mediaKey: String get() = "${if (isVideo) "video" else "image"}:$id"
+}
 
 /** Чтение медиатеки устройства через MediaStore (фото + видео, от новых к старым). */
 object DeviceMediaStore {
@@ -30,7 +34,7 @@ object DeviceMediaStore {
             MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
             isVideo = true,
         )
-        (images + videos).sortedByDescending { it.dateAdded }
+        (images + videos).sortedByDescending { it.dateTakenMillis }
     }
 
     private fun queryCollection(
@@ -42,6 +46,9 @@ object DeviceMediaStore {
             MediaStore.MediaColumns._ID,
             MediaStore.MediaColumns.DISPLAY_NAME,
             MediaStore.MediaColumns.DATE_ADDED,
+            MediaStore.MediaColumns.DATE_MODIFIED,
+            MediaStore.MediaColumns.SIZE,
+            MediaStore.Images.ImageColumns.DATE_TAKEN,
         )
         val result = ArrayList<DeviceMedia>()
         context.contentResolver.query(
@@ -54,6 +61,9 @@ object DeviceMediaStore {
             val idCol = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns._ID)
             val nameCol = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.DISPLAY_NAME)
             val dateCol = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.DATE_ADDED)
+            val dateTakenCol = cursor.getColumnIndexOrThrow(MediaStore.Images.ImageColumns.DATE_TAKEN)
+            val modifiedCol = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.DATE_MODIFIED)
+            val sizeCol = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.SIZE)
             while (cursor.moveToNext()) {
                 val id = cursor.getLong(idCol)
                 result.add(
@@ -62,7 +72,11 @@ object DeviceMediaStore {
                         uri = ContentUris.withAppendedId(collection, id),
                         isVideo = isVideo,
                         name = cursor.getString(nameCol) ?: id.toString(),
-                        dateAdded = cursor.getLong(dateCol),
+                        dateTakenMillis = cursor.getLong(dateTakenCol)
+                            .takeIf { it > 0L }
+                            ?: cursor.getLong(dateCol) * 1000L,
+                        dateModifiedSeconds = cursor.getLong(modifiedCol),
+                        sizeBytes = cursor.getLong(sizeCol),
                     )
                 )
             }
