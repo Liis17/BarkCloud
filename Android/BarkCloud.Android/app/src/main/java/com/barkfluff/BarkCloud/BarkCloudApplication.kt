@@ -20,6 +20,7 @@ import com.barkfluff.BarkCloud.data.cache.FileCacheSettings
 import com.barkfluff.BarkCloud.data.cloud.AlbumRepository
 import com.barkfluff.BarkCloud.data.cloud.CloudRepository
 import com.barkfluff.BarkCloud.data.cloud.DynamicFolderRepository
+import com.barkfluff.BarkCloud.data.cloud.SharedRepository
 import com.barkfluff.BarkCloud.data.gallery.AutoUploadScheduler
 import com.barkfluff.BarkCloud.data.gallery.AutoUploadSettings
 import com.barkfluff.BarkCloud.data.upload.UploadQueueStore
@@ -68,6 +69,9 @@ class BarkCloudApplication : Application(), SingletonImageLoader.Factory {
     lateinit var dynamicFolderRepository: DynamicFolderRepository
         private set
 
+    lateinit var sharedRepository: SharedRepository
+        private set
+
     lateinit var userRepository: UserRepository
         private set
 
@@ -96,6 +100,7 @@ class BarkCloudApplication : Application(), SingletonImageLoader.Factory {
         cloudRepository = CloudRepository(grpcManager, fileTransfer)
         albumRepository = AlbumRepository(grpcManager)
         dynamicFolderRepository = DynamicFolderRepository(grpcManager)
+        sharedRepository = SharedRepository(grpcManager)
         userRepository = UserRepository(grpcManager, fileTransfer)
         fileCacheSettings = FileCacheSettings(this)
         fileCache = FileCacheService(this, fileTransfer, fileCacheSettings)
