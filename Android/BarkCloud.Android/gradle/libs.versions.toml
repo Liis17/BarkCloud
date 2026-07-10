@@ -22,6 +22,7 @@ okhttp = "4.12.0"
 graphicsShapes = "1.0.1"
 work = "2.10.5"
 room = "2.7.0"
+biometric = "1.1.0"
 
 protobufPlugin = "0.9.4"
 protobufJava = "3.25.1"
@@ -47,8 +48,10 @@ androidx-compose-material3            = { module = "androidx.compose.material3:m
 androidx-compose-material-icons-extended = { module = "androidx.compose.material:material-icons-extended" }
 androidx-lifecycle-runtime-compose    = { module = "androidx.lifecycle:lifecycle-runtime-compose", version.ref = "lifecycle" }
 androidx-lifecycle-viewmodel-compose  = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycle" }
+androidx-lifecycle-process            = { module = "androidx.lifecycle:lifecycle-process", version.ref = "lifecycle" }
 androidx-navigation-compose           = { module = "androidx.navigation:navigation-compose", version.ref = "navigationCompose" }
 androidx-security-crypto              = { module = "androidx.security:security-crypto", version.ref = "securityCrypto" }
+androidx-biometric                    = { module = "androidx.biometric:biometric", version.ref = "biometric" }
 
 protobuf-javalite      = { module = "com.google.protobuf:protobuf-javalite", version.ref = "protobufJava" }
 protobuf-kotlin-lite   = { module = "com.google.protobuf:protobuf-kotlin-lite", version.ref = "protobufJava" }
