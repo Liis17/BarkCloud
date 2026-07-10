@@ -86,7 +86,6 @@
     <string name="vault_locked_title">Vault заблокирован</string>
     <string name="vault_unlock_button">Разблокировать</string>
     <string name="vault_add">Добавить в vault</string>
-    <string name="vault_added">Добавлено в vault</string>
     <string name="vault_remove">Убрать из vault</string>
 
     <!-- Smart folders -->
