@@ -5,6 +5,7 @@ import android.database.ContentObserver
 import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
+import androidx.lifecycle.ProcessLifecycleOwner
 import coil3.ImageLoader
 import coil3.PlatformContext
 import coil3.SingletonImageLoader
@@ -12,6 +13,8 @@ import coil3.disk.DiskCache
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.request.crossfade
 import coil3.video.VideoFrameDecoder
+import com.barkfluff.BarkCloud.data.AppLockManager
+import com.barkfluff.BarkCloud.data.AppLockStore
 import com.barkfluff.BarkCloud.data.AuthRepository
 import com.barkfluff.BarkCloud.data.GlobalParam
 import com.barkfluff.BarkCloud.data.SessionManager
@@ -90,6 +93,12 @@ class BarkCloudApplication : Application(), SingletonImageLoader.Factory {
     lateinit var uploadQueue: UploadQueueStore
         private set
 
+    lateinit var appLockStore: AppLockStore
+        private set
+
+    lateinit var appLockManager: AppLockManager
+        private set
+
     override fun onCreate() {
         super.onCreate()
         globalParam = GlobalParam(this)
@@ -107,6 +116,9 @@ class BarkCloudApplication : Application(), SingletonImageLoader.Factory {
         autoUploadSettings = AutoUploadSettings(this)
         uploadQueue = UploadQueueStore(this)
         sessionManager = SessionManager(this, authRepository, globalParam, grpcManager, fileCache, uploadQueue)
+        appLockStore = AppLockStore(this)
+        appLockManager = AppLockManager(appLockStore)
+        ProcessLifecycleOwner.get().lifecycle.addObserver(appLockManager)
         appScope.launch {
             fileCache.runStartupSweepIfNeeded()
             uploadQueue.initialize()
