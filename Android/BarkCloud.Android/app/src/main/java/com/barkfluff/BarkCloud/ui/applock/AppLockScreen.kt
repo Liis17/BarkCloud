@@ -41,7 +41,7 @@ import com.barkfluff.BarkCloud.data.BiometricAvailability
 import com.barkfluff.BarkCloud.data.BiometricGate
 import kotlinx.coroutines.launch
 
-private const val PIN_LENGTH = 6
+internal const val PIN_LENGTH = 6
 
 /** Full-screen блокировка приложения — авто-биометрия, PIN как fallback. Рисуется оверлеем поверх [com.barkfluff.BarkCloud.ui.navigation.RootNavGraph]. */
 @Composable
@@ -141,7 +141,7 @@ fun AppLockScreen(onUnlocked: () -> Unit) {
 }
 
 @Composable
-private fun PinDots(length: Int, total: Int) {
+internal fun PinDots(length: Int, total: Int) {
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         repeat(total) { index ->
             Box(
@@ -157,7 +157,7 @@ private fun PinDots(length: Int, total: Int) {
 }
 
 @Composable
-private fun PinKeypad(onDigit: (Char) -> Unit, onBackspace: () -> Unit) {
+internal fun PinKeypad(onDigit: (Char) -> Unit, onBackspace: () -> Unit) {
     val rows = listOf("123", "456", "789")
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
         rows.forEach { row ->

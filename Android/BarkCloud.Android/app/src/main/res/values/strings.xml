@@ -78,8 +78,7 @@
     <string name="applock_unlock_title">BarkCloud заблокирован</string>
     <string name="applock_use_pin">Ввести PIN-код</string>
     <string name="applock_locked_out">Слишком много попыток — выполнен выход</string>
-    <string name="applock_enable_failed">Не удалось включить App Lock</string>
-    <string name="applock_disable_failed">Не удалось выключить App Lock</string>
+    <string name="applock_enable_failed">Не удалось подтвердить личность</string>
 
     <!-- Vault -->
     <string name="vault_title">Vault</string>
