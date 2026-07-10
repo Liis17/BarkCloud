@@ -4,7 +4,7 @@ Parent: [[index]] · See also: [[modules/shared-proto]] · [[api/identity-api]] 
 
 ## Назначение
 
-Нативный Android-клиент BarkCloud (Kotlin, Jetpack Compose, **Material 3 Expressive**). Достигнут функциональный паритет с [[modules/ios-app]]: вход+OTP, 5 табов как в iOS (**Галерея / Файлы / Альбомы(по умолчанию) / Корзина / Настройки**), облачные медиа с пагинацией, альбомы (CRUD), облачный файл-браузер (CRUD/перемещение/загрузка), умные разделы (`DynamicFolderApi`), Shared Files Hub (публичные ссылки/исходящие/входящие гранты), управляемый кеш оригиналов, foreground upload queue с Android 16 `Notification.ProgressStyle`, автозагрузка медиатеки через WorkManager, очистка локальных копий, Storage widget, deep links, системный share target, корзина, профиль/аватар/приватность/устройства, избранное. gRPC-связь со всеми микросервисами (Identity :7020, Users :7021, Files/Cloud/Album/DynamicFolder :7025) + HTTP-слой для upload/download/превью по self-signed TLS.
+Нативный Android-клиент BarkCloud (Kotlin, Jetpack Compose, **Material 3 Expressive**). Достигнут функциональный паритет с [[modules/ios-app]]: вход+OTP, 5 табов как в iOS (**Галерея / Файлы / Альбомы(по умолчанию) / Корзина / Настройки**), облачные медиа с пагинацией, альбомы (CRUD), облачный файл-браузер (CRUD/перемещение/загрузка), умные разделы (`DynamicFolderApi`), Shared Files Hub (публичные ссылки/исходящие/входящие гранты), App Lock (биометрия/PIN на вход) и Vault (приватная папка), управляемый кеш оригиналов, foreground upload queue с Android 16 `Notification.ProgressStyle`, автозагрузка медиатеки через WorkManager, очистка локальных копий, Storage widget, deep links, системный share target, корзина, профиль/аватар/приватность/устройства, избранное. gRPC-связь со всеми микросервисами (Identity :7020, Users :7021, Files/Cloud/Album/DynamicFolder :7025) + HTTP-слой для upload/download/превью по self-signed TLS.
 
 ## Реализованный функционал (паритет с iOS)
 
@@ -22,10 +22,13 @@ Parent: [[index]] · See also: [[modules/shared-proto]] · [[api/identity-api]] 
 - **gRPC/сеть** (`grpc/`, `net/`): `GrpcManager` (мульти-эндпоинт, кэш каналов; стабы Identity/Users/Files/Cloud/Album/DynamicFolder), `GrpcEndpoint.normalizedFileDownloadURL`, `InsecureTls` (общий trust-all), `InsecureHttp` (OkHttp), `FileTransferService` (multipart upload стримингом по Uri / download). Coil настроен на trust-all OkHttp (`OkHttpNetworkFetcherFactory`) для превью с :7025.
 - **Данные** (`data/cloud/`, `data/users/`, `data/cache/`, `data/gallery/`, `data/upload/`): `CloudModels` (MediaAsset/Album/Trash/Favorite…), `DynamicFolderModels`, `CloudRepository` (медиа/каталоги/корзина/избранное/upload), `AlbumRepository`, `DynamicFolderRepository`, `UserRepository`, `FileCacheService`/`FileCacheSettings`, `AutoUploadSettings`/`AutoUploadWorker`/`AutoUploadScheduler`, `UploadQueueStore`/`UploadWorker`/`UploadNotification`, `SessionManager` (logout+очистка). Зарегистрированы в `BarkCloudApplication`.
 - **UI-экраны** (`ui/`): `gallery/` (MediaStore+SHA256-бейдж «в облаке» через `CheckFileHashes`, автозагрузка, системное удаление локальных копий через `MediaStore.createDeleteRequest`), `media/`+`albums/` (сегменты Фото/Видео/Альбомы, cursor-пагинация, CRUD альбомов, контекстное меню избранного), `files/` (`CloudBrowserScreen` + `CloudMovePicker`, секция умных разделов на корне), `smartfolders/` (`SmartFolderDetailScreen`, `SmartFolderFormDialog`), `trash/` (свайпы restore/delete-forever, empty), `settings/` (профиль/аватар/приватность/устройства/кеш/выход/удаление), `favorites/`. Общие компоненты — `ui/components/` (`RemoteImage`, `MediaThumb`, `CloudMediaViewer`, `ComingSoonScreen`, `TextInputDialog`, `rememberRemoteOpener`).
-- **Widgets/deep links**: `widgets/StorageWidgetProvider` + `StorageWidgetBridge` (RemoteViews, snapshot used/limit из `ProfileViewModel`), deep links `barkcloud://gallery|files|albums|media|trash|settings`.
+- **Widgets/deep links**: `widgets/StorageWidgetProvider` + `StorageWidgetBridge` (RemoteViews, snapshot used/limit из `ProfileViewModel`), deep links `barkcloud://gallery|files|albums|media|trash|settings|vault` (`vault` резолвится напрямую на вложенный роут `settings/vault` — NavHost ищет route глобально по графу).
 - **Share target**: `ShareActivity` принимает `ACTION_SEND`/`ACTION_SEND_MULTIPLE` из системного Sharesheet и ставит переданные `EXTRA_STREAM` URI в foreground upload queue.
 - **Навигация** (`ui/main/`): 5 табов через вложенные графы (per-tab back-stack), pill-NavigationBar; sign-out проброшен `RootNavGraph → MainScreen → SettingsScreen`.
 - **Shared Files Hub** (`ui/shared/`): 3 сегмента на роуте `files/shared` — «Мои публичные» (`ListMyShares`/`ListMyFolderShares`/`ListMyAlbumShares`, без пагинации, revoke оптимистичен, «Поделиться ссылкой» строит `{filesHost}/s|f|al/{token}` и открывает system share sheet), «Я поделился» (`ListMyOutgoingSharesAll` cursor-paginated + `ListMyOutgoingFolderShares` best-effort, группировка по файлу/папке, резолв получателей через `UserRepository.listByIds`), «Мне доступны» (`ListSharedWithMe` cursor-paginated + `ListSharedFoldersWithMe` best-effort, скачивание во временный кэш + `ACTION_VIEW`, без revoke). Навигация по чужой папке — отдельный read-only экран `SharedFolderBrowserScreen` (роут `files/shared/folder`, `ListSharedDirectory`). `SharedRepository` — обёртка над шаринг-RPC `CloudApi`, отдельно от `CloudRepository`. `UserRepository.listByIds` резолвит батч параллельными `GetUser` — `ListByIds` в `UsersServerApi` (inter-service), клиенту недоступен.
+- **App Lock** (`ui/applock/` + `data/`): полноэкранный `AppLockScreen` — оверлей (`Box` поверх `NavHost` в `RootNavGraph.kt`, не route), авто-биометрия при появлении, PIN-клавиатура (`PinKeypad`/`PinDots`) как fallback. `AppLockManager` (`DefaultLifecycleObserver` на `ProcessLifecycleOwner`) держит `shouldShowLock: StateFlow<Boolean>` с 30-сек grace-period после ухода в фон (зеркалит iOS `scenePhase`). `AppLockStore` — PIN хранится как PBKDF2-HMAC-SHA256 (100k итераций) хэш+соль, зашифрованные AES-256-GCM ключом из Android Keystore (тот же паттерн, что `TokenStore`), сравнение `MessageDigest.isEqual`. 3 неверных попытки → `SessionManager.resetLocalState()` (логаут, трактуется как "wipe"). Настройки — `AppLockSettingsScreen` (роут `settings/applock`), toggle требует биометрию/PIN устройства. PIN **не сбрасывается** при логауте (в отличие от Vault).
+- **Vault** (`ui/vault/` + `data/vault/`): приватная папка — **чисто клиент-локальная** (сервер не знает о «приватности», это ссылки на обычные облачные файлы), зеркалит iOS-архитектуру. `VaultStore` хранит JSON-список `VaultItem` (file_id+превью+isVideo) в обычном `SharedPreferences` (без Keystore-шифрования — защита от чужого взгляда, не от компрометации устройства). `VaultScreen` (роут `settings/vault`) — грид по образцу `FavoritesScreen`, per-session biometric-гейт через общий `BiometricGate` (релок на `ON_STOP` жизненного цикла экрана, без grace-period, в отличие от App Lock). Точка входа «Добавить в vault» — контекстное меню `MediaGridScreen` (единственная в этой итерации). `VaultStore.removeAll()` подключен к `SessionManager.resetLocalState()` — вайпается при логауте.
+- **BiometricGate** (`data/BiometricGate.kt`) — общая обёртка над `androidx.biometric.BiometricPrompt` (`BIOMETRIC_STRONG or DEVICE_CREDENTIAL`, допускает device PIN/паттерн как фолбэк) для App Lock и Vault.
 
 ⚠️ Не проверено в рантайме на устройстве (forward-совместимость material3-alpha с Compose из BOM; реальное поведение self-signed превью/upload). Ниже — описание исходного каркаса (вход + локальный браузер), частично устарело.
 
@@ -43,6 +46,10 @@ app/src/main/java/com/barkfluff/BarkCloud/
 ├── data/
 │   ├── GlobalParam.kt        — EncryptedSharedPreferences: access/refresh токены + сроки, hasValidRefreshToken, clearSession
 │   ├── AuthRepository.kt     — IdentityApi.Auth → AuthResult (Success/OtpRequired/InvalidCredentials/OtherError)
+│   ├── AppLockStore.kt       — Keystore-хранилище PIN-хэша (PBKDF2+AES-256-GCM)
+│   ├── AppLockManager.kt     — ProcessLifecycleOwner-наблюдатель, 30s grace-period, shouldShowLock: StateFlow
+│   ├── BiometricGate.kt      — обёртка над BiometricPrompt (App Lock + Vault)
+│   ├── vault/VaultStore.kt   — JSON-список VaultItem в SharedPreferences (без шифрования)
 │   ├── cache/
 │   │   ├── FileCacheSettings.kt — SharedPreferences: лимит кеша, автоочистка, lastSweep
 │   │   └── FileCacheService.kt  — кеш оригиналов в cache/BarkCloudFiles/originals, LRU/age очистка
@@ -67,10 +74,12 @@ app/src/main/java/com/barkfluff/BarkCloud/
 │   ├── GrpcError.kt           — StatusRuntimeException.errorCode() из трейлера x-error-code
 │   └── AuthErrorCodes.kt      — GUID-коды OTP_REQUIRED / INVALID_CREDENTIALS
 ├── ui/
-│   ├── navigation/RootNavGraph.kt — гейт login ↔ main по hasValidRefreshToken()
+│   ├── navigation/RootNavGraph.kt — гейт login ↔ main по hasValidRefreshToken() + оверлей AppLockScreen (Box поверх NavHost)
 │   ├── login/                 — LoginScreen, LoginUiState, LoginViewModel (логин/пароль + OTP)
 │   ├── main/                  — MainScreen (Scaffold + вложенный NavHost), MainDestination (5 табов), MainBottomBar
-│   ├── settings/              — настройки профиля/приватности/устройств + CacheSettingsScreen
+│   ├── applock/                — AppLockScreen (биометрия+PIN keypad), PinDots/PinKeypad (internal, переиспользуются в settings)
+│   ├── vault/                  — VaultScreen + VaultViewModel (грид, per-session biometric-гейт)
+│   ├── settings/              — настройки профиля/приватности/устройств + CacheSettingsScreen + AppLockSettingsScreen
 │   ├── shared/                 — Shared Files Hub: SharedHubScreen + 3 таба + SharedFolderBrowserScreen
 │   ├── smartfolders/           — содержимое умного раздела и форма правил
 │   ├── screens/PlaceholderScreen.kt — заглушка табов Photos/Videos/Shared/Settings
