@@ -39,6 +39,7 @@ import com.barkfluff.BarkCloud.ui.smartfolders.SmartFolderDetailScreen
 import com.barkfluff.BarkCloud.ui.upload.GlobalUploadBanner
 import com.barkfluff.BarkCloud.ui.upload.UploadQueueScreen
 import com.barkfluff.BarkCloud.ui.upload.UploadQueueViewModel
+import com.barkfluff.BarkCloud.ui.vault.VaultScreen
 
 /**
  * Главный экран с нижней навигацией из 5 вкладок (как в iOS). Каждая вкладка — свой
@@ -63,6 +64,7 @@ fun MainScreen(
             "albums", "media" -> MainDestination.Albums.route
             "trash" -> MainDestination.Trash.route
             "settings" -> MainDestination.Settings.route
+            "vault" -> "settings/vault"
             else -> return@LaunchedEffect
         }
         navController.navigate(route) {
@@ -213,6 +215,7 @@ fun MainScreen(
                         onUploadSettings = { navController.navigate("settings/uploads") },
                         onCache = { navController.navigate("settings/cache") },
                         onAppLock = { navController.navigate("settings/applock") },
+                        onVault = { navController.navigate("settings/vault") },
                         onSignedOut = onSignOut,
                     )
                 }
@@ -233,6 +236,9 @@ fun MainScreen(
                 }
                 composable("settings/applock") {
                     AppLockSettingsScreen(onNavigateUp = { navController.popBackStack() })
+                }
+                composable("settings/vault") {
+                    VaultScreen(onNavigateUp = { navController.popBackStack() })
                 }
             }
 
