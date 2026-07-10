@@ -44,6 +44,29 @@
     <string name="cloud_upload_media">Загрузить медиа</string>
     <string name="cloud_upload_document">Загрузить документ</string>
 
+    <!-- Shared hub -->
+    <string name="shared_tab_my_public">Мои публичные</string>
+    <string name="shared_tab_i_shared">Я поделился</string>
+    <string name="shared_tab_shared_with_me">Мне доступны</string>
+
+    <string name="shared_click_count">Переходов: %1$d</string>
+    <string name="shared_revoke_action">Отозвать</string>
+    <string name="shared_share_link_action">Поделиться ссылкой</string>
+    <string name="shared_link_revoked">Ссылка отозвана</string>
+    <string name="shared_revoke_failed">Не удалось отозвать</string>
+    <string name="shared_grant_revoked">Доступ отозван</string>
+    <string name="shared_load_failed">Не удалось загрузить</string>
+    <string name="shared_download_failed">Не удалось скачать файл</string>
+
+    <string name="shared_my_public_empty">Нет публичных ссылок</string>
+    <string name="shared_outgoing_empty">Вы ни с кем не делились файлами</string>
+    <string name="shared_with_me_empty">Вам пока ничего не доступно</string>
+
+    <string name="shared_recipient_fallback">Пользователь #%1$d</string>
+    <string name="shared_owner_fallback">Пользователь #%1$d</string>
+    <string name="shared_shared_at">Доступ выдан: %1$s</string>
+    <string name="shared_download">Скачать</string>
+
     <!-- Smart folders -->
     <string name="smart_folders_section">Умные разделы</string>
     <string name="smart_folder_new">Новая</string>
