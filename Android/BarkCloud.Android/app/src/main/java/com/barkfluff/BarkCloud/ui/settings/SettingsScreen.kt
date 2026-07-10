@@ -26,6 +26,7 @@ import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Fingerprint
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material.icons.outlined.Storage
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CenterAlignedTopAppBar
@@ -72,6 +73,7 @@ fun SettingsScreen(
     onUploadSettings: () -> Unit,
     onCache: () -> Unit,
     onAppLock: () -> Unit,
+    onVault: () -> Unit,
     onSignedOut: () -> Unit,
     viewModel: ProfileViewModel = viewModel(factory = ProfileViewModel.factory()),
 ) {
@@ -140,6 +142,8 @@ fun SettingsScreen(
                     SettingsRow(Icons.Outlined.Storage, stringResource(R.string.cache_title), onCache)
                     HorizontalDivider()
                     SettingsRow(Icons.Outlined.Fingerprint, stringResource(R.string.applock_title), onAppLock)
+                    HorizontalDivider()
+                    SettingsRow(Icons.Outlined.Shield, stringResource(R.string.vault_title), onVault)
                 }
 
                 OutlinedButton(
