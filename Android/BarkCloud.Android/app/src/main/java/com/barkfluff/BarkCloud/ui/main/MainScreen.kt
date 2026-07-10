@@ -25,6 +25,7 @@ import com.barkfluff.BarkCloud.ui.favorites.FavoritesScreen
 import com.barkfluff.BarkCloud.ui.files.CloudBrowserScreen
 import com.barkfluff.BarkCloud.ui.gallery.GalleryScreen
 import com.barkfluff.BarkCloud.ui.media.MediaTabScreen
+import com.barkfluff.BarkCloud.ui.settings.AppLockSettingsScreen
 import com.barkfluff.BarkCloud.ui.settings.DevicesScreen
 import com.barkfluff.BarkCloud.ui.shared.SharedFolderBrowserScreen
 import com.barkfluff.BarkCloud.ui.shared.SharedHubScreen
@@ -211,6 +212,7 @@ fun MainScreen(
                         onDevices = { navController.navigate("settings/devices") },
                         onUploadSettings = { navController.navigate("settings/uploads") },
                         onCache = { navController.navigate("settings/cache") },
+                        onAppLock = { navController.navigate("settings/applock") },
                         onSignedOut = onSignOut,
                     )
                 }
@@ -228,6 +230,9 @@ fun MainScreen(
                 }
                 composable("settings/uploads") {
                     UploadSettingsScreen(onNavigateUp = { navController.popBackStack() })
+                }
+                composable("settings/applock") {
+                    AppLockSettingsScreen(onNavigateUp = { navController.popBackStack() })
                 }
             }
 
