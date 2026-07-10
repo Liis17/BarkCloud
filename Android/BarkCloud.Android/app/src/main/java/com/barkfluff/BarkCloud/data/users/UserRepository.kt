@@ -15,11 +15,15 @@ import barkcloud.users.UsersApiOuterClass.GetPrivacySettingsRequest
 import barkcloud.users.UsersApiOuterClass.GetUserRequest
 import barkcloud.users.UsersApiOuterClass.PrivacySettings
 import barkcloud.users.UsersApiOuterClass.RenameDeviceRequest
+import barkcloud.users.UsersApiOuterClass.SearchUsersRequest
 import barkcloud.users.UsersApiOuterClass.SetProfilePictureRequest
 import barkcloud.users.UsersApiOuterClass.UpdatePrivacySettingsRequest
 import barkcloud.users.UsersApiOuterClass.User
 import com.barkfluff.BarkCloud.grpc.GrpcManager
 import com.barkfluff.BarkCloud.net.FileTransferService
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 
 /**
  * Доступ к сервису Users (профиль, приватность, устройства, аккаунт) + установка
@@ -56,6 +60,23 @@ class UserRepository(
 
     suspend fun changeBio(bio: String) {
         grpc.usersStub().changeBio(ChangeBioRequest.newBuilder().setBio(bio).build())
+    }
+
+    /** Поиск пользователей по username/имени/фамилии (минимум 2 символа). */
+    suspend fun searchUsers(query: String, limit: Int = 20): List<User> =
+        grpc.usersStub().searchUsers(
+            SearchUsersRequest.newBuilder().setQuery(query).setLimit(limit).build()
+        ).usersList
+
+    /**
+     * Резолв нескольких пользователей по id. `ListByIds` — inter-service RPC,
+     * клиенту недоступен, поэтому резолвим параллельными [getUser] (как на iOS).
+     */
+    suspend fun listByIds(ids: Collection<Long>): List<User> {
+        if (ids.isEmpty()) return emptyList()
+        return coroutineScope {
+            ids.distinct().map { id -> async { getUser(id) } }.awaitAll()
+        }
     }
 
     // MARK: Приватность
