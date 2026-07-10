@@ -1,8 +1,10 @@
 package com.barkfluff.BarkCloud.ui.navigation
 
 import android.net.Uri
+import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -10,6 +12,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.barkfluff.BarkCloud.BarkCloudApplication
+import com.barkfluff.BarkCloud.ui.applock.AppLockScreen
 import com.barkfluff.BarkCloud.ui.login.LoginScreen
 import com.barkfluff.BarkCloud.ui.main.MainScreen
 
@@ -35,30 +38,38 @@ fun RootNavGraph(deepLink: Uri? = null) {
         }
     }
 
-    NavHost(
-        navController = navController,
-        startDestination = startDestination,
-    ) {
-        composable(ROUTE_LOGIN) {
-            LoginScreen(
-                onAuthenticated = {
-                    navController.navigate(ROUTE_MAIN) {
-                        popUpTo(ROUTE_LOGIN) { inclusive = true }
-                        launchSingleTop = true
-                    }
-                },
-            )
+    Box {
+        NavHost(
+            navController = navController,
+            startDestination = startDestination,
+        ) {
+            composable(ROUTE_LOGIN) {
+                LoginScreen(
+                    onAuthenticated = {
+                        navController.navigate(ROUTE_MAIN) {
+                            popUpTo(ROUTE_LOGIN) { inclusive = true }
+                            launchSingleTop = true
+                        }
+                    },
+                )
+            }
+            composable(ROUTE_MAIN) {
+                MainScreen(
+                    deepLink = deepLink,
+                    onSignOut = {
+                        navController.navigate(ROUTE_LOGIN) {
+                            popUpTo(ROUTE_MAIN) { inclusive = true }
+                            launchSingleTop = true
+                        }
+                    },
+                )
+            }
         }
-        composable(ROUTE_MAIN) {
-            MainScreen(
-                deepLink = deepLink,
-                onSignOut = {
-                    navController.navigate(ROUTE_LOGIN) {
-                        popUpTo(ROUTE_MAIN) { inclusive = true }
-                        launchSingleTop = true
-                    }
-                },
-            )
+
+        val shouldShowLock by app.appLockManager.shouldShowLock.collectAsStateWithLifecycle()
+        // Лок актуален только для аутентифицированной сессии — до логина показывать нечего.
+        if (shouldShowLock && sessionActive.value) {
+            AppLockScreen(onUnlocked = { app.appLockManager.unlock() })
         }
     }
 }
