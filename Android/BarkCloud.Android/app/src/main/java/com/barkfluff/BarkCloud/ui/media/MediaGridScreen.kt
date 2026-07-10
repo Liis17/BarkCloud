@@ -17,6 +17,7 @@ import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -106,6 +107,7 @@ fun MediaGridScreen(
                             asset = asset,
                             onTap = { viewer = asset },
                             onFavorite = { viewModel.addFavorite(asset.id) },
+                            onAddToVault = { viewModel.addToVault(asset) },
                         )
                     }
                 }
@@ -142,6 +144,7 @@ private fun MediaCell(
     asset: MediaAsset,
     onTap: () -> Unit,
     onFavorite: () -> Unit,
+    onAddToVault: () -> Unit,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
     Box(
@@ -162,6 +165,11 @@ private fun MediaCell(
                 text = { Text(stringResource(R.string.media_add_favorite)) },
                 leadingIcon = { Icon(Icons.Outlined.FavoriteBorder, contentDescription = null) },
                 onClick = { menuOpen = false; onFavorite() },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.vault_add)) },
+                leadingIcon = { Icon(Icons.Outlined.VisibilityOff, contentDescription = null) },
+                onClick = { menuOpen = false; onAddToVault() },
             )
         }
     }

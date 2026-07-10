@@ -11,6 +11,7 @@ import com.barkfluff.BarkCloud.data.cloud.CloudMediaKind
 import com.barkfluff.BarkCloud.data.cloud.CloudRepository
 import com.barkfluff.BarkCloud.data.cloud.MediaAsset
 import com.barkfluff.BarkCloud.data.upload.UploadScheduler
+import com.barkfluff.BarkCloud.data.vault.VaultItem
 import com.barkfluff.BarkCloud.data.upload.UploadPhase
 import com.barkfluff.BarkCloud.net.queryFileName
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -135,12 +136,18 @@ class MediaGridViewModel(
         }
     }
 
+    fun addToVault(asset: MediaAsset) {
+        (appContext as BarkCloudApplication).vaultStore.add(VaultItem.from(asset))
+        _state.update { it.copy(snackbar = VAULT_ADDED) }
+    }
+
     fun snackbarShown() = _state.update { it.copy(snackbar = null) }
 
     companion object {
         private const val UPLOAD_PARTIAL = "Часть файлов не загрузилась"
         private const val UPLOAD_QUEUED = "Загрузка поставлена в очередь"
         private const val FAVORITE_ADDED = "Добавлено в избранное"
+        private const val VAULT_ADDED = "Добавлено в vault"
 
         fun factory(kind: CloudMediaKind): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
