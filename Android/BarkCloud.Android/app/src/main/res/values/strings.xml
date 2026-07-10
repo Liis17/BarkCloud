@@ -67,6 +67,29 @@
     <string name="shared_shared_at">Доступ выдан: %1$s</string>
     <string name="shared_download">Скачать</string>
 
+    <!-- App Lock -->
+    <string name="applock_title">App Lock</string>
+    <string name="applock_enable">Включить App Lock</string>
+    <string name="applock_setup_pin_title">Установите PIN-код</string>
+    <string name="applock_confirm_pin_title">Подтвердите PIN-код</string>
+    <string name="applock_pin_mismatch">PIN-коды не совпадают</string>
+    <string name="applock_wrong_pin">Неверный PIN-код</string>
+    <string name="applock_unlock_with_biometric">Разблокировать</string>
+    <string name="applock_unlock_title">BarkCloud заблокирован</string>
+    <string name="applock_use_pin">Ввести PIN-код</string>
+    <string name="applock_locked_out">Слишком много попыток — выполнен выход</string>
+    <string name="applock_enable_failed">Не удалось включить App Lock</string>
+    <string name="applock_disable_failed">Не удалось выключить App Lock</string>
+
+    <!-- Vault -->
+    <string name="vault_title">Vault</string>
+    <string name="vault_empty">В vault пока ничего нет</string>
+    <string name="vault_locked_title">Vault заблокирован</string>
+    <string name="vault_unlock_button">Разблокировать</string>
+    <string name="vault_add">Добавить в vault</string>
+    <string name="vault_added">Добавлено в vault</string>
+    <string name="vault_remove">Убрать из vault</string>
+
     <!-- Smart folders -->
     <string name="smart_folders_section">Умные разделы</string>
     <string name="smart_folder_new">Новая</string>
