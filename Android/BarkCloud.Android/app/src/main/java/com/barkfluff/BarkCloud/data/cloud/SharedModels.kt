@@ -18,6 +18,7 @@ enum class PublicShareKind { FILE, FOLDER, ALBUM }
 data class PublicShareItem(
     val kind: PublicShareKind,
     val recordId: String, // id ссылки (share_id/folder_share_id/album_share_id) — используется для revoke
+    val token: String, // URL-safe токен — используется для сборки публичного URL
     val name: String,
     val clickCount: Long,
     val createdAtMillis: Long,
@@ -34,6 +35,7 @@ data class PublicShareItem(
         fun from(s: ShareInfo): PublicShareItem = PublicShareItem(
             kind = PublicShareKind.FILE,
             recordId = s.id,
+            token = s.token,
             name = s.name,
             clickCount = s.clickCount,
             createdAtMillis = if (s.hasCreatedAt()) s.createdAt.toEpochMillis() else 0L,
@@ -44,6 +46,7 @@ data class PublicShareItem(
         fun from(s: FolderShareInfo): PublicShareItem = PublicShareItem(
             kind = PublicShareKind.FOLDER,
             recordId = s.id,
+            token = s.token,
             name = s.name,
             clickCount = s.clickCount,
             createdAtMillis = if (s.hasCreatedAt()) s.createdAt.toEpochMillis() else 0L,
@@ -54,6 +57,7 @@ data class PublicShareItem(
         fun from(s: AlbumShareInfo): PublicShareItem = PublicShareItem(
             kind = PublicShareKind.ALBUM,
             recordId = s.id,
+            token = s.token,
             name = s.name,
             clickCount = s.clickCount,
             createdAtMillis = if (s.hasCreatedAt()) s.createdAt.toEpochMillis() else 0L,
@@ -61,6 +65,27 @@ data class PublicShareItem(
             isVideo = false,
         )
     }
+}
+
+/**
+ * Публичный URL ссылки (`/s/{token}` файл, `/f/{token}` папка, `/al/{token}` альбом) —
+ * веб-страницу рендерит веб-клиент на хосте Files без порта (зеркалит iOS
+ * `GrpcEndpoint.webHost` в BarkCloudKit).
+ */
+fun PublicShareItem.publicUrl(): String? {
+    if (token.isEmpty()) return null
+    val path = when (kind) {
+        PublicShareKind.FILE -> "s"
+        PublicShareKind.FOLDER -> "f"
+        PublicShareKind.ALBUM -> "al"
+    }
+    return "${filesWebHost()}/$path/$token"
+}
+
+private fun filesWebHost(): String {
+    val address = com.barkfluff.BarkCloud.BuildConfig.FILES_API_ADDRESS // "https://host:7025"
+    val (scheme, hostPort) = address.split("://", limit = 2).let { it[0] to it.getOrElse(1) { address } }
+    return "$scheme://${hostPort.substringBefore(":")}"
 }
 
 // ============ Я поделился (гранты конкретным пользователям) ============
