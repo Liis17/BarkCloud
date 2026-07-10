@@ -28,6 +28,7 @@ import com.barkfluff.BarkCloud.data.gallery.AutoUploadScheduler
 import com.barkfluff.BarkCloud.data.gallery.AutoUploadSettings
 import com.barkfluff.BarkCloud.data.upload.UploadQueueStore
 import com.barkfluff.BarkCloud.data.users.UserRepository
+import com.barkfluff.BarkCloud.data.vault.VaultStore
 import com.barkfluff.BarkCloud.files.data.LocalFileRepository
 import com.barkfluff.BarkCloud.grpc.ClientMetadataInterceptor
 import com.barkfluff.BarkCloud.grpc.GrpcManager
@@ -99,6 +100,9 @@ class BarkCloudApplication : Application(), SingletonImageLoader.Factory {
     lateinit var appLockManager: AppLockManager
         private set
 
+    lateinit var vaultStore: VaultStore
+        private set
+
     override fun onCreate() {
         super.onCreate()
         globalParam = GlobalParam(this)
@@ -115,7 +119,8 @@ class BarkCloudApplication : Application(), SingletonImageLoader.Factory {
         fileCache = FileCacheService(this, fileTransfer, fileCacheSettings)
         autoUploadSettings = AutoUploadSettings(this)
         uploadQueue = UploadQueueStore(this)
-        sessionManager = SessionManager(this, authRepository, globalParam, grpcManager, fileCache, uploadQueue)
+        vaultStore = VaultStore(this)
+        sessionManager = SessionManager(this, authRepository, globalParam, grpcManager, fileCache, uploadQueue, vaultStore)
         appLockStore = AppLockStore(this)
         appLockManager = AppLockManager(appLockStore)
         ProcessLifecycleOwner.get().lifecycle.addObserver(appLockManager)

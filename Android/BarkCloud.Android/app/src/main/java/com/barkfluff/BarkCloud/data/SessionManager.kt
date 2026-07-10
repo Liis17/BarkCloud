@@ -6,6 +6,7 @@ import com.barkfluff.BarkCloud.data.cache.FileCacheService
 import com.barkfluff.BarkCloud.data.gallery.AutoUploadScheduler
 import com.barkfluff.BarkCloud.data.upload.UploadQueueStore
 import com.barkfluff.BarkCloud.data.persistence.BarkCloudDatabase
+import com.barkfluff.BarkCloud.data.vault.VaultStore
 import com.barkfluff.BarkCloud.grpc.GrpcManager
 import kotlinx.coroutines.runBlocking
 
@@ -21,6 +22,7 @@ class SessionManager(
     private val grpcManager: GrpcManager,
     private val fileCache: FileCacheService,
     private val uploadQueue: UploadQueueStore,
+    private val vaultStore: VaultStore,
 ) {
 
     suspend fun signOut() {
@@ -32,6 +34,7 @@ class SessionManager(
         globalParam.clearSession()
         AutoUploadScheduler.disable(appContext)
         grpcManager.shutdown()
+        vaultStore.removeAll()
         runBlocking {
             fileCache.clearAll()
             uploadQueue.clear()
