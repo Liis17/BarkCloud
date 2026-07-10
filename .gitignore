@@ -437,3 +437,4 @@ FodyWeavers.xsd
 .DS_Store
 /Mac/BarkCloudKit/.build
 /Mac/BarkCloudDrive/build
+.claude/scheduled_tasks.lock
