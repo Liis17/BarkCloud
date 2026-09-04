@@ -9,7 +9,7 @@ services:
   # === Основные микросервисы (prod-образы) ===
 
   configuration:
-    image: docker.barkfluff.com:5000/barkcloud-configuration:latest
+    image: docker.barkfluff.com/barkcloud-configuration:latest
     container_name: cloud-configuration
     restart: always
     env_file:
@@ -41,7 +41,7 @@ services:
       - barkcloud-network
 
   identity:
-    image: docker.barkfluff.com:5000/barkcloud-identity:latest
+    image: docker.barkfluff.com/barkcloud-identity:latest
     container_name: cloud-identity
     restart: always
     environment:
@@ -53,7 +53,7 @@ services:
       - configuration
 
   users:
-    image: docker.barkfluff.com:5000/barkcloud-users:latest
+    image: docker.barkfluff.com/barkcloud-users:latest
     container_name: cloud-users
     restart: always
     environment:
@@ -65,7 +65,7 @@ services:
       - configuration
 
   files:
-    image: docker.barkfluff.com:5000/barkcloud-files:latest
+    image: docker.barkfluff.com/barkcloud-files:latest
     container_name: cloud-files
     restart: always
     environment:
@@ -84,7 +84,7 @@ services:
 
   # Сервис уведомлений. Внешнего API нет — в nginx не маршрутизируется. Опционален
   notification:
-    image: docker.barkfluff.com:5000/barkcloud-notification:latest
+    image: docker.barkfluff.com/barkcloud-notification:latest
     container_name: cloud-notification
     restart: always
     environment:
@@ -96,7 +96,7 @@ services:
 
   # Веб-клиент
   web:
-    image: docker.barkfluff.com:5000/barkcloud-web:latest
+    image: docker.barkfluff.com/barkcloud-web:latest
     container_name: cloud-web
     restart: always
     user: root
