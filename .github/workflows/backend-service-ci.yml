@@ -200,7 +200,7 @@ jobs:
       - name: "Login to Private Registry"
         uses: docker/login-action@v2
         with:
-          registry: docker.barkfluff.com:5000
+          registry: docker.barkfluff.com
           username: ${{ secrets.REGISTRY_USERNAME }}
           password: ${{ secrets.REGISTRY_PASSWORD }}
 
@@ -216,8 +216,8 @@ jobs:
             image="${{ inputs.image-name }}"
           fi
 
-          echo "tags=docker.barkfluff.com:5000/${image}:latest,docker.barkfluff.com:5000/${image}:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
-          echo "tag_sha=docker.barkfluff.com:5000/${image}:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          echo "tags=docker.barkfluff.com/${image}:latest,docker.barkfluff.com/${image}:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          echo "tag_sha=docker.barkfluff.com/${image}:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
 
       - name: "Build and Push Docker image"
         uses: docker/build-push-action@v4
