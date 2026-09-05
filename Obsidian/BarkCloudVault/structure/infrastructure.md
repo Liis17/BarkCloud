@@ -2,7 +2,7 @@
 
 Parent: [[index]] · See also: [[structure/overview]] · [[structure/entrypoints]]
 
-Файл: `Backend/docker-compose-dev.yml`
+Файлы: `Backend/docker-compose.yml` (prod), `Backend/docker-compose-dev.yml` (dev)
 
 ## Микросервисы в dev-окружении
 
@@ -12,7 +12,8 @@ Parent: [[index]] · See also: [[structure/overview]] · [[structure/entrypoints
 - `identity` — [[modules/backend-identity]]
 - `users` — [[modules/backend-users]]
 - `files` — [[modules/backend-files]]
-- `web` — [[modules/backend-web]] (HTTP-веб-клиент; не gRPC-сервис). Единственный с проброшенным портом наружу: `${WEB_PORT}:8080`. `depends_on`: configuration, identity, users, files.
+- `torrent` — [[modules/backend-torrent]] (MonoTorrent; скачивание на том `/mnt/torrents`)
+- `web` — [[modules/backend-web]] (HTTP-веб-клиент; не gRPC-сервис). Публикует `${WEB_PORT}:8080`; `depends_on`: configuration, identity, users, files, torrent.
 
 Все микросервисы (кроме `configuration`) объявлены с `depends_on: configuration`.
 
@@ -27,6 +28,7 @@ Parent: [[index]] · See also: [[structure/overview]] · [[structure/entrypoints
 | `7020` | `grpc://cloud-identity:7000` |
 | `7021` | `grpc://cloud-users:7021` |
 | `7025` | `grpc://cloud-files:7025` (gRPC) + `http://cloud-files:7026` под `/web/` (скачивание/загрузка файлов) |
+| `7027` | `grpc://cloud-torrent:7027` (gRPC) + `http://cloud-torrent:7028` под `/web/` (Range-скачивание) |
 
 > Backend-порты соответствуют `RunSettings:Port` сервисов в конфиг-БД; при их смене — править конфиг.
 
@@ -51,8 +53,11 @@ Parent: [[index]] · See also: [[structure/overview]] · [[structure/entrypoints
 - `RABBITMQ_DEFAULT_USER/PASS`
 - `SEQ_ADMIN_PASSWORD/WEBPORT`
 - `WEB_PORT` — host-порт веб-клиента; `WEB_COOKIE_SECURE`, `WEB_PUBLIC_HOST` — UI-настройки web (JwtSettings и адреса сервисов web берёт из Configuration).
+- `TORRENT_PORT/TORRENT_HTTP1PORT/TORRENT_PEER_PORT` — gRPC, HTTP1 и BitTorrent peer-порты торрент-сервиса
+- `TORRENT_DOWNLOAD_PATH` — путь на хосте для скачанных торрентов; по умолчанию named volume `torrent_data`
+- `EXTERNAL_TORRENT_HOST` — внешний gRPC-адрес торрент-сервиса для клиентов
 
-Файл `.env` рядом с `docker-compose-dev.yml` обязателен; шаблон — `Backend/sample.env`.
+Файл `.env` рядом с compose-файлом обязателен; шаблон — `Backend/sample.env`.
 
 ## Volumes
 
@@ -62,6 +67,7 @@ Parent: [[index]] · See also: [[structure/overview]] · [[structure/entrypoints
 - `backup_volume` — бэкапы Postgres (монтируется в Postgres-контейнер на `/backup`); переопределяется через `BACKUP_PATH`
 - `seq_data` — данные Seq; переопределяется через `SEQ_DATA_PATH`
 - `archive_temp` — временный файл ZIP при «Скачать архивом» (монтируется в `cloud-files` как `/mnt/archive-temp`, путь читается из env `Archive__TempPath`); переопределяется через `ARCHIVE_TEMP_PATH`. Только в прод-`docker-compose.yml`. Сценарий: zip собирается на диск → заливается в S3 → temp удаляется; готовый архив кладётся в корзину со сроком 3 дня (переиспользует фоновую очистку `TrashCleanupService`). Вынести на второй диск (где больше места, чем в образе) — `ARCHIVE_TEMP_PATH=/d/barkcloud/archive-temp`. Папка на NTFS/drvfs здесь годится (последовательная запись файла, без БД-семантики).
+- `torrent_data` — скачанные торрент-файлы, монтируется в `cloud-torrent` как `/mnt/torrents`; переопределяется через `TORRENT_DOWNLOAD_PATH`.
 
 ## MinIO на отдельном диске (Windows/WSL2)
 

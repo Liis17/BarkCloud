@@ -37,6 +37,10 @@ public static class BackendComposeGenerator
               + "\n      EMAIL_SENDER_EMAIL: ${EMAIL_SENDER_EMAIL}"
               + "\n      EMAIL_SENDER_PASSWORD: ${EMAIL_SENDER_PASSWORD}"
             : "";
+        string torrentDependency = m.IncludeTorrent ? "\n      - torrent" : "";
+        string torrentNginxPort = m.IncludeTorrent
+            ? "\n      - \"${TORRENT_PORT}:${TORRENT_PORT}\""
+            : "";
 
         // Каждый блок-секция не содержит завершающего перевода строки; секции склеиваются
         // через пустую строку, что даёт ровно один разделитель между сервисами.
@@ -206,7 +210,7 @@ services:
       - configuration
       - identity
       - users
-      - files
+      - files{{torrentDependency}}
 """);
 
         if (m.IncludeNginx)
@@ -221,7 +225,7 @@ services:
       - "443:443"
       - "${IDENTITY_PORT}:${IDENTITY_PORT}"
       - "${USERS_PORT}:${USERS_PORT}"
-      - "${FILES_PORT}:${FILES_PORT}"
+      - "${FILES_PORT}:${FILES_PORT}"{{torrentNginxPort}}
     volumes:
       - ./nginx/cloud.barkfluff.conf:/etc/nginx/conf.d/cloud.barkfluff.conf:ro
       - ./certs:/etc/nginx/certs:ro
@@ -231,7 +235,7 @@ services:
       - identity
       - users
       - files
-      - web
+      - web{{torrentDependency}}
 """);
 
         if (m.IncludeSeq || m.IncludeMinio || m.IncludeRabbitmq || m.IncludePostgres)
