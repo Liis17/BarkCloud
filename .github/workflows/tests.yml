@@ -17,7 +17,7 @@ jobs:
   # ═══════════════════════════════════════════════════════════════
   changes:
     name: "Определение изменений"
-    runs-on: [self-hosted, linux]
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       pull-requests: read
@@ -73,7 +73,7 @@ jobs:
     name: "Configuration"
     needs: changes
     if: ${{ needs.changes.outputs.configuration == 'true' || needs.changes.outputs.shared == 'true' }}
-    runs-on: [self-hosted, linux]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: "Test"
@@ -89,7 +89,7 @@ jobs:
     name: "Files"
     needs: changes
     if: ${{ needs.changes.outputs.files == 'true' || needs.changes.outputs.shared == 'true' }}
-    runs-on: [self-hosted, linux]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: "Test"
@@ -105,7 +105,7 @@ jobs:
     name: "GrpcServer"
     needs: changes
     if: ${{ needs.changes.outputs.grpcserver == 'true' || needs.changes.outputs.shared == 'true' }}
-    runs-on: [self-hosted, linux]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: "Test"
@@ -121,7 +121,7 @@ jobs:
     name: "Identity"
     needs: changes
     if: ${{ needs.changes.outputs.identity == 'true' || needs.changes.outputs.shared == 'true' }}
-    runs-on: [self-hosted, linux]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: "Test"
@@ -137,7 +137,7 @@ jobs:
     name: "Notification"
     needs: changes
     if: ${{ needs.changes.outputs.notification == 'true' || needs.changes.outputs.shared == 'true' }}
-    runs-on: [self-hosted, linux]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: "Test"
@@ -153,7 +153,7 @@ jobs:
     name: "Users"
     needs: changes
     if: ${{ needs.changes.outputs.users == 'true' || needs.changes.outputs.shared == 'true' }}
-    runs-on: [self-hosted, linux]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: "Test"
@@ -169,7 +169,7 @@ jobs:
     name: "Web"
     needs: changes
     if: ${{ needs.changes.outputs.web == 'true' || needs.changes.outputs.shared == 'true' }}
-    runs-on: [self-hosted, linux]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: "Test"
@@ -188,7 +188,7 @@ jobs:
     name: "Shared"
     needs: changes
     if: ${{ needs.changes.outputs.shared == 'true' }}
-    runs-on: [self-hosted, linux]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: "Test"
