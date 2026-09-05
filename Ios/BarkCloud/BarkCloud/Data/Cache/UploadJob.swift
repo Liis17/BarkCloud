@@ -21,8 +21,9 @@ enum UploadJobSource: String, Sendable {
 
 /// Запись фоновой задачи загрузки. Persist в App Group, чтобы переживала перезапуск
 /// main app и была видна Share Extension. Жизненный цикл:
-/// pending → preparing → running → (completed | failed). Multipart body файл живёт
-/// в `multipartBodyPath` до перехода в completed/failed, потом удаляется.
+/// pending → preparing → running → (completed | failed). Исходный файл и multipart
+/// body удаляются координатором после успеха, отмены или окончательной ошибки;
+/// при запланированном retry временно сохраняются.
 @Model
 final class UploadJob {
     @Attribute(.unique) var id: String

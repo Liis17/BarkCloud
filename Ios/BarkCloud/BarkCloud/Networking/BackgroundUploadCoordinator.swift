@@ -95,6 +95,12 @@ final class BackgroundUploadCoordinator: NSObject, @unchecked Sendable {
     func submit(jobID: String) async {
         guard let request = await prepareRequest(jobID: jobID),
               let multipartURL = await multipartFileURL(jobID: jobID) else {
+            if let snapshot = await queueStore.fetch(id: jobID) {
+                UploadArtifactCleanup.remove(
+                    sourcePath: snapshot.sourceFilePath,
+                    multipartPath: snapshot.multipartBodyPath
+                )
+            }
             _ = await queueStore.updateState(id: jobID, state: .failed, lastError: "Bad upload metadata")
             if let snapshot = await queueStore.fetch(id: jobID) {
                 await notifyFailure(snapshot)
@@ -151,15 +157,22 @@ final class BackgroundUploadCoordinator: NSObject, @unchecked Sendable {
         // сабмитят, удаление гонилось бы с submit и «съедало» новые загрузки.
         let staleCutoff = Date().addingTimeInterval(-60)
         let active = await queueStore.activeJobs()
+        let retryable = await queueStore.failedJobs(maxRetries: UploadConstants.maxUploadRetries)
+        var referencedPaths = Set(retryable.flatMap { [$0.sourceFilePath, $0.multipartBodyPath] })
         for snapshot in active {
-            if snapshot.state == .running,
-               liveIdentifiers.contains(snapshot.sessionTaskIdentifier) {
+            let hasLiveTask = snapshot.state == .running
+                && liveIdentifiers.contains(snapshot.sessionTaskIdentifier)
+            guard hasLiveTask || snapshot.createdAt >= staleCutoff else {
+                UploadArtifactCleanup.remove(
+                    sourcePath: snapshot.sourceFilePath,
+                    multipartPath: snapshot.multipartBodyPath
+                )
+                await queueStore.delete(id: snapshot.id)
                 continue
             }
-            guard snapshot.createdAt < staleCutoff else { continue }
-            try? FileManager.default.removeItem(atPath: snapshot.multipartBodyPath)
-            await queueStore.delete(id: snapshot.id)
+            referencedPaths.formUnion([snapshot.sourceFilePath, snapshot.multipartBodyPath])
         }
+        UploadConstants.purgeOrphanedStaging(referencedPaths: referencedPaths)
         // Обновить Live Activity и UI: если main app открылся после того как
         // Share Extension стартовал Activity и ушёл — controller подцепился к
         // существующей активности в init, но её state нужно освежить актуальным
@@ -231,7 +244,10 @@ final class BackgroundUploadCoordinator: NSObject, @unchecked Sendable {
                 state: .failed,
                 lastError: "Cancelled by user"
             )
-            try? FileManager.default.removeItem(atPath: snapshot.multipartBodyPath)
+            UploadArtifactCleanup.remove(
+                sourcePath: snapshot.sourceFilePath,
+                multipartPath: snapshot.multipartBodyPath
+            )
         }
         await UploadLiveActivityController.shared.notifyChanged()
     }
@@ -335,21 +351,25 @@ private extension BackgroundUploadCoordinator {
 
     func handleCompletion(taskID: Int, statusCode: Int, body: Data, error: String?) async {
         guard let snapshot = await queueStore.fetch(byTaskIdentifier: taskID) else { return }
-        try? FileManager.default.removeItem(atPath: snapshot.multipartBodyPath)
+        let canRetry = snapshot.retries < UploadConstants.maxUploadRetries
+            && onPersistentFailure != nil
         if let error {
             let updated = await queueStore.updateState(id: snapshot.id, state: .failed, lastError: error) ?? snapshot
+            if !canRetry { removeArtifacts(for: snapshot) }
             await notifyFailure(updated)
             await UploadLiveActivityController.shared.notifyChanged()
-            await notifyPersistentFailure()
+            if canRetry { await notifyPersistentFailure() }
             return
         }
         guard (200..<300).contains(statusCode) else {
             let updated = await queueStore.updateState(id: snapshot.id, state: .failed, lastError: "HTTP \(statusCode)") ?? snapshot
+            if !canRetry { removeArtifacts(for: snapshot) }
             await notifyFailure(updated)
             await UploadLiveActivityController.shared.notifyChanged()
-            await notifyPersistentFailure()
+            if canRetry { await notifyPersistentFailure() }
             return
         }
+        removeArtifacts(for: snapshot)
         let returnedFileID = Self.parseFileID(from: body)
         let updated = await queueStore.updateState(
             id: snapshot.id,
@@ -386,6 +406,13 @@ private extension BackgroundUploadCoordinator {
         await MainActor.run { hook() }
     }
 
+    func removeArtifacts(for snapshot: UploadJobSnapshot) {
+        UploadArtifactCleanup.remove(
+            sourcePath: snapshot.sourceFilePath,
+            multipartPath: snapshot.multipartBodyPath
+        )
+    }
+
     static func parseFileID(from body: Data) -> String? {
         guard !body.isEmpty,
               let obj = try? JSONSerialization.jsonObject(with: body) as? [String: Any],
@@ -393,4 +420,3 @@ private extension BackgroundUploadCoordinator {
         return fid
     }
 }
-

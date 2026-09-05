@@ -41,7 +41,7 @@ config.sessionSendsLaunchEvents = true
 - `urlSession(_:task:didSendBodyData:)` — обновляет `UploadJob.bytesSent` →
   `UploadLiveActivityController.notifyChanged()`.
 - `urlSession(_:task:didCompleteWithError:)` — `completed`/`failed`, парсит
-  `fileId` из JSON-ответа, удаляет multipart body файл.
+  `fileId` из JSON-ответа, удаляет исходник и multipart body файл.
 - `urlSession(_:dataTask:didReceive data:)` — накапливает body для парсинга
   `fileId` (через `NSLock`-защищённый словарь `[taskIdentifier: Data]`).
 
@@ -67,6 +67,16 @@ CRUD + `recentJobs(since:)` для Live Activity + `failedJobs(maxRetries:)` д�
 
 Все методы возвращают **Sendable snapshot** (`UploadJobSnapshot`), а не сам
 `UploadJob` — чтобы actor-bounded модель не утекала на другие исполнители.
+
+### Жизненный цикл файлов
+
+Для каждого job в `UploadStaging` лежат два артефакта: исходный файл
+(`sourceFilePath`) и подготовленный multipart body (`multipartBodyPath`). Координатор
+удаляет оба артефакта после успеха, отмены или окончательной ошибки; при
+запланированном retry временно сохраняет их.
+При старте/возврате main app старые осиротевшие jobs удаляются вместе с файлами,
+а затем из `UploadStaging` убираются неупомянутые артефакты старше часа; свежие
+файлы сохраняются, чтобы не пересечься с только что запущенным Share Extension.
 
 ### MultipartBodyBuilder
 
@@ -155,7 +165,13 @@ AppEnvironment подписывает системный хук attachFile, Uplo
    Group, UploadJob с `directoryID = selectedFolder?.id`, submit.
 5. main app позже (после восстановления через `handleEventsForBackgroundURLSession`)
    получит completion-событие и сам сделает `attachFile` через observer
-   AppEnvironment.
+   AppEnvironment. Временный исходник провайдера удаляется после копирования;
+   при ошибке подготовки удаляются и staging-файлы.
+
+Legacy `ShareInbox` (от старых версий Share Extension) мигрируется в UploadJob при
+наличии токена; элементы, которые не удаётся доставить, автоматически удаляются
+после 30 дней, чтобы общий контейнер не рос бесконечно. При полном сбросе
+локального состояния legacy-ящик удаляется целиком.
 
 ### Auto-refresh галереи при возврате на таб
 

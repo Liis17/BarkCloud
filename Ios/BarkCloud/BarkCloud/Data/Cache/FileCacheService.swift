@@ -49,6 +49,7 @@ actor FileCacheService {
 
         let remote = try await urlResolver()
         let (tempURL, response) = try await http.download(from: remote)
+        defer { try? FileManager.default.removeItem(at: tempURL) }
         guard let httpResp = response as? HTTPURLResponse, (200..<300).contains(httpResp.statusCode) else {
             throw FileCacheError.downloadFailed
         }

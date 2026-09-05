@@ -28,13 +28,19 @@ extension CloudRepository {
         }
         let multipartURL = stagingDir.appendingPathComponent("\(UUID().uuidString).body")
         let mime = mimeType ?? MimeIcon.mime(forFileName: fileName)
-        let totalBytes = try MultipartBodyBuilder.writeMultipartFile(
-            boundary: UploadConstants.multipartBoundary,
-            fileName: fileName,
-            mimeType: mime,
-            sourceFile: sourceFile,
-            destination: multipartURL
-        )
+        let totalBytes: Int64
+        do {
+            totalBytes = try MultipartBodyBuilder.writeMultipartFile(
+                boundary: UploadConstants.multipartBoundary,
+                fileName: fileName,
+                mimeType: mime,
+                sourceFile: sourceFile,
+                destination: multipartURL
+            )
+        } catch {
+            try? FileManager.default.removeItem(at: multipartURL)
+            throw error
+        }
         let snapshot = await UploadQueueStore.shared.create(
             sourceKind: source,
             sourceFilePath: sourceFile.path,
@@ -66,12 +72,17 @@ extension CloudRepository {
         }
         let tempURL = stagingDir.appendingPathComponent("\(UUID().uuidString)-\(fileName)")
         try data.write(to: tempURL)
-        return try await enqueueBackgroundUpload(
-            sourceFile: tempURL,
-            fileName: fileName,
-            mimeType: mimeType,
-            toDirectory: directoryID,
-            source: source
-        )
+        do {
+            return try await enqueueBackgroundUpload(
+                sourceFile: tempURL,
+                fileName: fileName,
+                mimeType: mimeType,
+                toDirectory: directoryID,
+                source: source
+            )
+        } catch {
+            try? FileManager.default.removeItem(at: tempURL)
+            throw error
+        }
     }
 }

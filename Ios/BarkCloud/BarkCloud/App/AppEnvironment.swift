@@ -42,6 +42,9 @@ final class AppEnvironment {
     var pendingMediaID: String?
 
     init() {
+        // `tmp` содержит только воспроизводимые временные файлы; после краша или
+        // force-quit они могут остаться и больше не попасть под очистку UI.
+        TemporaryFileCleanup.purgeStale()
         self.serverConfig = ServerConfigStore()
 
         let langSettings = LanguageSettings()
@@ -190,6 +193,7 @@ final class AppEnvironment {
         await backgroundUploads.cancelAll()
         await UploadQueueStore.shared.deleteAll()
         UploadConstants.purgeStaging()
+        ShareInbox.purgeAll()
         backupManager.setAutoUpload(false)
         RemoteImageCache.shared.clear()
         InsecureHTTP.clearCaches()

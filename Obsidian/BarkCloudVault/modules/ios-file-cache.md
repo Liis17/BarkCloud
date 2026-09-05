@@ -60,6 +60,8 @@ func runStartupSweepIfNeeded() // раз в неделю при старте
   временные signed-ссылки **не подходят как ключ** — ключ = `(fileId, .original)`,
   ссылка тянется только при cache-miss.
 - Расширение файла определяется из `response` (suggestedFilename → mimeType → URL).
+- Временный URL, который возвращает `URLSession.download`, удаляется через `defer`
+  после успешного сохранения и при ошибке HTTP; он не должен накапливаться в `tmp`.
 
 ## Политика eviction
 
@@ -89,6 +91,9 @@ func runStartupSweepIfNeeded() // раз в неделю при старте
   тома через `volumeAvailableCapacityForImportantUsage`/`volumeTotalCapacity`), размер
   и число записей, селектор лимита (1/2/5/10/20 ГБ), период автоочистки (1/7/30 дней
   или «Никогда» → `staleMaxAge`), кнопки «Очистить устаревшее» / «Очистить весь кеш».
+- «Очистить весь кеш» дополнительно удаляет неиспользуемые upload-артефакты старше
+  часа в App Group и временные файлы `tmp` старше суток, сохраняя свежие source/body
+  активных и retryable jobs.
 - `App/AppEnvironment.swift` — `fileCache`/`fileCacheSettings`, стартовый sweep в
   `init()`, `fileCache.clearAll()` в `resetLocalState()` (кеш строго пользовательский).
 
@@ -98,6 +103,8 @@ func runStartupSweepIfNeeded() // раз в неделю при старте
 таргет `BarkCloudTests` (host-based, `@testable import BarkCloud`). Покрывает
 `enforceSizeLimit` (порядок LRU-вытеснения) и `runStartupSweepIfNeeded` (логика
 порога по `lastSweepAt`): записи вставляются прямо в in-memory `ModelContainer`.
+`FileCleanupTests.swift` проверяет удаление upload-артефактов и возрастную очистку
+временных файлов.
 
 ```bash
 cd Ios/BarkCloud
