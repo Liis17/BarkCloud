@@ -122,28 +122,6 @@ services:
     depends_on:
       - configuration
 
-  # Торрент-сервис: качает торренты на хост-диск (TORRENT_DOWNLOAD_PATH → /mnt/torrents)
-  torrent:
-    image: docker.barkfluff.com/barkcloud-torrent:latest
-    container_name: cloud-torrent
-    restart: always
-    environment:
-      <<: *common-variables
-      SERVICE_PORT: ${TORRENT_PORT}
-      SERVICE_HTTP1PORT: ${TORRENT_HTTP1PORT}
-      Torrent__DownloadPath: "/mnt/torrents"
-      Torrent__PeerPort: ${TORRENT_PEER_PORT}
-    volumes:
-      - ${TORRENT_DOWNLOAD_PATH:-torrent_data}:/mnt/torrents
-    # BitTorrent peer-порт публикуется напрямую; gRPC/HTTP идут через nginx.
-    ports:
-      - "${TORRENT_PEER_PORT}:${TORRENT_PEER_PORT}"
-      - "${TORRENT_PEER_PORT}:${TORRENT_PEER_PORT}/udp"
-    networks:
-      - barkcloud-network
-    depends_on:
-      - configuration
-
   # Веб-клиент
   web:
     image: docker.barkfluff.com/barkcloud-web:latest
