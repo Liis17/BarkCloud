@@ -54,7 +54,7 @@ permissions:
 jobs:
   changes:
     name: "Определение изменений"
-    runs-on: [self-hosted, linux]
+    runs-on: ubuntu-latest
     permissions:
       contents: read
     outputs:
@@ -101,7 +101,7 @@ jobs:
     name: "Проверка .NET 10.0 SDK"
     needs: changes
     if: ${{ needs.changes.outputs.should_test == 'true' }}
-    runs-on: [self-hosted, linux]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -136,7 +136,7 @@ jobs:
       - changes
       - check_dotnet
     if: ${{ needs.changes.outputs.should_test == 'true' && needs.check_dotnet.result == 'success' }}
-    runs-on: [self-hosted, linux]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -172,7 +172,7 @@ jobs:
       - changes
       - test
     if: ${{ !cancelled() && needs.changes.result == 'success' && needs.changes.outputs.should_build == 'true' && needs.test.result != 'failure' }}
-    runs-on: [self-hosted, linux]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 

@@ -14,7 +14,7 @@ jobs:
   # ═══════════════════════════════════════════════════════════════
   test-backend:
     name: "Backend (${{ matrix.name }})"
-    runs-on: [self-hosted, linux]
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
@@ -49,7 +49,7 @@ jobs:
   # ═══════════════════════════════════════════════════════════════
   test-shared:
     name: "Shared"
-    runs-on: [self-hosted, linux]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: "Test"
