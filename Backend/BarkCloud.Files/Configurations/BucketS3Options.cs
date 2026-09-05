@@ -7,7 +7,7 @@ namespace BarkCloud.Files.Configurations;
 public class BucketS3Options
 {
     /// <summary>
-    /// URL сервиса S3-совместимого хранилища (например, http://minio:9000)
+    /// URL сервиса S3-совместимого хранилища (например, http://cloud-minio:9000)
     /// </summary>
     public string ServiceUrl { get; set; }
 

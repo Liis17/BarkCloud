@@ -11,7 +11,7 @@ public static class BackendComposeGenerator
 {
     public static string BuildCompose(BuilderModel m)
     {
-        // Образ приложения: docker.barkfluff.com:5000/barkcloud-<svc>[-dev]:latest
+        // Образ приложения: docker.barkfluff.com/barkcloud-<svc>[-dev]:latest
         string suffix = m.ImageChannel == "Dev" ? "-dev" : "";
         string Img(string name) => $"{BuilderModel.ImageRegistry}/barkcloud-{name}{suffix}:latest";
 
@@ -37,7 +37,7 @@ public static class BackendComposeGenerator
               + "\n      EMAIL_SENDER_EMAIL: ${EMAIL_SENDER_EMAIL}"
               + "\n      EMAIL_SENDER_PASSWORD: ${EMAIL_SENDER_PASSWORD}"
             : "";
-        string torrentDependency = m.IncludeTorrent ? "\n      - torrent" : "";
+        string torrentDependency = m.IncludeTorrent ? "\n      - cloud-torrent" : "";
         string torrentNginxPort = m.IncludeTorrent
             ? "\n      - \"${TORRENT_PORT}:${TORRENT_PORT}\""
             : "";
@@ -58,7 +58,7 @@ x-common-variables: &common-variables
 services:
   # === Основные микросервисы (prod-образы) ===
 
-  configuration:
+  cloud-configuration:
     image: {{Img("configuration")}}
     container_name: cloud-configuration
     restart: always
@@ -66,13 +66,13 @@ services:
       - .env
     environment:
       <<: *common-variables
-      CONFIGURATION_HOST:  postgres_barkcloud:5432
+      CONFIGURATION_HOST:  cloud-postgres:5432
       CONFIGURATION_DATABASE: configuration
       CONFIGURATION_USERNAME: ${POSTGRES_USER}
       CONFIGURATION_PASSWORD: ${POSTGRES_PASSWORD}
       CONFIGURATION_PORT: ${CONFIGURATION_PORT}
       CONFIGURATION_DBPORT: "5432"
-      MINIO_HOST: minio
+      MINIO_HOST: cloud-minio
       MINIO_PORT: "9000"
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
@@ -90,7 +90,7 @@ services:
     networks:
       - barkcloud-network
 
-  identity:
+  cloud-identity:
     image: {{Img("identity")}}
     container_name: cloud-identity
     restart: always
@@ -100,9 +100,9 @@ services:
     networks:
       - barkcloud-network
     depends_on:
-      - configuration
+      - cloud-configuration
 
-  users:
+  cloud-users:
     image: {{Img("users")}}
     container_name: cloud-users
     restart: always
@@ -112,9 +112,9 @@ services:
     networks:
       - barkcloud-network
     depends_on:
-      - configuration
+      - cloud-configuration
 
-  files:
+  cloud-files:
     image: {{Img("files")}}
     container_name: cloud-files
     restart: always
@@ -125,19 +125,19 @@ services:
       StorageProbe__Path: "/mnt/minio-data"
       Archive__TempPath: "/mnt/archive-temp"{{Ports("FILES_PORT", "FILES_HTTP1PORT")}}
     volumes:
-      - ${MINIO_DATA_PATH:-minio_data}:/mnt/minio-data:ro
+      - ${MINIO_DATA_PATH:-cloud-minio_data}:/mnt/minio-data:ro
       - ${ARCHIVE_TEMP_PATH:-archive_temp}:/mnt/archive-temp
     networks:
       - barkcloud-network
     depends_on:
-      - configuration
+      - cloud-configuration
 """,
         };
 
         if (m.IncludeNotification)
             sections.Add($$"""
   # Сервис уведомлений. Внешнего API нет — в nginx не маршрутизируется. Опционален
-  notification:
+  cloud-notification:
     image: {{Img("notification")}}
     container_name: cloud-notification
     restart: always
@@ -146,7 +146,7 @@ services:
     networks:
       - barkcloud-network
     depends_on:
-      - configuration
+      - cloud-configuration
 """);
 
         if (m.IncludeTorrent)
@@ -163,7 +163,7 @@ services:
 
             sections.Add($$"""
   # Торрент-сервис: качает торренты на хост-диск ({TORRENT_DOWNLOAD_PATH} → /mnt/torrents)
-  torrent:
+  cloud-torrent:
     image: {{Img("torrent")}}
     container_name: cloud-torrent
     restart: always
@@ -178,14 +178,14 @@ services:
     networks:
       - barkcloud-network
     depends_on:
-      - configuration
+      - cloud-configuration
 """);
         }
 
         // Веб-клиент — всегда (отключить нельзя).
         sections.Add($$"""
   # Веб-клиент
-  web:
+  cloud-web:
     image: {{Img("web")}}
     container_name: cloud-web
     restart: always
@@ -207,16 +207,16 @@ services:
     networks:
       - barkcloud-network
     depends_on:
-      - configuration
-      - identity
-      - users
-      - files{{torrentDependency}}
+      - cloud-configuration
+      - cloud-identity
+      - cloud-users
+      - cloud-files{{torrentDependency}}
 """);
 
         if (m.IncludeNginx)
             sections.Add("""
   # === Reverse-proxy (единственная точка выхода наружу) ===
-  nginx:
+  cloud-nginx:
     image: nginx:latest
     container_name: cloud-nginx
     restart: always
@@ -232,10 +232,10 @@ services:
     networks:
       - barkcloud-network
     depends_on:
-      - identity
-      - users
-      - files
-      - web{{torrentDependency}}
+      - cloud-identity
+      - cloud-users
+      - cloud-files
+      - cloud-web{{torrentDependency}}
 """);
 
         if (m.IncludeSeq || m.IncludeMinio || m.IncludeRabbitmq || m.IncludePostgres)
@@ -243,9 +243,9 @@ services:
 
         if (m.IncludeSeq)
             sections.Add("""
-  seq:
+  cloud-seq:
     image: datalust/seq:latest
-    container_name: seq
+    container_name: cloud-seq
     restart: always
     ports:
       - "${SEQ_WEBPORT}:80"
@@ -260,9 +260,9 @@ services:
 
         if (m.IncludeMinio)
             sections.Add("""
-  minio:
+  cloud-minio:
     image: quay.io/minio/minio:RELEASE.2025-04-22T22-12-26Z-cpuv1
-    container_name: minio
+    container_name: cloud-minio
     restart: always
     ports:
       - "${MINIO_PORT}:9000"
@@ -271,7 +271,7 @@ services:
       MINIO_ROOT_USER: "${MINIO_ROOT_USER}"
       MINIO_ROOT_PASSWORD: "${MINIO_ROOT_PASSWORD}"
     volumes:
-      - ${MINIO_DATA_PATH:-minio_data}:/data
+      - ${MINIO_DATA_PATH:-cloud-minio_data}:/data
     command: server /data --console-address ":9001"
     networks:
       - barkcloud-network
@@ -279,12 +279,12 @@ services:
 
         if (m.IncludeRabbitmq)
             sections.Add("""
-  rabbitmq:
+  cloud-rabbitmq:
     image: rabbitmq:latest
-    container_name: rabbitmq
+    container_name: cloud-rabbitmq
     restart: always
     volumes:
-      - rabbitmq_data:/var/lib/rabbitmq
+      - cloud-rabbitmq_data:/var/lib/rabbitmq
     environment:
       RABBITMQ_DEFAULT_USER: "${RABBITMQ_DEFAULT_USER}"
       RABBITMQ_DEFAULT_PASS: "${RABBITMQ_DEFAULT_PASS}"
@@ -294,9 +294,9 @@ services:
 
         if (m.IncludePostgres)
             sections.Add("""
-  postgres:
+  cloud-postgres:
     image: postgres:18
-    container_name: postgres_barkcloud
+    container_name: cloud-postgres
     restart: always
     environment:
       POSTGRES_USER: "${POSTGRES_USER}"
@@ -358,8 +358,8 @@ volumes:
 
 """);
         if (m.IncludePostgres) sb.Append("  pgdata:\n");
-        if (m.IncludeRabbitmq) sb.Append("  rabbitmq_data:\n");
-        sb.Append("  minio_data:\n");
+        if (m.IncludeRabbitmq) sb.Append("  cloud-rabbitmq_data:\n");
+        sb.Append("  cloud-minio_data:\n");
         if (m.IncludePostgres) sb.Append("  backup_volume:\n");
         if (m.IncludeSeq) sb.Append("  seq_data:\n");
         sb.Append("  archive_temp:\n");

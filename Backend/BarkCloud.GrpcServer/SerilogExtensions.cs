@@ -17,7 +17,7 @@ public static class SerilogExtensions
     /// </summary>
     public static WebApplicationBuilder AddBarkCloudSerilog(this WebApplicationBuilder builder, string serviceName)
     {
-        var seqUrl = builder.Configuration["Seq:ServerUrl"] ?? "http://seq:5341";
+        var seqUrl = builder.Configuration["Seq:ServerUrl"] ?? "http://cloud-seq:5341";
 
         builder.Host.UseSerilog((context, loggerConfig) =>
         {
