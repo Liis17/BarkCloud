@@ -63,6 +63,7 @@ final class ShareViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        TemporaryFileCleanup.purgeStale()
         setupUI()
         // tokenProvider у координатора может быть не установлен (Share Extension
         // живёт в своём процессе) — поставим свой, чтобы запрос имел `x-auth-token`.
@@ -453,7 +454,16 @@ final class ShareViewController: UIViewController {
                     let scoped = url.startAccessingSecurityScopedResource()
                     defer { if scoped { url.stopAccessingSecurityScopedResource() } }
                     try FileManager.default.copyItem(at: url, to: staged)
+                    TemporaryFileCleanup.removeFileAndEmptyParent(
+                        at: url,
+                        within: FileManager.default.temporaryDirectory
+                    )
                 } catch {
+                    try? FileManager.default.removeItem(at: staged)
+                    TemporaryFileCleanup.removeFileAndEmptyParent(
+                        at: url,
+                        within: FileManager.default.temporaryDirectory
+                    )
                     continue
                 }
                 let mime = inferMime(for: name)
@@ -498,6 +508,7 @@ final class ShareViewController: UIViewController {
         do {
             upload = try await transfer.getUploadURL(type: .cloudFile)
         } catch {
+            try? FileManager.default.removeItem(at: prepared.stagedURL)
             return nil
         }
 
@@ -513,6 +524,8 @@ final class ShareViewController: UIViewController {
                 destination: multipartURL
             )
         } catch {
+            try? FileManager.default.removeItem(at: prepared.stagedURL)
+            try? FileManager.default.removeItem(at: multipartURL)
             return nil
         }
 

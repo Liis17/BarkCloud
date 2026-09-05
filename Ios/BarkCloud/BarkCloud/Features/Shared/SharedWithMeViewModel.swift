@@ -32,8 +32,7 @@ struct SharedWithMeUiState {
 /// View-model раздела «Мне доступны»: пагинируемый список входящих шаров +
 /// скачивание через `URLSession.shared.download`. После скачивания выставляем
 /// `pendingExportFile` — Screen открывает `UIDocumentPickerViewController` для
-/// сохранения; временный файл живёт в `temporaryDirectory` и удаляется
-/// после закрытия пикера системой (пикер копирует к себе).
+/// сохранения; временный файл удаляется после закрытия пикера.
 @MainActor
 @Observable
 final class SharedWithMeViewModel {
@@ -108,6 +107,7 @@ final class SharedWithMeViewModel {
                 return
             }
             let (tmp, _) = try await URLSession.shared.download(from: url)
+            defer { try? FileManager.default.removeItem(at: tmp) }
             let destDir = FileManager.default.temporaryDirectory
                 .appendingPathComponent("shared-\(UUID().uuidString)")
             try FileManager.default.createDirectory(at: destDir, withIntermediateDirectories: true)
@@ -120,7 +120,15 @@ final class SharedWithMeViewModel {
         }
     }
 
-    func exportShown() { state.pendingExportFile = nil }
+    func exportShown() {
+        if let file = state.pendingExportFile {
+            TemporaryFileCleanup.removeFileAndEmptyParent(
+                at: file,
+                within: FileManager.default.temporaryDirectory
+            )
+        }
+        state.pendingExportFile = nil
+    }
 
     func snackbarShown() { state.snackbar = nil }
 

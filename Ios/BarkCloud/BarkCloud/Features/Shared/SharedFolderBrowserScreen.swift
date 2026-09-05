@@ -57,6 +57,12 @@ struct SharedFolderBrowserScreen: View {
                         }
                     }
             }
+            .onDisappear {
+                TemporaryFileCleanup.removeFileAndEmptyParent(
+                    at: file.url,
+                    within: FileManager.default.temporaryDirectory
+                )
+            }
         }
         .task { await load() }
     }
@@ -166,6 +172,7 @@ struct SharedFolderBrowserScreen: View {
         defer { downloadingID = nil }
         do {
             let (tmp, _) = try await URLSession.shared.download(from: url)
+            defer { try? FileManager.default.removeItem(at: tmp) }
             let destDir = FileManager.default.temporaryDirectory
                 .appendingPathComponent("shared-\(UUID().uuidString)")
             try FileManager.default.createDirectory(at: destDir, withIntermediateDirectories: true)

@@ -1,8 +1,8 @@
 import Foundation
 import Observation
 
-/// Состояние и действия раздела «Кеш» в Настройках. Все операции делегируются
-/// актору `FileCacheService`; лимит хранится в `FileCacheSettings`.
+/// Состояние и действия раздела «Кеш» в Настройках. Основные операции делегируются
+/// актору `FileCacheService`; полная очистка также удаляет сиротские tmp/upload-файлы.
 @MainActor
 @Observable
 final class CacheSettingsViewModel {
@@ -81,6 +81,19 @@ final class CacheSettingsViewModel {
     func clearAll() async {
         state.isWorking = true
         await cache.clearAll()
+        let activeJobs = await UploadQueueStore.shared.activeJobs()
+        let retryableJobs = await UploadQueueStore.shared.failedJobs(
+            maxRetries: UploadConstants.maxUploadRetries
+        )
+        let referencedPaths = Set((activeJobs + retryableJobs).flatMap {
+            [$0.sourceFilePath, $0.multipartBodyPath]
+        })
+        UploadConstants.purgeOrphanedStaging(
+            referencedPaths: referencedPaths,
+            olderThan: 3600
+        )
+        TemporaryFileCleanup.purgeStale(olderThan: 24 * 3600)
+        ShareInbox.purgeStale()
         await refreshStats()
         state.isWorking = false
     }
@@ -88,5 +101,8 @@ final class CacheSettingsViewModel {
     private func refreshStats() async {
         state.sizeBytes = await cache.totalSize()
         state.entryCount = await cache.entryCount()
+        let device = Self.deviceStorage()
+        state.deviceFreeBytes = device.free
+        state.deviceTotalBytes = device.total
     }
 }

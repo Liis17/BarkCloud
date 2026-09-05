@@ -23,6 +23,7 @@ final class ShareInboxUploader {
     }
 
     func uploadPendingIfNeeded() {
+        ShareInbox.purgeStale()
         guard !isRunning, session.hasValidRefreshToken() else { return }
         let items = ShareInbox.pendingItems()
         guard !items.isEmpty else { return }

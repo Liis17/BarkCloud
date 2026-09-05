@@ -91,6 +91,7 @@ public final class FileTransferService: Sendable {
     /// (removeItem выдёргивал бы файл из-под читателя).
     public func download(from url: URL, suggestedName: String) async throws -> URL {
         let (tempURL, response) = try await InsecureHTTP.session.download(from: url)
+        defer { try? FileManager.default.removeItem(at: tempURL) }
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
             throw FileTransferError.downloadFailed
         }

@@ -382,13 +382,18 @@ final class BackupManager {
         let sourcePath = FileManager.default.fileExists(atPath: renamed.path) ? renamed : originalPath
         // Без явной папки: сервер разложит по системным «Фото»/«Видео»/«Другие
         // документы» по типу медиа (route_by_media_kind) при attach в main app.
-        return try await cloud.enqueueBackgroundUpload(
-            sourceFile: sourcePath,
-            fileName: fileName,
-            mimeType: nil,
-            toDirectory: nil,
-            source: .backup
-        )
+        do {
+            return try await cloud.enqueueBackgroundUpload(
+                sourceFile: sourcePath,
+                fileName: fileName,
+                mimeType: nil,
+                toDirectory: nil,
+                source: .backup
+            )
+        } catch {
+            try? FileManager.default.removeItem(at: sourcePath)
+            throw error
+        }
     }
 
     // MARK: - Освобождение места

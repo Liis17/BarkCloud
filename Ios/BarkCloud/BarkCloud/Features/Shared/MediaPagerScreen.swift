@@ -508,7 +508,16 @@ private struct MediaPager: UIViewControllerRepresentable {
             self.onCurrentID = onCurrentID
         }
 
-        deinit { indexTimer?.invalidate() }
+        deinit {
+            indexTimer?.invalidate()
+            let temporaryDirectory = FileManager.default.temporaryDirectory
+            for url in resolved.values {
+                TemporaryFileCleanup.removeFileAndEmptyParent(
+                    at: url,
+                    within: temporaryDirectory
+                )
+            }
+        }
 
         func numberOfPreviewItems(in controller: QLPreviewController) -> Int { ids.count }
 

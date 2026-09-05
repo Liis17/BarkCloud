@@ -8,8 +8,6 @@ import UIKit
 ///    (`handleEventsForBackgroundURLSession`).
 /// 2. Зарегистрировать BGTask-хендлер для retry упавших загрузок.
 final class AppDelegate: NSObject, UIApplicationDelegate {
-    private let maxRetries = 3
-
     func application(
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
@@ -42,9 +40,8 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
     /// в pending и пере-submit'им. Реальная передача байт уйдёт в background
     /// URLSession, которая работает независимо от life-cycle'а нашего процесса.
     private func handleRetryTask(_ task: BGProcessingTask) {
-        let maxRetries = self.maxRetries
         let work = Task {
-            let failed = await UploadQueueStore.shared.failedJobs(maxRetries: maxRetries)
+            let failed = await UploadQueueStore.shared.failedJobs(maxRetries: UploadConstants.maxUploadRetries)
             for snapshot in failed {
                 await UploadQueueStore.shared.incrementRetries(id: snapshot.id)
                 await UploadQueueStore.shared.resetForRetry(id: snapshot.id)

@@ -66,10 +66,15 @@ final class DeviceMediaImageLoader: @unchecked Sendable {
             }
             return fileURL
         } catch {
+            TemporaryFileCleanup.removeFileAndEmptyParent(
+                at: fileURL,
+                within: FileManager.default.temporaryDirectory
+            )
             return nil
         }
     }
 }
+
 
 /// Квадратная ячейка медиатеки устройства с бейджем видео и галкой выбора.
 struct DeviceMediaThumb: View {
@@ -136,4 +141,3 @@ struct DeviceMediaThumb: View {
         }
     }
 }
-

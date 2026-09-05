@@ -226,8 +226,8 @@ private struct SharedFolderRow: View {
     }
 }
 
-/// Адаптер `UIDocumentPickerViewController` для экспорта одного файла. После
-/// закрытия пикером оригинал из `temporaryDirectory` система удаляет сама.
+/// Адаптер `UIDocumentPickerViewController` для экспорта одного файла. Исходник
+/// из `temporaryDirectory` удаляется view-model после закрытия sheet.
 private struct DocumentExporter: UIViewControllerRepresentable {
     let url: URL
 

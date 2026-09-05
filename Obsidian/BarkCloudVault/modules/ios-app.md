@@ -194,7 +194,9 @@ BarkCloud/
   ассета во временный файл (`PHAssetResourceManager.writeData`, приоритет ресурсов как при загрузке —
   имя сохраняет расширение, чтобы QuickLook определил тип). **Видео** тоже идёт в QuickLook через прямой
   URL файла медиатеки (`DeviceMediaImageLoader.videoFileURL` → `requestAVAsset`/`AVURLAsset.url`, без
-  копии на диск; ранее — `VideoPlayer`, теперь единый просмотрщик ради свайпа).
+  копии на диск; ранее — `VideoPlayer`, теперь единый просмотрщик ради свайпа). Экспортированные
+  файлы фото удаляются при закрытии `MediaPager`, а старые прямые элементы app `tmp` очищаются при
+  следующем запуске приложения.
   Режим выбора → загрузка выбранных в облако (`DeviceAssetResource.originalData` → `CloudRepository.uploadFile`).
   **Медиа загружается без явной папки с `routeByMediaKind: true`** — сервер сам раскладывает файл по
   системным папкам «Фото»/«Видео»/«Другие документы» по типу медиа (`uploadFile`/`attachFile` шлют
@@ -480,7 +482,7 @@ BarkCloud/
   оригинала → `MediaAsset.jpegViewFileID`); видео/без-вида — по своему оригиналу. Тот же
   дисковый кеш, что `RemoteFilePreviewScreen`. Шеринг/«копировать ссылку» по-прежнему ведут
   на оригинал. Устройство — `GalleryScreen.deviceResolve` (фото → `exportPhotoToTempFile`,
-  видео → `videoFileURL`).
+  видео → `videoFileURL`); временные фото-экспорты удаляются при уничтожении `Coordinator`.
 - **Pull-to-refresh Галереи:** `GalleryScreen.barkRefreshable → GalleryViewModel.refresh()` —
   пересобирает ассеты и через `CloudPresenceTracker.recheck(_:)` сбрасывает кеш присутствия и
   заново пакетно перепроверяет наличие в облаке (обновляет иконки-облачка; хеши берёт из кеша).
@@ -517,6 +519,9 @@ BarkCloud/
   нет API автозапуска; ковыряние внутренней иерархии вью отвергнуто как хрупкое/риск App
   Store). При первом открытии не-кешированного файла короткий пустой кадр, пока идёт
   докачка; неуспешный резолв оставляет прозрачную заглушку.
+- Скачанные файлы из раздела «Мне доступны» удаляются после закрытия системного
+  экспортёра или QuickLook; оставшиеся после аварийного завершения элементы `tmp`
+  очищаются возрастным sweep при следующем запуске.
 
 ### PendingDelete
 
@@ -704,8 +709,9 @@ SPM-пакеты подключены — сгенерённые символы 
 ## Тесты
 
 Unit-test таргет `BarkCloudTests` (`Ios/BarkCloud/BarkCloudTests/`, host-based,
-`@testable import BarkCloud`, shared scheme с TestAction). Сейчас покрывает
-обслуживающую логику дискового кеша ([[ios-file-cache]]).
+`@testable import BarkCloud`, shared scheme с TestAction). Покрывает обслуживающую
+логику дискового кеша и очистку временных upload/QuickLook-файлов
+([[ios-file-cache]]).
 
 ```bash
 cd Ios/BarkCloud
@@ -806,7 +812,8 @@ gRPC/Networking/Generated файлы в Share Extension target + линкует 
 
 `ShareInboxUploader` остался как одноразовая миграция legacy очереди
 (`ShareInbox/<uuid>/<file>`) — переоформляет файлы в UploadJob через
-`cloud.enqueueBackgroundUpload(sourceFile:)` при старте app.
+`cloud.enqueueBackgroundUpload(sourceFile:)` при старте app; недоставленные
+legacy-файлы старше 30 дней удаляются.
 
 ## Widget — заполнение физического диска
 

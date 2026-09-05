@@ -42,4 +42,31 @@ enum ShareInbox {
     static func remove(_ item: URL) {
         try? FileManager.default.removeItem(at: item.deletingLastPathComponent())
     }
+
+    /// Legacy-файлы не должны оставаться в App Group навсегда, если аккаунт
+    /// недоступен для повторной загрузки. Свежие элементы сохраняем для миграции.
+    static func purgeStale(olderThan age: TimeInterval = 30 * 24 * 3600) {
+        guard let folderURL,
+              let items = try? FileManager.default.contentsOfDirectory(
+                at: folderURL,
+                includingPropertiesForKeys: [.contentModificationDateKey, .isDirectoryKey],
+                options: [.skipsHiddenFiles]
+              ) else { return }
+        let cutoff = Date.now.addingTimeInterval(-age)
+        for item in items {
+            guard let values = try? item.resourceValues(
+                forKeys: [.contentModificationDateKey, .isDirectoryKey]
+            ),
+                  values.isDirectory == true,
+                  let modifiedAt = values.contentModificationDate,
+                  modifiedAt < cutoff else { continue }
+            try? FileManager.default.removeItem(at: item)
+        }
+    }
+
+    /// Полностью удалить legacy-ящик при полном сбросе локального состояния.
+    static func purgeAll() {
+        guard let folderURL else { return }
+        try? FileManager.default.removeItem(at: folderURL)
+    }
 }
