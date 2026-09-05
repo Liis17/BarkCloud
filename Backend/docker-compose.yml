@@ -37,8 +37,36 @@ services:
       EXTERNAL_IDENTITY_HOST: ${EXTERNAL_IDENTITY_HOST}
       EXTERNAL_USERS_HOST: ${EXTERNAL_USERS_HOST}
       EXTERNAL_FILES_HOST: ${EXTERNAL_FILES_HOST}
+      EXTERNAL_TORRENT_HOST: ${EXTERNAL_TORRENT_HOST}
+      TORRENT_PORT: ${TORRENT_PORT}
+      TORRENT_HTTP1PORT: ${TORRENT_HTTP1PORT}
+      TORRENT_PEER_PORT: ${TORRENT_PEER_PORT}
     networks:
       - barkcloud-network
+
+
+
+  torrent:
+    image: docker.barkfluff.com/barkcloud-torrent:latest
+    container_name: cloud-torrent
+    restart: always
+    environment:
+      <<: *common-variables
+      SERVICE_PORT: ${TORRENT_PORT}
+      SERVICE_HTTP1PORT: ${TORRENT_HTTP1PORT}
+      Torrent__DownloadPath: "/mnt/torrents"
+      Torrent__PeerPort: ${TORRENT_PEER_PORT}
+    volumes:
+      - ${TORRENT_DOWNLOAD_PATH:-torrent_data}:/mnt/torrents
+    # BitTorrent peer-порт публикуется напрямую; gRPC/HTTP идут через nginx.
+    ports:
+      - "${TORRENT_PEER_PORT}:${TORRENT_PEER_PORT}"
+      - "${TORRENT_PEER_PORT}:${TORRENT_PEER_PORT}/udp"
+    networks:
+      - barkcloud-network
+    depends_on:
+      - configuration
+
 
   identity:
     image: docker.barkfluff.com/barkcloud-identity:latest
@@ -121,35 +149,13 @@ services:
       - identity
       - users
       - files
-
-  # === Reverse-proxy (единственная точка выхода наружу) ===
-  nginx:
-    image: nginx:latest
-    container_name: cloud-nginx
-    restart: always
-    # Наружу выставлены только эти порты; микросервисы доступны лишь через прокси
-    ports:
-      - "80:80"
-      - "443:443"
-      - "${IDENTITY_PORT}:${IDENTITY_PORT}"
-      - "${USERS_PORT}:${USERS_PORT}"
-      - "${FILES_PORT}:${FILES_PORT}"
-    volumes:
-      - ./nginx/cloud.barkfluff.conf:/etc/nginx/conf.d/cloud.barkfluff.conf:ro
-      - ./certs:/etc/nginx/certs:ro
-    networks:
-      - barkcloud-network
-    depends_on:
-      - identity
-      - users
-      - files
-      - web
+      - torrent
 
   # === Инфраструктурные сервисы ===
 
   seq:
     image: datalust/seq:latest
-    container_name: seq
+    container_name: seq_barkcloud
     restart: always
     ports:
       - "${SEQ_WEBPORT}:80"
@@ -163,7 +169,7 @@ services:
 
   minio:
     image: quay.io/minio/minio:RELEASE.2025-04-22T22-12-26Z-cpuv1
-    container_name: minio
+    container_name: minio_barkcloud
     restart: always
     ports:
       - "${MINIO_PORT}:9000"
@@ -179,7 +185,7 @@ services:
 
   rabbitmq:
     image: rabbitmq:latest
-    container_name: rabbitmq
+    container_name: rabbitmq_barkcloud
     restart: always
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
@@ -240,7 +246,8 @@ services:
 
 networks:
   barkcloud-network:
-    driver: bridge
+    external: true
+    name: barkcloud-network
 
 volumes:
   pgdata:
@@ -249,3 +256,4 @@ volumes:
   backup_volume:
   seq_data:
   archive_temp:
+  torrent_data:
