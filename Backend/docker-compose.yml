@@ -8,7 +8,7 @@ x-common-variables: &common-variables
 services:
   # === Основные микросервисы (prod-образы) ===
 
-  configuration:
+  cloud-configuration:
     image: docker.barkfluff.com/barkcloud-configuration:latest
     container_name: cloud-configuration
     restart: always
@@ -16,13 +16,13 @@ services:
       - .env
     environment:
       <<: *common-variables
-      CONFIGURATION_HOST:  postgres_barkcloud:5432
+      CONFIGURATION_HOST:  cloud-postgres:5432
       CONFIGURATION_DATABASE: configuration
       CONFIGURATION_USERNAME: ${POSTGRES_USER}
       CONFIGURATION_PASSWORD: ${POSTGRES_PASSWORD}
       CONFIGURATION_PORT: ${CONFIGURATION_PORT}
       CONFIGURATION_DBPORT: "5432"
-      MINIO_HOST: minio
+      MINIO_HOST: cloud-minio
       MINIO_PORT: "9000"
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
@@ -38,61 +38,42 @@ services:
       EXTERNAL_USERS_HOST: ${EXTERNAL_USERS_HOST}
       EXTERNAL_FILES_HOST: ${EXTERNAL_FILES_HOST}
       EXTERNAL_TORRENT_HOST: ${EXTERNAL_TORRENT_HOST}
+      # Порты торрент-сервиса нужны configuration для вычисления TorrentService:Host/RunSettings
       TORRENT_PORT: ${TORRENT_PORT}
       TORRENT_HTTP1PORT: ${TORRENT_HTTP1PORT}
       TORRENT_PEER_PORT: ${TORRENT_PEER_PORT}
     networks:
       - barkcloud-network
 
-
-
-  torrent:
-    image: docker.barkfluff.com/barkcloud-torrent:latest
-    container_name: cloud-torrent
-    restart: always
-    environment:
-      <<: *common-variables
-      SERVICE_PORT: ${TORRENT_PORT}
-      SERVICE_HTTP1PORT: ${TORRENT_HTTP1PORT}
-      Torrent__DownloadPath: "./data/torrents"
-      Torrent__PeerPort: ${TORRENT_PEER_PORT}
-    volumes:
-      - ${TORRENT_DOWNLOAD_PATH:-torrent_data}:/mnt/torrents
-    # BitTorrent peer-порт публикуется напрямую; gRPC/HTTP идут через nginx.
-    ports:
-      - "${TORRENT_PEER_PORT}:${TORRENT_PEER_PORT}"
-      - "${TORRENT_PEER_PORT}:${TORRENT_PEER_PORT}/udp"
-    networks:
-      - barkcloud-network
-    depends_on:
-      - configuration
-
-
-  identity:
+  cloud-identity:
     image: docker.barkfluff.com/barkcloud-identity:latest
     container_name: cloud-identity
     restart: always
     environment:
       <<: *common-variables
       SERVICE_PORT: ${IDENTITY_PORT}
+    ports:
+      - "${IDENTITY_PORT}:${IDENTITY_PORT}"
     networks:
       - barkcloud-network
     depends_on:
-      - configuration
+      - cloud-configuration
 
-  users:
+  cloud-users:
     image: docker.barkfluff.com/barkcloud-users:latest
     container_name: cloud-users
     restart: always
     environment:
       <<: *common-variables
       SERVICE_PORT: ${USERS_PORT}
+    ports:
+      - "${USERS_PORT}:${USERS_PORT}"
     networks:
       - barkcloud-network
     depends_on:
-      - configuration
+      - cloud-configuration
 
-  files:
+  cloud-files:
     image: docker.barkfluff.com/barkcloud-files:latest
     container_name: cloud-files
     restart: always
@@ -100,18 +81,21 @@ services:
       <<: *common-variables
       SERVICE_PORT: ${FILES_PORT}
       SERVICE_HTTP1PORT: ${FILES_HTTP1PORT}
-      StorageProbe__Path: "./data/minio-data"
-      Archive__TempPath: "./data/archive-temp"
+      StorageProbe__Path: "/mnt/minio-data"
+      Archive__TempPath: "/mnt/archive-temp"
+    ports:
+      - "${FILES_PORT}:${FILES_PORT}"
+      - "${FILES_HTTP1PORT}:${FILES_HTTP1PORT}"
     volumes:
       - ${MINIO_DATA_PATH:-minio_data}:/mnt/minio-data:ro
       - ${ARCHIVE_TEMP_PATH:-archive_temp}:/mnt/archive-temp
     networks:
       - barkcloud-network
     depends_on:
-      - configuration
+      - cloud-configuration
 
   # Сервис уведомлений. Внешнего API нет — в nginx не маршрутизируется. Опционален
-  notification:
+  cloud-notification:
     image: docker.barkfluff.com/barkcloud-notification:latest
     container_name: cloud-notification
     restart: always
@@ -120,10 +104,33 @@ services:
     networks:
       - barkcloud-network
     depends_on:
-      - configuration
+      - cloud-configuration
+
+  # Торрент-сервис: качает торренты на хост-диск ({TORRENT_DOWNLOAD_PATH} → /mnt/torrents)
+  cloud-torrent:
+    image: docker.barkfluff.com/barkcloud-torrent:latest
+    container_name: cloud-torrent
+    restart: always
+    environment:
+      <<: *common-variables
+      SERVICE_PORT: ${TORRENT_PORT}
+      SERVICE_HTTP1PORT: ${TORRENT_HTTP1PORT}
+      Torrent__DownloadPath: "/mnt/torrents"
+      Torrent__PeerPort: ${TORRENT_PEER_PORT}
+    volumes:
+      - ${TORRENT_DOWNLOAD_PATH:-torrent_data}:/mnt/torrents
+    ports:
+      - "${TORRENT_PEER_PORT}:${TORRENT_PEER_PORT}"
+      - "${TORRENT_PEER_PORT}:${TORRENT_PEER_PORT}/udp"
+      - "${TORRENT_PORT}:${TORRENT_PORT}"
+      - "${TORRENT_HTTP1PORT}:${TORRENT_HTTP1PORT}"
+    networks:
+      - barkcloud-network
+    depends_on:
+      - cloud-configuration
 
   # Веб-клиент
-  web:
+  cloud-web:
     image: docker.barkfluff.com/barkcloud-web:latest
     container_name: cloud-web
     restart: always
@@ -145,17 +152,17 @@ services:
     networks:
       - barkcloud-network
     depends_on:
-      - configuration
-      - identity
-      - users
-      - files
-      - torrent
+      - cloud-configuration
+      - cloud-identity
+      - cloud-users
+      - cloud-files
+      - cloud-torrent
 
   # === Инфраструктурные сервисы ===
 
-  seq:
+  cloud-seq:
     image: datalust/seq:latest
-    container_name: seq_barkcloud
+    container_name: cloud-seq
     restart: always
     ports:
       - "${SEQ_WEBPORT}:80"
@@ -167,9 +174,9 @@ services:
     networks:
       - barkcloud-network
 
-  minio:
+  cloud-minio:
     image: quay.io/minio/minio:RELEASE.2025-04-22T22-12-26Z-cpuv1
-    container_name: minio_barkcloud
+    container_name: cloud-minio
     restart: always
     ports:
       - "${MINIO_PORT}:9000"
@@ -183,21 +190,21 @@ services:
     networks:
       - barkcloud-network
 
-  rabbitmq:
+  cloud-rabbitmq:
     image: rabbitmq:latest
-    container_name: rabbitmq_barkcloud
+    container_name: cloud-rabbitmq
     restart: always
     volumes:
-      - rabbitmq_data:/var/lib/rabbitmq
+      - cloud-rabbitmq_data:/var/lib/rabbitmq
     environment:
       RABBITMQ_DEFAULT_USER: "${RABBITMQ_DEFAULT_USER}"
       RABBITMQ_DEFAULT_PASS: "${RABBITMQ_DEFAULT_PASS}"
     networks:
       - barkcloud-network
 
-  postgres:
+  cloud-postgres:
     image: postgres:18
-    container_name: postgres_barkcloud
+    container_name: cloud-postgres
     restart: always
     environment:
       POSTGRES_USER: "${POSTGRES_USER}"
@@ -246,13 +253,12 @@ services:
 
 networks:
   barkcloud-network:
-    external: true
-    name: barkcloud-network
+    driver: bridge
 
 volumes:
   pgdata:
-  rabbitmq_data:
-  minio_data:
+  cloud-rabbitmq_data:
+  cloud-minio_data:
   backup_volume:
   seq_data:
   archive_temp:
