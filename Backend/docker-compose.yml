@@ -54,7 +54,7 @@ services:
       <<: *common-variables
       SERVICE_PORT: ${TORRENT_PORT}
       SERVICE_HTTP1PORT: ${TORRENT_HTTP1PORT}
-      Torrent__DownloadPath: "/mnt/torrents"
+      Torrent__DownloadPath: "./data/torrents"
       Torrent__PeerPort: ${TORRENT_PEER_PORT}
     volumes:
       - ${TORRENT_DOWNLOAD_PATH:-torrent_data}:/mnt/torrents
@@ -100,8 +100,8 @@ services:
       <<: *common-variables
       SERVICE_PORT: ${FILES_PORT}
       SERVICE_HTTP1PORT: ${FILES_HTTP1PORT}
-      StorageProbe__Path: "/mnt/minio-data"
-      Archive__TempPath: "/mnt/archive-temp"
+      StorageProbe__Path: "./data/minio-data"
+      Archive__TempPath: "./data/archive-temp"
     volumes:
       - ${MINIO_DATA_PATH:-minio_data}:/mnt/minio-data:ro
       - ${ARCHIVE_TEMP_PATH:-archive_temp}:/mnt/archive-temp
