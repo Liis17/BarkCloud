@@ -4,6 +4,10 @@ Parent: [[index]] · See also: [[structure/overview]] · [[structure/entrypoints
 
 Файлы: `Backend/docker-compose.yml` (prod), `Backend/docker-compose-dev.yml` (dev)
 
+В production compose ключи сервисов и имена контейнеров используют единый префикс `cloud-`
+(`cloud-configuration`, `cloud-identity`, `cloud-users`, `cloud-files`, `cloud-torrent`,
+`cloud-web` и инфраструктурные `cloud-*`). Эти же имена используются как Docker DNS-адреса.
+
 ## Микросервисы в dev-окружении
 
 Все на образах `barkcloud-*-dev:latest`, требующих локальной сборки из соответствующих `Dockerfile`. Все цепляются в общую сеть `barkcloud-network`.
@@ -36,10 +40,10 @@ Parent: [[index]] · See also: [[structure/overview]] · [[structure/entrypoints
 
 | Сервис | Образ | Назначение |
 |--------|-------|-----------|
-| `postgres_barkcloud` | `postgres:18` | Единая PostgreSQL для всех сервисов (схемы изолируют). В прод-`docker-compose.yml` запускается с тюнингом через `command` (`-c shared_buffers=1GB`, `effective_cache_size=3GB`, `work_mem=16MB`, `jit=off`, параллелизм под 2 ядра) — дефолты PG18 (128MB) под 8 ГБ малы. Движок **не меняем**: тормозили seq-scan'ы из-за отсутствия индексов + дефолтный конфиг, а не сам Postgres. |
-| `rabbitmq` | `rabbitmq:latest` | Очередь сообщений между сервисами; контракты в [[modules/shared-queue]] |
-| `minio` | `quay.io/minio/minio` | S3-совместимое хранилище для файлов, аватаров, стикеров |
-| `seq` | `datalust/seq:latest` | Централизованный лог-агрегатор; логи через Serilog |
+| `cloud-postgres` | `postgres:18` | Единая PostgreSQL для всех сервисов (схемы изолируют). В прод-`docker-compose.yml` запускается с тюнингом через `command` (`-c shared_buffers=1GB`, `effective_cache_size=3GB`, `work_mem=16MB`, `jit=off`, параллелизм под 2 ядра) — дефолты PG18 (128MB) под 8 ГБ малы. Движок **не меняем**: тормозили seq-scan'ы из-за отсутствия индексов + дефолтный конфиг, а не сам Postgres. |
+| `cloud-rabbitmq` | `rabbitmq:latest` | Очередь сообщений между сервисами; контракты в [[modules/shared-queue]] |
+| `cloud-minio` | `quay.io/minio/minio` | S3-совместимое хранилище для файлов, аватаров, стикеров |
+| `cloud-seq` | `datalust/seq:latest` | Централизованный лог-агрегатор; логи через Serilog |
 
 ## Переменные окружения (из .env)
 
@@ -62,8 +66,8 @@ Parent: [[index]] · See also: [[structure/overview]] · [[structure/entrypoints
 ## Volumes
 
 - `pgdata` — данные PostgreSQL по умолчанию (named volume); переопределяется через `POSTGRES_DATA_PATH` — см. «Переносимый диск с данными БД» ниже
-- `rabbitmq_data` — данные RabbitMQ
-- `minio_data` — данные MinIO по умолчанию (named volume). Источник `/data` переопределяется через `MINIO_DATA_PATH` в `.env`; тот же источник монтируется в `cloud-files` read-only как `/mnt/minio-data` для расчёта физического объёма диска. Вынос на отдельный диск — см. раздел «MinIO на отдельном диске» ниже.
+- `cloud-rabbitmq_data` — данные RabbitMQ
+- `cloud-minio_data` — данные MinIO по умолчанию (named volume). Источник `/data` переопределяется через `MINIO_DATA_PATH` в `.env`; тот же источник монтируется в `cloud-files` read-only как `/mnt/minio-data` для расчёта физического объёма диска. Вынос на отдельный диск — см. раздел «MinIO на отдельном диске» ниже.
 - `backup_volume` — бэкапы Postgres (монтируется в Postgres-контейнер на `/backup`); переопределяется через `BACKUP_PATH`
 - `seq_data` — данные Seq; переопределяется через `SEQ_DATA_PATH`
 - `archive_temp` — временный файл ZIP при «Скачать архивом» (монтируется в `cloud-files` как `/mnt/archive-temp`, путь читается из env `Archive__TempPath`); переопределяется через `ARCHIVE_TEMP_PATH`. Только в прод-`docker-compose.yml`. Сценарий: zip собирается на диск → заливается в S3 → temp удаляется; готовый архив кладётся в корзину со сроком 3 дня (переиспользует фоновую очистку `TrashCleanupService`). Вынести на второй диск (где больше места, чем в образе) — `ARCHIVE_TEMP_PATH=/d/barkcloud/archive-temp`. Папка на NTFS/drvfs здесь годится (последовательная запись файла, без БД-семантики).
@@ -71,7 +75,7 @@ Parent: [[index]] · See also: [[structure/overview]] · [[structure/entrypoints
 
 ## MinIO на отдельном диске (Windows/WSL2)
 
-> Зачем: named volume `minio_data` лежит внутри образа диска Docker (обычно на C:) и растёт вместе с загрузками в S3. Чтобы хранить S3-данные на втором диске (D:), укажи путь к папке на нём через `MINIO_DATA_PATH` (по умолчанию — named volume, поведение не меняется).
+> Зачем: named volume `cloud-minio_data` лежит внутри образа диска Docker (обычно на C:) и растёт вместе с загрузками в S3. Чтобы хранить S3-данные на втором диске (D:), укажи путь к папке на нём через `MINIO_DATA_PATH` (по умолчанию — named volume, поведение не меняется).
 
 **1. Создай папку на D:**, напр. `D:\barkcloud\minio`.
 

@@ -8,16 +8,16 @@ public sealed class BuilderModel
 {
     // Сервисы, включаемые в compose. Ядро (configuration/identity/users/files)
     // и web — всегда; web отключить нельзя.
-    public bool IncludeNginx { get; set; } = true;
+    public bool IncludeNginx { get; set; } = false;
     public bool IncludeNotification { get; set; } = true;
     public bool IncludeMinio { get; set; } = true;
     public bool IncludeRabbitmq { get; set; } = true;
     public bool IncludePostgres { get; set; } = true;
     public bool IncludeSeq { get; set; } = true;
-    public bool IncludeTorrent { get; set; } = false;
+    public bool IncludeTorrent { get; set; } = true;
 
     // Образы: реестр фиксирован, выбирается только канал (Release/Dev).
-    public const string ImageRegistry = "docker.barkfluff.com:5000";
+    public const string ImageRegistry = "docker.barkfluff.com";
     public string ImageChannel { get; set; } = "Release"; // "Release" | "Dev"
 
     // Общие

@@ -15,7 +15,8 @@ Parent: [[index]]
 ### Корневые
 - `WebApplicationBuilderExtensions.cs` — расширения для `WebApplicationBuilder` (регистрация Kestrel/gRPC/Serilog и т.п.)
 - `ServiceCollectionExtensions.cs` — расширения DI
-- `SerilogExtensions.cs` — настройка Serilog (вероятно с экспортом в Seq)
+- `SerilogExtensions.cs` — настройка Serilog с экспортом в Seq; если `Seq:ServerUrl` не
+  задан, используется Docker-адрес `http://cloud-seq:5341` из production compose
 - `ServerExceptionInterceptor.cs` — gRPC-интерсептор для маппинга .NET-исключений на gRPC-статусы (использует [[modules/shared-exceptions]])
 
 ### Settings

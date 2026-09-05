@@ -87,7 +87,7 @@ services:
       - "${FILES_PORT}:${FILES_PORT}"
       - "${FILES_HTTP1PORT}:${FILES_HTTP1PORT}"
     volumes:
-      - ${MINIO_DATA_PATH:-minio_data}:/mnt/minio-data:ro
+      - ${MINIO_DATA_PATH:-cloud-minio_data}:/mnt/minio-data:ro
       - ${ARCHIVE_TEMP_PATH:-archive_temp}:/mnt/archive-temp
     networks:
       - barkcloud-network
@@ -185,7 +185,7 @@ services:
       MINIO_ROOT_USER: "${MINIO_ROOT_USER}"
       MINIO_ROOT_PASSWORD: "${MINIO_ROOT_PASSWORD}"
     volumes:
-      - ${MINIO_DATA_PATH:-minio_data}:/data
+      - ${MINIO_DATA_PATH:-cloud-minio_data}:/data
     command: server /data --console-address ":9001"
     networks:
       - barkcloud-network

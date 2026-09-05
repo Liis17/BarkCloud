@@ -337,7 +337,7 @@ public class ConfigurationDefaultsPopulator
         {
             return config.Key switch
             {
-                "Host" => "rabbitmq",
+                "Host" => "cloud-rabbitmq",
                 "Username" => _rabbitUsername,
                 "Password" => _rabbitPassword,
                 "VirtualHost" => "/",
@@ -348,7 +348,7 @@ public class ConfigurationDefaultsPopulator
         // --- Seq (агрегатор логов) ---
         if (config.Section == "Seq" && config.Key == "ServerUrl")
         {
-            return "http://seq:5341";
+            return "http://cloud-seq:5341";
         }
 
         // --- Database connection strings ---

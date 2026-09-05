@@ -112,7 +112,7 @@ public class Program
 
                         // MinIO: дефолтные значения соответствуют внутренней docker-сети.
                         // MINIO_PORT здесь — порт API внутри контейнера (не маппинг наружу).
-                        var minioHost = builder.Configuration["MINIO_HOST"] ?? "minio";
+                        var minioHost = builder.Configuration["MINIO_HOST"] ?? "cloud-minio";
                         var minioPort = builder.Configuration["MINIO_PORT"] ?? "9000";
                         var minioAccessKey = builder.Configuration["MINIO_ROOT_USER"] ?? "minioadmin";
                         var minioSecretKey = builder.Configuration["MINIO_ROOT_PASSWORD"] ?? "minioadmin";

@@ -127,7 +127,7 @@
                     </ui:CardExpander.Header>
                     <StackPanel>
                         <TextBlock Style="{StaticResource FieldLabel}" Text="Реестр" />
-                        <ui:TextBox IsReadOnly="True" Text="docker.barkfluff.com:5000" />
+                        <ui:TextBox IsReadOnly="True" Text="docker.barkfluff.com" />
                         <TextBlock Style="{StaticResource FieldLabel}" Text="Канал" />
                         <ComboBox SelectedValue="{Binding ImageChannel, Mode=TwoWay}" SelectedValuePath="Tag">
                             <ComboBoxItem Content="Релиз — barkcloud-*:latest" Tag="Release" />

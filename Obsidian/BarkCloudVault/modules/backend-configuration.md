@@ -18,7 +18,7 @@ Parent: [[index]] · See also: [[api/configuration-api]]
 - `Infrastructure/ConfigurationContext.cs` — EF Core DbContext
 - `Infrastructure/ConfigurationContextFactory.cs` — фабрика контекста (для EF Tools)
 - `Infrastructure/ConfigurationSeed.cs` — эталонный список всех ожидаемых ключей (`Section`/`Key`/`ServiceId`), включая SMTP-поля `Email:*` для Notification и общий флаг `Features:RegistrationEnabled`
-- `Infrastructure/ConfigurationDefaultsPopulator.cs` — заливка дефолтных значений. `EnsureSeedAsync` при **каждом** старте сверяет таблицу с `ConfigurationSeed` и досевает только недостающие ключи (по тройке `Section/Key/ServiceId`), без дубликатов — новые ключи доезжают и в уже существующую БД. `PopulateDefaultsAsync` заполняет **пустые** записи дефолтами. SMTP-поля `Email:*` (Notification) и `ExternalEndpoint:Host` (Identity/Users/Files) берутся из env (`.env`): email опционален (пусто → не трогаем, режим без почты), внешние адреса обязательны — вне Development пустой env даёт `InvalidOperationException` при старте (проброшен в `Program.cs`, контейнер падает). В Development внешние адреса фолбэчат на `https://{subdomain}.example.com`. Конструктор получает эти значения из `Program.cs` (`EMAIL_*`, `EXTERNAL_{IDENTITY,USERS,FILES}_HOST`) + флаг `requireExternalEndpoints = !IsDevelopment()`
+- `Infrastructure/ConfigurationDefaultsPopulator.cs` — заливка дефолтных значений. `EnsureSeedAsync` при **каждом** старте сверяет таблицу с `ConfigurationSeed` и досевает только недостающие ключи (по тройке `Section/Key/ServiceId`), без дубликатов — новые ключи доезжают и в уже существующую БД. `PopulateDefaultsAsync` заполняет **пустые** записи дефолтами. Внутренние Docker-адреса используют имена production compose: `cloud-rabbitmq`, `cloud-seq`, `cloud-minio`, а межсервисные адреса — `cloud-identity`, `cloud-users`, `cloud-files`, `cloud-torrent`. SMTP-поля `Email:*` (Notification) и `ExternalEndpoint:Host` (Identity/Users/Files/Torrent) берутся из env (`.env`): email опционален (пусто → не трогаем, режим без почты), внешние адреса обязательны — вне Development пустой env даёт `InvalidOperationException` при старте (проброшен в `Program.cs`, контейнер падает). В Development внешние адреса фолбэчат на `https://{subdomain}.example.com`. Конструктор получает эти значения из `Program.cs` (`EMAIL_*`, `EXTERNAL_{IDENTITY,USERS,FILES,TORRENT}_HOST`) + флаг `requireExternalEndpoints = !IsDevelopment()`
 - `Infrastructure/ConfigurationStorage.cs` — слой доступа к данным
 - `Persistence/Migrations/20260518172647_InitialCreate.cs` — единственная миграция
 - `Dockerfile`, `Dockerfile.slim`
@@ -47,7 +47,7 @@ ENV переменные: `CONFIGURATION_HOST`, `CONFIGURATION_DATABASE`, `CONFI
 
 Для авто-заполнения БД на чистом старте сервис `configuration` также получает:
 - `EMAIL_HOST` / `EMAIL_PORT` / `EMAIL_SENDER_EMAIL` / `EMAIL_SENDER_PASSWORD` — SMTP (опционально; пусто → без почты).
-- `EXTERNAL_IDENTITY_HOST` / `EXTERNAL_USERS_HOST` / `EXTERNAL_FILES_HOST` — внешние адреса сервисов для клиентов (обязательны вне Development).
+- `EXTERNAL_IDENTITY_HOST` / `EXTERNAL_USERS_HOST` / `EXTERNAL_FILES_HOST` / `EXTERNAL_TORRENT_HOST` — внешние адреса сервисов для клиентов (обязательны вне Development).
 
 Эти ключи генерит [[modules/tools-builder]] в `.env` и продублированы в `Backend/sample.env`.
 
