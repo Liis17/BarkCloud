@@ -26,6 +26,7 @@
     <Project Path="Tests/Backend/BarkCloud.GrpcServer.Tests/BarkCloud.GrpcServer.Tests.csproj" />
     <Project Path="Tests/Backend/BarkCloud.Identity.Tests/BarkCloud.Identity.Tests.csproj" />
     <Project Path="Tests/Backend/BarkCloud.Notification.Tests/BarkCloud.Notification.Tests.csproj" />
+    <Project Path="Tests/Backend/BarkCloud.Torrent.Tests/BarkCloud.Torrent.Tests.csproj" />
     <Project Path="Tests/Backend/BarkCloud.Users.Tests/BarkCloud.Users.Tests.csproj" />
     <Project Path="Tests/Backend/BarkCloud.Web.Tests/BarkCloud.Web.Tests.csproj" />
   </Folder>

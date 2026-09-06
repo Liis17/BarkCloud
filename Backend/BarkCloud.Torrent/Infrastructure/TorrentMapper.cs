@@ -73,9 +73,29 @@ public static class TorrentMapper
             Size = file.Length,
             Downloaded = downloaded,
             Progress = file.Length > 0 ? (double)downloaded / file.Length : 0,
-            Priority = (TorrentFilePriority)(int)file.Priority,
+            Priority = ToProtoPriority(file.Priority),
         };
     }
+
+    public static TorrentFilePriority ToProtoPriority(Priority priority)
+        => priority switch
+        {
+            Priority.DoNotDownload => TorrentFilePriority.Skip,
+            Priority.Lowest or Priority.Low => TorrentFilePriority.Low,
+            Priority.Normal => TorrentFilePriority.Normal,
+            Priority.High or Priority.Highest or Priority.Immediate => TorrentFilePriority.High,
+            _ => TorrentFilePriority.Normal,
+        };
+
+    public static Priority ToMonoTorrentPriority(TorrentFilePriority priority)
+        => priority switch
+        {
+            TorrentFilePriority.Skip => Priority.DoNotDownload,
+            TorrentFilePriority.Low => Priority.Low,
+            TorrentFilePriority.Normal => Priority.Normal,
+            TorrentFilePriority.High => Priority.High,
+            _ => Priority.Normal,
+        };
 
     public static TorrentStatus MapStatus(TorrentState state, bool complete, bool paused)
     {

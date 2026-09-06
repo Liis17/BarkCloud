@@ -216,7 +216,7 @@ public class TorrentApiService : TorrentApi.TorrentApiBase
         if (managed == null)
             throw new RpcException(new Status(StatusCode.FailedPrecondition, "Торрент не активен"));
 
-        await _engine.SetFilePriorityAsync(entity.Id, request.FileIndex, (Priority)(int)request.Priority);
+        await _engine.SetFilePriorityAsync(entity.Id, request.FileIndex, TorrentMapper.ToMonoTorrentPriority(request.Priority));
 
         // Персистим приоритет для восстановления после рестарта.
         var fileRow = entity.Files.FirstOrDefault(f => f.Index == request.FileIndex);

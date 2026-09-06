@@ -69,7 +69,9 @@ public class TorrentStartupService : IHostedService
         foreach (var f in entity.Files)
         {
             if (f.Index >= 0 && f.Index < managed.Manager.Files.Count)
-                await managed.Manager.SetFilePriorityAsync(managed.Manager.Files[f.Index], (Priority)f.Priority);
+                await managed.Manager.SetFilePriorityAsync(
+                    managed.Manager.Files[f.Index],
+                    TorrentMapper.ToMonoTorrentPriority((BarkCloud.Proto.Torrent.TorrentFilePriority)f.Priority));
         }
     }
 
