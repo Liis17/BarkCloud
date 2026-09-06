@@ -23,6 +23,9 @@ public class TorrentContext : DbContext
         modelBuilder.Entity<TorrentEntity>()
             .HasIndex(t => t.UserId);
 
+        modelBuilder.Entity<TorrentEntity>()
+            .HasIndex(t => new { t.UserId, t.Name });
+
         base.OnModelCreating(modelBuilder);
     }
 }

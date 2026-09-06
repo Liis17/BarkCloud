@@ -202,3 +202,9 @@ UI: в сетке — превью (`MediaThumb`: `<img srcset sizes>` пове�
 - Превью/оригиналы грузит **браузер** по абсолютным URL `{ExternalEndpoint:Host}/web/download/{id}` — ключ Files `ExternalEndpoint:Host` обязан быть `https://cloud.barkfluff.com:7025` (со схемой **https**), иначе на https-странице превью — mixed-content и блокируются браузером. Загрузка байтов от этого ключа уже **не** зависит (идёт на внутренний `cloud-files:7026`).
 - Аплоад большого файла: nginx-vhost фронта веб-клиента (`cloud.barkfluff.com:443` → cloud-web) должен иметь `client_max_body_size 512m;` (по умолчанию 1 МБ → `413`). Этот vhost — вне репозитория (`nginx/cloud.barkfluff.conf` покрывает только gRPC-порты 7020/7021/7025). На стороне .NET лимиты уже сняты в `Program.cs` (Kestrel `MaxRequestBodySize` + `FormOptions.MultipartBodyLengthLimit` = 512 МБ).
 - Шаги с кодом (2FA-логин, подтверждение регистрации, сброс пароля) переносят логин/пароль/`code_id`/`reset_id` в скрытых полях формы — упрощение MVP, стоит заменить на короткоживущий pending-токен/серверное состояние.
+
+## Единый поиск
+
+`Endpoints/SearchEndpoints.cs` публикует same-origin API: `GET /api/search/suggest`, `GET /api/search`, `GET /api/search/hit` и `PUT /api/files/{fileId}/search-metadata`. Web запускает Files и Torrent параллельно; ошибка Torrent возвращается как `sections[].unavailable`, не скрывая Files. Для gRPC установлены deadlines 2 с для подсказок и 5 с для выдачи, `RequestAborted` передаётся дальше.
+
+SPA: `Topbar` — доступный combobox с debounce 250 мс, отменой прошлого fetch, максимум тремя элементами группы и клавиатурой; `/search?q=` — отдельные секции с cursor-пагинацией. `lib/search.ts` — единственное место маршрутизации `openSearchHit`. В `PropertiesModal` можно сохранить личный алиас и теги.

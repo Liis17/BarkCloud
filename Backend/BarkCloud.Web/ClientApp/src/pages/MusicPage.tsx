@@ -1,5 +1,5 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import { EmptyState, Loading } from '../components/ui/EmptyState';
 import { ConfirmModal } from '../components/ui/ConfirmModal';
@@ -14,6 +14,7 @@ import { useToast } from '../hooks/useToast';
 import { apiGet, apiPost, pickFiles, uploadFile } from '../lib/api';
 import { formatDuration } from '../lib/format';
 import { createMusicPlaylistShare, createShare } from '../lib/share';
+import type { SearchHit } from '../lib/search';
 import type { MediaItem, MusicPlaylist, MusicPlaylistTrack, MusicTrack, Page, SharedMusicPlaylist } from '../lib/types';
 
 type Tab = 'tracks' | 'playlists';
@@ -32,7 +33,10 @@ function trackDurationLabel(seconds: number): string {
 }
 
 export function MusicPage() {
+  const location = useLocation();
   const navigate = useNavigate();
+  const openTrackId = new URLSearchParams(location.search).get('track') || '';
+  const openPlaylistId = new URLSearchParams(location.search).get('playlist') || '';
   const [tab, setTab] = React.useState<Tab>('tracks');
   const [tracks, setTracks] = React.useState<MusicTrack[]>([]);
   const [playlists, setPlaylists] = React.useState<MusicPlaylist[]>([]);
@@ -60,6 +64,7 @@ export function MusicPage() {
   const trackBusyRef = React.useRef(false);
   const trackRequestRef = React.useRef(0);
   const trackObserverRef = React.useRef<IntersectionObserver | null>(null);
+  const resolvedDeepLink = React.useRef('');
 
   usePageHeader(() => ({
     title: 'Музыка',
@@ -189,6 +194,47 @@ export function MusicPage() {
     );
     setDetail(resp);
   }
+
+  React.useEffect(() => {
+    if (!openPlaylistId || !playlists.length || resolvedDeepLink.current === `playlist:${openPlaylistId}`) return;
+    resolvedDeepLink.current = `playlist:${openPlaylistId}`;
+    const playlist = playlists.find((item) => item.id === openPlaylistId);
+    if (playlist) {
+      setTab('playlists');
+      openPlaylist(playlist).catch((e) => toast((e as Error).message || 'Плейлист больше недоступен', 'err'));
+      return;
+    }
+    apiGet(`/api/search/hit?kind=playlist&id=${encodeURIComponent(openPlaylistId)}`)
+      .then(() => toast('Плейлист больше недоступен', 'err'))
+      .catch((e) => toast((e as Error).message || 'Плейлист больше недоступен', 'err'))
+      .finally(() => navigate('/music', { replace: true }));
+  }, [openPlaylistId, playlists, navigate, toast]);
+
+  React.useEffect(() => {
+    if (!openTrackId || resolvedDeepLink.current === `track:${openTrackId}`) return;
+    const known = tracks.find((item) => item.file.id === openTrackId);
+    if (known) {
+      resolvedDeepLink.current = `track:${openTrackId}`;
+      setTab('tracks');
+      play(known);
+      return;
+    }
+    resolvedDeepLink.current = `track:${openTrackId}`;
+    apiGet<SearchHit>(`/api/search/hit?kind=track&id=${encodeURIComponent(openTrackId)}`)
+      .then((hit) => apiGet<Page<MusicTrack>>('/api/music/tracks?q=' + encodeURIComponent(hit.title) + '&limit=200'))
+      .then((page) => {
+        const track = page.items.find((item) => item.file.id === openTrackId);
+        if (track) {
+          setTracks((current) => current.some((item) => item.file.id === track.file.id) ? current : [track, ...current]);
+          setTab('tracks');
+          play(track, [track]);
+        } else {
+          toast('Трек больше недоступен', 'err');
+          navigate('/music', { replace: true });
+        }
+      })
+      .catch((e) => { toast((e as Error).message || 'Трек больше недоступен', 'err'); navigate('/music', { replace: true }); });
+  }, [openTrackId, tracks, navigate, toast]);
 
   async function duplicatePlaylist(playlist: MusicPlaylist) {
     try {

@@ -13,6 +13,7 @@ service TorrentApi {
   rpc AddTorrentFile  (AddTorrentFileRequest) returns (TorrentInfo);          // Добавить торрент из .torrent-файла
 
   rpc ListTorrents    (ListTorrentsRequest)   returns (ListTorrentsResponse); // Список торрентов пользователя
+  rpc SearchTorrents  (SearchTorrentsRequest) returns (SearchTorrentsResponse); // Поиск по имени и info hash
   rpc GetTorrent      (TorrentIdRequest)      returns (TorrentInfo);          // Один торрент
   rpc ListFiles       (TorrentIdRequest)      returns (ListFilesResponse);    // Файлы внутри торрента
 
@@ -88,6 +89,18 @@ message ListTorrentsRequest {}
 
 message ListTorrentsResponse {
   repeated TorrentInfo torrents = 1;
+}
+
+message SearchTorrentsRequest {
+  string query = 1;
+  int32 limit = 2;
+  string cursor = 3;
+}
+
+message SearchTorrentsResponse {
+  repeated TorrentInfo torrents = 1;
+  string next_cursor = 2;
+  bool has_more = 3;
 }
 
 message TorrentIdRequest {

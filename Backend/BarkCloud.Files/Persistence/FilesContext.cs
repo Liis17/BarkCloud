@@ -55,6 +55,10 @@ public class FilesContext : DbContext
 
     public DbSet<FileActivityEvent> FileActivityEvents { get; set; }
 
+    public DbSet<FileSearchAlias> FileSearchAliases { get; set; }
+
+    public DbSet<FileTag> FileTags { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<TempFile>()
@@ -235,6 +239,24 @@ public class FilesContext : DbContext
             b.Property(x => x.Kind).HasMaxLength(64);
             b.Property(x => x.Summary).HasMaxLength(512);
             b.Property(x => x.DetailsJson).HasColumnType("jsonb");
+        });
+
+        modelBuilder.Entity<FileSearchAlias>(b =>
+        {
+            b.HasKey(x => new { x.OwnerId, x.FileId });
+            b.Property(x => x.Value).HasMaxLength(120);
+            b.Property(x => x.NormalizedValue).HasMaxLength(120);
+            b.HasIndex(x => new { x.OwnerId, x.NormalizedValue });
+            b.HasOne<UploadFile>().WithMany().HasForeignKey(x => x.FileId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<FileTag>(b =>
+        {
+            b.HasKey(x => new { x.OwnerId, x.FileId, x.NormalizedValue });
+            b.Property(x => x.Value).HasMaxLength(50);
+            b.Property(x => x.NormalizedValue).HasMaxLength(50);
+            b.HasIndex(x => new { x.OwnerId, x.NormalizedValue });
+            b.HasOne<UploadFile>().WithMany().HasForeignKey(x => x.FileId).OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

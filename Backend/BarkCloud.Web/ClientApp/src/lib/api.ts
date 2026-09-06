@@ -49,9 +49,11 @@ export async function api<T = unknown>(path: string, opts: RequestInit = {}): Pr
   return data as T;
 }
 
-export const apiGet = <T = unknown>(path: string) => api<T>(path);
+export const apiGet = <T = unknown>(path: string, opts?: RequestInit) => api<T>(path, opts);
 export const apiPost = <T = unknown>(path: string, body?: unknown) =>
   api<T>(path, { method: 'POST', body: JSON.stringify(body || {}) });
+export const apiPut = <T = unknown>(path: string, body?: unknown) =>
+  api<T>(path, { method: 'PUT', body: JSON.stringify(body || {}) });
 
 /** Открыть системный диалог выбора файлов. */
 export function pickFiles({ accept, multiple = true }: { accept?: string; multiple?: boolean } = {}): Promise<File[]> {

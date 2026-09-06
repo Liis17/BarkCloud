@@ -142,6 +142,14 @@ service MusicApi {
   rpc ListSharedPlaylistsWithMe  (ListSharedMusicPlaylistsWithMeRequest)  returns (ListSharedMusicPlaylistsWithMeResponse); // Плейлисты, доступные мне
 }
 
+// Единый поиск по данным файлового сервиса. Торренты добавляет Web BFF отдельным вызовом.
+service SearchApi {
+  rpc Search                    (SearchRequest)                    returns (SearchResponse);
+  rpc ResolveHit                (SearchHitReference)               returns (SearchHit);
+  rpc GetFileSearchMetadata     (GetFileSearchMetadataRequest)     returns (FileSearchMetadata);
+  rpc ReplaceFileSearchMetadata (ReplaceFileSearchMetadataRequest) returns (FileSearchMetadata);
+}
+
 service DynamicFolderApi {
   rpc CreateDynamicFolder    (CreateDynamicFolderRequest)    returns (DynamicFolderInfo);            // Создать умную папку
   rpc UpdateDynamicFolder    (UpdateDynamicFolderRequest)    returns (DynamicFolderInfo);            // Изменить имя / критерии / иконку
@@ -1044,6 +1052,96 @@ message SearchFilesResponse {
   repeated FileEntryDetailed files = 1;                 // совпавшие записи (entry + файл с превью/URL)
   google.protobuf.Timestamp next_cursor_created_at = 2; // пусто = больше нет страниц
   string next_cursor_entry_id = 3;
+}
+
+// ============ Единый поиск ============
+
+enum SearchSection {
+  SEARCH_SECTION_UNSPECIFIED = 0;
+  SEARCH_SECTION_PHOTOS = 1;
+  SEARCH_SECTION_VIDEOS = 2;
+  SEARCH_SECTION_FILES = 3;
+  SEARCH_SECTION_TRACKS = 4;
+  SEARCH_SECTION_ALBUMS = 5;
+  SEARCH_SECTION_PLAYLISTS = 6;
+  SEARCH_SECTION_FOLDERS = 7;
+  SEARCH_SECTION_SHARED = 8;
+  SEARCH_SECTION_TRASH = 9;
+}
+
+enum SearchHitKind {
+  SEARCH_HIT_KIND_UNSPECIFIED = 0;
+  SEARCH_HIT_KIND_PHOTO = 1;
+  SEARCH_HIT_KIND_VIDEO = 2;
+  SEARCH_HIT_KIND_FILE = 3;
+  SEARCH_HIT_KIND_TRACK = 4;
+  SEARCH_HIT_KIND_ALBUM = 5;
+  SEARCH_HIT_KIND_PLAYLIST = 6;
+  SEARCH_HIT_KIND_FOLDER = 7;
+  SEARCH_HIT_KIND_DYNAMIC_FOLDER = 8;
+  SEARCH_HIT_KIND_SHARED_FILE = 9;
+  SEARCH_HIT_KIND_SHARED_FOLDER = 10;
+  SEARCH_HIT_KIND_SHARED_PLAYLIST = 11;
+  SEARCH_HIT_KIND_TRASH = 12;
+}
+
+message SearchSectionPage {
+  SearchSection section = 1;
+  int32 limit = 2;
+  string cursor = 3;
+}
+
+message SearchRequest {
+  string query = 1;
+  repeated SearchSectionPage pages = 2;
+}
+
+message SearchResponse {
+  repeated SearchSectionResult sections = 1;
+}
+
+message SearchSectionResult {
+  SearchSection section = 1;
+  repeated SearchHit hits = 2;
+  string next_cursor = 3;
+  bool has_more = 4;
+}
+
+message SearchHitReference {
+  SearchHitKind kind = 1;
+  string id = 2;
+}
+
+message SearchHit {
+  SearchHitKind kind = 1;
+  string id = 2;
+  string file_id = 3;
+  string entry_id = 4;
+  string title = 5;
+  string subtitle = 6;
+  string preview_url = 7;
+  MediaKind media_kind = 8;
+  bool favorite = 9;
+  string match_field = 10;
+  string match_value = 11;
+  google.protobuf.Timestamp created_at = 12;
+  int64 size = 13;
+  string owner_name = 14;
+}
+
+message GetFileSearchMetadataRequest {
+  string file_id = 1;
+}
+
+message ReplaceFileSearchMetadataRequest {
+  string file_id = 1;
+  string alias = 2; // пусто = удалить алиас
+  repeated string tags = 3;
+}
+
+message FileSearchMetadata {
+  string alias = 1;
+  repeated string tags = 2;
 }
 
 // ============ Публичные ссылки ============

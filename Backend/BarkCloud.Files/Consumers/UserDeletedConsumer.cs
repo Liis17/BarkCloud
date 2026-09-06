@@ -59,6 +59,8 @@ public class UserDeletedConsumer(
         var musicShares = await context.MusicPlaylistShareLinks.Where(x => x.OwnerId == userId).ExecuteDeleteAsync();
         var musicGrants = await context.MusicPlaylistGrants.Where(x => x.OwnerId == userId || x.RecipientId == userId).ExecuteDeleteAsync();
         var favorites = await context.FavoriteFiles.Where(x => x.OwnerId == userId).ExecuteDeleteAsync();
+        var aliases = await context.FileSearchAliases.Where(x => x.OwnerId == userId).ExecuteDeleteAsync();
+        var tags = await context.FileTags.Where(x => x.OwnerId == userId).ExecuteDeleteAsync();
         var shares = await context.ShareLinks.Where(x => x.OwnerId == userId).ExecuteDeleteAsync();
         var folderShares = await context.FolderShareLinks.Where(x => x.OwnerId == userId).ExecuteDeleteAsync();
         // Гранты доступа, где пользователь — владелец ИЛИ получатель (не оставляем висящие доступы на/от удалённого).
@@ -68,7 +70,7 @@ public class UserDeletedConsumer(
         metrics.Increment("accounts_cleaned_files");
 
         logger.LogInformation(
-            "Данные Files для пользователя {UserId} очищены: блобов откреплено {Files}, записей {Entries}, папок {Dirs}, альбомов {Albums} (элементов {AlbumItems}), избранного {Favorites}, ссылок {Shares}, публичных папок {FolderShares}, грантов файлов {Grants}, грантов папок {DirGrants}",
-            userId, files.Count, entries, dirs, albums + musicPlaylists, albumItems + musicItems, favorites, shares + musicShares, folderShares, grants + musicGrants, dirGrants);
+            "Данные Files для пользователя {UserId} очищены: блобов откреплено {Files}, записей {Entries}, папок {Dirs}, альбомов {Albums} (элементов {AlbumItems}), избранного {Favorites}, алиасов {Aliases}, тегов {Tags}, ссылок {Shares}, публичных папок {FolderShares}, грантов файлов {Grants}, грантов папок {DirGrants}",
+            userId, files.Count, entries, dirs, albums + musicPlaylists, albumItems + musicItems, favorites, aliases, tags, shares + musicShares, folderShares, grants + musicGrants, dirGrants);
     }
 }

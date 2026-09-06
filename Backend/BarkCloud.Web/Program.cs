@@ -68,6 +68,7 @@ builder.Services.AddGrpcClient<CloudApi.CloudApiClient>(o => o.Address = new Uri
 builder.Services.AddGrpcClient<AlbumApi.AlbumApiClient>(o => o.Address = new Uri(filesAddress));
 builder.Services.AddGrpcClient<MusicApi.MusicApiClient>(o => o.Address = new Uri(filesAddress));
 builder.Services.AddGrpcClient<DynamicFolderApi.DynamicFolderApiClient>(o => o.Address = new Uri(filesAddress));
+builder.Services.AddGrpcClient<SearchApi.SearchApiClient>(o => o.Address = new Uri(filesAddress));
 builder.Services.AddGrpcClient<TorrentApi.TorrentApiClient>(o => o.Address = new Uri(torrentAddress));
 
 // HttpClient для прокси-загрузки байтов в Files (на внутренний HTTP1-эндпоинт).
@@ -137,6 +138,7 @@ app.UseStaticFiles();
 
 app.MapWebEndpoints();
 app.MapCloudApiEndpoints();
+app.MapSearchEndpoints();
 app.MapTorrentApiEndpoints();
 app.MapSystemEndpoints();
 app.MapSettingsEndpoints();

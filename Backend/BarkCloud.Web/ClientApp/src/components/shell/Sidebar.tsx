@@ -17,6 +17,7 @@ const NAV_PRIMARY: NavItem[] = [
   { key: 'files', to: '/files', label: 'Файлы', icon: 'folder' },
   { key: 'torrents', to: '/torrents', label: 'Торренты', icon: 'torrent' },
 ];
+const NAV_SEARCH: NavItem = { key: 'search', to: '/search', label: 'Поиск', icon: 'search' };
 const NAV_SHARE: NavItem[] = [
   { key: 'shared', to: '/shared', label: 'Общие', icon: 'share' },
   { key: 'favorites', to: '/favorites', label: 'Избранное', icon: 'star' },
@@ -60,6 +61,7 @@ export function Sidebar() {
 
       <nav className="sb-nav">
         <div>
+          <div className="sb-items"><NavRow item={NAV_SEARCH} /></div>
           <div className="sb-section-label">Библиотека</div>
           <div className="sb-items">{NAV_PRIMARY.map((i) => <NavRow key={i.key} item={i} />)}</div>
         </div>

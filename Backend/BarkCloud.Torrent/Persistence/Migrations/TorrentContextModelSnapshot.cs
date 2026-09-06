@@ -75,6 +75,8 @@ namespace BarkCloud.Torrent.Persistence.Migrations
 
                     b.HasIndex("UserId");
 
+                    b.HasIndex("UserId", "Name");
+
                     b.ToTable("Torrents");
                 });
 

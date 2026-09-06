@@ -1,4 +1,5 @@
 import React from 'react';
+import { useLocation } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import { EmptyState, Loading } from '../components/ui/EmptyState';
 import { SharedFolderModal } from '../components/ui/SharedFolderModal';
@@ -138,10 +139,10 @@ function LinkCard({ link, onCopy, onRevoke }: { link: ShareLink; onCopy: (l: Sha
   );
 }
 
-function SharedCard({ item, onDownload }: { item: SharedItem; onDownload: (it: SharedItem) => void }) {
+function SharedCard({ item, onDownload, opened }: { item: SharedItem; onDownload: (it: SharedItem) => void; opened?: boolean }) {
   const preview = item.file.previews && item.file.previews[0];
   return (
-    <div className="link-card">
+    <div id={opened ? `search-shared-grant-${item.grantId}` : undefined} className={'link-card' + (opened ? ' search-open-card' : '')}>
       <div className="link-icon" style={{ overflow: 'hidden' }}>
         {preview ? (
           <img src={preview.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -288,6 +289,8 @@ function byCreatedDesc(a: ShareLink, b: ShareLink): number {
 }
 
 export function SharedPage() {
+  const location = useLocation();
+  const openGrantId = new URLSearchParams(location.search).get('open') || '';
   const [tab, setTab] = React.useState<'public' | 'ishared' | 'mine'>('public');
   const [links, setLinks] = React.useState<ShareLink[] | null>(null);
   const [iShared, setIShared] = React.useState<ISharedItem[] | null>(null);
@@ -374,6 +377,19 @@ export function SharedPage() {
     loadIShared();
     loadShared();
   }, [loadPublic, loadIShared, loadShared]);
+  React.useEffect(() => {
+    if (!openGrantId || !shared || !sharedFolders) return;
+    const folder = sharedFolders.find((item) => item.grantId === openGrantId);
+    if (folder) {
+      setTab('mine');
+      setOpenFolder({ id: folder.directoryId, name: folder.name });
+      return;
+    }
+    if (shared.some((item) => item.grantId === openGrantId)) {
+      setTab('mine');
+      requestAnimationFrame(() => document.getElementById(`search-shared-grant-${openGrantId}`)?.scrollIntoView({ block: 'center' }));
+    }
+  }, [openGrantId, shared, sharedFolders]);
 
   const hasPubMore = !!(pubCursors.file || pubCursors.folder || pubCursors.album || pubCursors.musicPlaylist);
 
@@ -649,7 +665,7 @@ export function SharedPage() {
                   </div>
                 </div>
                 {shared.map((it) => (
-                  <SharedCard key={it.grantId} item={it} onDownload={download} />
+                  <SharedCard key={it.grantId} item={it} onDownload={download} opened={it.grantId === openGrantId} />
                 ))}
               </>
             )}

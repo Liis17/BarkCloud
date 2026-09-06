@@ -1303,6 +1303,7 @@ public static class CloudApiEndpoints
             AuthGateway auth,
             FilesServerApi.FilesServerApiClient filesServer,
             FilesApi.FilesApiClient filesUser,
+            SearchApi.SearchApiClient search,
             string? id) =>
         {
             var user = await auth.AuthenticateAsync(http);
@@ -1321,6 +1322,7 @@ public static class CloudApiEndpoints
                     return Results.Json(new { error = "Нет доступа" }, Json, statusCode: 403);
 
                 object? metadataJson = null;
+                FileSearchMetadata? searchMetadata = null;
                 try
                 {
                     var metaResp = await filesUser.GetFileMetadataAsync(
@@ -1332,6 +1334,18 @@ public static class CloudApiEndpoints
                 catch (RpcException)
                 {
                     // Метаданных может ещё не быть (бэкафилл не дошёл) — это не ошибка модалки.
+                }
+
+                try
+                {
+                    searchMetadata = await search.GetFileSearchMetadataAsync(
+                        new GetFileSearchMetadataRequest { FileId = id },
+                        BrowserContext.UserToken(user.AccessToken), deadline: DateTime.UtcNow.AddSeconds(5),
+                        cancellationToken: http.RequestAborted);
+                }
+                catch (RpcException)
+                {
+                    // Поисковые метаданные необязательны для открытия свойств.
                 }
 
                 var (iconKind, ext) = FileKind.Classify(f.FileName);
@@ -1358,7 +1372,9 @@ public static class CloudApiEndpoints
                     createdAt = f.CreatedAt?.ToDateTimeOffset(),
                     uploadedAt = f.UploadedAt?.ToDateTimeOffset(),
                     uploadDeviceName = f.UploadDeviceName,
-                    metadata = metadataJson
+                    metadata = metadataJson,
+                    searchAlias = searchMetadata?.Alias ?? string.Empty,
+                    tags = searchMetadata?.Tags.ToArray() ?? Array.Empty<string>()
                 }, Json);
             }
             catch (RpcException ex) when (ex.StatusCode == StatusCode.NotFound)

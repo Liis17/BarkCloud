@@ -1,4 +1,5 @@
 import React from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import { EmptyState, Loading } from '../components/ui/EmptyState';
 import { AlbumCard } from '../components/albums/AlbumCard';
@@ -12,11 +13,15 @@ import type { Album, MediaItem } from '../lib/types';
 
 /** Отдельная вкладка «Альбомы» (бывшая вкладка внутри Фото/Видео). */
 export function AlbumsPage() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const openAlbumId = new URLSearchParams(location.search).get('album') || '';
   const [albums, setAlbums] = React.useState<Album[] | null>(null);
   const [openAlbum, setOpenAlbum] = React.useState<Album | null>(null);
   const [creating, setCreating] = React.useState(false);
   const [candidates, setCandidates] = React.useState<MediaItem[]>([]);
   const [toastNode, toast] = useToast();
+  const resolvedOpenId = React.useRef('');
 
   const loadAlbums = React.useCallback(() => {
     apiGet<{ albums: Album[] }>('/api/albums')
@@ -30,6 +35,20 @@ export function AlbumsPage() {
   React.useEffect(() => {
     loadAlbums();
   }, [loadAlbums]);
+
+  React.useEffect(() => {
+    if (!openAlbumId || !albums || resolvedOpenId.current === openAlbumId) return;
+    resolvedOpenId.current = openAlbumId;
+    const album = albums.find((item) => item.id === openAlbumId);
+    if (album) {
+      setOpenAlbum(album);
+      return;
+    }
+    apiGet(`/api/search/hit?kind=album&id=${encodeURIComponent(openAlbumId)}`)
+      .then(() => toast('Альбом недоступен в текущем списке', 'err'))
+      .catch((e) => toast((e as Error).message || 'Альбом больше недоступен', 'err'))
+      .finally(() => navigate('/albums', { replace: true }));
+  }, [openAlbumId, albums, navigate, toast]);
 
   // Кандидаты для PickMediaModal (последние фото и видео) — лениво, при первом открытии альбома.
   const candidatesLoaded = React.useRef(false);

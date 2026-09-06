@@ -16,6 +16,24 @@ public class TorrentStore : ITorrentStore
             .OrderByDescending(t => t.AddedAt)
             .ToListAsync();
 
+    public Task<List<TorrentEntity>> SearchByUser(long userId, string query, CancellationToken cancellationToken = default)
+    {
+        var pattern = LikeContainsPattern(query);
+        return _context.Torrents.AsNoTracking()
+            .Where(t => t.UserId == userId
+                && (EF.Functions.ILike(t.Name, pattern, "\\")
+                    || EF.Functions.ILike(t.InfoHash, pattern, "\\")
+                    || query.Length >= 4 && EF.Functions.TrigramsWordSimilarity(t.Name, query) >= .45d))
+            .OrderByDescending(t => t.AddedAt)
+            .ThenByDescending(t => t.Id)
+            .ToListAsync(cancellationToken);
+    }
+
+    private static string LikeContainsPattern(string query)
+        => "%" + query.Replace("\\", "\\\\", StringComparison.Ordinal)
+            .Replace("%", "\\%", StringComparison.Ordinal)
+            .Replace("_", "\\_", StringComparison.Ordinal) + "%";
+
     public Task<List<TorrentEntity>> ListAll() =>
         _context.Torrents.Include(t => t.Files).ToListAsync();
 

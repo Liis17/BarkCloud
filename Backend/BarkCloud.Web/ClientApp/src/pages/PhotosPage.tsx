@@ -1,5 +1,5 @@
 import React from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import { MediaThumb } from '../components/media/MediaThumb';
 import { Lightbox } from '../components/media/Lightbox';
@@ -15,6 +15,7 @@ import { usePageHeader } from '../hooks/usePageHeader';
 import { useUploadActions } from '../hooks/useUploadManager';
 import { apiGet, pickFiles } from '../lib/api';
 import { GRID_SIZES, plural, groupByDate } from '../lib/format';
+import { searchHitToCardFile, type SearchHit } from '../lib/search';
 import type { Album, MediaItem } from '../lib/types';
 
 function Photo({ m, selecting, checked, onToggle, onOpen, onMenu }: {
@@ -46,15 +47,33 @@ function Photo({ m, selecting, checked, onToggle, onOpen, onMenu }: {
 
 export function PhotosPage() {
   const location = useLocation();
+  const navigate = useNavigate();
   const searchQuery = (new URLSearchParams(location.search).get('q') || '').trim();
+  const openFileId = new URLSearchParams(location.search).get('open') || '';
   const [albums, setAlbums] = React.useState<Album[] | null>(null);
   const [lightbox, setLightbox] = React.useState<number | null>(null);
+  const [deepMedia, setDeepMedia] = React.useState<MediaItem | null>(null);
+  const resolvedOpenId = React.useRef('');
   // Инкремент при удалении фото — «В этот день» перезагружается, иначе там остаётся удалённый снимок.
   const [memKey, setMemKey] = React.useState(0);
   const [toastNode, toast] = useToast();
   const { enqueue, attachVersion } = useUploadActions();
 
   const { items: photos, loading, done, sentinelRef, removeItem, updateItem, prependItems } = useInfiniteMedia('photo', toast);
+
+  React.useEffect(() => {
+    if (!openFileId || resolvedOpenId.current === openFileId) return;
+    const index = photos.findIndex((item) => item.id === openFileId);
+    if (index >= 0) {
+      resolvedOpenId.current = openFileId;
+      setLightbox(index);
+      return;
+    }
+    resolvedOpenId.current = openFileId;
+    apiGet<SearchHit>(`/api/search/hit?kind=photo&id=${encodeURIComponent(openFileId)}`)
+      .then((hit) => setDeepMedia({ ...searchHitToCardFile(hit), entriesCount: 0, entryNames: [], entryIds: [] }))
+      .catch((e) => { toast((e as Error).message || 'Фото больше недоступно', 'err'); navigate('/photos', { replace: true }); });
+  }, [openFileId, photos, toast, navigate]);
 
   const loadAlbums = React.useCallback(() => {
     apiGet<{ albums: Album[] }>('/api/albums')
@@ -216,6 +235,7 @@ export function PhotosPage() {
       </div>
 
       {lightbox !== null && <Lightbox items={photos} index={lightbox} actions={actionsCtx.api} onClose={() => setLightbox(null)} />}
+      {deepMedia && <Lightbox media={deepMedia} actions={actionsCtx.api} onClose={() => { setDeepMedia(null); navigate('/photos', { replace: true }); }} />}
     </>
   );
 }

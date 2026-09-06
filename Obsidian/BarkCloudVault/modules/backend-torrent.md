@@ -38,3 +38,7 @@ enum MonoTorrent (`DoNotDownload/Low/Normal/High`): их числовые зна
 - Контракт: `Shared/BarkCloud.Proto/torrent_api.proto` → [[modules/shared-proto]].
 - Конфиг-дефолты (порты/БД/DownloadPath/inter-service) — [[modules/backend-configuration]] (`ServiceId.Torrent=7`).
 - Генерация compose/nginx/.env — [[modules/tools-builder]] (тогл `IncludeTorrent`).
+
+## Поиск
+
+`TorrentApi.SearchTorrents(query, limit, cursor)` отдаёт постраничный список собственных торрентов. Поиск сопоставляет имя и info hash; курсор — UUID последнего результата. Миграция `20260906151000_AddTorrentSearchIndexes` включает `pg_trgm`, обычный индекс `(UserId, Name)` и concurrent GIN trigram-индексы имени/info hash.

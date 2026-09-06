@@ -1,4 +1,5 @@
 import React from 'react';
+import { useLocation } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import { EmptyState, Loading } from '../components/ui/EmptyState';
 import { ConfirmModal } from '../components/ui/ConfirmModal';
@@ -29,16 +30,17 @@ function purgeLeft(iso: string | null): string {
   return `через ${hours} ${plural(hours, 'час', 'часа', 'часов')}`;
 }
 
-function TrashRow({ item, bulkChecked, onBulkToggle, onRestore, onPurge }: {
+function TrashRow({ item, bulkChecked, onBulkToggle, onRestore, onPurge, opened }: {
   item: TrashItem;
   bulkChecked: boolean;
   onBulkToggle: (i: TrashItem) => void;
   onRestore: (i: TrashItem) => void;
   onPurge: (i: TrashItem) => void;
+  opened?: boolean;
 }) {
   const m = item.media || ({} as NonNullable<TrashItem['media']>);
   return (
-    <tr className={bulkChecked ? 'checked' : ''}>
+    <tr id={opened ? `search-open-${item.entryId}` : undefined} className={(bulkChecked ? 'checked ' : '') + (opened ? 'search-open-row' : '')}>
       <td className="selcell">
         <input type="checkbox" checked={bulkChecked} onChange={() => onBulkToggle(item)} />
       </td>
@@ -70,6 +72,8 @@ function TrashRow({ item, bulkChecked, onBulkToggle, onRestore, onPurge }: {
 }
 
 export function TrashPage() {
+  const location = useLocation();
+  const openEntryId = new URLSearchParams(location.search).get('open') || '';
   const [items, setItems] = React.useState<TrashItem[] | null>(null);
   const [bulkPurgeConfirm, setBulkPurgeConfirm] = React.useState(false);
   const [toastNode, toast] = useToast();
@@ -86,6 +90,10 @@ export function TrashPage() {
       });
   }, [toast, fsel.clear]);
   React.useEffect(load, [load]);
+  React.useEffect(() => {
+    if (!openEntryId || !items?.some((item) => item.entryId === openEntryId)) return;
+    document.getElementById(`search-open-${openEntryId}`)?.scrollIntoView({ block: 'center' });
+  }, [openEntryId, items]);
 
   async function restore(item: TrashItem) {
     try {
@@ -220,6 +228,7 @@ export function TrashPage() {
                       onBulkToggle={(t) => fsel.toggle(t.entryId)}
                       onRestore={restore}
                       onPurge={purge}
+                      opened={it.entryId === openEntryId}
                     />
                   ))}
                 </tbody>
