@@ -141,8 +141,11 @@ public enum Barkcloud_Files_DfField: SwiftProtobuf.Enum, Swift.CaseIterable {
   /// Высота изображения
   case dfImgHeight // = 8
 
-  /// Имя устройства загрузки
+  /// Имя устройства загрузки (сохранено для совместимости)
   case dfDevice // = 9
+
+  /// Устройство из метаданных (Make + Model)
+  case dfMetadataDevice // = 10
   case UNRECOGNIZED(Int)
 
   public init() {
@@ -161,6 +164,7 @@ public enum Barkcloud_Files_DfField: SwiftProtobuf.Enum, Swift.CaseIterable {
     case 7: self = .dfImgWidth
     case 8: self = .dfImgHeight
     case 9: self = .dfDevice
+    case 10: self = .dfMetadataDevice
     default: self = .UNRECOGNIZED(rawValue)
     }
   }
@@ -177,6 +181,7 @@ public enum Barkcloud_Files_DfField: SwiftProtobuf.Enum, Swift.CaseIterable {
     case .dfImgWidth: return 7
     case .dfImgHeight: return 8
     case .dfDevice: return 9
+    case .dfMetadataDevice: return 10
     case .UNRECOGNIZED(let i): return i
     }
   }
@@ -193,6 +198,7 @@ public enum Barkcloud_Files_DfField: SwiftProtobuf.Enum, Swift.CaseIterable {
     .dfImgWidth,
     .dfImgHeight,
     .dfDevice,
+    .dfMetadataDevice,
   ]
 
 }
@@ -3726,7 +3732,7 @@ extension Barkcloud_Files_UploadFileType: SwiftProtobuf._ProtoNameProviding {
 }
 
 extension Barkcloud_Files_DfField: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0DF_FIELD_NONE\0\u{1}DF_DATE\0\u{1}DF_TAKEN_AT\0\u{1}DF_SIZE\0\u{1}DF_NAME\0\u{1}DF_MEDIA_KIND\0\u{1}DF_EXTENSION\0\u{1}DF_IMG_WIDTH\0\u{1}DF_IMG_HEIGHT\0\u{1}DF_DEVICE\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0DF_FIELD_NONE\0\u{1}DF_DATE\0\u{1}DF_TAKEN_AT\0\u{1}DF_SIZE\0\u{1}DF_NAME\0\u{1}DF_MEDIA_KIND\0\u{1}DF_EXTENSION\0\u{1}DF_IMG_WIDTH\0\u{1}DF_IMG_HEIGHT\0\u{1}DF_DEVICE\0\u{1}DF_METADATA_DEVICE\0")
 }
 
 extension Barkcloud_Files_DfOperator: SwiftProtobuf._ProtoNameProviding {

@@ -79,6 +79,7 @@ public static class DynamicFolderQueryBuilder
             case DfField.Name:
             case DfField.Extension:
             case DfField.Device:
+            case DfField.MetadataDevice:
                 return value.Length > 0;
             default:
                 return false;
@@ -177,14 +178,41 @@ public static class DynamicFolderQueryBuilder
                 if (value.Length == 0)
                     return false;
                 var device = value.ToLower();
-                predicate = rule.Operator == DfOperator.Equals
-                    ? f => f.UploadDeviceName != null && f.UploadDeviceName.ToLower() == device
-                    : f => f.UploadDeviceName != null && f.UploadDeviceName.ToLower().Contains(device);
+                predicate = rule.Operator switch
+                {
+                    DfOperator.Equals => f => f.UploadDeviceName != null && f.UploadDeviceName.ToLower() == device,
+                    DfOperator.StartsWith => f => f.UploadDeviceName != null && f.UploadDeviceName.ToLower().StartsWith(device),
+                    DfOperator.EndsWith => f => f.UploadDeviceName != null && f.UploadDeviceName.ToLower().EndsWith(device),
+                    _ => f => f.UploadDeviceName != null && f.UploadDeviceName.ToLower().Contains(device),
+                };
+                return true;
+
+            case DfField.MetadataDevice:
+                if (value.Length == 0)
+                    return false;
+                var metadataDevice = value.ToLower();
+                predicate = BuildMetadataDeviceRule(ctx, rule.Operator, metadataDevice);
                 return true;
 
             default:
                 return false;
         }
+    }
+
+    private static Expression<Func<UploadFile, bool>> BuildMetadataDeviceRule(
+        FilesContext ctx, DfOperator op, string device)
+    {
+        return op switch
+        {
+            DfOperator.Equals => f => ctx.FileMetadata.Any(m => m.FileId == f.Id
+                && ((m.CameraMake ?? string.Empty) + " " + (m.CameraModel ?? string.Empty)).Trim().ToLower() == device),
+            DfOperator.StartsWith => f => ctx.FileMetadata.Any(m => m.FileId == f.Id
+                && ((m.CameraMake ?? string.Empty) + " " + (m.CameraModel ?? string.Empty)).Trim().ToLower().StartsWith(device)),
+            DfOperator.EndsWith => f => ctx.FileMetadata.Any(m => m.FileId == f.Id
+                && ((m.CameraMake ?? string.Empty) + " " + (m.CameraModel ?? string.Empty)).Trim().ToLower().EndsWith(device)),
+            _ => f => ctx.FileMetadata.Any(m => m.FileId == f.Id
+                && ((m.CameraMake ?? string.Empty) + " " + (m.CameraModel ?? string.Empty)).Trim().ToLower().Contains(device)),
+        };
     }
 
     private static bool TryBuildDate(DfOperator op, string value, DateTime now, out Expression<Func<UploadFile, bool>> predicate)

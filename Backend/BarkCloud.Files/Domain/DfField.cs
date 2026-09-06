@@ -15,5 +15,6 @@ public enum DfField
     Extension = 6,   // расширение из Filename
     ImageWidth = 7,  // UploadFile.ImageWidth
     ImageHeight = 8, // UploadFile.ImageHeight
-    Device = 9       // UploadFile.UploadDeviceName
+    Device = 9,         // UploadFile.UploadDeviceName (старое имя)
+    MetadataDevice = 10 // FileMetadata.CameraMake + CameraModel
 }

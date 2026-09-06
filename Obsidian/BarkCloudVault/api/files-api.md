@@ -121,6 +121,8 @@ Package: `barkcloud.files`
 | `ListDynamicFolders(ListDynamicFoldersRequest) → ListDynamicFoldersResponse` | Системные + пользовательские папки с count/cover |
 | `ListDynamicFolderItems(ListDynamicFolderItemsRequest) → ListDynamicFolderItemsResponse` | Содержимое папки, cursor `(cursor_created_at + cursor_file_id)`, опциональный `kind_filter` |
 
+Поля `DfField.DF_DEVICE=9` и `DfField.DF_METADATA_DEVICE=10` разделяют устройство загрузки (`UploadFile.UploadDeviceName`) и устройство из метаданных (`FileMetadata.CameraMake + CameraModel`). Значение метаданных строится как отображаемая строка Make/Model; отсутствие метаданных не даёт совпадения.
+
 ## Сервис: `FilesServerApi` (служебный)
 
 Все RPC реализованы:
