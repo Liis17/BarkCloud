@@ -26,6 +26,11 @@
 - `Host/TorrentController` — http1 download (Range, проверка владельца).
 - `Consumers/UserDeletedConsumer` — чистит торренты и папку пользователя при удалении аккаунта.
 
+Приоритет файла в `TorrentMapper` преобразуется явно между enum API (`Skip/Low/Normal/High`) и
+enum MonoTorrent (`DoNotDownload/Low/Normal/High`): их числовые значения не совпадают.
+Это преобразование используется при отображении файлов, изменении приоритета и восстановлении
+торрента после перезапуска.
+
 ## Живой прогресс (веб)
 Браузер `EventSource('/api/torrents/stream')` → [[modules/backend-web]] SSE-эндпоинт → gRPC `StreamProgress` к `cloud-torrent:7027`. WebSocket/SignalR в проекте не используется. Вкладка «Торренты» — `ClientApp/src/pages/TorrentsPage.tsx` + `hooks/useTorrentStream.tsx`.
 
