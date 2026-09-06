@@ -10,6 +10,7 @@ public enum DeploymentJobKind
     Restart,
     Start,
     Stop,
+    SwitchBranch,
 }
 
 /// <summary>Состояние всей задачи обслуживания.</summary>
@@ -18,6 +19,7 @@ public enum DeploymentJobState
 {
     Queued,
     Running,
+    AwaitingReconnect,
     Completed,
     Failed,
 }
@@ -30,6 +32,7 @@ public enum DeploymentStepState
     InProgress,
     Completed,
     Failed,
+    Skipped,
 }
 
 /// <summary>Один последовательный шаг задачи обслуживания.</summary>
@@ -37,9 +40,13 @@ public sealed class DeploymentStep
 {
     public string Service { get; init; } = string.Empty;
 
+    public string? Branch { get; init; }
+
     public DeploymentStepState State { get; set; } = DeploymentStepState.Pending;
 
     public string? Message { get; set; }
+
+    public string? Diagnostic { get; set; }
 
     public bool RolledBack { get; set; }
 }
@@ -58,6 +65,10 @@ public sealed class DeploymentJob
     public DeploymentJobState State { get; set; } = DeploymentJobState.Queued;
 
     public string? Error { get; set; }
+
+    public string? Diagnostic { get; set; }
+
+    public bool RequiresReconnect { get; set; }
 
     public DateTime CreatedAtUtc { get; init; }
 

@@ -1,0 +1,109 @@
+name: "BarkCloud Docker version"
+description: "Вычисляет следующий SemVer patch-тег для ветки BarkCloud и набор тегов образа"
+inputs:
+  image:
+    description: "Имя образа без registry и branch suffix"
+    required: true
+  registry:
+    description: "Docker Registry"
+    required: false
+    default: "docker.barkfluff.com"
+  username:
+    description: "Registry username для чтения тегов"
+    required: false
+    default: ""
+  password:
+    description: "Registry password для чтения тегов"
+    required: false
+    default: ""
+outputs:
+  version:
+    description: "Новая SemVer patch-версия"
+    value: ${{ steps.version.outputs.version }}
+  repository:
+    description: "Репозиторий с branch suffix"
+    value: ${{ steps.version.outputs.repository }}
+  tags:
+    description: "Версионный, latest и SHA-теги"
+    value: ${{ steps.version.outputs.tags }}
+  tag_sha:
+    description: "SHA-тег образа"
+    value: ${{ steps.version.outputs.tag_sha }}
+  tag_version:
+    description: "Полный тег с SemVer-версией"
+    value: ${{ steps.version.outputs.tag_version }}
+runs:
+  using: composite
+  steps:
+    - name: "Вычислить следующую patch-версию"
+      id: version
+      shell: bash
+      env:
+        IMAGE: ${{ inputs.image }}
+        REGISTRY: ${{ inputs.registry }}
+        REGISTRY_USERNAME: ${{ inputs.username }}
+        REGISTRY_PASSWORD: ${{ inputs.password }}
+        REF_NAME: ${{ github.ref_name }}
+        SHA: ${{ github.sha }}
+      run: |
+        set -euo pipefail
+
+        case "$REF_NAME" in
+          master) suffix="" ;;
+          nightly) suffix="-nightly" ;;
+          dev) suffix="-dev" ;;
+          *) echo "Ветка $REF_NAME не поддерживает публикацию BarkCloud-образов" >&2; exit 1 ;;
+        esac
+
+        repository="${IMAGE}${suffix}"
+        response_file="$(mktemp)"
+        trap 'rm -f "$response_file"' EXIT
+        if [ -n "$REGISTRY_USERNAME" ] && [ -n "$REGISTRY_PASSWORD" ]; then
+          http_code="$(curl -k --silent --show-error --retry 2 \
+            --user "$REGISTRY_USERNAME:$REGISTRY_PASSWORD" \
+            --output "$response_file" --write-out '%{http_code}' \
+            "https://${REGISTRY}/v2/${repository}/tags/list")" || {
+            echo "Не удалось связаться с Docker Registry" >&2
+            exit 1
+          }
+        else
+          http_code="$(curl -k --silent --show-error --retry 2 \
+            --output "$response_file" --write-out '%{http_code}' \
+            "https://${REGISTRY}/v2/${repository}/tags/list")" || {
+            echo "Не удалось связаться с Docker Registry" >&2
+            exit 1
+          }
+        fi
+
+        case "$http_code" in
+          200) tags_json="$(<"$response_file")" ;;
+          404) tags_json="" ;; # первое опубликованное изображение в новом репозитории
+          *) echo "Docker Registry вернул HTTP ${http_code} для ${repository}" >&2; exit 1 ;;
+        esac
+
+        latest=""
+        if [ -n "$tags_json" ]; then
+          latest="$(printf '%s' "$tags_json" \
+            | grep -oE '"[0-9]+\.[0-9]+\.[0-9]+"' \
+            | tr -d '"' \
+            | sort -V \
+            | tail -n 1 || true)"
+        fi
+
+        if [ -z "$latest" ]; then
+          version="1.0.0"
+        else
+          IFS=. read -r major minor patch <<< "$latest"
+          version="${major}.${minor}.$((patch + 1))"
+        fi
+
+        tag_version="${REGISTRY}/${repository}:${version}"
+        tag_latest="${REGISTRY}/${repository}:latest"
+        tag_sha="${REGISTRY}/${repository}:${SHA}"
+        {
+          echo "version=${version}"
+          echo "repository=${repository}"
+          echo "tags=${tag_version},${tag_latest},${tag_sha}"
+          echo "tag_sha=${tag_sha}"
+          echo "tag_version=${tag_version}"
+        } >> "$GITHUB_OUTPUT"

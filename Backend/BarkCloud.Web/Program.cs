@@ -74,6 +74,14 @@ builder.Services.AddGrpcClient<TorrentApi.TorrentApiClient>(o => o.Address = new
 builder.Services.AddHttpClient("files-upload");
 // HttpClient для прокси-скачивания файлов торрентов с диска (Range).
 builder.Services.AddHttpClient("torrent");
+// Реестр версий читается без авторизации; короткий in-memory cache снижает число запросов
+// при параллельной загрузке строк раздела «Обслуживание».
+builder.Services.AddMemoryCache();
+builder.Services.AddHttpClient<DockerRegistryService>(client =>
+{
+    client.BaseAddress = new Uri($"https://{DockerRegistryService.RegistryHost}");
+    client.Timeout = TimeSpan.FromSeconds(10);
+});
 
 // Загрузка файлов без лимита размера: снимаем лимиты тела запроса, multipart-формы и
 // минимальной скорости (иначе большой файл на медленном канале оборвётся до таймаута).
@@ -97,6 +105,8 @@ builder.Services.AddGrpcClient<FilesServerApi.FilesServerApiClient>(o => o.Addre
 builder.Services.AddSingleton<TemplateRenderer>();
 builder.Services.AddSingleton<PageService>();
 builder.Services.AddSingleton<AdminGate>();
+builder.Services.AddSingleton<ComposeImageService>();
+builder.Services.AddSingleton<MaintenanceOperationStore>();
 builder.Services.AddSingleton<DockerService>();
 builder.Services.AddSingleton<IDockerDeployment>(sp => sp.GetRequiredService<DockerService>());
 builder.Services.AddSingleton<DeploymentJobOptions>();

@@ -51,6 +51,10 @@ permissions:
   contents: read
   actions: write
 
+concurrency:
+  group: barkcloud-image-${{ inputs.image-name }}-${{ github.ref_name }}
+  cancel-in-progress: false
+
 jobs:
   changes:
     name: "Определение изменений"
@@ -207,17 +211,14 @@ jobs:
       - name: "Set up Docker Buildx"
         uses: docker/setup-buildx-action@v2
 
-      - name: "Set tags"
-        id: vars
-        run: |
-          if [ "${{ github.ref_name }}" = "dev" ]; then
-            image="${{ inputs.image-name }}-dev"
-          else
-            image="${{ inputs.image-name }}"
-          fi
-
-          echo "tags=docker.barkfluff.com/${image}:latest,docker.barkfluff.com/${image}:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
-          echo "tag_sha=docker.barkfluff.com/${image}:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+      - name: "Вычисление SemVer Docker-образа"
+        id: docker-version
+        uses: ./.github/actions/docker-version
+        with:
+          image: ${{ inputs.image-name }}
+          registry: docker.barkfluff.com
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
 
       - name: "Build and Push Docker image"
         uses: docker/build-push-action@v4
@@ -225,7 +226,7 @@ jobs:
           context: .
           file: ./${{ inputs.dockerfile }}
           push: true
-          tags: ${{ steps.vars.outputs.tags }}
+          tags: ${{ steps.docker-version.outputs.tags }}
 
       - name: "Уведомление: сборка готова"
         if: success()
@@ -240,7 +241,7 @@ jobs:
             📌 Ветка: `${{ github.ref_name }}`
             🔗 Коммит: `${{ github.sha }}`
             👤 Автор: *${{ github.actor }}*
-            🏷️ Тег: `${{ steps.vars.outputs.tag_sha }}`
+            🏷️ Тег: `${{ steps.docker-version.outputs.tag_sha }}`
         run: bash .github/scripts/send-telegram.sh
 
       - name: "Уведомление: сборка провалена"

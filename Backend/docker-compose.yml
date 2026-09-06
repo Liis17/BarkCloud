@@ -133,8 +133,9 @@ services:
       App__AdminPassword: "${WEB_ADMIN_PASSWORD}"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ./docker-compose.yml:/docker-compose.yml:ro
+      - ./docker-compose.yml:/docker-compose.yml:rw
       - ./.env:/.env:ro
+      - cloud-web-maintenance:/app/maintenance
     networks:
       - barkcloud-network
     depends_on:
@@ -243,3 +244,4 @@ volumes:
   seq_data:
   archive_temp:
   torrent_data:
+  cloud-web-maintenance:

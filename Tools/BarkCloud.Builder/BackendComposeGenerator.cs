@@ -11,8 +11,13 @@ public static class BackendComposeGenerator
 {
     public static string BuildCompose(BuilderModel m)
     {
-        // Образ приложения: docker.barkfluff.com/barkcloud-<svc>[-dev]:latest
-        string suffix = m.ImageChannel == "Dev" ? "-dev" : "";
+        // Образ приложения: docker.barkfluff.com/barkcloud-<svc>[-nightly|-dev]:latest
+        string suffix = m.ImageChannel switch
+        {
+            "Nightly" => "-nightly",
+            "Dev" => "-dev",
+            _ => "",
+        };
         string Img(string name) => $"{BuilderModel.ImageRegistry}/barkcloud-{name}{suffix}:latest";
 
         // Все сервисы доступны только внутри barkcloud-network.
@@ -182,8 +187,9 @@ services:
       App__AdminPassword: "${WEB_ADMIN_PASSWORD}"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ./docker-compose.yml:/docker-compose.yml:ro
+      - ./docker-compose.yml:/docker-compose.yml:rw
       - ./.env:/.env:ro
+      - cloud-web-maintenance:/app/maintenance
     networks:
       - barkcloud-network
     depends_on:
@@ -338,6 +344,7 @@ volumes:
         if (m.IncludeSeq) sb.Append("  seq_data:\n");
         sb.Append("  archive_temp:\n");
         if (m.IncludeTorrent) sb.Append("  torrent_data:\n");
+        sb.Append("  cloud-web-maintenance:\n");
 
         return sb.ToString();
     }

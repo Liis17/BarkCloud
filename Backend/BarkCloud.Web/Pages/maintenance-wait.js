@@ -1,17 +1,24 @@
 (function () {
     const checkIntervalMs = 3000;
     const requiredSuccessCount = 3;
+    const maxWaitSeconds = 90;
 
     function start({ initialDelayMs, pageServerStartedAt, target = '/settings#system' }) {
         let seconds = 0;
         let successCount = 0;
         let checkInProgress = false;
         let redirectStarted = false;
+        let timeoutShown = false;
         const timer = document.getElementById('timer');
+        const waitError = document.getElementById('wait-error');
 
         setInterval(() => {
             seconds++;
             if (timer) timer.textContent = seconds;
+            if (seconds >= maxWaitSeconds && !timeoutShown) {
+                timeoutShown = true;
+                if (waitError) waitError.hidden = false;
+            }
         }, 1000);
 
         function goBack() {

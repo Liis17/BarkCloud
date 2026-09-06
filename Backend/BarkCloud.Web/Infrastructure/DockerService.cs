@@ -8,10 +8,56 @@ namespace BarkCloud.Web.Infrastructure;
 public sealed record ServiceActionResult(bool Success, string Message, string? ErrorDetails = null);
 
 /// <summary>Статус управляемого сервиса (для UI).</summary>
-public sealed record ServiceStatus(string Service, string Container, string State, string Status, string Image, bool IsWeb);
+public sealed record ServiceStatus(string Service, string Container, string State, string Status, string Image, bool IsWeb)
+{
+    public string ComposeService { get; init; } = string.Empty;
+    public string? ImageDigest { get; init; }
+    public ImageVersionStatus Version { get; init; } = new();
+    public string? Branch => Version.Branch;
+    public string? CurrentVersion => Version.CurrentVersion;
+    public string? LatestVersion => Version.LatestVersion;
+    public bool? UpdateAvailable => Version.UpdateAvailable;
+    public string VersionState => Version.State;
+    public string? VersionError => Version.Error;
+}
 
 /// <summary>Снимок состояния сервисов + доступность Docker (чтобы UI не оставался пустым при сбое).</summary>
-public sealed record ServicesSnapshot(IReadOnlyList<ServiceStatus> Services, bool DockerOk, string? Error);
+public sealed record ServicesSnapshot(IReadOnlyList<ServiceStatus> Services, bool DockerOk, string? Error)
+{
+    public MaintenanceOperationStatus? LastMaintenance { get; init; }
+}
+
+/// <summary>Результат общей проверки Docker Compose перед массовой операцией.</summary>
+public sealed record DockerPreflightResult(
+    bool Success,
+    IReadOnlySet<string> ComposeServices,
+    IReadOnlyList<string> MissingServices,
+    string? Error,
+    string? Diagnostic);
+
+/// <summary>Ошибка CLI с командой и обоими потоками вывода для диагностики в UI.</summary>
+public sealed class DockerCommandException : Exception
+{
+    public DockerCommandException(string fileName, IReadOnlyList<string> arguments, int exitCode, string stdout, string stderr)
+        : base(BuildMessage(fileName, arguments, exitCode, stderr))
+    {
+        FileName = fileName;
+        Arguments = arguments;
+        ExitCode = exitCode;
+        Stdout = stdout;
+        Stderr = stderr;
+    }
+
+    public string FileName { get; }
+    public IReadOnlyList<string> Arguments { get; }
+    public int ExitCode { get; }
+    public string Stdout { get; }
+    public string Stderr { get; }
+    public string Command => $"{FileName} {string.Join(' ', Arguments)}";
+
+    private static string BuildMessage(string fileName, IReadOnlyList<string> arguments, int exitCode, string stderr)
+        => $"{fileName} {string.Join(' ', arguments)} → код {exitCode}: {stderr}".Trim();
+}
 
 /// <summary>
 /// Управление обновлением/перезапуском микросервисов бэкенда на той же машине через
@@ -45,10 +91,22 @@ public sealed class DockerService : IDockerDeployment
     // Пути внутри контейнера web, куда смонтированы compose-файл и .env (см. docker-compose.yml).
     private const string ComposeFileInContainer = "/docker-compose.yml";
     private const string EnvFileInContainer = "/.env";
+    private const string MaintenanceDirectoryInContainer = "/app/maintenance";
+    private const string MaintenanceVolumeKey = "cloud-web-maintenance";
 
     private readonly ILogger<DockerService> _logger;
+    private readonly ComposeImageService _compose;
+    private readonly MaintenanceOperationStore _maintenance;
 
-    public DockerService(ILogger<DockerService> logger) => _logger = logger;
+    public DockerService(
+        ILogger<DockerService> logger,
+        ComposeImageService compose,
+        MaintenanceOperationStore maintenance)
+    {
+        _logger = logger;
+        _compose = compose;
+        _maintenance = maintenance;
+    }
 
     // ───────────────────────── Статус ─────────────────────────
 
@@ -94,8 +152,17 @@ public sealed class DockerService : IDockerDeployment
                 found ? info.State : (dockerOk ? "not_found" : "unavailable"),
                 found ? info.Status : (dockerOk ? "Контейнер не найден" : "Docker недоступен"),
                 found ? info.Image : "",
-                m.Service == WebService);
+                m.Service == WebService)
+            {
+                ComposeService = m.ComposeService,
+            };
         }).ToList();
+
+        if (dockerOk)
+        {
+            services = (await Task.WhenAll(services.Select(async service =>
+                service with { ImageDigest = await GetContainerImageDigestAsync(service.Container, service.Image) }))).ToList();
+        }
 
         return new ServicesSnapshot(services, dockerOk, error);
     }
@@ -105,10 +172,10 @@ public sealed class DockerService : IDockerDeployment
     /// <summary>Скачать образ сервиса через Compose helper-контейнер.</summary>
     public async Task ComposePullAsync(string service)
     {
-        if (!TryGetManagedNonWebService(service, out var canonical))
+        if (!TryGetManagedDefinition(service, out var managed))
             throw new ArgumentException($"Неизвестный или недоступный для Compose сервис: {service}", nameof(service));
-        await RunDockerComposeCommandAsync("pull", ComposeServiceOf(canonical));
-        _logger.LogInformation("Образ сервиса {Service} скачан", canonical);
+        await RunDockerComposeCommandAsync("pull", managed.ComposeService);
+        _logger.LogInformation("Образ сервиса {Service} скачан", managed.Service);
     }
 
     /// <summary>Пересоздать сервис, не затрагивая его зависимости.</summary>
@@ -145,6 +212,99 @@ public sealed class DockerService : IDockerDeployment
         try { return await RunDockerCommandAsync("inspect", "--format", "{{.Config.Image}}", container); }
         catch { return null; }
     }
+
+    /// <summary>Digest конкретного образа контейнера для сопоставления latest с SemVer.</summary>
+    public async Task<string?> GetContainerImageDigestAsync(string container, string image)
+    {
+        if (string.IsNullOrWhiteSpace(image)) return null;
+
+        try
+        {
+            var imageId = await GetContainerImageIdAsync(container);
+            if (string.IsNullOrWhiteSpace(imageId)) return null;
+
+            var digests = await RunDockerCommandAsync(
+                "image", "inspect", "--format", "{{join .RepoDigests \"\\n\"}}", imageId);
+            var at = image.LastIndexOf('@');
+            var repository = at >= 0
+                ? image[..at]
+                : image.LastIndexOf(':') > image.LastIndexOf('/')
+                    ? image[..image.LastIndexOf(':')]
+                    : image;
+            return digests.Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                .Select(line => line.Trim())
+                .FirstOrDefault(line => line.StartsWith(repository + "@", StringComparison.OrdinalIgnoreCase));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Не удалось получить digest контейнера {Container}", container);
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Проверить Compose один раз и, для update, скачать все целевые образы одной командой.
+    /// Возвращает отсутствующие optional-сервисы отдельно: это не ошибка массовой задачи.
+    /// </summary>
+    public async Task<DockerPreflightResult> PreflightAsync(
+        IEnumerable<string> services,
+        bool pullImages,
+        CancellationToken cancellationToken = default)
+    {
+        var requested = services
+            .Select(service => service.Trim())
+            .Where(service => service.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        try
+        {
+            await RunDockerCommandAsync("info", "--format", "{{.ServerVersion}}");
+            await GetComposeProjectAsync(requireLabel: true);
+            await RunDockerComposeCommandAsync("version");
+            var configured = (await RunDockerComposeCommandAsync("config", "--services"))
+                .Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                .Select(service => service.Trim())
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            var composeTargets = requested
+                .Where(service => TryGetManagedDefinition(service, out var managed) && configured.Contains(managed.ComposeService))
+                .Select(service => ComposeServiceOf(service))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            var missing = requested
+                .Where(service => !TryGetManagedDefinition(service, out var managed) || !configured.Contains(managed.ComposeService))
+                .ToList();
+
+            if (composeTargets.Count == 0)
+            {
+                // Очередь отдельно превратит отсутствующие обязательные сервисы в ошибку.
+                // Если отсутствуют только optional-сервисы, корректный результат — все шаги Skipped,
+                // а не повторная ошибка preflight без единой Docker-операции.
+                return new DockerPreflightResult(
+                    true,
+                    configured,
+                    missing,
+                    null,
+                    null);
+            }
+
+            if (pullImages)
+                await RunDockerComposeCommandAsync(["pull", "--quiet", .. composeTargets]);
+            return new DockerPreflightResult(true, configured, missing, null, null);
+        }
+        catch (Exception ex)
+        {
+            var diagnostic = FormatDiagnostic(ex);
+            _logger.LogError(ex, "Общий Docker Compose preflight завершился ошибкой");
+            return new DockerPreflightResult(false, new HashSet<string>(StringComparer.OrdinalIgnoreCase), [],
+                "Общая проверка Docker Compose не пройдена", diagnostic);
+        }
+    }
+
+    /// <summary>Получить текущую ссылку образа приложения из Compose-файла.</summary>
+    public Task<string?> GetComposeImageReferenceAsync(string service)
+        => _compose.GetImageReferenceAsync(ComposeServiceOf(service));
 
     /// <summary>Вернуть старый ID образа под его прежнюю ссылку для отката.</summary>
     public Task TagImageAsync(string imageId, string reference)
@@ -190,12 +350,20 @@ public sealed class DockerService : IDockerDeployment
     /// mount'ов, что демон уже применяет, поэтому работает и на Windows Docker Desktop, и под
     /// Linux/WSL. При сбое пересоздания helper откатывается на прежний контейнер.
     /// </summary>
-    public async Task<ServiceActionResult> UpdateWebSelfAsync()
+    public async Task<ServiceActionResult> UpdateWebSelfAsync(string? targetImage = null, string? operationId = null)
     {
         try
         {
-            var spec = await BuildWebRecreateSpecAsync();
-            return await RunWebHelperAsync("cloud-web-updater", BuildSelfUpdateScript(spec), "Обновление веб-клиента запущено");
+            var spec = await BuildWebRecreateSpecAsync(targetImage);
+            return await RunWebHelperAsync(
+                "cloud-web-updater",
+                BuildSelfUpdateScript(
+                    spec,
+                    NormalizeOperationId(operationId),
+                    _maintenance.StateFilePath,
+                    _maintenance.LogFilePath,
+                    _compose.BackupDirectory),
+                "Обновление веб-клиента запущено");
         }
         catch (Exception ex)
         {
@@ -205,14 +373,25 @@ public sealed class DockerService : IDockerDeployment
     }
 
     /// <summary>Перезапустить сам веб через detached helper-контейнер.</summary>
-    public Task<ServiceActionResult> RestartWebSelfAsync()
-        => RunWebHelperAsync("cloud-web-restarter", $"sleep 2 && docker restart {WebContainer}", "Перезапуск веб-клиента запущен");
+    public Task<ServiceActionResult> RestartWebSelfAsync(string? operationId = null)
+        => RunWebHelperAsync(
+            "cloud-web-restarter",
+            BuildRestartScript(
+                NormalizeOperationId(operationId),
+                _maintenance.StateFilePath,
+                _maintenance.LogFilePath),
+            "Перезапуск веб-клиента запущен");
 
-    /// <summary>Образ + аргументы `docker run` для пересоздания web и команды подключения доп. сетей.</summary>
-    private sealed record WebRecreateSpec(string Image, List<string> RunArgs, List<string> ExtraNetworkConnects);
+    /// <summary>Аргументы `docker run` для нового и rollback-контейнера web плюс доп. сети.</summary>
+    private sealed record WebRecreateSpec(
+        string Image,
+        List<string> RunArgs,
+        List<string> RollbackRunArgs,
+        List<string> ExtraNetworkConnects,
+        bool LegacyMaintenance);
 
     /// <summary>Собрать спецификацию пересоздания web из его текущего <c>docker inspect</c>.</summary>
-    private async Task<WebRecreateSpec> BuildWebRecreateSpecAsync()
+    private async Task<WebRecreateSpec> BuildWebRecreateSpecAsync(string? targetImage)
     {
         var json = await RunDockerCommandAsync("inspect", WebContainer);
         using var doc = JsonDocument.Parse(json);
@@ -220,7 +399,14 @@ public sealed class DockerService : IDockerDeployment
         var config = c.GetProperty("Config");
         var host = c.GetProperty("HostConfig");
 
-        var image = config.GetProperty("Image").GetString()!;
+        var image = string.IsNullOrWhiteSpace(targetImage)
+            ? config.GetProperty("Image").GetString()!
+            : targetImage;
+        var oldImageId = c.TryGetProperty("Image", out var imageIdProperty)
+            ? imageIdProperty.GetString()
+            : null;
+        if (string.IsNullOrWhiteSpace(oldImageId))
+            throw new InvalidOperationException("У контейнера cloud-web не удалось определить ID прежнего образа.");
         var id = c.TryGetProperty("Id", out var idp) ? idp.GetString() ?? "" : "";
         var shortId = id.Length >= 12 ? id[..12] : id;
 
@@ -272,6 +458,7 @@ public sealed class DockerService : IDockerDeployment
             }
 
         // mounts (bind + volume) — переиспользуем источники, которые демон уже знает (включая Windows-пути)
+        var hasMaintenanceMount = false;
         if (c.TryGetProperty("Mounts", out var mounts) && mounts.ValueKind == JsonValueKind.Array)
             foreach (var m in mounts.EnumerateArray())
             {
@@ -282,10 +469,24 @@ public sealed class DockerService : IDockerDeployment
                     : (m.TryGetProperty("Source", out var sp) ? sp.GetString() : null);
                 if (string.IsNullOrEmpty(type) || string.IsNullOrEmpty(src) || string.IsNullOrEmpty(dest)) continue;
                 var spec = $"type={type},source={src},destination={dest}";
-                if (!(m.TryGetProperty("RW", out var rwp) && rwp.GetBoolean())) spec += ",readonly";
+                if (dest == MaintenanceDirectoryInContainer)
+                    hasMaintenanceMount = true;
+                var readWrite = dest is ComposeFileInContainer or MaintenanceDirectoryInContainer
+                    || m.TryGetProperty("RW", out var rwp) && rwp.GetBoolean();
+                if (!readWrite) spec += ",readonly";
                 args.Add("--mount");
                 args.Add(spec);
             }
+
+        // Старые установки не имели maintenance volume. Подключаем тот же Compose volume
+        // по имени проекта и к helper, и к новому web, чтобы первый self-update уже был
+        // способен сохранить marker/backup.
+        if (!hasMaintenanceMount)
+        {
+            var project = await GetComposeProjectAsync();
+            args.Add("--mount");
+            args.Add($"type=volume,source={project}_{MaintenanceVolumeKey},destination={MaintenanceDirectoryInContainer}");
+        }
 
         // сети: первую — на `docker run`, остальные — отдельным `docker network connect` после запуска
         var connects = new List<string>();
@@ -318,35 +519,144 @@ public sealed class DockerService : IDockerDeployment
             }
         }
 
-        args.Add(image); // образ — последним аргументом
-        return new WebRecreateSpec(image, args, connects);
+        args.Add(image); // новый образ — последним аргументом
+        var rollbackArgs = args[..^1];
+        rollbackArgs.Add(oldImageId); // ID сохраняет старый образ после обновления тега latest
+        return new WebRecreateSpec(image, args, rollbackArgs, connects, !hasMaintenanceMount);
     }
 
     /// <summary>
     /// Скрипт для helper'а: тянет образ, под именем <c>-bak</c> гасит текущий web и поднимает новый;
     /// при сбое пересоздания — откат на прежний контейнер, чтобы веб не остался недоступным.
     /// </summary>
-    private static string BuildSelfUpdateScript(WebRecreateSpec spec)
+    private static string BuildSelfUpdateScript(
+        WebRecreateSpec spec,
+        string operationId,
+        string stateFile,
+        string logFile,
+        string composeBackupDirectory)
     {
         var run = string.Join(" ", spec.RunArgs.Select(ShQuote));
+        var rollbackRun = string.Join(" ", spec.RollbackRunArgs.Select(ShQuote));
         var connects = spec.ExtraNetworkConnects.Count == 0
             ? "true"
-            : string.Join(" && ", spec.ExtraNetworkConnects.Select(cmd => $"{cmd} >/dev/null 2>&1"));
+            : string.Join(" && ", spec.ExtraNetworkConnects.Select(cmd => $"run_logged {cmd}"));
+        var stateWriter = BuildStateWriter(operationId, "update", stateFile, logFile);
+        var composeBackup = Path.Combine(composeBackupDirectory, $"docker-compose-operation-{operationId}.yml");
+        const string inspectFormat = "{{.State.Status}}|{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}";
+        var exposeLegacyState = spec.LegacyMaintenance
+            ? $"  run_logged docker exec {WebContainer} sh -c {ShQuote($"mkdir -p {MaintenanceDirectoryInContainer}")} || true\n"
+              + $"  run_logged docker cp {ShQuote(stateFile)} {ShQuote($"{WebContainer}:{stateFile}")} || true\n"
+              + $"  run_logged docker cp {ShQuote(logFile)} {ShQuote($"{WebContainer}:{logFile}")} || true\n"
+            : "  true\n";
         return
-$@"sleep 2
-docker pull {ShQuote(spec.Image)} || exit 1
-docker rm -f {WebContainer}-bak >/dev/null 2>&1 || true
-docker rename {WebContainer} {WebContainer}-bak >/dev/null 2>&1 || exit 1
-docker stop -t 10 {WebContainer}-bak >/dev/null 2>&1
-if docker run {run} && {connects}; then
-  docker rm -f {WebContainer}-bak >/dev/null 2>&1
-  docker image prune -f >/dev/null 2>&1
-else
-  docker rm -f {WebContainer} >/dev/null 2>&1
-  docker rename {WebContainer}-bak {WebContainer} >/dev/null 2>&1
-  docker start {WebContainer} >/dev/null 2>&1
-fi";
+$"{stateWriter}\n" +
+        "describe_command() {\n" +
+        "  if [ \"$1\" = docker ] && [ \"$2\" = run ]; then\n" +
+        "    printf '$ docker run <web-container-configuration>'\n" +
+        "  else\n" +
+        "    printf '$'\n" +
+        "    printf ' %s' \"$@\"\n" +
+        "  fi\n" +
+        "}\n" +
+        $"run_logged() {{ describe_command \"$@\" >> {ShQuote(logFile)}; printf '\\n' >> {ShQuote(logFile)}; \"$@\" >> {ShQuote(logFile)} 2>&1; code=$?; printf '[exit %s]\\n' \"$code\" >> {ShQuote(logFile)}; return \"$code\"; }}\n" +
+        "expose_legacy_state() {\n" +
+        exposeLegacyState +
+        "}\n" +
+        "wait_for_web() {\n" +
+        "  i=0\n" +
+        "  saw_running=0\n" +
+        "  while [ \"$i\" -lt 60 ]; do\n" +
+        $"    info=\"$(docker inspect --format {ShQuote(inspectFormat)} {WebContainer} 2>> {ShQuote(logFile)} || true)\n" +
+        "    state=\"${info%%|*}\"\n" +
+        "    health=\"${info#*|}\"\n" +
+        "    if [ \"$state\" = running ] && [ \"$health\" = healthy ]; then return 0; fi\n" +
+        "    if [ \"$state\" = running ] && [ \"$health\" = none ]; then\n" +
+        "      if [ \"$saw_running\" = 1 ]; then return 0; fi\n" +
+        "      saw_running=1\n" +
+        "    fi\n" +
+        "    case \"$state\" in exited|dead|restarting) return 1;; esac\n" +
+        "    if [ \"$health\" = unhealthy ]; then return 1; fi\n" +
+        "    i=$((i + 1))\n" +
+        "    sleep 1\n" +
+        "  done\n" +
+        "  return 1\n" +
+        "}\n" +
+        $"restore_compose() {{ if [ -f {ShQuote(composeBackup)} ]; then cat {ShQuote(composeBackup)} > {ShQuote(ComposeFileInContainer)} 2>> {ShQuote(logFile)}; else return 0; fi; }}\n" +
+        "rollback_web() {\n" +
+        "  rollback_ok=1\n" +
+        $"  if docker inspect {WebContainer} >/dev/null 2>&1; then if ! run_logged docker rm -f {WebContainer}; then rollback_ok=0; fi; fi\n" +
+        $"  if ! run_logged docker rm -f {WebContainer}-bak; then rollback_ok=0; fi\n" +
+        $"  if ! run_logged docker run {rollbackRun}; then rollback_ok=0; fi\n" +
+        $"  if [ \"$rollback_ok\" = 1 ] && {connects}; then :; else rollback_ok=0; fi\n" +
+        "  if ! restore_compose; then rollback_ok=0; fi\n" +
+        "  if [ \"$rollback_ok\" = 1 ] && wait_for_web; then\n" +
+        "    write_state failed 'Новый контейнер web не прошёл проверку; откат подтверждён'\n" +
+        "  else\n" +
+        "    write_state failed 'Новый контейнер web не прошёл проверку; откат не подтверждён'\n" +
+        "  fi\n" +
+        "  exit 1\n" +
+        "}\n" +
+        "write_state pending 'Операция запущена'\n" +
+        "sleep 2\n" +
+        $"if ! run_logged docker pull {ShQuote(spec.Image)}; then\n" +
+        "  restore_compose || true\n" +
+        "  write_state failed 'Не удалось скачать новый образ'\n" +
+        "  expose_legacy_state\n" +
+        "  exit 1\n" +
+        "fi\n" +
+        $"run_logged docker rm -f {WebContainer}-bak || true\n" +
+        $"if ! run_logged docker rename {WebContainer} {WebContainer}-bak; then\n" +
+        "  restore_compose || true\n" +
+        "  write_state failed 'Не удалось сохранить старый контейнер'\n" +
+        "  expose_legacy_state\n" +
+        "  exit 1\n" +
+        "fi\n" +
+        $"run_logged docker stop -t 10 {WebContainer}-bak || true\n" +
+        $"if run_logged docker run {run} && {connects} && wait_for_web; then\n" +
+        $"  write_state completed 'Новый контейнер web запущен и прошёл проверку'\n" +
+        $"  run_logged docker rm -f {WebContainer}-bak || true\n" +
+        "  run_logged docker image prune -f || true\n" +
+        "  exit 0\n" +
+        "fi\n" +
+        $"run_logged docker logs --tail 100 {WebContainer} || true\n" +
+        "rollback_web";
     }
+
+    private static string BuildRestartScript(string operationId, string stateFile, string logFile)
+        => BuildStateWriter(operationId, "restart", stateFile, logFile) + "\n"
+            + "describe_command() { printf '$'; printf ' %s' \"$@\"; }\n"
+            + $"run_logged() {{ describe_command \"$@\" >> {ShQuote(logFile)}; printf '\\n' >> {ShQuote(logFile)}; \"$@\" >> {ShQuote(logFile)} 2>&1; code=$?; printf '[exit %s]\\n' \"$code\" >> {ShQuote(logFile)}; return \"$code\"; }}\n"
+            + "write_state pending 'Перезапуск запущен'\n"
+            + "sleep 2\n"
+            + $"if run_logged docker restart {WebContainer}; then\n"
+            + "  write_state completed 'Контейнер web перезапущен'\n"
+            + "  exit 0\n"
+            + "fi\n"
+            + "write_state failed 'Не удалось перезапустить контейнер web'\n"
+            + "exit 1";
+
+    private static string BuildStateWriter(string operationId, string kind, string stateFile, string logFile)
+    {
+        var operationLiteral = JsonSerializer.Serialize(operationId);
+        var kindLiteral = JsonSerializer.Serialize(kind);
+        var diagnosticLiteral = JsonSerializer.Serialize($"Лог helper: {logFile}");
+        return $"state_file={ShQuote(stateFile)}\n"
+            + $"log_file={ShQuote(logFile)}\n"
+            + $"diagnostic_json={ShQuote(diagnosticLiteral)}\n"
+            + "mkdir -p \"$(dirname \"$state_file\")\" >/dev/null 2>&1 || true\n"
+            + "mkdir -p \"$(dirname \"$log_file\")\" >/dev/null 2>&1 || true\n"
+            + ": > \"$log_file\" 2>/dev/null || true\n"
+            + "write_state() {\n"
+            + "  tmp=\"${state_file}.tmp\"\n"
+            + $"  printf '{{\"operationId\":{operationLiteral},\"kind\":{kindLiteral},\"state\":\"%s\",\"message\":\"%s\",\"diagnostic\":%s,\"updatedAtUtc\":\"%s\"}}\\n' \"$1\" \"$2\" \"$diagnostic_json\" \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\" > \"$tmp\" && mv -f \"$tmp\" \"$state_file\" || true\n"
+            + "}";
+    }
+
+    private static string NormalizeOperationId(string? operationId)
+        => Guid.TryParse(operationId, out var parsed)
+            ? parsed.ToString("N")
+            : Guid.NewGuid().ToString("N");
 
     /// <summary>Безопасное single-quote экранирование аргумента для <c>sh -c</c>.</summary>
     private static string ShQuote(string s) => "'" + s.Replace("'", "'\\''") + "'";
@@ -358,6 +668,7 @@ fi";
         {
             var image = (await RunDockerCommandAsync("inspect", "--format", "{{.Config.Image}}", WebContainer)).Trim();
             var dockerSock = await GetMountSourceAsync(WebContainer, "/var/run/docker.sock");
+            var maintenanceMount = await GetMaintenanceMountAsync();
 
             await TryRemoveContainerAsync(helperName);
 
@@ -371,6 +682,15 @@ fi";
                 "-v", $"{dockerSock}:/var/run/docker.sock",
                 "--entrypoint", "sh", image, "-c", innerScript,
             ];
+
+            if (maintenanceMount is not null)
+            {
+                var insertAt = args.Length - 5;
+                var withMaintenance = args.ToList();
+                withMaintenance.Insert(insertAt, "--mount");
+                withMaintenance.Insert(insertAt + 1, maintenanceMount);
+                args = withMaintenance.ToArray();
+            }
 
             await RunDockerCommandAsync(args);
             return new ServiceActionResult(true, startedMessage);
@@ -387,10 +707,60 @@ fi";
     public static string ContainerNameFor(string service)
         => Managed.First(m => string.Equals(m.Service, service, StringComparison.OrdinalIgnoreCase)).Container;
 
+    public static string ComposeServiceNameFor(string service)
+        => ComposeServiceOf(service);
+
     private static string ComposeServiceOf(string service)
         => Managed.First(m => string.Equals(m.Service, service, StringComparison.OrdinalIgnoreCase)).ComposeService;
 
     private static string ContainerOf(string service) => ContainerNameFor(service);
+
+    private static bool TryGetManagedDefinition(
+        string service,
+        out (string Service, string ComposeService, string Container) managed)
+    {
+        var match = Managed.FirstOrDefault(m => string.Equals(m.Service, service, StringComparison.OrdinalIgnoreCase));
+        if (match.Service is null)
+        {
+            managed = default;
+            return false;
+        }
+
+        managed = match;
+        return true;
+    }
+
+    /// <summary>Проверить любое управляемое приложение сервисное имя, включая web.</summary>
+    public static bool TryGetManagedService(string service, out string canonicalService)
+    {
+        var match = Managed.FirstOrDefault(item =>
+            string.Equals(item.Service, service, StringComparison.OrdinalIgnoreCase));
+        canonicalService = match.Service ?? string.Empty;
+        return canonicalService.Length > 0;
+    }
+
+    /// <summary>Преобразовать имя Compose-сервиса в короткое имя очереди.</summary>
+    public static string? LogicalServiceNameForCompose(string composeService)
+        => Managed.FirstOrDefault(item =>
+            string.Equals(item.ComposeService, composeService, StringComparison.OrdinalIgnoreCase)).Service;
+
+    private static string FormatDiagnostic(Exception exception)
+    {
+        var command = exception as DockerCommandException
+            ?? exception.InnerException as DockerCommandException;
+        if (command is null)
+            return LimitDiagnostic(exception.Message);
+
+        var output = $"Команда: {command.Command}\nКод: {command.ExitCode}";
+        if (!string.IsNullOrWhiteSpace(command.Stdout))
+            output += $"\nstdout:\n{command.Stdout.Trim()}";
+        if (!string.IsNullOrWhiteSpace(command.Stderr))
+            output += $"\nstderr:\n{command.Stderr.Trim()}";
+        return LimitDiagnostic(output);
+    }
+
+    private static string LimitDiagnostic(string text)
+        => text.Length <= 8000 ? text : text[..8000] + "\n…";
 
     /// <summary>Проверить и канонизировать имя управляемого не-web сервиса.</summary>
     public static bool TryGetManagedNonWebService(string service, out string canonicalService)
@@ -424,7 +794,7 @@ fi";
     }
 
     /// <summary>Имя docker compose проекта берём из метки запущенного web-контейнера (без хардкода).</summary>
-    private async Task<string> GetComposeProjectAsync()
+    private async Task<string> GetComposeProjectAsync(bool requireLabel = false)
     {
         try
         {
@@ -432,7 +802,15 @@ fi";
                 "inspect", "--format", "{{ index .Config.Labels \"com.docker.compose.project\" }}", WebContainer)).Trim();
             if (!string.IsNullOrEmpty(project)) return project;
         }
-        catch (Exception ex) { _logger.LogWarning(ex, "Не удалось определить имя compose-проекта, fallback=barkcloud"); }
+        catch (Exception ex)
+        {
+            if (requireLabel)
+                throw new InvalidOperationException("Не удалось проверить имя Compose-проекта по метке cloud-web", ex);
+            _logger.LogWarning(ex, "Не удалось определить имя compose-проекта, fallback=barkcloud");
+        }
+
+        if (requireLabel)
+            throw new InvalidOperationException("У контейнера cloud-web отсутствует метка Compose-проекта");
         return "barkcloud";
     }
 
@@ -441,6 +819,35 @@ fi";
     {
         var template = "{{range .Mounts}}{{if eq .Destination \"" + destination + "\"}}{{.Source}}{{end}}{{end}}";
         return (await RunDockerCommandAsync("inspect", "--format", template, container)).Trim();
+    }
+
+    /// <summary>Получить mount-спеку maintenance volume без раскрытия внутреннего host-path volume.</summary>
+    private async Task<string?> GetMaintenanceMountAsync()
+    {
+        try
+        {
+            var template = "{{range .Mounts}}{{if eq .Destination \"" + MaintenanceDirectoryInContainer
+                + "\"}}{{.Type}}|{{.Source}}|{{.Name}}{{end}}{{end}}";
+            var value = (await RunDockerCommandAsync("inspect", "--format", template, WebContainer)).Trim();
+            var parts = value.Split('|');
+            if (parts.Length < 3)
+                return null;
+
+            var type = parts[0];
+            var source = parts[1];
+            var name = parts[2];
+            if (string.Equals(type, "volume", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(name))
+                return $"type=volume,source={name},destination={MaintenanceDirectoryInContainer}";
+            if (string.Equals(type, "bind", StringComparison.OrdinalIgnoreCase) && IsAbsoluteHostPath(source))
+                return $"type=bind,src={source},dst={MaintenanceDirectoryInContainer}";
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Не удалось определить maintenance volume для helper-контейнера");
+        }
+
+        var project = await GetComposeProjectAsync();
+        return $"type=volume,source={project}_{MaintenanceVolumeKey},destination={MaintenanceDirectoryInContainer}";
     }
 
     private async Task TryRemoveContainerAsync(string container)
@@ -553,9 +960,10 @@ fi";
         process.BeginOutputReadLine();
         process.BeginErrorReadLine();
         await process.WaitForExitAsync();
+        process.WaitForExit();
 
         if (process.ExitCode != 0)
-            throw new InvalidOperationException($"{fileName} {string.Join(' ', args)} → код {process.ExitCode}: {errors}".Trim());
+            throw new DockerCommandException(fileName, args, process.ExitCode, output.ToString().Trim(), errors.ToString().Trim());
 
         return output.ToString().Trim();
     }

@@ -16,9 +16,9 @@ public sealed class BuilderModel
     public bool IncludeSeq { get; set; } = true;
     public bool IncludeTorrent { get; set; } = true;
 
-    // Образы: реестр фиксирован, выбирается только канал (Release/Dev).
+    // Образы: реестр фиксирован, выбирается только канал (Release/Nightly/Dev).
     public const string ImageRegistry = "docker.barkfluff.com";
-    public string ImageChannel { get; set; } = "Release"; // "Release" | "Dev"
+    public string ImageChannel { get; set; } = "Release"; // "Release" | "Nightly" | "Dev"
 
     // Общие
     public string ConfigurationAccessKey { get; set; } = "";

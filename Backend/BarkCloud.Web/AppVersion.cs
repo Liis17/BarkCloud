@@ -10,5 +10,5 @@ namespace BarkCloud.Web;
 /// </summary>
 public static class AppVersion
 {
-    public const string Current = "v1.2.2";
+    public const string Current = "v1.3.0";
 }

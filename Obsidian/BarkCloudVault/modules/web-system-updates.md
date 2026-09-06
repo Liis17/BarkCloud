@@ -27,7 +27,8 @@ HMAC-SHA256 на общем `JwtSettings:SecretKey`, сроком 30 минут.
 `torrent→cloud-torrent→cloud-torrent`, `web→cloud-web→cloud-web`.
 
 Отсутствующие optional-сервисы (`notification`, `torrent`) показываются как «не найден» и
-исключаются из массовой операции. Web не запускается через обычный `start/stop/restart`.
+исключаются из массовой операции. При отсутствии обязательного Compose-сервиса задача
+останавливается до первого пересоздания. Web не запускается через обычный `start/stop/restart`.
 
 ## Серверная очередь
 
@@ -36,15 +37,23 @@ HMAC-SHA256 на общем `JwtSettings:SecretKey`, сроком 30 минут.
 сообщения и признак отката; последние 20 завершённых задач живут в памяти процесса.
 
 - Для одного сервиса доступны операции update/restart/start/stop.
-- Массовые update/restart сначала читает фактически существующие контейнеры, затем ставит
-  их в очередь в порядке `configuration → identity → users → files → notification → torrent`.
-- Каждый update делает `pull` и `up --force-recreate --no-deps`, ждёт состояние контейнера.
+- Массовые update/restart строят цель по сервисам из `docker compose config --services`, а не
+  по найденным контейнерам. Порядок: `configuration → identity → users → files → notification →
+  torrent → web`; отсутствующий контейнер существующего Compose-сервиса будет создан,
+  optional-сервис без Compose-описания пропускается.
+- До первого пересоздания выполняется единый preflight: Docker daemon, helper-образ, CLI/Compose,
+  mount-пути и имя Compose-проекта. Для update все образы скачиваются одной командой
+  `docker compose pull`; одинаковая ошибка не размножается по шагам.
+- Каждый update делает `up --force-recreate --no-deps`, ждёт состояние контейнера.
   `running + healthy` считается успехом; без healthcheck нужны два опроса `running` подряд.
   `exited/dead/restarting/unhealthy` — явная ошибка, после которой старый image ID
   перемаркируется под прежнюю ссылку и сервис пересоздаётся. Таймаут не трактуется как
   доказательство поломки и автоматически не откатывается.
-- `docker image prune -f` выполняется только после всей update-задачи, когда материал для
-  отката больше не нужен.
+- При ошибке preflight все шаги получают `Skipped`, а диагностика хранится только на задаче,
+  чтобы одно и то же сообщение не дублировалось на каждом контейнере; при падении
+  `configuration` зависимые шаги также получают `Skipped`. `docker image prune -f` выполняется
+  только после полностью успешной update/switch-branch задачи, когда материал для отката больше
+  не нужен.
 
 `DockerService` запускает `docker compose` через helper-контейнер из образа web. Helper
 получает реальный host-каталог compose, compose-файл, `.env` и `docker.sock` из `docker inspect`;
@@ -57,8 +66,17 @@ Web нельзя пересоздать из собственного проце
 `RestartWebSelfAsync` запускают detached helper из текущего образа web. Self-update клонирует
 текущую конфигурацию `cloud-web` (env, labels, ports, mounts, networks), делает `pull`,
 переименовывает старый контейнер в `cloud-web-bak`, запускает новый и при ошибке `docker run`
-или подключения сети возвращает старый контейнер. Self-restart выполняет отложенный
+или подключения сети возвращает старый контейнер. После запуска helper ждёт новый контейнер и
+проверяет `running + healthy` либо два стабильных `running` без healthcheck; при crash-loop,
+`unhealthy` или таймауте выполняется rollback. Self-restart выполняет отложенный
 `docker restart cloud-web`.
+
+Helper пишет `last-operation.json` и лог в persistent volume `/app/maintenance`. При первом
+self-update старой установки helper сам подключает volume с именем `<compose-project>_cloud-web-maintenance`
+и переводит Compose mount в `rw`, поэтому миграция не теряет результат операции. Для переключения
+канала web в этот volume также сохраняется резервная копия Compose, поэтому после перезапуска
+процесса видны ошибка, команда/exit-код/stderr и факт rollback. Compose-файл web монтируется с
+`rw`, запись идёт в тот же inode.
 
 После ответа API браузер открывает `/updating` или `/restarting`. Эти анонимные страницы
 подставляют метку текущего процесса, опрашивают `/healthz` каждые 3 секунды и возвращаются в
@@ -69,25 +87,32 @@ Web нельзя пересоздать из собственного проце
 
 - `GET /healthz` — анонимный health-check с заголовком `X-BarkCloud-Started-At`;
 - `/updating`, `/restarting`, `/maintenance-wait.js` — страницы и скрипт ожидания;
-- `POST /api/system/unlock`, `POST /api/system/lock`, `GET /api/system/services`;
+- `POST /api/system/unlock`, `POST /api/system/lock`, `GET /api/system/services` (статус,
+  канал, current/latest SemVer, updateAvailable, versionState/versionError);
+- `GET /api/system/branches`, `POST /api/system/services/{svc}/branch` с `{ branch }`;
 - `POST /api/system/services/{svc}/{update|restart|start|stop}` — ставит одну операцию в очередь;
-- `POST /api/system/update-all`, `POST /api/system/restart-all`;
-- `GET /api/system/deploy/jobs`, `GET /api/system/deploy/jobs/{id}` — список и состояние задач;
+- `POST /api/system/update-available`, `POST /api/system/update-all`,
+  `POST /api/system/restart-all`;
+- `GET /api/system/deploy/jobs`, `GET /api/system/deploy/jobs/{id}` — список и состояние задач
+  с `Pending/InProgress/Completed/Failed/Skipped`, диагностикой, rollback и `requiresReconnect`;
 - `POST /api/system/web/update-self`, `POST /api/system/web/restart-self`.
 
 ## UI
 
-`ClientApp/src/pages/SettingsPage.tsx` (`SystemSection`) показывает статус, image tag и
-действия. Модалка прогресса опрашивает серверную задачу каждые 2 секунды, показывает шаги,
-ошибки и откат, а при повторном открытии раздела продолжает активную задачу. Массовые
-кнопки больше не выполняют цикл запросов из браузера. Self-update/-restart переводит на
-страницу ожидания. Отсутствующие контейнеры и параллельные действия блокируются в UI.
+`ClientApp/src/pages/SettingsPage.tsx` (`SystemSection`) показывает адаптивную таблицу/карточки:
+статус, канал, текущую и последнюю SemVer, badge доступного обновления, действия и раскрываемую
+техническую ошибку. Кнопки — «Обновить доступные (N)», «Обновить все», «Перезапустить все» и
+«Обновить статус». Модалка прогресса опрашивает серверную задачу каждые 2 секунды, показывает
+skipped-шаги, команду/stderr и rollback, а при `requiresReconnect` переводит на `/updating` или
+`/restarting`.
 
 ## Инфраструктура
 
 - `BarkCloud.Web/Dockerfile` и `Dockerfile.slim`: `aspnet:10.0-alpine` + `docker-cli`,
   `docker-cli-compose`, `icu-libs`, `tzdata`; root задаётся compose для доступа к socket.
-- `docker-compose.yml` у web монтирует `docker.sock`, `./docker-compose.yml` и `./.env`;
+- `docker-compose.yml` у web монтирует `docker.sock`, `./docker-compose.yml:rw`, `./.env` и
+  named volume `cloud-web-maintenance:/app/maintenance`; там лежат compose-backups и marker
+  self-update.
   `App__AdminPassword` получает `WEB_ADMIN_PASSWORD`.
 - Registry публичен на pull; `DOCKER_CONFIG=/tmp/barkcloud-docker` не читает host
   `credsStore`, отсутствующий внутри alpine-образа.
@@ -95,5 +120,5 @@ Web нельзя пересоздать из собственного проце
 ## Компромисс безопасности
 
 `docker.sock` и root дают web полный контроль над Docker-хостом. Митигация: отдельный пароль,
-подписанная cookie и белый список из шести backend-сервисов; web сам управляется только
+подписанная cookie и белый список шести микросервисов плюс web; web сам управляется только
 ограниченными helper-сценариями update/restart.
