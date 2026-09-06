@@ -352,7 +352,8 @@ services:
         sb.Append("""
 networks:
   barkcloud-network:
-    driver: bridge
+    external: true
+    name: barkcloud-network
 
 volumes:
 

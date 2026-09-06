@@ -7,6 +7,8 @@ Parent: [[index]] · See also: [[structure/overview]] · [[structure/entrypoints
 В production compose ключи сервисов и имена контейнеров используют единый префикс `cloud-`
 (`cloud-configuration`, `cloud-identity`, `cloud-users`, `cloud-files`, `cloud-torrent`,
 `cloud-web` и инфраструктурные `cloud-*`). Эти же имена используются как Docker DNS-адреса.
+Production compose подключается к заранее созданной внешней сети `barkcloud-network`;
+перед запуском её нужно создать командой `docker network create barkcloud-network`.
 
 ## Микросервисы в dev-окружении
 
