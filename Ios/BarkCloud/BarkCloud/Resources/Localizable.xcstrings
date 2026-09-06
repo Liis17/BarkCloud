@@ -716,19 +716,41 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Устройство"
+            "value" : "Устройство загрузки"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Device"
+            "value" : "Upload device"
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Gerät"
+            "value" : "Hochladegerät"
+          }
+        }
+      }
+    },
+    "df_field_metadata_device" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Устройство из метаданных"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Metadata device"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gerät aus Metadaten"
           }
         }
       }

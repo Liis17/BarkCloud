@@ -110,7 +110,8 @@
     <string name="smart_folder_field_ext">Расширение</string>
     <string name="smart_folder_field_width">Ширина</string>
     <string name="smart_folder_field_height">Высота</string>
-    <string name="smart_folder_field_device">Устройство</string>
+    <string name="smart_folder_field_device">Устройство загрузки</string>
+    <string name="smart_folder_field_metadata_device">Устройство из метаданных</string>
     <string name="smart_folder_op_days">За N дней</string>
     <string name="smart_folder_op_before">До</string>
     <string name="smart_folder_op_after">После</string>

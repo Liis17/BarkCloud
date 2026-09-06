@@ -895,7 +895,8 @@ enum DfField {
   DF_EXTENSION = 6;   // Расширение
   DF_IMG_WIDTH = 7;   // Ширина изображения
   DF_IMG_HEIGHT = 8;  // Высота изображения
-  DF_DEVICE = 9;      // Имя устройства загрузки
+  DF_DEVICE = 9;      // Имя устройства загрузки (сохранено для совместимости)
+  DF_METADATA_DEVICE = 10; // Устройство из метаданных (Make + Model)
 }
 
 enum DfOperator {

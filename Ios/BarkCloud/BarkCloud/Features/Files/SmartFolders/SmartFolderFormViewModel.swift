@@ -31,7 +31,8 @@ struct DfFieldMeta: Identifiable {
         .init(field: .dfExtension, titleKey: "df_field_ext", operators: [.dfEndsWith], editor: .ext),
         .init(field: .dfImgWidth, titleKey: "df_field_width", operators: [.dfGt, .dfLt, .dfEquals], editor: .number),
         .init(field: .dfImgHeight, titleKey: "df_field_height", operators: [.dfGt, .dfLt, .dfEquals], editor: .number),
-        .init(field: .dfDevice, titleKey: "df_field_device", operators: [.dfEquals, .dfContains], editor: .text),
+        .init(field: .dfDevice, titleKey: "df_field_device", operators: [.dfEquals, .dfContains, .dfStartsWith, .dfEndsWith], editor: .text),
+        .init(field: .dfMetadataDevice, titleKey: "df_field_metadata_device", operators: [.dfEquals, .dfContains, .dfStartsWith, .dfEndsWith], editor: .text),
     ]
 
     static func meta(for field: Barkcloud_Files_DfField) -> DfFieldMeta {

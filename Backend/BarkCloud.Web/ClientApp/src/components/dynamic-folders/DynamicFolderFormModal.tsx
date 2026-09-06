@@ -26,6 +26,12 @@ const NAME_OPS: Op[] = [
   { v: 8, label: 'заканчивается на' },
   { v: 7, label: 'равно' },
 ];
+const DEVICE_OPS: Op[] = [
+  { v: 7, label: 'равно' },
+  { v: 6, label: 'содержит' },
+  { v: 9, label: 'начинается с' },
+  { v: 8, label: 'заканчивается на' },
+];
 
 const FIELDS: FieldDef[] = [
   { v: 1, label: 'Дата загрузки', ops: DATE_OPS, kind: 'date' },
@@ -36,7 +42,8 @@ const FIELDS: FieldDef[] = [
   { v: 6, label: 'Расширение', ops: [{ v: 8, label: 'заканчивается на' }], kind: 'ext' },
   { v: 7, label: 'Ширина (px)', ops: NUM_OPS, kind: 'num' },
   { v: 8, label: 'Высота (px)', ops: NUM_OPS, kind: 'num' },
-  { v: 9, label: 'Устройство', ops: [{ v: 7, label: 'равно' }, { v: 6, label: 'содержит' }], kind: 'text' },
+  { v: 9, label: 'Устройство загрузки', ops: DEVICE_OPS, kind: 'text' },
+  { v: 10, label: 'Устройство из метаданных', ops: DEVICE_OPS, kind: 'text' },
 ];
 const MEDIA_KINDS = [
   { v: '1', label: 'Фото' },

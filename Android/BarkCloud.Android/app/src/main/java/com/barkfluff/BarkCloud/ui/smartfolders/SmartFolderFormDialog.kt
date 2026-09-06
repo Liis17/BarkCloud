@@ -194,6 +194,7 @@ private val fields = listOf(
     DfField.DF_IMG_WIDTH,
     DfField.DF_IMG_HEIGHT,
     DfField.DF_DEVICE,
+    DfField.DF_METADATA_DEVICE,
 )
 
 private fun defaultRule() =
@@ -209,7 +210,8 @@ private fun operatorsFor(field: DfField): List<DfOperator> = when (field) {
     DfField.DF_IMG_WIDTH,
     DfField.DF_IMG_HEIGHT -> listOf(DfOperator.DF_GT, DfOperator.DF_LT, DfOperator.DF_EQUALS)
     DfField.DF_NAME,
-    DfField.DF_DEVICE -> listOf(DfOperator.DF_CONTAINS, DfOperator.DF_STARTS_WITH, DfOperator.DF_ENDS_WITH, DfOperator.DF_EQUALS)
+    DfField.DF_DEVICE,
+    DfField.DF_METADATA_DEVICE -> listOf(DfOperator.DF_CONTAINS, DfOperator.DF_STARTS_WITH, DfOperator.DF_ENDS_WITH, DfOperator.DF_EQUALS)
     DfField.DF_EXTENSION -> listOf(DfOperator.DF_ENDS_WITH)
     DfField.DF_MEDIA_KIND -> listOf(DfOperator.DF_EQUALS)
     else -> listOf(DfOperator.DF_EQUALS)
@@ -238,6 +240,7 @@ private fun DfField.title(): String = stringResource(
         DfField.DF_IMG_WIDTH -> R.string.smart_folder_field_width
         DfField.DF_IMG_HEIGHT -> R.string.smart_folder_field_height
         DfField.DF_DEVICE -> R.string.smart_folder_field_device
+        DfField.DF_METADATA_DEVICE -> R.string.smart_folder_field_metadata_device
         else -> R.string.smart_folder_field_name
     }
 )
