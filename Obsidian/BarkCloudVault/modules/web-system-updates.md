@@ -4,51 +4,96 @@ Parent: [[modules/backend-web]] · See also: [[index]] · [[structure/infrastruc
 
 ## Назначение
 
-Управление обновлением и перезапуском микросервисов бэкенда прямо со страницы настроек веба (`/settings` → раздел «Обслуживание»). Логика перенесена из админ-панели BarkFluff (`Barkfluff.AdminPanel`) под один локальный хост — без SSH и удалённых серверов. Веб-контейнер через смонтированный `docker.sock` запускает `docker` / `docker compose`.
+Раздел «Обслуживание» в настройках (`/settings`) управляет контейнерами BarkCloud на одном
+локальном Docker-хосте. Логика адаптирована из админ-панели BarkFluff: без SSH и удалённых
+серверов, но с серверной очередью, проверкой состояния контейнеров и отдельными страницами
+ожидания для пересоздания web.
 
 ## Доступ
 
-В BarkCloud нет ролей. Раздел закрыт отдельным паролем `App:AdminPassword` (env `WEB_ADMIN_PASSWORD`) — облако self-hosted «для своих».
-- `Auth/AdminGate.cs`: `Unlock` сверяет пароль и выдаёт HttpOnly-cookie `bark_admin` — подписанный токен (HMAC-SHA256 на общем `JwtSettings:SecretKey`, срок 30 мин). `IsUnlocked` валидирует подпись и срок, `Lock` сбрасывает.
-- Все `/api/system/*` требуют **и** авторизованного пользователя (`bark_at`), **и** разблокировки (`bark_admin`), кроме `unlock` (нужен только пользователь).
+В BarkCloud нет ролей. Раздел закрыт отдельным паролем `App:AdminPassword`
+(`WEB_ADMIN_PASSWORD`). `Auth/AdminGate.cs` выдаёт HttpOnly-cookie `bark_admin`, подписанную
+HMAC-SHA256 на общем `JwtSettings:SecretKey`, сроком 30 минут. Все `/api/system/*`, кроме
+`unlock`, требуют авторизованного пользователя и разблокированного раздела.
 
 ## Управляемый набор
 
-Только сервисы приложения + сам веб (инфраструктуру postgres/minio/rabbitmq/seq/nginx **не трогаем**). Маппинг сервис → контейнер:
-`configuration→cloud-configuration`, `identity→cloud-identity`, `users→cloud-users`, `files→cloud-files`, `notification→cloud-notification`, `web→cloud-web`.
+Инфраструктуру postgres/minio/rabbitmq/seq/nginx не трогаем. Белый список приложения.
+В UI и очереди используются короткие имена, а Compose — ключи с префиксом `cloud-`:
 
-## Механизм
+`configuration→cloud-configuration→cloud-configuration`,
+`identity→cloud-identity→cloud-identity`, `users→cloud-users→cloud-users`,
+`files→cloud-files→cloud-files`, `notification→cloud-notification→cloud-notification`,
+`torrent→cloud-torrent→cloud-torrent`, `web→cloud-web→cloud-web`.
 
-`Infrastructure/DockerService.cs` (Process + `ArgumentList`, без shell):
-- **Обновить сервис:** `docker compose -p <project> --env-file /.env -f /docker-compose.yml pull <svc>` → `up --force-recreate -d <svc>` → `docker image prune -f`.
-- **Обновить всё:** последовательно `configuration → identity → users → files` (web исключён).
-- **restart / start / stop:** `docker <action> <container>` по белому списку (web запрещён — только self-методы).
-- **Self-restart веба:** detached **helper-контейнер** из образа самого web (`docker run -d --rm` c `sh -c "sleep 2 && docker restart cloud-web"`). Веб не может перезапустить себя изнутри. Имя compose-проекта — из метки `com.docker.compose.project`.
-- **Self-update веба** (`UpdateWebSelfAsync`): **compose не используется** — он требует резолва относительных путей web (`./docker-compose.yml`, `./.env`) в реальные хостовые, что невозможно из Linux-helper'а на Windows-путях (`C:\…`). Вместо этого web пересоздаётся **клонированием**: `BuildWebRecreateSpecAsync` читает `docker inspect cloud-web` и собирает аргументы `docker run` из текущей конфигурации (image-tag, env целиком, labels включая `com.docker.compose.*`, порты, mounts с теми же источниками что уже знает демон, сеть+aliases). Detached helper выполняет `BuildSelfUpdateScript`: `pull` → `rename cloud-web→cloud-web-bak` → `stop bak` → `docker run` новый → при успехе `rm bak` + `image prune -f`, **при сбое — откат** (`rm` нового, `rename bak→cloud-web`, `start`). Источники mount'ов берутся из inspect как есть, поэтому работает **и под Linux/WSL, и на Windows Docker Desktop** — проверка `IsWindowsPath` удалена. Аргументы экранируются `ShQuote` (single-quote) для `sh -c`.
-- Registry `docker.barkfluff.com:5000` **публичный на pull** (auth нужен только для push в CI), поэтому креды не требуются. `DOCKER_CONFIG=/tmp/barkcloud-docker` (пустой) — чтобы CLI не читал `config.json` хоста с `"credsStore": "desktop"` и не звал отсутствующий `docker-credential-desktop`. `config.json` хоста больше не монтируется.
+Отсутствующие optional-сервисы (`notification`, `torrent`) показываются как «не найден» и
+исключаются из массовой операции. Web не запускается через обычный `start/stop/restart`.
+
+## Серверная очередь
+
+`Infrastructure/DeploymentJobService.cs` — singleton `BackgroundService` с одним consumer:
+одновременно выполняется только одна Docker-операция. Задача хранит шаги, состояние,
+сообщения и признак отката; последние 20 завершённых задач живут в памяти процесса.
+
+- Для одного сервиса доступны операции update/restart/start/stop.
+- Массовые update/restart сначала читает фактически существующие контейнеры, затем ставит
+  их в очередь в порядке `configuration → identity → users → files → notification → torrent`.
+- Каждый update делает `pull` и `up --force-recreate --no-deps`, ждёт состояние контейнера.
+  `running + healthy` считается успехом; без healthcheck нужны два опроса `running` подряд.
+  `exited/dead/restarting/unhealthy` — явная ошибка, после которой старый image ID
+  перемаркируется под прежнюю ссылку и сервис пересоздаётся. Таймаут не трактуется как
+  доказательство поломки и автоматически не откатывается.
+- `docker image prune -f` выполняется только после всей update-задачи, когда материал для
+  отката больше не нужен.
+
+`DockerService` запускает `docker compose` через helper-контейнер из образа web. Helper
+получает реальный host-каталог compose, compose-файл, `.env` и `docker.sock` из `docker inspect`;
+это сохраняет корректный резолв относительных bind mounts под Linux/WSL и Windows Docker
+Desktop. Аргументы CLI передаются через `ProcessStartInfo.ArgumentList`.
+
+## Self-update веба
+
+Web нельзя пересоздать из собственного процесса. `UpdateWebSelfAsync` и
+`RestartWebSelfAsync` запускают detached helper из текущего образа web. Self-update клонирует
+текущую конфигурацию `cloud-web` (env, labels, ports, mounts, networks), делает `pull`,
+переименовывает старый контейнер в `cloud-web-bak`, запускает новый и при ошибке `docker run`
+или подключения сети возвращает старый контейнер. Self-restart выполняет отложенный
+`docker restart cloud-web`.
+
+После ответа API браузер открывает `/updating` или `/restarting`. Эти анонимные страницы
+подставляют метку текущего процесса, опрашивают `/healthz` каждые 3 секунды и возвращаются в
+`/settings#system` только после трёх успешных ответов уже нового процесса. Cache-Control
+`no-store` и query-параметр при возврате не дают браузеру застрять на старом SPA-бандле.
 
 ## Эндпоинты (`SystemEndpoints.cs`)
 
-`GET /healthz` (анонимный, для опроса страницей при self-update). Группа `/api/system`:
-`POST /unlock`, `POST /lock`, `GET /services`, `POST /services/{svc}/{update|restart|start|stop}`, `POST /update-all`, `POST /web/update-self`, `POST /web/restart-self`.
-
-Данные для рендера: `PageDataBuilder.BuildSettingsJsonAsync` добавляет в payload `admin{enabled,unlocked}` и `system{version,edition}`.
+- `GET /healthz` — анонимный health-check с заголовком `X-BarkCloud-Started-At`;
+- `/updating`, `/restarting`, `/maintenance-wait.js` — страницы и скрипт ожидания;
+- `POST /api/system/unlock`, `POST /api/system/lock`, `GET /api/system/services`;
+- `POST /api/system/services/{svc}/{update|restart|start|stop}` — ставит одну операцию в очередь;
+- `POST /api/system/update-all`, `POST /api/system/restart-all`;
+- `GET /api/system/deploy/jobs`, `GET /api/system/deploy/jobs/{id}` — список и состояние задач;
+- `POST /api/system/web/update-self`, `POST /api/system/web/restart-self`.
 
 ## UI
 
-`Pages/Settings.html` — раздел «Обслуживание» (компонент `SystemSection`, M3-стиль `shared.css`):
-- не настроен пароль → заглушка; не разблокировано → поле пароля; разблокировано → список сервисов (статус-pill, тег образа, кнопки обновить/перезапустить/стоп-старт), «Обновить всё», «Заблокировать».
-- **Режим без почты:** при `system.emailEnabled=false` (из `PageDataBuilder`, см. [[modules/backend-configuration]]) у строки сервиса `notification` показывается пометка, что он не используется и его можно остановить/убрать из docker-compose. `DockerService` умеет только stop/start/restart контейнеров — сам compose-файл не редактирует (удаление сервиса — ручной шаг администратора).
-- progress-модалка для «Обновить всё» (последовательные вызовы с прогресс-баром).
-- full-screen overlay при self-update/-restart веба: опрашивает `/healthz` каждые 3с, после 2 успехов перезагружает страницу.
-- Иконки `refresh`/`power` добавлены в `shared.jsx`.
+`ClientApp/src/pages/SettingsPage.tsx` (`SystemSection`) показывает статус, image tag и
+действия. Модалка прогресса опрашивает серверную задачу каждые 2 секунды, показывает шаги,
+ошибки и откат, а при повторном открытии раздела продолжает активную задачу. Массовые
+кнопки больше не выполняют цикл запросов из браузера. Self-update/-restart переводит на
+страницу ожидания. Отсутствующие контейнеры и параллельные действия блокируются в UI.
 
 ## Инфраструктура
 
-- `BarkCloud.Web/Dockerfile.slim` (**его использует prod-CI** `build-backend-web.yml`) и `Dockerfile`: финальный образ `aspnet:10.0-alpine` + `apk add docker-cli docker-cli-compose icu-libs tzdata` (chiseled не подходит — нет shell/пакетов), `DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false`, без `USER` (root задаётся в compose).
-- `docker-compose.yml` сервис `web`: `user: root`, volumes `docker.sock`/`./docker-compose.yml`/`./.env` (монтирование `~/.docker/config.json` убрано — registry публичный), env `App__AdminPassword`.
-- `sample.env`: `WEB_ADMIN_PASSWORD`.
+- `BarkCloud.Web/Dockerfile` и `Dockerfile.slim`: `aspnet:10.0-alpine` + `docker-cli`,
+  `docker-cli-compose`, `icu-libs`, `tzdata`; root задаётся compose для доступа к socket.
+- `docker-compose.yml` у web монтирует `docker.sock`, `./docker-compose.yml` и `./.env`;
+  `App__AdminPassword` получает `WEB_ADMIN_PASSWORD`.
+- Registry публичен на pull; `DOCKER_CONFIG=/tmp/barkcloud-docker` не читает host
+  `credsStore`, отсутствующий внутри alpine-образа.
 
 ## Компромисс безопасности
 
-В BarkFluff это был изолированный admin-сервис; здесь те же права (`docker.sock`+root → полный контроль над хостом) получает публичный веб. Митигация: отдельный пароль + подписанная cookie, белый список из 5 сервисов, веб себя не stop/start (только self-update/-restart).
+`docker.sock` и root дают web полный контроль над Docker-хостом. Митигация: отдельный пароль,
+подписанная cookie и белый список из шести backend-сервисов; web сам управляется только
+ограниченными helper-сценариями update/restart.
