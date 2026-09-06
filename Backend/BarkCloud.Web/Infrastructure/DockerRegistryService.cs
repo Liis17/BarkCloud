@@ -425,12 +425,12 @@ public sealed class DockerRegistryService
 
         var candidateHex = StripDigestAlgorithm(candidateValue);
         var expectedHex = StripDigestAlgorithm(expectedValue);
-        return expectedHex.Length >= 12
-            && candidateHex.Length > expectedHex.Length
-            && candidateHex.StartsWith(expectedHex, StringComparison.OrdinalIgnoreCase)
-            || candidateHex.Length >= 12
-            && expectedHex.Length > candidateHex.Length
-            && expectedHex.StartsWith(candidateHex, StringComparison.OrdinalIgnoreCase);
+        return (expectedHex.Length >= 12
+                && candidateHex.Length > expectedHex.Length
+                && candidateHex.StartsWith(expectedHex, StringComparison.OrdinalIgnoreCase))
+            || (candidateHex.Length >= 12
+                && expectedHex.Length > candidateHex.Length
+                && expectedHex.StartsWith(candidateHex, StringComparison.OrdinalIgnoreCase));
     }
 
     private static string StripDigestAlgorithm(string digest)
