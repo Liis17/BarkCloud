@@ -15,18 +15,8 @@ public static class BackendComposeGenerator
         string suffix = m.ImageChannel == "Dev" ? "-dev" : "";
         string Img(string name) => $"{BuilderModel.ImageRegistry}/barkcloud-{name}{suffix}:latest";
 
-        // Без nginx микросервисы остаются отрезанными: единственным мостом наружу был nginx
-        // (он публиковал их порты и проксировал в docker-сеть). Тогда публикуем порты прямо на
-        // сервисе; при включённом nginx этого делать не нужно — он сам пробрасывает порты.
-        string Ports(params string[] portVars)
-        {
-            if (m.IncludeNginx)
-                return "";
-            var b = new StringBuilder("\n    ports:");
-            foreach (var v in portVars)
-                b.Append("\n      - \"${").Append(v).Append("}:${").Append(v).Append("}\"");
-            return b.ToString();
-        }
+        // Все сервисы доступны только внутри barkcloud-network.
+        // Внешние порты публикует reverse-proxy, если он включён.
 
         // SMTP-переменные в configuration имеют смысл только с notification (он шлёт письма).
         // Без notification — не выводим блок, чтобы не тащить пустые EMAIL_* в configuration.
@@ -96,7 +86,7 @@ services:
     restart: always
     environment:
       <<: *common-variables
-      SERVICE_PORT: ${IDENTITY_PORT}{{Ports("IDENTITY_PORT")}}
+      SERVICE_PORT: ${IDENTITY_PORT}
     networks:
       - barkcloud-network
     depends_on:
@@ -108,7 +98,7 @@ services:
     restart: always
     environment:
       <<: *common-variables
-      SERVICE_PORT: ${USERS_PORT}{{Ports("USERS_PORT")}}
+      SERVICE_PORT: ${USERS_PORT}
     networks:
       - barkcloud-network
     depends_on:
@@ -123,7 +113,7 @@ services:
       SERVICE_PORT: ${FILES_PORT}
       SERVICE_HTTP1PORT: ${FILES_HTTP1PORT}
       StorageProbe__Path: "/mnt/minio-data"
-      Archive__TempPath: "/mnt/archive-temp"{{Ports("FILES_PORT", "FILES_HTTP1PORT")}}
+      Archive__TempPath: "/mnt/archive-temp"
     volumes:
       - ${MINIO_DATA_PATH:-cloud-minio_data}:/mnt/minio-data:ro
       - ${ARCHIVE_TEMP_PATH:-archive_temp}:/mnt/archive-temp
@@ -151,15 +141,7 @@ services:
 
         if (m.IncludeTorrent)
         {
-            // Peer-порт BitTorrent публикуется на хост всегда (nginx его не проксирует).
-            // gRPC/HTTP1-порты публикуем только без nginx (иначе их пробрасывает прокси).
-            var torrentPorts = new StringBuilder()
-                .Append("\n    ports:")
-                .Append("\n      - \"${TORRENT_PEER_PORT}:${TORRENT_PEER_PORT}\"")
-                .Append("\n      - \"${TORRENT_PEER_PORT}:${TORRENT_PEER_PORT}/udp\"");
-            if (!m.IncludeNginx)
-                torrentPorts.Append("\n      - \"${TORRENT_PORT}:${TORRENT_PORT}\"")
-                            .Append("\n      - \"${TORRENT_HTTP1PORT}:${TORRENT_HTTP1PORT}\"");
+            var torrentPorts = "";
 
             sections.Add($$"""
   # Торрент-сервис: качает торренты на хост-диск ({TORRENT_DOWNLOAD_PATH} → /mnt/torrents)
@@ -202,8 +184,6 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./docker-compose.yml:/docker-compose.yml:ro
       - ./.env:/.env:ro
-    ports:
-      - "${WEB_PORT}:8080"
     networks:
       - barkcloud-network
     depends_on:
@@ -247,8 +227,6 @@ services:
     image: datalust/seq:latest
     container_name: cloud-seq
     restart: always
-    ports:
-      - "${SEQ_WEBPORT}:80"
     environment:
       ACCEPT_EULA: "Y"
       SEQ_FIRSTRUN_ADMINPASSWORD: "${SEQ_ADMIN_PASSWORD}"
@@ -264,9 +242,6 @@ services:
     image: quay.io/minio/minio:RELEASE.2025-04-22T22-12-26Z-cpuv1
     container_name: cloud-minio
     restart: always
-    ports:
-      - "${MINIO_PORT}:9000"
-      - "${MINIO_WEBPORT}:9001"
     environment:
       MINIO_ROOT_USER: "${MINIO_ROOT_USER}"
       MINIO_ROOT_PASSWORD: "${MINIO_ROOT_PASSWORD}"
@@ -338,8 +313,6 @@ services:
     volumes:
       - ${POSTGRES_DATA_PATH:-pgdata}:/var/lib/postgresql
       - ${BACKUP_PATH:-backup_volume}:/backup
-    ports:
-      - "${POSTGRES_PORT}:5432"
     networks:
       - barkcloud-network
 """);

@@ -12,7 +12,8 @@
 ## Порты
 - `TORRENT_PORT=7027` — gRPC (`TorrentApi`, `[Authorize(User)]`).
 - `TORRENT_HTTP1PORT=7028` — HTTP1 стриминг файлов по Range (`GET /download/{torrentId}?file=`).
-- `TORRENT_PEER_PORT=6881` — BitTorrent peer-порт (TCP+UDP), публикуется на хост.
+- `TORRENT_PEER_PORT=6881` — BitTorrent peer-порт (TCP+UDP), слушается внутри Docker-сети;
+  production compose не публикует его на host.
 - БД `torrent` (Postgres), `Torrent:DownloadPath=/mnt/torrents` (том `TORRENT_DOWNLOAD_PATH`).
 
 ## Устройство
