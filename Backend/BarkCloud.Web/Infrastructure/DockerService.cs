@@ -641,13 +641,20 @@ $"{stateWriter}\n" +
         => BuildStateWriter(operationId, "restart", stateFile, logFile) + "\n"
             + "describe_command() { printf '$'; printf ' %s' \"$@\"; }\n"
             + $"run_logged() {{ describe_command \"$@\" >> {ShQuote(logFile)}; printf '\\n' >> {ShQuote(logFile)}; \"$@\" >> {ShQuote(logFile)} 2>&1; code=$?; printf '[exit %s]\\n' \"$code\" >> {ShQuote(logFile)}; return \"$code\"; }}\n"
+            + "expose_state() {\n"
+            + $"  run_logged docker exec {WebContainer} sh -c {ShQuote("mkdir -p " + MaintenanceDirectoryInContainer)} || true\n"
+            + $"  run_logged docker cp {ShQuote(stateFile)} {ShQuote(WebContainer + ":" + stateFile)} || true\n"
+            + $"  run_logged docker cp {ShQuote(logFile)} {ShQuote(WebContainer + ":" + logFile)} || true\n"
+            + "}\n"
             + "write_state pending 'Перезапуск запущен'\n"
             + "sleep 2\n"
             + $"if run_logged docker restart {WebContainer}; then\n"
             + "  write_state completed 'Контейнер web перезапущен'\n"
+            + "  expose_state\n"
             + "  exit 0\n"
             + "fi\n"
             + "write_state failed 'Не удалось перезапустить контейнер web'\n"
+            + "expose_state\n"
             + "exit 1";
 
     private static string BuildStateWriter(string operationId, string kind, string stateFile, string logFile)
