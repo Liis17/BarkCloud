@@ -129,9 +129,10 @@ skipped-шаги, команду/stderr и rollback, а при `requiresReconnec
   named volume `cloud-web-maintenance:/app/maintenance`; там лежат compose-backups и marker
   self-update.
   `App__AdminPassword` получает `WEB_ADMIN_PASSWORD`.
-- Web подключает `AddBarkCloudSerilog("BarkCloud.Web")`: события очереди и ошибки helper
-  дублируются в stdout контейнера и Seq, поэтому диагностика доступна через `docker logs`
-  даже без внешнего проброса порта Seq.
+- Web подключает `AddBarkCloudSerilog("BarkCloud.Web")`: события очереди и ошибки самого
+  процесса дублируются в stdout контейнера и Seq, поэтому их можно смотреть через
+  `docker logs`; подробный вывод detached helper сохраняется в persistent maintenance-логе
+  и показывается в защищённом разделе обслуживания. Внешний проброс порта Seq не требуется.
 - Registry публичен на pull; `DOCKER_CONFIG=/tmp/barkcloud-docker` не читает host
   `credsStore`, отсутствующий внутри alpine-образа.
 
