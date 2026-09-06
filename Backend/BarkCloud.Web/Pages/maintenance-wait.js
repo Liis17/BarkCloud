@@ -72,8 +72,11 @@
                 });
                 const serverStartedAt = response.headers.get('X-BarkCloud-Started-At');
                 const operationCompleted = operation && operation.state.toLowerCase() === 'completed';
+                const healthyRestart = operationId
+                    ? operationCompleted
+                    : serverStartedAt !== pageServerStartedAt;
 
-                if (response.status === 200 && serverStartedAt && (serverStartedAt !== pageServerStartedAt || operationCompleted)) {
+                if (response.status === 200 && serverStartedAt && healthyRestart) {
                     successCount++;
                     if (successCount >= requiredSuccessCount) {
                         redirectStarted = true;

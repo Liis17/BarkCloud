@@ -45,7 +45,7 @@ describe('maintenance wait page', () => {
 
     window.BarkCloudWait.start({
       initialDelayMs: 0,
-      operationId: 'operation-1',
+      operationId: '11111111-1111-1111-1111-111111111111',
       pageServerStartedAt: '2026-09-06T21:55:23.4320929+00:00',
     });
 
@@ -58,7 +58,7 @@ describe('maintenance wait page', () => {
       }
     }
 
-    expect(fetchMock).toHaveBeenCalledWith('/maintenance-status?operationId=operation-1', expect.any(Object));
+    expect(fetchMock).toHaveBeenCalledWith('/maintenance-status?operationId=11111111-1111-1111-1111-111111111111', expect.any(Object));
     expect(window.location.replace).toHaveBeenCalledTimes(1);
   });
 
@@ -68,7 +68,7 @@ describe('maintenance wait page', () => {
       : response(null)));
     const { window, timers, elements } = loadWaitScript(fetchMock);
 
-    window.BarkCloudWait.start({ initialDelayMs: 0, operationId: 'operation-2', pageServerStartedAt: 'old' });
+    window.BarkCloudWait.start({ initialDelayMs: 0, operationId: '22222222-2222-2222-2222-222222222222', pageServerStartedAt: 'old' });
     const callback = timers.shift();
     callback();
     for (let flush = 0; flush < 30; flush++) await Promise.resolve();
@@ -78,5 +78,24 @@ describe('maintenance wait page', () => {
     expect(window.location.replace).not.toHaveBeenCalled();
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(timers).toHaveLength(0);
+  });
+
+  it('does not accept a different server timestamp until the tracked operation is completed', async () => {
+    const fetchMock = vi.fn((url) => Promise.resolve(url.startsWith('/maintenance-status')
+      ? response({ state: 'pending' })
+      : response(null)));
+    const { window, timers } = loadWaitScript(fetchMock);
+
+    window.BarkCloudWait.start({
+      initialDelayMs: 0,
+      operationId: '33333333-3333-3333-3333-333333333333',
+      pageServerStartedAt: 'old',
+    });
+    const callback = timers.shift();
+    callback();
+    for (let flush = 0; flush < 30; flush++) await Promise.resolve();
+
+    expect(window.location.replace).not.toHaveBeenCalled();
+    expect(timers).toHaveLength(1);
   });
 });
