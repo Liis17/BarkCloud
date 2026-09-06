@@ -10,6 +10,26 @@ namespace BarkCloud.Web.Tests.Infrastructure;
 public sealed class DockerRegistryServiceTests
 {
     [Fact]
+    public void ResolveImageReference_UsesComposeForUnrecognisedRuntimeImageId()
+    {
+        DockerRegistryService.ResolveImageReference(
+                "36b99952f177",
+                "docker.barkfluff.com/barkcloud-web:latest")
+            .Should()
+            .Be("docker.barkfluff.com/barkcloud-web:latest");
+    }
+
+    [Fact]
+    public void ResolveImageReference_PreservesRecognisedRuntimeReference()
+    {
+        DockerRegistryService.ResolveImageReference(
+                "docker.barkfluff.com/barkcloud-web:1.0.1",
+                "docker.barkfluff.com/barkcloud-web:latest")
+            .Should()
+            .Be("docker.barkfluff.com/barkcloud-web:1.0.1");
+    }
+
+    [Fact]
     public async Task GetVersionStatusAsync_UsesHighestSemverAndIgnoresNonSemverTags()
     {
         var service = CreateService("{\"name\":\"barkcloud-users-dev\",\"tags\":[\"1.0.9\",\"latest\",\"1.0.10\",\"3331878f5f4f\",\"invalid\"]}");
