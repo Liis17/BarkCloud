@@ -74,6 +74,29 @@ public sealed class DockerRegistryServiceTests
     }
 
     [Fact]
+    public async Task GetVersionStatusAsync_MatchesInstalledDockerConfigDigest()
+    {
+        var service = CreateService(request => request.RequestUri?.AbsolutePath switch
+        {
+            "/v2/barkcloud-web/tags/list" => Response("{\"tags\":[\"1.0.4\",\"latest\"]}"),
+            "/v2/barkcloud-web/manifests/1.0.4" => ManifestIndex(
+                "sha256:index-1.0.4", "sha256:platform-manifest-1.0.4"),
+            "/v2/barkcloud-web/manifests/sha256:platform-manifest-1.0.4" => ManifestWithConfig(
+                "sha256:platform-manifest-1.0.4", "sha256:installed-config"),
+            _ => new HttpResponseMessage(HttpStatusCode.NotFound),
+        });
+
+        var result = await service.GetVersionStatusAsync(
+            "docker.barkfluff.com/barkcloud-web:latest",
+            "sha256:installed-config");
+
+        result.CurrentVersion.Should().Be("1.0.4");
+        result.LatestVersion.Should().Be("1.0.4");
+        result.UpdateAvailable.Should().BeFalse();
+        result.State.Should().Be(ImageVersionState.Ready);
+    }
+
+    [Fact]
     public async Task GetVersionStatusAsync_DerivesInstalledVersionFromDigestReference()
     {
         var service = CreateService(request => request.RequestUri?.AbsolutePath switch
@@ -178,6 +201,20 @@ public sealed class DockerRegistryServiceTests
     private static HttpResponseMessage Manifest(string digest)
     {
         var response = Response("{}");
+        response.Headers.Add("Docker-Content-Digest", digest);
+        return response;
+    }
+
+    private static HttpResponseMessage ManifestWithConfig(string digest, string configDigest)
+    {
+        var response = Response($"{{\"config\":{{\"digest\":\"{configDigest}\"}}}}");
+        response.Headers.Add("Docker-Content-Digest", digest);
+        return response;
+    }
+
+    private static HttpResponseMessage ManifestIndex(string digest, string childDigest)
+    {
+        var response = Response($"{{\"manifests\":[{{\"digest\":\"{childDigest}\",\"platform\":{{\"os\":\"linux\",\"architecture\":\"amd64\"}}}}]}}");
         response.Headers.Add("Docker-Content-Digest", digest);
         return response;
     }

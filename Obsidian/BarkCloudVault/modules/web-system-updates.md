@@ -100,7 +100,9 @@ self-update старой установки helper сам подключает v
 При чтении статуса Web поле `docker ps .Image` может содержать короткий ID образа вместо
 registry-ссылки. В этом случае `DockerRegistryService` использует reference из Compose и
 получает digest по каноническому репозиторию, поэтому SemVer и канал остаются доступны
-даже для контейнеров, созданных по ID или digest.
+даже для контейнеров, созданных по ID или digest. Registry-ответы в формате OCI index
+дополнительно раскрываются до платформенного manifest и его `config.digest`: локальный
+Docker может не сохранять `RepoDigests`, а `.Image` тогда содержит именно config ID.
 
 ## UI
 
