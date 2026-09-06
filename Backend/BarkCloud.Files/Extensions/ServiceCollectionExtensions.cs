@@ -14,6 +14,7 @@ public static class ServiceCollectionExtensions
 
         // Регистрируем инициализатор бакетов
         services.AddSingleton<S3BucketInitializer>();
+        services.AddHostedService<S3BucketInitializationHostedService>();
 
         return services;
     }

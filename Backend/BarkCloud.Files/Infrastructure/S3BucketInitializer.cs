@@ -13,7 +13,9 @@ namespace BarkCloud.Files.Infrastructure;
 /// </summary>
 public class S3BucketInitializer
 {
-    private const int MaxAttempts = 10;
+    // Один проход ограничен, чтобы фоновая служба могла сообщить об ошибке и
+    // начать новый проход после паузы. Сам процесс больше не падает из-за MinIO.
+    private const int MaxAttemptsPerPass = 10;
 
     private readonly S3BucketRegistry _registry;
     private readonly ILogger<S3BucketInitializer> _logger;
@@ -36,6 +38,10 @@ public class S3BucketInitializer
             try
             {
                 await EnsureBucketExistsAsync(client, bucketName, cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception ex)
             {
@@ -62,14 +68,14 @@ public class S3BucketInitializer
                 await EnsureBucketExistsOnceAsync(client, bucketName, cancellationToken);
                 return;
             }
-            catch (Exception ex) when (attempt < MaxAttempts && IsTransientStartupException(ex))
+            catch (Exception ex) when (attempt < MaxAttemptsPerPass && IsTransientStartupException(ex))
             {
                 var delay = TimeSpan.FromSeconds(Math.Min(attempt, 5));
                 _logger.LogWarning(
                     "S3 недоступен для бакета {BucketName}; повтор {Attempt}/{MaxAttempts} через {DelaySeconds} с",
                     bucketName,
                     attempt + 1,
-                    MaxAttempts,
+                    MaxAttemptsPerPass,
                     delay.TotalSeconds);
                 await Task.Delay(delay, cancellationToken);
             }
