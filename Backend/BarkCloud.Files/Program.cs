@@ -1,7 +1,6 @@
 using BarkCloud.Files.Consumers;
 using BarkCloud.Files.Extensions;
 using BarkCloud.Files.Host;
-using BarkCloud.Files.Infrastructure;
 using BarkCloud.Files.Persistence;
 using BarkCloud.Files.Services;
 using BarkCloud.GrpcServer;
@@ -138,10 +137,6 @@ public class Program
         {
             var ctx = scope.ServiceProvider.GetRequiredService<FilesContext>();
             ctx.Database.Migrate();
-
-            // Инициализируем S3 бакеты
-            var bucketInitializer = scope.ServiceProvider.GetRequiredService<S3BucketInitializer>();
-            bucketInitializer.InitializeBucketsAsync().GetAwaiter().GetResult();
         }
 
         app.MapGrpcReflectionService();
