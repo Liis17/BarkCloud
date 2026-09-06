@@ -102,7 +102,9 @@ registry-ссылки. В этом случае `DockerRegistryService` испо
 получает digest по каноническому репозиторию, поэтому SemVer и канал остаются доступны
 даже для контейнеров, созданных по ID или digest. Registry-ответы в формате OCI index
 дополнительно раскрываются до платформенного manifest и его `config.digest`: локальный
-Docker может не сохранять `RepoDigests`, а `.Image` тогда содержит именно config ID.
+Docker может не сохранять `RepoDigests`, а `.Image` тогда содержит config ID или его
+сокращённый префикс. Если совпадение уже найдено по index/child digest, дополнительный
+запрос за config не требуется.
 
 ## UI
 

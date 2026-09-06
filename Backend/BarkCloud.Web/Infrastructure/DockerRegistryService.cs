@@ -84,7 +84,11 @@ public sealed class DockerRegistryService
                 {
                     item.Tag,
                     item.Version,
-                    Digests = await GetManifestDigestsAsync(reference.Repository, item.Tag, cancellationToken),
+                    Digests = await GetManifestDigestsAsync(
+                        reference.Repository,
+                        item.Tag,
+                        cancellationToken,
+                        normalizedDigest),
                 }));
 
                 var installed = manifests.FirstOrDefault(item =>
@@ -248,7 +252,8 @@ public sealed class DockerRegistryService
     private async Task<ManifestDigests> GetManifestDigestsAsync(
         string repository,
         string tag,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? installedDigest = null)
     {
         var cacheKey = $"barkcloud-registry:manifest:{repository}:{tag}";
         if (_cache.TryGetValue(cacheKey, out ManifestDigests? cached) && cached is not null)
@@ -311,16 +316,25 @@ public sealed class DockerRegistryService
             ManifestRequestGate.Release();
         }
 
-        if (result.ConfigDigest is null && result.ReferencedManifestDigest is not null)
+        if (result.ConfigDigest is null
+            && result.ReferencedManifestDigest is not null
+            && (installedDigest is null || !result.Matches(installedDigest)))
         {
-            var child = await GetManifestDigestsAsync(repository, result.ReferencedManifestDigest, cancellationToken);
+            var child = await GetManifestDigestsAsync(
+                repository,
+                result.ReferencedManifestDigest,
+                cancellationToken,
+                installedDigest);
             result = new ManifestDigests(
                 result.ManifestDigest,
                 child.ConfigDigest,
                 child.ManifestDigest ?? result.ReferencedManifestDigest);
         }
 
-        _cache.Set(cacheKey, result, TimeSpan.FromMinutes(5));
+        // Не кэшируем нераскрытый index, если уже нашли совпадение по его
+        // descriptor/header: другой digest потребует config-проверку.
+        if (result.ConfigDigest is not null || result.ReferencedManifestDigest is null)
+            _cache.Set(cacheKey, result, TimeSpan.FromMinutes(5));
         return result;
     }
 
@@ -396,7 +410,33 @@ public sealed class DockerRegistryService
     private static string NormalizeDigest(string digest)
     {
         var separator = digest.LastIndexOf('@');
-        return separator >= 0 ? digest[(separator + 1)..] : digest;
+        return (separator >= 0 ? digest[(separator + 1)..] : digest).Trim();
+    }
+
+    private static bool DigestMatches(string? candidate, string expected)
+    {
+        if (candidate is null)
+            return false;
+
+        var candidateValue = NormalizeDigest(candidate);
+        var expectedValue = NormalizeDigest(expected);
+        if (string.Equals(candidateValue, expectedValue, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        var candidateHex = StripDigestAlgorithm(candidateValue);
+        var expectedHex = StripDigestAlgorithm(expectedValue);
+        return expectedHex.Length >= 12
+            && candidateHex.Length > expectedHex.Length
+            && candidateHex.StartsWith(expectedHex, StringComparison.OrdinalIgnoreCase)
+            || candidateHex.Length >= 12
+            && expectedHex.Length > candidateHex.Length
+            && expectedHex.StartsWith(candidateHex, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string StripDigestAlgorithm(string digest)
+    {
+        var separator = digest.IndexOf(':');
+        return separator > 0 ? digest[(separator + 1)..] : digest;
     }
 
     private sealed record ManifestDigests(
@@ -405,9 +445,9 @@ public sealed class DockerRegistryService
         string? ReferencedManifestDigest)
     {
         public bool Matches(string digest)
-            => string.Equals(ManifestDigest, digest, StringComparison.OrdinalIgnoreCase)
-               || string.Equals(ConfigDigest, digest, StringComparison.OrdinalIgnoreCase)
-               || string.Equals(ReferencedManifestDigest, digest, StringComparison.OrdinalIgnoreCase);
+            => DigestMatches(ManifestDigest, digest)
+               || DigestMatches(ConfigDigest, digest)
+               || DigestMatches(ReferencedManifestDigest, digest);
     }
 
     private static ImageVersionStatus RegistryUnavailable(ImageReference reference, string error)
