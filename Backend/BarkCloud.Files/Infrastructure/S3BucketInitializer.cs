@@ -1,6 +1,10 @@
 using Amazon.S3;
 using Amazon.S3.Model;
 
+using System.Net;
+using System.Net.Http;
+using System.Net.Sockets;
+
 namespace BarkCloud.Files.Infrastructure;
 
 /// <summary>
@@ -9,6 +13,8 @@ namespace BarkCloud.Files.Infrastructure;
 /// </summary>
 public class S3BucketInitializer
 {
+    private const int MaxAttempts = 10;
+
     private readonly S3BucketRegistry _registry;
     private readonly ILogger<S3BucketInitializer> _logger;
 
@@ -21,7 +27,7 @@ public class S3BucketInitializer
     /// <summary>
     /// Инициализирует все необходимые S3 бакеты
     /// </summary>
-    public async Task InitializeBucketsAsync()
+    public async Task InitializeBucketsAsync(CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Начинается инициализация S3 бакетов...");
 
@@ -29,7 +35,7 @@ public class S3BucketInitializer
         {
             try
             {
-                await EnsureBucketExistsAsync(client, bucketName);
+                await EnsureBucketExistsAsync(client, bucketName, cancellationToken);
             }
             catch (Exception ex)
             {
@@ -44,14 +50,43 @@ public class S3BucketInitializer
     /// <summary>
     /// Проверяет существование бакета и создает его при необходимости
     /// </summary>
-    private async Task EnsureBucketExistsAsync(IAmazonS3 client, string bucketName)
+    private async Task EnsureBucketExistsAsync(
+        IAmazonS3 client,
+        string bucketName,
+        CancellationToken cancellationToken)
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                await EnsureBucketExistsOnceAsync(client, bucketName, cancellationToken);
+                return;
+            }
+            catch (Exception ex) when (attempt < MaxAttempts && IsTransientStartupException(ex))
+            {
+                var delay = TimeSpan.FromSeconds(Math.Min(attempt, 5));
+                _logger.LogWarning(
+                    "S3 недоступен для бакета {BucketName}; повтор {Attempt}/{MaxAttempts} через {DelaySeconds} с",
+                    bucketName,
+                    attempt + 1,
+                    MaxAttempts,
+                    delay.TotalSeconds);
+                await Task.Delay(delay, cancellationToken);
+            }
+        }
+    }
+
+    private async Task EnsureBucketExistsOnceAsync(
+        IAmazonS3 client,
+        string bucketName,
+        CancellationToken cancellationToken)
     {
         try
         {
             // Проверяем существование бакета через попытку получить его локацию
             try
             {
-                await client.GetBucketLocationAsync(bucketName);
+                await client.GetBucketLocationAsync(bucketName, cancellationToken);
                 _logger.LogInformation("Бакет {BucketName} уже существует", bucketName);
                 return;
             }
@@ -68,7 +103,7 @@ public class S3BucketInitializer
                 UseClientRegion = false
             };
 
-            await client.PutBucketAsync(putBucketRequest);
+            await client.PutBucketAsync(putBucketRequest, cancellationToken);
             _logger.LogInformation("Бакет {BucketName} создан как приватный (доступ только через presigned URL)", bucketName);
         }
         catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.Conflict)
@@ -76,5 +111,25 @@ public class S3BucketInitializer
             // Бакет уже существует (может быть создан параллельно)
             _logger.LogWarning("Бакет {BucketName} уже существует (конфликт при создании)", bucketName);
         }
+    }
+
+    internal static bool IsTransientStartupException(Exception exception)
+    {
+        if (exception is AggregateException aggregate)
+            return aggregate.InnerExceptions.Any(IsTransientStartupException);
+
+        if (exception is HttpRequestException or SocketException or TimeoutException)
+            return true;
+
+        if (exception is AmazonS3Exception s3Exception)
+        {
+            var statusCode = (int)s3Exception.StatusCode;
+            if (statusCode is (int)HttpStatusCode.RequestTimeout
+                or (int)HttpStatusCode.TooManyRequests
+                || statusCode >= 500)
+                return true;
+        }
+
+        return exception.InnerException is not null && IsTransientStartupException(exception.InnerException);
     }
 }

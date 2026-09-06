@@ -65,7 +65,9 @@ Parent: [[index]] · See also: [[api/files-api]] · [[modules/backend-files-clou
 - `FileActivityWriter.cs` — best-effort writer истории: команды не падают, если запись события не удалась; детали сериализуются в `DetailsJson`. В тестах может подставляться `Noop`, чтобы старые unit-тесты хендлеров не требовали нового dependency
 
 ### Infrastructure
-- `S3BucketInitializer.cs` — создание/проверка бакетов MinIO при старте
+- `S3BucketInitializer.cs` — создание/проверка бакетов MinIO при старте; временная
+  недоступность MinIO (например, `Connection refused` во время запуска контейнера)
+  повторяется до 10 попыток с backoff, постоянные ошибки конфигурации не ретраятся
 - `S3BucketRegistry.cs` — реестр бакетов
 - `S3Uploader.cs` — обёртка над S3/MinIO: `UploadAsync`, `DownloadAsync`, `DeleteAsync` (удаление объекта, идемпотентно — используется зачисткой корзины)
 - `PhysicalStorageStatsProvider.cs` — ленивый snapshot диска MinIO: общий размер, занято не-S3, занято S3; кеш 5 минут, обновляется только при запросах storage-info
