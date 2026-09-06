@@ -231,9 +231,13 @@ public sealed class DockerService : IDockerDeployment
                 : image.LastIndexOf(':') > image.LastIndexOf('/')
                     ? image[..image.LastIndexOf(':')]
                     : image;
-            return digests.Split('\n', StringSplitOptions.RemoveEmptyEntries)
+            var repositoryDigest = digests.Split('\n', StringSplitOptions.RemoveEmptyEntries)
                 .Select(line => line.Trim())
                 .FirstOrDefault(line => line.StartsWith(repository + "@", StringComparison.OrdinalIgnoreCase));
+            // Образы, созданные через self-update или сохранённые локальным Docker,
+            // иногда не содержат RepoDigests. В этом случае возвращаем config ID:
+            // Registry-манифест также содержит этот digest в поле config.digest.
+            return repositoryDigest ?? imageId;
         }
         catch (Exception ex)
         {

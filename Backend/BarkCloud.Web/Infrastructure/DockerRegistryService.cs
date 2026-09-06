@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Caching.Memory;
 
 using System.Net.Http.Headers;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
@@ -79,16 +80,15 @@ public sealed class DockerRegistryService
             if (currentParsedVersion is null && !string.IsNullOrWhiteSpace(installedDigest))
             {
                 var normalizedDigest = NormalizeDigest(installedDigest);
-                var manifestDigests = await Task.WhenAll(versions.Select(async item => new
+                var manifests = await Task.WhenAll(versions.Select(async item => new
                 {
                     item.Tag,
                     item.Version,
-                    Digest = await GetManifestDigestAsync(reference.Repository, item.Tag, cancellationToken),
+                    Digests = await GetManifestDigestsAsync(reference.Repository, item.Tag, cancellationToken),
                 }));
 
-                var installed = manifestDigests.FirstOrDefault(item =>
-                    item.Digest is not null &&
-                    string.Equals(item.Digest, normalizedDigest, StringComparison.OrdinalIgnoreCase));
+                var installed = manifests.FirstOrDefault(item =>
+                    item.Digests.Matches(normalizedDigest));
 
                 if (installed is not null)
                 {
@@ -245,16 +245,20 @@ public sealed class DockerRegistryService
         return tags;
     }
 
-    private async Task<string?> GetManifestDigestAsync(string repository, string tag, CancellationToken cancellationToken)
+    private async Task<ManifestDigests> GetManifestDigestsAsync(
+        string repository,
+        string tag,
+        CancellationToken cancellationToken)
     {
         var cacheKey = $"barkcloud-registry:manifest:{repository}:{tag}";
-        if (_cache.TryGetValue(cacheKey, out string? cached))
+        if (_cache.TryGetValue(cacheKey, out ManifestDigests? cached) && cached is not null)
             return cached;
 
+        ManifestDigests result;
         await ManifestRequestGate.WaitAsync(cancellationToken);
         try
         {
-            if (_cache.TryGetValue(cacheKey, out cached))
+            if (_cache.TryGetValue(cacheKey, out cached) && cached is not null)
                 return cached;
 
             using var request = new HttpRequestMessage(HttpMethod.Get, $"/v2/{repository}/manifests/{tag}");
@@ -268,20 +272,110 @@ public sealed class DockerRegistryService
                 throw new HttpRequestException(
                     $"HTTP {(int)response.StatusCode} {response.ReasonPhrase} для manifest {repository}:{tag}");
 
-            var digest = response.Headers.TryGetValues("Docker-Content-Digest", out var values)
+            var manifestDigest = response.Headers.TryGetValues("Docker-Content-Digest", out var values)
                 ? values.FirstOrDefault()
                 : null;
-            if (string.IsNullOrWhiteSpace(digest))
-                throw new HttpRequestException($"В ответе manifest {repository}:{tag} отсутствует Docker-Content-Digest");
 
-            _cache.Set(cacheKey, digest, TimeSpan.FromMinutes(5));
-            return digest;
+            string? configDigest = null;
+            string? childManifestDigest = null;
+            try
+            {
+                await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+                using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
+                if (document.RootElement.TryGetProperty("config", out var config)
+                    && config.ValueKind == JsonValueKind.Object
+                    && config.TryGetProperty("digest", out var digest)
+                    && digest.ValueKind == JsonValueKind.String)
+                {
+                    configDigest = digest.GetString();
+                }
+
+                if (string.IsNullOrWhiteSpace(configDigest))
+                    childManifestDigest = SelectPlatformManifestDigest(document.RootElement);
+            }
+            catch (JsonException)
+            {
+                // Для сопоставления достаточно заголовка манифеста; некоторые
+                // registry-совместимые прокси не возвращают стандартное JSON-тело.
+            }
+
+            if (string.IsNullOrWhiteSpace(manifestDigest)
+                && string.IsNullOrWhiteSpace(configDigest)
+                && string.IsNullOrWhiteSpace(childManifestDigest))
+                throw new HttpRequestException($"В ответе manifest {repository}:{tag} отсутствует digest");
+
+            result = new ManifestDigests(manifestDigest, configDigest, childManifestDigest);
         }
         finally
         {
             ManifestRequestGate.Release();
         }
+
+        if (result.ConfigDigest is null && result.ReferencedManifestDigest is not null)
+        {
+            var child = await GetManifestDigestsAsync(repository, result.ReferencedManifestDigest, cancellationToken);
+            result = new ManifestDigests(
+                result.ManifestDigest,
+                child.ConfigDigest,
+                child.ManifestDigest ?? result.ReferencedManifestDigest);
+        }
+
+        _cache.Set(cacheKey, result, TimeSpan.FromMinutes(5));
+        return result;
     }
+
+    private static string? SelectPlatformManifestDigest(JsonElement root)
+    {
+        if (!root.TryGetProperty("manifests", out var manifests)
+            || manifests.ValueKind != JsonValueKind.Array)
+            return null;
+
+        var candidates = manifests.EnumerateArray()
+            .Select(item =>
+            {
+                var digest = item.TryGetProperty("digest", out var digestElement)
+                    && digestElement.ValueKind == JsonValueKind.String
+                    ? digestElement.GetString()
+                    : null;
+                var platform = item.TryGetProperty("platform", out var platformElement)
+                    && platformElement.ValueKind == JsonValueKind.Object
+                    ? platformElement
+                    : default;
+                var os = platform.ValueKind == JsonValueKind.Object
+                    && platform.TryGetProperty("os", out var osElement)
+                    && osElement.ValueKind == JsonValueKind.String
+                    ? osElement.GetString()
+                    : null;
+                var architecture = platform.ValueKind == JsonValueKind.Object
+                    && platform.TryGetProperty("architecture", out var architectureElement)
+                    && architectureElement.ValueKind == JsonValueKind.String
+                    ? architectureElement.GetString()
+                    : null;
+                return (Digest: digest, Os: os, Architecture: architecture);
+            })
+            .Where(item => !string.IsNullOrWhiteSpace(item.Digest))
+            .ToList();
+
+        var preferred = candidates.FirstOrDefault(item =>
+            string.Equals(item.Os, "linux", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(item.Architecture, CurrentDockerArchitecture(), StringComparison.OrdinalIgnoreCase));
+        if (preferred.Digest is not null)
+            return preferred.Digest;
+
+        return candidates.FirstOrDefault(item =>
+                string.Equals(item.Os, "linux", StringComparison.OrdinalIgnoreCase))
+            .Digest
+            ?? candidates.FirstOrDefault().Digest;
+    }
+
+    private static string CurrentDockerArchitecture() => RuntimeInformation.ProcessArchitecture switch
+    {
+        Architecture.X64 => "amd64",
+        Architecture.Arm64 => "arm64",
+        Architecture.Arm => "arm",
+        Architecture.X86 => "386",
+        _ => string.Empty,
+    };
 
     private static bool TryParseSemver(string? tag, out Version version)
     {
@@ -303,6 +397,17 @@ public sealed class DockerRegistryService
     {
         var separator = digest.LastIndexOf('@');
         return separator >= 0 ? digest[(separator + 1)..] : digest;
+    }
+
+    private sealed record ManifestDigests(
+        string? ManifestDigest,
+        string? ConfigDigest,
+        string? ReferencedManifestDigest)
+    {
+        public bool Matches(string digest)
+            => string.Equals(ManifestDigest, digest, StringComparison.OrdinalIgnoreCase)
+               || string.Equals(ConfigDigest, digest, StringComparison.OrdinalIgnoreCase)
+               || string.Equals(ReferencedManifestDigest, digest, StringComparison.OrdinalIgnoreCase);
     }
 
     private static ImageVersionStatus RegistryUnavailable(ImageReference reference, string error)
