@@ -46,6 +46,9 @@
   пробрасываются (их публикует и проксирует сам nginx). TLS в этом режиме нет — трафик h2c.
 - **Образы:** реестр фиксирован (`docker.barkfluff.com`, read-only), выбор канала
   Release/Dev → `barkcloud-<svc>[-dev]:latest`.
+- **Docker-сеть:** compose подключается к заранее созданной внешней сети
+  `barkcloud-network` (`external: true`, `name: barkcloud-network`); генератор не создаёт
+  её автоматически.
 - **Внешние адреса и почта** (карточки UI → `EXTERNAL_*_HOST`, `EMAIL_*` в `.env`): эти env
   читает `configuration` и пишет в БД на чистом старте (см. [[modules/backend-configuration]]).
   Внешние адреса обязательны (дефолт — домен + порт сервиса), SMTP опционален (пусто → без почты);

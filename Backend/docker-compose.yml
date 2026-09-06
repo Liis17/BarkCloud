@@ -253,7 +253,8 @@ services:
 
 networks:
   barkcloud-network:
-    driver: bridge
+    external: true
+    name: barkcloud-network
 
 volumes:
   pgdata:
