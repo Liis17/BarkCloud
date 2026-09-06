@@ -44,7 +44,10 @@
   внешнего доступа к сервисам нет — это режим для отдельного reverse-proxy. BitTorrent peer-порт
   также не публикуется автоматически.
 - **Образы:** реестр фиксирован (`docker.barkfluff.com`, read-only), выбор канала
-  Release/Dev → `barkcloud-<svc>[-dev]:latest`.
+  Release/Nightly/Dev → `barkcloud-<svc>[-nightly|-dev]:latest`. CI дополнительно публикует
+  SemVer и SHA-теги.
+- Web получает `./docker-compose.yml:rw` и named volume `cloud-web-maintenance:/app/maintenance`
+  для резервных копий Compose и результата self-update.
 - **Docker-сеть:** compose подключается к заранее созданной внешней сети
   `barkcloud-network` (`external: true`, `name: barkcloud-network`); генератор не создаёт
   её автоматически.

@@ -14,6 +14,7 @@ namespace BarkCloud.Web;
 public static class SystemEndpoints
 {
     public sealed record UnlockRequest(string? Password);
+    public sealed record BranchRequest(string? Branch);
 
     public static void MapSystemEndpoints(this WebApplication app)
     {
@@ -60,8 +61,73 @@ public static class SystemEndpoints
 
         // ───────── Статус ─────────
 
-        api.MapGet("/services", async (HttpContext http, AuthGateway auth, AdminGate admin, DockerService docker) =>
-            await Guard(http, auth, admin) is { } fail ? fail : Results.Ok(await docker.GetServicesStatusAsync()));
+        api.MapGet("/services", async (
+            HttpContext http,
+            AuthGateway auth,
+            AdminGate admin,
+            DockerService docker,
+            ComposeImageService compose,
+            DockerRegistryService registry,
+            MaintenanceOperationStore maintenance) =>
+            await Guard(http, auth, admin) is { } fail
+                ? fail
+                : Results.Ok(await GetEnrichedServicesAsync(docker, compose, registry, maintenance)));
+
+        api.MapGet("/branches", async (
+            HttpContext http,
+            AuthGateway auth,
+            AdminGate admin,
+            DockerService docker,
+            ComposeImageService compose) =>
+        {
+            if (await Guard(http, auth, admin) is { } fail) return fail;
+
+            IReadOnlyDictionary<string, ComposeImageInfo> images;
+            try
+            {
+                images = await compose.GetImagesAsync();
+            }
+            catch (Exception ex)
+            {
+                return Results.Ok(new
+                {
+                    currentBranch = (string?)null,
+                    branches = ComposeImageService.Branches,
+                    services = Array.Empty<object>(),
+                    error = $"Не удалось прочитать docker-compose.yml: {ex.Message}",
+                });
+            }
+
+            var snapshot = await docker.GetServicesStatusAsync();
+            var runningByService = snapshot.Services.ToDictionary(
+                service => service.Service,
+                service => ComposeImageService.BranchFromImage(service.Image),
+                StringComparer.OrdinalIgnoreCase);
+            var branchInfo = images.Values
+                .Select(image => new
+                {
+                    image,
+                    service = DockerService.LogicalServiceNameForCompose(image.Service),
+                })
+                .Where(item => item.service is not null)
+                .OrderBy(item => item.service, StringComparer.Ordinal)
+                .Select(item => new
+                {
+                    service = item.service!,
+                    composeService = item.image.Service,
+                    branch = item.image.Branch,
+                    runningBranch = runningByService.TryGetValue(item.service!, out var running)
+                        ? running
+                        : null,
+                    branches = ComposeImageService.Branches,
+                })
+                .ToList();
+
+            var currentBranch = branchInfo.Select(item => item.branch).Distinct(StringComparer.OrdinalIgnoreCase).Count() == 1
+                ? branchInfo[0].branch
+                : null;
+            return Results.Ok(new { currentBranch, branches = ComposeImageService.Branches, services = branchInfo });
+        });
 
         // ───────── Действия над сервисами ─────────
 
@@ -81,11 +147,109 @@ public static class SystemEndpoints
             HttpContext http, AuthGateway auth, AdminGate admin, DeploymentJobService jobs, string service) =>
             EnqueueSingle(http, auth, admin, jobs, service, DeploymentJobKind.Stop, jobs.EnqueueStop));
 
+        api.MapPost("/services/{service}/branch", async (
+            HttpContext http,
+            AuthGateway auth,
+            AdminGate admin,
+            ComposeImageService compose,
+            DockerRegistryService registry,
+            DockerService docker,
+            DeploymentJobService jobs,
+            string service,
+            BranchRequest request) =>
+        {
+            if (await Guard(http, auth, admin) is { } fail) return fail;
+            if (!DockerService.TryGetManagedService(service, out var canonical))
+                return Results.BadRequest(new { message = $"Неизвестный сервис: {service}" });
+
+            var branch = request.Branch?.Trim().ToLowerInvariant() ?? string.Empty;
+            if (!ComposeImageService.IsKnownBranch(branch))
+                return Results.BadRequest(new { message = $"Неизвестный канал: {branch}" });
+
+            IReadOnlyDictionary<string, ComposeImageInfo> images;
+            try
+            {
+                images = await compose.GetImagesAsync();
+            }
+            catch (Exception ex)
+            {
+                return Results.BadRequest(new
+                {
+                    message = "Не удалось прочитать docker-compose.yml",
+                    diagnostic = ex.Message,
+                });
+            }
+
+            var composeService = DockerService.ComposeServiceNameFor(canonical);
+            if (!images.TryGetValue(composeService, out var image))
+                return Results.NotFound(new { message = $"Сервис {canonical} не найден в docker-compose.yml" });
+
+            var snapshot = await docker.GetServicesStatusAsync();
+            var current = snapshot.Services.FirstOrDefault(item =>
+                string.Equals(item.Service, canonical, StringComparison.OrdinalIgnoreCase));
+            var runningBranch = ComposeImageService.BranchFromImage(current?.Image);
+            if (string.Equals(image.Branch, branch, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(runningBranch, branch, StringComparison.OrdinalIgnoreCase))
+            {
+                return Results.Ok(new { message = $"{canonical} уже работает на канале {branch}" });
+            }
+
+            var repository = ComposeImageService.Repository(image.BaseRepository, branch);
+            if (!await registry.RepositoryExistsAsync(repository))
+                return Results.BadRequest(new
+                {
+                    message = $"Репозиторий {repository} не найден или реестр недоступен",
+                });
+
+            var job = jobs.EnqueueBranchSwitch(canonical, branch);
+            return Results.Ok(new
+            {
+                jobId = job.Id,
+                message = $"{canonical} переключается на канал {branch}",
+            });
+        });
+
         api.MapPost("/update-all", async (HttpContext http, AuthGateway auth, AdminGate admin, DeploymentJobService jobs) =>
             await EnqueueAll(http, auth, admin, jobs, DeploymentJobKind.Update));
 
         api.MapPost("/restart-all", async (HttpContext http, AuthGateway auth, AdminGate admin, DeploymentJobService jobs) =>
             await EnqueueAll(http, auth, admin, jobs, DeploymentJobKind.Restart));
+
+        api.MapPost("/update-available", async (
+            HttpContext http,
+            AuthGateway auth,
+            AdminGate admin,
+            DockerService docker,
+            ComposeImageService compose,
+            DockerRegistryService registry,
+            MaintenanceOperationStore maintenance,
+            DeploymentJobService jobs) =>
+        {
+            if (await Guard(http, auth, admin) is { } fail) return fail;
+
+            var snapshot = await GetEnrichedServicesAsync(docker, compose, registry, maintenance);
+            var services = snapshot.Services
+                .Where(service => !string.IsNullOrWhiteSpace(service.ComposeService) && service.UpdateAvailable == true)
+                .Select(service => service.Service)
+                .ToList();
+            if (services.Count == 0)
+            {
+                return Results.Ok(new
+                {
+                    jobId = (Guid?)null,
+                    updated = 0,
+                    message = "Доступных обновлений нет",
+                });
+            }
+
+            var job = jobs.EnqueueUpdate(services);
+            return Results.Ok(new
+            {
+                jobId = job.Id,
+                updated = services.Count,
+                message = $"Обновление доступных сервисов ({services.Count}) поставлено в очередь",
+            });
+        });
 
         // ───────── Состояние задач ─────────
 
@@ -103,10 +267,79 @@ public static class SystemEndpoints
         // ───────── Self-update веба ─────────
 
         api.MapPost("/web/update-self", (HttpContext http, AuthGateway auth, AdminGate admin, DockerService docker) =>
-            Run(http, auth, admin, docker.UpdateWebSelfAsync));
+            Run(http, auth, admin, () => docker.UpdateWebSelfAsync()));
 
         api.MapPost("/web/restart-self", (HttpContext http, AuthGateway auth, AdminGate admin, DockerService docker) =>
-            Run(http, auth, admin, docker.RestartWebSelfAsync));
+            Run(http, auth, admin, () => docker.RestartWebSelfAsync()));
+    }
+
+    private static async Task<ServicesSnapshot> GetEnrichedServicesAsync(
+        DockerService docker,
+        ComposeImageService compose,
+        DockerRegistryService registry,
+        MaintenanceOperationStore maintenance)
+    {
+        var snapshot = await docker.GetServicesStatusAsync();
+        IReadOnlyDictionary<string, ComposeImageInfo> composeImages;
+        try
+        {
+            composeImages = await compose.GetImagesAsync();
+        }
+        catch
+        {
+            composeImages = new Dictionary<string, ComposeImageInfo>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        var services = await Task.WhenAll(snapshot.Services.Select(async service =>
+        {
+            composeImages.TryGetValue(service.ComposeService, out var composeImage);
+            var image = !string.IsNullOrWhiteSpace(service.Image)
+                ? service.Image
+                : composeImage is null ? null : ComposeImageService.ImageReference(composeImage);
+            var version = service.State == "unavailable"
+                ? new ImageVersionStatus
+                {
+                    Branch = composeImage?.Branch,
+                    Tag = composeImage?.Tag,
+                    State = ImageVersionState.Unknown,
+                }
+                : await registry.GetVersionStatusAsync(image, service.ImageDigest);
+
+            // Если контейнер отсутствует, показываем канал из Compose — именно его обновит очередь.
+            if (version.Branch is null && composeImage is not null)
+            {
+                version = version with
+                {
+                    Branch = composeImage.Branch,
+                    Tag = composeImage.Tag,
+                };
+            }
+
+            // Для отсутствующего контейнера Compose даёт только целевой образ, а не текущую версию.
+            // Latest остаётся видимой, но сравнение обновления до запуска было бы ложным.
+            if (service.State == "not_found")
+            {
+                version = version with
+                {
+                    CurrentVersion = null,
+                    UpdateAvailable = null,
+                    State = ImageVersionState.Unknown,
+                    Error = "Контейнер не найден; версия станет известна после запуска",
+                };
+            }
+
+            return service with
+            {
+                ComposeService = composeImage?.Service ?? string.Empty,
+                Version = version,
+            };
+        }));
+
+        return snapshot with
+        {
+            Services = services,
+            LastMaintenance = await maintenance.ReadAsync(),
+        };
     }
 
     private static async Task<IResult> RenderWaitPage(HttpContext http, PageService pages, string fileName)
@@ -170,6 +403,7 @@ public static class SystemEndpoints
         DeploymentJobKind.Restart => "перезапуск",
         DeploymentJobKind.Start => "запуск",
         DeploymentJobKind.Stop => "остановка",
+        DeploymentJobKind.SwitchBranch => "переключение канала",
         _ => "операция",
     };
 

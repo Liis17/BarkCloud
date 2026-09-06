@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - dev
+      - nightly
       - master
     paths:
       - 'Backend/BarkCloud.Web/**'

@@ -78,6 +78,9 @@ Production compose не публикует порты сервисов на host
 - `seq_data` — данные Seq; переопределяется через `SEQ_DATA_PATH`
 - `archive_temp` — временный файл ZIP при «Скачать архивом» (монтируется в `cloud-files` как `/mnt/archive-temp`, путь читается из env `Archive__TempPath`); переопределяется через `ARCHIVE_TEMP_PATH`. Только в прод-`docker-compose.yml`. Сценарий: zip собирается на диск → заливается в S3 → temp удаляется; готовый архив кладётся в корзину со сроком 3 дня (переиспользует фоновую очистку `TrashCleanupService`). Вынести на второй диск (где больше места, чем в образе) — `ARCHIVE_TEMP_PATH=/d/barkcloud/archive-temp`. Папка на NTFS/drvfs здесь годится (последовательная запись файла, без БД-семантики).
 - `torrent_data` — скачанные торрент-файлы, монтируется в `cloud-torrent` как `/mnt/torrents`; переопределяется через `TORRENT_DOWNLOAD_PATH`.
+- `cloud-web-maintenance` — persistent-том для резервных копий `docker-compose.yml`, маркера результата detached self-update и лога helper’а; монтируется в `cloud-web` как `/app/maintenance`.
+  Для уже поднятой установки первый self-update подключает его автоматически; альтернативно можно
+  один раз выполнить `docker compose up -d cloud-web` после обновления Compose-файла.
 
 ## MinIO на отдельном диске (Windows/WSL2)
 

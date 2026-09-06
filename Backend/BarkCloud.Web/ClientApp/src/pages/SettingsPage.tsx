@@ -99,26 +99,77 @@ function SaveBtn({ saving, onClick, disabled, children, icon }: { saving?: boole
 
 // ─────────── Обслуживание ───────────
 
+type VersionState = 'ready' | 'unknown' | 'registry_unavailable' | string;
+
+interface VersionInfo {
+  repository?: string | null;
+  tag?: string | null;
+  branch?: string | null;
+  currentVersion?: string | null;
+  latestVersion?: string | null;
+  updateAvailable?: boolean | null;
+  state?: VersionState;
+  error?: string | null;
+}
+
 interface Svc {
   service: string;
+  container: string;
+  composeService?: string;
   state: string;
+  status?: string;
   image?: string;
+  imageDigest?: string | null;
   isWeb?: boolean;
+  branch?: string | null;
+  currentVersion?: string | null;
+  latestVersion?: string | null;
+  updateAvailable?: boolean | null;
+  versionState?: VersionState;
+  versionError?: string | null;
+  version?: VersionInfo;
 }
+
+interface MaintenanceStatus {
+  operationId: string;
+  kind: string;
+  state: string;
+  message?: string | null;
+  diagnostic?: string | null;
+  updatedAtUtc: string;
+}
+
 interface ServicesSnap {
   services: Svc[];
   dockerOk: boolean;
-  error?: string;
+  error?: string | null;
+  lastMaintenance?: MaintenanceStatus | null;
 }
 
-type DeploymentKind = 'Update' | 'Restart' | 'Start' | 'Stop';
-type DeploymentJobState = 'Queued' | 'Running' | 'Completed' | 'Failed';
-type DeploymentStepState = 'Pending' | 'InProgress' | 'Completed' | 'Failed';
+interface BranchInfo {
+  service: string;
+  composeService: string;
+  branch: string;
+  runningBranch?: string | null;
+  branches: string[];
+}
+
+interface BranchSnap {
+  currentBranch?: string | null;
+  branches: string[];
+  services: BranchInfo[];
+}
+
+type DeploymentKind = 'Update' | 'Restart' | 'Start' | 'Stop' | 'SwitchBranch';
+type DeploymentJobState = 'Queued' | 'Running' | 'AwaitingReconnect' | 'Completed' | 'Failed';
+type DeploymentStepState = 'Pending' | 'InProgress' | 'Completed' | 'Failed' | 'Skipped';
 
 interface DeploymentStep {
   service: string;
+  branch?: string | null;
   state: DeploymentStepState;
   message?: string | null;
+  diagnostic?: string | null;
   rolledBack?: boolean;
 }
 
@@ -128,17 +179,31 @@ interface DeploymentJob {
   state: DeploymentJobState;
   steps: DeploymentStep[];
   error?: string | null;
+  diagnostic?: string | null;
+  requiresReconnect?: boolean;
   createdAtUtc: string;
   startedAtUtc?: string | null;
   finishedAtUtc?: string | null;
 }
 
 interface JobStart {
-  jobId: string;
+  jobId?: string | null;
   message?: string;
+  updated?: number;
 }
 
-function SvcStatus({ state }: { state: string }) {
+function versionOf(service: Svc): VersionInfo {
+  return service.version || {
+    branch: service.branch,
+    currentVersion: service.currentVersion,
+    latestVersion: service.latestVersion,
+    updateAvailable: service.updateAvailable,
+    state: service.versionState,
+    error: service.versionError,
+  };
+}
+
+function SvcStatus({ state, status }: { state: string; status?: string }) {
   const running = state === 'running';
   const unavailable = state === 'unavailable';
   const label = running
@@ -157,10 +222,24 @@ function SvcStatus({ state }: { state: string }) {
     ? 'Docker недоступен'
     : state || '—';
   return (
-    <span className={'pill-info ' + (running ? 'ok' : unavailable ? 'err' : 'warn')}>
+    <span className={'pill-info ' + (running ? 'ok' : unavailable ? 'err' : 'warn')} title={status || undefined}>
       {running ? <Icon.check size={12} /> : <Icon.x size={12} />} {label}
     </span>
   );
+}
+
+function VersionBadge({ service }: { service: Svc }) {
+  const version = versionOf(service);
+  if (version.state === 'registry_unavailable') {
+    return <span className="pill-info err"><Icon.x size={12} /> Реестр недоступен</span>;
+  }
+  if (version.updateAvailable === true) {
+    return <span className="pill-info warn"><Icon.download size={12} /> Доступно обновление</span>;
+  }
+  if (version.state === 'ready' && version.updateAvailable === false) {
+    return <span className="pill-info ok"><Icon.check size={12} /> Актуально</span>;
+  }
+  return <span className="pill-info warn"><Icon.info size={12} /> Версия не определена</span>;
 }
 
 interface ProgressState {
@@ -175,7 +254,9 @@ function SystemSection({ admin, system }: { admin: SettingsState['admin']; syste
   const [unlockErr, setUnlockErr] = React.useState('');
   const [unlocking, setUnlocking] = React.useState(false);
   const [services, setServices] = React.useState<Svc[] | null>(null);
+  const [branches, setBranches] = React.useState<BranchSnap | null>(null);
   const [dockerErr, setDockerErr] = React.useState<string | null>(null);
+  const [lastMaintenance, setLastMaintenance] = React.useState<MaintenanceStatus | null>(null);
   const [busy, setBusy] = React.useState<Record<string, boolean>>({});
   const [toast, setToast] = React.useState<{ kind: 'ok' | 'err'; msg: string } | null>(null);
   const [progress, setProgress] = React.useState<ProgressState | null>(null);
@@ -191,17 +272,24 @@ function SystemSection({ admin, system }: { admin: SettingsState['admin']; syste
 
   const loadServices = React.useCallback(async () => {
     try {
-      const r = await fetch('/api/system/services', { credentials: 'same-origin', cache: 'no-cache' });
-      if (r.ok) {
-        const snap: ServicesSnap = await r.json();
-        setServices(snap.services || []);
-        setDockerErr(snap.dockerOk ? null : snap.error || 'Docker недоступен');
-      } else if (r.status === 403) {
+      const serviceRes = await sGet<ServicesSnap>('/api/system/services');
+      if (serviceRes.status === 403) {
         setUnlocked(false);
-      } else {
-        setServices([]);
-        setDockerErr(`Сервер ответил ${r.status}`);
+        return;
       }
+      if (!serviceRes.ok || !serviceRes.data) {
+        setServices([]);
+        setDockerErr(errMsg(serviceRes, `Сервер ответил ${serviceRes.status}`));
+        return;
+      }
+
+      setServices(serviceRes.data.services || []);
+      setDockerErr(serviceRes.data.dockerOk ? null : serviceRes.data.error || 'Docker недоступен');
+      setLastMaintenance(serviceRes.data.lastMaintenance || null);
+
+      const branchRes = await sGet<BranchSnap>('/api/system/branches');
+      if (branchRes.ok && branchRes.data) setBranches(branchRes.data);
+      else setBranches(null);
     } catch (e) {
       setServices([]);
       setDockerErr(String(e));
@@ -211,7 +299,7 @@ function SystemSection({ admin, system }: { admin: SettingsState['admin']; syste
   React.useEffect(() => {
     if (unlocked) {
       setServices(null);
-      loadServices();
+      void loadServices();
     }
   }, [unlocked, loadServices]);
 
@@ -223,6 +311,9 @@ function SystemSection({ admin, system }: { admin: SettingsState['admin']; syste
     (async () => {
       const res = await sGet<DeploymentJob[]>('/api/system/deploy/jobs');
       if (cancelled || !res.ok || !res.data) return;
+      // AwaitingReconnect уже был передан странице ожидания. Если helper упал до
+      // перезапуска web, ссылка с /updating должна вернуть сюда, а не запускать
+      // бесконечный цикл переходов обратно на страницу ожидания.
       const active = res.data.find((job) => job.state === 'Queued' || job.state === 'Running');
       if (active) await waitForJob('Продолжение операции обслуживания', active.id, false, active);
     })().catch(() => {
@@ -251,14 +342,15 @@ function SystemSection({ admin, system }: { admin: SettingsState['admin']; syste
       setUnlocked(true);
     } else setUnlockErr(data?.message || 'Не удалось разблокировать');
   }
+
   async function doLock() {
     await sPost('/api/system/lock');
     setUnlocked(false);
     setServices(null);
+    setBranches(null);
     setProgress(null);
     resumedJobs.current = false;
   }
-
 
   async function toggleRegistration(next: boolean) {
     setRegistrationBusy(true);
@@ -272,6 +364,7 @@ function SystemSection({ admin, system }: { admin: SettingsState['admin']; syste
       flash('err', data?.message || 'Не удалось изменить регистрацию');
     }
   }
+
   async function waitForJob(title: string, jobId: string, autoClose = false, initial?: DeploymentJob): Promise<DeploymentJob | null> {
     if (trackedJobs.current.has(jobId)) return null;
     trackedJobs.current.add(jobId);
@@ -293,6 +386,10 @@ function SystemSection({ admin, system }: { admin: SettingsState['admin']; syste
             misses = 0;
             lastJob = res.data;
             setProgress({ title, job: lastJob, autoClose });
+            if (lastJob.state === 'AwaitingReconnect') {
+              window.location.replace(lastJob.kind === 'Restart' ? '/restarting' : '/updating');
+              return lastJob;
+            }
             if (lastJob.state === 'Completed' || lastJob.state === 'Failed') return lastJob;
           } else if (++misses >= 5) {
             lastJob = {
@@ -328,8 +425,13 @@ function SystemSection({ admin, system }: { admin: SettingsState['admin']; syste
   async function runQueuedAction(title: string, path: string, kind: DeploymentKind, autoClose = false) {
     try {
       const res = await sPost<JobStart>(path);
-      if (!res.ok || !res.data?.jobId) {
+      if (!res.ok) {
         flash('err', errMsg(res, 'Не удалось поставить операцию в очередь'));
+        return;
+      }
+      if (!res.data?.jobId) {
+        flash('ok', res.data?.message || 'Доступных операций нет');
+        void loadServices();
         return;
       }
 
@@ -340,7 +442,7 @@ function SystemSection({ admin, system }: { admin: SettingsState['admin']; syste
         steps: [],
         createdAtUtc: new Date().toISOString(),
       });
-      if (job) {
+      if (job && job.state !== 'AwaitingReconnect') {
         flash(job.state === 'Completed' ? 'ok' : 'err', job.state === 'Completed' ? (res.data.message || 'Готово') : (job.error || 'Операция завершилась с ошибкой'));
       }
       void loadServices();
@@ -349,33 +451,65 @@ function SystemSection({ admin, system }: { admin: SettingsState['admin']; syste
     }
   }
 
-  async function svcAction(svc: string, kind: DeploymentKind) {
+  async function svcAction(svc: string, kind: Exclude<DeploymentKind, 'SwitchBranch'>) {
     setBusy((b) => ({ ...b, [svc]: true }));
     try {
-      const labels: Record<DeploymentKind, string> = {
+      const labels: Record<Exclude<DeploymentKind, 'SwitchBranch'>, string> = {
         Update: 'Обновление',
         Restart: 'Перезапуск',
         Start: 'Запуск',
         Stop: 'Остановка',
       };
-      await runQueuedAction(`${labels[kind]}: ${SVC_LABELS[svc] || svc}`, `/api/system/services/${svc}/${kind.toLowerCase()}`, kind);
+      await runQueuedAction(`${labels[kind]}: ${SVC_LABELS[svc] || svc}`, `/api/system/services/${encodeURIComponent(svc)}/${kind.toLowerCase()}`, kind);
     } finally {
       setBusy((b) => ({ ...b, [svc]: false }));
     }
   }
 
+  async function changeBranch(svc: string, branch: string) {
+    setBusy((b) => ({ ...b, [`branch:${svc}`]: true }));
+    try {
+      const res = await sPost<JobStart>(`/api/system/services/${encodeURIComponent(svc)}/branch`, { branch });
+      if (!res.ok || !res.data?.jobId) {
+        flash(res.ok ? 'ok' : 'err', errMsg(res, res.ok ? 'Канал уже выбран' : 'Не удалось переключить канал'));
+        if (res.ok) void loadServices();
+        return;
+      }
+      const job = await waitForJob(`Переключение канала: ${SVC_LABELS[svc] || svc}`, res.data.jobId, true, {
+        id: res.data.jobId,
+        kind: 'SwitchBranch',
+        state: 'Queued',
+        steps: [],
+        createdAtUtc: new Date().toISOString(),
+      });
+      if (job && job.state !== 'AwaitingReconnect') {
+        flash(job.state === 'Completed' ? 'ok' : 'err', job.state === 'Completed' ? (res.data.message || 'Канал применён') : (job.error || 'Переключение канала завершилось с ошибкой'));
+      }
+      void loadServices();
+    } catch {
+      flash('err', 'Не удалось связаться с веб-сервисом');
+    } finally {
+      setBusy((b) => ({ ...b, [`branch:${svc}`]: false }));
+    }
+  }
+
   async function updateAll() {
-    const targets = (services || []).filter((s) => !s.isWeb && s.state !== 'not_found' && s.state !== 'unavailable');
-    if (!targets.length) return;
-    if (!window.confirm('Обновить все сервисы приложения (кроме веб-клиента)?')) return;
-    await runQueuedAction('Обновление микросервисов', '/api/system/update-all', 'Update', true);
+    if (!services?.length || dockerErr) return;
+    if (!window.confirm('Обновить все application-сервисы? Web будет обновлён последним, после чего страница переподключится.')) return;
+    await runQueuedAction('Обновление всех сервисов', '/api/system/update-all', 'Update', true);
+  }
+
+  async function updateAvailable() {
+    const count = (services || []).filter((service) => service.composeService && service.updateAvailable === true).length;
+    if (!count || dockerErr) return;
+    if (!window.confirm(`Обновить доступные сервисы (${count})? Web, если доступно обновление, будет последним.`)) return;
+    await runQueuedAction(`Обновление доступных сервисов (${count})`, '/api/system/update-available', 'Update', true);
   }
 
   async function restartAll() {
-    const targets = (services || []).filter((s) => !s.isWeb && s.state !== 'not_found' && s.state !== 'unavailable');
-    if (!targets.length) return;
-    if (!window.confirm('Перезапустить все найденные сервисы приложения?')) return;
-    await runQueuedAction('Перезапуск микросервисов', '/api/system/restart-all', 'Restart');
+    if (!services?.length || dockerErr) return;
+    if (!window.confirm('Перезапустить все application-сервисы? Web будет последним, затем страница переподключится.')) return;
+    await runQueuedAction('Перезапуск всех сервисов', '/api/system/restart-all', 'Restart');
   }
 
   function webSelf(kind: 'update' | 'restart') {
@@ -417,39 +551,10 @@ function SystemSection({ admin, system }: { admin: SettingsState['admin']; syste
       </div>
     );
   } else {
-    const micros = services.filter((s) => !s.isWeb);
-    const web = services.find((s) => s.isWeb);
+    const branchByService = new Map((branches?.services || []).map((branch) => [branch.service, branch]));
+    const availableCount = services.filter((service) => service.composeService && service.updateAvailable === true).length;
     const hasActiveJob = progress?.job.state === 'Queued' || progress?.job.state === 'Running';
-
-    const renderRow = (s: Svc, actions: (running: boolean, disabled: boolean) => React.ReactNode) => {
-      const available = s.state !== 'not_found' && s.state !== 'unavailable';
-      return (
-        <div key={s.service} className="svc-row">
-          <div className="svc-main">
-            <div className="svc-ic">
-              <Icon.server size={20} />
-            </div>
-            <div className="svc-info">
-              <div className="svc-name">
-                {SVC_LABELS[s.service] || s.service} <SvcStatus state={s.state} />
-              </div>
-              {s.image && (
-                <div className="svc-img" title={s.image}>
-                  {s.image}
-                </div>
-              )}
-              {s.service === 'notification' && !system.emailEnabled && (
-                <div className="svc-note" style={{ fontSize: 12, color: 'var(--md-on-surface-variant)', marginTop: 4 }}>
-                  Не используется — почта на сервере не настроена. Сервис можно остановить, а чтобы убрать совсем —
-                  удалить <code>notification</code> из <code>docker-compose.yml</code> и его переменные из <code>.env</code>.
-                </div>
-              )}
-            </div>
-          </div>
-          <div className="svc-actions">{busy[s.service] ? <span className="spin" style={{ margin: '0 11px' }} /> : actions(s.state === 'running', !available || !!hasActiveJob)}</div>
-        </div>
-      );
-    };
+    const hasConfiguredServices = services.some((service) => service.composeService);
 
     body = (
       <>
@@ -476,61 +581,144 @@ function SystemSection({ admin, system }: { admin: SettingsState['admin']; syste
             <span>Docker недоступен: {dockerErr}</span>
           </div>
         )}
+        {lastMaintenance && lastMaintenance.state.toLowerCase() === 'failed' && (
+          <div className="sys-banner err sys-maintenance-error">
+            <Icon.x size={18} />
+            <span>
+              Последняя операция web завершилась ошибкой: {lastMaintenance.message || 'выполнен откат'}
+              {lastMaintenance.diagnostic && (
+                <details className="svc-inline-details">
+                  <summary>Техническая диагностика</summary>
+                  <pre>{lastMaintenance.diagnostic}</pre>
+                </details>
+              )}
+            </span>
+          </div>
+        )}
 
-        <div className="sys-section-label">Микросервисы</div>
-        <div className="svc-list">
-          {micros.map((s) =>
-            renderRow(s, (running, disabled) => (
-              <>
-                <button className="iconb" title="Обновить" disabled={disabled} onClick={() => svcAction(s.service, 'Update')}>
-                  <Icon.download size={20} />
-                </button>
-                <button className="iconb" title="Перезапустить" disabled={disabled} onClick={() => svcAction(s.service, 'Restart')}>
-                  <Icon.refresh size={20} />
-                </button>
-                {running ? (
-                  <button className="iconb" title="Остановить" disabled={disabled} onClick={() => svcAction(s.service, 'Stop')}>
-                    <Icon.power size={20} />
-                  </button>
-                ) : (
-                  <button className="iconb" title="Запустить" disabled={disabled} onClick={() => svcAction(s.service, 'Start')}>
-                    <Icon.play size={20} />
-                  </button>
+        <div className="svc-toolbar">
+          <div>
+            <div className="sys-section-label">Сервисы приложения</div>
+            <div className="sys-note">PostgreSQL, MinIO, RabbitMQ, Seq и nginx не входят в массовое обновление.</div>
+          </div>
+          <div className="svc-toolbar-actions">
+            <button className="btn primary" onClick={updateAvailable} disabled={!availableCount || !!dockerErr || !!hasActiveJob}>
+              <Icon.download size={16} /> Обновить доступные ({availableCount})
+            </button>
+            <button className="btn" onClick={updateAll} disabled={!hasConfiguredServices || !!dockerErr || !!hasActiveJob}>
+              <Icon.download size={16} /> Обновить все
+            </button>
+            <button className="btn" onClick={restartAll} disabled={!hasConfiguredServices || !!dockerErr || !!hasActiveJob}>
+              <Icon.refresh size={16} /> Перезапустить все
+            </button>
+            <button className="btn" onClick={() => { setServices(null); void loadServices(); }} disabled={!!hasActiveJob}>
+              <Icon.refresh size={16} /> Обновить статус
+            </button>
+          </div>
+        </div>
+
+        <div className="svc-table" role="table" aria-label="Сервисы BarkCloud">
+          <div className="svc-head" role="row">
+            <span>Сервис</span>
+            <span>Состояние</span>
+            <span>Канал</span>
+            <span>Текущая</span>
+            <span>Последняя</span>
+            <span>Обновление</span>
+            <span>Действия</span>
+          </div>
+          {services.map((service) => {
+            const version = versionOf(service);
+            const branch = branchByService.get(service.service);
+            const configured = !!service.composeService;
+            const containerUnavailable = service.state === 'unavailable';
+            const rowBusy = !!busy[service.service] || !!busy[`branch:${service.service}`];
+            const actionDisabled = !configured || !!dockerErr || !!hasActiveJob || rowBusy;
+            // not_found остаётся управляемым: очередь создаст контейнер из Compose.
+            const lifecycleDisabled = actionDisabled || containerUnavailable;
+            const selectedBranch = branch?.branch || version.branch || 'master';
+            return (
+              <div key={service.service} className={'svc-row' + (service.isWeb ? ' svc-row-web' : '')} role="row">
+                <div className="svc-cell svc-service" data-label="Сервис">
+                  <div className="svc-main">
+                    <div className="svc-ic"><Icon.server size={20} /></div>
+                    <div className="svc-info">
+                      <div className="svc-name">
+                        {SVC_LABELS[service.service] || service.service}
+                        {service.isWeb && <span className="svc-web-label">web</span>}
+                      </div>
+                      <div className="svc-img" title={service.image || service.container}>
+                        {service.image || service.container}
+                      </div>
+                      {service.service === 'notification' && !system.emailEnabled && (
+                        <div className="svc-note">Не используется — почта на сервере не настроена.</div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <div className="svc-cell" data-label="Состояние"><SvcStatus state={service.state} status={service.status} /></div>
+                <div className="svc-cell svc-channel" data-label="Канал">
+                  {branch ? (
+                    <>
+                      <select
+                        value={selectedBranch}
+                        disabled={actionDisabled}
+                        onChange={(event) => { if (event.target.value !== selectedBranch) void changeBranch(service.service, event.target.value); }}
+                        aria-label={`Канал ${SVC_LABELS[service.service] || service.service}`}
+                      >
+                        {branch.branches.map((item) => <option key={item} value={item}>{item}</option>)}
+                      </select>
+                      {branch.runningBranch && branch.runningBranch !== branch.branch && (
+                        <small className="svc-channel-drift">запущен: {branch.runningBranch}</small>
+                      )}
+                    </>
+                  ) : <span className="svc-muted">—</span>}
+                </div>
+                <div className="svc-cell svc-version" data-label="Текущая">
+                  <span>{version.currentVersion || 'не определена'}</span>
+                  {version.tag && version.tag !== version.currentVersion && <small>{version.tag}</small>}
+                </div>
+                <div className="svc-cell svc-version" data-label="Последняя">
+                  <span>{version.latestVersion || '—'}</span>
+                </div>
+                <div className="svc-cell svc-update" data-label="Обновление"><VersionBadge service={service} /></div>
+                <div className="svc-cell svc-actions" data-label="Действия">
+                  {rowBusy ? <span className="spin" /> : (
+                    <>
+                      <button className="iconb" title="Обновить" disabled={actionDisabled} onClick={() => service.isWeb ? webSelf('update') : void svcAction(service.service, 'Update')}>
+                        <Icon.download size={19} />
+                      </button>
+                      <button className="iconb" title="Перезапустить" disabled={lifecycleDisabled} onClick={() => service.isWeb ? webSelf('restart') : void svcAction(service.service, 'Restart')}>
+                        <Icon.refresh size={19} />
+                      </button>
+                      {!service.isWeb && (service.state === 'running' ? (
+                        <button className="iconb" title="Остановить" disabled={lifecycleDisabled} onClick={() => void svcAction(service.service, 'Stop')}>
+                          <Icon.power size={19} />
+                        </button>
+                      ) : (
+                        <button className="iconb" title="Запустить" disabled={lifecycleDisabled} onClick={() => void svcAction(service.service, 'Start')}>
+                          <Icon.play size={19} />
+                        </button>
+                      ))}
+                    </>
+                  )}
+                </div>
+                {(version.error || service.versionError) && (
+                  <details className="svc-error">
+                    <summary>Техническая ошибка</summary>
+                    <pre>{version.error || service.versionError}</pre>
+                  </details>
                 )}
-              </>
-            )),
-          )}
-        </div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginTop: 6 }}>
-          <button className="btn primary" onClick={updateAll} disabled={!micros.some((s) => s.state !== 'not_found' && s.state !== 'unavailable') || !!hasActiveJob}>
-            <Icon.download size={16} /> Обновить микросервисы
-          </button>
-          <button className="btn" onClick={restartAll} disabled={!micros.some((s) => s.state !== 'not_found' && s.state !== 'unavailable') || !!hasActiveJob}>
-            <Icon.refresh size={16} /> Перезапустить все
-          </button>
-          <button className="btn" onClick={() => { setServices(null); loadServices(); }}>
-            <Icon.refresh size={16} /> Обновить статус
-          </button>
+              </div>
+            );
+          })}
         </div>
 
-        <hr className="divider" />
-
-        <div className="sys-section-label">Веб-клиент</div>
-        {web && <div className="svc-list">{renderRow(web, () => <span style={{ fontSize: 12, color: 'var(--md-on-surface-variant)' }}>ниже ↓</span>)}</div>}
-        <div className="sys-note">
-          Обновление и перезапуск веб-клиента: откроется отдельная страница ожидания, которая дождётся нового процесса и вернёт вас в настройки.
-          Веб пересоздаётся отдельным helper-контейнером, поэтому работает и под Linux/WSL, и на Windows Docker Desktop.
+        <div className="sys-note svc-web-note">
+          Web обновляется последним через detached helper. После запуска нового контейнера страница ожидания проверит новый процесс и вернёт вас в настройки; при сбое helper восстановит предыдущий контейнер.
         </div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-          <button className="btn primary" onClick={() => webSelf('update')} disabled={!!hasActiveJob}>
-            <Icon.download size={16} /> Обновить веб-клиент
-          </button>
-          <button className="btn" onClick={() => webSelf('restart')} disabled={!!hasActiveJob}>
-            <Icon.refresh size={16} /> Перезапустить веб-клиент
-          </button>
-          <button className="btn text" onClick={doLock} style={{ marginLeft: 'auto' }}>
-            <Icon.lock size={16} /> Заблокировать
-          </button>
+        <div className="svc-footer-actions">
+          <button className="btn text" onClick={doLock}><Icon.lock size={16} /> Заблокировать</button>
         </div>
       </>
     );
@@ -543,9 +731,7 @@ function SystemSection({ admin, system }: { admin: SettingsState['admin']; syste
           <h3>Обслуживание</h3>
           <div className="sub" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <span>Обновление и перезапуск сервисов бэкенда</span>
-            <span className="pill-info ok">
-              {system.version} · {system.edition}
-            </span>
+            <span className="pill-info ok">{system.version} · {system.edition}</span>
           </div>
         </div>
         <div className="set-card-body">{body}</div>
@@ -560,44 +746,40 @@ function SystemSection({ admin, system }: { admin: SettingsState['admin']; syste
                 ? 'Задача поставлена в очередь…'
                 : progress.job.state === 'Running'
                 ? 'Выполняется последовательно…'
+                : progress.job.state === 'AwaitingReconnect'
+                ? 'Новый web запущен, переподключаем страницу…'
                 : progress.job.state === 'Completed'
                 ? 'Готово'
                 : 'Завершено с ошибкой'}
             </div>
             {(() => {
               const total = progress.job.steps.length;
-              const done = progress.job.steps.filter((step) => step.state === 'Completed' || step.state === 'Failed').length;
+              const done = progress.job.steps.filter((step) => step.state === 'Completed' || step.state === 'Failed' || step.state === 'Skipped').length;
               const width = total ? Math.round((done / total) * 100) : 0;
-              return (
-                <div className="prog-bar">
-                  <span style={{ width: `${width}%` }} />
-                </div>
-              );
+              return <div className="prog-bar"><span style={{ width: `${width}%` }} /></div>;
             })()}
             <div className="prog-list">
               {progress.job.steps.map((step) => {
-                const stateClass = step.state === 'InProgress' ? 'current' : step.state === 'Completed' ? 'done' : step.state === 'Failed' ? 'error' : 'pending';
+                const stateClass = step.state === 'InProgress' ? 'current' : step.state === 'Completed' ? 'done' : step.state === 'Failed' ? 'error' : step.state === 'Skipped' ? 'skipped' : 'pending';
                 return (
-                <div key={step.service} className={'prog-item ' + stateClass}>
-                  <span className="pi">
-                    {step.state === 'InProgress' ? <span className="spin" /> : step.state === 'Completed' ? <Icon.check size={18} /> : step.state === 'Failed' ? <Icon.x size={18} /> : <Icon.clock size={16} />}
-                  </span>
-                  <span>
-                    {SVC_LABELS[step.service] || step.service}
-                    {step.message && <small className="prog-message">{step.message}</small>}
-                    {step.rolledBack && <small className="prog-rollback">Выполнен откат</small>}
-                  </span>
-                </div>
+                  <div key={step.service} className={'prog-item ' + stateClass}>
+                    <span className="pi">
+                      {step.state === 'InProgress' ? <span className="spin" /> : step.state === 'Completed' ? <Icon.check size={18} /> : step.state === 'Failed' ? <Icon.x size={18} /> : step.state === 'Skipped' ? <Icon.chev size={16} /> : <Icon.clock size={16} />}
+                    </span>
+                    <span>
+                      {SVC_LABELS[step.service] || step.service}
+                      {step.message && <small className="prog-message">{step.message}</small>}
+                      {step.rolledBack && <small className="prog-rollback">Выполнен откат</small>}
+                      {step.diagnostic && <details className="prog-diagnostic"><summary>Диагностика</summary><pre>{step.diagnostic}</pre></details>}
+                    </span>
+                  </div>
                 );
               })}
             </div>
             {progress.job.error && <div className="prog-error">{progress.job.error}</div>}
+            {progress.job.diagnostic && <details className="prog-diagnostic prog-job-diagnostic"><summary>Техническая диагностика задачи</summary><pre>{progress.job.diagnostic}</pre></details>}
             {(progress.job.state === 'Completed' || progress.job.state === 'Failed') && (
-              <div className="dlg-actions">
-                <button className="btn" onClick={() => setProgress(null)}>
-                  Закрыть
-                </button>
-              </div>
+              <div className="dlg-actions"><button className="btn" onClick={() => setProgress(null)}>Закрыть</button></div>
             )}
           </div>
         </div>

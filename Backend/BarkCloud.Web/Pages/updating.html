@@ -16,6 +16,8 @@
         .dot { width: 8px; height: 8px; border-radius: 50%; background: #d4d2cc; }
         .dot.active { background: #2f7045; animation: pulse 1.4s ease-in-out infinite; }
         .hint { font-size: 12px; color: #77746d; }
+        .wait-error { margin-top: 18px; color: #a23d35; font-size: 13px; line-height: 1.45; }
+        .wait-error a { color: inherit; font-weight: 600; }
         .timer { display: inline-block; margin-top: 24px; padding: 8px 15px; border-radius: 999px; background: #e1f0e4; color: #245c36; font-size: 14px; font-weight: 600; }
         @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes pulse { 50% { transform: scale(1.45); opacity: .65; } }
@@ -23,6 +25,7 @@
             body { background: #171714; color: #f2f0ea; }
             .card { background: #252521; box-shadow: 0 12px 40px rgb(0 0 0 / 35%); }
             p, .hint { color: #b9b6ad; }
+            .wait-error { color: #ffb4ab; }
             .loader { border-color: #24452e; border-top-color: #9ed1a6; }
             .dot { background: #55544e; }
             .dot.active { background: #9ed1a6; }
@@ -38,6 +41,7 @@
         <div class="stages" aria-hidden="true"><span class="dot active"></span><span class="dot"></span><span class="dot"></span></div>
         <div class="hint">Проверяем доступность сервера каждые 3 секунды</div>
         <div class="timer"><span id="timer">0</span> сек</div>
+        <p id="wait-error" class="wait-error" hidden>Сервер не перезапустился за 90 секунд. <a href="/settings#system">Открыть раздел обслуживания</a></p>
     </main>
     <script src="/maintenance-wait.js"></script>
     <script>

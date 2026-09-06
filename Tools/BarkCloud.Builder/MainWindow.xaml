@@ -131,6 +131,7 @@
                         <TextBlock Style="{StaticResource FieldLabel}" Text="Канал" />
                         <ComboBox SelectedValue="{Binding ImageChannel, Mode=TwoWay}" SelectedValuePath="Tag">
                             <ComboBoxItem Content="Релиз — barkcloud-*:latest" Tag="Release" />
+                            <ComboBoxItem Content="Ночной — barkcloud-*-nightly:latest" Tag="Nightly" />
                             <ComboBoxItem Content="Дев — barkcloud-*-dev:latest" Tag="Dev" />
                         </ComboBox>
                     </StackPanel>
