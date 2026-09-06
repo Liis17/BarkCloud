@@ -9,6 +9,8 @@ Parent: [[index]] · See also: [[structure/overview]] · [[structure/entrypoints
 `cloud-web` и инфраструктурные `cloud-*`). Эти же имена используются как Docker DNS-адреса.
 Production compose подключается к заранее созданной внешней сети `barkcloud-network`;
 перед запуском её нужно создать командой `docker network create barkcloud-network`.
+Production compose не публикует порты сервисов на host: `cloud-*` доступны только внутри
+`barkcloud-network`. Внешние TLS-порты публикует reverse-proxy nginx.
 
 ## Микросервисы в dev-окружении
 
@@ -58,7 +60,9 @@ Production compose подключается к заранее созданной
 - `MINIO_ROOT_USER/PASSWORD/PORT/WEBPORT`
 - `RABBITMQ_DEFAULT_USER/PASS`
 - `SEQ_ADMIN_PASSWORD/WEBPORT`
-- `WEB_PORT` — host-порт веб-клиента; `WEB_COOKIE_SECURE`, `WEB_PUBLIC_HOST` — UI-настройки web (JwtSettings и адреса сервисов web берёт из Configuration).
+- `WEB_PORT` — сохранённая переменная для совместимости с dev-конфигурацией; в production web
+  доступен внутри сети на `8080`; `WEB_COOKIE_SECURE`, `WEB_PUBLIC_HOST` — UI-настройки web
+  (JwtSettings и адреса сервисов web берёт из Configuration).
 - `TORRENT_PORT/TORRENT_HTTP1PORT/TORRENT_PEER_PORT` — gRPC, HTTP1 и BitTorrent peer-порты торрент-сервиса
 - `TORRENT_DOWNLOAD_PATH` — путь на хосте для скачанных торрентов; по умолчанию named volume `torrent_data`
 - `EXTERNAL_TORRENT_HOST` — внешний gRPC-адрес торрент-сервиса для клиентов
