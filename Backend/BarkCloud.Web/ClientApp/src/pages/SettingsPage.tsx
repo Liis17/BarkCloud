@@ -3,6 +3,7 @@ import { Icon } from '../components/Icon';
 import { Loading } from '../components/ui/EmptyState';
 import { usePageHeader } from '../hooks/usePageHeader';
 import { plural } from '../lib/format';
+import { maintenanceWaitPath } from '../lib/maintenance';
 import { applyTheme, getTheme, type Theme } from '../lib/theme';
 import { webauthnRegister, webauthnSupported } from '../lib/webauthn';
 import type { Privacy, Session, SettingsState } from '../lib/types';
@@ -41,6 +42,19 @@ const errMsg = (res: ApiResp, fallback?: string): string => {
   const m = res.data && typeof res.data === 'object' ? (res.data as { message?: string }).message : undefined;
   return m || fallback || 'Ошибка';
 };
+
+async function readServerStartedAt(): Promise<string | null> {
+  try {
+    const response = await fetch('/healthz', {
+      cache: 'no-store',
+      credentials: 'same-origin',
+      redirect: 'manual',
+    });
+    return response.status === 200 ? response.headers.get('X-BarkCloud-Started-At') : null;
+  } catch {
+    return null;
+  }
+}
 
 type Flash = (kind: 'ok' | 'err', msg: string) => void;
 
@@ -315,7 +329,10 @@ function SystemSection({ admin, system }: { admin: SettingsState['admin']; syste
       // перезапуска web, ссылка с /updating должна вернуть сюда, а не запускать
       // бесконечный цикл переходов обратно на страницу ожидания.
       const active = res.data.find((job) => job.state === 'Queued' || job.state === 'Running');
-      if (active) await waitForJob('Продолжение операции обслуживания', active.id, false, active);
+      if (active) {
+        const previousStartedAt = await readServerStartedAt();
+        await waitForJob('Продолжение операции обслуживания', active.id, false, active, previousStartedAt);
+      }
     })().catch(() => {
       /* состояние сервисов всё равно доступно через ручное обновление */
     });
@@ -365,7 +382,13 @@ function SystemSection({ admin, system }: { admin: SettingsState['admin']; syste
     }
   }
 
-  async function waitForJob(title: string, jobId: string, autoClose = false, initial?: DeploymentJob): Promise<DeploymentJob | null> {
+  async function waitForJob(
+    title: string,
+    jobId: string,
+    autoClose = false,
+    initial?: DeploymentJob,
+    previousStartedAt?: string | null,
+  ): Promise<DeploymentJob | null> {
     if (trackedJobs.current.has(jobId)) return null;
     trackedJobs.current.add(jobId);
     let lastJob = initial || {
@@ -387,7 +410,11 @@ function SystemSection({ admin, system }: { admin: SettingsState['admin']; syste
             lastJob = res.data;
             setProgress({ title, job: lastJob, autoClose });
             if (lastJob.state === 'AwaitingReconnect') {
-              window.location.replace(lastJob.kind === 'Restart' ? '/restarting' : '/updating');
+              window.location.replace(maintenanceWaitPath(
+                lastJob.kind === 'Restart' ? 'restart' : 'update',
+                lastJob.id,
+                previousStartedAt,
+              ));
               return lastJob;
             }
             if (lastJob.state === 'Completed' || lastJob.state === 'Failed') return lastJob;
@@ -424,6 +451,7 @@ function SystemSection({ admin, system }: { admin: SettingsState['admin']; syste
 
   async function runQueuedAction(title: string, path: string, kind: DeploymentKind, autoClose = false) {
     try {
+      const previousStartedAt = await readServerStartedAt();
       const res = await sPost<JobStart>(path);
       if (!res.ok) {
         flash('err', errMsg(res, 'Не удалось поставить операцию в очередь'));
@@ -441,7 +469,7 @@ function SystemSection({ admin, system }: { admin: SettingsState['admin']; syste
         state: 'Queued',
         steps: [],
         createdAtUtc: new Date().toISOString(),
-      });
+      }, previousStartedAt);
       if (job && job.state !== 'AwaitingReconnect') {
         flash(job.state === 'Completed' ? 'ok' : 'err', job.state === 'Completed' ? (res.data.message || 'Готово') : (job.error || 'Операция завершилась с ошибкой'));
       }
@@ -469,6 +497,7 @@ function SystemSection({ admin, system }: { admin: SettingsState['admin']; syste
   async function changeBranch(svc: string, branch: string) {
     setBusy((b) => ({ ...b, [`branch:${svc}`]: true }));
     try {
+      const previousStartedAt = await readServerStartedAt();
       const res = await sPost<JobStart>(`/api/system/services/${encodeURIComponent(svc)}/branch`, { branch });
       if (!res.ok || !res.data?.jobId) {
         flash(res.ok ? 'ok' : 'err', errMsg(res, res.ok ? 'Канал уже выбран' : 'Не удалось переключить канал'));
@@ -481,7 +510,7 @@ function SystemSection({ admin, system }: { admin: SettingsState['admin']; syste
         state: 'Queued',
         steps: [],
         createdAtUtc: new Date().toISOString(),
-      });
+      }, previousStartedAt);
       if (job && job.state !== 'AwaitingReconnect') {
         flash(job.state === 'Completed' ? 'ok' : 'err', job.state === 'Completed' ? (res.data.message || 'Канал применён') : (job.error || 'Переключение канала завершилось с ошибкой'));
       }
@@ -512,16 +541,23 @@ function SystemSection({ admin, system }: { admin: SettingsState['admin']; syste
     await runQueuedAction('Перезапуск всех сервисов', '/api/system/restart-all', 'Restart');
   }
 
-  function webSelf(kind: 'update' | 'restart') {
+  async function webSelf(kind: 'update' | 'restart') {
     const title = kind === 'update' ? 'Обновление веб-клиента' : 'Перезапуск веб-клиента';
     if (!window.confirm(`${title}? Страница ненадолго станет недоступна и перезагрузится автоматически.`)) return;
     const path = kind === 'update' ? '/api/system/web/update-self' : '/api/system/web/restart-self';
-    sPost<{ message?: string }>(path)
-      .then(({ ok, data }) => {
-        if (ok) window.location.assign(kind === 'update' ? '/updating' : '/restarting');
-        else flash('err', data?.message || 'Ошибка');
-      })
-      .catch(() => flash('err', 'Не удалось связаться с веб-сервисом'));
+    try {
+      const previousStartedAt = await readServerStartedAt();
+      const { ok, data } = await sPost<{ message?: string; operationId?: string | null }>(path);
+      if (ok) {
+        window.location.assign(maintenanceWaitPath(
+          kind,
+          data?.operationId,
+          previousStartedAt,
+        ));
+      } else flash('err', data?.message || 'Ошибка');
+    } catch {
+      flash('err', 'Не удалось связаться с веб-сервисом');
+    }
   }
 
   let body: React.ReactNode;

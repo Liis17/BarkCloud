@@ -79,13 +79,18 @@ self-update старой установки helper сам подключает v
 `rw`, запись идёт в тот же inode.
 
 После ответа API браузер открывает `/updating` или `/restarting`. Эти анонимные страницы
-подставляют метку текущего процесса, опрашивают `/healthz` каждые 3 секунды и возвращаются в
-`/settings#system` только после трёх успешных ответов уже нового процесса. Cache-Control
-`no-store` и query-параметр при возврате не дают браузеру застрять на старом SPA-бандле.
+подставляют метку процесса до операции, идентификатор detached-helper и опрашивают
+`/healthz` каждые 3 секунды. Идентификатор проверяется через `/maintenance-status`: три
+успешных ответа нового процесса либо завершённый именно этой операцией helper возвращают
+браузер в `/settings#system`; состояние `failed` сразу показывает сообщение и ссылку на
+защищённую диагностику. Cache-Control `no-store`, непрозрачный operation ID и query-параметры
+не дают браузеру застрять на свежей странице с тем же timestamp.
 
 ## Эндпоинты (`SystemEndpoints.cs`)
 
 - `GET /healthz` — анонимный health-check с заголовком `X-BarkCloud-Started-At`;
+- `GET /maintenance-status?operationId=` — анонимное минимальное состояние конкретной
+  detached-операции (`pending`, `completed`, `failed`) без helper-диагностики;
 - `/updating`, `/restarting`, `/maintenance-wait.js` — страницы и скрипт ожидания;
 - `POST /api/system/unlock`, `POST /api/system/lock`, `GET /api/system/services` (статус,
   канал, current/latest SemVer, updateAvailable, versionState/versionError);
@@ -95,7 +100,8 @@ self-update старой установки helper сам подключает v
   `POST /api/system/restart-all`;
 - `GET /api/system/deploy/jobs`, `GET /api/system/deploy/jobs/{id}` — список и состояние задач
   с `Pending/InProgress/Completed/Failed/Skipped`, диагностикой, rollback и `requiresReconnect`;
-- `POST /api/system/web/update-self`, `POST /api/system/web/restart-self`.
+- `POST /api/system/web/update-self`, `POST /api/system/web/restart-self` возвращают
+  `operationId`, который передаётся странице ожидания вместе с timestamp до операции.
 
 При чтении статуса Web поле `docker ps .Image` может содержать короткий ID образа вместо
 registry-ссылки. В этом случае `DockerRegistryService` использует reference из Compose и
@@ -123,6 +129,9 @@ skipped-шаги, команду/stderr и rollback, а при `requiresReconnec
   named volume `cloud-web-maintenance:/app/maintenance`; там лежат compose-backups и marker
   self-update.
   `App__AdminPassword` получает `WEB_ADMIN_PASSWORD`.
+- Web подключает `AddBarkCloudSerilog("BarkCloud.Web")`: события очереди и ошибки helper
+  дублируются в stdout контейнера и Seq, поэтому диагностика доступна через `docker logs`
+  даже без внешнего проброса порта Seq.
 - Registry публичен на pull; `DOCKER_CONFIG=/tmp/barkcloud-docker` не читает host
   `credsStore`, отсутствующий внутри alpine-образа.
 

@@ -41,11 +41,11 @@
         <div class="stages" aria-hidden="true"><span class="dot active"></span><span class="dot"></span><span class="dot"></span></div>
         <div class="hint">Проверяем доступность сервера каждые 3 секунды</div>
         <div class="timer"><span id="timer">0</span> сек</div>
-        <p id="wait-error" class="wait-error" hidden>Сервер не перезапустился за 90 секунд. <a href="/settings#system">Открыть раздел обслуживания</a></p>
+        <p id="wait-error" class="wait-error" hidden><span id="wait-error-message">Сервер не перезапустился за 90 секунд.</span> <a href="/settings#system">Открыть раздел обслуживания</a></p>
     </main>
     <script src="/maintenance-wait.js"></script>
     <script>
-        BarkCloudWait.start({ initialDelayMs: 10000, pageServerStartedAt: '{{BARKCLOUD_STARTED_AT_UTC}}' });
+        BarkCloudWait.start({ initialDelayMs: 10000, pageServerStartedAt: '{{BARKCLOUD_STARTED_AT_UTC}}', operationId: '{{BARKCLOUD_OPERATION_ID}}' });
     </script>
 </body>
 </html>

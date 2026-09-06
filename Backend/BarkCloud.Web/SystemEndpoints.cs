@@ -27,6 +27,30 @@ public static class SystemEndpoints
             return Results.Ok(new { status = "ok" });
         });
 
+        // Анонимная страница ожидания должна отличать свою detached-операцию от
+        // старого маркера в persistent volume. Диагностика здесь намеренно не выдаётся:
+        // подробный helper-лог доступен только в защищённом разделе обслуживания.
+        app.MapGet("/maintenance-status", async (
+            HttpContext http,
+            MaintenanceOperationStore maintenance,
+            string? operationId) =>
+        {
+            http.Response.Headers.CacheControl = "no-store";
+            var normalizedOperationId = NormalizeOperationId(operationId);
+            if (normalizedOperationId is null)
+                return Results.NoContent();
+
+            var status = await maintenance.ReadAsync(http.RequestAborted);
+            if (status is null || !string.Equals(status.OperationId, normalizedOperationId, StringComparison.OrdinalIgnoreCase))
+                return Results.NoContent();
+
+            return Results.Ok(new
+            {
+                state = status.State,
+                message = status.Message,
+            });
+        });
+
         // Эти страницы анонимны: cookie авторизации переживает пересоздание web,
         // а саму страницу ожидания нужно открыть до остановки текущего контейнера.
         app.MapGet("/updating", (HttpContext http, PageService pages) =>
@@ -348,12 +372,28 @@ public static class SystemEndpoints
     private static async Task<IResult> RenderWaitPage(HttpContext http, PageService pages, string fileName)
     {
         http.Response.Headers.CacheControl = "no-store";
+        var operationId = NormalizeOperationId(http.Request.Query["operationId"].ToString());
+        var previousStartedAt = NormalizeStartedAt(http.Request.Query["previousStartedAt"].ToString());
         var html = await pages.RenderAsync(fileName, new Dictionary<string, string?>
         {
-            ["BARKCLOUD_STARTED_AT_UTC"] = WebRuntime.StartedAtUtc.ToString("O", CultureInfo.InvariantCulture),
+            ["BARKCLOUD_STARTED_AT_UTC"] = previousStartedAt
+                ?? WebRuntime.StartedAtUtc.ToString("O", CultureInfo.InvariantCulture),
+            ["BARKCLOUD_OPERATION_ID"] = operationId,
         });
         return Results.Content(html, "text/html; charset=utf-8");
     }
+
+    private static string? NormalizeOperationId(string? value)
+        => Guid.TryParse(value, out var parsed) ? parsed.ToString("N") : null;
+
+    private static string? NormalizeStartedAt(string? value)
+        => DateTimeOffset.TryParse(
+            value,
+            CultureInfo.InvariantCulture,
+            DateTimeStyles.AllowWhiteSpaces,
+            out var parsed)
+            ? parsed.ToString("O", CultureInfo.InvariantCulture)
+            : null;
 
     private static async Task<IResult> EnqueueSingle(
         HttpContext http,

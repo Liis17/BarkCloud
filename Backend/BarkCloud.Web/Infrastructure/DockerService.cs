@@ -5,7 +5,11 @@ using System.Text.Json;
 namespace BarkCloud.Web.Infrastructure;
 
 /// <summary>Результат действия над сервисом/контейнером.</summary>
-public sealed record ServiceActionResult(bool Success, string Message, string? ErrorDetails = null);
+public sealed record ServiceActionResult(
+    bool Success,
+    string Message,
+    string? ErrorDetails = null,
+    string? OperationId = null);
 
 /// <summary>Статус управляемого сервиса (для UI).</summary>
 public sealed record ServiceStatus(string Service, string Container, string State, string Status, string Image, bool IsWeb)
@@ -356,6 +360,7 @@ public sealed class DockerService : IDockerDeployment
     /// </summary>
     public async Task<ServiceActionResult> UpdateWebSelfAsync(string? targetImage = null, string? operationId = null)
     {
+        var normalizedOperationId = NormalizeOperationId(operationId);
         try
         {
             var spec = await BuildWebRecreateSpecAsync(targetImage);
@@ -363,28 +368,33 @@ public sealed class DockerService : IDockerDeployment
                 "cloud-web-updater",
                 BuildSelfUpdateScript(
                     spec,
-                    NormalizeOperationId(operationId),
+                    normalizedOperationId,
                     _maintenance.StateFilePath,
                     _maintenance.LogFilePath,
                     _compose.BackupDirectory),
-                "Обновление веб-клиента запущено");
+                "Обновление веб-клиента запущено",
+                normalizedOperationId);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Ошибка подготовки самообновления веб-клиента");
-            return new ServiceActionResult(false, "Не удалось подготовить обновление веб-клиента", ex.Message);
+            return new ServiceActionResult(false, "Не удалось подготовить обновление веб-клиента", ex.Message, normalizedOperationId);
         }
     }
 
     /// <summary>Перезапустить сам веб через detached helper-контейнер.</summary>
     public Task<ServiceActionResult> RestartWebSelfAsync(string? operationId = null)
-        => RunWebHelperAsync(
+    {
+        var normalizedOperationId = NormalizeOperationId(operationId);
+        return RunWebHelperAsync(
             "cloud-web-restarter",
             BuildRestartScript(
-                NormalizeOperationId(operationId),
+                normalizedOperationId,
                 _maintenance.StateFilePath,
                 _maintenance.LogFilePath),
-            "Перезапуск веб-клиента запущен");
+            "Перезапуск веб-клиента запущен",
+            normalizedOperationId);
+    }
 
     /// <summary>Аргументы `docker run` для нового и rollback-контейнера web плюс доп. сети.</summary>
     private sealed record WebRecreateSpec(
@@ -666,7 +676,11 @@ $"{stateWriter}\n" +
     private static string ShQuote(string s) => "'" + s.Replace("'", "'\\''") + "'";
 
     /// <summary>Запустить detached helper-контейнер из образа web с готовым sh-скриптом.</summary>
-    private async Task<ServiceActionResult> RunWebHelperAsync(string helperName, string innerScript, string startedMessage)
+    private async Task<ServiceActionResult> RunWebHelperAsync(
+        string helperName,
+        string innerScript,
+        string startedMessage,
+        string operationId)
     {
         try
         {
@@ -697,12 +711,12 @@ $"{stateWriter}\n" +
             }
 
             await RunDockerCommandAsync(args);
-            return new ServiceActionResult(true, startedMessage);
+            return new ServiceActionResult(true, startedMessage, null, operationId);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Ошибка запуска helper-контейнера {Helper}", helperName);
-            return new ServiceActionResult(false, "Не удалось запустить операцию над веб-клиентом", ex.Message);
+            return new ServiceActionResult(false, "Не удалось запустить операцию над веб-клиентом", ex.Message, operationId);
         }
     }
 
