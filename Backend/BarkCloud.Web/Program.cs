@@ -15,6 +15,8 @@ using BarkCloud.Web.Rendering;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Http.Features;
 
+using Serilog;
+
 // gRPC к микросервисам идёт по docker-сети без TLS (h2c) — разрешаем HTTP/2 поверх http://
 AppContext.SetSwitch("System.Net.Http.SocketsHttpHandler.Http2UnencryptedSupport", true);
 
@@ -36,6 +38,10 @@ for (var attempt = 1; ; attempt++)
         Thread.Sleep(2000);
     }
 }
+
+// Web также пишет ошибки и события в stdout контейнера и Seq. Без этого провайдеров
+// Serilog на веб-хосте не было, поэтому detached self-update было трудно диагностировать.
+builder.AddBarkCloudSerilog("BarkCloud.Web");
 
 // Адреса сервисов в docker-сети. Первичный источник — Configuration
 // (IdentityService:Host / UsersService:Host / FilesService:Host).
@@ -120,6 +126,7 @@ builder.Services.AddScoped<PasswordResetGateway>();
 builder.Services.AddScoped<PageDataBuilder>();
 
 var app = builder.Build();
+app.Lifetime.ApplicationStopped.Register(Log.CloseAndFlush);
 
 // За nginx TLS терминируется снаружи, поэтому Kestrel видит scheme=http.
 // Доверяем X-Forwarded-Proto/Host от reverse-proxy, чтобы Request.Scheme был корректным

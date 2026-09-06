@@ -5,7 +5,7 @@ import react from '@vitejs/plugin-react';
 // Vite-dev отдаёт SPA на 5173 и проксирует серверные роуты на .NET, чтобы httpOnly-cookie
 // (bark_at/bark_rt) ходили как same-origin (changeOrigin:false — сохраняем домен cookie).
 const BACKEND = 'http://localhost:5148';
-const backendRoutes = ['/api', '/login', '/register', '/forgot', '/logout', '/healthz', '/updating', '/restarting', '/maintenance-wait.js'];
+const backendRoutes = ['/api', '/login', '/register', '/forgot', '/logout', '/healthz', '/updating', '/restarting', '/maintenance-status', '/maintenance-wait.js'];
 
 export default defineConfig({
   plugins: [react()],
