@@ -23,22 +23,23 @@ public sealed record ServicesSnapshot(IReadOnlyList<ServiceStatus> Services, boo
 /// Команды строятся через <see cref="ProcessStartInfo.ArgumentList"/> — аргументы передаются ОС
 /// буквально, без shell-интерпретации (защита от инъекций).
 /// </summary>
-public sealed class DockerService
+public sealed class DockerService : IDockerDeployment
 {
     private const string WebService = "web";
     private const string WebContainer = "cloud-web";
 
-    // Управляемый набор: сервис docker compose -> имя контейнера. Инфраструктуру не трогаем.
-    // Порядок важен для UpdateAll: configuration первым (от него зависят остальные).
-    private static readonly (string Service, string Container)[] Managed =
+    // Управляемый набор: логическое имя UI/очереди -> имя сервиса Compose -> контейнер.
+    // В compose BarkCloud ключи имеют префикс cloud-, а очередь работает с короткими именами.
+    // Инфраструктуру не трогаем. Порядок важен для UpdateAll.
+    private static readonly (string Service, string ComposeService, string Container)[] Managed =
     [
-        ("configuration", "cloud-configuration"),
-        ("identity", "cloud-identity"),
-        ("users", "cloud-users"),
-        ("files", "cloud-files"),
-        ("notification", "cloud-notification"),
-        ("torrent", "cloud-torrent"),
-        (WebService, WebContainer),
+        ("configuration", "cloud-configuration", "cloud-configuration"),
+        ("identity", "cloud-identity", "cloud-identity"),
+        ("users", "cloud-users", "cloud-users"),
+        ("files", "cloud-files", "cloud-files"),
+        ("notification", "cloud-notification", "cloud-notification"),
+        ("torrent", "cloud-torrent", "cloud-torrent"),
+        (WebService, "cloud-web", WebContainer),
     ];
 
     // Пути внутри контейнера web, куда смонтированы compose-файл и .env (см. docker-compose.yml).
@@ -99,54 +100,55 @@ public sealed class DockerService
         return new ServicesSnapshot(services, dockerOk, error);
     }
 
-    // ───────────────────────── Обновление ─────────────────────────
+    // ───────────────────────── Compose и health ─────────────────────────
 
-    /// <summary>Обновить образ и пересоздать один сервис (web — только через self-update).</summary>
-    public async Task<ServiceActionResult> UpdateServiceAsync(string service)
+    /// <summary>Скачать образ сервиса через Compose helper-контейнер.</summary>
+    public async Task ComposePullAsync(string service)
     {
-        if (!IsManagedNonWeb(service, out var error)) return error!;
-
-        try
-        {
-            await PullAndRecreateAsync(service);
-            await RunDockerCommandAsync("image", "prune", "-f");
-            return new ServiceActionResult(true, $"Сервис {service} обновлён и пересоздан");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Ошибка обновления сервиса {Service}", service);
-            return new ServiceActionResult(false, $"Ошибка обновления сервиса {service}", ex.Message);
-        }
+        if (!TryGetManagedNonWebService(service, out var canonical))
+            throw new ArgumentException($"Неизвестный или недоступный для Compose сервис: {service}", nameof(service));
+        await RunDockerComposeCommandAsync("pull", ComposeServiceOf(canonical));
+        _logger.LogInformation("Образ сервиса {Service} скачан", canonical);
     }
 
-    /// <summary>Последовательно обновить все сервисы приложения (web исключён).</summary>
-    public async Task<ServiceActionResult> UpdateAllServicesAsync()
+    /// <summary>Пересоздать сервис, не затрагивая его зависимости.</summary>
+    public async Task ComposeUpAsync(string service)
     {
-        var done = new List<string>();
-        var errors = new List<string>();
-
-        foreach (var (service, _) in Managed.Where(m => m.Service != WebService))
-        {
-            try
-            {
-                await PullAndRecreateAsync(service);
-                done.Add(service);
-                await Task.Delay(3000); // дать сервису подняться/инициализироваться
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Ошибка обновления сервиса {Service}", service);
-                errors.Add($"{service}: {ex.Message}");
-            }
-        }
-
-        try { await RunDockerCommandAsync("image", "prune", "-f"); }
-        catch (Exception ex) { _logger.LogWarning(ex, "Не удалось очистить неиспользуемые образы"); }
-
-        return errors.Count == 0
-            ? new ServiceActionResult(true, $"Обновлены: {string.Join(", ", done)}")
-            : new ServiceActionResult(false, $"Обновлены: {string.Join(", ", done)}. Ошибки: {string.Join("; ", errors)}", string.Join("\n", errors));
+        if (!TryGetManagedNonWebService(service, out var canonical))
+            throw new ArgumentException($"Неизвестный или недоступный для Compose сервис: {service}", nameof(service));
+        await RunDockerComposeCommandAsync("up", "--force-recreate", "--no-deps", "-d", ComposeServiceOf(canonical));
+        _logger.LogInformation("Контейнер сервиса {Service} пересоздан", canonical);
     }
+
+    /// <summary>Удалить неиспользуемые образы после завершения всей задачи.</summary>
+    public Task PruneImagesAsync() => RunDockerCommandAsync("image", "prune", "-f");
+
+    /// <summary>Состояние контейнера и статус Docker healthcheck.</summary>
+    public async Task<(string State, string Health)> InspectStateAsync(string container)
+    {
+        var output = await RunDockerCommandAsync("inspect", "--format",
+            "{{.State.Status}}|{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}", container);
+        var parts = output.Split('|');
+        return (parts[0], parts.Length > 1 ? parts[1] : "none");
+    }
+
+    /// <summary>Получить ID образа контейнера; null, если контейнер отсутствует.</summary>
+    public async Task<string?> GetContainerImageIdAsync(string container)
+    {
+        try { return await RunDockerCommandAsync("inspect", "--format", "{{.Image}}", container); }
+        catch { return null; }
+    }
+
+    /// <summary>Получить ссылку на образ контейнера; null, если контейнер отсутствует.</summary>
+    public async Task<string?> GetContainerImageReferenceAsync(string container)
+    {
+        try { return await RunDockerCommandAsync("inspect", "--format", "{{.Config.Image}}", container); }
+        catch { return null; }
+    }
+
+    /// <summary>Вернуть старый ID образа под его прежнюю ссылку для отката.</summary>
+    public Task TagImageAsync(string imageId, string reference)
+        => RunDockerCommandAsync("tag", imageId, reference);
 
     // ───────────────────────── Жизненный цикл ─────────────────────────
 
@@ -327,13 +329,16 @@ public sealed class DockerService
     private static string BuildSelfUpdateScript(WebRecreateSpec spec)
     {
         var run = string.Join(" ", spec.RunArgs.Select(ShQuote));
-        var connects = string.Concat(spec.ExtraNetworkConnects.Select(cmd => $"\n  {cmd} >/dev/null 2>&1"));
+        var connects = spec.ExtraNetworkConnects.Count == 0
+            ? "true"
+            : string.Join(" && ", spec.ExtraNetworkConnects.Select(cmd => $"{cmd} >/dev/null 2>&1"));
         return
 $@"sleep 2
 docker pull {ShQuote(spec.Image)} || exit 1
+docker rm -f {WebContainer}-bak >/dev/null 2>&1 || true
 docker rename {WebContainer} {WebContainer}-bak >/dev/null 2>&1 || exit 1
 docker stop -t 10 {WebContainer}-bak >/dev/null 2>&1
-if docker run {run}; then{connects}
+if docker run {run} && {connects}; then
   docker rm -f {WebContainer}-bak >/dev/null 2>&1
   docker image prune -f >/dev/null 2>&1
 else
@@ -379,25 +384,42 @@ fi";
 
     // ───────────────────────── Внутреннее ─────────────────────────
 
-    private async Task PullAndRecreateAsync(string service)
+    public static string ContainerNameFor(string service)
+        => Managed.First(m => string.Equals(m.Service, service, StringComparison.OrdinalIgnoreCase)).Container;
+
+    private static string ComposeServiceOf(string service)
+        => Managed.First(m => string.Equals(m.Service, service, StringComparison.OrdinalIgnoreCase)).ComposeService;
+
+    private static string ContainerOf(string service) => ContainerNameFor(service);
+
+    /// <summary>Проверить и канонизировать имя управляемого не-web сервиса.</summary>
+    public static bool TryGetManagedNonWebService(string service, out string canonicalService)
     {
-        var project = await GetComposeProjectAsync();
-        await RunDockerComposeCommandAsync("-p", project, "--env-file", EnvFileInContainer, "-f", ComposeFileInContainer, "pull", service);
-        await RunDockerComposeCommandAsync("-p", project, "--env-file", EnvFileInContainer, "-f", ComposeFileInContainer, "up", "--force-recreate", "-d", service);
+        var match = Managed.FirstOrDefault(m =>
+            m.Service != WebService && string.Equals(m.Service, service, StringComparison.OrdinalIgnoreCase));
+        canonicalService = match.Service ?? string.Empty;
+        return canonicalService.Length > 0;
     }
 
-    private static bool IsManaged(string service) => Managed.Any(m => m.Service == service);
-    private static string ContainerOf(string service) => Managed.First(m => m.Service == service).Container;
+    public static bool IsManagedNonWebService(string service)
+        => TryGetManagedNonWebService(service, out _);
 
     /// <summary>Сервис из белого списка и не web (web — только self-методы).</summary>
     private static bool IsManagedNonWeb(string service, out ServiceActionResult? error)
     {
-        if (!IsManaged(service))
+        if (!TryGetManagedNonWebService(service, out _))
+        {
+            if (string.Equals(service, WebService, StringComparison.OrdinalIgnoreCase))
+            {
+                error = new ServiceActionResult(false, "Веб-клиент управляется только через self-update / self-restart");
+                return false;
+            }
+
             error = new ServiceActionResult(false, $"Неизвестный сервис: {service}");
-        else if (service == WebService)
-            error = new ServiceActionResult(false, "Веб-клиент управляется только через self-update / self-restart");
-        else
-            error = null;
+            return false;
+        }
+
+        error = null;
         return error is null;
     }
 
@@ -429,7 +451,76 @@ fi";
 
     private Task<string> RunDockerCommandAsync(params string[] args) => RunProcessAsync("docker", args);
 
-    private Task<string> RunDockerComposeCommandAsync(params string[] args) => RunProcessAsync("docker", ["compose", .. args]);
+    /// <summary>
+    /// Выполнить Compose через эфемерный helper-контейнер.
+    ///
+    /// Относительные bind mounts из compose-файла должны разрешаться Docker daemon'ом
+    /// относительно реального каталога проекта на хосте. Поэтому helper получает
+    /// этот каталог и файлы по тем host-путям, которые уже использованы web-контейнером,
+    /// а не пытается запускать compose из своей рабочей директории.
+    /// </summary>
+    private async Task<string> RunDockerComposeCommandAsync(params string[] args)
+    {
+        var helperImage = (await RunDockerCommandAsync("inspect", "--format", "{{.Config.Image}}", WebContainer)).Trim();
+        var dockerSocket = await GetMountSourceAsync(WebContainer, "/var/run/docker.sock");
+        var composeFile = await GetMountSourceAsync(WebContainer, ComposeFileInContainer);
+        var envFile = await GetMountSourceAsync(WebContainer, EnvFileInContainer);
+        var projectDirectory = HostDirectoryOf(composeFile);
+
+        if (string.IsNullOrWhiteSpace(helperImage)
+            || string.IsNullOrWhiteSpace(dockerSocket)
+            || string.IsNullOrWhiteSpace(composeFile)
+            || string.IsNullOrWhiteSpace(envFile)
+            || string.IsNullOrWhiteSpace(projectDirectory)
+            || !IsAbsoluteHostPath(dockerSocket)
+            || !IsAbsoluteHostPath(composeFile)
+            || !IsAbsoluteHostPath(envFile)
+            || !IsAbsoluteHostPath(projectDirectory))
+        {
+            throw new InvalidOperationException("Не удалось определить реальные host-пути Docker Compose.");
+        }
+
+        var project = await GetComposeProjectAsync();
+        var dockerArguments = new List<string>
+        {
+            "run", "--rm", "--user", "root",
+            "--mount", $"type=bind,src={dockerSocket},dst=/var/run/docker.sock",
+            "--mount", $"type=bind,src={projectDirectory},dst={projectDirectory},readonly",
+        };
+
+        if (!string.Equals(HostDirectoryOf(envFile), projectDirectory, StringComparison.OrdinalIgnoreCase))
+        {
+            dockerArguments.Add("--mount");
+            dockerArguments.Add($"type=bind,src={envFile},dst={envFile},readonly");
+        }
+
+        dockerArguments.Add("--entrypoint");
+        dockerArguments.Add("docker");
+        dockerArguments.Add(helperImage);
+        dockerArguments.Add("compose");
+        dockerArguments.Add("--project-name");
+        dockerArguments.Add(project);
+        dockerArguments.Add("--env-file");
+        dockerArguments.Add(envFile);
+        dockerArguments.Add("-f");
+        dockerArguments.Add(composeFile);
+        dockerArguments.AddRange(args);
+
+        return await RunDockerCommandAsync(dockerArguments.ToArray());
+    }
+
+    private static bool IsAbsoluteHostPath(string path)
+        => path.StartsWith("/", StringComparison.Ordinal)
+            || path.StartsWith("\\\\", StringComparison.Ordinal)
+            || path.Length >= 3 && char.IsLetter(path[0]) && path[1] == ':' && (path[2] == '\\' || path[2] == '/');
+
+    /// <summary>Path.GetDirectoryName не распознаёт Windows-пути, когда web работает в Linux.</summary>
+    private static string HostDirectoryOf(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return string.Empty;
+        var index = path.LastIndexOfAny(['/', '\\']);
+        return index <= 0 ? (index == 0 ? path[..1] : string.Empty) : path[..index];
+    }
 
     private static async Task<string> RunProcessAsync(string fileName, string[] args)
     {

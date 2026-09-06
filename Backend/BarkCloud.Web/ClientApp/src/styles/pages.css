@@ -985,14 +985,11 @@ tr.selected .row-actions { opacity: 1; }
 .prog-item .pi { width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .prog-item.done .pi { color: var(--md-success); }
 .prog-item.error .pi { color: var(--md-error); }
+.prog-message, .prog-rollback { display: block; font-size: 12px; margin-top: 3px; color: var(--md-on-surface-variant); }
+.prog-rollback { color: var(--md-warning); }
+.prog-error { margin-top: 14px; padding: 10px 12px; border-radius: var(--r-md); background: var(--md-error-container); color: var(--md-on-error-container); font-size: 13px; line-height: 1.4; }
 .dlg-actions { display: flex; justify-content: flex-end; margin-top: 20px; }
 .dlg-actions.two { justify-content: space-between; }
-
-.upd-overlay { position: fixed; inset: 0; background: var(--md-surface); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; z-index: 1100; text-align: center; padding: 24px; }
-.upd-overlay .big-spin { width: 56px; height: 56px; border-radius: 50%; border: 4px solid var(--md-primary-container); border-top-color: var(--md-primary); animation: sysspin 1s linear infinite; }
-.upd-overlay h2 { font-size: 24px; font-weight: 500; color: var(--md-on-surface); }
-.upd-overlay p { color: var(--md-on-surface-variant); max-width: 420px; }
-.upd-overlay .timer { display: inline-flex; align-items: center; gap: 8px; background: var(--md-success-container); color: var(--md-on-success-container); padding: 8px 16px; border-radius: var(--r-full); font-size: 14px; font-weight: 500; }
 
 .sys-toast { position: fixed; left: 50%; bottom: 32px; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; padding: 14px 20px; border-radius: var(--r-md); font-size: 14px; font-weight: 500; z-index: 1200; box-shadow: 0 4px 16px rgba(0,0,0,.2); max-width: 520px; }
 .sys-toast.ok { background: var(--md-success-container); color: var(--md-on-success-container); }

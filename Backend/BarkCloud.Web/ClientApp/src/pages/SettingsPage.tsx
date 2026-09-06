@@ -50,6 +50,7 @@ const SVC_LABELS: Record<string, string> = {
   users: 'Users',
   files: 'Files',
   notification: 'Notification',
+  torrent: 'Torrent',
   web: 'Веб-клиент',
 };
 
@@ -110,8 +111,36 @@ interface ServicesSnap {
   error?: string;
 }
 
+type DeploymentKind = 'Update' | 'Restart' | 'Start' | 'Stop';
+type DeploymentJobState = 'Queued' | 'Running' | 'Completed' | 'Failed';
+type DeploymentStepState = 'Pending' | 'InProgress' | 'Completed' | 'Failed';
+
+interface DeploymentStep {
+  service: string;
+  state: DeploymentStepState;
+  message?: string | null;
+  rolledBack?: boolean;
+}
+
+interface DeploymentJob {
+  id: string;
+  kind: DeploymentKind;
+  state: DeploymentJobState;
+  steps: DeploymentStep[];
+  error?: string | null;
+  createdAtUtc: string;
+  startedAtUtc?: string | null;
+  finishedAtUtc?: string | null;
+}
+
+interface JobStart {
+  jobId: string;
+  message?: string;
+}
+
 function SvcStatus({ state }: { state: string }) {
   const running = state === 'running';
+  const unavailable = state === 'unavailable';
   const label = running
     ? 'Запущен'
     : state === 'not_found'
@@ -120,39 +149,24 @@ function SvcStatus({ state }: { state: string }) {
     ? 'Остановлен'
     : state === 'restarting'
     ? 'Перезапуск'
+    : state === 'starting'
+    ? 'Запускается'
+    : state === 'created'
+    ? 'Создан'
+    : unavailable
+    ? 'Docker недоступен'
     : state || '—';
   return (
-    <span className={'pill-info ' + (running ? 'ok' : 'warn')}>
+    <span className={'pill-info ' + (running ? 'ok' : unavailable ? 'err' : 'warn')}>
       {running ? <Icon.check size={12} /> : <Icon.x size={12} />} {label}
     </span>
   );
 }
 
 interface ProgressState {
-  items: { svc: string; state: 'pending' | 'current' | 'done' | 'error' }[];
-  done: number;
-  total: number;
-  finished: boolean;
-}
-
-/**
- * Перезагрузка с обходом кеша — после обновления/перезапуска веб-клиента браузер иначе
- * отдаёт старый index.html и бандлы (обычный reload не помогает, нужен Ctrl+F5).
- * Чистим Cache Storage и переходим на тот же URL с cache-busting-параметром, чтобы
- * гарантированно подтянуть свежий документ и новые хеши ассетов.
- */
-async function hardReload() {
-  try {
-    if ('caches' in window) {
-      const keys = await caches.keys();
-      await Promise.all(keys.map((k) => caches.delete(k)));
-    }
-  } catch {
-    /* не критично — продолжаем перезагрузку */
-  }
-  const url = new URL(window.location.href);
-  url.searchParams.set('_', Date.now().toString());
-  window.location.replace(url.toString());
+  title: string;
+  job: DeploymentJob;
+  autoClose: boolean;
 }
 
 function SystemSection({ admin, system }: { admin: SettingsState['admin']; system: SettingsState['system'] }) {
@@ -165,9 +179,10 @@ function SystemSection({ admin, system }: { admin: SettingsState['admin']; syste
   const [busy, setBusy] = React.useState<Record<string, boolean>>({});
   const [toast, setToast] = React.useState<{ kind: 'ok' | 'err'; msg: string } | null>(null);
   const [progress, setProgress] = React.useState<ProgressState | null>(null);
-  const [overlay, setOverlay] = React.useState<{ title: string; seconds: number } | null>(null);
   const [registrationEnabled, setRegistrationEnabled] = React.useState(system.registrationEnabled);
   const [registrationBusy, setRegistrationBusy] = React.useState(false);
+  const trackedJobs = React.useRef(new Set<string>());
+  const resumedJobs = React.useRef(false);
 
   const flash = (kind: 'ok' | 'err', msg: string) => {
     setToast({ kind, msg });
@@ -200,6 +215,31 @@ function SystemSection({ admin, system }: { admin: SettingsState['admin']; syste
     }
   }, [unlocked, loadServices]);
 
+  React.useEffect(() => {
+    if (!unlocked || resumedJobs.current) return;
+    resumedJobs.current = true;
+
+    let cancelled = false;
+    (async () => {
+      const res = await sGet<DeploymentJob[]>('/api/system/deploy/jobs');
+      if (cancelled || !res.ok || !res.data) return;
+      const active = res.data.find((job) => job.state === 'Queued' || job.state === 'Running');
+      if (active) await waitForJob('Продолжение операции обслуживания', active.id, false, active);
+    })().catch(() => {
+      /* состояние сервисов всё равно доступно через ручное обновление */
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [unlocked]);
+
+  React.useEffect(() => {
+    if (!progress || progress.job.state !== 'Completed' || !progress.autoClose) return;
+    const timer = window.setTimeout(() => setProgress(null), 3000);
+    return () => window.clearTimeout(timer);
+  }, [progress?.job.state, progress?.autoClose]);
+
   async function doUnlock() {
     if (!password) return;
     setUnlocking(true);
@@ -215,6 +255,8 @@ function SystemSection({ admin, system }: { admin: SettingsState['admin']; syste
     await sPost('/api/system/lock');
     setUnlocked(false);
     setServices(null);
+    setProgress(null);
+    resumedJobs.current = false;
   }
 
 
@@ -230,54 +272,122 @@ function SystemSection({ admin, system }: { admin: SettingsState['admin']; syste
       flash('err', data?.message || 'Не удалось изменить регистрацию');
     }
   }
-  async function svcAction(svc: string, kind: string) {
+  async function waitForJob(title: string, jobId: string, autoClose = false, initial?: DeploymentJob): Promise<DeploymentJob | null> {
+    if (trackedJobs.current.has(jobId)) return null;
+    trackedJobs.current.add(jobId);
+    let lastJob = initial || {
+      id: jobId,
+      kind: 'Update' as DeploymentKind,
+      state: 'Queued' as DeploymentJobState,
+      steps: [],
+      createdAtUtc: new Date().toISOString(),
+    };
+    let misses = 0;
+    setProgress({ title, job: lastJob, autoClose });
+
+    try {
+      while (true) {
+        try {
+          const res = await sGet<DeploymentJob>(`/api/system/deploy/jobs/${jobId}`);
+          if (res.ok && res.data) {
+            misses = 0;
+            lastJob = res.data;
+            setProgress({ title, job: lastJob, autoClose });
+            if (lastJob.state === 'Completed' || lastJob.state === 'Failed') return lastJob;
+          } else if (++misses >= 5) {
+            lastJob = {
+              ...lastJob,
+              state: 'Failed',
+              error: res.status === 404
+                ? 'Задача исчезла — возможно, веб-сервис был перезапущен до её завершения'
+                : errMsg(res, `Не удалось получить состояние задачи (HTTP ${res.status})`),
+              finishedAtUtc: new Date().toISOString(),
+            };
+            setProgress({ title, job: lastJob, autoClose: false });
+            return lastJob;
+          }
+        } catch {
+          if (++misses >= 5) {
+            lastJob = {
+              ...lastJob,
+              state: 'Failed',
+              error: 'Соединение с веб-сервисом потеряно, состояние задачи неизвестно',
+              finishedAtUtc: new Date().toISOString(),
+            };
+            setProgress({ title, job: lastJob, autoClose: false });
+            return lastJob;
+          }
+        }
+        await new Promise((resolve) => window.setTimeout(resolve, 2000));
+      }
+    } finally {
+      trackedJobs.current.delete(jobId);
+    }
+  }
+
+  async function runQueuedAction(title: string, path: string, kind: DeploymentKind, autoClose = false) {
+    try {
+      const res = await sPost<JobStart>(path);
+      if (!res.ok || !res.data?.jobId) {
+        flash('err', errMsg(res, 'Не удалось поставить операцию в очередь'));
+        return;
+      }
+
+      const job = await waitForJob(title, res.data.jobId, autoClose, {
+        id: res.data.jobId,
+        kind,
+        state: 'Queued',
+        steps: [],
+        createdAtUtc: new Date().toISOString(),
+      });
+      if (job) {
+        flash(job.state === 'Completed' ? 'ok' : 'err', job.state === 'Completed' ? (res.data.message || 'Готово') : (job.error || 'Операция завершилась с ошибкой'));
+      }
+      void loadServices();
+    } catch {
+      flash('err', 'Не удалось связаться с веб-сервисом');
+    }
+  }
+
+  async function svcAction(svc: string, kind: DeploymentKind) {
     setBusy((b) => ({ ...b, [svc]: true }));
-    const { ok, data } = await sPost<{ message?: string }>(`/api/system/services/${svc}/${kind}`);
-    flash(ok ? 'ok' : 'err', data?.message || (ok ? 'Готово' : 'Ошибка'));
-    setBusy((b) => ({ ...b, [svc]: false }));
-    setTimeout(loadServices, 1500);
+    try {
+      const labels: Record<DeploymentKind, string> = {
+        Update: 'Обновление',
+        Restart: 'Перезапуск',
+        Start: 'Запуск',
+        Stop: 'Остановка',
+      };
+      await runQueuedAction(`${labels[kind]}: ${SVC_LABELS[svc] || svc}`, `/api/system/services/${svc}/${kind.toLowerCase()}`, kind);
+    } finally {
+      setBusy((b) => ({ ...b, [svc]: false }));
+    }
   }
 
   async function updateAll() {
-    const targets = (services || []).filter((s) => !s.isWeb).map((s) => s.service);
+    const targets = (services || []).filter((s) => !s.isWeb && s.state !== 'not_found' && s.state !== 'unavailable');
     if (!targets.length) return;
     if (!window.confirm('Обновить все сервисы приложения (кроме веб-клиента)?')) return;
-    setProgress({ items: targets.map((s) => ({ svc: s, state: 'pending' })), done: 0, total: targets.length, finished: false });
-    for (const svc of targets) {
-      setProgress((p) => (p ? { ...p, items: p.items.map((it) => (it.svc === svc ? { ...it, state: 'current' } : it)) } : p));
-      const { ok } = await sPost(`/api/system/services/${svc}/update`);
-      setProgress((p) => (p ? { ...p, done: p.done + 1, items: p.items.map((it) => (it.svc === svc ? { ...it, state: ok ? 'done' : 'error' } : it)) } : p));
-    }
-    setProgress((p) => (p ? { ...p, finished: true } : p));
-    loadServices();
+    await runQueuedAction('Обновление микросервисов', '/api/system/update-all', 'Update', true);
   }
 
-  function startOverlay(title: string) {
-    setOverlay({ title, seconds: 0 });
-    let success = 0;
-    const t0 = Date.now();
-    const tick = setInterval(() => setOverlay((o) => (o ? { ...o, seconds: Math.floor((Date.now() - t0) / 1000) } : o)), 1000);
-    const poll = setInterval(async () => {
-      try {
-        const r = await fetch('/healthz', { cache: 'no-cache' });
-        if (r.ok) {
-          if (++success >= 2) {
-            clearInterval(poll);
-            clearInterval(tick);
-            setTimeout(() => { void hardReload(); }, 1500);
-          }
-        } else success = 0;
-      } catch {
-        success = 0;
-      }
-    }, 3000);
+  async function restartAll() {
+    const targets = (services || []).filter((s) => !s.isWeb && s.state !== 'not_found' && s.state !== 'unavailable');
+    if (!targets.length) return;
+    if (!window.confirm('Перезапустить все найденные сервисы приложения?')) return;
+    await runQueuedAction('Перезапуск микросервисов', '/api/system/restart-all', 'Restart');
   }
 
   function webSelf(kind: 'update' | 'restart') {
     const title = kind === 'update' ? 'Обновление веб-клиента' : 'Перезапуск веб-клиента';
     if (!window.confirm(`${title}? Страница ненадолго станет недоступна и перезагрузится автоматически.`)) return;
     const path = kind === 'update' ? '/api/system/web/update-self' : '/api/system/web/restart-self';
-    sPost<{ message?: string }>(path).then(({ ok, data }) => (ok ? startOverlay(title) : flash('err', data?.message || 'Ошибка')));
+    sPost<{ message?: string }>(path)
+      .then(({ ok, data }) => {
+        if (ok) window.location.assign(kind === 'update' ? '/updating' : '/restarting');
+        else flash('err', data?.message || 'Ошибка');
+      })
+      .catch(() => flash('err', 'Не удалось связаться с веб-сервисом'));
   }
 
   let body: React.ReactNode;
@@ -309,33 +419,37 @@ function SystemSection({ admin, system }: { admin: SettingsState['admin']; syste
   } else {
     const micros = services.filter((s) => !s.isWeb);
     const web = services.find((s) => s.isWeb);
+    const hasActiveJob = progress?.job.state === 'Queued' || progress?.job.state === 'Running';
 
-    const renderRow = (s: Svc, actions: (running: boolean) => React.ReactNode) => (
-      <div key={s.service} className="svc-row">
-        <div className="svc-main">
-          <div className="svc-ic">
-            <Icon.server size={20} />
-          </div>
-          <div className="svc-info">
-            <div className="svc-name">
-              {SVC_LABELS[s.service] || s.service} <SvcStatus state={s.state} />
+    const renderRow = (s: Svc, actions: (running: boolean, disabled: boolean) => React.ReactNode) => {
+      const available = s.state !== 'not_found' && s.state !== 'unavailable';
+      return (
+        <div key={s.service} className="svc-row">
+          <div className="svc-main">
+            <div className="svc-ic">
+              <Icon.server size={20} />
             </div>
-            {s.image && (
-              <div className="svc-img" title={s.image}>
-                {s.image}
+            <div className="svc-info">
+              <div className="svc-name">
+                {SVC_LABELS[s.service] || s.service} <SvcStatus state={s.state} />
               </div>
-            )}
-            {s.service === 'notification' && !system.emailEnabled && (
-              <div className="svc-note" style={{ fontSize: 12, color: 'var(--md-on-surface-variant)', marginTop: 4 }}>
-                Не используется — почта на сервере не настроена. Сервис можно остановить, а чтобы убрать совсем —
-                удалить <code>notification</code> из <code>docker-compose.yml</code> и его переменные из <code>.env</code>.
-              </div>
-            )}
+              {s.image && (
+                <div className="svc-img" title={s.image}>
+                  {s.image}
+                </div>
+              )}
+              {s.service === 'notification' && !system.emailEnabled && (
+                <div className="svc-note" style={{ fontSize: 12, color: 'var(--md-on-surface-variant)', marginTop: 4 }}>
+                  Не используется — почта на сервере не настроена. Сервис можно остановить, а чтобы убрать совсем —
+                  удалить <code>notification</code> из <code>docker-compose.yml</code> и его переменные из <code>.env</code>.
+                </div>
+              )}
+            </div>
           </div>
+          <div className="svc-actions">{busy[s.service] ? <span className="spin" style={{ margin: '0 11px' }} /> : actions(s.state === 'running', !available || !!hasActiveJob)}</div>
         </div>
-        <div className="svc-actions">{busy[s.service] ? <span className="spin" style={{ margin: '0 11px' }} /> : actions(s.state === 'running')}</div>
-      </div>
-    );
+      );
+    };
 
     body = (
       <>
@@ -366,20 +480,20 @@ function SystemSection({ admin, system }: { admin: SettingsState['admin']; syste
         <div className="sys-section-label">Микросервисы</div>
         <div className="svc-list">
           {micros.map((s) =>
-            renderRow(s, (running) => (
+            renderRow(s, (running, disabled) => (
               <>
-                <button className="iconb" title="Обновить" onClick={() => svcAction(s.service, 'update')}>
+                <button className="iconb" title="Обновить" disabled={disabled} onClick={() => svcAction(s.service, 'Update')}>
                   <Icon.download size={20} />
                 </button>
-                <button className="iconb" title="Перезапустить" onClick={() => svcAction(s.service, 'restart')}>
+                <button className="iconb" title="Перезапустить" disabled={disabled} onClick={() => svcAction(s.service, 'Restart')}>
                   <Icon.refresh size={20} />
                 </button>
                 {running ? (
-                  <button className="iconb" title="Остановить" onClick={() => svcAction(s.service, 'stop')}>
+                  <button className="iconb" title="Остановить" disabled={disabled} onClick={() => svcAction(s.service, 'Stop')}>
                     <Icon.power size={20} />
                   </button>
                 ) : (
-                  <button className="iconb" title="Запустить" onClick={() => svcAction(s.service, 'start')}>
+                  <button className="iconb" title="Запустить" disabled={disabled} onClick={() => svcAction(s.service, 'Start')}>
                     <Icon.play size={20} />
                   </button>
                 )}
@@ -388,8 +502,11 @@ function SystemSection({ admin, system }: { admin: SettingsState['admin']; syste
           )}
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginTop: 6 }}>
-          <button className="btn primary" onClick={updateAll} disabled={!micros.length}>
+          <button className="btn primary" onClick={updateAll} disabled={!micros.some((s) => s.state !== 'not_found' && s.state !== 'unavailable') || !!hasActiveJob}>
             <Icon.download size={16} /> Обновить микросервисы
+          </button>
+          <button className="btn" onClick={restartAll} disabled={!micros.some((s) => s.state !== 'not_found' && s.state !== 'unavailable') || !!hasActiveJob}>
+            <Icon.refresh size={16} /> Перезапустить все
           </button>
           <button className="btn" onClick={() => { setServices(null); loadServices(); }}>
             <Icon.refresh size={16} /> Обновить статус
@@ -401,14 +518,14 @@ function SystemSection({ admin, system }: { admin: SettingsState['admin']; syste
         <div className="sys-section-label">Веб-клиент</div>
         {web && <div className="svc-list">{renderRow(web, () => <span style={{ fontSize: 12, color: 'var(--md-on-surface-variant)' }}>ниже ↓</span>)}</div>}
         <div className="sys-note">
-          Обновление и перезапуск веб-клиента: страница ненадолго станет недоступна и перезагрузится сама. Веб пересоздаётся отдельным helper-контейнером, поэтому работает
-          и под Linux/WSL, и на Windows Docker Desktop. При неудачном обновлении автоматически откатывается на прежний контейнер.
+          Обновление и перезапуск веб-клиента: откроется отдельная страница ожидания, которая дождётся нового процесса и вернёт вас в настройки.
+          Веб пересоздаётся отдельным helper-контейнером, поэтому работает и под Linux/WSL, и на Windows Docker Desktop.
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-          <button className="btn primary" onClick={() => webSelf('update')}>
+          <button className="btn primary" onClick={() => webSelf('update')} disabled={!!hasActiveJob}>
             <Icon.download size={16} /> Обновить веб-клиент
           </button>
-          <button className="btn" onClick={() => webSelf('restart')}>
+          <button className="btn" onClick={() => webSelf('restart')} disabled={!!hasActiveJob}>
             <Icon.refresh size={16} /> Перезапустить веб-клиент
           </button>
           <button className="btn text" onClick={doLock} style={{ marginLeft: 'auto' }}>
@@ -437,39 +554,51 @@ function SystemSection({ admin, system }: { admin: SettingsState['admin']; syste
       {progress && (
         <div className="sys-scrim">
           <div className="sys-dialog">
-            <h3>Обновление сервисов</h3>
-            <div className="sub">{progress.finished ? 'Готово' : 'Выполняется последовательно…'}</div>
-            <div className="prog-bar">
-              <span style={{ width: `${Math.round((progress.done / progress.total) * 100)}%` }} />
+            <h3>{progress.title}</h3>
+            <div className="sub">
+              {progress.job.state === 'Queued'
+                ? 'Задача поставлена в очередь…'
+                : progress.job.state === 'Running'
+                ? 'Выполняется последовательно…'
+                : progress.job.state === 'Completed'
+                ? 'Готово'
+                : 'Завершено с ошибкой'}
             </div>
-            <div className="prog-list">
-              {progress.items.map((it) => (
-                <div key={it.svc} className={'prog-item ' + it.state}>
-                  <span className="pi">
-                    {it.state === 'current' ? <span className="spin" /> : it.state === 'done' ? <Icon.check size={18} /> : it.state === 'error' ? <Icon.x size={18} /> : <Icon.clock size={16} />}
-                  </span>
-                  <span>{SVC_LABELS[it.svc] || it.svc}</span>
+            {(() => {
+              const total = progress.job.steps.length;
+              const done = progress.job.steps.filter((step) => step.state === 'Completed' || step.state === 'Failed').length;
+              const width = total ? Math.round((done / total) * 100) : 0;
+              return (
+                <div className="prog-bar">
+                  <span style={{ width: `${width}%` }} />
                 </div>
-              ))}
+              );
+            })()}
+            <div className="prog-list">
+              {progress.job.steps.map((step) => {
+                const stateClass = step.state === 'InProgress' ? 'current' : step.state === 'Completed' ? 'done' : step.state === 'Failed' ? 'error' : 'pending';
+                return (
+                <div key={step.service} className={'prog-item ' + stateClass}>
+                  <span className="pi">
+                    {step.state === 'InProgress' ? <span className="spin" /> : step.state === 'Completed' ? <Icon.check size={18} /> : step.state === 'Failed' ? <Icon.x size={18} /> : <Icon.clock size={16} />}
+                  </span>
+                  <span>
+                    {SVC_LABELS[step.service] || step.service}
+                    {step.message && <small className="prog-message">{step.message}</small>}
+                    {step.rolledBack && <small className="prog-rollback">Выполнен откат</small>}
+                  </span>
+                </div>
+                );
+              })}
             </div>
-            {progress.finished && (
+            {progress.job.error && <div className="prog-error">{progress.job.error}</div>}
+            {(progress.job.state === 'Completed' || progress.job.state === 'Failed') && (
               <div className="dlg-actions">
                 <button className="btn" onClick={() => setProgress(null)}>
                   Закрыть
                 </button>
               </div>
             )}
-          </div>
-        </div>
-      )}
-
-      {overlay && (
-        <div className="upd-overlay">
-          <div className="big-spin" />
-          <h2>{overlay.title}</h2>
-          <p>Загрузка нового образа и пересоздание контейнера. Проверяем доступность каждые 3 секунды — страница перезагрузится сама.</p>
-          <div className="timer">
-            <Icon.clock size={16} /> {overlay.seconds} сек
           </div>
         </div>
       )}
