@@ -97,6 +97,11 @@ self-update старой установки helper сам подключает v
   с `Pending/InProgress/Completed/Failed/Skipped`, диагностикой, rollback и `requiresReconnect`;
 - `POST /api/system/web/update-self`, `POST /api/system/web/restart-self`.
 
+При чтении статуса Web поле `docker ps .Image` может содержать короткий ID образа вместо
+registry-ссылки. В этом случае `DockerRegistryService` использует reference из Compose и
+получает digest по каноническому репозиторию, поэтому SemVer и канал остаются доступны
+даже для контейнеров, созданных по ID или digest.
+
 ## UI
 
 `ClientApp/src/pages/SettingsPage.tsx` (`SystemSection`) показывает адаптивную таблицу/карточки:

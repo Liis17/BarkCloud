@@ -101,7 +101,8 @@ public static class SystemEndpoints
             var snapshot = await docker.GetServicesStatusAsync();
             var runningByService = snapshot.Services.ToDictionary(
                 service => service.Service,
-                service => ComposeImageService.BranchFromImage(service.Image),
+                service => ComposeImageService.BranchFromImage(service.Image)
+                    ?? (images.TryGetValue(service.ComposeService, out var composeImage) ? composeImage.Branch : null),
                 StringComparer.OrdinalIgnoreCase);
             var branchInfo = images.Values
                 .Select(image => new
@@ -293,9 +294,11 @@ public static class SystemEndpoints
         var services = await Task.WhenAll(snapshot.Services.Select(async service =>
         {
             composeImages.TryGetValue(service.ComposeService, out var composeImage);
-            var image = !string.IsNullOrWhiteSpace(service.Image)
-                ? service.Image
-                : composeImage is null ? null : ComposeImageService.ImageReference(composeImage);
+            var composeReference = composeImage is null ? null : ComposeImageService.ImageReference(composeImage);
+            var image = DockerRegistryService.ResolveImageReference(service.Image, composeReference);
+            var imageDigest = service.ImageDigest;
+            if (image is not null && !string.Equals(image, service.Image, StringComparison.OrdinalIgnoreCase))
+                imageDigest = await docker.GetContainerImageDigestAsync(service.Container, image);
             var version = service.State == "unavailable"
                 ? new ImageVersionStatus
                 {
@@ -303,7 +306,7 @@ public static class SystemEndpoints
                     Tag = composeImage?.Tag,
                     State = ImageVersionState.Unknown,
                 }
-                : await registry.GetVersionStatusAsync(image, service.ImageDigest);
+                : await registry.GetVersionStatusAsync(image, imageDigest);
 
             // Если контейнер отсутствует, показываем канал из Compose — именно его обновит очередь.
             if (version.Branch is null && composeImage is not null)

@@ -197,6 +197,20 @@ public sealed class DockerRegistryService
         return true;
     }
 
+    /// <summary>
+    /// Возвращает ссылку на образ для проверки реестра. Docker может вернуть в поле
+    /// <c>Image</c> только короткий ID, если контейнер был создан по digest или без тега;
+    /// в этом случае используем каноническую ссылку из Compose.
+    /// </summary>
+    public static string? ResolveImageReference(string? runtimeImage, string? composeImage)
+    {
+        if (TryParseImageReference(runtimeImage, out _))
+            return runtimeImage;
+        if (TryParseImageReference(composeImage, out _))
+            return composeImage;
+        return runtimeImage ?? composeImage;
+    }
+
     public static string RepositoryForBranch(string baseRepository, string branch) => branch switch
     {
         "nightly" => $"{baseRepository}-nightly",
