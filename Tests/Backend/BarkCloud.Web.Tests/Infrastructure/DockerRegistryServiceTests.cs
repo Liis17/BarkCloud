@@ -97,6 +97,46 @@ public sealed class DockerRegistryServiceTests
     }
 
     [Fact]
+    public async Task GetVersionStatusAsync_MatchesIndexDigestWithoutFetchingChildManifest()
+    {
+        var service = CreateService(request => request.RequestUri?.AbsolutePath switch
+        {
+            "/v2/barkcloud-web/tags/list" => Response("{\"tags\":[\"1.0.4\"]}"),
+            "/v2/barkcloud-web/manifests/1.0.4" => ManifestIndex(
+                "sha256:index-1.0.4", "sha256:platform-manifest-1.0.4"),
+            "/v2/barkcloud-web/manifests/sha256:platform-manifest-1.0.4" =>
+                new HttpResponseMessage(HttpStatusCode.InternalServerError),
+            _ => new HttpResponseMessage(HttpStatusCode.NotFound),
+        });
+
+        var result = await service.GetVersionStatusAsync(
+            "docker.barkfluff.com/barkcloud-web:latest",
+            "sha256:index-1.0.4");
+
+        result.CurrentVersion.Should().Be("1.0.4");
+        result.State.Should().Be(ImageVersionState.Ready);
+    }
+
+    [Fact]
+    public async Task GetVersionStatusAsync_MatchesShortDockerConfigId()
+    {
+        var service = CreateService(request => request.RequestUri?.AbsolutePath switch
+        {
+            "/v2/barkcloud-web/tags/list" => Response("{\"tags\":[\"1.0.4\"]}"),
+            "/v2/barkcloud-web/manifests/1.0.4" => ManifestWithConfig(
+                "sha256:manifest-1.0.4", "sha256:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"),
+            _ => new HttpResponseMessage(HttpStatusCode.NotFound),
+        });
+
+        var result = await service.GetVersionStatusAsync(
+            "docker.barkfluff.com/barkcloud-web:latest",
+            "1234567890ab");
+
+        result.CurrentVersion.Should().Be("1.0.4");
+        result.State.Should().Be(ImageVersionState.Ready);
+    }
+
+    [Fact]
     public async Task GetVersionStatusAsync_DerivesInstalledVersionFromDigestReference()
     {
         var service = CreateService(request => request.RequestUri?.AbsolutePath switch
