@@ -64,6 +64,14 @@ public class TrashPurgeService : ITrashPurgeService
                 .Where(f => f.OwnerId == pair.OwnerId && f.FileId == pair.FileId)
                 .ExecuteDeleteAsync(cancellationToken);
 
+            await _context.FileSearchAliases
+                .Where(a => a.OwnerId == pair.OwnerId && a.FileId == pair.FileId)
+                .ExecuteDeleteAsync(cancellationToken);
+
+            await _context.FileTags
+                .Where(t => t.OwnerId == pair.OwnerId && t.FileId == pair.FileId)
+                .ExecuteDeleteAsync(cancellationToken);
+
             await _context.ShareLinks
                 .Where(s => s.OwnerId == pair.OwnerId && s.FileId == pair.FileId)
                 .ExecuteDeleteAsync(cancellationToken);

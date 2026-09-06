@@ -233,7 +233,9 @@ export function FilesPage() {
   const navigate = useNavigate();
   const navState = (location.state || {}) as { stack?: { id: string; name: string }[]; selectEntryId?: string };
   const searchQuery = (new URLSearchParams(location.search).get('q') || '').trim();
-  const [stack, setStack] = React.useState<{ id: string; name: string }[]>(navState.stack || []);
+  const directDirectoryId = new URLSearchParams(location.search).get('dir') || '';
+  const smartFolderId = new URLSearchParams(location.search).get('smart') || '';
+  const [stack, setStack] = React.useState<{ id: string; name: string }[]>(navState.stack || (directDirectoryId ? [{ id: directDirectoryId, name: 'Папка' }] : []));
   const pendingSelect = React.useRef<string | null>(navState.selectEntryId || null);
   const [listing, setListing] = React.useState<Listing | null>(null);
   const [sel, setSel] = React.useState<Entry | null>(null);
@@ -310,6 +312,9 @@ export function FilesPage() {
       });
   }, [currentDir, searchQuery, toast, fsel.clear]);
   React.useEffect(load, [load]);
+  React.useEffect(() => {
+    if (directDirectoryId && directDirectoryId !== currentDir) setStack([{ id: directDirectoryId, name: 'Папка' }]);
+  }, [directDirectoryId, currentDir]);
   const loadRef = React.useRef(load);
   loadRef.current = load;
   React.useEffect(() => { loadRef.current(); }, [attachVersion]);
@@ -331,6 +336,12 @@ export function FilesPage() {
   React.useEffect(() => {
     loadSmartFolders();
   }, [loadSmartFolders]);
+  React.useEffect(() => {
+    if (!smartFolderId || !smartFolders.length) return;
+    const folder = smartFolders.find((item) => item.id === smartFolderId);
+    if (folder) setOpenSmart(folder);
+    else toast('Умная папка больше недоступна', 'err');
+  }, [smartFolderId, smartFolders, toast]);
   React.useEffect(() => {
     membership.ensureLoaded();
     // eslint-disable-next-line react-hooks/exhaustive-deps

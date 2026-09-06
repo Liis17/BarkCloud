@@ -31,3 +31,7 @@ Parent: [[index]]
 ## Зависимости
 
 - Используется: всеми Backend-микросервисами (зависимость в их `.csproj`) и Shared.Queue/Shared.Exceptions при необходимости
+
+## Поисковые контракты
+
+`files_api.proto` содержит `SearchApi`: `Search` (секции с отдельными limit/cursor), `ResolveHit`, `GetFileSearchMetadata`, `ReplaceFileSearchMetadata`; общие типы — `SearchSection`, `SearchHitKind`, `SearchHit`. `torrent_api.proto` содержит cursor-RPC `SearchTorrents`. Оба сервиса требуют пользовательский JWT.

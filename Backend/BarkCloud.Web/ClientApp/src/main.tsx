@@ -16,6 +16,7 @@ import { FavoritesPage } from './pages/FavoritesPage';
 import { TrashPage } from './pages/TrashPage';
 import { SharedPage } from './pages/SharedPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { SearchPage } from './pages/SearchPage';
 import { PublicViewPage } from './pages/PublicViewPage';
 import { PublicFolderPage } from './pages/PublicFolderPage';
 import { PublicAlbumPage } from './pages/PublicAlbumPage';
@@ -45,6 +46,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             <Route path="trash" element={<TrashPage />} />
             <Route path="shared" element={<SharedPage />} />
             <Route path="settings" element={<SettingsPage />} />
+            <Route path="search" element={<SearchPage />} />
             <Route path="*" element={<Navigate to="/photos" replace />} />
           </Route>
         </Routes>

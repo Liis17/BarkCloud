@@ -132,6 +132,8 @@ export interface FileInfo extends CardFile {
   previewCount?: number;
   uploadDeviceName?: string;
   metadata?: FileMetadata | null;
+  searchAlias?: string;
+  tags?: string[];
 }
 
 /** Событие истории файла (GET /api/files/activity). */

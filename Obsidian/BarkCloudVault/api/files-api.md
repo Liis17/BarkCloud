@@ -196,6 +196,12 @@ Messages: `ResolveShareRequest { token; }` → `ResolveShareResponse { found; fi
 - Загрузка изображений бейджей и постеров
 - Прямая HTTP-стримовая загрузка/скачивание — есть только `FilesController` (без proto-описания)
 
+## SearchApi
+
+`Search(SearchRequest)` принимает нормализуемый запрос и повторяемые `SearchSectionPage { section, limit, cursor }`, возвращает по каждой секции `SearchSectionResult { hits, next_cursor, has_more }`. `SearchHit` содержит стабильную пару `kind/id`, file/entry reference, данные карточки, избранность и поле совпадения.
+
+`ResolveHit(SearchHitReference)` заново проверяет право доступа. `GetFileSearchMetadata(file_id)` и `ReplaceFileSearchMetadata(file_id, alias, tags)` доступны только владельцу файла; пустой алиас удаляет его, а набор тегов заменяется целиком.
+
 `UploadFileType`: `Unknown=0`, `UserAvatar=1`, `CloudFile=2` (`CLOUD_FILE = 2` в proto enum).
 
 ## Типизированные ошибки

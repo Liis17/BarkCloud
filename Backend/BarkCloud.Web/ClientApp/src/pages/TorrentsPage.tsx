@@ -1,4 +1,5 @@
 import React from 'react';
+import { useLocation } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import { Modal } from '../components/ui/Modal';
 import { EmptyState } from '../components/ui/EmptyState';
@@ -88,9 +89,13 @@ function FilesPanel({ torrent, onToast }: { torrent: Torrent; onToast: (m: strin
   );
 }
 
-function TorrentRow({ t, onToast }: { t: Torrent; onToast: (m: string, k?: 'ok' | 'err') => void }) {
+function TorrentRow({ t, onToast, forceOpen = false }: { t: Torrent; onToast: (m: string, k?: 'ok' | 'err') => void; forceOpen?: boolean }) {
   const [open, setOpen] = React.useState(false);
   const paused = t.status === 'paused';
+
+  React.useEffect(() => {
+    if (forceOpen) setOpen(true);
+  }, [forceOpen]);
 
   const act = (fn: Promise<unknown>, ok?: string) =>
     fn.then(() => ok && onToast(ok)).catch((e) => onToast((e as Error).message, 'err'));
@@ -175,6 +180,8 @@ function AddModal({ onClose, onToast }: { onClose: () => void; onToast: (m: stri
 }
 
 export function TorrentsPage() {
+  const location = useLocation();
+  const openTorrentId = new URLSearchParams(location.search).get('open') || '';
   const { torrents } = useTorrentStream();
   const [toastNode, push] = useToast();
   const [adding, setAdding] = React.useState(false);
@@ -192,7 +199,7 @@ export function TorrentsPage() {
     <div style={{ padding: 16, maxWidth: 1100, margin: '0 auto' }}>
       {torrents.length === 0
         ? <EmptyState icon="torrent" title="Нет торрентов" hint="Добавьте magnet-ссылку или .torrent-файл" />
-        : torrents.map((t) => <TorrentRow key={t.id} t={t} onToast={push} />)}
+        : torrents.map((t) => <TorrentRow key={t.id} t={t} onToast={push} forceOpen={t.id === openTorrentId} />)}
 
       {adding && <AddModal onClose={() => setAdding(false)} onToast={push} />}
       {toastNode}

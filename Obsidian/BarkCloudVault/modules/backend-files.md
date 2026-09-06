@@ -156,4 +156,10 @@ Parent: [[index]] · See also: [[api/files-api]] · [[modules/backend-files-clou
 - Образ Files содержит бинарь `ffmpeg`/`ffprobe` (COPY из `mwader/static-ffmpeg` в `Dockerfile`/`Dockerfile.slim`)
 - В Dockerfile Files publish-артефакты и `ffmpeg`/`ffprobe` раскладываются по отдельным слоям (`runtimes`, `logs`, root publish, оба бинаря), чтобы push через registry не упирался в лимит размера одного upload-запроса.
 - Runtime-образ Files — `mcr.microsoft.com/dotnet/aspnet:10.0-noble` с установленным `libgssapi-krb5-2`: Npgsql/EF при миграциях может загружать GSSAPI, а `noble-chiseled` не содержит `libgssapi_krb5.so.2`
+
+## Единый поиск
+
+`SearchApiService` вызывает `UnifiedSearchService` для всех личных разделов поиска. Сервис нормализует Unicode NFKC, пробелы и регистр, классифицирует один файл ровно в одну основную группу (`Фото`/`Видео`/`Музыка`/`Файлы`), ранжирует exact → prefix → substring → trigram-like typo и выдаёт opaque keyset-курсор. `ResolveHit` повторно авторизует deeplink.
+
+Личные метаданные поиска лежат в `FileSearchAliases` и `FileTags`: ключ включает `OwnerId`, поэтому алиасы и теги не уходят получателю shared-доступа. `ReplaceFileSearchMetadata` атомарно заменяет один алиас (≤120) и до 20 тегов (≤50); `TrashPurgeService` и `UserDeletedConsumer` явно чистят строки. Миграция `20260906150936_AddFileSearchMetadata` включает `pg_trgm` и GIN-индексы для новых таблиц и создаёт trigram-индексы крупных именных таблиц concurrently.
 - Тесно связан с MinIO (см. [[structure/infrastructure]])

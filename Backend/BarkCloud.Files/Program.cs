@@ -87,6 +87,7 @@ public class Program
         builder.Services.AddScoped<AlbumViewBuilder>();
         builder.Services.AddScoped<DynamicFolderViewBuilder>();
         builder.Services.AddScoped<MusicLibraryService>();
+        builder.Services.AddScoped<UnifiedSearchService>();
         builder.Services.AddScoped<ITrashPurgeService, TrashPurgeService>();
         builder.Services.AddSingleton<IPhysicalStorageStatsProvider, PhysicalStorageStatsProvider>();
         builder.Services.AddHostedService<TempFileCleanupService>();
@@ -155,6 +156,7 @@ public class Program
         app.MapGrpcService<AlbumApiService>();
         app.MapGrpcService<MusicApiService>();
         app.MapGrpcService<DynamicFolderApiService>();
+        app.MapGrpcService<SearchApiService>();
 
         app.Lifetime.ApplicationStopped.Register(Log.CloseAndFlush);
         app.Run();

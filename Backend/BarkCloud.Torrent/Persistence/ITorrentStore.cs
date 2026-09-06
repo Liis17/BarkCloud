@@ -6,6 +6,8 @@ public interface ITorrentStore
 {
     Task<List<TorrentEntity>> ListByUser(long userId);
 
+    Task<List<TorrentEntity>> SearchByUser(long userId, string query, CancellationToken cancellationToken = default);
+
     Task<List<TorrentEntity>> ListAll();
 
     Task<TorrentEntity?> Get(Guid id, long userId);

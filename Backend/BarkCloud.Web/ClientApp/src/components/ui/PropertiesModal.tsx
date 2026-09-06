@@ -1,6 +1,6 @@
 import React from 'react';
 import { Modal } from './Modal';
-import { apiGet } from '../../lib/api';
+import { apiGet, apiPut } from '../../lib/api';
 import { fmtFull, kindRu } from '../../lib/format';
 import type { CardFile, FileActivity, FileInfo, FileMetadata, MediaItem, Page } from '../../lib/types';
 
@@ -72,6 +72,8 @@ export function PropertiesModal({ fileId, fallback, onClose }: PropertiesModalPr
         ))}
       </div>
 
+      {info && <SearchMetadataEditor fileId={fileId} initialAlias={info.searchAlias || ''} initialTags={info.tags || []} />}
+
       {metaRows.length > 0 && (
         <>
           <div className="prop-section">Метаданные</div>
@@ -110,6 +112,80 @@ export function PropertiesModal({ fileId, fallback, onClose }: PropertiesModalPr
         </div>
       )}
     </Modal>
+  );
+}
+
+function SearchMetadataEditor({ fileId, initialAlias, initialTags }: { fileId: string; initialAlias: string; initialTags: string[] }) {
+  const [alias, setAlias] = React.useState(initialAlias);
+  const [tags, setTags] = React.useState(initialTags);
+  const [tag, setTag] = React.useState('');
+  const [saving, setSaving] = React.useState(false);
+  const [message, setMessage] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    setAlias(initialAlias);
+    setTags(initialTags);
+    setTag('');
+    setMessage(null);
+  }, [fileId, initialAlias, initialTags]);
+
+  function addTags(value: string) {
+    const incoming = value.split(',').map((item) => item.trim()).filter(Boolean);
+    if (!incoming.length) return;
+    const merged = [...tags];
+    for (const item of incoming) {
+      if (item.length > 50 || merged.some((existing) => existing.localeCompare(item, undefined, { sensitivity: 'accent' }) === 0)) continue;
+      if (merged.length < 20) merged.push(item);
+    }
+    setTags(merged);
+    setTag('');
+  }
+
+  async function save() {
+    setSaving(true);
+    setMessage(null);
+    try {
+      const saved = await apiPut<{ alias: string; tags: string[] }>(`/api/files/${encodeURIComponent(fileId)}/search-metadata`, { alias: alias.trim(), tags });
+      setAlias(saved.alias || '');
+      setTags(saved.tags || []);
+      setMessage('Сохранено');
+    } catch (e) {
+      setMessage((e as Error).message || 'Не удалось сохранить');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <section className="prop-search-meta">
+      <div className="prop-section">Поиск</div>
+      <label className="prop-search-label">
+        <span>Имя для поиска</span>
+        <input value={alias} maxLength={120} onChange={(e) => setAlias(e.target.value)} placeholder="Например, Настя" />
+        <small>Настоящее имя файла не изменится.</small>
+      </label>
+      <label className="prop-search-label">
+        <span>Теги</span>
+        <div className="prop-tag-list">
+          {tags.map((item) => <button type="button" className="prop-tag" key={item.toLocaleLowerCase()} onClick={() => setTags(tags.filter((tagValue) => tagValue !== item))}>{item} ×</button>)}
+        </div>
+        <input
+          value={tag}
+          maxLength={50}
+          placeholder="Добавить тег"
+          onChange={(e) => setTag(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addTags(tag); }
+          }}
+          onBlur={() => addTags(tag)}
+        />
+        <small>Добавляйте Enter или запятой, максимум 20 тегов.</small>
+      </label>
+      <div className="prop-search-actions">
+        <button className="btn outlined" type="button" disabled={saving} onClick={save}>{saving ? 'Сохраняем…' : 'Сохранить'}</button>
+        {message && <span className={message === 'Сохранено' ? 'prop-search-ok' : 'prop-err'}>{message}</span>}
+      </div>
+    </section>
   );
 }
 

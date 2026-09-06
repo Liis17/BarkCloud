@@ -421,13 +421,13 @@ namespace BarkCloud.Files.Persistence.Migrations
                     b.Property<double?>("Altitude")
                         .HasColumnType("double precision");
 
-                    b.Property<string>("AudioCodec")
-                        .HasColumnType("text");
-
                     b.Property<string>("AudioAlbum")
                         .HasColumnType("text");
 
                     b.Property<string>("AudioArtist")
+                        .HasColumnType("text");
+
+                    b.Property<string>("AudioCodec")
                         .HasColumnType("text");
 
                     b.Property<string>("AudioTitle")
@@ -542,6 +542,65 @@ namespace BarkCloud.Files.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("FilePreviews");
+                });
+
+            modelBuilder.Entity("BarkCloud.Files.Domain.FileSearchAlias", b =>
+                {
+                    b.Property<long>("OwnerId")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("FileId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("NormalizedValue")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.HasKey("OwnerId", "FileId");
+
+                    b.HasIndex("FileId");
+
+                    b.HasIndex("OwnerId", "NormalizedValue");
+
+                    b.ToTable("FileSearchAliases");
+                });
+
+            modelBuilder.Entity("BarkCloud.Files.Domain.FileTag", b =>
+                {
+                    b.Property<long>("OwnerId")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("FileId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("NormalizedValue")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.HasKey("OwnerId", "FileId", "NormalizedValue");
+
+                    b.HasIndex("FileId");
+
+                    b.HasIndex("OwnerId", "NormalizedValue");
+
+                    b.ToTable("FileTags");
                 });
 
             modelBuilder.Entity("BarkCloud.Files.Domain.FolderShareLink", b =>
@@ -821,6 +880,24 @@ namespace BarkCloud.Files.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("UploadedFiles");
+                });
+
+            modelBuilder.Entity("BarkCloud.Files.Domain.FileSearchAlias", b =>
+                {
+                    b.HasOne("BarkCloud.Files.Domain.UploadFile", null)
+                        .WithMany()
+                        .HasForeignKey("FileId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("BarkCloud.Files.Domain.FileTag", b =>
+                {
+                    b.HasOne("BarkCloud.Files.Domain.UploadFile", null)
+                        .WithMany()
+                        .HasForeignKey("FileId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 #pragma warning restore 612, 618
         }

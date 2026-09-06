@@ -1,5 +1,5 @@
 import React from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import { MediaThumb } from '../components/media/MediaThumb';
 import { Lightbox } from '../components/media/Lightbox';
@@ -14,6 +14,7 @@ import { usePageHeader } from '../hooks/usePageHeader';
 import { useUploadActions } from '../hooks/useUploadManager';
 import { apiGet, pickFiles } from '../lib/api';
 import { plural, dateLabel, groupByDate } from '../lib/format';
+import { searchHitToCardFile, type SearchHit } from '../lib/search';
 import type { Album, MediaItem, VideoMeta } from '../lib/types';
 
 function fmtSize(bytes: number): string {
@@ -132,13 +133,31 @@ function VideoCard({ m, selecting, checked, onToggle, onOpen, onMenu }: {
 
 export function VideosPage() {
   const location = useLocation();
+  const navigate = useNavigate();
   const searchQuery = (new URLSearchParams(location.search).get('q') || '').trim();
+  const openFileId = new URLSearchParams(location.search).get('open') || '';
   const [albums, setAlbums] = React.useState<Album[] | null>(null);
   const [lightbox, setLightbox] = React.useState<number | null>(null);
+  const [deepMedia, setDeepMedia] = React.useState<MediaItem | null>(null);
+  const resolvedOpenId = React.useRef('');
   const [toastNode, toast] = useToast();
   const { enqueue, attachVersion } = useUploadActions();
 
   const { items: videos, loading, done, sentinelRef, removeItem, updateItem, prependItems } = useInfiniteMedia('video', toast);
+
+  React.useEffect(() => {
+    if (!openFileId || resolvedOpenId.current === openFileId) return;
+    const index = videos.findIndex((item) => item.id === openFileId);
+    if (index >= 0) {
+      resolvedOpenId.current = openFileId;
+      setLightbox(index);
+      return;
+    }
+    resolvedOpenId.current = openFileId;
+    apiGet<SearchHit>(`/api/search/hit?kind=video&id=${encodeURIComponent(openFileId)}`)
+      .then((hit) => setDeepMedia({ ...searchHitToCardFile(hit), entriesCount: 0, entryNames: [], entryIds: [] }))
+      .catch((e) => { toast((e as Error).message || 'Видео больше недоступно', 'err'); navigate('/videos', { replace: true }); });
+  }, [openFileId, videos, toast, navigate]);
 
   const loadAlbums = React.useCallback(() => {
     apiGet<{ albums: Album[] }>('/api/albums')
@@ -334,6 +353,7 @@ export function VideosPage() {
       </div>
 
       {lightbox !== null && <Lightbox items={videos} index={lightbox} actions={actionsCtx.api} onClose={() => setLightbox(null)} />}
+      {deepMedia && <Lightbox media={deepMedia} actions={actionsCtx.api} onClose={() => { setDeepMedia(null); navigate('/videos', { replace: true }); }} />}
     </>
   );
 }
