@@ -82,12 +82,12 @@ public class DownloadFileCommandHandler : IRequestHandler<DownloadFileCommand, D
         var storedFileName = file.Filename ?? string.Empty;
         var contentType = storedFileName.GetContentType();
         var extension = Path.GetExtension(storedFileName).ToLowerInvariant();
-        var bucketName = _bucketRegistry.GetBucketName(file.Type);
+        var storageProfileId = _bucketRegistry.ResolveReadProfileId(file);
 
         _logger.LogDebug(
             "Скачивание файла {FileId} из S3. Bucket: {BucketName}, Размер: {FileSize} байт",
             file.Id,
-            bucketName,
+            storageProfileId,
             file.Size
         );
 
@@ -106,7 +106,7 @@ public class DownloadFileCommandHandler : IRequestHandler<DownloadFileCommand, D
 
             if (start <= end)
             {
-                var rangeStream = await _s3Uploader.DownloadRangeAsync(bucketName, $"{file.Id}", start, end);
+                var rangeStream = await _s3Uploader.DownloadRangeAsync(storageProfileId, $"{file.Id}", start, end);
 
                 // Длина диапазона — из ответа S3 (ContentLength), а не из метаданных БД:
                 // это исключает рассинхрон Content-Length с реально отдаваемыми байтами.
@@ -131,7 +131,7 @@ public class DownloadFileCommandHandler : IRequestHandler<DownloadFileCommand, D
         }
 
         var fileStream = await _s3Uploader.DownloadAsync(
-            bucketName,
+            storageProfileId,
             $"{file.Id}"
         );
 

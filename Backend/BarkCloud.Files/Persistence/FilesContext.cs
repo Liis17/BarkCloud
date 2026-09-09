@@ -61,6 +61,10 @@ public class FilesContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<UploadFile>()
+            .Property(file => file.StorageProfileId)
+            .IsRequired();
+
         modelBuilder.Entity<TempFile>()
             .HasIndex(x => x.OriginalFileId);
 

@@ -187,16 +187,16 @@ public class TrashPurgeService : ITrashPurgeService
         var deleted = new List<UploadFile>();
         foreach (var f in orphans)
         {
-            var bucket = _bucketRegistry.GetBucketName(f.Type);
+            var storageProfileId = _bucketRegistry.ResolveReadProfileId(f);
             try
             {
-                await _s3.DeleteAsync(bucket, f.Id.ToString());
+                await _s3.DeleteAsync(storageProfileId, f.Id.ToString());
             }
             catch (Exception ex)
             {
                 _logger.LogWarning(ex,
                     "Не удалось удалить объект S3 (bucket={Bucket}, key={FileId}); блоб оставлен для повторной попытки",
-                    bucket, f.Id);
+                    storageProfileId, f.Id);
                 continue;
             }
 

@@ -22,6 +22,11 @@ public class UploadFile
     public UploadFileType Type { get; set; }
 
     /// <summary>
+    /// Stable Configuration storage profile id used for every read, range request and delete.
+    /// </summary>
+    public string StorageProfileId { get; set; } = string.Empty;
+
+    /// <summary>
     /// Категория медиа-контента (фото / видео / документ / аудио). Заполняется при загрузке
     /// по content-type. Используется для галереи и альбомов.
     /// </summary>

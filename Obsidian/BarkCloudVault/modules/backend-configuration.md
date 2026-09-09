@@ -1,69 +1,78 @@
 # Backend — Configuration
 
-Parent: [[index]] · See also: [[api/configuration-api]]
+Parent: [[index]] · See also: [[api/configuration-api]] · [[structure/infrastructure]]
 
 ## Назначение
 
-Центральный сервис хранения настроек. При старте каждого другого микросервиса (`identity`, `users`, `files`) тот обращается сюда за своей конфигурацией. Также управляет списком зарезервированных юзернеймов (`ReservedNames`), которые `Users` использует при регистрации.
+Центральный сервис настроек BarkCloud. Сохраняет package/service и имя проекта `BarkCloud.Configuration`, работает с отдельной БД `configuration` и раздаёт потребителям конфигурацию только при их старте. Live reload нет.
 
-## Расположение
+## Схема данных
 
-`Backend/BarkCloud.Configuration/`
+- `GlobalSettings`, `IdentitySettings`, `UsersSettings`, `NotificationSettings`, `FilesSettings`, `WebSettings`, `TorrentSettings` — отдельные key/value-таблицы (`Key` PK, `Value`, `EditedBy`, `EditedAt`).
+- `SettingsHistory` — предыдущие/новые значения, автор, источник, тип изменения и optional `SourceRevisionId`. Update и rollback идут в транзакции; в PostgreSQL строка блокируется `FOR UPDATE`.
+- `ReservedNames` — нормализованные lowercase-имена, одно имя на строку. Для старого Users-клиента `GetConfiguration` формирует read-only CSV-проекцию `ReservedNames:Usernames`.
+- `StorageProfiles` — версионируемые S3-профили со стабильным `ProfileId`; `StorageProfileRevisions` — их audit-журнал.
+- `ConfigurationsLegacy` — прежняя таблица после автомиграции. Runtime её не читает и не изменяет; неизвестные legacy-строки остаются в ней и выводятся warning’ом.
 
-## Файлы
+## Каталог и чтение
 
-- `Program.cs` — точка входа
-- `Domain/ConfigurationItem.cs` — доменная сущность (key/value-настройка)
-- `Host/ConfigurationApiService.cs` — реализация gRPC `ConfigurationApi`
-- `Infrastructure/ConfigurationContext.cs` — EF Core DbContext
-- `Infrastructure/ConfigurationContextFactory.cs` — фабрика контекста (для EF Tools)
-- `Infrastructure/ConfigurationSeed.cs` — эталонный список всех ожидаемых ключей (`Section`/`Key`/`ServiceId`), включая SMTP-поля `Email:*` для Notification и общий флаг `Features:RegistrationEnabled`
-- `Infrastructure/ConfigurationDefaultsPopulator.cs` — заливка дефолтных значений. `EnsureSeedAsync` при **каждом** старте сверяет таблицу с `ConfigurationSeed` и досевает только недостающие ключи (по тройке `Section/Key/ServiceId`), без дубликатов — новые ключи доезжают и в уже существующую БД. `PopulateDefaultsAsync` заполняет **пустые** записи дефолтами. Внутренние Docker-адреса используют имена production compose: `cloud-rabbitmq`, `cloud-seq`, `cloud-minio`, а межсервисные адреса — `cloud-identity`, `cloud-users`, `cloud-files`, `cloud-torrent`. SMTP-поля `Email:*` (Notification) и `ExternalEndpoint:Host` (Identity/Users/Files/Torrent) берутся из env (`.env`): email опционален (пусто → не трогаем, режим без почты), внешние адреса обязательны — вне Development пустой env даёт `InvalidOperationException` при старте (проброшен в `Program.cs`, контейнер падает). В Development внешние адреса фолбэчат на `https://{subdomain}.example.com`. Конструктор получает эти значения из `Program.cs` (`EMAIL_*`, `EXTERNAL_{IDENTITY,USERS,FILES,TORRENT}_HOST`) + флаг `requireExternalEndpoints = !IsDevelopment()`
-- `Infrastructure/ConfigurationStorage.cs` — слой доступа к данным
-- `Persistence/Migrations/20260518172647_InitialCreate.cs` — единственная миграция
-- `Dockerfile`, `Dockerfile.slim`
-- `appsettings.json`, `appsettings.Development.json`
+`Catalog/SettingsCatalog.cs` содержит строгий каталог существующих ключей и метаданные UI: тип значения, sensitive/read-only и список контейнеров для перезапуска. API не создаёт неизвестные ключи. Общие значения читаются первыми, затем настройки сервиса перекрывают их по полному `Section:Key`. Редкие существующие service override для известных global-ключей сохраняются миграцией.
 
-## Features (vertical slices)
+Typed validation ограничивает TCP-порты диапазоном `1..65535`, а длительности — положительными целыми. Источник последнего изменения для каждого ключа выбирается из `SettingsHistory` на стороне БД, без материализации всего append-only журнала.
 
-Каждая фича — `XxxCommand.cs` + `XxxCommandHandler.cs`:
+`Features:EmailEnabled` не хранится: `GetConfigurationCommandHandler` вычисляет его по полноте четырёх SMTP-полей Notification. `Features:RegistrationEnabled` хранится в `GlobalSettings`; быстрый toggle Web использует тот же API обновления.
 
-- `GetConfiguration` — отдать настройки для service_id
-- `UpdateConfiguration` — обновить значение
-- `GetReservedNames` / `AddReservedName` / `UpdateReservedName` / `DeleteReservedName` — CRUD по зарезервированным юзернеймам
+## Seed при старте
 
-## gRPC API
+`ConfigurationDefaultsPopulator` на каждом старте:
 
-Один публичный сервис — `ConfigurationApi`. Используется только серверными микросервисами, клиенту не выставляется. См. [[api/configuration-api]].
+- создаёт отсутствующие строки каталога;
+- заполняет только пустые значения из env, литерала или одноразового генератора;
+- не перезаписывает непустые/ручные значения;
+- сохраняет сгенерированный JWT secret и межсервисные токены, поэтому следующие старты стабильны;
+- оставляет SMTP пустым без `EMAIL_*`;
+- не подставляет `minioadmin`, `guest` или фиксированные dev-секреты;
+- создаёт только `universal-v1` (`cloud-universal`) при полном наборе `MINIO_*` и сразу пишет storage-revision.
 
-## Зависимости
+Вне Development обязательны внешние `EXTERNAL_*_HOST` и `CONFIGURATION_ACCESS_KEY`. Отсутствие bootstrap access key останавливает сервис до подключения к БД; в Development остаётся warning-режим interceptor’а.
 
-- Использует: `BarkCloud.Proto`, `BarkCloud.GrpcServer`, EF Core, PostgreSQL
-- Используется: всеми остальными микросервисами при старте
+## Legacy-миграция
 
-## Окружение (compose)
+`20260908120000_RebuildConfigurationSettings`:
 
-ENV переменные: `CONFIGURATION_HOST`, `CONFIGURATION_DATABASE`, `CONFIGURATION_USERNAME`, `CONFIGURATION_PASSWORD`, `CONFIGURATION_PORT` (см. [[structure/infrastructure]]).
+- переименовывает `Configurations` в `ConfigurationsLegacy`;
+- при дублях выбирает максимальные `EditedAt`, затем `Id`;
+- переносит известные строки и metadata в таблицу соответствующего сервиса;
+- создаёт `Migration`-ревизии с прежним `EditedFrom`;
+- разбирает CSV reserved names, приводит к lowercase и удаляет дубли;
+- создаёт `user-avatars-old-v1` и `cloud-files-old-v1` из прежних `S3Buckets:*`, только если профиль полный;
+- не копирует, не переименовывает и не удаляет S3-объекты.
 
-Для авто-заполнения БД на чистом старте сервис `configuration` также получает:
-- `EMAIL_HOST` / `EMAIL_PORT` / `EMAIL_SENDER_EMAIL` / `EMAIL_SENDER_PASSWORD` — SMTP (опционально; пусто → без почты).
-- `EXTERNAL_IDENTITY_HOST` / `EXTERNAL_USERS_HOST` / `EXTERNAL_FILES_HOST` / `EXTERNAL_TORRENT_HOST` — внешние адреса сервисов для клиентов (обязательны вне Development).
+Миграция транзакционна и идемпотентна через EF migrations history. EF snapshot синхронизирован; `dotnet ef migrations has-pending-model-changes` не находит расхождений.
 
-Эти ключи генерит [[modules/tools-builder]] в `.env` и продублированы в `Backend/sample.env`.
+## S3-профили
 
-## Режим без почты (Features:EmailEnabled)
+Роли: `universal`, `avatars`, `images`, `videos`, `audio`, `documents`, `other`, `previews`, а также compatibility-роли `user-avatars-old` и `cloud-files-old`.
 
-`GetConfigurationCommandHandler` подмешивает в ответ **всем** сервисам вычисляемый ключ
-`Features:EmailEnabled` (под `ServiceId.Unknown`, поэтому доезжает до Identity/Web/всех через их `LoadConfiguration`).
-Значение считается `ConfigurationStorage.IsEmailConfiguredAsync()`: `true`, только если **все 4** поля
-`Email:Host/Port/SenderEmail/SenderPassword` (под `ServiceId.Notification`) непусты; иначе `false`.
-Ключ **не хранится** в БД — всегда свежий на старте сервиса (смена SMTP требует рестарта Identity/Web).
-`ConfigurationDefaultsPopulator` заполняет секцию `Email` из env (`EMAIL_*`): если все 4 заданы — почта
-включается, если env пуст — поля остаются пустыми и деплой работает в режиме без почты (дефолт).
-Потребители флага — [[modules/backend-identity]] и [[modules/backend-web]].
+- Смена endpoint, bucket или `IsR2` активного обычного профиля создаёт следующую версию и деактивирует старую.
+- Ротация credentials обновляет все версии той же физической локации.
+- Отключение специализированной роли прекращает новые записи; версии остаются доступными для чтения.
+- Legacy-профиль никогда не активируется для новых объектов; любое исправление требует явного подтверждения.
+- Пустой secret при редактировании сохраняет текущий; частичный профиль отклоняется.
 
-## Запрет регистрации (Features:RegistrationEnabled)
+## Основные файлы
 
-`Features:RegistrationEnabled` хранится в БД как общий ключ `ServiceId.Unknown`. Миграция `AddRegistrationEnabledFlag` и `ConfigurationSeed` добавляют значение по умолчанию `true`, чтобы существующие инстансы не потеряли возможность регистрации после обновления.
+- `Infrastructure/ConfigurationContext.cs` — EF-модель всех новых таблиц.
+- `Catalog/SettingsCatalog.cs`, `SettingsValueValidator.cs` — whitelist и typed validation.
+- `Infrastructure/ConfigurationStorage.cs` — overlay, history/rollback, reserved names и compatibility-проекции.
+- `Infrastructure/StorageProfileStorage.cs` — версии, активация, disable и credential rotation.
+- `Infrastructure/ConfigurationDefaultsPopulator.cs` — идемпотентный seed.
+- `Infrastructure/ConfigurationAccessPolicy.cs` — production bootstrap-гейт.
+- `Infrastructure/LegacyConfigurationReporter.cs` — предупреждения о неизвестных legacy-ключах.
+- `Host/ConfigurationApiService.cs` — реализация [[api/configuration-api]].
 
-Флаг меняется из Web-настроек через `ConfigurationApi.UpdateConfiguration`. При `false` [[modules/backend-identity]] запрещает создание и подтверждение новых аккаунтов для всех клиентов; Web дополнительно скрывает UI регистрации на странице входа.
+## Окружение
+
+Собственная БД и bootstrap-параметры не хранятся в settings-таблицах: `CONFIGURATION_HOST`, `CONFIGURATION_DBPORT`, `CONFIGURATION_DATABASE`, `CONFIGURATION_USERNAME`, `CONFIGURATION_PASSWORD`, `CONFIGURATION_PORT`, `CONFIGURATION_ACCESS_KEY`, `ASPNETCORE_ENVIRONMENT`.
+
+Автозаполнение использует `POSTGRES_*`, `RABBITMQ_DEFAULT_*`, `MINIO_HOST/MINIO_PORT/MINIO_ROOT_USER/MINIO_ROOT_PASSWORD`, optional `EMAIL_*`, обязательные production `EXTERNAL_*_HOST` и service ports из compose.

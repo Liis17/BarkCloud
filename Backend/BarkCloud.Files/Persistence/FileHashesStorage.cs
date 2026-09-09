@@ -25,11 +25,19 @@ public class FileHashesStorage : IFileHashesStorage
     /// <summary>
     /// Gets the FileId associated with a given hash, or null if not found.
     /// </summary>
-    public async Task<Guid?> GetFileIdByHash(string hash)
+    public async Task<Guid?> GetFileIdByHash(string hash, string? storageProfileId = null)
     {
-        var fileHash = await _context.FileHashes
+        var query = _context.FileHashes
             .AsNoTracking()
-            .FirstOrDefaultAsync(x => x.Hash == hash);
+            .Where(x => x.Hash == hash);
+
+        if (!string.IsNullOrWhiteSpace(storageProfileId))
+        {
+            query = query.Where(hashRow => _context.UploadedFiles.Any(file =>
+                file.Id == hashRow.FileId && file.StorageProfileId == storageProfileId));
+        }
+
+        var fileHash = await query.FirstOrDefaultAsync();
 
         return fileHash?.FileId;
     }

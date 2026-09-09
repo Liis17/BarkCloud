@@ -6,24 +6,30 @@ Parent: [[index]] · Module: [[modules/backend-configuration]] · Proto: [[modul
 Namespace C#: `BarkCloud.Proto.Configuration`
 Package: `barkcloud.configuration`
 
-## Сервис: `ConfigurationApi`
+## Сервис `ConfigurationApi`
 
-Служебный API — вызывается другими микросервисами при старте.
+Служебный API вызывается только серверными сервисами. Каждый RPC защищён bootstrap-заголовком `x-config-access-key` из `CONFIGURATION_ACCESS_KEY` (обязателен вне Development).
 
 | RPC | Назначение |
 |-----|-----------|
-| `GetConfiguration(GetConfigurationRequest) → GetConfigurationResponse` | Получить настройки сервиса по `service_id` |
-| `UpdateConfiguration(UpdateConfigurationRequest) → UpdateConfigurationResponse` | Обновить значение настройки |
-| `GetReservedNames(GetReservedNamesRequest) → GetReservedNamesResponse` | Список зарезервированных юзернеймов |
-| `AddReservedName(AddReservedNameRequest) → AddReservedNameResponse` | Добавить зарезервированное имя |
-| `UpdateReservedName(UpdateReservedNameRequest) → UpdateReservedNameResponse` | Обновить |
-| `DeleteReservedName(DeleteReservedNameRequest) → DeleteReservedNameResponse` | Удалить |
+| `GetConfiguration` | Global + service overlay для одного потребителя; также compatibility-проекции и вычисляемый `Features:EmailEnabled` |
+| `UpdateConfiguration` | Обновить существующий ключ строгого каталога |
+| `GetReservedNames` / `AddReservedName` / `UpdateReservedName` / `DeleteReservedName` | CRUD нормализованных reserved names |
+| `GetAllConfigurations` | Все settings-таблицы с metadata для админского Web |
+| `GetConfigurationHistory` | История одного ключа |
+| `RollbackConfiguration` | Транзакционный откат к `PreviousValue` выбранной ревизии |
+| `GetStorageProfiles` | Все версии S3-профилей; optional audit metadata |
+| `SaveStorageProfile` | Создание версии, legacy correction или credentials rotation |
+| `ActivateStorageProfile` | Выбор версии для новых записей роли |
+| `DisableStorageRole` | Отключение специализированной роли для новых записей |
 
-## Поля
+Исходные номера старых RPC и полей сохранены; новые поля `ConfigurationItem` добавлены совместимо: `is_sensitive`, `has_value`, `is_read_only`, `value_kind`, `restart_targets`.
 
-- `GetConfigurationRequest.service_id: int32` — идентификатор сервиса (см. [[modules/shared-identity]] · `ServiceId.cs`)
+`StorageProfileItem` внутри доверенного service-to-service канала содержит credentials, нужные Files при старте. Web никогда не проксирует raw secret браузеру: [[modules/backend-web]] преобразует ответ в masked DTO.
 
 ## Использование
 
-- `Users` дёргает `GetReservedNames` через [[modules/backend-users]] · `ReservedUsernamesService.cs`
-- Все микросервисы дёргают `GetConfiguration` при старте через переменную `CONFIGURATION_SERVICE_URL`
+- Все сервисы вызывают `GetConfiguration` при старте через `LoadConfiguration` и `CONFIGURATION_SERVICE_URL`.
+- Files дополнительно вызывает `GetStorageProfiles` и индексирует registry по `ProfileId`; live reload не используется.
+- Старый Files-клиент получает `S3Buckets:user-avatars` и `S3Buckets:cloud-files` как проекцию legacy-профилей.
+- Users пока получает `ReservedNames:Usernames` как CSV-проекцию новой таблицы.

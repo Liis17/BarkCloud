@@ -102,11 +102,12 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
         // Классифицируем медиа (фото / видео / документ / аудио) для галереи и альбомов
         file.MediaKind = request.FileName.GetMediaKind();
 
-        // Получаем имя бакета в зависимости от типа файла
-        var bucketName = _bucketRegistry.GetBucketName(file.Type);
+        var storageProfileId = _bucketRegistry.ResolveWriteProfileId(file.Type, file.MediaKind, isPreview: false);
+        var previewProfileId = _bucketRegistry.ResolveWriteProfileId(file.Type, file.MediaKind, isPreview: true);
+        file.StorageProfileId = storageProfileId;
 
-        _logger.LogInformation("Загрузка файла {FileName} с типом {ContentType} в бакет {BucketName}",
-            request.FileName, contentType, bucketName);
+        _logger.LogInformation("Загрузка файла {FileName} с типом {ContentType} через S3-профиль {StorageProfileId}",
+            request.FileName, contentType, storageProfileId);
 
         long fileSize = request.FileSize > 0 ? request.FileSize : request.FileStream.Length;
 
@@ -438,7 +439,7 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
 
             // 3) Грузим оригинал в S3
             var etag = await _s3Uploader.UploadAsync(
-                bucketName,
+                storageProfileId,
                 $"{file.Id}",
                 originalStream,
                 contentType
@@ -465,7 +466,7 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
             try
             {
                 file.JpegViewFileId = await _previewPersistence.PersistJpegViewAsync(
-                    file, jpegViewBytes, file.ImageWidth ?? 0, file.ImageHeight ?? 0, bucketName, cancellationToken);
+                    file, jpegViewBytes, file.ImageWidth ?? 0, file.ImageHeight ?? 0, previewProfileId, cancellationToken);
             }
             catch (Exception ex)
             {
@@ -488,7 +489,7 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
         // 4) Поднимаем превью в S3 + дедуп + FilePreview-связки
         if (generatedPreviews is { Count: > 0 })
         {
-            await _previewPersistence.PersistPreviewsAsync(file, generatedPreviews, bucketName, cancellationToken);
+            await _previewPersistence.PersistPreviewsAsync(file, generatedPreviews, previewProfileId, cancellationToken);
         }
 
         // 5) Метаданные блоба. Сохраняем только для CloudFile (для аватаров не имеет смысла).

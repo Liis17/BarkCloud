@@ -16,6 +16,10 @@ public class Program
     {
         var builder = WebApplication.CreateBuilder(args);
 
+        ConfigurationAccessPolicy.EnsureConfigured(
+            builder.Environment.IsDevelopment(),
+            builder.Configuration["CONFIGURATION_ACCESS_KEY"]);
+
         builder.AddBarkCloudSerilog("BarkCloud.Configuration");
         builder.Services.AddBarkCloudMetrics("BarkCloud.Configuration");
 
@@ -71,6 +75,7 @@ public class Program
         builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssemblyContaining<Program>());
 
         builder.Services.AddScoped<IConfigurationStorage, ConfigurationStorage>();
+        builder.Services.AddScoped<StorageProfileStorage>();
 
         var app = builder.Build();
 
@@ -98,6 +103,7 @@ public class Program
                     metrics.Increment("db_migration_succeeded");
                     metrics.Set("db_healthy", 1);
                     logger.LogInformation("Database migrations applied successfully.");
+                    LegacyConfigurationReporter.WarnAboutUnknownRowsAsync(ctx, logger).GetAwaiter().GetResult();
 
                     // Авто-заполнение пустых конфигураций значениями по умолчанию
                     try
@@ -107,15 +113,15 @@ public class Program
 
                         // Креды RabbitMQ пробрасываются в контейнер через env_file: .env,
                         // совпадают с RABBITMQ_DEFAULT_USER/PASS, с которыми стартует брокер
-                        var rabbitUsername = builder.Configuration["RABBITMQ_DEFAULT_USER"] ?? "guest";
-                        var rabbitPassword = builder.Configuration["RABBITMQ_DEFAULT_PASS"] ?? "guest";
+                        var rabbitUsername = builder.Configuration["RABBITMQ_DEFAULT_USER"] ?? "";
+                        var rabbitPassword = builder.Configuration["RABBITMQ_DEFAULT_PASS"] ?? "";
 
                         // MinIO: дефолтные значения соответствуют внутренней docker-сети.
                         // MINIO_PORT здесь — порт API внутри контейнера (не маппинг наружу).
-                        var minioHost = builder.Configuration["MINIO_HOST"] ?? "cloud-minio";
-                        var minioPort = builder.Configuration["MINIO_PORT"] ?? "9000";
-                        var minioAccessKey = builder.Configuration["MINIO_ROOT_USER"] ?? "minioadmin";
-                        var minioSecretKey = builder.Configuration["MINIO_ROOT_PASSWORD"] ?? "minioadmin";
+                        var minioHost = builder.Configuration["MINIO_HOST"] ?? "";
+                        var minioPort = builder.Configuration["MINIO_PORT"] ?? "";
+                        var minioAccessKey = builder.Configuration["MINIO_ROOT_USER"] ?? "";
+                        var minioSecretKey = builder.Configuration["MINIO_ROOT_PASSWORD"] ?? "";
 
                         // SMTP-поля Notification: опциональны, пусто → режим без почты.
                         var emailHost = builder.Configuration["EMAIL_HOST"] ?? "";

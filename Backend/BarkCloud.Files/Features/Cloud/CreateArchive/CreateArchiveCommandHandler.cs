@@ -166,7 +166,9 @@ public class CreateArchiveCommandHandler : IRequestHandler<CreateArchiveCommand,
             tempRoot = Path.GetTempPath();
         Directory.CreateDirectory(tempRoot);
         var tempPath = Path.Combine(tempRoot, $"archive-{Guid.NewGuid():N}.zip");
-        var bucket = _buckets.GetBucketName(UploadFileType.CloudFile);
+        var sourceFiles = (await _files.GetFiles(items.Select(item => item.FileId).Distinct().ToList()))
+            .ToDictionary(file => file.Id);
+        var archiveProfileId = _buckets.ResolveWriteProfileId(UploadFileType.CloudFile, Domain.MediaKind.Other, false);
 
         try
         {
@@ -179,7 +181,10 @@ public class CreateArchiveCommandHandler : IRequestHandler<CreateArchiveCommand,
                     Stream src;
                     try
                     {
-                        src = await _s3.DownloadAsync(bucket, fileId.ToString());
+                        if (!sourceFiles.TryGetValue(fileId, out var sourceFile))
+                            continue;
+                        var sourceProfileId = _buckets.ResolveReadProfileId(sourceFile);
+                        src = await _s3.DownloadAsync(sourceProfileId, fileId.ToString());
                     }
                     catch (Exception ex)
                     {
@@ -206,13 +211,14 @@ public class CreateArchiveCommandHandler : IRequestHandler<CreateArchiveCommand,
                 Uploaders = new List<long> { ownerId },
                 Filename = archiveName,
                 MediaKind = archiveName.GetMediaKind(),
+                StorageProfileId = archiveProfileId,
             };
             await _files.AddToStorage(blob); // присваивает Id
 
             await using (var readStream = new FileStream(
                 tempPath, FileMode.Open, FileAccess.Read, FileShare.Read, 1 << 20, FileOptions.Asynchronous))
             {
-                blob.Etag = await _s3.UploadAsync(bucket, blob.Id.ToString(), readStream, "application/zip");
+                blob.Etag = await _s3.UploadAsync(archiveProfileId, blob.Id.ToString(), readStream, "application/zip");
             }
 
             blob.UploadedAt = DateTime.UtcNow;

@@ -42,7 +42,7 @@ public class PreviewPersistenceService
     public virtual async Task PersistPreviewsAsync(
         UploadFile original,
         List<MultiPreviewItem> previews,
-        string bucketName,
+        string storageProfileId,
         CancellationToken cancellationToken)
     {
         // Существующие превью — чтобы не нарушить уникальный индекс (OriginalFileId, TargetWidth).
@@ -64,7 +64,7 @@ public class PreviewPersistenceService
                 previewHash = Convert.ToHexString(hashBytes).ToLowerInvariant();
             }
 
-            var existingPreviewFileId = await _hashesStorage.GetFileIdByHash(previewHash);
+            var existingPreviewFileId = await _hashesStorage.GetFileIdByHash(previewHash, storageProfileId);
             Guid previewFileId;
 
             if (existingPreviewFileId.HasValue)
@@ -78,7 +78,7 @@ public class PreviewPersistenceService
             {
                 previewFileId = Guid.NewGuid();
                 using var ms = new MemoryStream(item.Bytes);
-                var previewEtag = await _s3Uploader.UploadAsync(bucketName, $"{previewFileId}", ms, "image/jpeg");
+                var previewEtag = await _s3Uploader.UploadAsync(storageProfileId, $"{previewFileId}", ms, "image/jpeg");
 
                 var previewFile = new UploadFile
                 {
@@ -88,6 +88,7 @@ public class PreviewPersistenceService
                     UploadedAt = DateTime.UtcNow,
                     Etag = previewEtag,
                     Type = UploadFileType.CloudFile,
+                    StorageProfileId = storageProfileId,
                     MediaKind = MediaKind.Photo,
                     Filename = $"preview_{item.TargetWidth}.jpg",
                     Size = item.Bytes.Length,
@@ -126,7 +127,7 @@ public class PreviewPersistenceService
         byte[] jpegBytes,
         int width,
         int height,
-        string bucketName,
+        string storageProfileId,
         CancellationToken cancellationToken)
     {
         var existing = await _context.FilePreviews
@@ -140,7 +141,7 @@ public class PreviewPersistenceService
             viewHash = Convert.ToHexString(sha256.ComputeHash(jpegBytes)).ToLowerInvariant();
         }
 
-        var existingByHash = await _hashesStorage.GetFileIdByHash(viewHash);
+        var existingByHash = await _hashesStorage.GetFileIdByHash(viewHash, storageProfileId);
         Guid viewFileId;
 
         if (existingByHash.HasValue)
@@ -153,7 +154,7 @@ public class PreviewPersistenceService
         {
             viewFileId = Guid.NewGuid();
             using var ms = new MemoryStream(jpegBytes);
-            var etag = await _s3Uploader.UploadAsync(bucketName, $"{viewFileId}", ms, "image/jpeg");
+            var etag = await _s3Uploader.UploadAsync(storageProfileId, $"{viewFileId}", ms, "image/jpeg");
 
             var viewFile = new UploadFile
             {
@@ -163,6 +164,7 @@ public class PreviewPersistenceService
                 UploadedAt = DateTime.UtcNow,
                 Etag = etag,
                 Type = UploadFileType.CloudFile,
+                StorageProfileId = storageProfileId,
                 MediaKind = MediaKind.Photo,
                 Filename = "view.jpg",
                 Size = jpegBytes.Length,

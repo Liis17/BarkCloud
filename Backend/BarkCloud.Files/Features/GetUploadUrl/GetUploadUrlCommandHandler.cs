@@ -1,5 +1,6 @@
 using BarkCloud.Files.Helpers;
 using BarkCloud.Files.Persistence;
+using BarkCloud.Files.Infrastructure;
 using BarkCloud.GrpcServer.Settings;
 using BarkCloud.GrpcServer.Tracker;
 using BarkCloud.GrpcServer.XAuth;
@@ -19,12 +20,14 @@ public class GetUploadUrlCommandHandler : IRequestHandler<GetUploadUrlCommand, G
     private readonly UserContext _userContext;
     private readonly RequestContext _requestContext;
     private readonly ILogger<GetUploadUrlCommandHandler> _logger;
+    private readonly S3BucketRegistry? _storageProfiles;
 
 
     public GetUploadUrlCommandHandler(IUploadedFilesStorage uploadedFilesStorage, UserContext userContext,
         RequestContext requestContext,
         RunSettings runSettings, IConfiguration configuration,
-        ILogger<GetUploadUrlCommandHandler> logger)
+        ILogger<GetUploadUrlCommandHandler> logger,
+        S3BucketRegistry? storageProfiles = null)
     {
         _uploadedFilesStorage = uploadedFilesStorage;
         _userContext = userContext;
@@ -32,6 +35,7 @@ public class GetUploadUrlCommandHandler : IRequestHandler<GetUploadUrlCommand, G
         _runSettings = runSettings;
         _configuration = configuration;
         _logger = logger;
+        _storageProfiles = storageProfiles;
     }
 
     public async Task<GetUploadUrlResponse> Handle(GetUploadUrlCommand request, CancellationToken cancellationToken)
@@ -49,6 +53,10 @@ public class GetUploadUrlCommandHandler : IRequestHandler<GetUploadUrlCommand, G
             Type = request.Type,
             Uploaders = new List<long> { _userContext.UserId },
             UploadDeviceName = _requestContext.DeviceName,
+            StorageProfileId = _storageProfiles?.ResolveWriteProfileId(request.Type, Domain.MediaKind.Other, false)
+                               ?? (request.Type == Domain.UploadFileType.UserAvatar
+                                   ? S3BucketRegistry.UserAvatarsOldProfileId
+                                   : S3BucketRegistry.CloudFilesOldProfileId),
         };
 
         var file = await _uploadedFilesStorage.AddToStorage(uploadFile);

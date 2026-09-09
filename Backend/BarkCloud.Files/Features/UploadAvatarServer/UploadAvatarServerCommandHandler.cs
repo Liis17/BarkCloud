@@ -42,7 +42,8 @@ public class UploadAvatarServerCommandHandler : IRequestHandler<UploadAvatarServ
 
     public async Task<UploadAvatarServerResponse> Handle(UploadAvatarServerCommand request, CancellationToken cancellationToken)
     {
-        var bucketName = _bucketRegistry.GetBucketName(UploadFileType.UserAvatar);
+        var mainProfileId = _bucketRegistry.ResolveWriteProfileId(UploadFileType.UserAvatar, Domain.MediaKind.Photo, false);
+        var previewProfileId = _bucketRegistry.ResolveWriteProfileId(UploadFileType.UserAvatar, Domain.MediaKind.Photo, true);
         var baseUrl = FileUrlHelper.GetPublicBaseUrl(_configuration, _runSettings);
 
         // Обработка изображения на сервере (ресайз + JPEG) —
@@ -55,7 +56,7 @@ public class UploadAvatarServerCommandHandler : IRequestHandler<UploadAvatarServ
         var processedBytes = await _imageCompressor.ProcessAvatarAsync(rawStream);
 
         using var mainStream = new MemoryStream(processedBytes);
-        var mainEtag = await _s3Uploader.UploadAsync(bucketName, $"{mainFileId}", mainStream, "image/jpeg");
+        var mainEtag = await _s3Uploader.UploadAsync(mainProfileId, $"{mainFileId}", mainStream, "image/jpeg");
 
         // Создаём превью (64px)
         var previewFileId = Guid.NewGuid();
@@ -64,7 +65,7 @@ public class UploadAvatarServerCommandHandler : IRequestHandler<UploadAvatarServ
         var previewBytes = await _imageCompressor.CompressImageAsync(previewInputStream, 64);
 
         using var previewStream = new MemoryStream(previewBytes);
-        var previewEtag = await _s3Uploader.UploadAsync(bucketName, $"{previewFileId}", previewStream, "image/jpeg");
+        var previewEtag = await _s3Uploader.UploadAsync(previewProfileId, $"{previewFileId}", previewStream, "image/jpeg");
 
         // Сохраняем превью в БД
         var previewFile = new DomainUploadFile
@@ -75,6 +76,7 @@ public class UploadAvatarServerCommandHandler : IRequestHandler<UploadAvatarServ
             UploadedAt = DateTime.UtcNow,
             Etag = previewEtag,
             Type = UploadFileType.UserAvatar,
+            StorageProfileId = previewProfileId,
             Filename = $"preview_{mainFileId}.jpg",
             Size = previewBytes.Length
         };
@@ -91,6 +93,7 @@ public class UploadAvatarServerCommandHandler : IRequestHandler<UploadAvatarServ
             UploadedAt = DateTime.UtcNow,
             Etag = mainEtag,
             Type = UploadFileType.UserAvatar,
+            StorageProfileId = mainProfileId,
             Filename = $"{mainFileId}.jpg",
             Size = processedBytes.Length
         };

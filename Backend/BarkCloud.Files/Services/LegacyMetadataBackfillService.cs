@@ -119,7 +119,7 @@ public class LegacyMetadataBackfillService : BackgroundService
             return false;
 
         var contentType = (file.Filename ?? "").GetContentType();
-        var bucket = bucketRegistry.GetBucketName(file.Type);
+        var storageProfileId = bucketRegistry.ResolveReadProfileId(file);
 
         var isVideo = contentType.StartsWith("video/");
         var isImage = contentType.StartsWith("image/");
@@ -135,7 +135,7 @@ public class LegacyMetadataBackfillService : BackgroundService
         try
         {
             // Скачиваем оригинал на диск; видео обязательно нужно как файл (для ffprobe).
-            await using (var s3Stream = await s3.DownloadAsync(bucket, file.Id.ToString()))
+            await using (var s3Stream = await s3.DownloadAsync(storageProfileId, file.Id.ToString()))
             await using (var fs = new FileStream(tempPath, FileMode.Create, FileAccess.Write))
             {
                 await s3Stream.CopyToAsync(fs, ct);

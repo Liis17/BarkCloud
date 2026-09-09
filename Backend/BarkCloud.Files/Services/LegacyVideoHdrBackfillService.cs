@@ -106,11 +106,11 @@ public class LegacyVideoHdrBackfillService : BackgroundService
         if (file is null || string.IsNullOrEmpty(file.Etag))
             return;
 
-        var bucket = bucketRegistry.GetBucketName(file.Type);
+        var storageProfileId = bucketRegistry.ResolveReadProfileId(file);
         var tempPath = Path.GetTempFileName();
         try
         {
-            await using (var s3Stream = await s3.DownloadAsync(bucket, file.Id.ToString()))
+            await using (var s3Stream = await s3.DownloadAsync(storageProfileId, file.Id.ToString()))
             await using (var fs = new FileStream(tempPath, FileMode.Create, FileAccess.Write))
             {
                 await s3Stream.CopyToAsync(fs, ct);
