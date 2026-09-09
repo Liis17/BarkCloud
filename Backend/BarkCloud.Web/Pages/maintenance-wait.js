@@ -38,7 +38,7 @@
         }
 
         async function readOperationState() {
-            if (!operationId) return null;
+            if (!operationId) return { status: 'not-tracked', operation: null };
 
             try {
                 const response = await fetch('/maintenance-status?operationId=' + encodeURIComponent(operationId), {
@@ -46,11 +46,14 @@
                     credentials: 'same-origin',
                     redirect: 'manual'
                 });
-                if (response.status === 204 || !response.ok) return null;
+                if (response.status === 204) return { status: 'missing', operation: null };
+                if (!response.ok) return { status: 'unavailable', operation: null };
                 const status = await response.json();
-                return status && typeof status.state === 'string' ? status : null;
+                return status && typeof status.state === 'string'
+                    ? { status: 'found', operation: status }
+                    : { status: 'unavailable', operation: null };
             } catch {
-                return null;
+                return { status: 'unavailable', operation: null };
             }
         }
 
@@ -59,7 +62,8 @@
             checkInProgress = true;
 
             try {
-                const operation = await readOperationState();
+                const operationResult = await readOperationState();
+                const operation = operationResult.operation;
                 if (operation && operation.state.toLowerCase() === 'failed') {
                     showOperationError(operation.message || 'Операция обслуживания завершилась с ошибкой.');
                     return;
@@ -74,6 +78,7 @@
                 const operationCompleted = operation && operation.state.toLowerCase() === 'completed';
                 const healthyRestart = operationId
                     ? operationCompleted
+                        || (operationResult.status === 'missing' && serverStartedAt !== pageServerStartedAt)
                     : serverStartedAt !== pageServerStartedAt;
 
                 if (response.status === 200 && serverStartedAt && healthyRestart) {
