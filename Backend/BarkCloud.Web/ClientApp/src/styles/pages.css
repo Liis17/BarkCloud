@@ -36,6 +36,13 @@
 
 /* Алиас и личные теги в свойствах файла. */
 .prop-search-meta { margin-top: 24px; }
+.prop-search-toggles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
+.prop-search-toggle { min-width: 0; min-height: 40px; padding: 0 12px; display: flex; align-items: center; justify-content: space-between; gap: 8px; border: 1px solid var(--md-outline); border-radius: var(--r-full); background: transparent; color: var(--md-on-surface); cursor: pointer; font: inherit; font-size: 14px; text-align: left; transition: background var(--d-short), border-color var(--d-short), color var(--d-short); }
+.prop-search-toggle:hover { background: color-mix(in srgb, var(--md-primary) 8%, transparent); }
+.prop-search-toggle.active { border-color: var(--md-secondary-container); background: var(--md-secondary-container); color: var(--md-on-secondary-container); }
+.prop-search-toggle-mark { flex: 0 0 auto; font-size: 18px; line-height: 1; }
+.prop-search-panel { margin-top: 12px; padding: 14px; border: 1px solid var(--md-outline-variant); border-radius: var(--r-md); background: var(--md-surface-container-low); }
+.prop-search-panel .prop-search-label { margin-top: 0; }
 .prop-search-label { display: grid; gap: 6px; margin-top: 12px; color: var(--md-on-surface); font-size: 14px; font-weight: 500; }
 .prop-search-label input { width: 100%; min-height: 40px; padding: 8px 12px; border: 1px solid var(--md-outline); border-radius: var(--r-sm); outline: none; background: var(--md-surface-container-lowest); color: var(--md-on-surface); font: inherit; font-weight: 400; }
 .prop-search-label input:focus { border-color: var(--md-primary); box-shadow: 0 0 0 2px color-mix(in srgb, var(--md-primary) 18%, transparent); }
