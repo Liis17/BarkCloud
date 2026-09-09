@@ -29,10 +29,10 @@ function loadWaitScript(fetchMock) {
   return { window, timers, elements };
 }
 
-const response = (body, status = 200) => ({
+const response = (body, status = 200, startedAt = '2026-09-06T21:55:23.4320929+00:00') => ({
   ok: status >= 200 && status < 300,
   status,
-  headers: { get: () => '2026-09-06T21:55:23.4320929+00:00' },
+  headers: { get: () => startedAt },
   json: async () => body,
 });
 
@@ -97,5 +97,27 @@ describe('maintenance wait page', () => {
 
     expect(window.location.replace).not.toHaveBeenCalled();
     expect(timers).toHaveLength(1);
+  });
+
+  it('returns when the operation marker is missing but the server has restarted', async () => {
+    const fetchMock = vi.fn((url) => Promise.resolve(url.startsWith('/maintenance-status')
+      ? response(null, 204)
+      : response(null, 200, '2026-09-09T12:00:00.0000000+00:00')));
+    const { window, timers } = loadWaitScript(fetchMock);
+
+    window.BarkCloudWait.start({
+      initialDelayMs: 0,
+      operationId: '44444444-4444-4444-4444-444444444444',
+      pageServerStartedAt: '2026-09-09T11:59:00.0000000+00:00',
+    });
+
+    for (let i = 0; i < 3; i++) {
+      const callback = timers.shift();
+      expect(callback).toBeTypeOf('function');
+      callback();
+      for (let flush = 0; flush < 30; flush++) await Promise.resolve();
+    }
+
+    expect(window.location.replace).toHaveBeenCalledTimes(1);
   });
 });
