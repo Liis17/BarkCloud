@@ -181,5 +181,7 @@ export function Topbar({ kicker, title, actions }: PageHeader) {
 
 function HitGlyph({ hit }: { hit: SearchHit }) {
   const Glyph = Icon[searchHitIconName(hit)];
-  return <span className="search-hit-glyph"><Glyph size={18} /></span>;
+  return <span className="search-hit-glyph">
+    {hit.previewUrl ? <img src={hit.previewUrl} alt="" /> : <Glyph size={18} />}
+  </span>;
 }

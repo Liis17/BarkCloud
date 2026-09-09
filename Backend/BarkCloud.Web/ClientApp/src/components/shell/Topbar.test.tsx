@@ -4,8 +4,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Topbar } from './Topbar';
 import { UploadManagerProvider } from '../../hooks/useUploadManager';
 
-const hit = (id: string) => ({
-  kind: 'photo', id, fileId: id, entryId: '', title: `Фото ${id}`, subtitle: '', previewUrl: '', mediaKind: 'photo',
+const hit = (id: string, previewUrl = '') => ({
+  kind: 'photo', id, fileId: id, entryId: '', title: `Фото ${id}`, subtitle: '', previewUrl, mediaKind: 'photo',
   favorite: false, matchField: 'name', matchValue: id, createdAt: null, size: 0,
 });
 const jsonResponse = (body: unknown) => ({ ok: true, text: async () => JSON.stringify(body) });
@@ -61,5 +61,24 @@ describe('Topbar global search', () => {
     fireEvent.keyDown(input, { key: 'ArrowDown' });
     fireEvent.keyDown(input, { key: 'Enter' });
     expect(screen.getByTestId('location').textContent).toBe('/photos?open=1');
+  });
+
+  it('показывает превью найденного медиа в подсказке', async () => {
+    const previewUrl = 'https://cdn.example/photo-preview.jpg';
+    vi.useFakeTimers();
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(jsonResponse({
+      query: 'на',
+      sections: [{ key: 'photos', items: [hit('1', previewUrl)], nextCursor: '', hasMore: false, unavailable: false }],
+    }))));
+    renderTopbar();
+
+    const input = screen.getByRole('combobox');
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: 'на' } });
+    await act(async () => { await vi.advanceTimersByTimeAsync(250); await Promise.resolve(); });
+
+    const image = screen.getByRole('option', { name: 'Фото 1' }).querySelector('img');
+    expect(image).not.toBeNull();
+    expect(image?.getAttribute('src')).toBe(previewUrl);
   });
 });
