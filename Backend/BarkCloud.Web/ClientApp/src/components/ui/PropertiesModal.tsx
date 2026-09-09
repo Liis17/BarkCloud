@@ -43,8 +43,12 @@ export function PropertiesModal({ fileId, fallback, onClose }: PropertiesModalPr
 
   const f = (info || fallback || {}) as Partial<FileInfo>;
   const fb = (fallback || {}) as Partial<MediaItem>;
+  const searchAlias = info?.searchAlias?.trim() || '';
+  const searchTags = (info?.tags || []).map((tag) => tag.trim()).filter(Boolean);
   const rows: Array<[string, React.ReactNode] | null> = [
     ['Имя', f.name],
+    searchAlias ? ['Имя для поиска', searchAlias] : null,
+    searchTags.length ? ['Теги', searchTags.join(', ')] : null,
     ['Тип', kindRu(f.kind)],
     ['Размер', f.sizeLabel || (f.size != null ? f.size + ' Б' : '—')],
     f.width && f.height ? ['Разрешение', f.width + ' × ' + f.height + ' px'] : null,
@@ -72,7 +76,14 @@ export function PropertiesModal({ fileId, fallback, onClose }: PropertiesModalPr
         ))}
       </div>
 
-      {info && <SearchMetadataEditor fileId={fileId} initialAlias={info.searchAlias || ''} initialTags={info.tags || []} />}
+      {info && (
+        <SearchMetadataEditor
+          fileId={fileId}
+          initialAlias={info.searchAlias || ''}
+          initialTags={info.tags || []}
+          onSaved={(saved) => setInfo((current) => current ? { ...current, searchAlias: saved.alias, tags: saved.tags } : current)}
+        />
+      )}
 
       {metaRows.length > 0 && (
         <>
@@ -115,19 +126,36 @@ export function PropertiesModal({ fileId, fallback, onClose }: PropertiesModalPr
   );
 }
 
-function SearchMetadataEditor({ fileId, initialAlias, initialTags }: { fileId: string; initialAlias: string; initialTags: string[] }) {
+type SearchMetadataPanel = 'alias' | 'tags';
+
+function SearchMetadataEditor({
+  fileId,
+  initialAlias,
+  initialTags,
+  onSaved,
+}: {
+  fileId: string;
+  initialAlias: string;
+  initialTags: string[];
+  onSaved: (saved: { alias: string; tags: string[] }) => void;
+}) {
   const [alias, setAlias] = React.useState(initialAlias);
   const [tags, setTags] = React.useState(initialTags);
   const [tag, setTag] = React.useState('');
+  const [openPanel, setOpenPanel] = React.useState<SearchMetadataPanel | null>(null);
   const [saving, setSaving] = React.useState(false);
   const [message, setMessage] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     setAlias(initialAlias);
     setTags(initialTags);
+  }, [initialAlias, initialTags]);
+
+  React.useEffect(() => {
     setTag('');
+    setOpenPanel(null);
     setMessage(null);
-  }, [fileId, initialAlias, initialTags]);
+  }, [fileId]);
 
   function addTags(value: string) {
     const incoming = value.split(',').map((item) => item.trim()).filter(Boolean);
@@ -148,6 +176,7 @@ function SearchMetadataEditor({ fileId, initialAlias, initialTags }: { fileId: s
       const saved = await apiPut<{ alias: string; tags: string[] }>(`/api/files/${encodeURIComponent(fileId)}/search-metadata`, { alias: alias.trim(), tags });
       setAlias(saved.alias || '');
       setTags(saved.tags || []);
+      onSaved({ alias: saved.alias || '', tags: saved.tags || [] });
       setMessage('Сохранено');
     } catch (e) {
       setMessage((e as Error).message || 'Не удалось сохранить');
@@ -159,32 +188,69 @@ function SearchMetadataEditor({ fileId, initialAlias, initialTags }: { fileId: s
   return (
     <section className="prop-search-meta">
       <div className="prop-section">Поиск</div>
-      <label className="prop-search-label">
-        <span>Имя для поиска</span>
-        <input value={alias} maxLength={120} onChange={(e) => setAlias(e.target.value)} placeholder="Например, Настя" />
-        <small>Настоящее имя файла не изменится.</small>
-      </label>
-      <label className="prop-search-label">
-        <span>Теги</span>
-        <div className="prop-tag-list">
-          {tags.map((item) => <button type="button" className="prop-tag" key={item.toLocaleLowerCase()} onClick={() => setTags(tags.filter((tagValue) => tagValue !== item))}>{item} ×</button>)}
-        </div>
-        <input
-          value={tag}
-          maxLength={50}
-          placeholder="Добавить тег"
-          onChange={(e) => setTag(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addTags(tag); }
-          }}
-          onBlur={() => addTags(tag)}
-        />
-        <small>Добавляйте Enter или запятой, максимум 20 тегов.</small>
-      </label>
-      <div className="prop-search-actions">
-        <button className="btn outlined" type="button" disabled={saving} onClick={save}>{saving ? 'Сохраняем…' : 'Сохранить'}</button>
-        {message && <span className={message === 'Сохранено' ? 'prop-search-ok' : 'prop-err'}>{message}</span>}
+      <div className="prop-search-toggles">
+        <button
+          type="button"
+          className={'prop-search-toggle' + (openPanel === 'alias' ? ' active' : '')}
+          aria-expanded={openPanel === 'alias'}
+          aria-controls="prop-search-alias-panel"
+          onClick={() => setOpenPanel((current) => current === 'alias' ? null : 'alias')}
+        >
+          <span>Имя для поиска</span>
+          <span className="prop-search-toggle-mark" aria-hidden="true">{openPanel === 'alias' ? '⌃' : '⌄'}</span>
+        </button>
+        <button
+          type="button"
+          className={'prop-search-toggle' + (openPanel === 'tags' ? ' active' : '')}
+          aria-expanded={openPanel === 'tags'}
+          aria-controls="prop-search-tags-panel"
+          onClick={() => setOpenPanel((current) => current === 'tags' ? null : 'tags')}
+        >
+          <span>Теги</span>
+          <span className="prop-search-toggle-mark" aria-hidden="true">{openPanel === 'tags' ? '⌃' : '⌄'}</span>
+        </button>
       </div>
+
+      {openPanel === 'alias' && (
+        <div className="prop-search-panel" id="prop-search-alias-panel">
+          <label className="prop-search-label">
+            <span>Имя для поиска</span>
+            <input value={alias} maxLength={120} onChange={(e) => setAlias(e.target.value)} placeholder="Например, важный документ" />
+            <small>Настоящее имя файла не изменится.</small>
+          </label>
+        </div>
+      )}
+
+      {openPanel === 'tags' && (
+        <div className="prop-search-panel" id="prop-search-tags-panel">
+          <label className="prop-search-label">
+            <span>Теги</span>
+            {tags.length > 0 && (
+              <div className="prop-tag-list">
+                {tags.map((item) => <button type="button" className="prop-tag" key={item.toLocaleLowerCase()} onClick={() => setTags(tags.filter((tagValue) => tagValue !== item))}>{item} ×</button>)}
+              </div>
+            )}
+            <input
+              value={tag}
+              maxLength={50}
+              placeholder="Добавить тег"
+              onChange={(e) => setTag(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addTags(tag); }
+              }}
+              onBlur={() => addTags(tag)}
+            />
+            <small>Добавляйте Enter или запятой, максимум 20 тегов.</small>
+          </label>
+        </div>
+      )}
+
+      {openPanel && (
+        <div className="prop-search-actions">
+          <button className="btn outlined" type="button" disabled={saving} onClick={save}>{saving ? 'Сохраняем…' : 'Сохранить'}</button>
+          {message && <span className={message === 'Сохранено' ? 'prop-search-ok' : 'prop-err'}>{message}</span>}
+        </div>
+      )}
     </section>
   );
 }
