@@ -51,6 +51,12 @@ async function request<T>(path: string, method = 'GET', body?: unknown): Promise
 
 const settingId = (setting: ServerSetting) => `${setting.serviceId}:${setting.section}:${setting.key}`;
 
+function countLabel(count: number, one: string, few: string, many: string) {
+  const lastTwo = count % 100;
+  const last = count % 10;
+  return `${count} ${last === 1 && lastTwo !== 11 ? one : last >= 2 && last <= 4 && (lastTwo < 10 || lastTwo >= 20) ? few : many}`;
+}
+
 function displayValue(revision: SettingRevision, side: 'previous' | 'new') {
   if (!revision.isSensitive) return side === 'previous' ? revision.previousValue : revision.newValue;
   const hasValue = side === 'previous' ? revision.previousHasValue : revision.newHasValue;
@@ -188,32 +194,40 @@ function StorageCard({ role, profiles, revisions, onChanged }: {
     if (response.ok) onChanged(response.data?.restartTargets || ['files']);
   }
 
-  return <div className={'storage-profile-card' + (legacy ? ' legacy' : '')}>
-    <div className="storage-profile-head"><div><strong>{role}</strong><small>{selected?.profileId || 'Не настроен'}</small></div>
-      <span className={'pill-info ' + (selected?.isActive ? 'ok' : 'warn')}>{selected?.isActive ? 'Активен' : legacy ? 'Legacy' : selected ? 'Прошлая версия' : 'Fallback universal'}</span></div>
-    <div className="storage-profile-grid">
-      <label>Endpoint<input type="url" value={draft.serviceUrl} onChange={(event) => setDraft({ ...draft, serviceUrl: event.target.value })} /></label>
-      <label>Bucket<input value={draft.bucketName} onChange={(event) => setDraft({ ...draft, bucketName: event.target.value })} /></label>
-      <label>Access key<input value={draft.accessKey} placeholder={selected?.hasAccessKey ? selected.accessKey || 'Задан' : ''} onChange={(event) => setDraft({ ...draft, accessKey: event.target.value })} /></label>
-      <label>Secret key<input type="password" value={draft.secretKey} placeholder={selected?.hasSecretKey ? 'Оставьте пустым, чтобы не менять' : ''} onChange={(event) => setDraft({ ...draft, secretKey: event.target.value })} /></label>
+  const statusLabel = selected?.isActive ? 'Активен' : legacy ? 'Legacy' : selected ? 'Прошлая версия' : 'Fallback universal';
+  return <article className={'storage-profile-card' + (legacy ? ' legacy' : '')}>
+    <div className="storage-profile-head">
+      <div className="storage-profile-identity"><strong>{role}</strong><small>{selected?.profileId || 'Не настроен'}</small></div>
+      <div className="storage-profile-status">
+        <span className={'pill-info ' + (selected?.isActive ? 'ok' : 'warn')}>{statusLabel}</span>
+        {selected?.isActive && <small>Для новых файлов</small>}
+      </div>
     </div>
-    <label className="server-check"><input type="checkbox" checked={draft.isR2} onChange={(event) => setDraft({ ...draft, isR2: event.target.checked })} /> Cloudflare R2</label>
-    <div className="storage-profile-actions"><button className="btn primary" onClick={save}>Сохранить</button>
-      {!legacy && role !== 'universal' && active && <button className="btn" onClick={disable}>Отключить роль</button>}</div>
-    {message && <div className="server-setting-message">{message}</div>}
+    <div className="storage-profile-grid">
+      <label><span>Endpoint</span><input type="url" value={draft.serviceUrl} onChange={(event) => setDraft({ ...draft, serviceUrl: event.target.value })} /></label>
+      <label><span>Bucket</span><input type="text" value={draft.bucketName} onChange={(event) => setDraft({ ...draft, bucketName: event.target.value })} /></label>
+      <label><span>Access key</span><input type="text" value={draft.accessKey} placeholder={selected?.hasAccessKey ? selected.accessKey || 'Задан' : ''} onChange={(event) => setDraft({ ...draft, accessKey: event.target.value })} /></label>
+      <label><span>Secret key</span><input type="password" value={draft.secretKey} placeholder={selected?.hasSecretKey ? 'Оставьте пустым, чтобы не менять' : ''} onChange={(event) => setDraft({ ...draft, secretKey: event.target.value })} /></label>
+    </div>
+    <div className="storage-profile-footer">
+      <label className="server-check"><input type="checkbox" checked={draft.isR2} onChange={(event) => setDraft({ ...draft, isR2: event.target.checked })} /><span>Cloudflare R2</span></label>
+      <div className="storage-profile-actions"><button type="button" className="btn primary" onClick={save}>Сохранить</button>
+        {!legacy && role !== 'universal' && active && <button type="button" className="btn" onClick={disable}>Отключить роль</button>}</div>
+    </div>
+    {message && <div className="server-setting-message" role="status">{message}</div>}
     {ordered.length > 0 && <details><summary>Версии и история</summary>
       {ordered.map((profile) => <div className="storage-version-row" key={profile.profileId}>
         <span>{profile.profileId} · {profile.serviceUrl}/{profile.bucketName}</span>
         <span className="storage-version-actions">
-          <button className="btn" onClick={() => setSelectedProfileId(profile.profileId)}>Редактировать</button>
-          {!profile.isLegacy && !profile.isActive && <button className="btn" onClick={() => activate(profile.profileId)}>Активировать</button>}
+          <button type="button" className="btn" onClick={() => setSelectedProfileId(profile.profileId)}>Редактировать</button>
+          {!profile.isLegacy && !profile.isActive && <button type="button" className="btn" onClick={() => activate(profile.profileId)}>Активировать</button>}
         </span>
       </div>)}
       {revisions.filter((revision) => ordered.some((profile) => profile.profileId === revision.profileId)).map((revision) =>
         <div className="storage-revision-row" key={revision.id}>{revision.changeKind} · {revision.profileId} · {revision.changedAt ? new Date(revision.changedAt).toLocaleString('ru-RU') : '—'}</div>)}
     </details>}
-  </div>;
-}
+    </article>;
+  }
 
 export default function ServerSettingsTab() {
   const [data, setData] = React.useState<ServerSettings | null>(null);
@@ -252,18 +266,47 @@ export default function ServerSettingsTab() {
   const legacyRoles = Array.from(new Set(data.storageProfiles.filter((profile) => profile.isLegacy).map((profile) => profile.role)));
   return <div className="server-settings-tab">
     {restartTargets.length > 0 && <div className="sys-banner warn">Изменения сохранены. Требуется ручной перезапуск: {restartTargets.join(', ')}. Перейдите в «Обслуживание».</div>}
-    <div className="set-card"><div className="set-card-head"><div><div className="ttl">Параметры сервисов</div><div className="sub">Секреты не загружаются в браузер</div></div></div>
-      <div className="set-card-body"><input className="server-settings-search" placeholder="Поиск по ключу…" value={search} onChange={(event) => setSearch(event.target.value)} /></div></div>
-    {serviceIds.map((serviceId) => <div className="set-card" key={serviceId}>
-      <div className="set-card-head"><div><div className="ttl">{SERVICE_LABELS[serviceId] || `Service ${serviceId}`}</div></div></div>
-      <div className="set-card-body server-settings-list">{filtered.filter((setting) => setting.serviceId === serviceId).map((setting) =>
-        <SettingEditor key={settingId(setting)} setting={setting} onSaved={changed} />)}</div>
-    </div>)}
-    <div className="set-card"><div className="set-card-head"><div><div className="ttl">Зарезервированные имена</div><div className="sub">Хранятся нормализованно в lowercase</div></div></div>
-      <div className="set-card-body"><div className="reserved-add"><input value={newReserved} onChange={(event) => setNewReserved(event.target.value)} placeholder="Новое имя" /><button className="btn primary" onClick={addReserved}>Добавить</button></div>
-        <div className="reserved-list">{data.reservedNames.map((name) => <span key={name}>{name}<button onClick={() => renameReserved(name)}>✎</button><button onClick={() => deleteReserved(name)}>×</button></span>)}</div></div></div>
-    <div className="set-card"><div className="set-card-head"><div><div className="ttl">S3-профили</div><div className="sub">Оригиналы маршрутизируются по типу, все превью — через роль previews</div></div></div>
+    <header className="server-settings-intro">
+      <div>
+        <span className="server-settings-kicker">Администрирование</span>
+        <h2>Конфигурация сервера</h2>
+        <p>Параметры сервисов, зарезервированные имена и маршрутизация файлов.</p>
+      </div>
+      <div className="server-settings-summary" aria-label="Сводка конфигурации">
+        <div><strong>{serviceIds.length}</strong><span>{countLabel(serviceIds.length, 'группа сервиса', 'группы сервисов', 'групп сервисов')}</span></div>
+        <div><strong>{data.storageProfiles.length}</strong><span>{countLabel(data.storageProfiles.length, 'профиль S3', 'профиля S3', 'профилей S3')}</span></div>
+      </div>
+    </header>
+    <section className="set-card server-settings-toolbar">
+      <div className="server-section-head">
+        <div><div className="ttl">Параметры сервисов</div><div className="sub">Секреты не загружаются в браузер</div></div>
+        <span className="server-section-count">{countLabel(filtered.length, 'параметр', 'параметра', 'параметров')}</span>
+      </div>
+      <label className="server-search-field"><span>Поиск по ключу</span><input className="server-settings-search" placeholder="Например, JwtSettings:Issuer" value={search} onChange={(event) => setSearch(event.target.value)} /></label>
+      {filtered.length === 0 && <div className="server-empty">{query ? 'По этому запросу параметры не найдены.' : 'Параметры сервисов не найдены.'}</div>}
+    </section>
+    {serviceIds.map((serviceId, index) => {
+      const serviceSettings = filtered.filter((setting) => setting.serviceId === serviceId);
+      return <section className="set-card server-service-card" key={serviceId}>
+        <div className="set-card-head server-section-head">
+          <div className="server-service-title"><span className="server-service-number">{String(index + 1).padStart(2, '0')}</span><div><div className="ttl">{SERVICE_LABELS[serviceId] || `Service ${serviceId}`}</div><div className="sub">{countLabel(serviceSettings.length, 'параметр', 'параметра', 'параметров')}</div></div></div>
+        </div>
+        <div className="set-card-body server-settings-list">{serviceSettings.map((setting) =>
+          <SettingEditor key={settingId(setting)} setting={setting} onSaved={changed} />)}</div>
+      </section>;
+    })}
+    <section className="set-card server-reserved-card">
+      <div className="set-card-head server-section-head"><div><div className="ttl">Зарезервированные имена</div><div className="sub">Хранятся нормализованно в lowercase</div></div><span className="server-section-count">{countLabel(data.reservedNames.length, 'имя', 'имени', 'имён')}</span></div>
+      <div className="set-card-body server-reserved-body">
+        <div className="reserved-add"><label><span>Добавить имя</span><input type="text" aria-label="Новое зарезервированное имя" value={newReserved} onChange={(event) => setNewReserved(event.target.value)} placeholder="Например, admin" /></label><button type="button" className="btn primary" onClick={addReserved}>Добавить</button></div>
+        {data.reservedNames.length > 0 ? <div className="reserved-list">{data.reservedNames.map((name) => <span key={name}><b>{name}</b><button type="button" aria-label={`Переименовать ${name}`} title="Переименовать" onClick={() => renameReserved(name)}>✎</button><button type="button" aria-label={`Удалить ${name}`} title="Удалить" onClick={() => deleteReserved(name)}>×</button></span>)}</div>
+          : <div className="server-empty">Зарезервированных имён пока нет.</div>}
+      </div>
+    </section>
+    <section className="set-card server-storage-section">
+      <div className="set-card-head server-section-head"><div><div className="ttl">S3-профили</div><div className="sub">Роль определяет, где хранятся оригиналы. Превью используют роль previews.</div></div><span className="server-section-count">{countLabel(data.storageProfiles.length, 'профиль сохранён', 'профиля сохранено', 'профилей сохранено')}</span></div>
       <div className="set-card-body storage-profile-list">{[...STORAGE_ROLES, ...legacyRoles].map((role) =>
-        <StorageCard key={role} role={role} profiles={data.storageProfiles} revisions={data.storageRevisions} onChanged={changed} />)}</div></div>
+        <StorageCard key={role} role={role} profiles={data.storageProfiles} revisions={data.storageRevisions} onChanged={changed} />)}</div>
+    </section>
   </div>;
 }
