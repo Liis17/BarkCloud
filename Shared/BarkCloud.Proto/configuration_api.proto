@@ -19,6 +19,17 @@ service ConfigurationApi {
   rpc AddReservedName(AddReservedNameRequest) returns(AddReservedNameResponse);
   rpc UpdateReservedName(UpdateReservedNameRequest) returns(UpdateReservedNameResponse);
   rpc DeleteReservedName(DeleteReservedNameRequest) returns(DeleteReservedNameResponse);
+
+  // Административное управление настройками и их ревизиями
+  rpc GetAllConfigurations(GetAllConfigurationsRequest) returns(GetAllConfigurationsResponse);
+  rpc GetConfigurationHistory(GetConfigurationHistoryRequest) returns(GetConfigurationHistoryResponse);
+  rpc RollbackConfiguration(RollbackConfigurationRequest) returns(UpdateConfigurationResponse);
+
+  // Версионируемые S3-профили
+  rpc GetStorageProfiles(GetStorageProfilesRequest) returns(GetStorageProfilesResponse);
+  rpc SaveStorageProfile(SaveStorageProfileRequest) returns(SaveStorageProfileResponse);
+  rpc ActivateStorageProfile(ActivateStorageProfileRequest) returns(UpdateConfigurationResponse);
+  rpc DisableStorageRole(DisableStorageRoleRequest) returns(UpdateConfigurationResponse);
 }
 
 message GetConfigurationRequest{
@@ -47,6 +58,16 @@ message ConfigurationItem {
   string edited_from = 6;
 
   int32 service_id = 7;
+
+  bool is_sensitive = 8;
+
+  bool has_value = 9;
+
+  bool is_read_only = 10;
+
+  string value_kind = 11;
+
+  repeated string restart_targets = 12;
 }
 
 message UpdateConfigurationRequest {
@@ -97,4 +118,117 @@ message DeleteReservedNameRequest {
 message DeleteReservedNameResponse {
   bool success = 1;
   string message = 2;
+}
+
+message GetAllConfigurationsRequest {}
+
+message GetAllConfigurationsResponse {
+  repeated ConfigurationItem configurations = 1;
+}
+
+message GetConfigurationHistoryRequest {
+  string section = 1;
+  string key = 2;
+  int32 service_id = 3;
+  int32 count = 4;
+}
+
+message ConfigurationRevision {
+  int64 id = 1;
+  string section = 2;
+  string key = 3;
+  int32 service_id = 4;
+  string previous_value = 5;
+  string new_value = 6;
+  google.protobuf.Timestamp changed_at = 7;
+  string changed_by = 8;
+  string changed_from = 9;
+  string change_kind = 10;
+  int64 source_revision_id = 11;
+  bool has_source_revision = 12;
+  bool is_sensitive = 13;
+  bool previous_has_value = 14;
+  bool new_has_value = 15;
+}
+
+message GetConfigurationHistoryResponse {
+  repeated ConfigurationRevision revisions = 1;
+}
+
+message RollbackConfigurationRequest {
+  int64 revision_id = 1;
+  string edited_by = 2;
+  string edited_from = 3;
+}
+
+message GetStorageProfilesRequest {
+  bool include_revisions = 1;
+}
+
+message StorageProfileItem {
+  string profile_id = 1;
+  string role = 2;
+  int32 version = 3;
+  string service_url = 4;
+  string access_key = 5;
+  string secret_key = 6;
+  string bucket_name = 7;
+  bool is_r2 = 8;
+  bool is_active = 9;
+  bool is_legacy = 10;
+  google.protobuf.Timestamp created_at = 11;
+  string created_by = 12;
+  string created_from = 13;
+  google.protobuf.Timestamp edited_at = 14;
+  string edited_by = 15;
+  string edited_from = 16;
+  bool has_secret_key = 17;
+}
+
+message StorageProfileRevisionItem {
+  int64 id = 1;
+  string profile_id = 2;
+  google.protobuf.Timestamp changed_at = 3;
+  string changed_by = 4;
+  string changed_from = 5;
+  string change_kind = 6;
+  int64 source_revision_id = 7;
+  bool has_source_revision = 8;
+}
+
+message GetStorageProfilesResponse {
+  repeated StorageProfileItem profiles = 1;
+  repeated StorageProfileRevisionItem revisions = 2;
+}
+
+message SaveStorageProfileRequest {
+  string role = 1;
+  string service_url = 2;
+  string access_key = 3;
+  string secret_key = 4;
+  string bucket_name = 5;
+  bool is_r2 = 6;
+  bool is_legacy = 7;
+  string profile_id = 8;
+  bool confirm_legacy_mutation = 9;
+  string edited_by = 10;
+  string edited_from = 11;
+}
+
+message SaveStorageProfileResponse {
+  bool success = 1;
+  string message = 2;
+  StorageProfileItem profile = 3;
+}
+
+message ActivateStorageProfileRequest {
+  string profile_id = 1;
+  string edited_by = 2;
+  string edited_from = 3;
+}
+
+message DisableStorageRoleRequest {
+  string role = 1;
+  string edited_by = 2;
+  string edited_from = 3;
 }

@@ -106,6 +106,26 @@ public static class WebApplicationBuilderExtensions
             configurationDictionary.Add(key, configurationItem.Value);
         }
 
+        if (serviceId == ServiceId.Files)
+        {
+            var profiles = configurationApiClient.GetStorageProfiles(
+                new GetStorageProfilesRequest { IncludeRevisions = false }, headers);
+            foreach (var profile in profiles.Profiles)
+            {
+                var prefix = $"StorageProfiles:{profile.ProfileId}";
+                configurationDictionary[$"{prefix}:ProfileId"] = profile.ProfileId;
+                configurationDictionary[$"{prefix}:Role"] = profile.Role;
+                configurationDictionary[$"{prefix}:Version"] = profile.Version.ToString();
+                configurationDictionary[$"{prefix}:ServiceUrl"] = profile.ServiceUrl;
+                configurationDictionary[$"{prefix}:AccessKey"] = profile.AccessKey;
+                configurationDictionary[$"{prefix}:SecretKey"] = profile.SecretKey;
+                configurationDictionary[$"{prefix}:BucketName"] = profile.BucketName;
+                configurationDictionary[$"{prefix}:IsR2"] = profile.IsR2.ToString();
+                configurationDictionary[$"{prefix}:IsActive"] = profile.IsActive.ToString();
+                configurationDictionary[$"{prefix}:IsLegacy"] = profile.IsLegacy.ToString();
+            }
+        }
+
         configurationDictionary.Add("ConfigurationServiceAddr", configurationServiceAddress);
 
         builder.Configuration.AddInMemoryCollection(configurationDictionary);

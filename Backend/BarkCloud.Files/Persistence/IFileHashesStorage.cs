@@ -5,7 +5,7 @@ namespace BarkCloud.Files.Persistence;
 public interface IFileHashesStorage
 {
     Task AddHash(FileHash fileHash);
-    Task<Guid?> GetFileIdByHash(string hash);
+    Task<Guid?> GetFileIdByHash(string hash, string? storageProfileId = null);
     Task<List<Guid>> GetFileIdsByHash(string hash, CancellationToken cancellationToken = default);
     Task<bool> HashExists(string hash);
     Task<HashSet<string>> GetExistingHashesForOwner(long ownerId, IReadOnlyCollection<string> hashes, CancellationToken cancellationToken = default);

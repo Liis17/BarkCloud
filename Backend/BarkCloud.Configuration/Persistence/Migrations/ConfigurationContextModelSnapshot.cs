@@ -17,18 +17,96 @@ namespace BarkCloud.Configuration.Persistence.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.1")
+                .HasAnnotation("ProductVersion", "10.0.8")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("BarkCloud.Configuration.Domain.ConfigurationItem", b =>
+            modelBuilder.Entity("BarkCloud.Configuration.Domain.ReservedName", b =>
+                {
+                    b.Property<string>("Name")
+                        .HasColumnType("text");
+
+                    b.HasKey("Name");
+
+                    b.ToTable("ReservedNames", (string)null);
+                });
+
+            modelBuilder.Entity("BarkCloud.Configuration.Domain.SettingRevision", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("bigint");
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("ChangeKind")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("ChangedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ChangedBy")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ChangedFrom")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("NewValue")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("PreviousValue")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("SettingsTable")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<long?>("SourceRevisionId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SourceRevisionId");
+
+                    b.HasIndex("SettingsTable", "Key", "ChangedAt", "Id")
+                        .IsDescending(false, false, true, true);
+
+                    b.ToTable("SettingsHistory", (string)null);
+                });
+
+            modelBuilder.Entity("BarkCloud.Configuration.Domain.StorageProfile", b =>
+                {
+                    b.Property<string>("ProfileId")
+                        .HasColumnType("text");
+
+                    b.Property<string>("AccessKey")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("BucketName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("CreatedFrom")
+                        .IsRequired()
+                        .HasColumnType("text");
 
                     b.Property<DateTime>("EditedAt")
                         .HasColumnType("timestamp with time zone");
@@ -41,24 +119,255 @@ namespace BarkCloud.Configuration.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("Key")
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsLegacy")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsR2")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Role")
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("Section")
+                    b.Property<string>("SecretKey")
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<int>("ServiceId")
+                    b.Property<string>("ServiceUrl")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("Version")
                         .HasColumnType("integer");
+
+                    b.HasKey("ProfileId");
+
+                    b.HasIndex("Role", "IsActive");
+
+                    b.HasIndex("Role", "Version")
+                        .IsUnique();
+
+                    b.ToTable("StorageProfiles", (string)null);
+                });
+
+            modelBuilder.Entity("BarkCloud.Configuration.Domain.StorageProfileRevision", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("ChangeKind")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("ChangedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ChangedBy")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ChangedFrom")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("NewValue")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("PreviousValue")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ProfileId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<long?>("SourceRevisionId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SourceRevisionId");
+
+                    b.HasIndex("ProfileId", "ChangedAt", "Id")
+                        .IsDescending(false, true, true);
+
+                    b.ToTable("StorageProfileRevisions", (string)null);
+                });
+
+            modelBuilder.Entity("FilesSettings", b =>
+                {
+                    b.Property<string>("Key")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("EditedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("EditedBy")
+                        .IsRequired()
+                        .HasColumnType("text");
 
                     b.Property<string>("Value")
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.HasKey("Id");
+                    b.HasKey("Key");
 
-                    b.ToTable("Configurations");
+                    b.ToTable("FilesSettings", (string)null);
+                });
+
+            modelBuilder.Entity("GlobalSettings", b =>
+                {
+                    b.Property<string>("Key")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("EditedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("EditedBy")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Key");
+
+                    b.ToTable("GlobalSettings", (string)null);
+                });
+
+            modelBuilder.Entity("IdentitySettings", b =>
+                {
+                    b.Property<string>("Key")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("EditedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("EditedBy")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Key");
+
+                    b.ToTable("IdentitySettings", (string)null);
+                });
+
+            modelBuilder.Entity("NotificationSettings", b =>
+                {
+                    b.Property<string>("Key")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("EditedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("EditedBy")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Key");
+
+                    b.ToTable("NotificationSettings", (string)null);
+                });
+
+            modelBuilder.Entity("TorrentSettings", b =>
+                {
+                    b.Property<string>("Key")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("EditedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("EditedBy")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Key");
+
+                    b.ToTable("TorrentSettings", (string)null);
+                });
+
+            modelBuilder.Entity("UsersSettings", b =>
+                {
+                    b.Property<string>("Key")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("EditedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("EditedBy")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Key");
+
+                    b.ToTable("UsersSettings", (string)null);
+                });
+
+            modelBuilder.Entity("WebSettings", b =>
+                {
+                    b.Property<string>("Key")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("EditedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("EditedBy")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Key");
+
+                    b.ToTable("WebSettings", (string)null);
+                });
+
+            modelBuilder.Entity("BarkCloud.Configuration.Domain.SettingRevision", b =>
+                {
+                    b.HasOne("BarkCloud.Configuration.Domain.SettingRevision", null)
+                        .WithMany()
+                        .HasForeignKey("SourceRevisionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("BarkCloud.Configuration.Domain.StorageProfileRevision", b =>
+                {
+                    b.HasOne("BarkCloud.Configuration.Domain.StorageProfile", null)
+                        .WithMany()
+                        .HasForeignKey("ProfileId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("BarkCloud.Configuration.Domain.StorageProfileRevision", null)
+                        .WithMany()
+                        .HasForeignKey("SourceRevisionId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 #pragma warning restore 612, 618
         }

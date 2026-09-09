@@ -16,7 +16,7 @@ Parent: [[index]] · See also: [[api/files-api]] · [[modules/backend-files-clou
 ## Файлы
 
 ### Domain
-- `UploadFile.cs` — загруженный файл (реальный объект в S3); содержит `MediaKind`, `UploadDeviceName` (имя устройства, с которого блоб загружен в первый раз — читается из `x-device-name` в `GetUploadUrl`)
+- `UploadFile.cs` — загруженный файл (реальный объект в S3); содержит обязательный `StorageProfileId`, `MediaKind`, `UploadDeviceName` (имя устройства, с которого блоб загружен в первый раз — читается из `x-device-name` в `GetUploadUrl`)
 - `UploadFileType.cs` — enum типов: `Unknown=0`, `UserAvatar=1`, `CloudFile=2`
 - `MediaKind.cs` — категория медиа: `Other=0`, `Photo=1`, `Video=2`, `Document=3`, `Audio=4` (заполняется при загрузке по content-type)
 - `FileHash.cs` — хеш для дедупликации
@@ -52,7 +52,7 @@ Parent: [[index]] · See also: [[api/files-api]] · [[modules/backend-files-clou
   - `ExtractFromPdf(Stream)` — **UglyToad.PdfPig** (`PdfDocument.Information`: Author/Title/Subject/Producer/Creator/CreationDate/NumberOfPages)
   - `ExtractFromOffice(Stream, contentType)` — **DocumentFormat.OpenXml** для DOCX/XLSX/PPTX: `PackageProperties.Creator/Title/Subject/Created` + `ExtendedFilePropertiesPart` для `Application` и счётчика страниц/слайдов
 - `HeicImageConverter.cs` — перекодирование HEIC/HEIF → JPEG через ffmpeg (FFMpegCore, `-frames:v 1 -q:v 2`). Нужен потому, что ImageSharp HEIC не читает, а браузеры HEIC не отображают. Используется в `UploadFile` (отдельное JPEG-представление для размеров/превью/`JpegView`; **оригинал HEIC при этом не трогается и хешируется как есть**) и в `LegacyPreviewBackfillService`
-- `PreviewPersistenceService.cs` — сохранение превью (дедуп по SHA256 + S3 + `FilePreview`); общий для загрузки и `SetVideoThumbnail`
+- `PreviewPersistenceService.cs` — сохранение превью (дедуп по SHA256 внутри целевого `StorageProfileId` + S3 + `FilePreview`); общий для загрузки и `SetVideoThumbnail`. Одинаковые байты в legacy/R2 не переиспользуются для новой локальной роли `previews`, иначе гибридная схема продолжала бы обращаться к старому endpoint
 - `LegacyPreviewBackfillService.cs` — фоновый разовый бэкафилл при старте контейнера (BackgroundService): находит фото-оригиналы (`MediaKind.Photo`) без превью, перекодирует HEIC→JPEG (замена блоба в S3 под тем же ключом + обновление имени/размера/хеша) и генерирует превью 1024/512/128. Курсор по `Id` по возрастанию; дёшев на повторных стартах (файлы с превью выпадают из выборки). Видео не покрывает
 - `AlbumViewBuilder.cs` — сборка `AlbumInfo` (счётчик элементов + URL превью обложки) батчем
 - `MusicLibraryService.cs` — бизнес-логика аудиотеки: `ListTracks` по `MediaKind.Audio`, `GetTrackDownloadUrl`, плейлисты, `ResolvePublicPlaylist`, публичные `MusicPlaylistShareLink` и приватные `MusicPlaylistGrant`
@@ -65,21 +65,25 @@ Parent: [[index]] · See also: [[api/files-api]] · [[modules/backend-files-clou
 - `FileActivityWriter.cs` — best-effort writer истории: команды не падают, если запись события не удалась; детали сериализуются в `DetailsJson`. В тестах может подставляться `Noop`, чтобы старые unit-тесты хендлеров не требовали нового dependency
 
 ### Infrastructure
-- `S3BucketInitializer.cs` — создание/проверка бакетов MinIO; временная недоступность
+- `S3BucketInitializer.cs` — для активных non-R2 профилей создаёт отсутствующие бакеты; исторические/legacy non-R2 версии только проверяет (пустой бакет не маскирует ошибочный старый адрес); для R2 только проверяет заранее созданный bucket через Object Read/Write credentials; временная недоступность
   MinIO (например, `Connection refused` во время запуска контейнера) повторяется до 10
-  попыток с backoff за проход
+  попыток с backoff за проход. Ошибка исторической версии не прерывает текущий проход: все остальные активные бакеты всё равно будут проверены/созданы, после чего инициализатор вернёт собранные ошибки
 - `S3BucketInitializationHostedService.cs` — фоновая инициализация бакетов: Files
   начинает слушать HTTP/gRPC сразу, а при недоступном MinIO повторяет проходы без
   crash-loop контейнера; постоянные ошибки конфигурации только логируются
-- `S3BucketRegistry.cs` — реестр бакетов
-- `S3Uploader.cs` — обёртка над S3/MinIO: `UploadAsync`, `DownloadAsync`, `DeleteAsync` (удаление объекта, идемпотентно — используется зачисткой корзины)
+- `S3BucketRegistry.cs` — immutable startup-реестр по `ProfileId` (не по bucket name), поэтому одинаковые имена на разных endpoints не конфликтуют. Для записи выбирает специализированную роль или `universal`; настроенный, но недоступный профиль не переключается молча. R2 использует HTTPS, region `auto`, path-style и checksum-режим `WHEN_REQUIRED`
+- `S3Uploader.cs` — обёртка над S3/MinIO по `ProfileId`: `UploadAsync`, `DownloadAsync`, range и `DeleteAsync`. Начиная со 100 MiB использует multipart (часть минимум 64 MiB, увеличивается до `ceil(size/10000)`), при ошибке abort’ит upload
 - `PhysicalStorageStatsProvider.cs` — ленивый snapshot диска MinIO: общий размер, занято не-S3, занято S3; кеш 5 минут, обновляется только при запросах storage-info
 
 ### Configurations
-- `BucketS3Options.cs` — настройки S3-бакета
+- `StorageProfileOptions.cs` — одна версия S3-профиля (`ProfileId`, роль, endpoint, credentials, bucket, R2/active/legacy-флаги)
+
+Маршрутизация новых originals: avatar → `avatars`, photo → `images`, video → `videos`, audio → `audio`, document → `documents`, archive/other → `other`; отсутствующая специализированная роль использует `universal`. Любой JpegView, thumbnail, artwork, preview и avatar 64px идёт через `previews` → `universal`. Чтение, range, delete, backfill и архивирование всегда берут `StorageProfileId` конкретной строки; ZIP скачивает каждый source из его собственного профиля.
+
+Все версии профилей загружаются из [[modules/backend-configuration]] один раз на старте Files. Это позволяет держать originals в R2, previews в локальном S3 и продолжать читать старые файлы через прежнюю версию после смены endpoint.
 
 ### Persistence
-- `FilesContext.cs`, `FilesContextFactory.cs` — EF Core DbContext (содержит `UploadedFiles`, `FileHashes`, `TempFiles`, `CloudDirectories`, `CloudFileEntries`, `FilePreviews`, `Albums`, `AlbumItems`, `MusicPlaylists`, `MusicPlaylistItems`, `MusicPlaylistShareLinks`, `MusicPlaylistGrants`, `DynamicFolders`, `FavoriteFiles`, `ShareLinks`, `FolderShareLinks`, `FileGrants`, `DirectoryGrants`, `FileMetadata`, `FileActivityEvents`). Миграция `20260602120000_AddUploadedFilesUploadersIndex.cs` — raw-SQL GIN-индекс на массив `UploadedFiles."Uploaders"` (`array_ops`): галерея `ListUserMedia` и подсчёт квоты фильтруют `Uploaders.Contains(ownerId)` → `@>`, ранее seq-scan
+- `FilesContext.cs`, `FilesContextFactory.cs` — EF Core DbContext (содержит `UploadedFiles`, `FileHashes`, `TempFiles`, `CloudDirectories`, `CloudFileEntries`, `FilePreviews`, `Albums`, `AlbumItems`, `MusicPlaylists`, `MusicPlaylistItems`, `MusicPlaylistShareLinks`, `MusicPlaylistGrants`, `DynamicFolders`, `FavoriteFiles`, `ShareLinks`, `FolderShareLinks`, `FileGrants`, `DirectoryGrants`, `FileMetadata`, `FileActivityEvents`). `20260908123000_AddStorageProfileId` backfill’ит существующие аватары в `user-avatars-old-v1`, все остальные строки (включая старые previews) — в `cloud-files-old-v1`, затем делает колонку обязательной; S3-объекты не перемещаются. Миграция `20260602120000_AddUploadedFilesUploadersIndex.cs` — raw-SQL GIN-индекс на массив `UploadedFiles."Uploaders"` (`array_ops`)
 - `UploadedFilesStorage.cs`
 - `FileHashesStorage.cs`
 - `TempFilesStorage.cs`

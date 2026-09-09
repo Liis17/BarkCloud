@@ -8,6 +8,8 @@ import { applyTheme, getTheme, type Theme } from '../lib/theme';
 import { webauthnRegister, webauthnSupported } from '../lib/webauthn';
 import type { Privacy, Session, SettingsState } from '../lib/types';
 
+const ServerSettingsTab = React.lazy(() => import('./ServerSettingsTab'));
+
 interface WebAuthnKey {
   id: string;
   name: string;
@@ -262,7 +264,11 @@ interface ProgressState {
   autoClose: boolean;
 }
 
-function SystemSection({ admin, system }: { admin: SettingsState['admin']; system: SettingsState['system'] }) {
+function SystemSection({ admin, system, onUnlockedChange }: {
+  admin: SettingsState['admin'];
+  system: SettingsState['system'];
+  onUnlockedChange?: (value: boolean) => void;
+}) {
   const [unlocked, setUnlocked] = React.useState(admin.unlocked);
   const [password, setPassword] = React.useState('');
   const [unlockErr, setUnlockErr] = React.useState('');
@@ -289,6 +295,7 @@ function SystemSection({ admin, system }: { admin: SettingsState['admin']; syste
       const serviceRes = await sGet<ServicesSnap>('/api/system/services');
       if (serviceRes.status === 403) {
         setUnlocked(false);
+        onUnlockedChange?.(false);
         return;
       }
       if (!serviceRes.ok || !serviceRes.data) {
@@ -308,7 +315,7 @@ function SystemSection({ admin, system }: { admin: SettingsState['admin']; syste
       setServices([]);
       setDockerErr(String(e));
     }
-  }, []);
+  }, [onUnlockedChange]);
 
   React.useEffect(() => {
     if (unlocked) {
@@ -357,12 +364,14 @@ function SystemSection({ admin, system }: { admin: SettingsState['admin']; syste
     if (ok) {
       setPassword('');
       setUnlocked(true);
+      onUnlockedChange?.(true);
     } else setUnlockErr(data?.message || 'Не удалось разблокировать');
   }
 
   async function doLock() {
     await sPost('/api/system/lock');
     setUnlocked(false);
+    onUnlockedChange?.(false);
     setServices(null);
     setBranches(null);
     setProgress(null);
@@ -1422,7 +1431,7 @@ function StorageTab({ storage }: { storage: SettingsState['storage'] }) {
           </div>
           <div className="item">
             <span className="sw" style={{ background: DISK_S3_COLOR }} />
-            <span className="k">Облако (S3)</span>
+            <span className="k">Локальный S3</span>
             <span className="v">{disk.s3Label}</span>
           </div>
           <div className="item">
@@ -1585,6 +1594,7 @@ interface NavItem {
 
 export function SettingsPage() {
   const [data, setData] = React.useState<SettingsState | null>(null);
+  const [adminUnlocked, setAdminUnlocked] = React.useState(false);
   const [err, setErr] = React.useState<string | null>(null);
   const [toast, setToast] = React.useState<{ kind: 'ok' | 'err'; msg: string } | null>(null);
   const flash = React.useCallback<Flash>((kind, msg) => {
@@ -1599,7 +1609,10 @@ export function SettingsPage() {
           window.location.href = '/login';
           return;
         }
-        if (res.ok && res.data) setData(res.data);
+        if (res.ok && res.data) {
+          setData(res.data);
+          setAdminUnlocked(res.data.admin.unlocked);
+        }
         else setErr('Не удалось загрузить настройки');
       })
       .catch(() => setErr('Не удалось загрузить настройки'));
@@ -1614,8 +1627,11 @@ export function SettingsPage() {
       { key: 'sessions', label: 'Устройства и сессии', icon: 'device' },
       { key: 'appearance', label: 'Внешний вид', icon: 'palette' },
       ...(data?.admin.enabled ? [{ key: 'system', label: 'Обслуживание', icon: 'server' }] : []),
+      ...(data?.admin.enabled && adminUnlocked
+        ? [{ key: 'server-settings', label: 'Настройки сервера', icon: 'settings' }]
+        : []),
     ],
-    [data],
+    [data, adminUnlocked],
   );
   const navKeys = nav.map((n) => n.key);
 
@@ -1678,7 +1694,14 @@ export function SettingsPage() {
       content = <AppearanceTab />;
       break;
     case 'system':
-      content = <SystemSection admin={data.admin} system={data.system} />;
+      content = <SystemSection admin={data.admin} system={data.system} onUnlockedChange={setAdminUnlocked} />;
+      break;
+    case 'server-settings':
+      content = (
+        <React.Suspense fallback={<Loading label="Загрузка настроек сервера…" />}>
+          <ServerSettingsTab />
+        </React.Suspense>
+      );
       break;
     default:
       content = <AccountTab profile={data.profile} flash={flash} />;

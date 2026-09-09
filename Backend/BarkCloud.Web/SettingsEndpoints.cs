@@ -34,6 +34,22 @@ public static class SettingsEndpoints
     public sealed record WebAuthnRegisterCompleteBody(string? ChallengeId, JsonElement Attestation, string? Name);
     public sealed record WebAuthnRemoveBody(string? CredentialId);
     public sealed record RegistrationBody(bool Enabled);
+    public sealed record ServerValueBody(int ServiceId, string? Section, string? Key, string? Value);
+    public sealed record ServerRollbackBody(long RevisionId, int ServiceId, string? Section, string? Key);
+    public sealed record ServerStorageProfileBody(
+        string? Role,
+        string? ServiceUrl,
+        string? AccessKey,
+        string? SecretKey,
+        string? BucketName,
+        bool IsR2,
+        bool IsLegacy,
+        string? ProfileId,
+        bool ConfirmLegacyMutation);
+    public sealed record ServerStorageActivateBody(string? ProfileId);
+    public sealed record ServerStorageDisableBody(string? Role);
+    public sealed record ReservedNameBody(string? Name);
+    public sealed record ReservedNameUpdateBody(string? OldName, string? NewName);
 
     public static void MapSettingsEndpoints(this WebApplication app)
     {
@@ -68,6 +84,82 @@ public static class SettingsEndpoints
                     ? Results.Ok(new { enabled = body.Enabled })
                     : Results.BadRequest(new { message = response.Message });
             }));
+
+        // ───────── Настройки сервера (обычная сессия + AdminGate) ─────────
+
+        api.MapGet("/server", (HttpContext http, AuthGateway auth, AdminGate admin, ConfigurationManagementGateway configuration) =>
+            DoAdmin(http, auth, admin, async user =>
+                Results.Ok(await configuration.GetAsync(http.RequestAborted))));
+
+        api.MapPost("/server/value", (HttpContext http, AuthGateway auth, AdminGate admin, ConfigurationManagementGateway configuration, ServerValueBody body) =>
+            DoAdmin(http, auth, admin, async user => Mutation(await configuration.SaveValueAsync(
+                body.ServiceId,
+                body.Section ?? string.Empty,
+                body.Key ?? string.Empty,
+                body.Value,
+                $"user:{user.UserId}",
+                http.RequestAborted))));
+
+        api.MapGet("/server/history", (HttpContext http, AuthGateway auth, AdminGate admin, ConfigurationManagementGateway configuration,
+                int serviceId, string? section, string? key, int? count) =>
+            DoAdmin(http, auth, admin, async _ => Results.Ok(await configuration.GetHistoryAsync(
+                serviceId,
+                section ?? string.Empty,
+                key ?? string.Empty,
+                count ?? 50,
+                http.RequestAborted))));
+
+        api.MapPost("/server/rollback", (HttpContext http, AuthGateway auth, AdminGate admin, ConfigurationManagementGateway configuration, ServerRollbackBody body) =>
+            DoAdmin(http, auth, admin, async user => Mutation(await configuration.RollbackAsync(
+                body.RevisionId,
+                body.ServiceId,
+                body.Section ?? string.Empty,
+                body.Key ?? string.Empty,
+                $"user:{user.UserId}",
+                http.RequestAborted))));
+
+        api.MapPost("/server/storage/profile", (HttpContext http, AuthGateway auth, AdminGate admin, ConfigurationManagementGateway configuration, ServerStorageProfileBody body) =>
+            DoAdmin(http, auth, admin, async user => Mutation(await configuration.SaveStorageProfileAsync(
+                new StorageProfileEdit(
+                    body.Role ?? string.Empty,
+                    body.ServiceUrl ?? string.Empty,
+                    body.AccessKey ?? string.Empty,
+                    body.SecretKey ?? string.Empty,
+                    body.BucketName ?? string.Empty,
+                    body.IsR2,
+                    body.IsLegacy,
+                    body.ProfileId,
+                    body.ConfirmLegacyMutation),
+                $"user:{user.UserId}",
+                http.RequestAborted))));
+
+        api.MapPost("/server/storage/activate", (HttpContext http, AuthGateway auth, AdminGate admin, ConfigurationManagementGateway configuration, ServerStorageActivateBody body) =>
+            DoAdmin(http, auth, admin, async user => Mutation(await configuration.ActivateStorageProfileAsync(
+                body.ProfileId ?? string.Empty,
+                $"user:{user.UserId}",
+                http.RequestAborted))));
+
+        api.MapPost("/server/storage/disable", (HttpContext http, AuthGateway auth, AdminGate admin, ConfigurationManagementGateway configuration, ServerStorageDisableBody body) =>
+            DoAdmin(http, auth, admin, async user => Mutation(await configuration.DisableStorageRoleAsync(
+                body.Role ?? string.Empty,
+                $"user:{user.UserId}",
+                http.RequestAborted))));
+
+        api.MapPost("/server/reserved/add", (HttpContext http, AuthGateway auth, AdminGate admin, ConfigurationManagementGateway configuration, ReservedNameBody body) =>
+            DoAdmin(http, auth, admin, async _ => Mutation(await configuration.AddReservedNameAsync(
+                body.Name ?? string.Empty,
+                http.RequestAborted))));
+
+        api.MapPost("/server/reserved/update", (HttpContext http, AuthGateway auth, AdminGate admin, ConfigurationManagementGateway configuration, ReservedNameUpdateBody body) =>
+            DoAdmin(http, auth, admin, async _ => Mutation(await configuration.UpdateReservedNameAsync(
+                body.OldName ?? string.Empty,
+                body.NewName ?? string.Empty,
+                http.RequestAborted))));
+
+        api.MapPost("/server/reserved/delete", (HttpContext http, AuthGateway auth, AdminGate admin, ConfigurationManagementGateway configuration, ReservedNameBody body) =>
+            DoAdmin(http, auth, admin, async _ => Mutation(await configuration.DeleteReservedNameAsync(
+                body.Name ?? string.Empty,
+                http.RequestAborted))));
         // ───────── Профиль ─────────
 
         api.MapPost("/profile/name", (HttpContext http, AuthGateway auth, UsersApi.UsersApiClient users, NameBody body) =>
@@ -355,6 +447,30 @@ public static class SettingsEndpoints
             return MapRpc(ex);
         }
     }
+
+    private static async Task<IResult> DoAdmin(
+        HttpContext http,
+        AuthGateway auth,
+        AdminGate admin,
+        Func<WebUser, Task<IResult>> action)
+    {
+        var user = await auth.AuthenticateAsync(http);
+        if (user is null)
+            return Results.Unauthorized();
+        if (!admin.IsUnlocked(http))
+            return Results.StatusCode(StatusCodes.Status403Forbidden);
+        try
+        {
+            return await action(user);
+        }
+        catch (RpcException exception)
+        {
+            return MapRpc(exception);
+        }
+    }
+
+    private static IResult Mutation(ConfigurationMutationResult result) =>
+        result.Success ? Results.Ok(result) : Results.BadRequest(result);
 
     private static IResult MapRpc(RpcException ex)
     {

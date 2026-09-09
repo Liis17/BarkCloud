@@ -66,7 +66,7 @@ Web — тонкий релей к [[modules/backend-identity]] (валидац�
 - `WebEndpoints.cs` — только серверные маршруты: `/` (редирект на `/photos` или `/login`), блок логина (`/login` GET/POST, `/logout`, `/register` GET/POST, `/register/confirm` POST, `/forgot` GET/POST, `/forgot/confirm` POST) + `LoginVars/RegisterVars/...`. **`GET /s/{token}`** — анонимный публичный резолв ссылки: `FilesServerApi.ResolveShare(token)` сервисным токеном → `found` ? `Results.Redirect(download_url)` (302) : `404`; `RpcException` → 404. Маршрут замаплен до `MapFallback`, чтобы не попасть под SPA-fallback. Маршруты приложения (`/photos`, `/videos`, `/albums`, `/files`, `/favorites`, `/trash`, `/settings`, `/shared`) отдаёт SPA через `MapFallback`; прежние page-эндпоинты, `ServePage`, `/shared.jsx`, `/shared.css` **удалены**.
 - `Endpoints/CloudApiEndpoints.cs` — группа `/api/*` для Фото/Видео/Файлов (см. раздел «Фото/Видео/Файлы») + **`GET /api/me`** (каркас: профиль/аватар/хранилище/версия/хост — собирает `PageDataBuilder.BuildShellAsync`) + **`GET /api/storage`** (лёгкий рефетч только блока хранилища — `PageDataBuilder.BuildStorageAsync`, `GetUser` дёргается лишь при отсутствии лимита в Files; SPA вызывает при каждой смене вкладки). Также: `GET /api/cloud/path?entry=|dir=` (`GetPath` → `{ segments[{id,name}], fullPath }`, для «Показать в папке»), `POST /api/cloud/video/thumbnail` (`SetVideoThumbnail`, замена обложки видео), `POST /api/files/check-hash` (`CheckFileHash` → `{ fileId, exists, locations[] }` без побочных эффектов; для модалки дубликата «файл уже есть» — серверный дедуп снят). **Воспоминания**: `GET /api/cloud/memories?month=&day=&perYear=` (`GetMemories` → `{ groups }`, маппер `CloudJson.MemoryGroup`). (Вкладка «Карта» удалена; HTTP-эндпоинт `/api/cloud/map` и маппер `CloudJson.MapPoint` тоже убраны. gRPC-метод `CloudApi.ListMediaLocations` сервиса Files **остаётся** как часть контракта Files API — веб его больше не вызывает.)
 - `SystemEndpoints.cs` — `/healthz`, `/maintenance-status`, страницы ожидания `/updating`/`/restarting` и группа `/api/system/*` (обновление/перезапуск бэкенда). См. [[modules/web-system-updates]].
-- `SettingsEndpoints.cs` — группа `/api/settings/*` для действий страницы настроек (см. раздел «Настройки») + **`GET /api/settings/full`** (полное состояние страницы настроек — `PageDataBuilder.BuildSettingsJsonAsync`).
+- `SettingsEndpoints.cs` — группа `/api/settings/*` для действий страницы настроек (см. раздел «Настройки») + **`GET /api/settings/full`**. Admin-only `/api/settings/server*` требует одновременно обычную авторизацию и действующую сессию `AdminGate`
 
 ### Auth
 - `AuthGateway.cs` — cookie, локальная валидация JWT, refresh, логин/логаут, `IssueSession` (общая выдача cookie сессии), `ClearSession` (удаление cookie без обращения в Identity — после удаления аккаунта).
@@ -76,6 +76,8 @@ Web — тонкий релей к [[modules/backend-identity]] (валидац�
 - `WebUser.cs` — модель пользователя + `LoginOutcome`/`LoginResult` + `RegistrationOutcome`/`RegistrationResult` + `PasswordResetOutcome`/`PasswordResetResult`.
 
 ### Infrastructure
+
+- `ConfigurationManagementGateway.cs` — единый серверный gateway к Configuration: добавляет `x-config-access-key`, преобразует DTO, скрывает scalar secrets и полностью удаляет `SecretKey` S3 из browser JSON; пустой secret в edit означает «сохранить текущий»
 - `TemplateRenderer.cs` — рендер плейсхолдеров `{{ }}` / `{{{ }}}` / `| default("…")` с JS-экранированием. Используется только для серверной страницы логина.
 - `DeviceInfo.cs`, `BrowserContext.cs` — построение device-метаданных из запроса браузера.
 - `ServiceToken.cs` — генерация сервисного JWT (`TokenType=Service`) из общего `JwtSettings:SecretKey`.
@@ -160,7 +162,7 @@ UI: в сетке — превью (`MediaThumb`: `<img srcset sizes>` пове�
 
 ## Настройки (рабочие параметры)
 
-Маршрут SPA `/settings` (`pages/SettingsPage.tsx`) — настоящие вкладки (левая навигация `.set-nav`, активная секция в URL hash, рендерится только она). Данные грузятся на mount через `GET /api/settings/full` (раньше — серверный `page_data_json`). Вкладки: Аккаунт, Безопасность, Приватность, Хранилище, Устройства и сессии, Внешний вид, Обслуживание (только если задан `App:AdminPassword`).
+Маршрут SPA `/settings` (`pages/SettingsPage.tsx`) — настоящие вкладки (левая навигация `.set-nav`, активная секция в URL hash, рендерится только она). Данные грузятся на mount через `GET /api/settings/full`. Вкладки: Аккаунт, Безопасность, Приватность, Хранилище, Устройства и сессии, Внешний вид, Обслуживание и лениво загружаемая «Настройки сервера». Последняя появляется только после разблокировки `AdminGate`; frontend вынесен в отдельный `ServerSettingsTab` chunk.
 
 Действия идут через REST `/api/settings/*` (`SettingsEndpoints.cs`) — паттерн как у `/api/system/*`: проверка `AuthGateway.AuthenticateAsync`, затем gRPC с токеном пользователя (`BrowserContext.UserToken`), ошибки маппятся в `BadRequest { message }`. Эндпоинты:
 
@@ -171,6 +173,9 @@ UI: в сетке — превью (`MediaThumb`: `<img srcset sizes>` пове�
 - Аккаунт: `POST account/delete` (`DeleteAccount` + `ClearSession` → клиент уходит на `/login`).
 - Аватар: `POST avatar` (multipart `file` → `FilesServerApi.UploadAvatarServer` → `UsersServerApi.SetProfilePictureServer`), `POST avatar/remove` (тот же server-API с пустыми URL).
 - Обслуживание/доступ: `POST system/registration { enabled }` меняет общий `Features:RegistrationEnabled` через Configuration API; требует разблокированный `AdminGate`.
+- Настройки сервера: `GET server`, `POST server/value`, `GET server/history`, `POST server/rollback`, `POST server/storage/profile|activate|disable`; дополнительно `server/reserved/add|update|delete`. UI группирует keys по service-таблицам, использует boolean/integer/URL/password/string editors, показывает diff-confirmation, историю/rollback, reserved names и карточки всех версий S3. После изменения показывает контейнеры и banner ручного перезапуска через «Обслуживание».
+
+В browser DTO нет raw secret и истории secret: доступны только `isSensitive`/`hasValue`; S3 access key маскируется, `SecretKey` отсутствует целиком. Поля, управляемые `.env`/compose, read-only с подписью источника. Вкладка «Хранилище» называет физическую статистику диска «Локальный S3»; пользовательский объём по-прежнему считается по БД.
 
 Удалены секции-плейсхолдеры без бэкенда (уведомления, язык, API-интеграции, E2E, резервные коды, экспорт/деактивация).
 
@@ -186,8 +191,7 @@ UI: в сетке — превью (`MediaThumb`: `<img srcset sizes>` пове�
 Из env / appsettings (UI-настройки, не секреты):
 - `ASPNETCORE_URLS`, `App__PublicHost`, `App__CookieSecure`, `App__Version`.
 
-> Для нового `ServiceId.Web` правились `Shared.Identity/ServiceId.cs` и `ConfigurationSeed.cs`
-> (Configuration-сервис надо пересобрать; на существующей БД seed не перезапускается — сработает fallback в `Program.cs`).
+Строгий каталог Configuration досевает отсутствующие Web-ключи при каждом старте, не перезаписывая уже заполненные значения.
 
 ## Инфраструктура
 

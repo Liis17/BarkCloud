@@ -10,156 +10,198 @@ using System.Text;
 namespace BarkCloud.Files.Infrastructure;
 
 /// <summary>
-/// Реестр S3 бакетов. Управляет конфигурацией бакетов и клиентами S3 для каждого бакета.
-/// Каждый бакет может находиться на отдельном S3-совместимом хранилище со своими учетными данными.
+/// Immutable startup registry of versioned storage profiles. A file always addresses a profile id,
+/// never a physical bucket name, so equal bucket names at different endpoints remain unambiguous.
 /// </summary>
 public class S3BucketRegistry : IDisposable
 {
-    /// <summary>
-    /// Идентификатор бакета для аватарок пользователей
-    /// </summary>
-    public const string UserAvatarsBucketId = "user-avatars";
+    public const string UniversalRole = "universal";
+    public const string UserAvatarsOldProfileId = "user-avatars-old-v1";
+    public const string CloudFilesOldProfileId = "cloud-files-old-v1";
 
-    /// <summary>
-    /// Идентификатор бакета для файлов облачного хранилища
-    /// </summary>
-    public const string CloudFilesBucketId = "cloud-files";
-
-    /// <summary>
-    /// Соответствие типов файлов идентификаторам бакетов (логическое имя бакета в конфигурации)
-    /// </summary>
-    private static readonly Dictionary<UploadFileType, string> BucketIdMap = new()
-    {
-        { UploadFileType.Unknown, CloudFilesBucketId },
-        { UploadFileType.UserAvatar, UserAvatarsBucketId },
-        { UploadFileType.CloudFile, CloudFilesBucketId },
-    };
-
-    /// <summary>
-    /// Список всех идентификаторов бакетов
-    /// </summary>
-    private static readonly HashSet<string> AllBucketIds = new()
-    {
-        UserAvatarsBucketId,
-        CloudFilesBucketId,
-    };
-
-    /// <summary>
-    /// Конфигурация бакетов по идентификатору бакета
-    /// </summary>
-    private readonly Dictionary<string, BucketS3Options> _bucketConfigs;
-
-    /// <summary>
-    /// S3 клиенты по имени бакета (реальное имя из конфигурации)
-    /// </summary>
-    private readonly Dictionary<string, IAmazonS3> _clientsByBucketName;
-
-    /// <summary>
-    /// Кэш уникальных S3 клиентов для корректной очистки ресурсов
-    /// </summary>
+    private readonly Dictionary<string, StorageProfileOptions> _profiles;
+    private readonly Dictionary<string, string> _activeProfileByRole;
+    private readonly Dictionary<string, IAmazonS3> _clientsByProfileId;
     private readonly List<IAmazonS3> _uniqueClients;
 
     public S3BucketRegistry(IConfiguration configuration)
     {
-        _bucketConfigs = new Dictionary<string, BucketS3Options>();
-        _clientsByBucketName = new Dictionary<string, IAmazonS3>();
+        _profiles = new Dictionary<string, StorageProfileOptions>(StringComparer.Ordinal);
+        _activeProfileByRole = new Dictionary<string, string>(StringComparer.Ordinal);
+        _clientsByProfileId = new Dictionary<string, IAmazonS3>(StringComparer.Ordinal);
 
-        var s3BucketsSection = configuration.GetSection("S3Buckets");
-
-        foreach (var bucketSection in s3BucketsSection.GetChildren())
+        foreach (var section in configuration.GetSection("StorageProfiles").GetChildren())
         {
-            var options = new BucketS3Options();
-            bucketSection.Bind(options);
-
-            // Если BucketName не задан явно, используем идентификатор из конфигурации
-            if (string.IsNullOrWhiteSpace(options.BucketName))
+            var profile = new StorageProfileOptions();
+            section.Bind(profile);
+            if (string.IsNullOrWhiteSpace(profile.ProfileId))
+                profile.ProfileId = section.Key;
+            Validate(profile);
+            _profiles.Add(profile.ProfileId, profile);
+            if (profile.IsActive && !profile.IsLegacy)
             {
-                options.BucketName = bucketSection.Key;
+                if (!_activeProfileByRole.TryAdd(profile.Role, profile.ProfileId))
+                    throw new InvalidOperationException($"More than one active S3 profile is configured for role '{profile.Role}'.");
             }
-
-            _bucketConfigs[bucketSection.Key] = options;
         }
 
-        // Создаем S3 клиенты с кэшированием по уникальным параметрам подключения
-        var clientCache = new Dictionary<string, IAmazonS3>();
+        AddLegacyConfigurationFallback(configuration, "user-avatars", UserAvatarsOldProfileId, "user-avatars-old");
+        AddLegacyConfigurationFallback(configuration, "cloud-files", CloudFilesOldProfileId, "cloud-files-old");
 
-        foreach (var (bucketId, opts) in _bucketConfigs)
+        var clientCache = new Dictionary<string, IAmazonS3>(StringComparer.Ordinal);
+        foreach (var profile in _profiles.Values)
         {
-            // SecretKey не должен попадать в строку, хранящуюся в словаре (защита от дампа памяти)
-            var rawKey = $"{opts.ServiceUrl}|{opts.AccessKey}|{opts.SecretKey}";
-            var clientKey = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(rawKey)));
-
+            var clientKey = ClientKey(profile);
             if (!clientCache.TryGetValue(clientKey, out var client))
             {
-                var config = new AmazonS3Config
-                {
-                    ServiceURL = opts.ServiceUrl,
-                    ForcePathStyle = opts.ForcePathStyle,
-                };
-
-                client = new AmazonS3Client(new BasicAWSCredentials(opts.AccessKey, opts.SecretKey), config);
-                clientCache[clientKey] = client;
+                client = CreateClient(profile);
+                clientCache.Add(clientKey, client);
             }
-
-            _clientsByBucketName[opts.BucketName] = client;
+            _clientsByProfileId.Add(profile.ProfileId, client);
         }
-
         _uniqueClients = clientCache.Values.ToList();
     }
 
-    /// <summary>
-    /// Получает имя бакета для указанного типа файла (реальное имя из конфигурации)
-    /// </summary>
+    public virtual string ResolveWriteProfileId(UploadFileType fileType, MediaKind mediaKind, bool isPreview)
+    {
+        var role = isPreview ? "previews" : fileType switch
+        {
+            UploadFileType.UserAvatar => "avatars",
+            UploadFileType.CloudFile => mediaKind switch
+            {
+                MediaKind.Photo => "images",
+                MediaKind.Video => "videos",
+                MediaKind.Audio => "audio",
+                MediaKind.Document => "documents",
+                _ => "other"
+            },
+            _ => "other"
+        };
+        if (_activeProfileByRole.TryGetValue(role, out var specialized))
+            return specialized;
+        if (_activeProfileByRole.TryGetValue(UniversalRole, out var universal))
+            return universal;
+        throw new InvalidOperationException($"No active S3 profile is configured for role '{role}' or fallback '{UniversalRole}'.");
+    }
+
+    public virtual StorageProfileOptions GetProfile(string profileId) =>
+        _profiles.TryGetValue(profileId, out var profile)
+            ? profile
+            : throw new InvalidOperationException($"S3 profile '{profileId}' is not configured.");
+
+    public virtual string ResolveReadProfileId(UploadFile file)
+    {
+        if (!string.IsNullOrWhiteSpace(file.StorageProfileId))
+            return file.StorageProfileId;
+
+        var legacyProfileId = file.Type == UploadFileType.UserAvatar
+            ? UserAvatarsOldProfileId
+            : CloudFilesOldProfileId;
+        return _profiles.ContainsKey(legacyProfileId)
+            ? legacyProfileId
+            : ResolveWriteProfileId(file.Type, file.MediaKind, isPreview: false);
+    }
+
+    public virtual IAmazonS3 GetClientForProfile(string profileId) =>
+        _clientsByProfileId.TryGetValue(profileId, out var client)
+            ? client
+            : throw new InvalidOperationException($"S3 client is not configured for profile '{profileId}'.");
+
+    public virtual IEnumerable<(StorageProfileOptions Profile, IAmazonS3 Client)> GetAllProfiles() =>
+        _profiles.Values.Select(profile => (profile, _clientsByProfileId[profile.ProfileId]));
+
+    // Compatibility surface for old tests/callers while all production paths migrate to ProfileId.
     public virtual string GetBucketName(UploadFileType fileType)
     {
-        var bucketId = GetBucketId(fileType);
-
-        return _bucketConfigs.TryGetValue(bucketId, out var config)
-            ? config.BucketName
-            : bucketId;
+        var profileId = fileType == UploadFileType.UserAvatar
+            ? _profiles.ContainsKey(UserAvatarsOldProfileId) ? UserAvatarsOldProfileId : ResolveWriteProfileId(fileType, MediaKind.Photo, false)
+            : _profiles.ContainsKey(CloudFilesOldProfileId) ? CloudFilesOldProfileId : ResolveWriteProfileId(fileType, MediaKind.Other, false);
+        return GetProfile(profileId).BucketName;
     }
 
-    /// <summary>
-    /// Получает S3 клиент для указанного имени бакета
-    /// </summary>
     public IAmazonS3 GetClientForBucket(string bucketName)
     {
-        if (_clientsByBucketName.TryGetValue(bucketName, out var client))
-            return client;
-
-        throw new InvalidOperationException($"S3 клиент не настроен для бакета: {bucketName}");
-    }
-
-    /// <summary>
-    /// Возвращает все бакеты с их S3 клиентами для инициализации
-    /// </summary>
-    public IEnumerable<(string BucketName, IAmazonS3 Client)> GetAllBuckets()
-    {
-        return AllBucketIds
-            .Where(_bucketConfigs.ContainsKey)
-            .Select(bucketId => (_bucketConfigs[bucketId].BucketName, _clientsByBucketName[_bucketConfigs[bucketId].BucketName]));
-    }
-
-    /// <summary>
-    /// Получает все уникальные идентификаторы бакетов
-    /// </summary>
-    public static IEnumerable<string> GetAllBucketIds()
-    {
-        return AllBucketIds;
-    }
-
-    private static string GetBucketId(UploadFileType fileType)
-    {
-        return BucketIdMap.TryGetValue(fileType, out var id)
-            ? id
-            : BucketIdMap[UploadFileType.Unknown];
+        var matches = _profiles.Values.Where(profile => profile.BucketName == bucketName).ToArray();
+        return matches.Length switch
+        {
+            1 => GetClientForProfile(matches[0].ProfileId),
+            0 => throw new InvalidOperationException($"S3 client is not configured for bucket '{bucketName}'."),
+            _ => throw new InvalidOperationException(
+                $"Bucket name '{bucketName}' exists in multiple S3 profiles; address it by ProfileId.")
+        };
     }
 
     public void Dispose()
     {
         foreach (var client in _uniqueClients)
-        {
             client.Dispose();
+    }
+
+    private void AddLegacyConfigurationFallback(
+        IConfiguration configuration,
+        string bucketId,
+        string profileId,
+        string role)
+    {
+        if (_profiles.ContainsKey(profileId))
+            return;
+        var section = configuration.GetSection($"S3Buckets:{bucketId}");
+        if (!section.Exists())
+            return;
+        var profile = new StorageProfileOptions
+        {
+            ProfileId = profileId,
+            Role = role,
+            Version = 1,
+            ServiceUrl = section["ServiceUrl"] ?? string.Empty,
+            AccessKey = section["AccessKey"] ?? string.Empty,
+            SecretKey = section["SecretKey"] ?? string.Empty,
+            BucketName = section["BucketName"] ?? bucketId,
+            IsLegacy = true,
+            IsActive = false,
+            IsR2 = (section["ServiceUrl"] ?? string.Empty).Contains(".r2.cloudflarestorage.com", StringComparison.OrdinalIgnoreCase)
+        };
+        Validate(profile);
+        _profiles.Add(profile.ProfileId, profile);
+    }
+
+    private static IAmazonS3 CreateClient(StorageProfileOptions profile)
+    {
+        var config = new AmazonS3Config
+        {
+            ServiceURL = R2Endpoint(profile),
+            ForcePathStyle = true
+        };
+        if (profile.IsR2)
+        {
+            config.AuthenticationRegion = "auto";
+            config.RequestChecksumCalculation = RequestChecksumCalculation.WHEN_REQUIRED;
+            config.ResponseChecksumValidation = ResponseChecksumValidation.WHEN_REQUIRED;
         }
+        return new AmazonS3Client(new BasicAWSCredentials(profile.AccessKey, profile.SecretKey), config);
+    }
+
+    private static string R2Endpoint(StorageProfileOptions profile)
+    {
+        if (!profile.IsR2)
+            return profile.ServiceUrl;
+        var uri = new UriBuilder(profile.ServiceUrl) { Scheme = Uri.UriSchemeHttps, Port = -1 };
+        return uri.Uri.ToString().TrimEnd('/');
+    }
+
+    private static string ClientKey(StorageProfileOptions profile)
+    {
+        var value = $"{R2Endpoint(profile)}|{profile.AccessKey}|{profile.SecretKey}|{profile.IsR2}";
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
+    }
+
+    private static void Validate(StorageProfileOptions profile)
+    {
+        if (new[] { profile.ProfileId, profile.Role, profile.ServiceUrl, profile.AccessKey, profile.SecretKey, profile.BucketName }
+            .Any(string.IsNullOrWhiteSpace))
+            throw new InvalidOperationException($"S3 profile '{profile.ProfileId}' is incomplete.");
+        if (!Uri.TryCreate(profile.ServiceUrl, UriKind.Absolute, out var endpoint)
+            || endpoint.Scheme is not ("http" or "https"))
+            throw new InvalidOperationException($"S3 profile '{profile.ProfileId}' has an invalid endpoint.");
     }
 }

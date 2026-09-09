@@ -1,6 +1,8 @@
 using Amazon.S3;
 using Amazon.S3.Model;
 
+using BarkCloud.Files.Configurations;
+
 using System.Net;
 using System.Net.Http;
 using System.Net.Sockets;
@@ -32,12 +34,13 @@ public class S3BucketInitializer
     public async Task InitializeBucketsAsync(CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Начинается инициализация S3 бакетов...");
+        var failures = new List<Exception>();
 
-        foreach (var (bucketName, client) in _registry.GetAllBuckets())
+        foreach (var (profile, client) in _registry.GetAllProfiles())
         {
             try
             {
-                await EnsureBucketExistsAsync(client, bucketName, cancellationToken);
+                await EnsureBucketExistsAsync(client, profile, cancellationToken);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -45,10 +48,15 @@ public class S3BucketInitializer
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Ошибка при инициализации бакета {BucketName}", bucketName);
-                throw;
+                _logger.LogError(ex, "Ошибка при инициализации S3-профиля {ProfileId}, бакет {BucketName}", profile.ProfileId, profile.BucketName);
+                failures.Add(ex);
             }
         }
+
+        if (failures.Count == 1)
+            throw failures[0];
+        if (failures.Count > 1)
+            throw new AggregateException("Не удалось инициализировать несколько S3-профилей.", failures);
 
         _logger.LogInformation("Инициализация S3 бакетов успешно завершена");
     }
@@ -58,14 +66,14 @@ public class S3BucketInitializer
     /// </summary>
     private async Task EnsureBucketExistsAsync(
         IAmazonS3 client,
-        string bucketName,
+        StorageProfileOptions profile,
         CancellationToken cancellationToken)
     {
         for (var attempt = 1; ; attempt++)
         {
             try
             {
-                await EnsureBucketExistsOnceAsync(client, bucketName, cancellationToken);
+                await EnsureBucketExistsOnceAsync(client, profile, cancellationToken);
                 return;
             }
             catch (Exception ex) when (attempt < MaxAttemptsPerPass && IsTransientStartupException(ex))
@@ -73,7 +81,7 @@ public class S3BucketInitializer
                 var delay = TimeSpan.FromSeconds(Math.Min(attempt, 5));
                 _logger.LogWarning(
                     "S3 недоступен для бакета {BucketName}; повтор {Attempt}/{MaxAttempts} через {DelaySeconds} с",
-                    bucketName,
+                    profile.BucketName,
                     attempt + 1,
                     MaxAttemptsPerPass,
                     delay.TotalSeconds);
@@ -84,12 +92,25 @@ public class S3BucketInitializer
 
     private async Task EnsureBucketExistsOnceAsync(
         IAmazonS3 client,
-        string bucketName,
+        StorageProfileOptions profile,
         CancellationToken cancellationToken)
     {
+        var bucketName = profile.BucketName;
         try
         {
-            // Проверяем существование бакета через попытку получить его локацию
+            if (profile.IsR2)
+            {
+                // Object Read/Write credentials do not need bucket-administration permissions.
+                await client.ListObjectsV2Async(new ListObjectsV2Request
+                {
+                    BucketName = bucketName,
+                    MaxKeys = 1
+                }, cancellationToken);
+                _logger.LogInformation("R2-бакет {BucketName} доступен", bucketName);
+                return;
+            }
+
+            // Для локального S3 проверяем существование и при необходимости создаём бакет.
             try
             {
                 await client.GetBucketLocationAsync(bucketName, cancellationToken);
@@ -98,7 +119,11 @@ public class S3BucketInitializer
             }
             catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
             {
-                // Бакет не найден, продолжаем создание
+                if (!profile.IsActive)
+                {
+                    throw new InvalidOperationException(
+                        $"Inactive S3 profile '{profile.ProfileId}' points to missing bucket '{bucketName}'.", ex);
+                }
             }
 
             // Создаем бакет

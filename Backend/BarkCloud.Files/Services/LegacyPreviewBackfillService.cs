@@ -127,13 +127,14 @@ public class LegacyPreviewBackfillService : BackgroundService
         if (file is null || string.IsNullOrEmpty(file.Etag))
             return;
 
-        var bucket = bucketRegistry.GetBucketName(file.Type);
+        var storageProfileId = bucketRegistry.ResolveReadProfileId(file);
+        var previewProfileId = bucketRegistry.ResolveWriteProfileId(file.Type, file.MediaKind, true);
 
         var tempPath = Path.GetTempFileName();
         try
         {
             // Скачиваем оригинал на диск (нужно для ffmpeg при HEIC).
-            await using (var s3Stream = await s3.DownloadAsync(bucket, file.Id.ToString()))
+            await using (var s3Stream = await s3.DownloadAsync(storageProfileId, file.Id.ToString()))
             await using (var fs = new FileStream(tempPath, FileMode.Create, FileAccess.Write))
             {
                 await s3Stream.CopyToAsync(fs, ct);
@@ -154,7 +155,7 @@ public class LegacyPreviewBackfillService : BackgroundService
 
                 // Заменяем блоб в S3 на JPEG под тем же ключом.
                 using (var ms = new MemoryStream(jpeg))
-                    file.Etag = await s3.UploadAsync(bucket, file.Id.ToString(), ms, "image/jpeg");
+                    file.Etag = await s3.UploadAsync(storageProfileId, file.Id.ToString(), ms, "image/jpeg");
 
                 file.Filename = Path.ChangeExtension(file.Filename, ".jpg");
                 file.Size = jpeg.Length;
@@ -202,7 +203,7 @@ public class LegacyPreviewBackfillService : BackgroundService
             using var previewStream = new MemoryStream(previewSource);
             var previews = await compressor.GenerateMultiplePreviewsAsync(previewStream, CloudPreviewWidths, ct);
             if (previews.Count > 0)
-                await previewPersistence.PersistPreviewsAsync(file, previews, bucket, ct);
+                await previewPersistence.PersistPreviewsAsync(file, previews, previewProfileId, ct);
         }
         finally
         {

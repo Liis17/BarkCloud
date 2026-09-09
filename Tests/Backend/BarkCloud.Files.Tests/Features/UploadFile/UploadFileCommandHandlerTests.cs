@@ -29,6 +29,9 @@ public class UploadFileCommandHandlerTests
     {
         _bucketRegistry = new Mock<S3BucketRegistry>(TestConfiguration.Empty()) { CallBase = false };
         _bucketRegistry.Setup(r => r.GetBucketName(It.IsAny<UploadFileType>())).Returns("test-bucket");
+        _bucketRegistry.Setup(r => r.ResolveWriteProfileId(
+                It.IsAny<UploadFileType>(), It.IsAny<MediaKind>(), It.IsAny<bool>()))
+            .Returns("test-bucket");
 
         _s3 = new Mock<S3Uploader>(_bucketRegistry.Object) { CallBase = false };
         _s3.Setup(u => u.UploadAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<Stream>(), It.IsAny<string>()))

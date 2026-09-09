@@ -64,11 +64,13 @@ public class SetVideoThumbnailCommandHandler : IRequestHandler<SetVideoThumbnail
         if (video.MediaKind != MediaKind.Video || source.MediaKind != MediaKind.Photo)
             throw new InvalidThumbnailSourceException();
 
-        var bucketName = _bucketRegistry.GetBucketName(video.Type);
+        var previewProfileId = _bucketRegistry.ResolveWriteProfileId(video.Type, video.MediaKind, true);
 
         // 1) Скачиваем картинку-источник в память (S3-поток не seekable) и генерируем превью.
         List<MultiPreviewItem> previews;
-        await using (var s3Stream = await _s3Uploader.DownloadAsync(_bucketRegistry.GetBucketName(source.Type), source.Id.ToString()))
+        await using (var s3Stream = await _s3Uploader.DownloadAsync(
+                         _bucketRegistry.ResolveReadProfileId(source),
+                         source.Id.ToString()))
         {
             using var memStream = new MemoryStream();
             await s3Stream.CopyToAsync(memStream, cancellationToken);
@@ -80,7 +82,7 @@ public class SetVideoThumbnailCommandHandler : IRequestHandler<SetVideoThumbnail
         await _filesStorage.RemovePreviewsForOriginal(video.Id, ownerId, cancellationToken);
 
         // 3) Сохраняем новые превью (дедуп + S3 + связки) той же логикой, что при загрузке.
-        await _previewPersistence.PersistPreviewsAsync(video, previews, bucketName, cancellationToken);
+        await _previewPersistence.PersistPreviewsAsync(video, previews, previewProfileId, cancellationToken);
 
         _logger.LogInformation(
             "Превью видео {VideoId} заменено из картинки {SourceId} (Owner: {OwnerId}, превью: {Count})",

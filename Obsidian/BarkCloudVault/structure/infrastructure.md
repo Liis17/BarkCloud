@@ -49,11 +49,16 @@ Production compose не публикует порты сервисов на host
 | `cloud-minio` | `quay.io/minio/minio` | S3-совместимое хранилище для файлов, аватаров, стикеров |
 | `cloud-seq` | `datalust/seq:latest` | Централизованный лог-агрегатор; логи через Serilog |
 
+MinIO остаётся локальным universal/fallback-хранилищем, но Files поддерживает несколько S3 endpoints через версионируемые профили [[modules/backend-configuration]]. Типовой hybrid: originals (`images/videos/audio/documents/other`) в Cloudflare R2, роль `previews` в локальном MinIO. Bucket автоматически создаётся только для активного non-R2 профиля; исторические/legacy non-R2 версии только проверяются. R2 bucket должен быть создан заранее и на старте тоже только проверяется. Смена физического endpoint создаёт новую версию без переноса объектов.
+
+Порядок обновления для перехода на профили: сначала совместимый `cloud-configuration`, затем `cloud-files` (его EF-миграция заполняет `StorageProfileId`), после него `cloud-web`; потребители Configuration перезапускаются вручную после сохранения настроек. Такой порядок сохраняет работу старого Files-клиента через legacy `S3Buckets:*` projection и не перемещает S3-объекты.
+
 ## Переменные окружения (из .env)
 
 Используются в compose:
 
 - `CONFIGURATION_SERVICE_URL` — URL gRPC сервиса конфигурации (раздаётся всем)
+- `CONFIGURATION_ACCESS_KEY` — общий bootstrap-ключ Configuration и всех потребителей; вне Development отсутствие ключа останавливает `cloud-configuration`
 - `ASPNETCORE_ENVIRONMENT`
 - `CONFIGURATION_HOST/DATABASE/USERNAME/PASSWORD/PORT` — БД самого Configuration
 - `POSTGRES_USER/PASSWORD/DB/PORT` — общая Postgres
@@ -74,6 +79,7 @@ Production compose не публикует порты сервисов на host
 - `pgdata` — данные PostgreSQL по умолчанию (named volume); переопределяется через `POSTGRES_DATA_PATH` — см. «Переносимый диск с данными БД» ниже
 - `cloud-rabbitmq_data` — данные RabbitMQ
 - `cloud-minio_data` — данные MinIO по умолчанию (named volume). Источник `/data` переопределяется через `MINIO_DATA_PATH` в `.env`; тот же источник монтируется в `cloud-files` read-only как `/mnt/minio-data` для расчёта физического объёма диска. Вынос на отдельный диск — см. раздел «MinIO на отдельном диске» ниже.
+- Физическая статистика диска относится только к этому локальному MinIO («Локальный S3» в Web). Объём пользователя считается по строкам Files DB независимо от того, лежат originals/previews локально или в R2.
 - `backup_volume` — бэкапы Postgres (монтируется в Postgres-контейнер на `/backup`); переопределяется через `BACKUP_PATH`
 - `seq_data` — данные Seq; переопределяется через `SEQ_DATA_PATH`
 - `archive_temp` — временный файл ZIP при «Скачать архивом» (монтируется в `cloud-files` как `/mnt/archive-temp`, путь читается из env `Archive__TempPath`); переопределяется через `ARCHIVE_TEMP_PATH`. Только в прод-`docker-compose.yml`. Сценарий: zip собирается на диск → заливается в S3 → temp удаляется; готовый архив кладётся в корзину со сроком 3 дня (переиспользует фоновую очистку `TrashCleanupService`). Вынести на второй диск (где больше места, чем в образе) — `ARCHIVE_TEMP_PATH=/d/barkcloud/archive-temp`. Папка на NTFS/drvfs здесь годится (последовательная запись файла, без БД-семантики).
