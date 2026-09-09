@@ -77,6 +77,7 @@ public sealed class DockerService : IDockerDeployment
 {
     private const string WebService = "web";
     private const string WebContainer = "cloud-web";
+    private const string NginxContainer = "cloud-nginx";
 
     // Управляемый набор: логическое имя UI/очереди -> имя сервиса Compose -> контейнер.
     // В compose BarkCloud ключи имеют префикс cloud-, а очередь работает с короткими именами.
@@ -401,8 +402,7 @@ public sealed class DockerService : IDockerDeployment
         string Image,
         List<string> RunArgs,
         List<string> RollbackRunArgs,
-        List<string> ExtraNetworkConnects,
-        bool LegacyMaintenance);
+        List<string> ExtraNetworkConnects);
 
     /// <summary>Собрать спецификацию пересоздания web из его текущего <c>docker inspect</c>.</summary>
     private async Task<WebRecreateSpec> BuildWebRecreateSpecAsync(string? targetImage)
@@ -536,7 +536,7 @@ public sealed class DockerService : IDockerDeployment
         args.Add(image); // новый образ — последним аргументом
         var rollbackArgs = args[..^1];
         rollbackArgs.Add(oldImageId); // ID сохраняет старый образ после обновления тега latest
-        return new WebRecreateSpec(image, args, rollbackArgs, connects, !hasMaintenanceMount);
+        return new WebRecreateSpec(image, args, rollbackArgs, connects);
     }
 
     /// <summary>
@@ -558,11 +558,9 @@ public sealed class DockerService : IDockerDeployment
         var stateWriter = BuildStateWriter(operationId, "update", stateFile, logFile);
         var composeBackup = Path.Combine(composeBackupDirectory, $"docker-compose-operation-{operationId}.yml");
         const string inspectFormat = "{{.State.Status}}|{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}";
-        var exposeLegacyState = spec.LegacyMaintenance
-            ? $"  run_logged docker exec {WebContainer} sh -c {ShQuote($"mkdir -p {MaintenanceDirectoryInContainer}")} || true\n"
-              + $"  run_logged docker cp {ShQuote(stateFile)} {ShQuote($"{WebContainer}:{stateFile}")} || true\n"
-              + $"  run_logged docker cp {ShQuote(logFile)} {ShQuote($"{WebContainer}:{logFile}")} || true\n"
-            : "  true\n";
+        var exposeState = $"  run_logged docker exec {WebContainer} sh -c {ShQuote($"mkdir -p {MaintenanceDirectoryInContainer}")} || true\n"
+            + $"  run_logged docker cp {ShQuote(stateFile)} {ShQuote($"{WebContainer}:{stateFile}")} || true\n"
+            + $"  run_logged docker cp {ShQuote(logFile)} {ShQuote($"{WebContainer}:{logFile}")} || true\n";
         return
 $"{stateWriter}\n" +
         "describe_command() {\n" +
@@ -574,8 +572,8 @@ $"{stateWriter}\n" +
         "  fi\n" +
         "}\n" +
         $"run_logged() {{ describe_command \"$@\" >> {ShQuote(logFile)}; printf '\\n' >> {ShQuote(logFile)}; \"$@\" >> {ShQuote(logFile)} 2>&1; code=$?; printf '[exit %s]\\n' \"$code\" >> {ShQuote(logFile)}; return \"$code\"; }}\n" +
-        "expose_legacy_state() {\n" +
-        exposeLegacyState +
+        "expose_state() {\n" +
+        exposeState +
         "}\n" +
         "wait_for_web() {\n" +
         "  i=0\n" +
@@ -605,30 +603,36 @@ $"{stateWriter}\n" +
         $"  if [ \"$rollback_ok\" = 1 ] && {connects}; then :; else rollback_ok=0; fi\n" +
         "  if ! restore_compose; then rollback_ok=0; fi\n" +
         "  if [ \"$rollback_ok\" = 1 ] && wait_for_web; then\n" +
+        $"    run_logged docker exec {NginxContainer} nginx -s reload || true\n" +
         "    write_state failed 'Новый контейнер web не прошёл проверку; откат подтверждён'\n" +
+        "    expose_state\n" +
         "  else\n" +
         "    write_state failed 'Новый контейнер web не прошёл проверку; откат не подтверждён'\n" +
+        "    expose_state\n" +
         "  fi\n" +
         "  exit 1\n" +
         "}\n" +
         "write_state pending 'Операция запущена'\n" +
+        "expose_state\n" +
         "sleep 2\n" +
         $"if ! run_logged docker pull {ShQuote(spec.Image)}; then\n" +
         "  restore_compose || true\n" +
         "  write_state failed 'Не удалось скачать новый образ'\n" +
-        "  expose_legacy_state\n" +
+        "  expose_state\n" +
         "  exit 1\n" +
         "fi\n" +
         $"run_logged docker rm -f {WebContainer}-bak || true\n" +
         $"if ! run_logged docker rename {WebContainer} {WebContainer}-bak; then\n" +
         "  restore_compose || true\n" +
         "  write_state failed 'Не удалось сохранить старый контейнер'\n" +
-        "  expose_legacy_state\n" +
+        "  expose_state\n" +
         "  exit 1\n" +
         "fi\n" +
         $"run_logged docker stop -t 10 {WebContainer}-bak || true\n" +
         $"if run_logged docker run {run} && {connects} && wait_for_web; then\n" +
+        $"  run_logged docker exec {NginxContainer} nginx -s reload || true\n" +
         $"  write_state completed 'Новый контейнер web запущен и прошёл проверку'\n" +
+        "  expose_state\n" +
         $"  run_logged docker rm -f {WebContainer}-bak || true\n" +
         "  run_logged docker image prune -f || true\n" +
         "  exit 0\n" +
@@ -649,6 +653,7 @@ $"{stateWriter}\n" +
             + "write_state pending 'Перезапуск запущен'\n"
             + "sleep 2\n"
             + $"if run_logged docker restart {WebContainer}; then\n"
+            + $"  run_logged docker exec {NginxContainer} nginx -s reload || true\n"
             + "  write_state completed 'Контейнер web перезапущен'\n"
             + "  expose_state\n"
             + "  exit 0\n"
