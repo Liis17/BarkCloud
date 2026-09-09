@@ -69,15 +69,17 @@ Web нельзя пересоздать из собственного проце
 или подключения сети возвращает старый контейнер. После запуска helper ждёт новый контейнер и
 проверяет `running + healthy` либо два стабильных `running` без healthcheck; при crash-loop,
 `unhealthy` или таймауте выполняется rollback. Self-restart выполняет отложенный
-`docker restart cloud-web`.
+`docker restart cloud-web`. После успешной замены или rollback helper делает best-effort
+`docker exec cloud-nginx nginx -s reload`, чтобы reverse-proxy переопределил IP нового
+`cloud-web`; отсутствие nginx не делает Docker-операцию неуспешной.
 
 Helper пишет `last-operation.json` и лог в persistent volume `/app/maintenance`. При первом
 self-update старой установки helper сам подключает volume с именем `<compose-project>_cloud-web-maintenance`
 и переводит Compose mount в `rw`, поэтому миграция не теряет результат операции. Для переключения
 канала web в этот volume также сохраняется резервная копия Compose, поэтому после перезапуска
 процесса видны ошибка, команда/exit-код/stderr и факт rollback. Compose-файл web монтируется с
-`rw`, запись идёт в тот же inode. При self-restart старой установки helper дополнительно копирует
-маркер и лог в контейнер web, у которого ещё нет этого mount.
+`rw`, запись идёт в тот же inode. После каждого изменения состояния helper дополнительно
+копирует маркер и лог в текущий контейнер web, в том числе в старой установке без этого mount.
 
 После ответа API браузер открывает `/updating` или `/restarting`. Эти анонимные страницы
 подставляют метку процесса до операции, идентификатор detached-helper и опрашивают
