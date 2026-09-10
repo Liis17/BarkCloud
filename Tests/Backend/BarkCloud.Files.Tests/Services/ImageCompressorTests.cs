@@ -18,6 +18,25 @@ public class ImageCompressorTests
         return ms;
     }
 
+    private static MemoryStream CreateVerticalSplitImageStream()
+    {
+        using var image = new Image<Rgba32>(100, 200);
+        var topColor = new Rgba32(255, 0, 0);
+        var bottomColor = new Rgba32(0, 0, 255);
+
+        for (var y = 0; y < image.Height; y++)
+        {
+            var color = y < image.Height / 2 ? topColor : bottomColor;
+            for (var x = 0; x < image.Width; x++)
+                image[x, y] = color;
+        }
+
+        var ms = new MemoryStream();
+        image.SaveAsPng(ms);
+        ms.Position = 0;
+        return ms;
+    }
+
     [Fact]
     public async Task EnforceOriginalLimits_SmallImage_NotCompressed()
     {
@@ -64,5 +83,69 @@ public class ImageCompressorTests
 
         previews.Select(p => p.TargetWidth).Should().Equal(1024, 512);
         previews.Should().OnlyContain(p => p.ActualWidth <= p.TargetWidth);
+    }
+
+    [Fact]
+    public async Task GenerateVideoPreviews_ProducesLandscapeSixteenByNineImages()
+    {
+        using var input = CreateImageStream(720, 1280);
+
+        var previews = await _sut.GenerateVideoPreviewsAsync(input, [1024, 512, 128]);
+
+        previews.Select(p => (p.TargetWidth, p.ActualWidth, p.ActualHeight))
+            .Should().Equal(
+                (1024, 1024, 576),
+                (512, 512, 288),
+                (128, 128, 72));
+
+        foreach (var preview in previews)
+        {
+            using var result = Image.Load(preview.Bytes);
+            result.Width.Should().Be(preview.ActualWidth);
+            result.Height.Should().Be(preview.ActualHeight);
+        }
+    }
+
+    [Fact]
+    public async Task GenerateVideoPreviews_PreservesForegroundAndBlursBackground()
+    {
+        using var input = CreateVerticalSplitImageStream();
+
+        var previews = await _sut.GenerateVideoPreviewsAsync(input, [320]);
+
+        using var result = Image.Load<Rgba32>(previews.Single().Bytes);
+        var centerX = result.Width / 2;
+        var centerTop = result[centerX, result.Height / 4];
+        var centerBottom = result[centerX, result.Height * 3 / 4];
+        var edgeTop = result[0, result.Height / 4];
+        var edgeBottom = result[0, result.Height * 3 / 4];
+        var edgeBoundary = result[0, result.Height / 2];
+
+        ((int)centerTop.R).Should().BeGreaterThan((int)centerTop.B + 100);
+        ((int)centerBottom.B).Should().BeGreaterThan((int)centerBottom.R + 100);
+        ((int)centerTop.R).Should().BeGreaterThan((int)edgeTop.R + 40);
+        ((int)centerBottom.B).Should().BeGreaterThan((int)edgeBottom.B + 40);
+        edgeBoundary.R.Should().BeGreaterThan(20);
+        edgeBoundary.B.Should().BeGreaterThan(20);
+    }
+
+    [Fact]
+    public async Task GenerateVideoPreviews_CompositesTransparentSourceOnOpaqueBackground()
+    {
+        using var image = new Image<Rgba32>(100, 200, new Rgba32(0, 0, 0, 0));
+        image[50, 100] = new Rgba32(255, 255, 255, 255);
+        using var input = new MemoryStream();
+        image.SaveAsPng(input);
+        input.Position = 0;
+
+        var previews = await _sut.GenerateVideoPreviewsAsync(input, [160]);
+
+        using var result = Image.Load<Rgba32>(previews.Single().Bytes);
+        var edge = result[0, result.Height / 2];
+
+        edge.A.Should().Be(255);
+        edge.R.Should().BeLessThan(10);
+        edge.G.Should().BeLessThan(10);
+        edge.B.Should().BeLessThan(10);
     }
 }

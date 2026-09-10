@@ -1,5 +1,6 @@
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats.Jpeg;
+using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
 
 namespace BarkCloud.Files.Services;
@@ -253,6 +254,74 @@ public partial class ImageCompressor
                 TargetWidth: targetWidth,
                 ActualWidth: preview.Width,
                 ActualHeight: preview.Height,
+                Bytes: ms.ToArray()));
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Генерирует горизонтальные 16:9-превью видео.
+    /// Фон заполняет весь кадр, размывается и затемняется; исходный кадр поверх него
+    /// вписывается целиком без обрезания. Это сохраняет вертикальное видео полностью
+    /// видимым в горизонтальной плитке галереи.
+    /// </summary>
+    public virtual async Task<List<MultiPreviewItem>> GenerateVideoPreviewsAsync(
+        Stream inputStream,
+        int[] targetWidths,
+        CancellationToken cancellationToken = default)
+    {
+        var result = new List<MultiPreviewItem>();
+        if (targetWidths is null || targetWidths.Length == 0)
+            return result;
+
+        using var image = await Image.LoadAsync(inputStream, cancellationToken);
+
+        var widths = targetWidths
+            .Where(w => w > 0)
+            .Distinct()
+            .OrderByDescending(w => w)
+            .ToArray();
+
+        foreach (var targetWidth in widths)
+        {
+            var targetHeight = Math.Max(1, (int)Math.Round(targetWidth * 9d / 16d));
+
+            using var canvas = new Image<Rgba32>(
+                targetWidth,
+                targetHeight,
+                new Rgba32(0, 0, 0, 255));
+            using var background = image.Clone(x => x
+                .Resize(new ResizeOptions
+                {
+                    Mode = ResizeMode.Crop,
+                    Size = new Size(targetWidth, targetHeight),
+                    Position = AnchorPositionMode.Center
+                })
+                .GaussianBlur(Math.Max(3f, targetWidth / 64f))
+                .Brightness(0.45f));
+            using var foreground = image.Clone(x => x.Resize(new ResizeOptions
+            {
+                Mode = ResizeMode.Max,
+                Size = new Size(targetWidth, targetHeight),
+                Position = AnchorPositionMode.Center
+            }));
+
+            var foregroundPoint = new Point(
+                (targetWidth - foreground.Width) / 2,
+                (targetHeight - foreground.Height) / 2);
+
+            canvas.Mutate(x => x
+                .DrawImage(background, new Point(0, 0), 1f)
+                .DrawImage(foreground, foregroundPoint, 1f));
+
+            using var ms = new MemoryStream();
+            await canvas.SaveAsync(ms, new JpegEncoder { Quality = PreviewJpegQuality }, cancellationToken);
+
+            result.Add(new MultiPreviewItem(
+                TargetWidth: targetWidth,
+                ActualWidth: targetWidth,
+                ActualHeight: targetHeight,
                 Bytes: ms.ToArray()));
         }
 

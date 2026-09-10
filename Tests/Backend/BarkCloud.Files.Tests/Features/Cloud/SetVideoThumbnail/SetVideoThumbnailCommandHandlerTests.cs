@@ -1,6 +1,8 @@
 using BarkCloud.Files.Domain;
 using BarkCloud.Files.Features.Cloud.SetVideoThumbnail;
+using BarkCloud.Files.Infrastructure;
 using BarkCloud.Files.Persistence;
+using BarkCloud.Files.Services;
 using BarkCloud.Files.Tests._Helpers;
 using BarkCloud.Shared.Exceptions.Files;
 
@@ -72,5 +74,82 @@ public class SetVideoThumbnailCommandHandlerTests
         var act = () => CreateSut().Handle(new SetVideoThumbnailCommand { VideoFileId = videoId, SourceImageFileId = sourceId }, default);
 
         await act.Should().ThrowAsync<InvalidThumbnailSourceException>();
+    }
+
+    [Fact]
+    public async Task Handle_UsesLandscapeVideoPreviewGenerator()
+    {
+        var videoId = Guid.NewGuid();
+        var sourceId = Guid.NewGuid();
+        var video = new UploadFileEntity
+        {
+            Id = videoId,
+            Type = UploadFileType.CloudFile,
+            MediaKind = MediaKind.Video,
+            Uploaders = new() { OwnerId }
+        };
+        var source = new UploadFileEntity
+        {
+            Id = sourceId,
+            Type = UploadFileType.CloudFile,
+            MediaKind = MediaKind.Photo,
+            Uploaders = new() { OwnerId }
+        };
+
+        var files = new Mock<IUploadedFilesStorage>();
+        files.Setup(s => s.GetFile(videoId)).ReturnsAsync(video);
+        files.Setup(s => s.GetFile(sourceId)).ReturnsAsync(source);
+        files.Setup(s => s.RemovePreviewsForOriginal(videoId, OwnerId, It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        var bucketRegistry = new Mock<S3BucketRegistry>(TestConfiguration.Empty()) { CallBase = false };
+        bucketRegistry.Setup(r => r.ResolveWriteProfileId(
+                UploadFileType.CloudFile, MediaKind.Video, true))
+            .Returns("preview-profile");
+        bucketRegistry.Setup(r => r.ResolveReadProfileId(It.Is<UploadFileEntity>(f => f.Id == sourceId)))
+            .Returns("source-profile");
+
+        var s3 = new Mock<S3Uploader>(bucketRegistry.Object) { CallBase = false };
+        s3.Setup(u => u.DownloadAsync("source-profile", sourceId.ToString()))
+            .ReturnsAsync(new MemoryStream(new byte[] { 1, 2, 3 }));
+
+        var compressor = new Mock<ImageCompressor>();
+        var previews = new List<MultiPreviewItem>
+        {
+            new(1024, 1024, 576, new byte[] { 4, 5, 6 })
+        };
+        compressor.Setup(c => c.GenerateVideoPreviewsAsync(
+                It.IsAny<Stream>(), It.IsAny<int[]>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(previews);
+
+        var previewPersistence = new Mock<PreviewPersistenceService>(
+            null!, null!, s3.Object, null!, NullLogger<PreviewPersistenceService>.Instance)
+        {
+            CallBase = false
+        };
+        previewPersistence.Setup(p => p.PersistPreviewsAsync(
+                video, previews, "preview-profile", It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        var handler = new SetVideoThumbnailCommandHandler(
+            files.Object,
+            compressor.Object,
+            previewPersistence.Object,
+            s3.Object,
+            bucketRegistry.Object,
+            UserContextFactory.Create(OwnerId),
+            NullLogger<SetVideoThumbnailCommandHandler>.Instance);
+
+        var response = await handler.Handle(
+            new SetVideoThumbnailCommand { VideoFileId = videoId, SourceImageFileId = sourceId }, default);
+
+        response.Should().NotBeNull();
+        compressor.Verify(c => c.GenerateVideoPreviewsAsync(
+            It.IsAny<Stream>(), It.IsAny<int[]>(), It.IsAny<CancellationToken>()), Times.Once);
+        compressor.Verify(c => c.GenerateMultiplePreviewsAsync(
+            It.IsAny<Stream>(), It.IsAny<int[]>(), It.IsAny<CancellationToken>()), Times.Never);
+        files.Verify(s => s.RemovePreviewsForOriginal(videoId, OwnerId, It.IsAny<CancellationToken>()), Times.Once);
+        previewPersistence.Verify(p => p.PersistPreviewsAsync(
+            video, previews, "preview-profile", It.IsAny<CancellationToken>()), Times.Once);
     }
 }

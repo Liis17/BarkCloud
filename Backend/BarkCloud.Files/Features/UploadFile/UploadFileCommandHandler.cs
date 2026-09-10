@@ -363,7 +363,7 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
                         tempFilePath!, VideoThumbnailExtractor.DefaultFramePosition, cancellationToken);
 
                     using var frameStream = new MemoryStream(frameBytes);
-                    generatedPreviews = await _imageCompressor.GenerateMultiplePreviewsAsync(
+                    generatedPreviews = await _imageCompressor.GenerateVideoPreviewsAsync(
                         frameStream, CloudPreviewWidths, cancellationToken);
 
                     _logger.LogInformation(

@@ -75,7 +75,7 @@ public class SetVideoThumbnailCommandHandler : IRequestHandler<SetVideoThumbnail
             using var memStream = new MemoryStream();
             await s3Stream.CopyToAsync(memStream, cancellationToken);
             memStream.Position = 0;
-            previews = await _imageCompressor.GenerateMultiplePreviewsAsync(memStream, CloudPreviewWidths, cancellationToken);
+            previews = await _imageCompressor.GenerateVideoPreviewsAsync(memStream, CloudPreviewWidths, cancellationToken);
         }
 
         // 2) Снимаем старые превью видео: убираем владельца из их Uploaders и удаляем связки.
