@@ -173,9 +173,9 @@ UI: в сетке — превью (`MediaThumb`: `<img srcset sizes>` пове�
 - Аккаунт: `POST account/delete` (`DeleteAccount` + `ClearSession` → клиент уходит на `/login`).
 - Аватар: `POST avatar` (multipart `file` → `FilesServerApi.UploadAvatarServer` → `UsersServerApi.SetProfilePictureServer`), `POST avatar/remove` (тот же server-API с пустыми URL).
 - Обслуживание/доступ: `POST system/registration { enabled }` меняет общий `Features:RegistrationEnabled` через Configuration API; требует разблокированный `AdminGate`.
-- Настройки сервера: `GET server`, `POST server/value`, `GET server/history`, `POST server/rollback`, `POST server/storage/profile|activate|disable`; дополнительно `server/reserved/add|update|delete`. UI группирует keys по service-таблицам, использует boolean/integer/URL/password/string editors, показывает diff-confirmation, историю/rollback, reserved names и карточки всех версий S3. После изменения показывает контейнеры и banner ручного перезапуска через «Обслуживание».
+- Настройки сервера: `GET server`, `POST server/value`, `GET server/history`, `POST server/rollback`, `POST server/storage/profile|activate|disable`; дополнительно `server/reserved/add|update|delete`. UI группирует keys по service-таблицам, использует boolean/integer/URL/password/string editors, не показывает служебные `*:Token`, показывает diff-confirmation, историю/rollback, reserved names и карточки всех версий S3. После изменения показывает контейнеры и banner ручного перезапуска через «Обслуживание».
 
-В browser DTO нет raw secret и истории secret: доступны только `isSensitive`/`hasValue`; S3 access key маскируется, `SecretKey` отсутствует целиком. Поля, управляемые `.env`/compose, read-only с подписью источника. Вкладка «Хранилище» называет физическую статистику диска «Локальный S3»; пользовательский объём по-прежнему считается по БД.
+В browser DTO нет raw secret, истории secret и access key: доступны только `isSensitive`/`hasValue` и `hasAccessKey`/`hasSecretKey`; служебные `*:Token` отфильтрованы до выдачи Web. Поля, управляемые `.env`/compose, read-only с подписью источника и без placeholder для ввода. Вкладка «Хранилище» называет физическую статистику диска «Локальный S3»; пользовательский объём по-прежнему считается по БД.
 
 Удалены секции-плейсхолдеры без бэкенда (уведомления, язык, API-интеграции, E2E, резервные коды, экспорт/деактивация).
 

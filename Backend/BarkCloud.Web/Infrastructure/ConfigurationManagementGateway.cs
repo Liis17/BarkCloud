@@ -36,7 +36,6 @@ public sealed record ServerStorageProfileDto(
     string Role,
     int Version,
     string ServiceUrl,
-    string AccessKey,
     bool HasAccessKey,
     bool HasSecretKey,
     string BucketName,
@@ -95,7 +94,10 @@ public sealed class ConfigurationManagementGateway(
         await Task.WhenAll(allTask, reservedTask, profilesTask);
 
         return new ServerSettingsDto(
-            allTask.Result.Configurations.Select(Mask).ToArray(),
+            allTask.Result.Configurations
+                .Where(configuration => !IsTokenSetting(configuration))
+                .Select(Mask)
+                .ToArray(),
             reservedTask.Result.Names.ToArray(),
             profilesTask.Result.Profiles.Select(Mask).ToArray(),
             profilesTask.Result.Revisions.Select(revision => new ServerStorageRevisionDto(
@@ -296,7 +298,6 @@ public sealed class ConfigurationManagementGateway(
         profile.Role,
         profile.Version,
         profile.ServiceUrl,
-        MaskAccessKey(profile.AccessKey),
         !string.IsNullOrEmpty(profile.AccessKey),
         profile.HasSecretKey,
         profile.BucketName,
@@ -307,8 +308,8 @@ public sealed class ConfigurationManagementGateway(
         profile.EditedBy,
         profile.EditedFrom);
 
-    private static string MaskAccessKey(string value) =>
-        string.IsNullOrEmpty(value) ? string.Empty : value.Length <= 4 ? "••••" : $"••••{value[^4..]}";
+    private static bool IsTokenSetting(ConfigurationItem item) =>
+        string.Equals(item.Key, "Token", StringComparison.OrdinalIgnoreCase);
 
     private static Metadata? BuildHeaders(IConfiguration configuration)
     {
