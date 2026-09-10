@@ -1,0 +1,1416 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#09090b" />
+    <title>Upload progress bar — prototype</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #09090b;
+        --panel: rgba(25, 25, 31, 0.94);
+        --panel-soft: rgba(25, 26, 36, 0.82);
+        --ink: #f5f5f7;
+        --muted: #8c8b96;
+        --muted-strong: #b7b6c2;
+        --track: #404049;
+        --accent: #6657ff;
+        --accent-bright: #806dff;
+        --accent-deep: #a600ff;
+        --success: #73e3b0;
+        --danger: #ff718b;
+        --hairline: rgba(255, 255, 255, 0.13);
+        --shadow: 0 28px 80px rgba(0, 0, 0, 0.42), 0 4px 12px rgba(0, 0, 0, 0.36);
+        font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-synthesis: none;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        min-width: 320px;
+        min-height: 100vh;
+        margin: 0;
+        overflow-x: hidden;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at 50% -12%, rgba(82, 77, 255, 0.19), transparent 34rem),
+          radial-gradient(circle at 100% 74%, rgba(159, 0, 255, 0.08), transparent 28rem),
+          var(--bg);
+      }
+
+      button,
+      input {
+        font: inherit;
+      }
+
+      button {
+        border: 0;
+      }
+
+      .prototype-stage {
+        position: relative;
+        display: flex;
+        min-height: 100vh;
+        align-items: center;
+        justify-content: center;
+        padding: 58px 22px 172px;
+      }
+
+      .prototype-grid {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        opacity: 0.22;
+        background-image:
+          linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px);
+        background-size: 48px 48px;
+        mask-image: linear-gradient(to bottom, black, transparent 82%);
+      }
+
+      .prototype-frame {
+        position: relative;
+        z-index: 1;
+        width: min(920px, 100%);
+      }
+
+      .eyebrow {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin: 0 0 28px;
+        color: #777681;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.19em;
+        line-height: 1;
+        text-transform: uppercase;
+      }
+
+      .eyebrow strong {
+        color: #a3a0b0;
+        font-weight: 700;
+      }
+
+      .eyebrow .live-dot {
+        display: inline-block;
+        width: 6px;
+        height: 6px;
+        margin-right: 7px;
+        border-radius: 50%;
+        background: var(--accent-bright);
+        box-shadow: 0 0 14px var(--accent);
+        vertical-align: 1px;
+      }
+
+      .variant-canvas {
+        display: grid;
+        min-height: 410px;
+        align-items: center;
+      }
+
+      .variant {
+        width: 100%;
+        animation: variant-in 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+      }
+
+      @keyframes variant-in {
+        from {
+          opacity: 0;
+          transform: translateY(10px) scale(0.985);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0) scale(1);
+        }
+      }
+
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+
+      .file-icon {
+        position: relative;
+        display: grid;
+        width: 70px;
+        height: 80px;
+        flex: 0 0 auto;
+        place-items: end center;
+        padding-bottom: 11px;
+        overflow: hidden;
+        border-radius: 14px;
+        color: rgba(255, 255, 255, 0.96);
+        background: linear-gradient(148deg, #bd0bff 0%, #8b13ee 54%, #6c16df 100%);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 12px 28px rgba(101, 12, 223, 0.28);
+      }
+
+      .file-icon::before {
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 22px;
+        height: 22px;
+        content: "";
+        background: rgba(71, 7, 139, 0.42);
+        clip-path: polygon(0 0, 100% 100%, 0 100%);
+      }
+
+      .file-icon::after {
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 22px;
+        height: 22px;
+        content: "";
+        background: linear-gradient(140deg, rgba(255, 255, 255, 0.24), transparent 72%);
+        clip-path: polygon(0 0, 100% 100%, 0 100%);
+      }
+
+      .file-icon svg {
+        position: absolute;
+        top: 11px;
+        left: 13px;
+        width: 18px;
+        height: 18px;
+        fill: currentColor;
+      }
+
+      .file-icon span {
+        position: relative;
+        z-index: 1;
+        font-size: 17px;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+      }
+
+      .file-icon--pdf {
+        background: linear-gradient(148deg, #fb5b70 0%, #e33b61 100%);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 12px 28px rgba(227, 59, 97, 0.22);
+      }
+
+      .file-icon--zip {
+        background: linear-gradient(148deg, #20b9aa 0%, #1974ad 100%);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 12px 28px rgba(25, 116, 173, 0.22);
+      }
+
+      .ring {
+        --ring-progress: 75%;
+        position: relative;
+        display: grid;
+        width: 40px;
+        height: 40px;
+        flex: 0 0 auto;
+        place-items: center;
+        border-radius: 50%;
+        background: conic-gradient(var(--accent-bright) var(--ring-progress), rgba(255, 255, 255, 0.18) 0);
+        transform: rotate(-8deg);
+      }
+
+      .ring::after {
+        position: absolute;
+        inset: 4px;
+        border-radius: inherit;
+        content: "";
+        background: #171722;
+      }
+
+      .ring svg {
+        position: relative;
+        z-index: 1;
+        width: 14px;
+        height: 14px;
+        fill: var(--accent-bright);
+        transform: rotate(8deg);
+      }
+
+      .ring.is-cancelled {
+        background: conic-gradient(var(--danger) 100%, var(--danger));
+      }
+
+      .ring.is-cancelled svg {
+        fill: var(--danger);
+      }
+
+      .ring.is-complete {
+        background: conic-gradient(var(--success) 100%, var(--success));
+      }
+
+      .ring.is-complete svg {
+        fill: var(--success);
+      }
+
+      .icon-button {
+        display: grid;
+        width: 40px;
+        height: 40px;
+        flex: 0 0 auto;
+        place-items: center;
+        border-radius: 50%;
+        color: #f7f7fb;
+        cursor: pointer;
+        background: rgba(82, 82, 94, 0.68);
+        transition: background 160ms ease, transform 160ms ease, color 160ms ease;
+      }
+
+      .icon-button:hover {
+        background: rgba(112, 111, 128, 0.9);
+        transform: translateY(-1px);
+      }
+
+      .icon-button:active {
+        transform: scale(0.95);
+      }
+
+      .icon-button svg,
+      .text-button svg {
+        width: 18px;
+        height: 18px;
+        fill: currentColor;
+      }
+
+      .icon-button--ghost {
+        width: 36px;
+        height: 36px;
+        background: transparent;
+      }
+
+      .icon-button--ghost:hover {
+        color: #fff;
+        background: rgba(255, 255, 255, 0.08);
+      }
+
+      /* Variant A — the supplied reference card. */
+      .variant-a {
+        padding-top: 3px;
+      }
+
+      .ghost-dropzone {
+        width: 88%;
+        height: 78px;
+        margin: 0 auto -1px;
+        border: 1px dashed rgba(174, 174, 197, 0.48);
+        border-bottom: 0;
+        border-radius: 22px 22px 0 0;
+        background: rgba(31, 31, 39, 0.36);
+        opacity: 0.76;
+      }
+
+      .upload-card {
+        position: relative;
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        gap: 28px;
+        align-items: center;
+        --card-progress: 75%;
+        padding: 34px 32px 30px;
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        border-radius: 24px;
+        background:
+          linear-gradient(100deg, rgba(25, 25, 30, 0.98), rgba(20, 21, 36, 0.98) 72%, rgba(13, 13, 17, 0.99)),
+          var(--panel);
+        box-shadow: var(--shadow), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+      }
+
+      .upload-card::before {
+        position: absolute;
+        inset: 0 auto 0 0;
+        z-index: 0;
+        width: var(--card-progress);
+        pointer-events: none;
+        content: "";
+        background: linear-gradient(104deg, rgba(75, 61, 182, 0.2), rgba(79, 70, 189, 0.16) 72%, rgba(127, 99, 255, 0.1));
+        transition: width 180ms ease, background 180ms ease;
+      }
+
+      .upload-card::after {
+        position: absolute;
+        top: 0;
+        left: var(--card-progress);
+        bottom: 0;
+        z-index: 0;
+        width: 1px;
+        height: 100%;
+        content: "";
+        opacity: 0.42;
+        background: linear-gradient(transparent, rgba(108, 92, 255, 0.56), transparent);
+        transition: left 180ms ease;
+      }
+
+      .upload-card.is-cancelled::before {
+        background: linear-gradient(104deg, rgba(143, 50, 77, 0.2), rgba(175, 61, 84, 0.16) 72%, rgba(255, 113, 139, 0.1));
+      }
+
+      .upload-card.is-complete::before {
+        background: linear-gradient(104deg, rgba(45, 137, 99, 0.2), rgba(64, 161, 117, 0.16) 72%, rgba(115, 227, 176, 0.1));
+      }
+
+      .upload-card .file-icon,
+      .upload-card .upload-copy,
+      .upload-card .card-actions {
+        position: relative;
+        z-index: 1;
+      }
+
+      .upload-copy {
+        min-width: 0;
+        align-self: start;
+        padding-top: 1px;
+      }
+
+      .file-name {
+        max-width: 100%;
+        margin: 0 0 16px;
+        overflow: hidden;
+        color: var(--ink);
+        font-size: clamp(18px, 2.4vw, 27px);
+        font-weight: 700;
+        letter-spacing: -0.035em;
+        line-height: 1.08;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .upload-meta {
+        display: flex;
+        min-width: 0;
+        align-items: center;
+        gap: 10px;
+        color: var(--muted);
+        font-size: clamp(15px, 2vw, 21px);
+        line-height: 1.1;
+        white-space: nowrap;
+      }
+
+      .upload-status {
+        color: var(--accent-bright);
+      }
+
+      .upload-percent {
+        color: #e3e1fb;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .upload-size {
+        overflow: hidden;
+        color: #7c7b88;
+        text-overflow: ellipsis;
+      }
+
+      .meta-dot {
+        color: #6f6e7a;
+      }
+
+      .card-actions {
+        display: flex;
+        align-items: center;
+        gap: 13px;
+        align-self: start;
+      }
+
+      .card-progress {
+        position: absolute;
+        right: 32px;
+        bottom: 30px;
+        left: 32px;
+        z-index: 2;
+        height: 12px;
+        overflow: hidden;
+        border-radius: 999px;
+        background: var(--track);
+        box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.35);
+      }
+
+      .progress-fill {
+        width: 75%;
+        height: 100%;
+        border-radius: inherit;
+        background: linear-gradient(90deg, #5951a0 0%, #6f62ff 64%, #8a6bff 100%);
+        box-shadow: 0 0 18px rgba(115, 94, 255, 0.52);
+        transition: width 180ms ease, background 180ms ease;
+      }
+
+      .progress-fill.is-cancelled {
+        background: linear-gradient(90deg, #933b52, #ff718b);
+        box-shadow: 0 0 18px rgba(255, 113, 139, 0.36);
+      }
+
+      .progress-fill.is-complete {
+        background: linear-gradient(90deg, #3aa87b, #73e3b0);
+        box-shadow: 0 0 18px rgba(115, 227, 176, 0.36);
+      }
+
+      .upload-card .file-icon {
+        margin-bottom: 14px;
+      }
+
+      .upload-card .upload-copy {
+        margin-bottom: 14px;
+      }
+
+      /* Variant B — a queue gives each file its own hierarchy. */
+      .queue-shell {
+        width: min(760px, 100%);
+        margin: 0 auto;
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.13);
+        border-radius: 25px;
+        background: rgba(22, 22, 29, 0.95);
+        box-shadow: var(--shadow);
+      }
+
+      .queue-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 25px 28px 22px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+        background: linear-gradient(105deg, rgba(42, 38, 76, 0.38), rgba(20, 20, 27, 0.18));
+      }
+
+      .queue-title {
+        margin: 0 0 7px;
+        font-size: 20px;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+      }
+
+      .queue-subtitle {
+        margin: 0;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .queue-summary {
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        color: var(--accent-bright);
+        font-size: 14px;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+      }
+
+      .queue-summary strong {
+        color: #ecebff;
+        font-size: 22px;
+        letter-spacing: -0.05em;
+      }
+
+      .queue-progress {
+        height: 5px;
+        overflow: hidden;
+        background: rgba(255, 255, 255, 0.09);
+      }
+
+      .queue-progress .progress-fill {
+        box-shadow: none;
+      }
+
+      .queue-list {
+        display: grid;
+        gap: 0;
+        padding: 2px 12px 12px;
+      }
+
+      .queue-row {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        gap: 15px;
+        align-items: center;
+        padding: 17px 15px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.075);
+      }
+
+      .queue-row:last-child {
+        border-bottom: 0;
+      }
+
+      .queue-row .file-icon {
+        width: 43px;
+        height: 49px;
+        padding-bottom: 7px;
+        border-radius: 10px;
+      }
+
+      .queue-row .file-icon::before,
+      .queue-row .file-icon::after {
+        width: 15px;
+        height: 15px;
+      }
+
+      .queue-row .file-icon svg {
+        top: 7px;
+        left: 8px;
+        width: 13px;
+        height: 13px;
+      }
+
+      .queue-row .file-icon span {
+        font-size: 11px;
+      }
+
+      .queue-file {
+        min-width: 0;
+      }
+
+      .queue-file-name {
+        margin: 0 0 7px;
+        overflow: hidden;
+        font-size: 14px;
+        font-weight: 650;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .queue-file-meta {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--muted);
+        font-size: 12px;
+        white-space: nowrap;
+      }
+
+      .queue-file-meta .active {
+        color: var(--accent-bright);
+      }
+
+      .queue-file-progress {
+        height: 5px;
+        margin-top: 10px;
+        overflow: hidden;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.11);
+      }
+
+      .queue-file-progress .progress-fill {
+        box-shadow: none;
+      }
+
+      .queue-row .ring {
+        width: 30px;
+        height: 30px;
+      }
+
+      .queue-row .ring::after {
+        inset: 3px;
+      }
+
+      .queue-row .ring svg {
+        width: 10px;
+        height: 10px;
+      }
+
+      .queue-row.is-waiting {
+        opacity: 0.6;
+      }
+
+      .queue-row.is-waiting .queue-file-progress {
+        display: none;
+      }
+
+      .queue-footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 15px;
+        padding: 2px 27px 24px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .text-button {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        padding: 6px 0;
+        color: var(--accent-bright);
+        cursor: pointer;
+        background: transparent;
+      }
+
+      .text-button:hover {
+        color: #a99eff;
+      }
+
+      /* Variant C — low-weight bottom dock for a busy workspace. */
+      .dock-stage {
+        display: grid;
+        gap: 17px;
+        width: min(860px, 100%);
+        margin: 0 auto;
+        justify-items: center;
+      }
+
+      .dock-context {
+        max-width: 520px;
+        color: #696874;
+        font-size: 13px;
+        line-height: 1.55;
+        text-align: center;
+      }
+
+      .dock {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        gap: 16px;
+        width: 100%;
+        align-items: center;
+        padding: 13px 14px 13px 17px;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        border-radius: 18px;
+        background: rgba(32, 32, 41, 0.92);
+        box-shadow: 0 22px 55px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+        backdrop-filter: blur(16px);
+      }
+
+      .dock .file-icon {
+        width: 45px;
+        height: 51px;
+        padding-bottom: 7px;
+        border-radius: 10px;
+      }
+
+      .dock .file-icon::before,
+      .dock .file-icon::after {
+        width: 15px;
+        height: 15px;
+      }
+
+      .dock .file-icon svg {
+        top: 7px;
+        left: 8px;
+        width: 13px;
+        height: 13px;
+      }
+
+      .dock .file-icon span {
+        font-size: 11px;
+      }
+
+      .dock-copy {
+        min-width: 0;
+      }
+
+      .dock-heading {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 13px;
+        margin-bottom: 9px;
+      }
+
+      .dock-file-name {
+        min-width: 0;
+        overflow: hidden;
+        font-size: 14px;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .dock-percent {
+        color: #e0dcff;
+        font-size: 13px;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .dock-progress {
+        height: 7px;
+        overflow: hidden;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.14);
+      }
+
+      .dock-subline {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 15px;
+        margin-top: 8px;
+        color: #898792;
+        font-size: 11px;
+      }
+
+      .dock-actions {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .dock-actions .icon-button {
+        width: 34px;
+        height: 34px;
+      }
+
+      .prototype-toolbar {
+        position: fixed;
+        right: 16px;
+        bottom: 16px;
+        left: 16px;
+        z-index: 10;
+        display: grid;
+        grid-template-columns: minmax(200px, 1fr) auto;
+        gap: 16px;
+        width: min(840px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 13px 15px 13px 17px;
+        border: 1px solid rgba(255, 255, 255, 0.13);
+        border-radius: 19px;
+        background: rgba(18, 18, 24, 0.88);
+        box-shadow: 0 16px 45px rgba(0, 0, 0, 0.46), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(22px) saturate(1.18);
+      }
+
+      .toolbar-state {
+        display: grid;
+        grid-template-columns: auto minmax(80px, 1fr) auto;
+        gap: 12px;
+        align-items: center;
+        min-width: 0;
+      }
+
+      .toolbar-state label {
+        color: #8e8d99;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.09em;
+        text-transform: uppercase;
+      }
+
+      .range {
+        width: 100%;
+        height: 4px;
+        margin: 0;
+        accent-color: var(--accent-bright);
+        cursor: pointer;
+      }
+
+      .toolbar-percent {
+        min-width: 34px;
+        color: #e7e4ff;
+        font-size: 12px;
+        font-variant-numeric: tabular-nums;
+        text-align: right;
+      }
+
+      .toolbar-actions {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding-left: 14px;
+        border-left: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .toolbar-actions .icon-button {
+        width: 32px;
+        height: 32px;
+      }
+
+      .toolbar-actions .icon-button svg {
+        width: 15px;
+        height: 15px;
+      }
+
+      .variant-switcher {
+        position: fixed;
+        right: 50%;
+        bottom: 94px;
+        z-index: 9;
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        min-width: 245px;
+        padding: 7px 9px;
+        border: 1px solid rgba(255, 255, 255, 0.11);
+        border-radius: 999px;
+        color: #9896a6;
+        background: rgba(16, 16, 21, 0.84);
+        box-shadow: 0 12px 38px rgba(0, 0, 0, 0.33);
+        transform: translateX(50%);
+        backdrop-filter: blur(18px);
+      }
+
+      .switcher-arrow {
+        display: grid;
+        width: 28px;
+        height: 28px;
+        flex: 0 0 auto;
+        place-items: center;
+        border-radius: 50%;
+        color: #bebdca;
+        cursor: pointer;
+        background: rgba(255, 255, 255, 0.08);
+        transition: background 150ms ease, color 150ms ease, transform 150ms ease;
+      }
+
+      .switcher-arrow:hover {
+        color: #fff;
+        background: rgba(255, 255, 255, 0.15);
+        transform: scale(1.05);
+      }
+
+      .switcher-arrow svg {
+        width: 14px;
+        height: 14px;
+        fill: currentColor;
+      }
+
+      .switcher-label {
+        min-width: 0;
+        flex: 1;
+        overflow: hidden;
+        font-size: 11px;
+        font-weight: 650;
+        letter-spacing: 0.02em;
+        text-align: center;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .switcher-label strong {
+        color: #e5e2ff;
+      }
+
+      .focus-ring:focus-visible,
+      button:focus-visible,
+      input:focus-visible {
+        outline: 2px solid #aaa0ff;
+        outline-offset: 3px;
+      }
+
+      @media (max-width: 680px) {
+        .prototype-stage {
+          align-items: flex-start;
+          padding-top: 38px;
+        }
+
+        .eyebrow {
+          margin-bottom: 18px;
+        }
+
+        .variant-canvas {
+          min-height: 500px;
+        }
+
+        .ghost-dropzone {
+          width: 82%;
+          height: 46px;
+          border-radius: 16px 16px 0 0;
+        }
+
+        .upload-card {
+          grid-template-columns: auto minmax(0, 1fr);
+          gap: 15px;
+          padding: 23px 18px 62px;
+          border-radius: 20px;
+        }
+
+        .upload-card::after {
+          display: none;
+        }
+
+        .upload-card .file-icon {
+          width: 56px;
+          height: 65px;
+          margin-bottom: 0;
+          border-radius: 12px;
+        }
+
+        .upload-card .file-icon svg {
+          top: 9px;
+          left: 10px;
+        }
+
+        .upload-card .file-icon span {
+          font-size: 14px;
+        }
+
+        .upload-card .upload-copy {
+          margin: 0;
+          padding-top: 2px;
+        }
+
+        .file-name {
+          margin-bottom: 11px;
+          font-size: 17px;
+        }
+
+        .upload-meta {
+          flex-wrap: wrap;
+          gap: 7px;
+          font-size: 14px;
+          white-space: normal;
+        }
+
+        .upload-meta .meta-dot:last-of-type,
+        .upload-size {
+          display: none;
+        }
+
+        .card-actions {
+          position: absolute;
+          top: 16px;
+          right: 12px;
+          gap: 2px;
+        }
+
+        .card-actions .icon-button {
+          width: 32px;
+          height: 32px;
+        }
+
+        .card-actions .icon-button:first-child {
+          background: rgba(82, 82, 94, 0.58);
+        }
+
+        .card-progress {
+          right: 18px;
+          bottom: 25px;
+          left: 18px;
+          height: 9px;
+        }
+
+        .queue-shell {
+          border-radius: 20px;
+        }
+
+        .queue-head {
+          padding: 20px 18px 18px;
+        }
+
+        .queue-list {
+          padding: 2px 6px 8px;
+        }
+
+        .queue-row {
+          grid-template-columns: auto minmax(0, 1fr) auto;
+          gap: 11px;
+          padding: 15px 8px;
+        }
+
+        .queue-footer {
+          padding: 2px 18px 18px;
+        }
+
+        .dock {
+          position: relative;
+          grid-template-columns: auto minmax(0, 1fr);
+          gap: 12px;
+          padding: 12px 92px 12px 12px;
+        }
+
+        .dock-actions {
+          position: absolute;
+          top: 11px;
+          right: 10px;
+          margin: 0;
+        }
+
+        .dock-stage {
+          padding-top: 50px;
+        }
+
+        .prototype-toolbar {
+          grid-template-columns: 1fr;
+          gap: 10px;
+          padding: 12px 14px;
+        }
+
+        .toolbar-actions {
+          justify-content: flex-end;
+          padding-top: 8px;
+          padding-left: 0;
+          border-top: 1px solid rgba(255, 255, 255, 0.1);
+          border-left: 0;
+        }
+
+        .variant-switcher {
+          bottom: 126px;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          scroll-behavior: auto !important;
+          transition-duration: 0.01ms !important;
+          animation-duration: 0.01ms !important;
+          animation-iteration-count: 1 !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="prototype-stage">
+      <div class="prototype-grid" aria-hidden="true"></div>
+      <section class="prototype-frame" aria-labelledby="prototype-title">
+        <div class="eyebrow">
+          <span><span class="live-dot"></span>Upload interaction lab</span>
+          <strong id="prototype-title">PROTOTYPE — NOT PRODUCTION</strong>
+        </div>
+        <div id="variant-canvas" class="variant-canvas" aria-live="polite"></div>
+      </section>
+    </main>
+
+    <nav class="variant-switcher" aria-label="Переключатель вариантов прототипа">
+      <button class="switcher-arrow focus-ring" type="button" data-switch="previous" aria-label="Предыдущий вариант">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.8 5.2-6.8 6.8 6.8 6.8 1.4-1.4-5.4-5.4 5.4-5.4-1.4-1.4Z" /></svg>
+      </button>
+      <span class="switcher-label" id="switcher-label"></span>
+      <button class="switcher-arrow focus-ring" type="button" data-switch="next" aria-label="Следующий вариант">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9.2 5.2 6.8 6.8-6.8 6.8-1.4-1.4 5.4-5.4-5.4-5.4 1.4-1.4Z" /></svg>
+      </button>
+    </nav>
+
+    <aside class="prototype-toolbar" aria-label="Управление состоянием прототипа">
+      <div class="toolbar-state">
+        <label for="progress-range">Состояние</label>
+        <input class="range focus-ring" id="progress-range" type="range" min="0" max="100" value="75" />
+        <span class="toolbar-percent" id="toolbar-percent">75%</span>
+      </div>
+      <div class="toolbar-actions">
+        <button class="icon-button icon-button--ghost focus-ring" type="button" data-action="toggle" aria-label="Пауза">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h3v14H7V5Zm7 0h3v14h-3V5Z" /></svg>
+        </button>
+        <button class="icon-button icon-button--ghost focus-ring" type="button" data-action="restart" aria-label="Начать заново">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5a7 7 0 1 1-6.7 9H3.2A9 9 0 1 0 5.8 7.6L4 5.8V11h5.2L7.7 9.5A6.9 6.9 0 0 1 12 5Z" /></svg>
+        </button>
+        <button class="icon-button icon-button--ghost focus-ring" type="button" data-action="cancel" aria-label="Отменить загрузку">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6.7 5.3-1.4 1.4 5.3 5.3-5.3 5.3 1.4 1.4 5.3-5.3 5.3 5.3 1.4-1.4-5.3-5.3 5.3-5.3-1.4-1.4-5.3 5.3-5.3-5.3Z" /></svg>
+        </button>
+      </div>
+    </aside>
+
+    <script>
+      const variants = [
+        { key: "a", name: "Reference card" },
+        { key: "b", name: "Queue panel" },
+        { key: "c", name: "Bottom dock" },
+      ];
+
+      const state = {
+        progress: 75,
+        running: true,
+        cancelled: false,
+      };
+
+      const canvas = document.querySelector("#variant-canvas");
+      const range = document.querySelector("#progress-range");
+      const toolbarPercent = document.querySelector("#toolbar-percent");
+      const switcherLabel = document.querySelector("#switcher-label");
+      let activeVariant = getVariantFromUrl();
+      let simulationTimer = null;
+
+      const svg = {
+        play: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5 11 7-11 7V5Z" /></svg>',
+        pause: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h3v14H7V5Zm7 0h3v14h-3V5Z" /></svg>',
+        check: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9.4 16.2-4.1-4.1-1.5 1.5 5.6 5.6L20.2 8.4l-1.5-1.5-9.3 9.3Z" /></svg>',
+        upload: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 16h2V8.8l2.6 2.6L17 10l-5-5-5 5 1.4 1.4L11 8.8V16Zm-6 3h14v2H5v-2Z" /></svg>',
+        x: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6.7 5.3-1.4 1.4 5.3 5.3-5.3 5.3 1.4 1.4 5.3-5.3 5.3 5.3 1.4-1.4-5.3-5.3 5.3-5.3-1.4-1.4-5.3 5.3-5.3-5.3Z" /></svg>',
+        arrow: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v12.2l-4.6-4.6L6 13l6 6 6-6-1.4-1.4-4.6 4.6V4h-2Z" /></svg>',
+      };
+
+      function getVariantFromUrl() {
+        const requested = new URLSearchParams(window.location.search).get("variant");
+        return variants.some((variant) => variant.key === requested) ? requested : "a";
+      }
+
+      function setVariant(nextVariant) {
+        activeVariant = nextVariant;
+        const url = new URL(window.location.href);
+        url.searchParams.set("variant", nextVariant);
+        window.history.replaceState({}, "", url);
+        render();
+      }
+
+      function cycleVariant(direction) {
+        const currentIndex = variants.findIndex((variant) => variant.key === activeVariant);
+        const nextIndex = (currentIndex + direction + variants.length) % variants.length;
+        setVariant(variants[nextIndex].key);
+      }
+
+      function clamp(value, min = 0, max = 100) {
+        return Math.min(max, Math.max(min, value));
+      }
+
+      function percent(value) {
+        return `${Math.round(value)}%`;
+      }
+
+      function uploadedSize(value) {
+        const mb = 24 * value / 100;
+        return `${mb.toFixed(mb === 24 ? 0 : 1)} MB of 24 MB`;
+      }
+
+      function statusText() {
+        if (state.cancelled) return "Upload cancelled";
+        if (state.progress >= 100) return "Uploaded";
+        return state.running ? "Uploading" : "Paused";
+      }
+
+      function stateClass(value = state.progress) {
+        if (state.cancelled) return "is-cancelled";
+        if (value >= 100) return "is-complete";
+        return "";
+      }
+
+      function fileIcon(type, modifier = "") {
+        const icon = type === "MP4"
+          ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 6 10 6-10 6V6Z" /></svg>'
+          : type === "PDF"
+            ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h7l4 4v14H7V3Zm7 1.8V8h3.2L14 4.8ZM9 12h2.2c1.4 0 2.3.8 2.3 2s-.9 2-2.3 2H10v2H9v-6Zm1 1v2h1.2c.8 0 1.3-.4 1.3-1s-.5-1-1.3-1H10Zm4.5-1H17v1h-1.5v1.4h1.3v1h-1.3V18h-1v-6Z" /></svg>'
+            : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18H6V3Zm3 3v2h6V6H9Zm0 4v2h2v-2H9Zm4 0v2h2v-2h-2Zm-4 4v2h2v-2H9Zm4 0v2h2v-2h-2Z" /></svg>';
+        return `<div class="file-icon ${modifier}">${icon}<span>${type}</span></div>`;
+      }
+
+      function ring(value = state.progress, small = false) {
+        const className = `${small ? "" : ""} ${stateClass(value)}`.trim();
+        const icon = state.cancelled ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6.7 5.3-1.4 1.4 5.3 5.3-5.3 5.3 1.4 1.4 5.3-5.3 5.3 5.3 1.4-1.4-5.3-5.3 5.3-5.3-1.4-1.4-5.3 5.3-5.3-5.3Z" /></svg>'
+          : state.progress >= 100 ? svg.check : svg.upload;
+        return `<span class="ring ${className}" style="--ring-progress: ${clamp(value)}%" data-progress-ring>${icon}</span>`;
+      }
+
+      function renderVariantA() {
+        return `
+          <article class="variant variant-a" data-variant="a">
+            <div class="ghost-dropzone" aria-hidden="true"></div>
+            <div class="upload-card ${stateClass()}" data-state-card style="--card-progress: ${clamp(state.progress)}%">
+              ${fileIcon("MP4")}
+              <div class="upload-copy">
+                <h1 class="file-name">product-demo.mp4</h1>
+                <div class="upload-meta">
+                  <span class="upload-status" data-status-text>${statusText()}</span>
+                  ${ring()}
+                  <span class="upload-percent" data-progress-label>${percent(state.progress)}</span>
+                  <span class="meta-dot">•</span>
+                  <span class="upload-size" data-size-label>${uploadedSize(state.progress)}</span>
+                </div>
+              </div>
+              <div class="card-actions">
+                <button class="icon-button focus-ring" type="button" data-action="toggle" aria-label="Приостановить или продолжить">
+                  <span data-toggle-icon>${state.running ? svg.pause : svg.play}</span>
+                </button>
+                <button class="icon-button icon-button--ghost focus-ring" type="button" data-action="cancel" aria-label="Отменить загрузку">
+                  ${svg.x}
+                </button>
+              </div>
+              <div class="card-progress" aria-hidden="true">
+                <div class="progress-fill ${stateClass()}" data-progress-fill style="width: ${clamp(state.progress)}%"></div>
+              </div>
+            </div>
+          </article>`;
+      }
+
+      function queueRow(file, value, status, modifier = "", progressKey = "primary") {
+        const waiting = value === 0 && !state.cancelled;
+        const rowState = state.cancelled && file.type === "MP4" ? "cancelled" : status;
+        const rowClass = waiting ? "is-waiting" : "";
+        const statusClass = rowState === "Uploading" ? "active" : "";
+        return `
+          <div class="queue-row ${rowClass}">
+            ${fileIcon(file.type, modifier)}
+            <div class="queue-file">
+              <p class="queue-file-name">${file.name}</p>
+              <div class="queue-file-meta">
+                <span class="${statusClass}" data-queue-status="${progressKey}">${waiting ? "Waiting" : rowState}</span>
+                <span>•</span>
+                <span>${file.size}</span>
+                ${!waiting ? `<span>•</span><span data-queue-percent="${progressKey}">${percent(value)}</span>` : ""}
+              </div>
+              ${!waiting ? `<div class="queue-file-progress"><div class="progress-fill ${file.type === "MP4" ? stateClass(value) : ""}" data-progress-fill data-progress-key="${progressKey}" style="width: ${value}%"></div></div>` : ""}
+            </div>
+            ${file.type === "MP4" ? ring(value, true) : `<span class="ring ${value >= 100 ? "is-complete" : ""}" style="--ring-progress: ${value}%">${value >= 100 ? svg.check : ""}</span>`}
+          </div>`;
+      }
+
+      function renderVariantB() {
+        const secondProgress = clamp(state.progress - 24);
+        const thirdProgress = clamp(state.progress - 66);
+        return `
+          <article class="variant variant-b" data-variant="b">
+            <div class="queue-shell">
+              <header class="queue-head">
+                <div>
+                  <h1 class="queue-title">Sending files</h1>
+                  <p class="queue-subtitle">${state.cancelled ? "Upload cancelled" : "3 files · one transfer queue"}</p>
+                </div>
+                <div class="queue-summary"><strong data-progress-label>${percent(state.progress)}</strong><span>overall</span></div>
+              </header>
+              <div class="queue-progress" aria-hidden="true"><div class="progress-fill ${stateClass()}" data-progress-fill style="width: ${state.progress}%"></div></div>
+              <div class="queue-list">
+                ${queueRow({ name: "product-demo.mp4", type: "MP4", size: "24 MB" }, state.progress, statusText(), "", "primary")}
+                ${queueRow({ name: "launch-notes.pdf", type: "PDF", size: "2.4 MB" }, secondProgress, secondProgress >= 100 ? "Uploaded" : secondProgress > 0 ? "Uploading" : "Waiting", "file-icon--pdf", "secondary")}
+                ${queueRow({ name: "brand-assets.zip", type: "ZIP", size: "86 MB" }, thirdProgress, thirdProgress >= 100 ? "Uploaded" : thirdProgress > 0 ? "Uploading" : "Waiting", "file-icon--zip", "tertiary")}
+              </div>
+              <footer class="queue-footer">
+                <span data-size-label>${uploadedSize(state.progress)} sent</span>
+                <button class="text-button focus-ring" type="button" data-action="toggle"><span data-toggle-icon>${state.running ? "Pause queue" : "Resume queue"}</span> ${state.running ? svg.pause : svg.play}</button>
+              </footer>
+            </div>
+          </article>`;
+      }
+
+      function renderVariantC() {
+        return `
+          <article class="variant variant-c" data-variant="c">
+            <div class="dock-stage">
+              <p class="dock-context">A quieter treatment for a workspace where the upload should stay available without taking over the screen.</p>
+              <div class="dock" data-state-card>
+                ${fileIcon("MP4")}
+                <div class="dock-copy">
+                  <div class="dock-heading">
+                    <span class="dock-file-name">product-demo.mp4</span>
+                    <span class="dock-percent" data-progress-label>${percent(state.progress)}</span>
+                  </div>
+                <div class="dock-progress" aria-hidden="true"><div class="progress-fill ${stateClass()}" data-progress-fill style="width: ${state.progress}%"></div></div>
+                  <div class="dock-subline"><span data-status-text>${statusText()}</span><span data-size-label>${uploadedSize(state.progress)}</span></div>
+                </div>
+                <div class="dock-actions">
+                  <button class="icon-button focus-ring" type="button" data-action="toggle" aria-label="Приостановить или продолжить"><span data-toggle-icon>${state.running ? svg.pause : svg.play}</span></button>
+                  <button class="icon-button icon-button--ghost focus-ring" type="button" data-action="cancel" aria-label="Отменить загрузку">${svg.x}</button>
+                </div>
+              </div>
+            </div>
+          </article>`;
+      }
+
+      function render() {
+        const variant = variants.find((item) => item.key === activeVariant);
+        document.documentElement.dataset.variant = activeVariant;
+        switcherLabel.innerHTML = `<strong>${variant.key.toUpperCase()}</strong> — ${variant.name}`;
+        canvas.innerHTML = activeVariant === "a" ? renderVariantA() : activeVariant === "b" ? renderVariantB() : renderVariantC();
+        range.value = state.progress;
+        toolbarPercent.textContent = percent(state.progress);
+        syncUi();
+      }
+
+      function syncUi() {
+        toolbarPercent.textContent = percent(state.progress);
+        range.value = state.progress;
+        document.querySelectorAll("[data-progress-fill]").forEach((element) => {
+          const key = element.dataset.progressKey || "primary";
+          const value = key === "secondary" ? clamp(state.progress - 24) : key === "tertiary" ? clamp(state.progress - 66) : state.progress;
+          element.style.width = `${clamp(value)}%`;
+          element.classList.toggle("is-cancelled", state.cancelled);
+          element.classList.toggle("is-complete", !state.cancelled && value >= 100);
+        });
+        document.querySelectorAll("[data-state-card]").forEach((element) => {
+          element.style.setProperty("--card-progress", `${clamp(state.progress)}%`);
+          element.classList.toggle("is-cancelled", state.cancelled);
+          element.classList.toggle("is-complete", !state.cancelled && state.progress >= 100);
+        });
+        document.querySelectorAll("[data-progress-ring]").forEach((element) => {
+          element.style.setProperty("--ring-progress", `${clamp(state.progress)}%`);
+          element.classList.toggle("is-cancelled", state.cancelled);
+          element.classList.toggle("is-complete", !state.cancelled && state.progress >= 100);
+        });
+        document.querySelectorAll("[data-progress-label]").forEach((element) => {
+          element.textContent = percent(state.progress);
+        });
+        document.querySelectorAll("[data-size-label]").forEach((element) => {
+          element.textContent = activeVariant === "b" ? `${uploadedSize(state.progress)} sent` : uploadedSize(state.progress);
+        });
+        document.querySelectorAll("[data-status-text]").forEach((element) => {
+          element.textContent = statusText();
+        });
+        document.querySelectorAll("[data-queue-status]").forEach((element) => {
+          const key = element.dataset.queueStatus;
+          const value = key === "secondary" ? clamp(state.progress - 24) : key === "tertiary" ? clamp(state.progress - 66) : state.progress;
+          element.textContent = key === "primary" ? statusText() : value >= 100 ? "Uploaded" : value > 0 ? "Uploading" : "Waiting";
+          element.classList.toggle("active", value > 0 && value < 100 && !state.cancelled);
+        });
+        document.querySelectorAll("[data-queue-percent]").forEach((element) => {
+          const key = element.dataset.queuePercent;
+          const value = key === "secondary" ? clamp(state.progress - 24) : key === "tertiary" ? clamp(state.progress - 66) : state.progress;
+          element.textContent = percent(value);
+        });
+        document.querySelectorAll("[data-toggle-icon]").forEach((element) => {
+          if (element.tagName === "SPAN" && element.children.length === 0 && activeVariant === "b") {
+            element.textContent = state.running ? "Pause queue" : "Resume queue";
+          } else {
+            element.innerHTML = state.running ? svg.pause : svg.play;
+          }
+        });
+      }
+
+      function startSimulation() {
+        window.clearInterval(simulationTimer);
+        simulationTimer = window.setInterval(() => {
+          if (!state.running || state.cancelled || state.progress >= 100) return;
+          state.progress = clamp(state.progress + 0.16);
+          if (state.progress >= 100) state.running = false;
+          syncUi();
+        }, 100);
+      }
+
+      document.addEventListener("click", (event) => {
+        const switchButton = event.target.closest("[data-switch]");
+        if (switchButton) {
+          cycleVariant(switchButton.dataset.switch === "next" ? 1 : -1);
+          return;
+        }
+
+        const actionButton = event.target.closest("[data-action]");
+        if (!actionButton) return;
+
+        if (actionButton.dataset.action === "toggle") {
+          if (state.cancelled || state.progress >= 100) return;
+          state.running = !state.running;
+          syncUi();
+        }
+
+        if (actionButton.dataset.action === "restart") {
+          state.progress = 0;
+          state.cancelled = false;
+          state.running = true;
+          syncUi();
+        }
+
+        if (actionButton.dataset.action === "cancel") {
+          state.cancelled = true;
+          state.running = false;
+          syncUi();
+        }
+      });
+
+      range.addEventListener("input", (event) => {
+        state.progress = Number(event.target.value);
+        state.running = false;
+        state.cancelled = false;
+        syncUi();
+      });
+
+      document.addEventListener("keydown", (event) => {
+        const target = event.target;
+        if (target.matches("input, textarea, [contenteditable='true']")) return;
+        if (event.key === "ArrowLeft") cycleVariant(-1);
+        if (event.key === "ArrowRight") cycleVariant(1);
+      });
+
+      window.addEventListener("popstate", () => {
+        activeVariant = getVariantFromUrl();
+        render();
+      });
+
+      render();
+      startSimulation();
+    </script>
+  </body>
+</html>
