@@ -43,8 +43,8 @@ Parent: [[index]] · See also: [[api/files-api]] · [[modules/backend-files-clou
 - `FilesController.cs` — HTTP-контроллер (прямые upload/download)
 
 ### Services
-- `ImageCompressor.cs` — сжатие изображений (на **SixLabors.ImageSharp**; HEIC/HEIF **не декодирует** — для них см. `HeicImageConverter`)
-- `VideoThumbnailExtractor.cs` — извлечение кадра-обложки и размеров видео через FFMpegCore (кадр на 5-й секунде). Метод `ProbeFullAsync` возвращает `VideoProbe` (размеры, длительность, кодеки, битрейт, fps, теги контейнера) — используется и для превью, и для метаданных
+- `ImageCompressor.cs` — сжатие изображений и генерация превью (на **SixLabors.ImageSharp**; HEIC/HEIF **не декодирует** — для них см. `HeicImageConverter`). `GenerateVideoPreviewsAsync` делает горизонтальный холст 16:9 для каждого размера (1024/512/128): размытый затемнённый cover-фон + исходный кадр, вписанный целиком поверх него; обычные фото- и квадратные аудио-превью используют отдельные методы
+- `VideoThumbnailExtractor.cs` — извлечение кадра-обложки и размеров видео через FFMpegCore (кадр на 5-й секунде; короткое видео — середина). Метод `ProbeFullAsync` возвращает `VideoProbe` (размеры, длительность, кодеки, битрейт, fps, теги контейнера) — используется и для превью, и для метаданных
 - `AudioMetadataExtractor.cs` — извлечение аудиотегов через `ffprobe` (`title`/`artist`/`album`/`track`, длительность) и embedded artwork через `ffmpeg`; при загрузке аудио обложка сохраняется как квадратные превью 128/512 через `ImageCompressor.GenerateSquarePreviewsAsync`
 - `FileMetadataExtractor.cs` — извлекатор метаданных под все типы (синглтон):
   - `ExtractFromImage(Stream)` — EXIF IFD0/SubIfd/GPS через **MetadataExtractor** (JPEG/HEIC/PNG/TIFF)

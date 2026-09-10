@@ -172,4 +172,52 @@ public class UploadFileCommandHandlerTests
             Times.Once);
         _files.Verify(s => s.UpdateFile(It.Is<UploadFileEntity>(f => f.Filename == "photo.heic")), Times.Once);
     }
+
+    [Fact]
+    public async Task Handle_VideoFile_UsesLandscapeVideoPreviewGenerator()
+    {
+        var id = Guid.NewGuid();
+        _files.Setup(s => s.GetFile(id))
+            .ReturnsAsync(new UploadFileEntity { Id = id, Type = UploadFileType.CloudFile, Uploaders = new() { 42 } });
+
+        _videoExtractor
+            .Setup(v => v.ProbeFullAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new VideoProbe(
+                Width: 1080,
+                Height: 1920,
+                Duration: TimeSpan.FromSeconds(10),
+                VideoCodec: "h264",
+                AudioCodec: "aac",
+                BitRate: 1_000_000,
+                FrameRate: 30,
+                FormatTags: null));
+        _videoExtractor
+            .Setup(v => v.ExtractFrameJpegAsync(
+                It.IsAny<string>(), It.IsAny<TimeSpan>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new byte[] { 1, 2, 3 });
+
+        var previews = new List<MultiPreviewItem>
+        {
+            new(1024, 1024, 576, new byte[] { 4, 5, 6 })
+        };
+        _imageCompressor
+            .Setup(c => c.GenerateVideoPreviewsAsync(
+                It.IsAny<Stream>(), It.IsAny<int[]>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(previews);
+        _previewPersistence
+            .Setup(p => p.PersistPreviewsAsync(
+                It.IsAny<UploadFileEntity>(), previews, It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        var response = await CreateSut().Handle(
+            new UploadFileCommand { FileId = id, FileName = "clip.mp4", FileStream = MakeStream() }, default);
+
+        response.Should().Be(id.ToString());
+        _imageCompressor.Verify(c => c.GenerateVideoPreviewsAsync(
+            It.IsAny<Stream>(), It.IsAny<int[]>(), It.IsAny<CancellationToken>()), Times.Once);
+        _imageCompressor.Verify(c => c.GenerateMultiplePreviewsAsync(
+            It.IsAny<Stream>(), It.IsAny<int[]>(), It.IsAny<CancellationToken>()), Times.Never);
+        _previewPersistence.Verify(p => p.PersistPreviewsAsync(
+            It.IsAny<UploadFileEntity>(), previews, "test-bucket", It.IsAny<CancellationToken>()), Times.Once);
+    }
 }
