@@ -14,7 +14,7 @@ interface SettingRevision {
 }
 
 interface StorageProfile {
-  profileId: string; role: string; version: number; serviceUrl: string; accessKey: string;
+  profileId: string; role: string; version: number; serviceUrl: string;
   hasAccessKey: boolean; hasSecretKey: boolean; bucketName: string; isR2: boolean;
   isActive: boolean; isLegacy: boolean; editedAt: string | null; editedBy: string; editedFrom: string;
 }
@@ -37,6 +37,7 @@ const SERVICE_LABELS: Record<number, string> = {
   5: 'FilesSettings', 6: 'WebSettings', 7: 'TorrentSettings',
 };
 const STORAGE_ROLES = ['universal', 'avatars', 'images', 'videos', 'audio', 'documents', 'other', 'previews'];
+const isTokenSetting = (setting: ServerSetting) => setting.key.toLowerCase() === 'token';
 
 async function request<T>(path: string, method = 'GET', body?: unknown): Promise<{ ok: boolean; data: T | null }> {
   const response = await fetch(path, {
@@ -119,7 +120,7 @@ function SettingEditor({ setting, onSaved }: { setting: ServerSetting; onSaved: 
           </select>
         ) : (
           <input type={inputType} value={value} disabled={setting.isReadOnly || busy}
-            placeholder={setting.isSensitive && setting.hasValue ? 'Значение задано — введите новое для замены' : ''}
+            placeholder={!setting.isReadOnly && setting.isSensitive && setting.hasValue ? 'Значение задано — введите новое для замены' : ''}
             onChange={(event) => setValue(event.target.value)} />
         )}
         <button className="btn primary" disabled={setting.isReadOnly || busy || (setting.isSensitive && !value)} onClick={save}>Сохранить</button>
@@ -206,7 +207,7 @@ function StorageCard({ role, profiles, revisions, onChanged }: {
     <div className="storage-profile-grid">
       <label><span>Endpoint</span><input type="url" value={draft.serviceUrl} onChange={(event) => setDraft({ ...draft, serviceUrl: event.target.value })} /></label>
       <label><span>Bucket</span><input type="text" value={draft.bucketName} onChange={(event) => setDraft({ ...draft, bucketName: event.target.value })} /></label>
-      <label><span>Access key</span><input type="text" value={draft.accessKey} placeholder={selected?.hasAccessKey ? selected.accessKey || 'Задан' : ''} onChange={(event) => setDraft({ ...draft, accessKey: event.target.value })} /></label>
+      <label><span>Access key</span><input type="text" value={draft.accessKey} placeholder={selected?.hasAccessKey ? 'Задан' : ''} onChange={(event) => setDraft({ ...draft, accessKey: event.target.value })} /></label>
       <label><span>Secret key</span><input type="password" value={draft.secretKey} placeholder={selected?.hasSecretKey ? 'Оставьте пустым, чтобы не менять' : ''} onChange={(event) => setDraft({ ...draft, secretKey: event.target.value })} /></label>
     </div>
     <div className="storage-profile-footer">
@@ -261,7 +262,9 @@ export default function ServerSettingsTab() {
   if (error) return <div className="sys-banner err">{error}</div>;
   if (!data) return <Loading label="Загрузка настроек сервера…" />;
   const query = search.trim().toLowerCase();
-  const filtered = data.settings.filter((setting) => !query || `${setting.section}:${setting.key}`.toLowerCase().includes(query));
+  const filtered = data.settings
+    .filter((setting) => !isTokenSetting(setting))
+    .filter((setting) => !query || `${setting.section}:${setting.key}`.toLowerCase().includes(query));
   const serviceIds = Array.from(new Set(filtered.map((setting) => setting.serviceId)));
   const legacyRoles = Array.from(new Set(data.storageProfiles.filter((profile) => profile.isLegacy).map((profile) => profile.role)));
   return <div className="server-settings-tab">
