@@ -51,6 +51,7 @@
 
 ### 🛠 Инструменты
 - [[modules/tools-builder]] — BarkCloud.Builder: WPF-генератор `docker-compose.yml` и `.env` для поднятия бэкенда (WPF-UI, Win11)
+- [[modules/upload-progress-bar-prototype]] — standalone-прототип дизайна индикатора отправки файлов (не production-код)
 
 ### 🛡 Аудит
 - `Docs/audit/SECURITY_PERFORMANCE_AUDIT.md` — Пошаговый план аудита безопасности и производительности (Backend + Web + инфраструктура): сквозные этапы E1–E10, проверки по каждому микросервису, нагрузочное тестирование, шаблон отчёта и приложение с известными горячими точками (file:line).
