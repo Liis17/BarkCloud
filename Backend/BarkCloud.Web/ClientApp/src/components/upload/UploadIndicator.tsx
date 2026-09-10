@@ -48,8 +48,12 @@ function statusLabel(s: TaskStatus): string {
   }
 }
 
+function isActiveTask(task: UploadTask): boolean {
+  return task.status === 'pending' || task.status === 'checking' || task.status === 'uploading' || task.status === 'attaching';
+}
+
 function TaskRow({ task, onRetry, onDismiss, onCancel }: { task: UploadTask; onRetry: (id: string) => void; onDismiss: (id: string) => void; onCancel: (id: string) => void }) {
-  const isActive = task.status === 'pending' || task.status === 'checking' || task.status === 'uploading' || task.status === 'attaching';
+  const isActive = isActiveTask(task);
   return (
     <div className={'upload-task' + (task.status === 'error' ? ' has-error' : '')}>
       <div className="upload-task-icon"><StatusIcon status={task.status} /></div>
@@ -105,6 +109,7 @@ function TaskRow({ task, onRetry, onDismiss, onCancel }: { task: UploadTask; onR
 export function UploadIndicator() {
   const { tasks, summary, hasActive, dupPrompt, retry, dismiss, clearCompleted, cancel, answerDuplicate } = useUploadState();
   const [open, setOpen] = React.useState(false);
+  const orderedTasks = [...tasks].sort((a, b) => Number(isActiveTask(b)) - Number(isActiveTask(a)));
 
   if (tasks.length === 0) return null;
 
@@ -140,7 +145,7 @@ export function UploadIndicator() {
             </div>
           )}
           <div className="upload-popup-list">
-            {tasks.map(t => (
+            {orderedTasks.map(t => (
               <TaskRow key={t.id} task={t} onRetry={retry} onDismiss={dismiss} onCancel={cancel} />
             ))}
           </div>
