@@ -282,7 +282,7 @@ export function UploadManagerProvider({ children }: { children: React.ReactNode 
       else if (x.status === 'error') error++;
       else {
         active++;
-        if (x.status === 'uploading') uploaded += x.progress;
+        if (x.status === 'uploading' || x.status === 'attaching') uploaded += x.progress;
       }
     }
     const total = t.length;
