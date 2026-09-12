@@ -31,6 +31,7 @@ Parent: [[index]]
 ## Зависимости
 
 - Используется: всеми Backend-микросервисами (зависимость в их `.csproj`) и Shared.Queue/Shared.Exceptions при необходимости
+- C#-генерация protobuf выровнена на `Google.Protobuf 3.36.1` и `Grpc.Tools 2.83.0`; runtime-пакеты `Grpc.*` используют `2.83.0`.
 
 ## Поисковые контракты
 
