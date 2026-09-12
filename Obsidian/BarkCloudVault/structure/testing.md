@@ -102,7 +102,7 @@ Backend deploy-воркфлоу `build-backend-*.yml` вызывают общи�
 
 `tests-backend-manual.yml` запускает backend matrix-тесты и `Shared.*.Tests` вручную на `ubuntu-latest`.
 
-Docker-теги сохраняют прежнее правило: для ветки `dev` используется постфикс `-dev`, для `master` — имя образа без постфикса. Например, `barkcloud-files-dev:<sha>` в `dev` и `barkcloud-files:<sha>` в `master`.
+Docker-теги считает локальная экшн `.github/actions/docker-version`: следующий patch-SemVer по тегам реестра (первая сборка — `1.0.0`) для репозитория с суффиксом ветки (`dev` → `-dev`, `nightly` → `-nightly`, `master` — без суффикса). Пушатся три тега: `<version>`, `latest` и `<sha>` (коммит). Telegram-уведомление об успехе показывает SemVer-тег. Например, `barkcloud-files-dev:1.2.3` в `dev` и `barkcloud-files:1.2.3` в `master`.
 
 Drive (`Drive/*`, WPF/Windows, тестов нет) в CI не собирается — только локально. Backend-воркфлоу `build-backend-*.yml` выполняются на GitHub-hosted runner `ubuntu-latest`.
 
