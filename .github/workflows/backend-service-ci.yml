@@ -241,7 +241,7 @@ jobs:
             📌 Ветка: `${{ github.ref_name }}`
             🔗 Коммит: `${{ github.sha }}`
             👤 Автор: *${{ github.actor }}*
-            🏷️ Тег: `${{ steps.docker-version.outputs.tag_sha }}`
+            🏷️ Тег: `${{ steps.docker-version.outputs.tag_version }}`
         run: bash .github/scripts/send-telegram.sh
 
       - name: "Уведомление: сборка провалена"
