@@ -1,4 +1,5 @@
 using BarkCloud.Files.Helpers;
+using BarkCloud.Files.Domain;
 using BarkCloud.Files.Mapping;
 using BarkCloud.Files.Persistence;
 using BarkCloud.GrpcServer.Settings;
@@ -31,7 +32,9 @@ public class GetFilesDataCommandHandler : IRequestHandler<GetFilesDataCommand, G
             request.FileIds.Count()
         );
 
-        var files = await _uploadedFilesStorage.GetFiles(request.FileIds);
+        var files = (await _uploadedFilesStorage.GetFiles(request.FileIds))
+            .Where(x => x.IsReady())
+            .ToList();
 
         _logger.LogInformation(
             "Получены данные для {FoundCount} файлов из {RequestedCount} запрошенных",

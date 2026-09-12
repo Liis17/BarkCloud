@@ -1,3 +1,4 @@
+using BarkCloud.Files.Domain;
 using BarkCloud.Files.Helpers;
 using BarkCloud.Files.Mapping;
 using BarkCloud.Files.Persistence;
@@ -62,8 +63,8 @@ public class ListMyOutgoingSharesAllCommandHandler
         foreach (var g in page)
         {
             var file = await _filesStorage.GetFile(g.FileId);
-            if (file is null)
-                continue; // файл удалён — пропускаем (висящий грант подчистит TrashPurge)
+            if (file is null || !file.IsReady())
+                continue; // удалённые и незавершённые файлы не показываем
 
             previewsByFile.TryGetValue(g.FileId, out var previews);
             response.Items.Add(new OutgoingShareFull

@@ -1,10 +1,13 @@
 using BarkCloud.Files.Helpers;
+using BarkCloud.Files.Domain;
 using BarkCloud.Files.Mapping;
 using BarkCloud.Files.Persistence;
 using BarkCloud.GrpcServer.Settings;
 using BarkCloud.Proto.Files;
 
 using MediatR;
+
+using FileNotReadyException = BarkCloud.Shared.Exceptions.Files.FileNotReadyException;
 
 namespace BarkCloud.Files.Features.GetFileData;
 
@@ -36,6 +39,8 @@ public class GetFileDataCommandHandler : IRequestHandler<GetFileDataCommand, Get
             _logger.LogWarning("Файл {FileId} не найден", request.FileId);
             throw new FileNotFoundException();
         }
+        if (!file.IsReady())
+            throw new FileNotReadyException();
 
         _logger.LogInformation(
             "Данные файла {FileId} получены. Имя: {FileName}, Тип: {FileType}, Размер: {FileSize} байт",

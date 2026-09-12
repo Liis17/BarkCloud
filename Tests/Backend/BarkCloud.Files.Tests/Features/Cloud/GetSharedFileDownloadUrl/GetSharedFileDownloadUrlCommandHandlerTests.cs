@@ -52,12 +52,32 @@ public class GetSharedFileDownloadUrlCommandHandlerTests
         var fileId = Guid.NewGuid();
         var tempId = Guid.NewGuid();
         _grants.Setup(s => s.RecipientHasAccess(RecipientId, fileId, It.IsAny<CancellationToken>())).ReturnsAsync(true);
-        _files.Setup(s => s.GetFile(fileId)).ReturnsAsync(new UploadFileEntity { Id = fileId });
+        _files.Setup(s => s.GetFile(fileId)).ReturnsAsync(new UploadFileEntity
+        {
+            Id = fileId,
+            Etag = "etag",
+            UploadedAt = DateTime.UtcNow
+        });
         _temp.Setup(s => s.CreateTempFilesBatchAsync(It.IsAny<IEnumerable<Guid>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<TempFileEntity> { new() { Id = tempId, OriginalFileId = fileId } });
 
         var response = await CreateSut().Handle(new GetSharedFileDownloadUrlCommand { FileId = fileId }, default);
 
         response.DownloadUrl.Should().Contain(tempId.ToString());
+    }
+
+    [Fact]
+    public async Task Handle_FileNotReady_ThrowsFileNotReady()
+    {
+        var fileId = Guid.NewGuid();
+        _grants.Setup(s => s.RecipientHasAccess(RecipientId, fileId, It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        _files.Setup(s => s.GetFile(fileId)).ReturnsAsync(new UploadFileEntity { Id = fileId });
+
+        var act = () => CreateSut().Handle(new GetSharedFileDownloadUrlCommand { FileId = fileId }, default);
+
+        await act.Should().ThrowAsync<FileNotReadyException>();
+        _temp.Verify(
+            s => s.CreateTempFilesBatchAsync(It.IsAny<IEnumerable<Guid>>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 }

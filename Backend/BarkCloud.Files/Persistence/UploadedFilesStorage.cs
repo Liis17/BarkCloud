@@ -55,6 +55,7 @@ public class UploadedFilesStorage : IUploadedFilesStorage
     {
         return await _context.UploadedFiles
             .AsNoTracking()
+            .WhereReady()
             .Where(x => ids.Contains(x.Id))
             .ToListAsync();
     }
@@ -142,7 +143,8 @@ public class UploadedFilesStorage : IUploadedFilesStorage
     {
         return await _context.UploadedFiles
             .AsNoTracking()
-            .Where(x => x.Uploaders.Contains(userId) && x.UploadedAt != null)
+            .WhereReady()
+            .Where(x => x.Uploaders.Contains(userId))
             .SumAsync(x => x.Size);
     }
 
@@ -153,7 +155,8 @@ public class UploadedFilesStorage : IUploadedFilesStorage
     {
         return await _context.UploadedFiles
             .AsNoTracking()
-            .Where(x => x.Uploaders.Contains(userId) && x.UploadedAt != null)
+            .WhereReady()
+            .Where(x => x.Uploaders.Contains(userId))
             .GroupBy(x => x.Type)
             .Select(g => new { Type = g.Key, Size = g.Sum(x => x.Size) })
             .ToDictionaryAsync(x => x.Type, x => x.Size);
@@ -175,6 +178,7 @@ public class UploadedFilesStorage : IUploadedFilesStorage
     {
         var query = _context.UploadedFiles
             .AsNoTracking()
+            .WhereReady()
             .Where(f => f.Uploaders.Contains(ownerId)
                         && f.Type == UploadFileType.CloudFile
                         && f.MediaKind == kind
@@ -207,6 +211,7 @@ public class UploadedFilesStorage : IUploadedFilesStorage
     {
         var query = _context.UploadedFiles
             .AsNoTracking()
+            .WhereReady()
             .Where(f => f.Uploaders.Contains(ownerId)
                         && f.Type == UploadFileType.CloudFile
                         && !_context.FilePreviews.Any(p => p.PreviewFileId == f.Id)
@@ -248,7 +253,7 @@ public class UploadedFilesStorage : IUploadedFilesStorage
         // Базовый фильтр «живых» медиа владельца (как ListUserMediaPage), плюс join к метаданным
         // по дате съёмки. Сравнение по месяцу/дню Npgsql транслирует в date_part('month'/'day').
         var query =
-            from f in _context.UploadedFiles.AsNoTracking()
+            from f in _context.UploadedFiles.AsNoTracking().WhereReady()
             join m in _context.FileMetadata on f.Id equals m.FileId
             where f.Uploaders.Contains(ownerId)
                   && f.Type == UploadFileType.CloudFile
@@ -272,7 +277,7 @@ public class UploadedFilesStorage : IUploadedFilesStorage
     public async Task<List<LocatedMediaItem>> ListMediaWithLocationPage(long ownerId, DateTime? cursorCreatedAt, Guid? cursorFileId, int limit, CancellationToken cancellationToken = default)
     {
         var query =
-            from f in _context.UploadedFiles.AsNoTracking()
+            from f in _context.UploadedFiles.AsNoTracking().WhereReady()
             join m in _context.FileMetadata on f.Id equals m.FileId
             where f.Uploaders.Contains(ownerId)
                   && f.Type == UploadFileType.CloudFile

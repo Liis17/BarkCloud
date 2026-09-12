@@ -1,3 +1,4 @@
+using BarkCloud.Files.Domain;
 using BarkCloud.Files.Persistence;
 using BarkCloud.Files.Services;
 using BarkCloud.GrpcServer.XAuth;
@@ -66,6 +67,8 @@ public class UpdateAlbumCommandHandler : IRequestHandler<UpdateAlbumCommand, Alb
                 var coverFile = await _filesStorage.GetFile(request.CoverFileId.Value);
                 if (coverFile is null || !coverFile.Uploaders.Contains(ownerId))
                     throw new CloudAccessDeniedException();
+                if (!coverFile.IsReady())
+                    throw new FileNotReadyException();
 
                 album.CoverFileId = coverFile.Id;
             }

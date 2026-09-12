@@ -183,7 +183,15 @@ public static class CloudApiEndpoints
             await Guarded(http, auth, async token =>
             {
                 await cloud.AttachFileAsync(
-                    new AttachFileRequest { DirectoryId = body.Dir ?? "", FileId = body.FileId, Name = body.Name, RouteByMediaKind = body.RouteByMediaKind }, token);
+                    new AttachFileRequest
+                    {
+                        DirectoryId = body.Dir ?? "",
+                        FileId = body.FileId,
+                        Name = body.Name,
+                        RouteByMediaKind = body.RouteByMediaKind,
+                        UploadSessionId = body.UploadSessionId ?? "",
+                        IsUploadRetry = body.IsUploadRetry
+                    }, token);
                 return Results.Json(new { ok = true }, Json);
             }));
 
@@ -1149,6 +1157,79 @@ public static class CloudApiEndpoints
 
         // ───────────────────────── Файлы: загрузка / оригинал ─────────────────────────
 
+        api.MapPost("/files/uploads", async (
+            HttpContext http,
+            AuthGateway auth,
+            FilesApi.FilesApiClient files,
+            IConfiguration config,
+            UploadSessionCreateReq body) =>
+            await Guarded(http, auth, async (user, _) =>
+            {
+                var device = BrowserContext.BuildDeviceInfo(
+                    http,
+                    user.DeviceId ?? auth.GetOrCreateDeviceId(http),
+                    config.Value("App:AppName", "BarkCloud Web"),
+                    config.Value("App:Version", AppVersion.Current));
+                var token = BrowserContext.UserTokenWithDevice(user.AccessToken, device);
+                var response = await files.CreateUploadSessionAsync(new CreateUploadSessionRequest
+                {
+                    IdempotencyKey = body.IdempotencyKey,
+                    FileName = body.FileName,
+                    FileSize = body.FileSize,
+                    ContentType = body.ContentType ?? "application/octet-stream",
+                    Sha256 = body.Sha256
+                }, token);
+                return Results.Json(UploadSessionJson(response), Json);
+            }));
+
+        api.MapGet("/files/uploads/{id}", async (
+            HttpContext http,
+            AuthGateway auth,
+            FilesApi.FilesApiClient files,
+            string id) =>
+            await Guarded(http, auth, async token =>
+            {
+                var response = await files.GetUploadSessionAsync(
+                    new UploadSessionIdRequest { SessionId = id }, token);
+                return Results.Json(UploadSessionJson(response), Json);
+            }));
+
+        api.MapPost("/files/uploads/{id}/resume", async (
+            HttpContext http,
+            AuthGateway auth,
+            FilesApi.FilesApiClient files,
+            string id) =>
+            await Guarded(http, auth, async token =>
+            {
+                var response = await files.ResumeUploadSessionAsync(
+                    new UploadSessionIdRequest { SessionId = id }, token);
+                return Results.Json(UploadSessionJson(response), Json);
+            }));
+
+        api.MapPost("/files/uploads/{id}/complete", async (
+            HttpContext http,
+            AuthGateway auth,
+            FilesApi.FilesApiClient files,
+            string id) =>
+            await Guarded(http, auth, async token =>
+            {
+                var response = await files.CompleteUploadSessionAsync(
+                    new UploadSessionIdRequest { SessionId = id }, token);
+                return Results.Json(UploadSessionJson(response), Json);
+            }));
+
+        api.MapDelete("/files/uploads/{id}", async (
+            HttpContext http,
+            AuthGateway auth,
+            FilesApi.FilesApiClient files,
+            string id) =>
+            await Guarded(http, auth, async token =>
+            {
+                var response = await files.CancelUploadSessionAsync(
+                    new UploadSessionIdRequest { SessionId = id }, token);
+                return Results.Json(UploadSessionJson(response), Json);
+            }));
+
         // Проверка наличия по SHA256-хешу (без побочных эффектов): клиент считает хеш в браузере
         // и, если контент уже есть, показывает модалку «такой файл уже есть» с его именем и папкой.
         api.MapPost("/files/check-hash", async (HttpContext http, AuthGateway auth, FilesApi.FilesApiClient files, HashReq body) =>
@@ -1480,6 +1561,25 @@ public static class CloudApiEndpoints
         createdAt = item.CreatedAt?.ToDateTimeOffset()
     };
 
+    private static object UploadSessionJson(UploadSessionResponse session) => new
+    {
+        sessionId = session.SessionId,
+        fileId = session.FileId,
+        status = session.Status.ToString().ToLowerInvariant(),
+        fileSize = session.FileSize,
+        partSize = session.PartSize,
+        expiresAt = session.ExpiresAt?.ToDateTimeOffset(),
+        uploadToken = string.IsNullOrEmpty(session.UploadToken) ? null : session.UploadToken,
+        error = string.IsNullOrEmpty(session.ErrorCode)
+            ? null
+            : new { code = session.ErrorCode, message = session.ErrorMessage },
+        uploadedParts = session.UploadedParts.Select(x => new
+        {
+            partNumber = x.PartNumber,
+            size = x.Size
+        }).ToArray()
+    };
+
     private static object MusicTrackJson(MusicTrackInfo item, bool includeEntries = false) => new
     {
         file = MusicTrackFileJson(item, includeEntries),
@@ -1666,7 +1766,16 @@ public static class CloudApiEndpoints
         {
             // доменная ошибка: ErrorCode (GUID) в trailing-метадате
             var code = ex.Trailers.GetValue("x-error-code");
-            return Results.Json(new { error = ex.Status.Detail, code }, Json, statusCode: 400);
+            var payload = new Dictionary<string, object?>
+            {
+                ["error"] = ex.Status.Detail,
+                ["code"] = code
+            };
+            AddInt64Trailer(ex.Trailers, payload, "x-quota-limit", "limit");
+            AddInt64Trailer(ex.Trailers, payload, "x-quota-used", "used");
+            AddInt64Trailer(ex.Trailers, payload, "x-quota-reserved", "reserved");
+            AddInt64Trailer(ex.Trailers, payload, "x-quota-requested", "requested");
+            return Results.Json(payload, Json, statusCode: 400);
         }
         catch (RpcException ex) when (ex.StatusCode == StatusCode.Unauthenticated)
         {
@@ -1678,13 +1787,29 @@ public static class CloudApiEndpoints
         }
     }
 
+    private static void AddInt64Trailer(
+        Metadata trailers,
+        IDictionary<string, object?> target,
+        string trailerName,
+        string jsonName)
+    {
+        if (long.TryParse(trailers.GetValue(trailerName), NumberStyles.Integer, CultureInfo.InvariantCulture, out var value))
+            target[jsonName] = value;
+    }
+
     // ───────────────────────── DTO тел запросов ─────────────────────────
 
     private sealed record DirCreate(string? ParentId, string Name);
     private sealed record RenameReq(string Id, string Name);
     private sealed record MoveReq(string Id, string? ParentId);
     private sealed record IdReq(string Id);
-    private sealed record AttachReq(string? Dir, string FileId, string Name, bool RouteByMediaKind = false);
+    private sealed record AttachReq(
+        string? Dir,
+        string FileId,
+        string Name,
+        bool RouteByMediaKind = false,
+        string? UploadSessionId = null,
+        bool IsUploadRetry = false);
     private sealed record EntryRenameReq(string EntryId, string Name);
     private sealed record EntryMoveReq(string EntryId, string? Dir);
     private sealed record EntryIdReq(string EntryId);
@@ -1711,6 +1836,12 @@ public static class CloudApiEndpoints
         Value = r.Value ?? ""
     };
     private sealed record HashReq(string? Hash);
+    private sealed record UploadSessionCreateReq(
+        string IdempotencyKey,
+        string FileName,
+        long FileSize,
+        string? ContentType,
+        string Sha256);
     private sealed record VideoThumbReq(string VideoFileId, string ImageFileId);
     private sealed record ShareCreateReq(string FileId, string? Name);
     private sealed record ShareIdReq(string ShareId);

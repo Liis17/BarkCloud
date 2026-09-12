@@ -24,6 +24,7 @@ public class UploadFileCommandHandlerTests
     private readonly Mock<HeicImageConverter> _heicConverter;
     private readonly Mock<FileMetadataExtractor> _metadataExtractor;
     private readonly Mock<PreviewPersistenceService> _previewPersistence;
+    private readonly Mock<ILegacyUploadCompletionMarker> _legacyCompletion = new();
 
     public UploadFileCommandHandlerTests()
     {
@@ -46,10 +47,12 @@ public class UploadFileCommandHandlerTests
             NullLogger<PreviewPersistenceService>.Instance);
     }
 
-    private UploadFileCommandHandler CreateSut() => new(
+    private UploadFileCommandHandler CreateSut(IUploadTempFileProvider? tempFiles = null) => new(
         _files.Object, _hashes.Object, _metadata.Object, _s3.Object, _bucketRegistry.Object,
         _imageCompressor.Object, _videoExtractor.Object, _heicConverter.Object,
-        _metadataExtractor.Object, _previewPersistence.Object, NullLogger<UploadFileCommandHandler>.Instance);
+        _metadataExtractor.Object, _previewPersistence.Object, _legacyCompletion.Object,
+        NullLogger<UploadFileCommandHandler>.Instance,
+        tempFiles: tempFiles);
 
     private static Stream MakeStream(string content = "hello") => new MemoryStream(System.Text.Encoding.UTF8.GetBytes(content));
 
@@ -117,6 +120,28 @@ public class UploadFileCommandHandlerTests
     }
 
     [Fact]
+    public async Task Handle_LegacyReservation_KeepsFileHiddenUntilQuotaCommit()
+    {
+        var id = Guid.NewGuid();
+        var reservationId = Guid.NewGuid();
+        _files.Setup(s => s.GetFile(id))
+            .ReturnsAsync(new UploadFileEntity { Id = id, Type = UploadFileType.CloudFile, Uploaders = [42] });
+
+        await CreateSut().Handle(new UploadFileCommand
+        {
+            FileId = id,
+            FileName = "doc.txt",
+            FileStream = MakeStream(),
+            QuotaReservationId = reservationId
+        }, default);
+
+        _files.Verify(s => s.UpdateFile(It.Is<UploadFileEntity>(file =>
+            file.Etag == "etag-123" && file.UploadedAt == null)), Times.Once);
+        _legacyCompletion.Verify(x => x.MarkProcessingCompletedAsync(
+            reservationId, CancellationToken.None), Times.Once);
+    }
+
+    [Fact]
     public async Task Handle_JpegFile_GeneratesSeparateJpegViewBlob()
     {
         var id = Guid.NewGuid();
@@ -147,8 +172,10 @@ public class UploadFileCommandHandlerTests
         _files.Verify(s => s.UpdateFile(It.Is<UploadFileEntity>(f => f.JpegViewFileId == viewId)), Times.Once);
     }
 
-    [Fact]
-    public async Task Handle_HeicFile_KeepsOriginalAndGeneratesJpegView()
+    [Theory]
+    [InlineData("image/heic")]
+    [InlineData("image/heif")]
+    public async Task Handle_HeicFile_KeepsOriginalAndGeneratesJpegView(string contentType)
     {
         var id = Guid.NewGuid();
         _files.Setup(s => s.GetFile(id))
@@ -160,7 +187,13 @@ public class UploadFileCommandHandlerTests
             .ReturnsAsync(jpegBytes);
 
         var response = await CreateSut().Handle(
-            new UploadFileCommand { FileId = id, FileName = "photo.heic", FileStream = MakeStream() }, default);
+            new UploadFileCommand
+            {
+                FileId = id,
+                FileName = "photo.heic",
+                ContentTypeOverride = contentType,
+                FileStream = MakeStream()
+            }, default);
 
         response.Should().Be(id.ToString());
         // HEIC конвертируется в JPEG-представление (для превью/просмотра в вебе).
@@ -168,7 +201,7 @@ public class UploadFileCommandHandlerTests
         // Но оригинал заливается КАК ЕСТЬ (image/heic, имя без изменений) — чтобы его SHA256
         // совпадал с клиентским и не ломались дедуп и индикатор «уже в облаке».
         _s3.Verify(
-            s => s.UploadAsync("test-bucket", id.ToString(), It.IsAny<Stream>(), "image/heic"),
+            s => s.UploadAsync("test-bucket", id.ToString(), It.IsAny<Stream>(), contentType),
             Times.Once);
         _files.Verify(s => s.UpdateFile(It.Is<UploadFileEntity>(f => f.Filename == "photo.heic")), Times.Once);
     }
@@ -219,5 +252,221 @@ public class UploadFileCommandHandlerTests
             It.IsAny<Stream>(), It.IsAny<int[]>(), It.IsAny<CancellationToken>()), Times.Never);
         _previewPersistence.Verify(p => p.PersistPreviewsAsync(
             It.IsAny<UploadFileEntity>(), previews, "test-bucket", It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_DeferredVideo_WhenThumbnailFails_StillCompletesEnrichment()
+    {
+        var id = Guid.NewGuid();
+        _files.Setup(s => s.GetFile(id))
+            .ReturnsAsync(new UploadFileEntity { Id = id, Type = UploadFileType.CloudFile, Uploaders = new() { 42 } });
+        _videoExtractor
+            .Setup(v => v.ProbeFullAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new VideoProbe(
+                Width: 1920,
+                Height: 1080,
+                Duration: TimeSpan.FromSeconds(10),
+                VideoCodec: "h264",
+                AudioCodec: "aac",
+                BitRate: 1_000_000,
+                FrameRate: 30,
+                FormatTags: null));
+        _videoExtractor
+            .Setup(v => v.ExtractFrameJpegAsync(
+                It.IsAny<string>(), It.IsAny<TimeSpan>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("thumbnail failed"));
+
+        var response = await CreateSut().Handle(new UploadFileCommand
+        {
+            FileId = id,
+            FileName = "clip.mp4",
+            FileStream = MakeStream(),
+            DeferAvailability = true
+        }, default);
+
+        response.Should().Be(id.ToString());
+        _files.Verify(s => s.UpdateFile(It.Is<UploadFileEntity>(f =>
+            f.Id == id && f.Etag == "etag-123" && f.UploadedAt == null)), Times.Once);
+        _previewPersistence.Verify(p => p.PersistPreviewsAsync(
+            It.IsAny<UploadFileEntity>(), It.IsAny<List<MultiPreviewItem>>(),
+            It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_DeferredUpload_UsesSessionContentTypeForKnownFormatValidation()
+    {
+        var id = Guid.NewGuid();
+        _files.Setup(s => s.GetFile(id))
+            .ReturnsAsync(new UploadFileEntity { Id = id, Type = UploadFileType.CloudFile, Uploaders = new() { 42 } });
+        _videoExtractor
+            .Setup(v => v.ProbeFullAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidDataException("not a video"));
+
+        var act = () => CreateSut().Handle(new UploadFileCommand
+        {
+            FileId = id,
+            FileName = "opaque.bin",
+            ContentTypeOverride = "video/mp4",
+            FileStream = MakeStream(),
+            DeferAvailability = true
+        }, default);
+
+        await act.Should().ThrowAsync<FileIntegrityException>();
+        _videoExtractor.Verify(v => v.ProbeFullAsync(
+            It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_WhenActualSizeDiffersFromDeclaredSize_RejectsObject()
+    {
+        var id = Guid.NewGuid();
+        _files.Setup(s => s.GetFile(id))
+            .ReturnsAsync(new UploadFileEntity { Id = id, Type = UploadFileType.CloudFile, Uploaders = new() { 42 } });
+
+        var act = () => CreateSut().Handle(new UploadFileCommand
+        {
+            FileId = id,
+            FileName = "doc.txt",
+            FileStream = MakeStream("hello"),
+            FileSize = 6,
+            DeferAvailability = true
+        }, default);
+
+        await act.Should().ThrowAsync<FileIntegrityException>()
+            .WithMessage("*размер*");
+        _s3.Verify(s => s.UploadAsync(
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<Stream>(), It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_WhenSha256DiffersFromDeclaredHash_RejectsObject()
+    {
+        var id = Guid.NewGuid();
+        _files.Setup(s => s.GetFile(id))
+            .ReturnsAsync(new UploadFileEntity { Id = id, Type = UploadFileType.CloudFile, Uploaders = new() { 42 } });
+
+        var act = () => CreateSut().Handle(new UploadFileCommand
+        {
+            FileId = id,
+            FileName = "doc.txt",
+            FileStream = MakeStream("hello"),
+            FileSize = 5,
+            ExpectedSha256 = new string('0', 64),
+            DeferAvailability = true
+        }, default);
+
+        await act.Should().ThrowAsync<FileIntegrityException>()
+            .WithMessage("*SHA-256*");
+        _s3.Verify(s => s.UploadAsync(
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<Stream>(), It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_DeferredPdf_WhenDocumentCannotBeParsed_RejectsObject()
+    {
+        var id = Guid.NewGuid();
+        _files.Setup(s => s.GetFile(id))
+            .ReturnsAsync(new UploadFileEntity { Id = id, Type = UploadFileType.CloudFile, Uploaders = new() { 42 } });
+        _metadataExtractor.Setup(x => x.ExtractFromPdf(It.IsAny<Stream>(), rejectInvalid: true))
+            .Throws(new InvalidDataException("not a PDF"));
+
+        var act = () => CreateSut().Handle(new UploadFileCommand
+        {
+            FileId = id,
+            FileName = "document.pdf",
+            FileStream = MakeStream("not a PDF"),
+            DeferAvailability = true
+        }, default);
+
+        await act.Should().ThrowAsync<FileIntegrityException>()
+            .WithMessage("*документ*");
+        _s3.Verify(s => s.UploadAsync(
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<Stream>(), It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_DeferredImage_WhenPreviewPersistenceFails_StillCompletesEnrichment()
+    {
+        var id = Guid.NewGuid();
+        _files.Setup(s => s.GetFile(id))
+            .ReturnsAsync(new UploadFileEntity { Id = id, Type = UploadFileType.CloudFile, Uploaders = new() { 42 } });
+        _imageCompressor.Setup(x => x.ProcessImageAllInOneAsync(
+                It.IsAny<Stream>(), false, null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ImageProcessingResult(null, null, 1920, 1080));
+        var previews = new List<MultiPreviewItem>
+        {
+            new(1024, 1024, 576, [1, 2, 3])
+        };
+        _imageCompressor.Setup(x => x.GenerateMultiplePreviewsAsync(
+                It.IsAny<Stream>(), It.IsAny<int[]>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(previews);
+        _previewPersistence.Setup(x => x.PersistPreviewsAsync(
+                It.IsAny<UploadFileEntity>(), previews, It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new IOException("preview storage unavailable"));
+
+        var response = await CreateSut().Handle(new UploadFileCommand
+        {
+            FileId = id,
+            FileName = "photo.jpg",
+            FileStream = MakeStream(),
+            DeferAvailability = true
+        }, default);
+
+        response.Should().Be(id.ToString());
+        _files.Verify(x => x.UpdateFile(It.Is<UploadFileEntity>(file =>
+            file.Id == id && file.Etag == "etag-123" && file.UploadedAt == null)), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_WhenDiskBufferCopyFails_DeletesTemporaryFile()
+    {
+        var id = Guid.NewGuid();
+        _files.Setup(s => s.GetFile(id))
+            .ReturnsAsync(new UploadFileEntity { Id = id, Type = UploadFileType.CloudFile, Uploaders = new() { 42 } });
+        var path = Path.Combine(Path.GetTempPath(), $"barkcloud-test-{Guid.NewGuid():N}.tmp");
+        var tempFiles = new Mock<IUploadTempFileProvider>();
+        tempFiles.Setup(x => x.CreatePath()).Returns(path);
+
+        try
+        {
+            var act = () => CreateSut(tempFiles.Object).Handle(new UploadFileCommand
+            {
+                FileId = id,
+                FileName = "file.bin",
+                FileStream = new FailingReadStream(),
+                FileSize = 42,
+                ForceDiskBuffer = true
+            }, default);
+
+            await act.Should().ThrowAsync<IOException>();
+            File.Exists(path).Should().BeFalse();
+        }
+        finally
+        {
+            if (File.Exists(path))
+                File.Delete(path);
+        }
+    }
+
+    private sealed class FailingReadStream : Stream
+    {
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => throw new NotSupportedException();
+        public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+        public override void Flush() { }
+        public override int Read(byte[] buffer, int offset, int count) => throw new IOException("copy failed");
+        public override Task<int> ReadAsync(
+            byte[] buffer,
+            int offset,
+            int count,
+            CancellationToken cancellationToken) => Task.FromException<int>(new IOException("copy failed"));
+        public override ValueTask<int> ReadAsync(
+            Memory<byte> buffer,
+            CancellationToken cancellationToken = default) => ValueTask.FromException<int>(new IOException("copy failed"));
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
     }
 }

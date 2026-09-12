@@ -1,7 +1,7 @@
 import React from 'react';
 import { Icon } from '../Icon';
 import { Modal } from '../ui/Modal';
-import { useUploadState } from '../../hooks/useUploadManager';
+import { uploadTaskOrdering, useUploadState } from '../../hooks/useUploadManager';
 import type { UploadTask, TaskStatus } from '../../hooks/useUploadManager';
 
 function fmtSize(bytes: number): string {
@@ -26,10 +26,15 @@ function fmtEta(seconds: number | null): string {
 function StatusIcon({ status }: { status: TaskStatus }) {
   switch (status) {
     case 'done': return <Icon.check size={14} className="upload-status done" />;
-    case 'error': return <Icon.x size={14} className="upload-status err" />;
+    case 'failed':
+    case 'needs_file':
+    case 'uploaded_not_attached':
+      return <Icon.x size={14} className="upload-status err" />;
     case 'skipped': return <Icon.x size={14} className="upload-status skip" />;
     case 'uploading':
+    case 'hashing':
     case 'checking':
+    case 'processing':
     case 'attaching':
       return <span className="spinner" style={{ width: 14, height: 14, borderWidth: 2 }} />;
     default: return null;
@@ -38,24 +43,25 @@ function StatusIcon({ status }: { status: TaskStatus }) {
 
 function statusLabel(s: TaskStatus): string {
   switch (s) {
-    case 'pending': return 'Ожидание…';
+    case 'hashing': return 'Хэширование…';
     case 'checking': return 'Проверка…';
+    case 'needs_file': return 'Нужен файл';
     case 'uploading': return 'Загрузка…';
+    case 'processing': return 'Обработка…';
     case 'attaching': return 'Прикрепление…';
+    case 'uploaded_not_attached': return 'Загружен, не прикреплён';
     case 'done': return 'Загружен';
-    case 'error': return 'Ошибка';
+    case 'failed': return 'Ошибка';
     case 'skipped': return 'Пропущен';
   }
 }
 
-function isActiveTask(task: UploadTask): boolean {
-  return task.status === 'pending' || task.status === 'checking' || task.status === 'uploading' || task.status === 'attaching';
-}
-
-function TaskRow({ task, onRetry, onDismiss, onCancel }: { task: UploadTask; onRetry: (id: string) => void; onDismiss: (id: string) => void; onCancel: (id: string) => void }) {
-  const isActive = isActiveTask(task);
+function TaskRow({ task, onRetry, onReselect, onDismiss, onCancel }: { task: UploadTask; onRetry: (id: string) => void; onReselect: (id: string) => void; onDismiss: (id: string) => void; onCancel: (id: string) => void }) {
+  const canCancel = task.status === 'hashing'
+    || task.status === 'checking'
+    || task.status === 'uploading';
   return (
-    <div className={'upload-task' + (task.status === 'error' ? ' has-error' : '')}>
+    <div className={'upload-task' + (task.status === 'failed' || task.status === 'uploaded_not_attached' || task.status === 'needs_file' ? ' has-error' : '')}>
       <div className="upload-task-icon"><StatusIcon status={task.status} /></div>
       <div className="upload-task-body">
         <div className="upload-task-name" title={task.fileName}>{task.fileName}</div>
@@ -66,27 +72,32 @@ function TaskRow({ task, onRetry, onDismiss, onCancel }: { task: UploadTask; onR
             <span className="upload-task-eta">~{fmtEta(task.eta)}</span>
           )}
         </div>
-        {task.status === 'uploading' && (
+        {(task.status === 'hashing' || task.status === 'uploading') && (
           <div className="upload-task-bar">
             <div className="bar-fill" style={{ width: Math.round(task.progress * 100) + '%' }} />
           </div>
         )}
-        {task.status === 'attaching' && (
+        {(task.status === 'processing' || task.status === 'attaching') && (
           <div className="upload-task-bar">
             <div className="bar-fill" style={{ width: '100%' }} />
           </div>
         )}
-        {task.status === 'error' && task.error && (
+        {(task.status === 'failed' || task.status === 'needs_file' || task.status === 'uploaded_not_attached') && task.error && (
           <div className="upload-task-error">{task.error}</div>
         )}
       </div>
       <div className="upload-task-actions">
-        {task.status === 'error' && (
+        {(task.status === 'failed' || task.status === 'uploaded_not_attached') && (
           <button className="icon-btn" title="Повторить" onClick={() => onRetry(task.id)}>
             <Icon.refresh size={16} />
           </button>
         )}
-        {isActive && (
+        {task.status === 'needs_file' && (
+          <button className="icon-btn" title="Выбрать файл" onClick={() => onReselect(task.id)}>
+            <Icon.upload size={16} />
+          </button>
+        )}
+        {canCancel && (
           <button className="icon-btn" title="Отменить" onClick={() => onCancel(task.id)}>
             <Icon.x size={16} />
           </button>
@@ -96,7 +107,7 @@ function TaskRow({ task, onRetry, onDismiss, onCancel }: { task: UploadTask; onR
             <Icon.x size={16} />
           </button>
         )}
-        {task.status === 'error' && (
+        {(task.status === 'failed' || task.status === 'uploaded_not_attached' || task.status === 'needs_file') && (
           <button className="icon-btn" title="Убрать" onClick={() => onDismiss(task.id)}>
             <Icon.x size={16} />
           </button>
@@ -107,9 +118,9 @@ function TaskRow({ task, onRetry, onDismiss, onCancel }: { task: UploadTask; onR
 }
 
 export function UploadIndicator() {
-  const { tasks, summary, hasActive, dupPrompt, retry, dismiss, clearCompleted, cancel, answerDuplicate } = useUploadState();
+  const { tasks, summary, hasActive, dupPrompt, retry, reselect, dismiss, clearCompleted, cancel, answerDuplicate } = useUploadState();
   const [open, setOpen] = React.useState(false);
-  const orderedTasks = [...tasks].sort((a, b) => Number(isActiveTask(b)) - Number(isActiveTask(a)));
+  const orderedTasks = [...tasks].sort(uploadTaskOrdering);
 
   if (tasks.length === 0) return null;
 
@@ -146,12 +157,12 @@ export function UploadIndicator() {
           )}
           <div className="upload-popup-list">
             {orderedTasks.map(t => (
-              <TaskRow key={t.id} task={t} onRetry={retry} onDismiss={dismiss} onCancel={cancel} />
+              <TaskRow key={t.id} task={t} onRetry={retry} onReselect={reselect} onDismiss={dismiss} onCancel={cancel} />
             ))}
           </div>
           {summary.done + summary.skipped + summary.error > 0 && (
             <div className="upload-popup-foot">
-              <button className="btn text" onClick={() => { clearCompleted(); if (!tasks.some(t => t.status !== 'done' && t.status !== 'error' && t.status !== 'skipped')) setOpen(false); }}>Очистить завершённые</button>
+              <button className="btn text" onClick={() => { clearCompleted(); if (!tasks.some(t => t.status !== 'done' && t.status !== 'failed' && t.status !== 'skipped')) setOpen(false); }}>Очистить завершённые</button>
             </div>
           )}
         </div>

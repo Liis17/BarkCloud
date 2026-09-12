@@ -59,6 +59,8 @@ public class SetVideoThumbnailCommandHandler : IRequestHandler<SetVideoThumbnail
         // Оба файла должны принадлежать пользователю.
         if (!video.Uploaders.Contains(ownerId) || !source.Uploaders.Contains(ownerId))
             throw new CloudAccessDeniedException();
+        if (!video.IsReady() || !source.IsReady())
+            throw new FileNotReadyException();
 
         // Видео-файл и картинка-источник.
         if (video.MediaKind != MediaKind.Video || source.MediaKind != MediaKind.Photo)

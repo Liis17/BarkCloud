@@ -1,4 +1,5 @@
 using BarkCloud.Files.Helpers;
+using BarkCloud.Files.Domain;
 using BarkCloud.Files.Persistence;
 using BarkCloud.GrpcServer.Settings;
 using BarkCloud.Proto.Files;
@@ -32,12 +33,12 @@ public class GetTempDownloadUrlCommandHandler : IRequestHandler<GetTempDownloadU
             request.FileIds.Count()
         );
 
-        var files = await _uploadedFilesStorage.GetFiles(request.FileIds);
-        
-        if (files is null)
+        var storedFiles = await _uploadedFilesStorage.GetFiles(request.FileIds);
+        if (storedFiles is null)
         {
             throw new FileNotFoundException();
         }
+        var files = storedFiles.Where(x => x.IsReady()).ToList();
         
         if (files.Count != request.FileIds.Count)
         {

@@ -41,6 +41,8 @@ public class AddFavoriteCommandHandler : IRequestHandler<AddFavoriteCommand, Clo
         var file = await _filesStorage.GetFile(request.FileId);
         if (file is null || !file.Uploaders.Contains(ownerId))
             throw new CloudAccessDeniedException();
+        if (!file.IsReady())
+            throw new FileNotReadyException();
 
         // Идемпотентность: повторное добавление не создаёт дубль.
         if (await _storage.Exists(ownerId, request.FileId, cancellationToken))

@@ -2,6 +2,7 @@ using BarkCloud.Files.Domain;
 using BarkCloud.Files.Helpers;
 using BarkCloud.Files.Persistence;
 using BarkCloud.Files.Services;
+using BarkCloud.GrpcServer.Metrics;
 using BarkCloud.GrpcServer.XAuth;
 using BarkCloud.Proto.Files;
 using BarkCloud.Shared.Exceptions.Files;
@@ -20,6 +21,7 @@ public class AttachFileCommandHandler : IRequestHandler<AttachFileCommand, Cloud
     private readonly IUploadedFilesStorage _filesStorage;
     private readonly UserContext _userContext;
     private readonly FileActivityWriter _activity;
+    private readonly MetricsCollector? _metrics;
     private readonly ILogger<AttachFileCommandHandler> _logger;
 
     public AttachFileCommandHandler(
@@ -27,12 +29,14 @@ public class AttachFileCommandHandler : IRequestHandler<AttachFileCommand, Cloud
         IUploadedFilesStorage filesStorage,
         UserContext userContext,
         ILogger<AttachFileCommandHandler> logger,
-        FileActivityWriter? activity = null)
+        FileActivityWriter? activity = null,
+        MetricsCollector? metrics = null)
     {
         _storage = storage;
         _filesStorage = filesStorage;
         _userContext = userContext;
         _activity = activity ?? FileActivityWriter.Noop;
+        _metrics = metrics;
         _logger = logger;
     }
 
@@ -65,6 +69,18 @@ public class AttachFileCommandHandler : IRequestHandler<AttachFileCommand, Cloud
         // Иначе кто угодно мог бы «приватизировать» чужой файл по знанию его ID.
         if (!file.Uploaders.Contains(ownerId))
             throw new CloudAccessDeniedException();
+        if (!file.IsReady())
+            throw new FileNotReadyException();
+
+        if (request.IsUploadRetry)
+        {
+            _metrics?.Increment("upload_attach_retries_total");
+            _logger.LogInformation(
+                "Повтор AttachFile для upload-сессии {SessionId}, файла {FileId}, пользователя {OwnerId}",
+                request.UploadSessionId,
+                file.Id,
+                ownerId);
+        }
 
         // Авто-распределение по типу медиа в системные папки Фото/Видео/Другие документы
         // (применяется, когда клиент грузит без явной папки — вкладки Фото/Видео, общий аплоад).

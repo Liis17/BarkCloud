@@ -21,7 +21,7 @@
 - [[modules/backend-identity]] — Сервис идентификации (авторизация, токены, 2FA, сессии)
 - [[modules/backend-notification]] — Сервис уведомлений (consumer RabbitMQ → SMTP: коды подтверждения, уведомления о входе)
 - [[modules/backend-users]] — Сервис пользователей (профили, устройства, контакты, draft-flow)
-- [[modules/backend-files]] — Сервис файлов (MinIO, аватары, превью видео через FFmpeg, галерея фото/видео, альбомы) + [[modules/backend-files-cloud]] облачная иерархия папок + [[modules/backend-files-dynamic-folders]] умные (динамические) папки
+- [[modules/backend-files]] — Сервис файлов (MinIO, аватары, превью видео через FFmpeg, галерея фото/видео, альбомы) + [[modules/upload-2]] возобновляемая Web-загрузка + [[modules/backend-files-cloud]] облачная иерархия папок + [[modules/backend-files-dynamic-folders]] умные (динамические) папки
 - [[modules/backend-torrent]] — Сервис торрентов (MonoTorrent, качает на хост-диск, стриминг по Range, импорт в облако, SSE-прогресс)
 - [[modules/backend-grpcserver]] — Общий хост для gRPC-серверов (расширения, метрики, перехватчики)
 - [[modules/backend-web]] — Веб-клиент (HTTP-страницы для браузера + gRPC-клиент к микросервисам, логин/cookie/JWT)

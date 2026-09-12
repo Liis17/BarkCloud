@@ -37,6 +37,12 @@ public class DownloadFileCommandHandler : IRequestHandler<DownloadFileCommand, D
         // Превью раздаются публично, потому что URL на них возвращается в GetFileData
         // и предназначен для прямой отдачи в UI без TempFile-ссылок.
         var isPreviewFile = file is not null && await _filesStorage.IsPreviewFile(file.Id, cancellationToken);
+        if (isPreviewFile)
+        {
+            var original = await _filesStorage.GetOriginalByPreviewFileId(file!.Id, cancellationToken);
+            if (original is null || !original.IsReady())
+                throw new FileNotUploadedException("Оригинал файла ещё не готов");
+        }
 
         // По оригинальному ID можно качать только аватарки и превью-файлы.
         // Остальное (полные cloud-файлы) — только через временные ссылки.
@@ -73,7 +79,7 @@ public class DownloadFileCommandHandler : IRequestHandler<DownloadFileCommand, D
             throw new Exception("Файл не найден");
         }
 
-        if (string.IsNullOrEmpty(file.Etag))
+        if (!file.IsReady())
         {
             _logger.LogWarning("Файл {FileId} ещё не был загружен", file.Id);
             throw new FileNotUploadedException("Файл ещё не был загружен");

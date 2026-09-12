@@ -88,7 +88,24 @@ public sealed class DynamicFolderQueryBuilderTests : IDisposable
         modelIds.Should().BeEquivalentTo(new[] { modelMatch });
     }
 
-    private Guid AddFile(string uploadDevice, string? cameraMake, string? cameraModel)
+    [Fact]
+    public async Task BuildQuery_FileIsStillProcessing_ExcludesIt()
+    {
+        var readyFile = AddFile("Pixel 9", "Google", "Pixel 9 Pro");
+        _ = AddFile("Pixel 9", "Google", "Pixel 9 Pro", ready: false);
+        await _db.Context.SaveChangesAsync();
+
+        var ids = await Query(new DynamicFolderRule
+        {
+            Field = DfField.Device,
+            Operator = DfOperator.Equals,
+            Value = "Pixel 9"
+        });
+
+        ids.Should().Equal(readyFile);
+    }
+
+    private Guid AddFile(string uploadDevice, string? cameraMake, string? cameraModel, bool ready = true)
     {
         var fileId = Guid.NewGuid();
         _db.Context.UploadedFiles.Add(new UploadFile
@@ -100,7 +117,9 @@ public sealed class DynamicFolderQueryBuilderTests : IDisposable
             MediaKind = MediaKind.Photo,
             Filename = $"{fileId}.jpg",
             UploadDeviceName = uploadDevice,
-            Size = 1
+            Size = 1,
+            UploadedAt = ready ? Now : null,
+            Etag = ready ? $"etag-{fileId}" : null
         });
 
         if (cameraMake is not null || cameraModel is not null)

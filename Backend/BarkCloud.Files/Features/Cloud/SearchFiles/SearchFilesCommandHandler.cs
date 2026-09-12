@@ -62,11 +62,14 @@ public class SearchFilesCommandHandler : IRequestHandler<SearchFilesCommand, Sea
 
         var fileIds = page.Select(e => e.FileId).Distinct().ToList();
         var filesById = (await _uploadedFiles.GetFiles(fileIds)).ToDictionary(f => f.Id);
-        var previewsByOriginal = await _uploadedFiles.GetPreviewsForFiles(fileIds, cancellationToken);
+        var previewsByOriginal = await _uploadedFiles.GetPreviewsForFiles(filesById.Keys, cancellationToken);
         var baseUrl = FileUrlHelper.GetPublicBaseUrl(_configuration, _runSettings);
 
         foreach (var e in page)
         {
+            if (!filesById.TryGetValue(e.FileId, out var file))
+                continue;
+
             var entryInfo = new FileEntryInfo
             {
                 Id = e.Id.ToString(),
@@ -76,17 +79,12 @@ public class SearchFilesCommandHandler : IRequestHandler<SearchFilesCommand, Sea
                 CreatedAt = Timestamp.FromDateTime(DateTime.SpecifyKind(e.CreatedAt, DateTimeKind.Utc))
             };
 
-            UploadFileInfo? fileInfo = null;
-            if (filesById.TryGetValue(e.FileId, out var file))
-            {
-                previewsByOriginal.TryGetValue(file.Id, out var previews);
-                fileInfo = file.ToGrpc(baseUrl, previews);
-            }
+            previewsByOriginal.TryGetValue(file.Id, out var previews);
 
             response.Files.Add(new FileEntryDetailed
             {
                 Entry = entryInfo,
-                File = fileInfo ?? new UploadFileInfo { Id = e.FileId.ToString() }
+                File = file.ToGrpc(baseUrl, previews)
             });
         }
 

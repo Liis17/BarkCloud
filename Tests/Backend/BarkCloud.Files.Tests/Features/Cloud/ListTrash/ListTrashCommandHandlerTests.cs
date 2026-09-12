@@ -36,7 +36,7 @@ public class ListTrashCommandHandlerTests
     }
 
     [Fact]
-    public async Task Handle_OrphanBlob_UsesPlaceholderFile()
+    public async Task Handle_FileIsNotReady_HidesEntry()
     {
         var entryId = Guid.NewGuid();
         var orphanFile = Guid.NewGuid();
@@ -51,9 +51,7 @@ public class ListTrashCommandHandlerTests
 
         var response = await CreateSut().Handle(new ListTrashCommand { Limit = 50 }, default);
 
-        var item = response.Items.Should().ContainSingle().Subject;
-        item.Entry.Id.Should().Be(entryId.ToString());
-        item.File.Id.Should().Be(orphanFile.ToString());
+        response.Items.Should().BeEmpty();
     }
 
     [Fact]
@@ -64,7 +62,8 @@ public class ListTrashCommandHandlerTests
             .ToList();
         _storage.Setup(s => s.ListTrashedPage(OwnerId, It.IsAny<DateTime?>(), It.IsAny<Guid?>(), 2, It.IsAny<CancellationToken>()))
             .ReturnsAsync(entries);
-        _files.Setup(s => s.GetFiles(It.IsAny<List<Guid>>())).ReturnsAsync(new List<UploadFileEntity>());
+        _files.Setup(s => s.GetFiles(It.IsAny<List<Guid>>())).ReturnsAsync(
+            entries.Select(e => new UploadFileEntity { Id = e.FileId }).ToList());
         _files.Setup(s => s.GetPreviewsForFiles(It.IsAny<IEnumerable<Guid>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Dictionary<Guid, List<FilePreview>>());
 

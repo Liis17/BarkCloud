@@ -38,9 +38,9 @@ public class FileMetadataStorage : IFileMetadataStorage
         var query = _context.FileMetadata
             .AsNoTracking()
             .Where(m => m.IsHdr == null)
-            .Join(_context.UploadedFiles.AsNoTracking(),
+            .Join(_context.UploadedFiles.AsNoTracking().WhereReady(),
                 m => m.FileId, f => f.Id, (m, f) => f)
-            .Where(f => f.MediaKind == MediaKind.Video && !string.IsNullOrEmpty(f.Etag));
+            .Where(f => f.MediaKind == MediaKind.Video);
 
         if (cursorFileId.HasValue)
         {
@@ -80,7 +80,7 @@ public class FileMetadataStorage : IFileMetadataStorage
     {
         var query = _context.UploadedFiles
             .AsNoTracking()
-            .Where(f => !string.IsNullOrEmpty(f.Etag))
+            .WhereReady()
             .Where(f => !_context.FileMetadata.Any(m => m.FileId == f.Id));
 
         if (cursorFileId.HasValue)

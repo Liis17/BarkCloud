@@ -5,6 +5,7 @@ import react from '@vitejs/plugin-react';
 // Vite-dev отдаёт SPA на 5173 и проксирует серверные роуты на .NET, чтобы httpOnly-cookie
 // (bark_at/bark_rt) ходили как same-origin (changeOrigin:false — сохраняем домен cookie).
 const BACKEND = 'http://localhost:5148';
+const FILES_HTTP1 = 'http://localhost:7026';
 const backendRoutes = ['/api', '/login', '/register', '/forgot', '/logout', '/healthz', '/updating', '/restarting', '/maintenance-status', '/maintenance-wait.js'];
 
 export default defineConfig({
@@ -15,9 +16,12 @@ export default defineConfig({
   },
   server: {
     port: 5173,
-    proxy: Object.fromEntries(
-      backendRoutes.map((p) => [p, { target: BACKEND, changeOrigin: false }]),
-    ),
+    proxy: {
+      ...Object.fromEntries(
+        backendRoutes.map((p) => [p, { target: BACKEND, changeOrigin: false }]),
+      ),
+      '/file-upload': { target: FILES_HTTP1, changeOrigin: false },
+    },
   },
   build: {
     // Собранный бандл кладём в wwwroot — Microsoft.NET.Sdk.Web публикует его автоматически.

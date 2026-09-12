@@ -36,7 +36,7 @@ public class ListDirectoryDetailedCommandHandlerTests
     }
 
     [Fact]
-    public async Task Handle_Root_MapsFilesAndOrphanPlaceholder()
+    public async Task Handle_Root_HidesEntriesWithoutReadyFile()
     {
         var liveFile = Guid.NewGuid();
         var orphanFile = Guid.NewGuid();
@@ -55,7 +55,7 @@ public class ListDirectoryDetailedCommandHandlerTests
 
         var response = await CreateSut().Handle(new ListDirectoryDetailedCommand { DirectoryId = null }, default);
 
-        response.Files.Should().HaveCount(2);
-        response.Files.Select(f => f.File.Id).Should().Contain(new[] { liveFile.ToString(), orphanFile.ToString() });
+        response.Files.Should().ContainSingle();
+        response.Files[0].File.Id.Should().Be(liveFile.ToString());
     }
 }

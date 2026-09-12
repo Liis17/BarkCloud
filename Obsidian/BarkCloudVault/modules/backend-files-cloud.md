@@ -61,10 +61,10 @@ NextCloud-подобная иерархия папок и файловых за�
 - `MoveDirectory` — переместить в другую папку
 - `DeleteDirectory` — удалить рекурсивно
 - `ListDirectory` — листинг (subdirs + files), только метаданные
-- `ListDirectoryDetailed` — листинг с обогащёнными `FileEntryDetailed` (полная `UploadFileInfo` с URL/превью)
+- `ListDirectoryDetailed` — листинг с обогащёнными `FileEntryDetailed` (полная `UploadFileInfo` с URL/превью); записи без ready-блоба не возвращаются
 
 ### Записи о файлах
-- `AttachFile` — привязать существующий `UploadFile` к папке (создаёт `CloudFileEntry`); отказывает, если файл уже привязан к директории владельца (`FileAlreadyAttachedException`); коллизия имени в папке разрешается суффиксом ` (1)`; при `route_by_media_kind=true` `directory_id` игнорируется и файл кладётся в системную папку по типу медиа
+- `AttachFile` — привязать существующий **ready** `UploadFile` к папке (создаёт `CloudFileEntry`); processing placeholder отклоняется `FileNotReadyException`; повтор уже привязанного файла даёт стабильный `FileAlreadyAttachedException`; коллизия имени разрешается суффиксом ` (1)`; при `route_by_media_kind=true` `directory_id` игнорируется и файл кладётся в системную папку по типу медиа
 - `RenameFileEntry` — изменить отображаемое имя записи
 - `MoveFileEntry` — перенести в другую папку
 - `DeleteFileEntry` — **перемещает запись в корзину** (soft-delete: `IsDeleted/DeletedAt/PurgeAt`). `Uploaders`/квота сохраняются, блоб не трогается
@@ -102,4 +102,4 @@ NextCloud-подобная иерархия папок и файловых за�
 
 ## Связь с UploadFile
 
-`CloudFileEntry.FileId → UploadFile.Id`. Удаление `CloudFileEntry` не каскадирует на `UploadFile`. `UploadFileType.CloudFile = 2` (см. [[modules/backend-files]] · Domain) — тип, который ассоциируется с пользовательским облачным хранилищем.
+`CloudFileEntry.FileId → UploadFile.Id`. Удаление `CloudFileEntry` не каскадирует на `UploadFile`. `UploadFileType.CloudFile = 2` (см. [[modules/backend-files]] · Domain) — тип, который ассоциируется с пользовательским облачным хранилищем. После [[modules/upload-2]] общая готовность означает `UploadedAt != null && Etag != null/empty` и задаётся `UploadFileReadiness.WhereReady()`: list/search/trash/share/music/download/metadata/activity пути скрывают всё остальное, а `AttachFile`/`DeleteUserMedia` отклоняют pre-ready ID.

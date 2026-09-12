@@ -4,6 +4,8 @@ public class ArchiveCreationException : BaseGrpcException
 {
     private readonly string _message;
 
+    public ArchiveCreationException() : this("Не удалось создать архив") { }
+
     public ArchiveCreationException(string message) => _message = message;
 
     public override string ErrorCode => "F2C9A7B1-3D4E-4F56-9A8B-7C6D5E4F3A2B";

@@ -42,8 +42,8 @@ public class GetTempDownloadUrlCommandHandlerTests
 
         _files.Setup(s => s.GetFiles(It.IsAny<List<Guid>>())).ReturnsAsync(new List<UploadFileEntity>
         {
-            new() { Id = fileId1 },
-            new() { Id = fileId2 }
+            new() { Id = fileId1, Etag = "etag-1", UploadedAt = DateTime.UtcNow },
+            new() { Id = fileId2, Etag = "etag-2", UploadedAt = DateTime.UtcNow }
         });
         _temp.Setup(s => s.CreateTempFilesBatchAsync(It.IsAny<IEnumerable<Guid>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<TempFile>

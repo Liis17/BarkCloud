@@ -123,7 +123,8 @@ public static class SettingsCatalog
             ("UsersService", "Host", SettingValueKind.Url, false, false),
             ("UsersService", "Token", SettingValueKind.Password, true, false),
             ("ExternalEndpoint", "Host", SettingValueKind.Url, false, false),
-            ("TempFiles", "ExpiresAt", SettingValueKind.Integer, false, false));
+            ("TempFiles", "ExpiresAt", SettingValueKind.Integer, false, false),
+            ("Uploads", "TempDirectory", SettingValueKind.String, false, false));
 
         AddService(entries, ServiceId.Torrent,
             ("RunSettings", "Port", SettingValueKind.Integer, false, true),

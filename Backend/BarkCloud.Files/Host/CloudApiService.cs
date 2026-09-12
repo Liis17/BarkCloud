@@ -164,7 +164,9 @@ public class CloudApiService : CloudApi.CloudApiBase
             DirectoryId = ParseOptionalGuid(request.DirectoryId),
             FileId = Guid.Parse(request.FileId),
             Name = request.Name,
-            RouteByMediaKind = request.RouteByMediaKind
+            RouteByMediaKind = request.RouteByMediaKind,
+            UploadSessionId = ParseOptionalGuid(request.UploadSessionId),
+            IsUploadRetry = request.IsUploadRetry
         };
 
         return _mediator.Send(command);

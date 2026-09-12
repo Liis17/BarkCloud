@@ -30,6 +30,9 @@ DTO-контракты сообщений, которые сервисы пуб�
 - `NotificationType.cs` — типы нотификаций
 - `TransportId.cs` — идентификатор транспорта (email/push/sms?)
 
+### Files
+- `Files/ProcessUploadedFile.cs` — команда `ProcessUploadedFile { SessionId }` для enrichment завершённого multipart из [[modules/upload-2]]. Публикуется Files в той же EF-транзакции, что переводит `UploadSession` в `processing`, через MassTransit Bus Outbox; consumer `process-uploaded-file` также живёт в Files, concurrency 2, retry 10s/1m/5m/15m
+
 ## Поток событий
 
 ```
@@ -37,8 +40,9 @@ Identity ──► SessionRevokedEvent ──► Users, Files (Consumers/Session
 Identity ──► EmailNotification    ──► (внешний сервис нотификаций, не в этом репо)
 Users    ──► UserChanged*         ──► (потребители вне видимости текущего репо)
 Users    ──► UserDeleted          ──► Identity, Files (Consumers/UserDeletedConsumer)
+Files    ──► ProcessUploadedFile  ──► Files (Consumers/ProcessUploadedFileConsumer)
 ```
 
 ## Зависимости
 
-- Используется: всеми Backend-микросервисами через MassTransit/RabbitMQ.Client (см. их `Consumers/` и `Infrastructure/`-классы вроде `NotificationQueueSender`, `UserInfoQueueSender`)
+- Используется: всеми Backend-микросервисами через MassTransit/RabbitMQ.Client (см. их `Consumers/` и `Infrastructure/`-классы вроде `NotificationQueueSender`, `UserInfoQueueSender`). Files дополнительно использует `MassTransit.EntityFrameworkCore` 8.5.2 и PostgreSQL inbox/outbox tables для атомарной доставки Upload 2.0

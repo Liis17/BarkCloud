@@ -60,11 +60,14 @@ public class ListTrashCommandHandler : IRequestHandler<ListTrashCommand, ListTra
 
         var fileIds = page.Select(e => e.FileId).Distinct().ToList();
         var filesById = (await _uploadedFiles.GetFiles(fileIds)).ToDictionary(f => f.Id);
-        var previewsByFile = await _uploadedFiles.GetPreviewsForFiles(fileIds, cancellationToken);
+        var previewsByFile = await _uploadedFiles.GetPreviewsForFiles(filesById.Keys, cancellationToken);
         var baseUrl = FileUrlHelper.GetPublicBaseUrl(_configuration, _runSettings);
 
         foreach (var e in page)
         {
+            if (!filesById.TryGetValue(e.FileId, out var file))
+                continue;
+
             var entryInfo = new FileEntryInfo
             {
                 Id = e.Id.ToString(),
@@ -74,21 +77,12 @@ public class ListTrashCommandHandler : IRequestHandler<ListTrashCommand, ListTra
                 CreatedAt = Timestamp.FromDateTime(DateTime.SpecifyKind(e.CreatedAt, DateTimeKind.Utc))
             };
 
-            UploadFileInfo fileInfo;
-            if (filesById.TryGetValue(e.FileId, out var file))
-            {
-                previewsByFile.TryGetValue(file.Id, out var previews);
-                fileInfo = file.ToGrpc(baseUrl, previews);
-            }
-            else
-            {
-                fileInfo = new UploadFileInfo { Id = e.FileId.ToString() };
-            }
+            previewsByFile.TryGetValue(file.Id, out var previews);
 
             var trashEntry = new TrashEntry
             {
                 Entry = entryInfo,
-                File = fileInfo
+                File = file.ToGrpc(baseUrl, previews)
             };
             if (e.DeletedAt.HasValue)
                 trashEntry.DeletedAt = Timestamp.FromDateTime(DateTime.SpecifyKind(e.DeletedAt.Value, DateTimeKind.Utc));
@@ -106,7 +100,7 @@ public class ListTrashCommandHandler : IRequestHandler<ListTrashCommand, ListTra
             response.NextCursorEntryId = last.Id.ToString();
         }
 
-        _logger.LogDebug("ListTrash: owner={Owner} returned={Count} hasMore={HasMore}", ownerId, page.Count, hasMore);
+        _logger.LogDebug("ListTrash: owner={Owner} returned={Count} hasMore={HasMore}", ownerId, response.Items.Count, hasMore);
 
         return response;
     }

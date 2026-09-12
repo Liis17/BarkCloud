@@ -20,4 +20,8 @@ public class AttachFileCommand : IRequest<CloudEmpty>
     /// Фото/Видео/Другие документы по типу медиа (авто-распределение без явной папки).
     /// </summary>
     public bool RouteByMediaKind { get; set; }
+
+    public Guid? UploadSessionId { get; set; }
+
+    public bool IsUploadRetry { get; set; }
 }

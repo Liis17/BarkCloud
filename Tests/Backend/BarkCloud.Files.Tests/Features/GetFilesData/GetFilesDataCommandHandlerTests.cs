@@ -39,8 +39,8 @@ public class GetFilesDataCommandHandlerTests
         _files.Setup(s => s.GetFiles(It.IsAny<List<Guid>>()))
             .ReturnsAsync(new List<UploadFileEntity>
             {
-                new() { Id = first, Filename = "a.jpg" },
-                new() { Id = second, Filename = "b.jpg" },
+                new() { Id = first, Filename = "a.jpg", Etag = "etag-1", UploadedAt = DateTime.UtcNow },
+                new() { Id = second, Filename = "b.jpg", Etag = "etag-2", UploadedAt = DateTime.UtcNow },
             });
         _files.Setup(s => s.GetPreviewsForFiles(It.IsAny<IEnumerable<Guid>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Dictionary<Guid, List<FilePreview>>());

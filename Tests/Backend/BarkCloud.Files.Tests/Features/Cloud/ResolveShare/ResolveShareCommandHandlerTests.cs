@@ -50,6 +50,22 @@ public class ResolveShareCommandHandlerTests
     }
 
     [Fact]
+    public async Task Handle_FileNotReady_ReturnsNotFound()
+    {
+        var share = new DomainShareLink { Id = Guid.NewGuid(), FileId = Guid.NewGuid(), Token = "t" };
+        _storage.Setup(s => s.GetByToken("t", It.IsAny<CancellationToken>())).ReturnsAsync(share);
+        _files.Setup(s => s.GetFile(share.FileId)).ReturnsAsync(new UploadFileEntity { Id = share.FileId });
+
+        var response = await CreateSut().Handle(new ResolveShareCommand { Token = "t" }, default);
+
+        response.Found.Should().BeFalse();
+        _storage.Verify(s => s.IncrementClicks(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
+        _temp.Verify(
+            s => s.CreateTempFilesBatchAsync(It.IsAny<IEnumerable<Guid>>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
     public async Task Handle_HappyPath_IncrementsClicksAndReturnsUrlWithPreview()
     {
         var fileId = Guid.NewGuid();
@@ -59,7 +75,13 @@ public class ResolveShareCommandHandlerTests
         _storage.Setup(s => s.GetByToken("t", It.IsAny<CancellationToken>())).ReturnsAsync(share);
         _files.Setup(s => s.GetFile(fileId)).ReturnsAsync(new UploadFileEntity
         {
-            Id = fileId, MediaKind = DomainMediaKind.Photo, ImageWidth = 800, ImageHeight = 600, Size = 12345
+            Id = fileId,
+            MediaKind = DomainMediaKind.Photo,
+            ImageWidth = 800,
+            ImageHeight = 600,
+            Size = 12345,
+            Etag = "etag",
+            UploadedAt = DateTime.UtcNow
         });
         _temp.Setup(s => s.CreateTempFilesBatchAsync(It.IsAny<IEnumerable<Guid>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<TempFileEntity> { new() { Id = tempId, OriginalFileId = fileId } });

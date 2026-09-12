@@ -215,7 +215,7 @@ public class FileMetadataExtractor
     /// CoreProperties + число страниц из PDF (через PdfPig). Возвращает null,
     /// если ничего не извлеклось или документ нечитаем.
     /// </summary>
-    public virtual FileMetadata? ExtractFromPdf(Stream pdfStream)
+    public virtual FileMetadata? ExtractFromPdf(Stream pdfStream, bool rejectInvalid = false)
     {
         try
         {
@@ -238,6 +238,8 @@ public class FileMetadataExtractor
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "PdfPig не смог прочитать PDF-документ");
+            if (rejectInvalid)
+                throw new InvalidDataException("PDF-документ не удалось разобрать.", ex);
             return null;
         }
     }
@@ -246,7 +248,10 @@ public class FileMetadataExtractor
     /// CoreProperties для DOCX/XLSX/PPTX (OpenXML SDK). Возвращает null
     /// для других форматов или если документ не открылся.
     /// </summary>
-    public virtual FileMetadata? ExtractFromOffice(Stream officeStream, string contentType)
+    public virtual FileMetadata? ExtractFromOffice(
+        Stream officeStream,
+        string contentType,
+        bool rejectInvalid = false)
     {
         try
         {
@@ -296,6 +301,8 @@ public class FileMetadataExtractor
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "OpenXml не смог прочитать офисный документ ({ContentType})", contentType);
+            if (rejectInvalid)
+                throw new InvalidDataException("OpenXML-документ не удалось разобрать.", ex);
             return null;
         }
     }

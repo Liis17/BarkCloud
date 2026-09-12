@@ -1,3 +1,4 @@
+using BarkCloud.Files.Domain;
 using BarkCloud.Files.Helpers;
 using BarkCloud.Files.Persistence;
 using BarkCloud.GrpcServer.Settings;
@@ -40,9 +41,12 @@ public class ResolveShareCommandHandler : IRequestHandler<ResolveShareCommand, R
 
         // Файл мог быть удалён владельцем после создания ссылки — отдадим 404 вместо мёртвой temp-ссылки.
         var file = await _filesStorage.GetFile(share.FileId);
-        if (file is null)
+        if (file is null || !file.IsReady())
         {
-            _logger.LogWarning("Резолв публичной ссылки {ShareId}: файл {FileId} не найден", share.Id, share.FileId);
+            _logger.LogWarning(
+                "Резолв публичной ссылки {ShareId}: файл {FileId} отсутствует или ещё не готов",
+                share.Id,
+                share.FileId);
             return new ResolveShareResponse { Found = false };
         }
 

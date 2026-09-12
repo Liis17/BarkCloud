@@ -69,7 +69,7 @@ public class ListDirectoryDetailedCommandHandler : IRequestHandler<ListDirectory
             : await _uploadedFiles.GetFiles(fileIds);
         var filesById = files.ToDictionary(f => f.Id);
 
-        var previewsByOriginal = await _uploadedFiles.GetPreviewsForFiles(fileIds, cancellationToken);
+        var previewsByOriginal = await _uploadedFiles.GetPreviewsForFiles(filesById.Keys, cancellationToken);
         var baseUrl = FileUrlHelper.GetPublicBaseUrl(_configuration, _runSettings);
 
         var response = new DirectoryListingDetailed();
@@ -87,6 +87,9 @@ public class ListDirectoryDetailedCommandHandler : IRequestHandler<ListDirectory
 
         foreach (var e in entries)
         {
+            if (!filesById.TryGetValue(e.FileId, out var file))
+                continue;
+
             var entryInfo = new FileEntryInfo
             {
                 Id = e.Id.ToString(),
@@ -96,23 +99,18 @@ public class ListDirectoryDetailedCommandHandler : IRequestHandler<ListDirectory
                 CreatedAt = Timestamp.FromDateTime(DateTime.SpecifyKind(e.CreatedAt, DateTimeKind.Utc))
             };
 
-            UploadFileInfo? fileInfo = null;
-            if (filesById.TryGetValue(e.FileId, out var file))
-            {
-                previewsByOriginal.TryGetValue(file.Id, out var previews);
-                fileInfo = file.ToGrpc(baseUrl, previews);
-            }
+            previewsByOriginal.TryGetValue(file.Id, out var previews);
 
             response.Files.Add(new FileEntryDetailed
             {
                 Entry = entryInfo,
-                File = fileInfo ?? new UploadFileInfo { Id = e.FileId.ToString() }
+                File = file.ToGrpc(baseUrl, previews)
             });
         }
 
         _logger.LogDebug(
             "ListDirectoryDetailed: owner={Owner} dir={Dir} subdirs={Subdirs} files={Files}",
-            ownerId, fileDirectoryId, subdirs.Count, entries.Count);
+            ownerId, fileDirectoryId, subdirs.Count, response.Files.Count);
 
         return response;
     }

@@ -106,6 +106,8 @@ public class MusicLibraryService
         var file = await _filesStorage.GetFile(fileId);
         if (file is null || file.MediaKind != DomainMediaKind.Audio || !file.Uploaders.Contains(_userContext.UserId))
             throw new CloudAccessDeniedException();
+        if (!file.IsReady())
+            throw new FileNotReadyException();
 
         var temp = await _tempFiles.CreateTempFile(fileId);
         return new GetTrackDownloadUrlResponse
@@ -154,6 +156,8 @@ public class MusicLibraryService
                 var cover = await _filesStorage.GetFile(coverFileId.Value);
                 if (cover is null || cover.MediaKind != DomainMediaKind.Photo || !cover.Uploaders.Contains(_userContext.UserId))
                     throw new CloudAccessDeniedException();
+                if (!cover.IsReady())
+                    throw new FileNotReadyException();
             }
 
             playlist.CoverFileId = coverFileId;
@@ -536,6 +540,7 @@ public class MusicLibraryService
     {
         return _context.UploadedFiles
             .AsNoTracking()
+            .WhereReady()
             .Where(f => f.Uploaders.Contains(ownerId)
                         && f.Type == DomainUploadFileType.CloudFile
                         && f.MediaKind == DomainMediaKind.Audio

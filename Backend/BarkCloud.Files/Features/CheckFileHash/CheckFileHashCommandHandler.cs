@@ -33,12 +33,12 @@ public partial class CheckFileHashCommandHandler : IRequestHandler<CheckFileHash
 
     public async Task<CheckFileHashResponse> Handle(CheckFileHashCommand request, CancellationToken cancellationToken)
     {
-        _logger.LogInformation("Проверка хеша файла: {FileHash}", request.FileHash);
+        _logger.LogInformation("Проверка SHA-256 файла");
 
         // Validate hash format (must be 64 hex characters for SHA256)
         if (string.IsNullOrEmpty(request.FileHash) || !Sha256HashRegex().IsMatch(request.FileHash))
         {
-            _logger.LogWarning("Неверный формат хеша: {FileHash}", request.FileHash);
+            _logger.LogWarning("Неверный формат SHA-256 файла");
             return new CheckFileHashResponse
             {
                 FileId = string.Empty
@@ -52,7 +52,7 @@ public partial class CheckFileHashCommandHandler : IRequestHandler<CheckFileHash
         var fileIds = await _hashesStorage.GetFileIdsByHash(normalizedHash, cancellationToken);
         if (fileIds.Count == 0)
         {
-            _logger.LogInformation("Файл с хешем {FileHash} не найден", normalizedHash);
+            _logger.LogInformation("Файл с указанным SHA-256 не найден");
             return new CheckFileHashResponse { FileId = string.Empty, Exists = false };
         }
 
@@ -64,12 +64,12 @@ public partial class CheckFileHashCommandHandler : IRequestHandler<CheckFileHash
         var entries = await _hierarchyStorage.GetLiveEntriesForFiles(ownerId, fileIds, cancellationToken);
         if (entries.Count == 0)
         {
-            _logger.LogInformation("Файл с хешем {FileHash} у пользователя {Owner} не найден", normalizedHash, ownerId);
+            _logger.LogInformation("Файл с указанным SHA-256 у пользователя {Owner} не найден", ownerId);
             return new CheckFileHashResponse { FileId = string.Empty, Exists = false };
         }
 
-        _logger.LogInformation("Файл с хешем {FileHash} найден у пользователя {Owner} ({Count} запис(ей))",
-            normalizedHash, ownerId, entries.Count);
+        _logger.LogInformation("Файл с указанным SHA-256 найден у пользователя {Owner} ({Count} запис(ей))",
+            ownerId, entries.Count);
 
         var response = new CheckFileHashResponse
         {

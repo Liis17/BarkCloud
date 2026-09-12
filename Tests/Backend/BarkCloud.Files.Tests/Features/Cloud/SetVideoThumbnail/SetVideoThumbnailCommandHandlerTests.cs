@@ -68,8 +68,8 @@ public class SetVideoThumbnailCommandHandlerTests
         var videoId = Guid.NewGuid();
         var sourceId = Guid.NewGuid();
         // "Видео" на деле фото — источник смены превью некорректен.
-        _files.Setup(s => s.GetFile(videoId)).ReturnsAsync(new UploadFileEntity { Id = videoId, MediaKind = MediaKind.Photo, Uploaders = new() { OwnerId } });
-        _files.Setup(s => s.GetFile(sourceId)).ReturnsAsync(new UploadFileEntity { Id = sourceId, MediaKind = MediaKind.Photo, Uploaders = new() { OwnerId } });
+        _files.Setup(s => s.GetFile(videoId)).ReturnsAsync(ReadyFile(videoId, MediaKind.Photo));
+        _files.Setup(s => s.GetFile(sourceId)).ReturnsAsync(ReadyFile(sourceId, MediaKind.Photo));
 
         var act = () => CreateSut().Handle(new SetVideoThumbnailCommand { VideoFileId = videoId, SourceImageFileId = sourceId }, default);
 
@@ -86,14 +86,18 @@ public class SetVideoThumbnailCommandHandlerTests
             Id = videoId,
             Type = UploadFileType.CloudFile,
             MediaKind = MediaKind.Video,
-            Uploaders = new() { OwnerId }
+            Uploaders = new() { OwnerId },
+            UploadedAt = DateTime.UtcNow,
+            Etag = "video-etag"
         };
         var source = new UploadFileEntity
         {
             Id = sourceId,
             Type = UploadFileType.CloudFile,
             MediaKind = MediaKind.Photo,
-            Uploaders = new() { OwnerId }
+            Uploaders = new() { OwnerId },
+            UploadedAt = DateTime.UtcNow,
+            Etag = "source-etag"
         };
 
         var files = new Mock<IUploadedFilesStorage>();
@@ -152,4 +156,32 @@ public class SetVideoThumbnailCommandHandlerTests
         previewPersistence.Verify(p => p.PersistPreviewsAsync(
             video, previews, "preview-profile", It.IsAny<CancellationToken>()), Times.Once);
     }
+
+    [Fact]
+    public async Task Handle_VideoIsNotReady_ThrowsFileNotReady()
+    {
+        var videoId = Guid.NewGuid();
+        var sourceId = Guid.NewGuid();
+        _files.Setup(s => s.GetFile(videoId)).ReturnsAsync(new UploadFileEntity
+        {
+            Id = videoId,
+            MediaKind = MediaKind.Video,
+            Uploaders = new() { OwnerId }
+        });
+        _files.Setup(s => s.GetFile(sourceId)).ReturnsAsync(ReadyFile(sourceId, MediaKind.Photo));
+
+        var act = () => CreateSut().Handle(
+            new SetVideoThumbnailCommand { VideoFileId = videoId, SourceImageFileId = sourceId }, default);
+
+        await act.Should().ThrowAsync<FileNotReadyException>();
+    }
+
+    private static UploadFileEntity ReadyFile(Guid id, MediaKind mediaKind) => new()
+    {
+        Id = id,
+        MediaKind = mediaKind,
+        Uploaders = new() { OwnerId },
+        UploadedAt = DateTime.UtcNow,
+        Etag = "etag"
+    };
 }

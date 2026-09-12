@@ -26,7 +26,9 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
     private readonly HeicImageConverter _heicConverter;
     private readonly FileMetadataExtractor _metadataExtractor;
     private readonly PreviewPersistenceService _previewPersistence;
+    private readonly ILegacyUploadCompletionMarker _legacyCompletion;
     private readonly FileActivityWriter _activity;
+    private readonly IUploadTempFileProvider _tempFiles;
     private readonly ILogger<UploadFileCommandHandler> _logger;
 
     /// <summary>
@@ -56,9 +58,11 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
         HeicImageConverter heicConverter,
         FileMetadataExtractor metadataExtractor,
         PreviewPersistenceService previewPersistence,
+        ILegacyUploadCompletionMarker legacyCompletion,
         ILogger<UploadFileCommandHandler> logger,
         FileActivityWriter? activity = null,
-        AudioMetadataExtractor? audioMetadataExtractor = null)
+        AudioMetadataExtractor? audioMetadataExtractor = null,
+        IUploadTempFileProvider? tempFiles = null)
     {
         _filesStorage = filesStorage;
         _hashesStorage = hashesStorage;
@@ -71,7 +75,9 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
         _heicConverter = heicConverter;
         _metadataExtractor = metadataExtractor;
         _previewPersistence = previewPersistence;
+        _legacyCompletion = legacyCompletion;
         _activity = activity ?? FileActivityWriter.Noop;
+        _tempFiles = tempFiles ?? new DefaultUploadTempFileProvider();
         _logger = logger;
     }
 
@@ -88,7 +94,7 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
         }
 
         // Проверяем, не был ли файл уже загружен
-        if (!string.IsNullOrEmpty(file.Etag))
+        if (!string.IsNullOrEmpty(file.Etag) && !request.OriginalAlreadyStored)
         {
             _logger.LogWarning("Файл с ID {FileId} уже был загружен (Etag: {Etag})", request.FileId, file.Etag);
             throw new FileAlreadyUploadedException("Файл уже был загружен");
@@ -96,13 +102,22 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
 
         file.Filename = request.FileName;
 
-        // Определяем тип контента по расширению файла
-        var contentType = request.FileName.GetContentType();
+        // V2 передаёт MIME-подсказку из upload-сессии. Для пустой/общей подсказки
+        // сохраняем прежний fallback по расширению, нужный legacy-клиентам.
+        var contentType = !string.IsNullOrWhiteSpace(request.ContentTypeOverride)
+                          && !string.Equals(
+                              request.ContentTypeOverride,
+                              "application/octet-stream",
+                              StringComparison.OrdinalIgnoreCase)
+            ? request.ContentTypeOverride.Trim().ToLowerInvariant()
+            : request.FileName.GetContentType();
 
         // Классифицируем медиа (фото / видео / документ / аудио) для галереи и альбомов
         file.MediaKind = request.FileName.GetMediaKind();
 
-        var storageProfileId = _bucketRegistry.ResolveWriteProfileId(file.Type, file.MediaKind, isPreview: false);
+        var storageProfileId = string.IsNullOrWhiteSpace(request.StorageProfileIdOverride)
+            ? _bucketRegistry.ResolveWriteProfileId(file.Type, file.MediaKind, isPreview: false)
+            : request.StorageProfileIdOverride;
         var previewProfileId = _bucketRegistry.ResolveWriteProfileId(file.Type, file.MediaKind, isPreview: true);
         file.StorageProfileId = storageProfileId;
 
@@ -115,33 +130,12 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
         var isVideoContent = contentType.StartsWith("video/");
         var isAudioContent = contentType.StartsWith("audio/");
         // HEIC/HEIF ImageSharp не декодирует — перекодируем в JPEG через ffmpeg (по файлу на диске).
-        var isHeic = contentType == "image/heic";
+        var isHeic = contentType is "image/heic" or "image/heif";
 
         Stream originalStream;
         // Путь к временному файлу на диске. Нужен для видео и HEIC (FFmpeg читает файл по пути),
         // а также используется для буферизации больших не-картинок. null = буфер в памяти.
         string? tempFilePath = null;
-
-        // Видео и HEIC всегда кладём на диск (FFmpeg работает с файлом), как и большие не-картинки.
-        if (isVideoContent || isAudioContent || isHeic || (!isImageType && fileSize > 100 * 1024 * 1024))
-        {
-            tempFilePath = Path.GetTempFileName();
-            _logger.LogInformation("Файл {FileId} ({Size} МБ) буферизуется через диск", request.FileId, fileSize / 1024 / 1024);
-            // FileShare.Read — чтобы процесс ffmpeg/ffprobe мог открыть файл параллельно нашему стриму.
-            var tempStream = new FileStream(
-                tempFilePath, FileMode.Create, FileAccess.ReadWrite,
-                FileShare.Read, 81920, FileOptions.None);
-            await request.FileStream.CopyToAsync(tempStream, cancellationToken);
-            tempStream.Position = 0;
-            originalStream = tempStream;
-        }
-        else
-        {
-            var memStream = new MemoryStream();
-            await request.FileStream.CopyToAsync(memStream, cancellationToken);
-            memStream.Position = 0;
-            originalStream = memStream;
-        }
 
         void CleanupTempFile()
         {
@@ -156,6 +150,51 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
             {
                 _logger.LogWarning(ex, "Не удалось удалить временный файл {TempPath}", tempFilePath);
             }
+        }
+
+        // Видео и HEIC всегда кладём на диск (FFmpeg работает с файлом), как и большие не-картинки.
+        if (request.ForceDiskBuffer || isVideoContent || isAudioContent || isHeic || (!isImageType && fileSize > 100 * 1024 * 1024))
+        {
+            tempFilePath = _tempFiles.CreatePath();
+            _logger.LogInformation("Файл {FileId} ({Size} МБ) буферизуется через диск", request.FileId, fileSize / 1024 / 1024);
+            // FileShare.Read — чтобы процесс ffmpeg/ffprobe мог открыть файл параллельно нашему стриму.
+            var tempStream = new FileStream(
+                tempFilePath, FileMode.Create, FileAccess.ReadWrite,
+                FileShare.Read, 81920, FileOptions.None);
+            try
+            {
+                await request.FileStream.CopyToAsync(tempStream, cancellationToken);
+            }
+            catch
+            {
+                await tempStream.DisposeAsync();
+                CleanupTempFile();
+                throw;
+            }
+            tempStream.Position = 0;
+            originalStream = tempStream;
+        }
+        else
+        {
+            var memStream = new MemoryStream();
+            try
+            {
+                await request.FileStream.CopyToAsync(memStream, cancellationToken);
+            }
+            catch
+            {
+                await memStream.DisposeAsync();
+                throw;
+            }
+            memStream.Position = 0;
+            originalStream = memStream;
+        }
+
+        if (request.FileSize > 0 && originalStream.Length != request.FileSize)
+        {
+            await originalStream.DisposeAsync();
+            CleanupTempFile();
+            throw new FileIntegrityException("Фактический размер загруженного объекта не совпадает с заявленным.");
         }
 
         // Метаданные (EXIF/QuickTime/PDF/Office) — извлекаются по ходу пайплайна
@@ -178,7 +217,8 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
             }
             finally
             {
-                originalStream.Position = 0;
+                if (originalStream.CanSeek)
+                    originalStream.Position = 0;
             }
         }
 
@@ -196,13 +236,26 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
                     "HEIC {FileId}: получено JPEG-представление ({Size} байт), оригинал сохраняется как есть",
                     file.Id, heicJpegBytes.Length);
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                await originalStream.DisposeAsync();
+                CleanupTempFile();
+                throw;
+            }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Не удалось получить JPEG-представление HEIC {FileId}", file.Id);
+                if (request.DeferAvailability)
+                {
+                    await originalStream.DisposeAsync();
+                    CleanupTempFile();
+                    throw new FileIntegrityException("Заявленный HEIC/HEIF-файл не удалось декодировать.");
+                }
             }
             finally
             {
-                originalStream.Position = 0;
+                if (originalStream.CanSeek)
+                    originalStream.Position = 0;
             }
         }
 
@@ -220,7 +273,15 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
 
         originalStream.Position = 0;
 
-        _logger.LogInformation("Вычислен хеш файла: {FileHash}", fileHash);
+        if (!string.IsNullOrWhiteSpace(request.ExpectedSha256)
+            && !string.Equals(fileHash, request.ExpectedSha256, StringComparison.OrdinalIgnoreCase))
+        {
+            await originalStream.DisposeAsync();
+            CleanupTempFile();
+            throw new FileIntegrityException("SHA-256 загруженного объекта не совпадает с заявленным.");
+        }
+
+        _logger.LogInformation("SHA-256 файла {FileId} вычислен", file.Id);
 
         // Дедупликация по хешу намеренно отключена: одинаковый контент сохраняется как
         // отдельные независимые блобы (каждая загрузка — свой file.Id и своя строка FileHash;
@@ -270,6 +331,8 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
                 catch (Exception ex)
                 {
                     _logger.LogWarning(ex, "Не удалось прочитать размеры изображения {FileId}", file.Id);
+                    if (request.DeferAvailability)
+                        throw new FileIntegrityException("Заявленный формат изображения не удалось декодировать.");
                     needsCloudPreviews = false;
                 }
                 finally
@@ -347,36 +410,68 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
             var needsVideoPreview = file.Type == UploadFileType.CloudFile && isVideoContent && tempFilePath is not null;
             if (needsVideoPreview)
             {
+                VideoProbe? probe = null;
                 try
                 {
-                    var probe = await _videoThumbnailExtractor.ProbeFullAsync(tempFilePath!, cancellationToken);
+                    probe = await _videoThumbnailExtractor.ProbeFullAsync(tempFilePath!, cancellationToken);
                     var (vw, vh) = (probe.Width, probe.Height);
-                    if (vw > 0 && vh > 0)
-                    {
-                        file.ImageWidth = vw;
-                        file.ImageHeight = vh;
-                    }
+                    if (vw <= 0 || vh <= 0 || string.IsNullOrWhiteSpace(probe.VideoCodec))
+                        throw new InvalidDataException("ffprobe не обнаружил основной видеопоток.");
 
-                    extractedMetadata ??= _metadataExtractor.ExtractFromVideo(probe);
-
-                    var frameBytes = await _videoThumbnailExtractor.ExtractFrameJpegAsync(
-                        tempFilePath!, VideoThumbnailExtractor.DefaultFramePosition, cancellationToken);
-
-                    using var frameStream = new MemoryStream(frameBytes);
-                    generatedPreviews = await _imageCompressor.GenerateVideoPreviewsAsync(
-                        frameStream, CloudPreviewWidths, cancellationToken);
-
-                    _logger.LogInformation(
-                        "Сгенерировано превью видео {FileId}: {Width}x{Height}, кадров={Count}",
-                        file.Id, vw, vh, generatedPreviews?.Count ?? 0);
+                    file.ImageWidth = vw;
+                    file.ImageHeight = vh;
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Не удалось сгенерировать превью видео {FileId}", file.Id);
+                    _logger.LogWarning(ex, "Не удалось разобрать видео {FileId}", file.Id);
+                    if (request.DeferAvailability)
+                        throw new FileIntegrityException("Заявленный видеоформат не удалось разобрать.");
                 }
                 finally
                 {
                     originalStream.Position = 0;
+                }
+
+                if (probe is not null)
+                {
+                    try
+                    {
+                        extractedMetadata ??= _metadataExtractor.ExtractFromVideo(probe);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Не удалось извлечь метаданные видео {FileId}", file.Id);
+                    }
+
+                    try
+                    {
+                        var frameBytes = await _videoThumbnailExtractor.ExtractFrameJpegAsync(
+                            tempFilePath!, VideoThumbnailExtractor.DefaultFramePosition, cancellationToken);
+
+                        using var frameStream = new MemoryStream(frameBytes);
+                        generatedPreviews = await _imageCompressor.GenerateVideoPreviewsAsync(
+                            frameStream, CloudPreviewWidths, cancellationToken);
+
+                        _logger.LogInformation(
+                            "Сгенерировано превью видео {FileId}: {Width}x{Height}, кадров={Count}",
+                            file.Id, probe.Width, probe.Height, generatedPreviews?.Count ?? 0);
+                    }
+                    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                    {
+                        throw;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Не удалось сгенерировать превью видео {FileId}", file.Id);
+                    }
+                    finally
+                    {
+                        originalStream.Position = 0;
+                    }
                 }
             }
 
@@ -384,31 +479,62 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
             var needsAudioMetadata = file.Type == UploadFileType.CloudFile && isAudioContent && tempFilePath is not null && _audioMetadataExtractor is not null;
             if (needsAudioMetadata)
             {
+                var audioExtractor = _audioMetadataExtractor!;
+                AudioProbe? probe = null;
                 try
                 {
-                    var audioExtractor = _audioMetadataExtractor!;
-                    var probe = await audioExtractor.ProbeAsync(tempFilePath!, cancellationToken);
-                    extractedMetadata ??= audioExtractor.ExtractMetadata(probe);
+                    probe = await audioExtractor.ProbeAsync(tempFilePath!, cancellationToken);
+                    if (string.IsNullOrWhiteSpace(probe.AudioCodec))
+                        throw new InvalidDataException("ffprobe не обнаружил основной аудиопоток.");
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Не удалось разобрать аудио {FileId}", file.Id);
+                    if (request.DeferAvailability)
+                        throw new FileIntegrityException("Заявленный аудиоформат не удалось разобрать.");
+                }
+                finally
+                {
+                    originalStream.Position = 0;
+                }
 
-                    var artworkBytes = await audioExtractor.ExtractArtworkJpegAsync(tempFilePath!, cancellationToken);
-                    if (artworkBytes is { Length: > 0 })
+                if (probe is not null)
+                {
+                    try
                     {
-                        using var artworkStream = new MemoryStream(artworkBytes);
-                        generatedPreviews = await _imageCompressor.GenerateSquarePreviewsAsync(
-                            artworkStream, AudioCoverWidths, cancellationToken);
+                        extractedMetadata ??= audioExtractor.ExtractMetadata(probe);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Не удалось извлечь метаданные аудио {FileId}", file.Id);
+                    }
+
+                    try
+                    {
+                        var artworkBytes = await audioExtractor.ExtractArtworkJpegAsync(tempFilePath!, cancellationToken);
+                        if (artworkBytes is { Length: > 0 })
+                        {
+                            using var artworkStream = new MemoryStream(artworkBytes);
+                            generatedPreviews = await _imageCompressor.GenerateSquarePreviewsAsync(
+                                artworkStream, AudioCoverWidths, cancellationToken);
+                        }
+                    }
+                    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                    {
+                        throw;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Не удалось сгенерировать обложку аудио {FileId}", file.Id);
                     }
 
                     _logger.LogInformation(
                         "Обработано аудио {FileId}: duration={Duration}, artwork={HasArtwork}",
                         file.Id, probe.Duration, generatedPreviews is { Count: > 0 });
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Не удалось извлечь метаданные аудио {FileId}", file.Id);
-                }
-                finally
-                {
-                    originalStream.Position = 0;
                 }
             }
 
@@ -420,16 +546,23 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
                     originalStream.Position = 0;
                     if (contentType == "application/pdf")
                     {
-                        extractedMetadata = _metadataExtractor.ExtractFromPdf(originalStream);
+                        extractedMetadata = _metadataExtractor.ExtractFromPdf(
+                            originalStream,
+                            rejectInvalid: request.DeferAvailability);
                     }
                     else if (contentType.StartsWith("application/vnd.openxmlformats-officedocument."))
                     {
-                        extractedMetadata = _metadataExtractor.ExtractFromOffice(originalStream, contentType);
+                        extractedMetadata = _metadataExtractor.ExtractFromOffice(
+                            originalStream,
+                            contentType,
+                            rejectInvalid: request.DeferAvailability);
                     }
                 }
                 catch (Exception ex)
                 {
                     _logger.LogWarning(ex, "Не удалось извлечь метаданные документа {FileId}", file.Id);
+                    if (request.DeferAvailability)
+                        throw new FileIntegrityException("Заявленный формат документа не удалось разобрать.");
                 }
                 finally
                 {
@@ -438,17 +571,21 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
             }
 
             // 3) Грузим оригинал в S3
-            var etag = await _s3Uploader.UploadAsync(
-                storageProfileId,
-                $"{file.Id}",
-                originalStream,
-                contentType
-            );
+            var etag = request.OriginalAlreadyStored
+                ? request.StoredEtag ?? throw new FileIntegrityException("Для сохранённого объекта отсутствует ETag.")
+                : await _s3Uploader.UploadAsync(
+                    storageProfileId,
+                    $"{file.Id}",
+                    originalStream,
+                    contentType
+                );
 
             _logger.LogInformation("Файл успешно загружен в S3, получен Etag: {Etag}", etag);
 
             file.Etag = etag;
-            file.UploadedAt = DateTime.UtcNow;
+            file.UploadedAt = request.DeferAvailability || request.QuotaReservationId.HasValue
+                ? null
+                : DateTime.UtcNow;
             file.Size = fileSize;
         }
         finally
@@ -477,19 +614,39 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
         // Сохраняем оригинал + его хеш
         await _filesStorage.UpdateFile(file);
 
-        var fileHashEntity = new FileHash
+        var existingHash = await _hashesStorage.GetHashByFileId(file.Id);
+        var hashWasAdded = existingHash is null;
+        if (existingHash is null)
         {
-            FileId = file.Id,
-            Hash = fileHash
-        };
-        await _hashesStorage.AddHash(fileHashEntity);
+            await _hashesStorage.AddHash(new FileHash
+            {
+                FileId = file.Id,
+                Hash = fileHash
+            });
+        }
+        else if (!string.Equals(existingHash.Hash, fileHash, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new FileIntegrityException("Сохранённый SHA-256 файла не совпадает с пересчитанным.");
+        }
 
         _logger.LogInformation("Хеш файла сохранен в базу данных");
 
         // 4) Поднимаем превью в S3 + дедуп + FilePreview-связки
         if (generatedPreviews is { Count: > 0 })
         {
-            await _previewPersistence.PersistPreviewsAsync(file, generatedPreviews, previewProfileId, cancellationToken);
+            try
+            {
+                await _previewPersistence.PersistPreviewsAsync(
+                    file, generatedPreviews, previewProfileId, cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception ex) when (request.DeferAvailability)
+            {
+                _logger.LogWarning(ex, "Не удалось сохранить одно или несколько превью файла {FileId}", file.Id);
+            }
         }
 
         // 5) Метаданные блоба. Сохраняем только для CloudFile (для аватаров не имеет смысла).
@@ -507,10 +664,8 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
             }
         }
 
-        _logger.LogInformation("Обработка файла {FileId} успешно завершена", file.Id);
-
         var ownerId = file.Uploaders.FirstOrDefault();
-        if (ownerId > 0 && file.Type == UploadFileType.CloudFile)
+        if (hashWasAdded && ownerId > 0 && file.Type == UploadFileType.CloudFile)
         {
             await _activity.AddAsync(
                 ownerId,
@@ -522,6 +677,21 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
                 cancellationToken: cancellationToken);
         }
 
+        if (request.QuotaReservationId is { } reservationId)
+        {
+            // Это последняя durable-операция legacy pipeline. После неё replay может
+            // безопасно завершить квотный резерв, даже если HTTP-ответ потерялся.
+            await _legacyCompletion.MarkProcessingCompletedAsync(
+                reservationId, CancellationToken.None);
+        }
+
+        _logger.LogInformation("Обработка файла {FileId} успешно завершена", file.Id);
+
         return file.Id.ToString();
+    }
+
+    private sealed class DefaultUploadTempFileProvider : IUploadTempFileProvider
+    {
+        public string CreatePath() => Path.Combine(Path.GetTempPath(), $"barkcloud-upload-{Guid.NewGuid():N}.tmp");
     }
 }
