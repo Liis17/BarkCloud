@@ -1,3 +1,6 @@
+using System.Buffers.Binary;
+
+using BarkCloud.Files.Exceptions;
 using BarkCloud.Files.Services;
 
 using SixLabors.ImageSharp;
@@ -147,5 +150,31 @@ public class ImageCompressorTests
         edge.R.Should().BeLessThan(10);
         edge.G.Should().BeLessThan(10);
         edge.B.Should().BeLessThan(10);
+    }
+
+    [Fact]
+    public async Task ProcessImageAllInOne_WhenHeaderExceedsTwoHundredMegapixels_RejectsBeforeDecode()
+    {
+        using var input = OversizedBitmapHeader(width: 20_001, height: 10_000);
+
+        var act = () => _sut.ProcessImageAllInOneAsync(input, false, null);
+
+        await act.Should().ThrowAsync<FileIntegrityException>()
+            .WithMessage("*200 MP*");
+    }
+
+    private static MemoryStream OversizedBitmapHeader(int width, int height)
+    {
+        var header = new byte[54];
+        header[0] = (byte)'B';
+        header[1] = (byte)'M';
+        BinaryPrimitives.WriteInt32LittleEndian(header.AsSpan(2), header.Length);
+        BinaryPrimitives.WriteInt32LittleEndian(header.AsSpan(10), 54);
+        BinaryPrimitives.WriteInt32LittleEndian(header.AsSpan(14), 40);
+        BinaryPrimitives.WriteInt32LittleEndian(header.AsSpan(18), width);
+        BinaryPrimitives.WriteInt32LittleEndian(header.AsSpan(22), height);
+        BinaryPrimitives.WriteInt16LittleEndian(header.AsSpan(26), 1);
+        BinaryPrimitives.WriteInt16LittleEndian(header.AsSpan(28), 24);
+        return new MemoryStream(header);
     }
 }

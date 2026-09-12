@@ -46,6 +46,7 @@ public static class DynamicFolderQueryBuilder
     {
         return ctx.UploadedFiles
             .AsNoTracking()
+            .WhereReady()
             .Where(f => f.Uploaders.Contains(ownerId)
                         && f.Type == UploadFileType.CloudFile
                         && !ctx.FilePreviews.Any(p => p.PreviewFileId == f.Id)

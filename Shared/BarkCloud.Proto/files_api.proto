@@ -9,6 +9,16 @@ package barkcloud.files;
 service FilesApi {
   rpc GetUploadUrl(GetUploadUrlRequest) returns(GetUploadUrlResponse); // Получить ссылку для загрузки файла
 
+  rpc CreateUploadSession(CreateUploadSessionRequest) returns(UploadSessionResponse); // Создать resumable upload-сессию
+
+  rpc GetUploadSession(UploadSessionIdRequest) returns(UploadSessionResponse); // Получить серверное состояние upload-сессии
+
+  rpc ResumeUploadSession(UploadSessionIdRequest) returns(UploadSessionResponse); // Получить новый upload-token и уже принятые части
+
+  rpc CompleteUploadSession(UploadSessionIdRequest) returns(UploadSessionResponse); // Завершить multipart и поставить файл в обработку
+
+  rpc CancelUploadSession(UploadSessionIdRequest) returns(UploadSessionResponse); // Отменить незавершённую загрузку
+
   rpc GetTempDownloadUrl(GetTempDownloadUrlRequest) returns(GetTempDownloadUrlResponse); // Получить ссылку для скачивания файла
 
   rpc CheckFileHash(CheckFileHashRequest) returns(CheckFileHashResponse); // Проверить существует ли файл с таким хешем
@@ -316,6 +326,46 @@ message GetUploadUrlResponse {
   string file_id = 2; // идентификатор файла
 }
 
+message CreateUploadSessionRequest {
+  string idempotency_key = 1;
+  string file_name = 2;
+  int64 file_size = 3;
+  string content_type = 4;
+  string sha256 = 5;
+}
+
+message UploadSessionIdRequest {
+  string session_id = 1;
+}
+
+enum UploadSessionStatus {
+  UPLOAD_SESSION_STATUS_UNSPECIFIED = 0;
+  UPLOAD_SESSION_STATUS_UPLOADING = 1;
+  UPLOAD_SESSION_STATUS_PROCESSING = 2;
+  UPLOAD_SESSION_STATUS_READY = 3;
+  UPLOAD_SESSION_STATUS_FAILED = 4;
+  UPLOAD_SESSION_STATUS_CANCELLED = 5;
+  UPLOAD_SESSION_STATUS_EXPIRED = 6;
+}
+
+message UploadPartInfo {
+  int32 part_number = 1;
+  int64 size = 2;
+}
+
+message UploadSessionResponse {
+  string session_id = 1;
+  string file_id = 2;
+  UploadSessionStatus status = 3;
+  int64 file_size = 4;
+  int64 part_size = 5;
+  google.protobuf.Timestamp expires_at = 6;
+  string upload_token = 7;
+  repeated UploadPartInfo uploaded_parts = 8;
+  string error_code = 9;
+  string error_message = 10;
+}
+
 enum UploadFileType {
   UPLOAD_FILE_TYPE_UNKNOWN = 0;
 
@@ -426,6 +476,8 @@ message AttachFileRequest {
   string file_id = 2;
   string name = 3;
   bool route_by_media_kind = 4; // true → сервер кладёт файл в системную папку Фото/Видео/Другие документы по типу медиа
+  string upload_session_id = 5; // Корреляция Upload 2.0; пусто для legacy/обычного AttachFile
+  bool is_upload_retry = 6; // Retry после uploaded_not_attached
 }
 
 message RenameFileEntryRequest {
@@ -629,6 +681,7 @@ message GetUserStorageInfoResponse {
   int64 total_available_storage = 4; // Общий доступный размер диска/хранилища в байтах
   int64 disk_used_storage = 5; // Занято на диске без учета S3-данных в байтах
   int64 s3_used_storage = 6; // Занято S3-данными в байтах
+  int64 reserved_storage = 7; // Зарезервировано активными upload-сессиями
 }
 
 // ============ AlbumApi messages ============

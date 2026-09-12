@@ -15,15 +15,18 @@ namespace BarkCloud.Files.Features.Cloud.ListDirectory;
 public class ListDirectoryCommandHandler : IRequestHandler<ListDirectoryCommand, DirectoryListing>
 {
     private readonly ICloudHierarchyStorage _storage;
+    private readonly IUploadedFilesStorage _filesStorage;
     private readonly UserContext _userContext;
     private readonly ILogger<ListDirectoryCommandHandler> _logger;
 
     public ListDirectoryCommandHandler(
         ICloudHierarchyStorage storage,
+        IUploadedFilesStorage filesStorage,
         UserContext userContext,
         ILogger<ListDirectoryCommandHandler> logger)
     {
         _storage = storage;
+        _filesStorage = filesStorage;
         _userContext = userContext;
         _logger = logger;
     }
@@ -51,6 +54,11 @@ public class ListDirectoryCommandHandler : IRequestHandler<ListDirectoryCommand,
 
         var subdirs = await _storage.ListSubdirectories(ownerId, request.DirectoryId, cancellationToken);
         var files = await _storage.ListFilesInDirectory(ownerId, fileDirectoryId, cancellationToken);
+        var readyFileIds = files.Count == 0
+            ? new HashSet<Guid>()
+            : (await _filesStorage.GetFiles(files.Select(x => x.FileId).Distinct().ToList()))
+                .Select(x => x.Id)
+                .ToHashSet();
 
         var response = new DirectoryListing();
         foreach (var d in subdirs)
@@ -64,7 +72,7 @@ public class ListDirectoryCommandHandler : IRequestHandler<ListDirectoryCommand,
                 UpdatedAt = Timestamp.FromDateTime(DateTime.SpecifyKind(d.UpdatedAt, DateTimeKind.Utc))
             });
         }
-        foreach (var f in files)
+        foreach (var f in files.Where(x => readyFileIds.Contains(x.FileId)))
         {
             response.Files.Add(new FileEntryInfo
             {

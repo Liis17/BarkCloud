@@ -29,6 +29,14 @@ internal sealed class SqliteFilesContext : IDisposable
         Context.Database.EnsureCreated();
     }
 
+    public FilesContext CreateAdditionalContext()
+    {
+        var options = new DbContextOptionsBuilder<FilesContext>()
+            .UseSqlite(_connection)
+            .Options;
+        return new FilesContext(options);
+    }
+
     public void Dispose()
     {
         Context.Dispose();

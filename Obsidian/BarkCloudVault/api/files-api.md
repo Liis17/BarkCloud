@@ -1,6 +1,6 @@
 # gRPC API — Files
 
-Parent: [[index]] · Module: [[modules/backend-files]] · Cloud: [[modules/backend-files-cloud]] · Proto: [[modules/shared-proto]] · Клиентский гайд: [[api/files-client-guide]]
+Parent: [[index]] · Module: [[modules/backend-files]] · Upload: [[modules/upload-2]] · Cloud: [[modules/backend-files-cloud]] · Proto: [[modules/shared-proto]] · Клиентский гайд: [[api/files-client-guide]]
 
 Файл: `Shared/BarkCloud.Proto/files_api.proto`
 Namespace C#: `BarkCloud.Proto.Files`
@@ -14,11 +14,27 @@ Package: `barkcloud.files`
 
 | RPC | Назначение |
 |-----|-----------|
-| `GetUploadUrl(GetUploadUrlRequest) → GetUploadUrlResponse` | Получить presigned URL для загрузки |
+| `CreateUploadSession(CreateUploadSessionRequest) → UploadSessionResponse` | Создать/переиспользовать V2-сессию по idempotency key и зарезервировать квоту |
+| `GetUploadSession(UploadSessionIdRequest) → UploadSessionResponse` | Получить owner-scoped состояние без upload-token |
+| `ResumeUploadSession(UploadSessionIdRequest) → UploadSessionResponse` | Выпустить новый token и вернуть фактический `ListParts` из S3 |
+| `CompleteUploadSession(UploadSessionIdRequest) → UploadSessionResponse` | Проверить полноту multipart, завершить объект и атомарно поставить processing-задачу через outbox |
+| `CancelUploadSession(UploadSessionIdRequest) → UploadSessionResponse` | Abort активного multipart, release quota, terminal `cancelled` |
+| `GetUploadUrl(GetUploadUrlRequest) → GetUploadUrlResponse` | Legacy: получить presigned URL для загрузки |
 | `GetTempDownloadUrl(GetTempDownloadUrlRequest) → GetTempDownloadUrlResponse` | Ссылки на скачивание + превью (`file_id`, `url`, `preview_url`) |
 | `CheckFileHash(CheckFileHashRequest) → CheckFileHashResponse` | Проверка наличия по хешу (без побочных эффектов): `exists` + `existing_locations` (имя+папка) для модалки «файл уже есть» |
-| `GetUserStorageInfo(GetUserStorageInfoRequest) → GetUserStorageInfoResponse` | Инфо о квоте/использовании + физический snapshot диска |
-| `GetFileMetadata(GetFileMetadataRequest) → GetFileMetadataResponse` | Метаданные файла (EXIF/ffprobe/PDF/Office) для диалога «Свойства». Только для собственных файлов (по `Uploaders`). Поля nullable (`optional`), клиент показывает только заданные. `has_metadata=false` если для блоба не извлечено ни одного поля |
+| `GetUserStorageInfo(GetUserStorageInfoRequest) → GetUserStorageInfoResponse` | Инфо о квоте/использовании, `reserved_storage` активных сессий + физический snapshot диска |
+| `GetFileMetadata(GetFileMetadataRequest) → GetFileMetadataResponse` | Метаданные ready-файла (EXIF/ffprobe/PDF/Office). Только собственные файлы; processing отклоняется `FileNotReadyException` |
+
+### UploadSession messages
+
+- `CreateUploadSessionRequest { idempotency_key, file_name, file_size, content_type, sha256 }` — SHA-256 lowercase hex, размер `1..5 TiB`.
+- `UploadSessionStatus`: `UPLOADING`, `PROCESSING`, `READY`, `FAILED`, `CANCELLED`, `EXPIRED`.
+- `UploadSessionResponse { session_id, file_id, status, file_size, part_size, expires_at, upload_token, uploaded_parts, error_code, error_message }`.
+- `upload_token` возвращается только create/reuse активной сессии и resume; GET/complete/terminal responses его не раскрывают.
+- `uploaded_parts` — фактические части S3 для resume. Клиент отправляет отсутствующие части в HTTP data endpoint `PUT /file-upload/{sessionId}/parts/{partNumber}`.
+- Сессии owner-isolated; другой дескриптор под тем же ключом даёт `UploadIdempotencyConflictException`. Quota rejection содержит `limit/used/reserved/requested` в typed exception/HTTP response.
+- Общий `ExceptionClientInterceptor` может построить все Files-исключения через parameterless-конструктор; `ArchiveCreationException` также имеет безопасный default message, поэтому один тип не ломает mapping остальных error codes.
+- Полный протокол, безопасность token и recovery — [[modules/upload-2]].
 
 ## Сервис: `CloudApi` (клиентский, облачная иерархия)
 
@@ -30,9 +46,9 @@ Package: `barkcloud.files`
 | `RenameDirectory(RenameDirectoryRequest) → CloudEmpty` | Переименовать папку |
 | `MoveDirectory(MoveDirectoryRequest) → CloudEmpty` | Переместить папку |
 | `DeleteDirectory(DeleteDirectoryRequest) → CloudEmpty` | Удалить рекурсивно |
-| `ListDirectory(ListDirectoryRequest) → DirectoryListing` | Листинг (`subdirs`, `files`); `directory_id` пуст = корень владельца. Только метаданные |
-| `ListDirectoryDetailed(ListDirectoryRequest) → DirectoryListingDetailed` | Та же выборка, что у `ListDirectory`, но каждый `FileEntryDetailed` содержит полный `UploadFileInfo` (URL, превью 128/512/1024, размеры) |
-| `AttachFile(AttachFileRequest) → CloudEmpty` | Привязать загруженный `UploadFile` к папке (создаёт `CloudFileEntry`); коллизия имени → суффикс ` (1)`. `route_by_media_kind=true` → `directory_id` игнорируется, файл кладётся по типу в системную папку Фото/Видео/Другие документы |
+| `ListDirectory(ListDirectoryRequest) → DirectoryListing` | Листинг (`subdirs`, ready `files`); `directory_id` пуст = корень владельца. Только метаданные |
+| `ListDirectoryDetailed(ListDirectoryRequest) → DirectoryListingDetailed` | Та же выборка, что у `ListDirectory`, но каждый ready-файл содержит полный `UploadFileInfo`; processing placeholders скрыты |
+| `AttachFile(AttachFileRequest) → CloudEmpty` | Привязать только ready `UploadFile`; `upload_session_id/is_upload_retry` коррелируют V2 retry для логов/метрики, processing даёт `FileNotReadyException`, replay уже привязанного — `FileAlreadyAttachedException` |
 | `RenameFileEntry(RenameFileEntryRequest) → CloudEmpty` | Переименовать запись (не меняет `UploadFile.Filename`) |
 | `MoveFileEntry(MoveFileEntryRequest) → CloudEmpty` | Переместить запись (`new_directory_id` пуст = корень) |
 | `DeleteFileEntry(DeleteFileEntryRequest) → CloudEmpty` | Удалить запись в корзину (`UploadFile`/`Uploaders` не трогает; blob удаляется только при очистке корзины) |
@@ -194,7 +210,7 @@ Messages: `ResolveShareRequest { token; }` → `ResolveShareResponse { found; fi
 
 - Стикерпаки и стикеры
 - Загрузка изображений бейджей и постеров
-- Прямая HTTP-стримовая загрузка/скачивание — есть только `FilesController` (без proto-описания)
+- Прямая загрузка браузера в S3 presigned URL: V2 намеренно стримит raw parts через Files для единой token/range-проверки
 
 ## SearchApi
 
@@ -206,8 +222,8 @@ Messages: `ResolveShareRequest { token; }` → `ResolveShareResponse { found; fi
 
 ## Типизированные ошибки
 
-- Локальные: `Exceptions/FileAlreadyUploadedException`, `Exceptions/FileNotUploadedException`
-- Общие из [[modules/shared-exceptions]] · Files: `FileNotFoundException`, `NotValidFileIdException`, `CloudAccessDeniedException`, `FileAlreadyAttachedException` (инвариант одной директории), `AlbumNotFoundException`, `AlbumNameConflictException`, `InvalidThumbnailSourceException` (SetVideoThumbnail)
+- Локальные: `Exceptions/FileAlreadyUploadedException`, `Exceptions/FileNotUploadedException`, `Exceptions/FileIntegrityException`
+- Общие из [[modules/shared-exceptions]] · Files: `FileNotFoundException`, `FileNotReadyException`, `NotValidFileIdException`, `CloudAccessDeniedException`, `FileAlreadyAttachedException` (инвариант одной директории), upload-session/token/part/quota/idempotency exceptions, `AlbumNotFoundException`, `AlbumNameConflictException`, `InvalidThumbnailSourceException` (SetVideoThumbnail)
 
 ## Связь с инфраструктурой
 

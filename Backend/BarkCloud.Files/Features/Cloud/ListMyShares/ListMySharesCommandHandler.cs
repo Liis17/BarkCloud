@@ -51,18 +51,22 @@ public class ListMySharesCommandHandler : IRequestHandler<ListMySharesCommand, L
             page.RemoveAt(page.Count - 1);
 
         var response = new ListMySharesResponse();
+        if (page.Count == 0)
+            return response;
 
         // Батчем подтягиваем тип медиа и превью файлов (как SearchFilesCommandHandler).
         var fileIds = page.Select(s => s.FileId).Distinct().ToList();
         var filesById = (await _uploadedFiles.GetFiles(fileIds)).ToDictionary(f => f.Id);
-        var previewsByOriginal = await _uploadedFiles.GetPreviewsForFiles(fileIds, cancellationToken);
+        var previewsByOriginal = await _uploadedFiles.GetPreviewsForFiles(filesById.Keys, cancellationToken);
         var baseUrl = FileUrlHelper.GetPublicBaseUrl(_configuration, _runSettings);
 
         foreach (var share in page)
         {
+            if (!filesById.TryGetValue(share.FileId, out var file))
+                continue;
+
             var info = CreateShareCommandHandler.ToGrpc(share);
-            if (filesById.TryGetValue(share.FileId, out var file))
-                info.MediaKind = (MediaKind)(int)file.MediaKind;
+            info.MediaKind = (MediaKind)(int)file.MediaKind;
             if (previewsByOriginal.TryGetValue(share.FileId, out var previews))
             {
                 var smallest = previews.Where(p => p.TargetWidth > 0).OrderBy(p => p.TargetWidth).FirstOrDefault();

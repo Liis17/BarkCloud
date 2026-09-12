@@ -1,11 +1,11 @@
 # Backend — Files
 
-Parent: [[index]] · See also: [[api/files-api]] · [[modules/backend-files-cloud]] · [[modules/shared-queue]]
+Parent: [[index]] · See also: [[api/files-api]] · [[modules/upload-2]] · [[modules/backend-files-cloud]] · [[modules/shared-queue]]
 
 ## Назначение
 
 Сервис файлов. Основные ответственности:
-1. **Загрузка/скачивание**: presigned URL в MinIO, квоты, временные файлы, сжатие изображений, превью видео (FFmpeg). **Оригинал хранится как есть** (с 2026-06: HEIC больше НЕ подменяется на JPEG — иначе серверный SHA256 не совпадал с клиентским и ломались дедуп автозагрузки/индикатор «уже в облаке»). Для изображений генерируется **полноразмерный JPEG 90% — `JpegView`** (HEIC через ffmpeg, прочие, **включая сам JPEG**, через ImageSharp): отдельный блоб, связан как превью с `TargetWidth=0` → исключён из галереи и чистится при удалении; file_id хранится в колонке `UploadFile.JpegViewFileId`, отдаётся клиентам как `jpeg_view_file_id/jpeg_view_url` для просмотра, оригинал — для скачивания. ⚠️ С 2026-06 JPEG-оригинал **больше не ссылается сам на себя**: раньше `JpegViewUrl` указывал на `/download/{оригинал}`, но `DownloadFile` отдаёт по прямому id только аватарки и превью-файлы (`IsPreviewFile`) → для JPEG-фото вьювер получал **404**. Теперь для всех изображений создаётся отдельный JpegView-блоб (он зарегистрирован как превью → раздаётся; оригинал остаётся за временными ссылками). Легаси-файлы добирает [[#Services|`LegacyJpegViewBackfillService`]]. **Дедупликация контента по хешу снята** — одинаковые файлы сохраняются как отдельные блобы (хеш пишется для проверок наличия; превью по-прежнему дедуплицируются по SHA256). ⚠️ `LegacyPreviewBackfillService` всё ещё перекодирует HEIC-оригинал в JPEG (старая логика) — новые загрузки он не трогает (у них есть превью), но согласовать с JpegView-подходом стоит отдельным шагом
+1. **Загрузка/скачивание**: возобновляемый Web multipart через `UploadSession` + сохранённый legacy presigned/HTTP transport, квоты, временные файлы, сжатие изображений, превью видео (FFmpeg). Полный V2-поток — [[modules/upload-2]]. **Оригинал хранится как есть** (с 2026-06: HEIC больше НЕ подменяется на JPEG — иначе серверный SHA256 не совпадал с клиентским и ломались дедуп автозагрузки/индикатор «уже в облаке»). Для изображений генерируется **полноразмерный JPEG 90% — `JpegView`** (HEIC через ffmpeg, прочие, **включая сам JPEG**, через ImageSharp): отдельный блоб, связан как превью с `TargetWidth=0` → исключён из галереи и чистится при удалении; file_id хранится в колонке `UploadFile.JpegViewFileId`, отдаётся клиентам как `jpeg_view_file_id/jpeg_view_url` для просмотра, оригинал — для скачивания. ⚠️ С 2026-06 JPEG-оригинал **больше не ссылается сам на себя**: раньше `JpegViewUrl` указывал на `/download/{оригинал}`, но `DownloadFile` отдаёт по прямому id только аватарки и превью-файлы (`IsPreviewFile`) → для JPEG-фото вьювер получал **404**. Теперь для всех изображений создаётся отдельный JpegView-блоб (он зарегистрирован как превью → раздаётся; оригинал остаётся за временными ссылками). Легаси-файлы добирает [[#Services|`LegacyJpegViewBackfillService`]]. **Дедупликация контента по хешу снята** — одинаковые файлы сохраняются как отдельные блобы (хеш пишется для проверок наличия; превью по-прежнему дедуплицируются по SHA256). ⚠️ `LegacyPreviewBackfillService` всё ещё перекодирует HEIC-оригинал в JPEG (старая логика) — новые загрузки он не трогает (у них есть превью), но согласовать с JpegView-подходом стоит отдельным шагом
 2. **Облачная иерархия** (NextCloud-подобная): папки + записи о файлах — см. дочернюю заметку [[modules/backend-files-cloud]]
 3. **Галерея, альбомы и музыка**: классификация медиа (`MediaKind`), раздельные списки фото/видео (`ListUserMedia`), универсальные альбомы фото/видео (`AlbumApi`), аудиотека и музыкальные плейлисты (`MusicApi`)
 
@@ -13,10 +13,15 @@ Parent: [[index]] · See also: [[api/files-api]] · [[modules/backend-files-clou
 
 `Backend/BarkCloud.Files/`
 
+## Upload 2.0
+
+Web использует server-owned `UploadSession` и состояния `uploading → processing → ready | failed`; байты частей идут прямо в Files/S3, а enrichment выполняет RabbitMQ consumer через MassTransit Bus Outbox. Квота резервируется до multipart, resume сверяется с S3 `ListParts`, незавершённый `UploadFile` скрыт общим ready-предикатом (`UploadedAt` + `Etag`). Подробный протокол, recovery и карта файлов — [[modules/upload-2]].
+
 ## Файлы
 
 ### Domain
 - `UploadFile.cs` — загруженный файл (реальный объект в S3); содержит обязательный `StorageProfileId`, `MediaKind`, `UploadDeviceName` (имя устройства, с которого блоб загружен в первый раз — читается из `x-device-name` в `GetUploadUrl`)
+- `UploadSession.cs` / `UploadFileReadiness.cs` — server-side lifecycle V2, квотный резерв, multipart/token/error state и единый предикат доступности
 - `UploadFileType.cs` — enum типов: `Unknown=0`, `UserAvatar=1`, `CloudFile=2`
 - `MediaKind.cs` — категория медиа: `Other=0`, `Photo=1`, `Video=2`, `Document=3`, `Audio=4` (заполняется при загрузке по content-type)
 - `FileHash.cs` — хеш для дедупликации
@@ -40,7 +45,7 @@ Parent: [[index]] · See also: [[api/files-api]] · [[modules/backend-files-clou
 - `CloudApiService.cs` — gRPC `CloudApi` (иерархия + галерея `ListUserMedia` + `SetVideoThumbnail`) → [[modules/backend-files-cloud]]
 - `AlbumApiService.cs` — gRPC `AlbumApi` (альбомы)
 - `MusicApiService.cs` — gRPC `MusicApi`: список аудиотреков, temp-URL трека, CRUD плейлистов, ручной порядок, публичные ссылки и приватные гранты
-- `FilesController.cs` — HTTP-контроллер (прямые upload/download)
+- `FilesController.cs` — HTTP-контроллер: V2 raw-part `PUT /file-upload/{sessionId}/parts/{partNumber}`, legacy upload и download
 
 ### Services
 - `ImageCompressor.cs` — сжатие изображений и генерация превью (на **SixLabors.ImageSharp**; HEIC/HEIF **не декодирует** — для них см. `HeicImageConverter`). `GenerateVideoPreviewsAsync` делает горизонтальный холст 16:9 для каждого размера (1024/512/128): размытый затемнённый cover-фон + исходный кадр, вписанный целиком поверх него; обычные фото- и квадратные аудио-превью используют отдельные методы
@@ -56,6 +61,10 @@ Parent: [[index]] · See also: [[api/files-api]] · [[modules/backend-files-clou
 - `LegacyPreviewBackfillService.cs` — фоновый разовый бэкафилл при старте контейнера (BackgroundService): находит фото-оригиналы (`MediaKind.Photo`) без превью, перекодирует HEIC→JPEG (замена блоба в S3 под тем же ключом + обновление имени/размера/хеша) и генерирует превью 1024/512/128. Курсор по `Id` по возрастанию; дёшев на повторных стартах (файлы с превью выпадают из выборки). Видео не покрывает
 - `AlbumViewBuilder.cs` — сборка `AlbumInfo` (счётчик элементов + URL превью обложки) батчем
 - `MusicLibraryService.cs` — бизнес-логика аудиотеки: `ListTracks` по `MediaKind.Audio`, `GetTrackDownloadUrl`, плейлисты, `ResolvePublicPlaylist`, публичные `MusicPlaylistShareLink` и приватные `MusicPlaylistGrant`
+- `UploadSessionCoordinator.cs` — create/get/resume/complete/cancel, token/range/part validation и S3 recovery через `ListParts`/`HeadObject`
+- `StorageQuotaService.cs` / `LegacyUploadQuotaGuard.cs` — PostgreSQL advisory lock, ready bytes + active reservations, атомарный reserve/release/convert
+- `UploadSessionProcessor.cs` / `ExistingUploadEnrichmentPipeline.cs` — disk-backed SHA/size validation и переиспользование текущего metadata/preview pipeline
+- `UploadArtifactCleaner.cs` / `UploadSessionMaintenance.cs` / `UploadSessionCleanupService.cs` — expire, abort, cleanup retry и 7-дневная terminal retention
 - `TempFileCleanupService.cs` — фоновая очистка временных файлов (BackgroundService)
 - `TrashPurgeService.cs` — окончательная зачистка корзины: снятие `Uploaders`, удаление из альбомов (`AlbumItems`), избранного (`FavoriteFiles`) и публичных ссылок (`ShareLinks`) владельца, удаление записей. ⚠️ **Превью дедуплицируются по SHA256** (один превью-блоб может быть привязан к нескольким оригиналам через разные строки `FilePreview`), поэтому при снятии `Uploaders` с превью владелец убирается **только если у него не осталось другого (не удаляемого сейчас) оригинала, ссылающегося на тот же превью-блоб** — иначе оставшийся файл лишился бы превью (блоб с пустым `Uploaders` добивается воркером, а строки `FilePreview` чистятся в `PurgeOrphanBlobsAsync` по `PreviewFileId`). Физическое удаление осиротевших блобов вынесено в публичный `PurgeOrphanBlobsAsync` (S3 + хеш + связки `FilePreview` + строка `UploadedFiles`); **строка БД удаляется только при успешном удалении объекта из S3** — иначе блоб остаётся осиротевшим и его добивает воркер (объект не «протекает» в S3). Общий для ручных RPC и воркеров. Константа `Retention = 14 дней`
 - `TrashCleanupService.cs` — фоновый воркер (BackgroundService, раз в 6 ч): зачищает записи корзины с истёкшим `PurgeAt` через `TrashPurgeService`
@@ -73,6 +82,7 @@ Parent: [[index]] · See also: [[api/files-api]] · [[modules/backend-files-clou
   crash-loop контейнера; постоянные ошибки конфигурации только логируются
 - `S3BucketRegistry.cs` — immutable startup-реестр по `ProfileId` (не по bucket name), поэтому одинаковые имена на разных endpoints не конфликтуют. Для записи выбирает специализированную роль или `universal`; настроенный, но недоступный профиль не переключается молча. R2 использует HTTPS, region `auto`, path-style и checksum-режим `WHEN_REQUIRED`
 - `S3Uploader.cs` — обёртка над S3/MinIO по `ProfileId`: `UploadAsync`, `DownloadAsync`, range и `DeleteAsync`. Начиная со 100 MiB использует multipart (часть минимум 64 MiB, увеличивается до `ceil(size/10000)`), при ошибке abort’ит upload
+- `IMultipartUploadStore.cs` / `S3MultipartUploadStore.cs` — Files-owned V2 multipart seam: initiate/upload/list/complete/abort/head
 - `PhysicalStorageStatsProvider.cs` — ленивый snapshot диска MinIO: общий размер, занято не-S3, занято S3; кеш 5 минут, обновляется только при запросах storage-info
 
 ### Configurations
@@ -83,7 +93,7 @@ Parent: [[index]] · See also: [[api/files-api]] · [[modules/backend-files-clou
 Все версии профилей загружаются из [[modules/backend-configuration]] один раз на старте Files. Это позволяет держать originals в R2, previews в локальном S3 и продолжать читать старые файлы через прежнюю версию после смены endpoint.
 
 ### Persistence
-- `FilesContext.cs`, `FilesContextFactory.cs` — EF Core DbContext (содержит `UploadedFiles`, `FileHashes`, `TempFiles`, `CloudDirectories`, `CloudFileEntries`, `FilePreviews`, `Albums`, `AlbumItems`, `MusicPlaylists`, `MusicPlaylistItems`, `MusicPlaylistShareLinks`, `MusicPlaylistGrants`, `DynamicFolders`, `FavoriteFiles`, `ShareLinks`, `FolderShareLinks`, `FileGrants`, `DirectoryGrants`, `FileMetadata`, `FileActivityEvents`). `20260908123000_AddStorageProfileId` backfill’ит существующие аватары в `user-avatars-old-v1`, все остальные строки (включая старые previews) — в `cloud-files-old-v1`, затем делает колонку обязательной; S3-объекты не перемещаются. Миграция `20260602120000_AddUploadedFilesUploadersIndex.cs` — raw-SQL GIN-индекс на массив `UploadedFiles."Uploaders"` (`array_ops`)
+- `FilesContext.cs`, `FilesContextFactory.cs` — EF Core DbContext (включая `UploadSessions` и MassTransit inbox/outbox). `20260911045624_AddUploadSessionsAndOutbox` добавляет V2 state, optimistic concurrency и transactional outbox; `20260908123000_AddStorageProfileId` backfill’ит существующие профили. Миграция `20260602120000_AddUploadedFilesUploadersIndex.cs` — raw-SQL GIN-индекс на массив `UploadedFiles."Uploaders"` (`array_ops`)
 - `UploadedFilesStorage.cs`
 - `FileHashesStorage.cs`
 - `TempFilesStorage.cs`
@@ -114,6 +124,7 @@ Parent: [[index]] · See also: [[api/files-api]] · [[modules/backend-files-clou
 ### Consumers
 - `SessionRevokedConsumer.cs` — слушает `SessionRevokedEvent` из [[modules/shared-queue]]
 - `UserDeletedConsumer.cs` — по `UserDeleted` (из [[modules/backend-users]]) снимает пользователя из `Uploaders` всех его блобов (освобождает квоту) и удаляет его `CloudDirectories`/`CloudFileEntries`/`Albums`/`AlbumItems`/`FavoriteFiles`/`ShareLinks`/`FileGrants` (как владельца и как получателя). Физическое удаление осиротевших S3-блобов делает фоновый `OrphanBlobCleanupService`
+- `ProcessUploadedFileConsumer.cs` — принимает `ProcessUploadedFile { SessionId }`, concurrency 2, вызывает идемпотентный V2 processor; retry 10s/1m/5m/15m
 
 ### Прочее
 - `Extensions/FileExtensions.cs`, `Extensions/ServiceCollectionExtensions.cs`
@@ -128,8 +139,9 @@ Parent: [[index]] · See also: [[api/files-api]] · [[modules/backend-files-clou
 
 | Feature | Назначение |
 |---------|-----------|
-| `GetUploadUrl` | Выдать presigned URL для загрузки |
-| `UploadFile` | Серверная загрузка файла |
+| `Create/Get/Resume/Complete/CancelUploadSession` | Control plane возобновляемой Web-загрузки; см. [[modules/upload-2]] |
+| `GetUploadUrl` | Legacy: выдать presigned URL для загрузки |
+| `UploadFile` | Общий enrichment handler и legacy-серверная загрузка; V2 вызывает его с уже сохранённым оригиналом и disk buffer |
 | `GetTempDownloadUrl` | Временные ссылки на скачивание + превью |
 | `DownloadFile` | Скачивание (через контроллер); для `TempFile`-ссылок отдаёт оригинальный `UploadFile.Filename` в `Content-Disposition`, а не `{fileId}.{ext}` |
 | `CheckFileHash` | Проверка наличия по хешу (без побочных эффектов); возвращает `exists` + локации копий пользователя (имя+папка) для модалки «файл уже есть» |

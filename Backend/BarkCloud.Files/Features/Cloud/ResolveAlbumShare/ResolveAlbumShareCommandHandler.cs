@@ -83,13 +83,14 @@ public class ResolveAlbumShareCommandHandler : IRequestHandler<ResolveAlbumShare
             var baseUrl = FileUrlHelper.GetPublicBaseUrl(_configuration, _runSettings);
             var fileIds = page.Select(i => i.FileId).Distinct().ToList();
             var files = (await _filesStorage.GetFiles(fileIds)).ToDictionary(f => f.Id);
-            var previewsByFile = await _filesStorage.GetPreviewsForFiles(fileIds, cancellationToken);
-            var trashed = await _hierarchy.GetEffectivelyTrashedFileIds(ownerId, fileIds, cancellationToken);
+            var previewsByFile = await _filesStorage.GetPreviewsForFiles(files.Keys, cancellationToken);
+            var trashed = await _hierarchy.GetEffectivelyTrashedFileIds(ownerId, files.Keys.ToList(), cancellationToken);
 
-            var tempFiles = await _tempFilesStorage.CreateTempFilesBatchAsync(fileIds, cancellationToken);
-            var tempByOriginal = tempFiles
-                .GroupBy(t => t.OriginalFileId)
-                .ToDictionary(g => g.Key, g => g.First().Id);
+            var tempByOriginal = files.Count == 0
+                ? new Dictionary<Guid, Guid>()
+                : (await _tempFilesStorage.CreateTempFilesBatchAsync(files.Keys, cancellationToken))
+                    .GroupBy(t => t.OriginalFileId)
+                    .ToDictionary(g => g.Key, g => g.First().Id);
 
             foreach (var item in page)
             {

@@ -45,10 +45,32 @@ public class CreateShareCommandHandlerTests
     }
 
     [Fact]
+    public async Task Handle_FileNotReady_ThrowsFileNotReady()
+    {
+        var fileId = Guid.NewGuid();
+        _files.Setup(s => s.GetFile(fileId)).ReturnsAsync(new UploadFileEntity
+        {
+            Id = fileId,
+            Uploaders = new() { OwnerId }
+        });
+
+        var act = () => CreateSut().Handle(new CreateShareCommand { FileId = fileId }, default);
+
+        await act.Should().ThrowAsync<FileNotReadyException>();
+        _storage.Verify(s => s.Add(It.IsAny<DomainShareLink>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
     public async Task Handle_HappyPath_AddsShareAndReturnsInfo()
     {
         var fileId = Guid.NewGuid();
-        _files.Setup(s => s.GetFile(fileId)).ReturnsAsync(new UploadFileEntity { Id = fileId, Uploaders = new() { OwnerId } });
+        _files.Setup(s => s.GetFile(fileId)).ReturnsAsync(new UploadFileEntity
+        {
+            Id = fileId,
+            Uploaders = new() { OwnerId },
+            Etag = "etag",
+            UploadedAt = DateTime.UtcNow
+        });
 
         var response = await CreateSut().Handle(new CreateShareCommand { FileId = fileId, Name = "Holiday" }, default);
 

@@ -1,3 +1,4 @@
+using BarkCloud.Files.Domain;
 using BarkCloud.Files.Mapping;
 using BarkCloud.Files.Persistence;
 using BarkCloud.GrpcServer.XAuth;
@@ -37,6 +38,8 @@ public class GetFileMetadataCommandHandler : IRequestHandler<GetFileMetadataComm
             throw new BarkCloud.Shared.Exceptions.Files.FileNotFoundException();
         if (!file.Uploaders.Contains(ownerId))
             throw new CloudAccessDeniedException();
+        if (!file.IsReady())
+            throw new FileNotReadyException();
 
         var metadata = await _metadataStorage.Get(request.FileId, cancellationToken);
         if (metadata is null)

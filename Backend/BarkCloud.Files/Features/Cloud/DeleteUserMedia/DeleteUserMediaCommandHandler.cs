@@ -51,6 +51,14 @@ public class DeleteUserMediaCommandHandler : IRequestHandler<DeleteUserMediaComm
     {
         var ownerId = _userContext.UserId;
 
+        var file = await _uploadedFiles.GetFile(request.FileId);
+        if (file is null)
+            throw new FileNotFoundException();
+        if (!file.Uploaders.Contains(ownerId))
+            throw new CloudAccessDeniedException();
+        if (!file.IsReady())
+            throw new FileNotReadyException();
+
         var liveEntries = await _cloudHierarchy.GetLiveEntriesForFile(ownerId, request.FileId, cancellationToken);
 
         if (liveEntries.Count > 0)
@@ -85,12 +93,6 @@ public class DeleteUserMediaCommandHandler : IRequestHandler<DeleteUserMediaComm
                 ownerId, new[] { request.FileId }, cancellationToken);
             if (existingEntries.Count > 0)
                 return new CloudEmpty();
-
-            var file = await _uploadedFiles.GetFile(request.FileId);
-            if (file is null)
-                throw new FileNotFoundException();
-            if (!file.Uploaders.Contains(ownerId))
-                throw new CloudAccessDeniedException();
 
             var (systemKind, folderName) = MapMediaKindToSystemFolder(file.MediaKind);
             var directoryId = await _cloudHierarchy.EnsureSystemDirectory(ownerId, systemKind, folderName, cancellationToken);

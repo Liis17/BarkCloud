@@ -24,21 +24,34 @@ public class ListSharedWithMeCommandHandlerTests
     {
         var fileA = Guid.NewGuid();
         var fileGone = Guid.NewGuid();
+        var filePending = Guid.NewGuid();
         var grantA = Guid.NewGuid();
         _grants.Setup(s => s.ListSharedWithMePage(RecipientId, null, null, 50, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<FileGrant>
             {
                 new() { Id = grantA, OwnerId = 7, RecipientId = RecipientId, FileId = fileA, CreatedAt = DateTime.UtcNow },
-                new() { Id = Guid.NewGuid(), OwnerId = 8, RecipientId = RecipientId, FileId = fileGone, CreatedAt = DateTime.UtcNow }
+                new() { Id = Guid.NewGuid(), OwnerId = 8, RecipientId = RecipientId, FileId = fileGone, CreatedAt = DateTime.UtcNow },
+                new() { Id = Guid.NewGuid(), OwnerId = 9, RecipientId = RecipientId, FileId = filePending, CreatedAt = DateTime.UtcNow }
             });
         _files.Setup(s => s.GetPreviewsForFiles(It.IsAny<IEnumerable<Guid>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Dictionary<Guid, List<FilePreview>>());
-        _files.Setup(s => s.GetFile(fileA)).ReturnsAsync(new UploadFileEntity { Id = fileA, Filename = "a.jpg" });
+        _files.Setup(s => s.GetFile(fileA)).ReturnsAsync(new UploadFileEntity
+        {
+            Id = fileA,
+            Filename = "a.jpg",
+            Etag = "etag",
+            UploadedAt = DateTime.UtcNow
+        });
         _files.Setup(s => s.GetFile(fileGone)).ReturnsAsync((UploadFileEntity?)null);
+        _files.Setup(s => s.GetFile(filePending)).ReturnsAsync(new UploadFileEntity
+        {
+            Id = filePending,
+            Filename = "pending.jpg"
+        });
 
         var response = await CreateSut().Handle(new ListSharedWithMeCommand { Limit = 50 }, default);
 
-        // Удалённый файл пропущен; вернулась только живая запись «от кого».
+        // Удалённый и незавершённый файлы пропущены; вернулась только ready-запись «от кого».
         response.Items.Should().ContainSingle();
         response.Items[0].GrantId.Should().Be(grantA.ToString());
         response.Items[0].OwnerUserId.Should().Be(7);

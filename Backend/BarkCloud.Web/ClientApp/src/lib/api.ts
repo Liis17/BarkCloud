@@ -73,11 +73,6 @@ export function pickFiles({ accept, multiple = true }: { accept?: string; multip
   });
 }
 
-export interface UploadResult {
-  fileId: string;
-  name: string;
-}
-
 export interface DuplicateLocation {
   entryId: string;
   name: string;
@@ -120,76 +115,13 @@ export async function downloadArchive(payload: ArchivePayload): Promise<void> {
   window.open(d.url, '_blank');
 }
 
-/** SHA256 файла в hex. Читает файл целиком в память — допустимо при лимите 512 МБ;
- *  Web Crypto не умеет инкрементальный digest. null — если crypto недоступен (http) или ошибка. */
-async function sha256Hex(file: File): Promise<string | null> {
-  if (!globalThis.crypto?.subtle) return null;
-  try {
-    const buf = await file.arrayBuffer();
-    const digest = await crypto.subtle.digest('SHA-256', buf);
-    return Array.from(new Uint8Array(digest))
-      .map((b) => b.toString(16).padStart(2, '0'))
-      .join('');
-  } catch {
-    return null;
-  }
-}
-
 /** Проверка наличия контента по SHA256 (без побочных эффектов): есть ли уже такой файл
- *  у пользователя и где он лежит. Нет crypto.subtle (http-контекст) → считаем «не дубликат». */
-export async function checkDuplicate(file: File): Promise<{ exists: boolean; locations: DuplicateLocation[] }> {
-  const hash = await sha256Hex(file);
-  if (!hash) return { exists: false, locations: [] };
+ *  у пользователя и где он лежит. Хеш вычисляется потоковым Worker до этого вызова. */
+export async function checkDuplicateHash(hash: string): Promise<{ exists: boolean; locations: DuplicateLocation[] }> {
   try {
     const r = await apiPost<{ exists?: boolean; locations?: DuplicateLocation[] }>('/api/files/check-hash', { hash });
     return { exists: !!r.exists, locations: r.locations || [] };
   } catch {
     return { exists: false, locations: [] };
   }
-}
-
-/** Загрузка файла (новый блоб). Серверный дедуп снят — каждая загрузка создаёт копию;
- *  предварительную проверку дубликата делает вызывающий код через checkDuplicate. */
-export async function uploadFile(file: File, onProgress?: (frac: number) => void, signal?: AbortSignal): Promise<UploadResult> {
-  return uploadXhr(file, onProgress, signal);
-}
-
-function uploadXhr(file: File, onProgress?: (frac: number) => void, signal?: AbortSignal): Promise<UploadResult> {
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', '/api/files/upload');
-    xhr.withCredentials = true;
-    if (signal) {
-      if (signal.aborted) { xhr.abort(); reject(new DOMException('Aborted', 'AbortError')); return; }
-      signal.addEventListener('abort', () => { xhr.abort(); reject(new DOMException('Aborted', 'AbortError')); }, { once: true });
-    }
-    xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable && onProgress) onProgress(e.loaded / e.total);
-    };
-    xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        try {
-          resolve(JSON.parse(xhr.responseText));
-        } catch {
-          reject(new Error('Некорректный ответ загрузки'));
-        }
-      } else if (xhr.status === 401) {
-        window.location.href = '/login';
-        reject(new ApiError('unauthorized', { status: 401 }));
-      } else {
-        let msg = 'Ошибка ' + xhr.status;
-        try {
-          const d = JSON.parse(xhr.responseText);
-          if (d.error) msg = d.error;
-        } catch {
-          /* ignore */
-        }
-        reject(new Error(msg));
-      }
-    };
-    xhr.onerror = () => reject(new Error('Сетевая ошибка загрузки'));
-    const fd = new FormData();
-    fd.append('file', file, file.name);
-    xhr.send(fd);
-  });
 }

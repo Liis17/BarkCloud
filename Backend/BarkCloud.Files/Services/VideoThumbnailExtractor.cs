@@ -23,6 +23,8 @@ public record VideoProbe(
 /// </summary>
 public class VideoThumbnailExtractor
 {
+    public static readonly TimeSpan ProbeTimeout = TimeSpan.FromMinutes(2);
+    public static readonly TimeSpan FfmpegTimeout = TimeSpan.FromMinutes(15);
     private readonly ILogger<VideoThumbnailExtractor> _logger;
 
     /// <summary>
@@ -40,7 +42,8 @@ public class VideoThumbnailExtractor
     /// </summary>
     public virtual async Task<(int Width, int Height, TimeSpan Duration)> ProbeAsync(string filePath, CancellationToken cancellationToken = default)
     {
-        var info = await FFProbe.AnalyseAsync(filePath, cancellationToken: cancellationToken);
+        using var timeout = CreateTimeout(cancellationToken, ProbeTimeout);
+        var info = await FFProbe.AnalyseAsync(filePath, cancellationToken: timeout.Token);
         var video = info.PrimaryVideoStream;
         return (video?.Width ?? 0, video?.Height ?? 0, info.Duration);
     }
@@ -52,7 +55,8 @@ public class VideoThumbnailExtractor
     /// </summary>
     public virtual async Task<VideoProbe> ProbeFullAsync(string filePath, CancellationToken cancellationToken = default)
     {
-        var info = await FFProbe.AnalyseAsync(filePath, cancellationToken: cancellationToken);
+        using var timeout = CreateTimeout(cancellationToken, ProbeTimeout);
+        var info = await FFProbe.AnalyseAsync(filePath, cancellationToken: timeout.Token);
         var video = info.PrimaryVideoStream;
         var audio = info.PrimaryAudioStream;
 
@@ -85,7 +89,14 @@ public class VideoThumbnailExtractor
         var tempJpg = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.jpg");
         try
         {
-            var ok = await FFMpeg.SnapshotAsync(filePath, tempJpg, size: null, captureTime: capture);
+            using var timeout = CreateTimeout(cancellationToken, FfmpegTimeout);
+            var ok = await FFMpegArguments
+                .FromFileInput(filePath, false, options => options.Seek(capture))
+                .OutputToFile(tempJpg, true, options => options
+                    .WithFrameOutputCount(1)
+                    .ForceFormat("image2"))
+                .CancellableThrough(timeout.Token)
+                .ProcessAsynchronously();
             if (!ok || !File.Exists(tempJpg))
                 throw new InvalidOperationException("FFmpeg не сгенерировал кадр-обложку");
 
@@ -103,5 +114,12 @@ public class VideoThumbnailExtractor
                 _logger.LogWarning(ex, "Не удалось удалить временный кадр {TempJpg}", tempJpg);
             }
         }
+    }
+
+    private static CancellationTokenSource CreateTimeout(CancellationToken cancellationToken, TimeSpan duration)
+    {
+        var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(duration);
+        return timeout;
     }
 }

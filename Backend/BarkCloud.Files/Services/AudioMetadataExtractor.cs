@@ -28,7 +28,9 @@ public class AudioMetadataExtractor
 
     public virtual async Task<AudioProbe> ProbeAsync(string filePath, CancellationToken cancellationToken = default)
     {
-        var info = await FFProbe.AnalyseAsync(filePath, cancellationToken: cancellationToken);
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(VideoThumbnailExtractor.ProbeTimeout);
+        var info = await FFProbe.AnalyseAsync(filePath, cancellationToken: timeout.Token);
         var audio = info.PrimaryAudioStream;
         var bitRate = info.Format?.BitRate > 0 ? (long)info.Format.BitRate : 0L;
 
@@ -76,9 +78,20 @@ public class AudioMetadataExtractor
                 }
             };
 
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeout.CancelAfter(VideoThumbnailExtractor.FfmpegTimeout);
             process.Start();
-            var stderrTask = process.StandardError.ReadToEndAsync(cancellationToken);
-            await process.WaitForExitAsync(cancellationToken);
+            var stderrTask = process.StandardError.ReadToEndAsync(timeout.Token);
+            try
+            {
+                await process.WaitForExitAsync(timeout.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                if (!process.HasExited)
+                    process.Kill(entireProcessTree: true);
+                throw;
+            }
 
             if (process.ExitCode != 0 || !File.Exists(tempJpg))
             {

@@ -19,8 +19,6 @@ public class ListMySharesCommandHandlerTests
 
     private ListMySharesCommandHandler CreateSut()
     {
-        _uploadedFiles.Setup(s => s.GetFiles(It.IsAny<List<Guid>>()))
-            .ReturnsAsync(new List<UploadFileEntity>());
         _uploadedFiles.Setup(s => s.GetPreviewsForFiles(It.IsAny<IEnumerable<Guid>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Dictionary<Guid, List<FilePreview>>());
 
@@ -53,10 +51,33 @@ public class ListMySharesCommandHandlerTests
             .ToList();
         _storage.Setup(s => s.ListPage(OwnerId, It.IsAny<DateTime?>(), It.IsAny<Guid?>(), 2, It.IsAny<CancellationToken>()))
             .ReturnsAsync(shares);
+        _uploadedFiles.Setup(s => s.GetFiles(It.IsAny<List<Guid>>()))
+            .ReturnsAsync(shares.Select(s => new UploadFileEntity { Id = s.FileId }).ToList());
 
         var response = await CreateSut().Handle(new ListMySharesCommand { Limit = 2 }, default);
 
         response.Shares.Should().HaveCount(2);
         response.NextCursorShareId.Should().Be(shares[1].Id.ToString());
+    }
+
+    [Fact]
+    public async Task Handle_FileIsNotReady_HidesShare()
+    {
+        var share = new DomainShareLink
+        {
+            Id = Guid.NewGuid(),
+            OwnerId = OwnerId,
+            FileId = Guid.NewGuid(),
+            Token = "token",
+            CreatedAt = DateTime.UtcNow
+        };
+        _storage.Setup(s => s.ListPage(OwnerId, It.IsAny<DateTime?>(), It.IsAny<Guid?>(), 50, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<DomainShareLink> { share });
+        _uploadedFiles.Setup(s => s.GetFiles(It.IsAny<List<Guid>>()))
+            .ReturnsAsync(new List<UploadFileEntity>());
+
+        var response = await CreateSut().Handle(new ListMySharesCommand { Limit = 50 }, default);
+
+        response.Shares.Should().BeEmpty();
     }
 }

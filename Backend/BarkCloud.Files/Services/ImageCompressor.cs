@@ -3,10 +3,32 @@ using SixLabors.ImageSharp.Formats.Jpeg;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
 
+using BarkCloud.Files.Exceptions;
+
 namespace BarkCloud.Files.Services;
 
 public partial class ImageCompressor
 {
+    private static async Task ValidatePixelCountAsync(Stream inputStream, CancellationToken cancellationToken)
+    {
+        if (!inputStream.CanSeek)
+            throw new FileIntegrityException("Для безопасного декодирования изображения требуется seekable-поток.");
+
+        var position = inputStream.Position;
+        try
+        {
+            var info = await Image.IdentifyAsync(inputStream, cancellationToken)
+                ?? throw new FileIntegrityException("Формат изображения не распознан.");
+            if ((long)info.Width * info.Height > MaximumDecodedPixels)
+                throw new FileIntegrityException("Изображение превышает лимит декодирования 200 MP.");
+        }
+        finally
+        {
+            inputStream.Position = position;
+        }
+    }
+
+    public const long MaximumDecodedPixels = 200_000_000;
     /// <summary>
     /// Максимальная сторона изображения (по дизайн-документу).
     /// </summary>
@@ -32,6 +54,7 @@ public partial class ImageCompressor
     /// </summary>
     public async Task<byte[]> CompressImageAsync(Stream inputStream, int width = 1024)
     {
+        await ValidatePixelCountAsync(inputStream, default);
         using var image = await Image.LoadAsync(inputStream);
 
         image.Mutate(x => x.Resize(new ResizeOptions
@@ -62,6 +85,7 @@ public partial class ImageCompressor
     {
         var streamLength = inputStream.Length;
 
+        await ValidatePixelCountAsync(inputStream, default);
         using var image = await Image.LoadAsync(inputStream);
 
         var needsResize = image.Width > MaxOriginalSide || image.Height > MaxOriginalSide;
@@ -95,6 +119,7 @@ public partial class ImageCompressor
     /// </summary>
     public async Task<byte[]> ProcessAvatarAsync(Stream inputStream, int maxSide = 1500, int quality = 85)
     {
+        await ValidatePixelCountAsync(inputStream, default);
         using var image = await Image.LoadAsync(inputStream);
 
         if (image.Width > maxSide || image.Height > maxSide)
@@ -124,6 +149,7 @@ public partial class ImageCompressor
     public virtual async Task<byte[]> EncodeFullJpegAsync(
         Stream inputStream, int quality = 90, CancellationToken cancellationToken = default)
     {
+        await ValidatePixelCountAsync(inputStream, cancellationToken);
         using var image = await Image.LoadAsync(inputStream, cancellationToken);
         image.Mutate(x => x.BackgroundColor(Color.White));
 
@@ -147,6 +173,7 @@ public partial class ImageCompressor
     {
         var inputLength = inputStream.CanSeek ? inputStream.Length : 0L;
 
+        await ValidatePixelCountAsync(inputStream, cancellationToken);
         using var image = await Image.LoadAsync(inputStream, cancellationToken);
 
         byte[]? compressedOriginal = null;
@@ -226,6 +253,7 @@ public partial class ImageCompressor
         if (targetWidths is null || targetWidths.Length == 0)
             return result;
 
+        await ValidatePixelCountAsync(inputStream, cancellationToken);
         using var image = await Image.LoadAsync(inputStream, cancellationToken);
 
         var originalWidth = image.Width;
@@ -275,6 +303,7 @@ public partial class ImageCompressor
         if (targetWidths is null || targetWidths.Length == 0)
             return result;
 
+        await ValidatePixelCountAsync(inputStream, cancellationToken);
         using var image = await Image.LoadAsync(inputStream, cancellationToken);
 
         var widths = targetWidths
@@ -340,6 +369,7 @@ public partial class ImageCompressor
         if (targetWidths is null || targetWidths.Length == 0)
             return result;
 
+        await ValidatePixelCountAsync(inputStream, cancellationToken);
         using var image = await Image.LoadAsync(inputStream, cancellationToken);
 
         var widths = targetWidths

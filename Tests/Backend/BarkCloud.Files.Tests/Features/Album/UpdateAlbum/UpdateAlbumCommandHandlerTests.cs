@@ -80,6 +80,25 @@ public class UpdateAlbumCommandHandlerTests
     }
 
     [Fact]
+    public async Task Handle_SetCoverToProcessingFile_ThrowsFileNotReady()
+    {
+        var album = new DomainAlbum { Id = Guid.NewGuid(), OwnerId = OwnerId };
+        SetupAlbum(album);
+        var coverId = Guid.NewGuid();
+        _files.Setup(s => s.GetFile(coverId)).ReturnsAsync(new UploadFileEntity
+        {
+            Id = coverId,
+            Uploaders = new() { OwnerId }
+        });
+
+        var act = () => CreateSut().Handle(
+            new UpdateAlbumCommand { AlbumId = album.Id, UpdateCover = true, CoverFileId = coverId }, default);
+
+        await act.Should().ThrowAsync<FileNotReadyException>();
+        _storage.Verify(s => s.UpdateAlbum(It.IsAny<DomainAlbum>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
     public async Task Handle_HappyPath_UpdatesNameAndDescription()
     {
         var album = new DomainAlbum { Id = Guid.NewGuid(), OwnerId = OwnerId, Name = "Old", Description = "old" };

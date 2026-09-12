@@ -54,6 +54,8 @@ public class ServerExceptionInterceptor : Interceptor
             {
                 { "x-error-code", ex.ErrorCode }
             };
+            foreach (var (key, value) in ex.ErrorMetadata)
+                trailers.Add(key, value);
 
             throw new RpcException(new Status(StatusCode.FailedPrecondition, ex.ErrorMessage), trailers);
         }

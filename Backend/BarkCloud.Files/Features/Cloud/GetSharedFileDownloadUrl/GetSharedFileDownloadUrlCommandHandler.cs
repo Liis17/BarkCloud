@@ -1,3 +1,4 @@
+using BarkCloud.Files.Domain;
 using BarkCloud.Files.Helpers;
 using BarkCloud.Files.Persistence;
 using BarkCloud.Files.Services;
@@ -53,6 +54,8 @@ public class GetSharedFileDownloadUrlCommandHandler : IRequestHandler<GetSharedF
         var file = await _filesStorage.GetFile(request.FileId);
         if (file is null)
             throw new FileNotFoundException();
+        if (!file.IsReady())
+            throw new FileNotReadyException();
 
         // Прямой /download/{fileId} для CloudFile запрещён — выдаём временную ссылку (как публичный резолв).
         var tempFiles = await _tempFilesStorage.CreateTempFilesBatchAsync(new[] { request.FileId }, cancellationToken);

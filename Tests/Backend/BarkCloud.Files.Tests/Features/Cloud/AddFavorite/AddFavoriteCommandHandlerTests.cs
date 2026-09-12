@@ -49,7 +49,7 @@ public class AddFavoriteCommandHandlerTests
     public async Task Handle_AlreadyFavorite_Idempotent_NoAdd()
     {
         var fileId = Guid.NewGuid();
-        _files.Setup(s => s.GetFile(fileId)).ReturnsAsync(new UploadFileEntity { Id = fileId, Uploaders = new() { OwnerId } });
+        _files.Setup(s => s.GetFile(fileId)).ReturnsAsync(ReadyFile(fileId));
         _storage.Setup(s => s.Exists(OwnerId, fileId, It.IsAny<CancellationToken>())).ReturnsAsync(true);
 
         await CreateSut().Handle(new AddFavoriteCommand { FileId = fileId }, default);
@@ -61,7 +61,7 @@ public class AddFavoriteCommandHandlerTests
     public async Task Handle_HappyPath_AddsFavorite()
     {
         var fileId = Guid.NewGuid();
-        _files.Setup(s => s.GetFile(fileId)).ReturnsAsync(new UploadFileEntity { Id = fileId, Uploaders = new() { OwnerId } });
+        _files.Setup(s => s.GetFile(fileId)).ReturnsAsync(ReadyFile(fileId));
         _storage.Setup(s => s.Exists(OwnerId, fileId, It.IsAny<CancellationToken>())).ReturnsAsync(false);
 
         await CreateSut().Handle(new AddFavoriteCommand { FileId = fileId }, default);
@@ -70,4 +70,28 @@ public class AddFavoriteCommandHandlerTests
             It.Is<DomainFavoriteFile>(f => f.OwnerId == OwnerId && f.FileId == fileId),
             It.IsAny<CancellationToken>()), Times.Once);
     }
+
+    [Fact]
+    public async Task Handle_FileIsNotReady_ThrowsFileNotReady()
+    {
+        var fileId = Guid.NewGuid();
+        _files.Setup(s => s.GetFile(fileId)).ReturnsAsync(new UploadFileEntity
+        {
+            Id = fileId,
+            Uploaders = new() { OwnerId }
+        });
+
+        var act = () => CreateSut().Handle(new AddFavoriteCommand { FileId = fileId }, default);
+
+        await act.Should().ThrowAsync<FileNotReadyException>();
+        _storage.Verify(s => s.Add(It.IsAny<DomainFavoriteFile>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    private static UploadFileEntity ReadyFile(Guid fileId) => new()
+    {
+        Id = fileId,
+        Uploaders = new() { OwnerId },
+        UploadedAt = DateTime.UtcNow,
+        Etag = "etag"
+    };
 }

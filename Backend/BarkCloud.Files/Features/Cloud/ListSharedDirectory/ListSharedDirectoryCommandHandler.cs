@@ -72,16 +72,18 @@ public class ListSharedDirectoryCommandHandler : IRequestHandler<ListSharedDirec
             var baseUrl = FileUrlHelper.GetPublicBaseUrl(_configuration, _runSettings);
             var fileIds = entries.Select(e => e.FileId).Distinct().ToList();
             var files = (await _filesStorage.GetFiles(fileIds)).ToDictionary(f => f.Id);
-            var previewsByFile = await _filesStorage.GetPreviewsForFiles(fileIds, cancellationToken);
+            var previewsByFile = await _filesStorage.GetPreviewsForFiles(files.Keys, cancellationToken);
 
-            var tempFiles = await _tempFilesStorage.CreateTempFilesBatchAsync(fileIds, cancellationToken);
-            var tempByOriginal = tempFiles
-                .GroupBy(t => t.OriginalFileId)
-                .ToDictionary(g => g.Key, g => g.First().Id);
+            var tempByOriginal = files.Count == 0
+                ? new Dictionary<Guid, Guid>()
+                : (await _tempFilesStorage.CreateTempFilesBatchAsync(files.Keys, cancellationToken))
+                    .GroupBy(t => t.OriginalFileId)
+                    .ToDictionary(g => g.Key, g => g.First().Id);
 
             foreach (var e in entries)
             {
-                files.TryGetValue(e.FileId, out var file);
+                if (!files.TryGetValue(e.FileId, out var file))
+                    continue;
 
                 var downloadUrl = tempByOriginal.TryGetValue(e.FileId, out var tempId)
                     ? FileUrlHelper.GenerateDownloadUrl(baseUrl, tempId)
@@ -95,12 +97,12 @@ public class ListSharedDirectoryCommandHandler : IRequestHandler<ListSharedDirec
                 {
                     FileId = e.FileId.ToString(),
                     Name = e.Name,
-                    MediaKind = file is null ? MediaKind.Other : (MediaKind)(int)file.MediaKind,
+                    MediaKind = (MediaKind)(int)file.MediaKind,
                     DownloadUrl = downloadUrl,
                     PreviewUrl = previewUrl,
-                    FileSize = file?.Size ?? 0,
-                    ImageWidth = file?.ImageWidth ?? 0,
-                    ImageHeight = file?.ImageHeight ?? 0
+                    FileSize = file.Size,
+                    ImageWidth = file.ImageWidth ?? 0,
+                    ImageHeight = file.ImageHeight ?? 0
                 });
             }
         }

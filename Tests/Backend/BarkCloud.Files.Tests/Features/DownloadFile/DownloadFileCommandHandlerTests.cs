@@ -46,7 +46,7 @@ public class DownloadFileCommandHandlerTests
     {
         var id = Guid.NewGuid();
         _files.Setup(s => s.GetFile(id))
-            .ReturnsAsync(new UploadFileEntity { Id = id, Type = UploadFileType.CloudFile, Etag = "e", Filename = "doc.pdf" });
+            .ReturnsAsync(new UploadFileEntity { Id = id, Type = UploadFileType.CloudFile, Etag = "e", UploadedAt = DateTime.UtcNow, Filename = "doc.pdf" });
         _files.Setup(s => s.IsPreviewFile(id, It.IsAny<CancellationToken>())).ReturnsAsync(false);
 
         var act = () => CreateSut().Handle(new DownloadFileCommand { FileId = id }, default);
@@ -59,7 +59,7 @@ public class DownloadFileCommandHandlerTests
     {
         var id = Guid.NewGuid();
         _files.Setup(s => s.GetFile(id))
-            .ReturnsAsync(new UploadFileEntity { Id = id, Type = UploadFileType.UserAvatar, Etag = "e", Filename = "a.png" });
+            .ReturnsAsync(new UploadFileEntity { Id = id, Type = UploadFileType.UserAvatar, Etag = "e", UploadedAt = DateTime.UtcNow, Filename = "a.png" });
         _files.Setup(s => s.IsPreviewFile(id, It.IsAny<CancellationToken>())).ReturnsAsync(false);
         _s3.Setup(s => s.DownloadAsync("test-bucket", id.ToString())).ReturnsAsync(new MemoryStream(new byte[] { 1, 2, 3 }));
 
@@ -73,14 +73,47 @@ public class DownloadFileCommandHandlerTests
     public async Task Handle_PreviewCloudFile_DownloadsFromS3()
     {
         var id = Guid.NewGuid();
+        var originalId = Guid.NewGuid();
         _files.Setup(s => s.GetFile(id))
-            .ReturnsAsync(new UploadFileEntity { Id = id, Type = UploadFileType.CloudFile, Etag = "e", Filename = "p.jpg" });
+            .ReturnsAsync(new UploadFileEntity { Id = id, Type = UploadFileType.CloudFile, Etag = "e", UploadedAt = DateTime.UtcNow, Filename = "p.jpg" });
         _files.Setup(s => s.IsPreviewFile(id, It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        _files.Setup(s => s.GetOriginalByPreviewFileId(id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new UploadFileEntity
+            {
+                Id = originalId,
+                Type = UploadFileType.CloudFile,
+                Etag = "original-etag",
+                UploadedAt = DateTime.UtcNow
+            });
         _s3.Setup(s => s.DownloadAsync("test-bucket", id.ToString())).ReturnsAsync(new MemoryStream());
 
         var result = await CreateSut().Handle(new DownloadFileCommand { FileId = id }, default);
 
         result.FileName.Should().Be("p.jpg");
+    }
+
+    [Fact]
+    public async Task Handle_PreviewOfPendingOriginal_ThrowsFileNotUploaded()
+    {
+        var previewId = Guid.NewGuid();
+        var originalId = Guid.NewGuid();
+        _files.Setup(s => s.GetFile(previewId))
+            .ReturnsAsync(new UploadFileEntity
+            {
+                Id = previewId,
+                Type = UploadFileType.CloudFile,
+                Etag = "preview-etag",
+                UploadedAt = DateTime.UtcNow,
+                Filename = "p.jpg"
+            });
+        _files.Setup(s => s.IsPreviewFile(previewId, It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        _files.Setup(s => s.GetOriginalByPreviewFileId(previewId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new UploadFileEntity { Id = originalId, Type = UploadFileType.CloudFile });
+
+        var act = () => CreateSut().Handle(new DownloadFileCommand { FileId = previewId }, default);
+
+        await act.Should().ThrowAsync<FileNotUploadedException>();
+        _s3.Verify(s => s.DownloadAsync(It.IsAny<string>(), It.IsAny<string>()), Times.Never);
     }
 
     [Fact]
@@ -92,7 +125,7 @@ public class DownloadFileCommandHandlerTests
         _temp.Setup(s => s.GetTempFile(tempId))
             .ReturnsAsync(new TempFile { Id = tempId, OriginalFileId = originalId });
         _files.Setup(s => s.GetFile(originalId))
-            .ReturnsAsync(new UploadFileEntity { Id = originalId, Type = UploadFileType.CloudFile, Etag = "e", Filename = "Мой файл.txt" });
+            .ReturnsAsync(new UploadFileEntity { Id = originalId, Type = UploadFileType.CloudFile, Etag = "e", UploadedAt = DateTime.UtcNow, Filename = "Мой файл.txt" });
         _s3.Setup(s => s.DownloadAsync("test-bucket", originalId.ToString())).ReturnsAsync(new MemoryStream());
 
         var result = await CreateSut().Handle(new DownloadFileCommand { FileId = tempId }, default);

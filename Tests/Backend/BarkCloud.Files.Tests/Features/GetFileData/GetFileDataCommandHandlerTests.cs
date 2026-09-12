@@ -33,7 +33,13 @@ public class GetFileDataCommandHandlerTests
     public async Task Handle_HappyPath_ReturnsFileInfo()
     {
         var fileId = Guid.NewGuid();
-        _files.Setup(s => s.GetFile(fileId)).ReturnsAsync(new UploadFileEntity { Id = fileId, Filename = "a.jpg" });
+        _files.Setup(s => s.GetFile(fileId)).ReturnsAsync(new UploadFileEntity
+        {
+            Id = fileId,
+            Filename = "a.jpg",
+            Etag = "etag",
+            UploadedAt = DateTime.UtcNow
+        });
         _files.Setup(s => s.GetPreviewsForFile(fileId, It.IsAny<CancellationToken>())).ReturnsAsync(new List<FilePreview>());
 
         var response = await CreateSut().Handle(new GetFileDataCommand { FileId = fileId }, default);

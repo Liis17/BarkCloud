@@ -195,7 +195,10 @@ public class UnifiedSearchService
         var ownerId = _userContext.UserId;
         var previewFileIds = _context.FilePreviews.AsNoTracking().Select(x => x.PreviewFileId);
         var fileQuery = _context.UploadedFiles.AsNoTracking()
-            .Where(x => x.Uploaders.Contains(ownerId) && x.Type == DomainUploadFileType.CloudFile && !previewFileIds.Contains(x.Id))
+            .WhereReady()
+            .Where(x => x.Uploaders.Contains(ownerId)
+                        && x.Type == DomainUploadFileType.CloudFile
+                        && !previewFileIds.Contains(x.Id))
             .AsQueryable();
         if (!string.IsNullOrEmpty(query))
         {
@@ -275,7 +278,7 @@ public class UnifiedSearchService
         var dynamicFolders = await dynamicFoldersQuery.ToListAsync(cancellationToken);
 
         var sharedFiles = await (from grant in _context.FileGrants.AsNoTracking()
-                                 join file in _context.UploadedFiles.AsNoTracking() on grant.FileId equals file.Id
+                                 join file in _context.UploadedFiles.AsNoTracking().WhereReady() on grant.FileId equals file.Id
                                  where grant.RecipientId == ownerId
                                  select new SharedFileRow(grant, file)).ToListAsync(cancellationToken);
         var sharedFolders = await (from grant in _context.DirectoryGrants.AsNoTracking()
@@ -565,8 +568,9 @@ public class UnifiedSearchService
     private async Task RequireOwnedFile(Guid fileId, CancellationToken cancellationToken)
     {
         var ownerId = _userContext.UserId;
-        var exists = await _context.UploadedFiles.AsNoTracking()
-            .AnyAsync(x => x.Id == fileId && x.Uploaders.Contains(ownerId), cancellationToken);
+        var exists = await _context.UploadedFiles.AsNoTracking().WhereReady()
+            .AnyAsync(x => x.Id == fileId
+                           && x.Uploaders.Contains(ownerId), cancellationToken);
         if (!exists)
             throw new RpcException(new Status(StatusCode.NotFound, "Файл не найден"));
     }

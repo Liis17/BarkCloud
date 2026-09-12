@@ -26,13 +26,15 @@ public class HeicImageConverter
         var tempJpg = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.jpg");
         try
         {
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeout.CancelAfter(VideoThumbnailExtractor.FfmpegTimeout);
             var ok = await FFMpegArguments
                 .FromFileInput(inputFilePath)
                 .OutputToFile(tempJpg, overwrite: true, options => options
                     .WithCustomArgument("-frames:v 1")
                     .WithCustomArgument("-q:v 2")
                     .ForceFormat("image2"))
-                .CancellableThrough(cancellationToken)
+                .CancellableThrough(timeout.Token)
                 .ProcessAsynchronously();
 
             if (!ok || !File.Exists(tempJpg))

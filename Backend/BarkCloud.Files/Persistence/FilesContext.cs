@@ -2,6 +2,8 @@ using System.Text.Json;
 
 using BarkCloud.Files.Domain;
 
+using MassTransit;
+
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
@@ -14,6 +16,8 @@ public class FilesContext : DbContext
     public FilesContext(DbContextOptions<FilesContext> options) : base(options) { }
 
     public DbSet<UploadFile> UploadedFiles { get; set; }
+
+    public DbSet<UploadSession> UploadSessions { get; set; }
 
     public DbSet<TempFile> TempFiles { get; set; }
 
@@ -61,9 +65,28 @@ public class FilesContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.AddInboxStateEntity();
+        modelBuilder.AddOutboxMessageEntity();
+        modelBuilder.AddOutboxStateEntity();
+
         modelBuilder.Entity<UploadFile>()
             .Property(file => file.StorageProfileId)
             .IsRequired();
+
+        modelBuilder.Entity<UploadSession>(b =>
+        {
+            b.HasIndex(x => new { x.OwnerId, x.IdempotencyKey }).IsUnique();
+            b.HasIndex(x => new { x.Status, x.ExpiresAt });
+            b.HasIndex(x => x.FileId).IsUnique();
+            b.Property(x => x.IdempotencyKey).HasMaxLength(128);
+            b.Property(x => x.FileName).HasMaxLength(512);
+            b.Property(x => x.ContentType).HasMaxLength(255);
+            b.Property(x => x.Sha256).HasMaxLength(64);
+            b.Property(x => x.UploadTokenHash).HasMaxLength(64);
+            b.Property(x => x.ErrorCode).HasMaxLength(64);
+            b.Property(x => x.ErrorMessage).HasMaxLength(1024);
+            b.Property(x => x.ConcurrencyToken).IsConcurrencyToken();
+        });
 
         modelBuilder.Entity<TempFile>()
             .HasIndex(x => x.OriginalFileId);

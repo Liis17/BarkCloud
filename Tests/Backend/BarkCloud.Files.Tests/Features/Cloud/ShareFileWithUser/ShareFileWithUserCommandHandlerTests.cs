@@ -34,10 +34,27 @@ public class ShareFileWithUserCommandHandlerTests
     }
 
     [Fact]
+    public async Task Handle_FileNotReady_ThrowsFileNotReady()
+    {
+        var fileId = Guid.NewGuid();
+        _files.Setup(s => s.GetFile(fileId)).ReturnsAsync(new UploadFileEntity
+        {
+            Id = fileId,
+            Uploaders = new() { OwnerId }
+        });
+
+        var act = () => CreateSut().Handle(
+            new ShareFileWithUserCommand { FileId = fileId, RecipientUserId = 7 }, default);
+
+        await act.Should().ThrowAsync<FileNotReadyException>();
+        _grants.Verify(s => s.Add(It.IsAny<FileGrant>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
     public async Task Handle_ShareWithSelf_NoOp()
     {
         var fileId = Guid.NewGuid();
-        _files.Setup(s => s.GetFile(fileId)).ReturnsAsync(new UploadFileEntity { Id = fileId, Uploaders = new() { OwnerId } });
+        _files.Setup(s => s.GetFile(fileId)).ReturnsAsync(ReadyFile(fileId));
 
         await CreateSut().Handle(new ShareFileWithUserCommand { FileId = fileId, RecipientUserId = OwnerId }, default);
 
@@ -48,7 +65,7 @@ public class ShareFileWithUserCommandHandlerTests
     public async Task Handle_AlreadyShared_Idempotent()
     {
         var fileId = Guid.NewGuid();
-        _files.Setup(s => s.GetFile(fileId)).ReturnsAsync(new UploadFileEntity { Id = fileId, Uploaders = new() { OwnerId } });
+        _files.Setup(s => s.GetFile(fileId)).ReturnsAsync(ReadyFile(fileId));
         _grants.Setup(s => s.Exists(OwnerId, fileId, 7, It.IsAny<CancellationToken>())).ReturnsAsync(true);
 
         await CreateSut().Handle(new ShareFileWithUserCommand { FileId = fileId, RecipientUserId = 7 }, default);
@@ -60,7 +77,7 @@ public class ShareFileWithUserCommandHandlerTests
     public async Task Handle_HappyPath_AddsGrant()
     {
         var fileId = Guid.NewGuid();
-        _files.Setup(s => s.GetFile(fileId)).ReturnsAsync(new UploadFileEntity { Id = fileId, Uploaders = new() { OwnerId } });
+        _files.Setup(s => s.GetFile(fileId)).ReturnsAsync(ReadyFile(fileId));
         _grants.Setup(s => s.Exists(OwnerId, fileId, 7, It.IsAny<CancellationToken>())).ReturnsAsync(false);
 
         await CreateSut().Handle(new ShareFileWithUserCommand { FileId = fileId, RecipientUserId = 7 }, default);
@@ -69,4 +86,12 @@ public class ShareFileWithUserCommandHandlerTests
             It.Is<FileGrant>(g => g.OwnerId == OwnerId && g.RecipientId == 7 && g.FileId == fileId),
             It.IsAny<CancellationToken>()), Times.Once);
     }
+
+    private static UploadFileEntity ReadyFile(Guid fileId) => new()
+    {
+        Id = fileId,
+        Uploaders = new() { OwnerId },
+        Etag = "etag",
+        UploadedAt = DateTime.UtcNow
+    };
 }

@@ -1,6 +1,7 @@
 using BarkCloud.Files.Consumers;
 using BarkCloud.Files.Extensions;
 using BarkCloud.Files.Host;
+using BarkCloud.Files.Infrastructure;
 using BarkCloud.Files.Persistence;
 using BarkCloud.Files.Services;
 using BarkCloud.GrpcServer;
@@ -87,11 +88,26 @@ public class Program
         builder.Services.AddScoped<DynamicFolderViewBuilder>();
         builder.Services.AddScoped<MusicLibraryService>();
         builder.Services.AddScoped<UnifiedSearchService>();
+        builder.Services.AddScoped<UploadSessionCoordinator>();
+        builder.Services.AddScoped<IUploadProcessingPublisher, MassTransitUploadProcessingPublisher>();
+        builder.Services.AddScoped<UploadSessionProcessor>();
+        builder.Services.AddScoped<IUploadEnrichmentPipeline, ExistingUploadEnrichmentPipeline>();
+        builder.Services.AddScoped<IUploadArtifactCleaner, UploadArtifactCleaner>();
+        builder.Services.AddSingleton<IUploadTempFileProvider, UploadTempFileProvider>();
+        builder.Services.AddScoped<IStorageLimitProvider, UsersStorageLimitProvider>();
+        builder.Services.AddScoped<IStorageQuotaService, StorageQuotaService>();
+        builder.Services.AddScoped<LegacyUploadQuotaGuard>();
+        builder.Services.AddScoped<ILegacyUploadCompletionMarker>(services =>
+            services.GetRequiredService<LegacyUploadQuotaGuard>());
+        builder.Services.AddScoped<UploadSessionMaintenance>();
+        builder.Services.AddSingleton<IMultipartUploadStore, S3MultipartUploadStore>();
+        builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddScoped<ITrashPurgeService, TrashPurgeService>();
         builder.Services.AddSingleton<IPhysicalStorageStatsProvider, PhysicalStorageStatsProvider>();
         builder.Services.AddHostedService<TempFileCleanupService>();
         builder.Services.AddHostedService<TrashCleanupService>();
         builder.Services.AddHostedService<OrphanBlobCleanupService>();
+        builder.Services.AddHostedService<UploadSessionCleanupService>();
         builder.Services.AddHostedService<LegacyPreviewBackfillService>();
         builder.Services.AddHostedService<LegacyMetadataBackfillService>();
         builder.Services.AddHostedService<LegacyVideoHdrBackfillService>();
@@ -108,8 +124,15 @@ public class Program
 
         builder.Services.AddMassTransit(x =>
         {
+            x.AddEntityFrameworkOutbox<FilesContext>(o =>
+            {
+                o.UsePostgres();
+                o.UseBusOutbox();
+            });
+
             x.AddConsumer<SessionRevokedConsumer>();
             x.AddConsumer<UserDeletedConsumer>();
+            x.AddConsumer<ProcessUploadedFileConsumer>();
 
             x.UsingRabbitMq((context, cfg) =>
             {
@@ -127,6 +150,19 @@ public class Program
                 cfg.ReceiveEndpoint("user-deleted-files", e =>
                 {
                     e.ConfigureConsumer<UserDeletedConsumer>(context);
+                });
+
+                cfg.ReceiveEndpoint("process-uploaded-file", e =>
+                {
+                    // Bus outbox covers Complete + publish. Processing itself must not hold an EF
+                    // transaction during S3 download/ffmpeg; the session state makes redelivery idempotent.
+                    e.ConcurrentMessageLimit = 2;
+                    e.UseMessageRetry(r => r.Intervals(
+                        TimeSpan.FromSeconds(10),
+                        TimeSpan.FromMinutes(1),
+                        TimeSpan.FromMinutes(5),
+                        TimeSpan.FromMinutes(15)));
+                    e.ConfigureConsumer<ProcessUploadedFileConsumer>(context);
                 });
             });
         });
