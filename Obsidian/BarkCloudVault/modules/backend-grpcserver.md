@@ -51,3 +51,4 @@ Parent: [[index]]
 
 - Использует: `BarkCloud.Shared.Exceptions`, `BarkCloud.Shared.Identity`, ASP.NET Core gRPC, Serilog
 - Используется: всеми Backend-микросервисами
+- Версии gRPC/protobuf выровнены: `Google.Protobuf 3.36.1`, `Grpc.Tools` и runtime-пакеты `Grpc.*` — `2.83.0`.
