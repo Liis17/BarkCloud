@@ -579,7 +579,7 @@ $"{stateWriter}\n" +
         "  i=0\n" +
         "  saw_running=0\n" +
         "  while [ \"$i\" -lt 60 ]; do\n" +
-        $"    info=\"$(docker inspect --format {ShQuote(inspectFormat)} {WebContainer} 2>> {ShQuote(logFile)} || true)\n" +
+        $"    info=\"$(docker inspect --format {ShQuote(inspectFormat)} {WebContainer} 2>> {ShQuote(logFile)} || true)\"\n" +
         "    state=\"${info%%|*}\"\n" +
         "    health=\"${info#*|}\"\n" +
         "    if [ \"$state\" = running ] && [ \"$health\" = healthy ]; then return 0; fi\n" +
