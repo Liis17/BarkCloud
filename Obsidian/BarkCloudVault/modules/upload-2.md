@@ -44,7 +44,7 @@ Web проксирует эти операции в аддитивные RPC `Fi
 - Базовый размер части — 16 MiB; для очень больших файлов он безопасно, без `Int64` overflow, округляется вверх так, чтобы multipart содержал не более 10 000 частей. Максимальный заявленный объект — 5 TiB, последняя часть может быть меньше.
 - Части одного файла отправляются последовательно. Повтор номера части безопасно заменяет её в S3.
 - `Resume` использует S3 `ListParts`, а не локальный прогресс браузера. `Complete` самостоятельно проверяет номера/размеры/ETag всех частей и общий размер.
-- Если ответ S3 Complete неоднозначен или Files перезапустился после него, состояние восстанавливается через `HeadObject`; повторный и конкурентный `Complete` идемпотентно перечитывает состояние после optimistic-concurrency конфликта.
+- Если ответ S3 Complete неоднозначен, `ListParts` уже пуст после завершения или Files перезапустился после него, состояние восстанавливается через `HeadObject`; неполный список безопасно логируется без токена/SHA. Повторный и конкурентный `Complete` идемпотентно перечитывает состояние после optimistic-concurrency конфликта.
 - `Backend/nginx/cloud.barkfluff.conf` направляет `/file-upload/` с 443 прямо в `cloud-files:7026`, `proxy_request_buffering off`; Vite dev proxy направляет тот же path на `localhost:7026`.
 
 S3 seam: `IMultipartUploadStore` / `S3MultipartUploadStore` (`InitiateAsync`, `UploadPartAsync`, `ListPartsAsync`, `CompleteAsync`, `AbortAsync`, `HeadAsync`).
@@ -92,7 +92,7 @@ Consumer пишет раздельные outcome-метрики `ready/failed/no
 - UI-состояния: `hashing`, `checking`, `needs_file`, `uploading`, `processing`, `attaching`, `uploaded_not_attached`, `done`, `failed`, `skipped`.
 - После reload `processing` polling продолжается раз в 2 секунды. Для `uploading` требуется повторно выбрать файл: размер проверяется сразу, SHA — окончательно; затем загружаются только отсутствующие S3 parts.
 - Глобально одновременно активны максимум четыре файла, части каждого файла последовательны. На `processing`/`attaching` transfer progress остаётся 100%.
-- Сетевой retry не уничтожает сессию. Новая сессия создаётся только после серверного `failed`/`expired`; обычный Retry делает resume.
+- Сетевой retry не уничтожает сессию. Если Complete отвечает `upload_parts_incomplete`, клиент один раз делает `resume`, отправляет только отсутствующие части и повторяет Complete; новая сессия создаётся только после серверного `failed`/`expired`; обычный Retry делает resume.
 - `AttachFile` вызывается только после `ready`. Ошибка даёт `uploaded_not_attached`; Retry повторяет только attach и помечает запрос для метрики. Стабильный `FileAlreadyAttachedException` считается успешным replay.
 - Одноразовые загрузки обложек/thumbnail используют V2 и ждут `ready`, но не записываются в постоянную массовую очередь.
 

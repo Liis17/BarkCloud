@@ -157,7 +157,8 @@ public class S3Uploader
                     PartSize = currentPartSize,
                     InputStream = data,
                     DisablePayloadSigning = profile.IsR2,
-                    DisableDefaultChecksumValidation = profile.IsR2
+                    DisableDefaultChecksumValidation = profile.IsR2,
+                    UseChunkEncoding = !profile.IsR2
                 }, cancellationToken);
                 parts.Add(new PartETag(partNumber, response.ETag));
                 remaining -= currentPartSize;

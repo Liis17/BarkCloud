@@ -439,7 +439,33 @@ public sealed class UploadSessionCoordinator
                     cancellationToken))
                 .OrderBy(x => x.PartNumber)
                 .ToArray();
-            ValidateCompleteParts(session, parts);
+            try
+            {
+                ValidateCompleteParts(session, parts);
+            }
+            catch (UploadPartsIncompleteException)
+            {
+                var stored = await TryGetCompletedObjectAsync(session, cancellationToken);
+                if (stored is not null && stored.Size == session.DeclaredSize
+                    && !string.IsNullOrWhiteSpace(stored.Etag))
+                {
+                    _logger.LogWarning(
+                        "Multipart upload-сессии {SessionId} уже завершён; состояние восстановлено через HeadObject после неполного ListParts",
+                        session.Id);
+                    return new CompletedMultipartObject(stored.Etag, stored.Size);
+                }
+
+                _logger.LogWarning(
+                    "Multipart upload-сессии {SessionId}, файла {FileId}, пользователя {OwnerId} не готов к Complete: частей {ActualPartCount}/{ExpectedPartCount}; детали {Parts}",
+                    session.Id,
+                    session.FileId,
+                    session.OwnerId,
+                    parts.Length,
+                    ExpectedPartCount(session),
+                    string.Join(",", parts.Select(static part =>
+                        $"{part.PartNumber}:{part.Size}:{(string.IsNullOrWhiteSpace(part.Etag) ? "no-etag" : "etag")}")));
+                throw;
+            }
 
             return await _objects.CompleteAsync(
                 session.StorageProfileId,
@@ -472,6 +498,34 @@ public sealed class UploadSessionCoordinator
             return new CompletedMultipartObject(stored.Etag, stored.Size);
         }
     }
+
+    private async Task<MultipartObjectInfo?> TryGetCompletedObjectAsync(
+        UploadSession session,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await _objects.HeadAsync(
+                session.StorageProfileId,
+                session.FileId.ToString(),
+                cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception error)
+        {
+            _logger.LogDebug(
+                error,
+                "Не удалось проверить готовый объект upload-сессии {SessionId} после неполного ListParts",
+                session.Id);
+            return null;
+        }
+    }
+
+    private static long ExpectedPartCount(UploadSession session) =>
+        (session.DeclaredSize + session.PartSize - 1) / session.PartSize;
 
     private async Task<UploadSessionResult> MoveToProcessingAsync(
         UploadSession session,

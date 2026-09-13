@@ -28,6 +28,8 @@ export interface CreateUploadSessionInput {
   sha256: string;
 }
 
+export const UPLOAD_PARTS_INCOMPLETE_CODE = '09BF4D7B-7DB9-4284-BDB0-85457B22A589';
+
 export const createUploadSession = (input: CreateUploadSessionInput) =>
   apiPost<UploadSession>('/api/files/uploads', input);
 
@@ -57,6 +59,50 @@ export interface UploadPartRequest {
 
 export type UploadPartSender = (request: UploadPartRequest) => Promise<void>;
 
+interface UploadSessionRecoveryOperations {
+  complete: (sessionId: string) => Promise<UploadSession>;
+  resume: (sessionId: string) => Promise<UploadSession>;
+  upload: (
+    file: File,
+    session: UploadSession,
+    onProgress?: (fraction: number) => void,
+    signal?: AbortSignal,
+  ) => Promise<void>;
+}
+
+/**
+ * Reconcile a race or a lost part acknowledgement before exposing an upload error.
+ * Resume always asks Files for the provider's actual part list, so a retry never
+ * relies on the browser's previous progress snapshot.
+ */
+export async function completeUploadWithRecovery(
+  file: File,
+  initialSession: UploadSession,
+  onProgress?: (fraction: number) => void,
+  signal?: AbortSignal,
+  operations: UploadSessionRecoveryOperations = {
+    complete: completeUploadSession,
+    resume: resumeUploadSession,
+    upload: uploadMissingParts,
+  },
+): Promise<UploadSession> {
+  let session = initialSession;
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await operations.complete(session.sessionId);
+    } catch (error) {
+      if (!isUploadPartsIncompleteError(error)
+          || attempt >= 1) {
+        throw error;
+      }
+
+      session = await operations.resume(session.sessionId);
+      if (session.status !== 'uploading') return session;
+      await operations.upload(file, session, onProgress, signal);
+    }
+  }
+}
+
 export async function uploadMissingParts(
   file: File,
   session: UploadSession,
@@ -66,6 +112,8 @@ export async function uploadMissingParts(
 ): Promise<void> {
   if (!session.uploadToken) throw new Error('Сервер не выдал токен загрузки');
   if (file.size !== session.fileSize) throw new Error('Размер выбранного файла не совпадает');
+  if (!Number.isSafeInteger(session.partSize) || session.partSize <= 0)
+    throw new Error('Сервер вернул некорректный размер части');
 
   const partCount = Math.ceil(session.fileSize / session.partSize);
   const completed = new Set(
@@ -133,7 +181,7 @@ export async function uploadFile(
       sha256,
     });
     await uploadMissingParts(file, session, onProgress, signal);
-    session = await completeUploadSession(session.sessionId);
+    session = await completeUploadWithRecovery(file, session, onProgress, signal);
     if (session.status !== 'ready')
       session = await waitForUploadReady(session.sessionId, signal);
     return { fileId: session.fileId, name: file.name };
@@ -154,6 +202,12 @@ export class UploadSessionTerminalError extends Error {
 }
 
 class UploadPartHttpError extends ApiError {}
+
+function isUploadPartsIncompleteError(error: unknown): boolean {
+  return error instanceof ApiError
+    && (error.code?.toUpperCase() === UPLOAD_PARTS_INCOMPLETE_CODE
+      || error.message === 'Не все части файла загружены');
+}
 
 async function uploadPartWithRetry(request: UploadPartRequest): Promise<void> {
   let lastError: unknown;

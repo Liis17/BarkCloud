@@ -63,7 +63,8 @@ public class S3MultipartUploadStoreTests
 
         client.Verify(x => x.UploadPartAsync(
             It.Is<UploadPartRequest>(r => r.DisablePayloadSigning == true
-                                          && r.DisableDefaultChecksumValidation == true),
+                                          && r.DisableDefaultChecksumValidation == true
+                                          && r.UseChunkEncoding == false),
             default));
     }
 
