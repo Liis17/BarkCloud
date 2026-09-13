@@ -992,6 +992,32 @@ namespace BarkCloud.Files.Persistence.Migrations
                     b.ToTable("UploadSessions");
                 });
 
+            modelBuilder.Entity("BarkCloud.Files.Domain.UploadSessionPart", b =>
+                {
+                    b.Property<Guid>("SessionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("PartNumber")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Etag")
+                        .IsRequired()
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)");
+
+                    b.Property<long>("Size")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("SessionId", "PartNumber");
+
+                    b.HasIndex("SessionId", "UpdatedAt");
+
+                    b.ToTable("UploadSessionParts");
+                });
+
             modelBuilder.Entity("MassTransit.EntityFrameworkCoreIntegration.InboxState", b =>
                 {
                     b.Property<long>("Id")
@@ -1174,6 +1200,15 @@ namespace BarkCloud.Files.Persistence.Migrations
                     b.HasOne("BarkCloud.Files.Domain.UploadFile", null)
                         .WithMany()
                         .HasForeignKey("FileId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("BarkCloud.Files.Domain.UploadSessionPart", b =>
+                {
+                    b.HasOne("BarkCloud.Files.Domain.UploadSession", null)
+                        .WithMany()
+                        .HasForeignKey("SessionId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

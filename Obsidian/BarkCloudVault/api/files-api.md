@@ -31,7 +31,7 @@ Package: `barkcloud.files`
 - `UploadSessionStatus`: `UPLOADING`, `PROCESSING`, `READY`, `FAILED`, `CANCELLED`, `EXPIRED`.
 - `UploadSessionResponse { session_id, file_id, status, file_size, part_size, expires_at, upload_token, uploaded_parts, error_code, error_message }`.
 - `upload_token` возвращается только create/reuse активной сессии и resume; GET/complete/terminal responses его не раскрывают.
-- `uploaded_parts` — фактические части S3 для resume. Клиент отправляет отсутствующие части в HTTP data endpoint `PUT /file-upload/{sessionId}/parts/{partNumber}`.
+- `uploaded_parts` — фактические части S3 для resume; каждый элемент содержит `part_number`, `size` и `has_etag`. Клиент повторяет часть с корректным размером, если `has_etag=false`, и отправляет отсутствующие части в HTTP data endpoint `PUT /file-upload/{sessionId}/parts/{partNumber}`.
 - Сессии owner-isolated; другой дескриптор под тем же ключом даёт `UploadIdempotencyConflictException`. Quota rejection содержит `limit/used/reserved/requested` в typed exception/HTTP response.
 - Общий `ExceptionClientInterceptor` может построить все Files-исключения через parameterless-конструктор; `ArchiveCreationException` также имеет безопасный default message, поэтому один тип не ломает mapping остальных error codes.
 - Полный протокол, безопасность token и recovery — [[modules/upload-2]].

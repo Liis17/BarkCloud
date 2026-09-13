@@ -351,6 +351,7 @@ enum UploadSessionStatus {
 message UploadPartInfo {
   int32 part_number = 1;
   int64 size = 2;
+  bool has_etag = 3; // ETag подтверждён Files/S3; без него часть нужно повторить
 }
 
 message UploadSessionResponse {

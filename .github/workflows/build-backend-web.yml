@@ -11,6 +11,7 @@ on:
       - 'Shared/**'
       # proto-контракты: Web — только клиент, владеет нулём; реагирует лишь на общий shared.proto
       - '!Shared/BarkCloud.Proto/**'
+      - 'Shared/BarkCloud.Proto/files_api.proto'
       - 'Shared/BarkCloud.Proto/shared.proto'
       - 'Tests/Backend/BarkCloud.Web.Tests/**'
       - 'Tests/BarkCloud.TestKit/**'

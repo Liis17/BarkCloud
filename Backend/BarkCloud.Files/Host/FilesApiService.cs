@@ -202,7 +202,8 @@ public class FilesApiService : FilesApi.FilesApiBase
         response.UploadedParts.AddRange(result.UploadedParts.Select(x => new UploadPartInfo
         {
             PartNumber = x.PartNumber,
-            Size = x.Size
+            Size = x.Size,
+            HasEtag = !string.IsNullOrWhiteSpace(x.Etag)
         }));
         return response;
     }

@@ -19,6 +19,8 @@ public class FilesContext : DbContext
 
     public DbSet<UploadSession> UploadSessions { get; set; }
 
+    public DbSet<UploadSessionPart> UploadSessionParts { get; set; }
+
     public DbSet<TempFile> TempFiles { get; set; }
 
     public DbSet<FileHash> FileHashes { get; set; }
@@ -86,6 +88,17 @@ public class FilesContext : DbContext
             b.Property(x => x.ErrorCode).HasMaxLength(64);
             b.Property(x => x.ErrorMessage).HasMaxLength(1024);
             b.Property(x => x.ConcurrencyToken).IsConcurrencyToken();
+        });
+
+        modelBuilder.Entity<UploadSessionPart>(b =>
+        {
+            b.HasKey(x => new { x.SessionId, x.PartNumber });
+            b.Property(x => x.Etag).HasMaxLength(1024);
+            b.HasIndex(x => new { x.SessionId, x.UpdatedAt });
+            b.HasOne<UploadSession>()
+                .WithMany()
+                .HasForeignKey(x => x.SessionId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<TempFile>()

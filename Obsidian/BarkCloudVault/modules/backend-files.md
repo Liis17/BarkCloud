@@ -61,7 +61,7 @@ Web использует server-owned `UploadSession` и состояния `upl
 - `LegacyPreviewBackfillService.cs` — фоновый разовый бэкафилл при старте контейнера (BackgroundService): находит фото-оригиналы (`MediaKind.Photo`) без превью, перекодирует HEIC→JPEG (замена блоба в S3 под тем же ключом + обновление имени/размера/хеша) и генерирует превью 1024/512/128. Курсор по `Id` по возрастанию; дёшев на повторных стартах (файлы с превью выпадают из выборки). Видео не покрывает
 - `AlbumViewBuilder.cs` — сборка `AlbumInfo` (счётчик элементов + URL превью обложки) батчем
 - `MusicLibraryService.cs` — бизнес-логика аудиотеки: `ListTracks` по `MediaKind.Audio`, `GetTrackDownloadUrl`, плейлисты, `ResolvePublicPlaylist`, публичные `MusicPlaylistShareLink` и приватные `MusicPlaylistGrant`
-- `UploadSessionCoordinator.cs` — create/get/resume/complete/cancel, token/range/part validation и S3 recovery через `ListParts`/`HeadObject`
+- `UploadSessionCoordinator.cs` — create/get/resume/complete/cancel, token/range/part validation и S3 recovery через `ListParts`/`HeadObject`; подтверждённые ответы `UploadPart` сохраняются в `UploadSessionParts`, чтобы восстановить ETag при неполном ответе S3-compatible `ListParts`
 - `StorageQuotaService.cs` / `LegacyUploadQuotaGuard.cs` — PostgreSQL advisory lock, ready bytes + active reservations, атомарный reserve/release/convert
 - `UploadSessionProcessor.cs` / `ExistingUploadEnrichmentPipeline.cs` — disk-backed SHA/size validation и переиспользование текущего metadata/preview pipeline
 - `UploadArtifactCleaner.cs` / `UploadSessionMaintenance.cs` / `UploadSessionCleanupService.cs` — expire, abort, cleanup retry и 7-дневная terminal retention

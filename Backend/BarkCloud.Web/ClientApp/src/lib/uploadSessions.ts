@@ -6,6 +6,7 @@ export type UploadSessionStatus = 'uploading' | 'processing' | 'ready' | 'failed
 export interface UploadedPart {
   partNumber: number;
   size: number;
+  hasEtag?: boolean;
 }
 
 export interface UploadSession {
@@ -119,7 +120,8 @@ export async function uploadMissingParts(
   const completed = new Set(
     session.uploadedParts
       .filter((part) => part.partNumber >= 1 && part.partNumber <= partCount
-        && part.size === expectedPartSize(session, part.partNumber))
+        && part.size === expectedPartSize(session, part.partNumber)
+        && part.hasEtag !== false)
       .map((part) => part.partNumber),
   );
   let completedBytes = [...completed]
