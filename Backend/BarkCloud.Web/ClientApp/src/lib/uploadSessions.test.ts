@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { uploadMissingParts } from './uploadSessions';
+import { ApiError } from './api';
+import { completeUploadWithRecovery, uploadMissingParts, type UploadSession } from './uploadSessions';
 
 describe('uploadMissingParts', () => {
   it('uploads only missing parts sequentially with exact ranges', async () => {
@@ -51,5 +52,44 @@ describe('uploadMissingParts', () => {
     ]);
     expect(maxActive).toBe(1);
     expect(progress[progress.length - 1]).toBe(1);
+  });
+});
+
+describe('completeUploadWithRecovery', () => {
+  it('resumes and sends missing parts when complete reports an incomplete session', async () => {
+    const file = new File(['abcdefghij'], 'ten.bin');
+    const initial: UploadSession = {
+      sessionId: 'session',
+      fileId: 'file',
+      status: 'uploading',
+      fileSize: 10,
+      partSize: 4,
+      expiresAt: '',
+      uploadToken: 'old-token',
+      error: null,
+      uploadedParts: [],
+    };
+    const resumed = { ...initial, uploadToken: 'new-token' };
+    const complete = vi.fn()
+      .mockRejectedValueOnce(new ApiError('Не все части файла загружены', {
+        status: 400,
+        code: '09BF4D7B-7DB9-4284-BDB0-85457B22A589',
+      }))
+      .mockResolvedValueOnce({ ...initial, status: 'processing' as const });
+    const resume = vi.fn().mockResolvedValue(resumed);
+    const upload = vi.fn().mockResolvedValue(undefined);
+
+    const result = await completeUploadWithRecovery(
+      file,
+      initial,
+      undefined,
+      undefined,
+      { complete, resume, upload },
+    );
+
+    expect(result.status).toBe('processing');
+    expect(complete).toHaveBeenCalledTimes(2);
+    expect(resume).toHaveBeenCalledWith('session');
+    expect(upload).toHaveBeenCalledWith(file, resumed, undefined, undefined);
   });
 });

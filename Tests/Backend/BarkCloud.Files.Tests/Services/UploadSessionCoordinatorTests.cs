@@ -301,6 +301,27 @@ public class UploadSessionCoordinatorTests : IDisposable
     }
 
     [Fact]
+    public async Task CompleteAsync_WhenListPartsIsEmptyButObjectExists_RecoversThroughHead()
+    {
+        var sut = CreateSut();
+        var created = await sut.CreateAsync(10, "Safari", Input("upload-1", size: 42), default);
+        _objects.Setup(x => x.ListPartsAsync(
+                "universal-v1", created.FileId.ToString(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Array.Empty<MultipartUploadPart>());
+        _objects.Setup(x => x.HeadAsync(
+                "universal-v1", created.FileId.ToString(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new MultipartObjectInfo("object-etag", 42));
+
+        var completed = await sut.CompleteAsync(10, created.SessionId, default);
+
+        completed.Status.Should().Be(UploadSessionStatus.Processing);
+        _processing.Verify(x => x.PublishAsync(created.SessionId, It.IsAny<CancellationToken>()), Times.Once);
+        _objects.Verify(x => x.CompleteAsync(
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
+            It.IsAny<IReadOnlyList<MultipartUploadPart>>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
     public async Task CompleteAsync_WhenPublishingFails_RollsBackStateAndCanRecoverCompletedObject()
     {
         var sut = CreateSut();

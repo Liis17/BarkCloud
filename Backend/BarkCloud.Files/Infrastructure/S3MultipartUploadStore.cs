@@ -60,7 +60,8 @@ public sealed class S3MultipartUploadStore : IMultipartUploadStore
                 PartSize = size,
                 DisablePayloadSigning = profile.IsR2,
                 InputStream = body,
-                DisableDefaultChecksumValidation = profile.IsR2
+                DisableDefaultChecksumValidation = profile.IsR2,
+                UseChunkEncoding = !profile.IsR2
             }, cancellationToken);
         return new MultipartUploadPart(partNumber, size, response.ETag);
     }

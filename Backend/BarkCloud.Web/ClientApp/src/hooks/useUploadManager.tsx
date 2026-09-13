@@ -4,6 +4,7 @@ import { hashFile } from '../lib/fileHasher';
 import {
   cancelUploadSession,
   completeUploadSession,
+  completeUploadWithRecovery,
   createUploadSession,
   getUploadSession,
   resumeUploadSession,
@@ -304,7 +305,20 @@ export function UploadManagerProvider({ children }: { children: React.ReactNode 
           }
           touchRef.current(task, false);
         }, controller.signal);
-        session = await completeUploadSession(session.sessionId);
+        session = await completeUploadWithRecovery(
+          task.file,
+          session,
+          (fraction) => {
+            task.progress = fraction;
+            touchRef.current(task, false);
+          },
+          controller.signal,
+          {
+            complete: completeUploadSession,
+            resume: resumeUploadSession,
+            upload: uploadMissingParts,
+          },
+        );
       }
 
       if (session.status !== 'ready') {
