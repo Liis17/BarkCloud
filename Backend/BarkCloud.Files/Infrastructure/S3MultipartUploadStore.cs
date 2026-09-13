@@ -85,7 +85,8 @@ public sealed class S3MultipartUploadStore : IMultipartUploadStore
                 UploadId = uploadId,
                 PartNumberMarker = marker
             }, cancellationToken);
-            result.AddRange(response.Parts.Select(x => new MultipartUploadPart(
+            var providerParts = response.Parts ?? new List<PartDetail>();
+            result.AddRange(providerParts.Select(x => new MultipartUploadPart(
                 x.PartNumber ?? 0,
                 x.Size ?? 0,
                 x.ETag)));
