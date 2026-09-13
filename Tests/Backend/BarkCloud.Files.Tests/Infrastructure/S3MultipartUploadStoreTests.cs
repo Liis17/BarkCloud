@@ -93,6 +93,19 @@ public class S3MultipartUploadStoreTests
     }
 
     [Fact]
+    public async Task ListPartsAsync_WhenProviderReturnsNoParts_ReturnsEmpty()
+    {
+        var client = new Mock<IAmazonS3>();
+        client.Setup(x => x.ListPartsAsync(It.IsAny<ListPartsRequest>(), default))
+            .ReturnsAsync(new ListPartsResponse { IsTruncated = false, Parts = null! });
+        var sut = new S3MultipartUploadStore(Registry(client));
+
+        var result = await sut.ListPartsAsync("profile", "file", "upload", default);
+
+        result.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task HeadAsync_WhenObjectDoesNotExist_ReturnsNull()
     {
         var client = new Mock<IAmazonS3>();

@@ -82,7 +82,7 @@ Web использует server-owned `UploadSession` и состояния `upl
   crash-loop контейнера; постоянные ошибки конфигурации только логируются
 - `S3BucketRegistry.cs` — immutable startup-реестр по `ProfileId` (не по bucket name), поэтому одинаковые имена на разных endpoints не конфликтуют. Для записи выбирает специализированную роль или `universal`; настроенный, но недоступный профиль не переключается молча. R2 использует HTTPS, region `auto`, path-style и checksum-режим `WHEN_REQUIRED`
 - `S3Uploader.cs` — обёртка над S3/MinIO по `ProfileId`: `UploadAsync`, `DownloadAsync`, range и `DeleteAsync`. Начиная со 100 MiB использует multipart (часть минимум 64 MiB, увеличивается до `ceil(size/10000)`), при ошибке abort’ит upload. Для R2 PutObject и UploadPart отключают streaming payload signing и default checksum validation
-- `IMultipartUploadStore.cs` / `S3MultipartUploadStore.cs` — Files-owned V2 multipart seam: initiate/upload/list/complete/abort/head; R2-части используют unsigned payload. Metadata имени файла отправляется только для печатного ASCII, Unicode-имя остаётся в `UploadSession`
+- `IMultipartUploadStore.cs` / `S3MultipartUploadStore.cs` — Files-owned V2 multipart seam: initiate/upload/list/complete/abort/head; R2-части используют unsigned payload. Metadata имени файла отправляется только для печатного ASCII, Unicode-имя остаётся в `UploadSession`; пустой/null `Parts` от S3 нормализуется в пустой список
 - `PhysicalStorageStatsProvider.cs` — ленивый snapshot диска MinIO: общий размер, занято не-S3, занято S3; кеш 5 минут, обновляется только при запросах storage-info
 
 ### Configurations
