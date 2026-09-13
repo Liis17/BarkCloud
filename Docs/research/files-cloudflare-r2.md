@@ -6,22 +6,22 @@
 
 Да, Cloudflare R2 можно использовать как S3-хранилище для BarkCloud.Files. Архитектурно сервис уже построен на AWS S3 SDK и не использует MinIO API напрямую. R2 поддерживает нужные операции: GetObject, PutObject, DeleteObject, GetBucketLocation и byte range-запросы.
 
-Однако текущий код не готов к надёжному переключению на R2 одним изменением endpoint. Перед production-переключением нужно:
+Переключение на R2 требует корректной настройки S3-адаптера и инфраструктуры. Перед production-переключением нужно:
 
-1. отключить streaming SigV4 и автоматическую проверку checksum в PutObjectRequest — это прямо требуется для AWS SDK .NET при работе с R2;
+1. отключить streaming SigV4 и автоматическую проверку checksum в PutObjectRequest и UploadPartRequest — это прямо требуется для AWS SDK .NET при работе с R2;
 2. заранее создать R2-бакеты и выдать Files ограниченные credentials;
 3. перенастроить два раздела S3Buckets в Configuration и перезапустить files;
 4. отдельно решить, что показывать в физической статистике хранилища: текущая реализация считает локальный диск MinIO, а не объём R2;
 5. для существующей инсталляции сначала перенести объекты из MinIO в R2 с сохранением ключей.
 
-Итоговая оценка: **совместимо после небольшой правки S3-адаптера и настройки инфраструктуры; полная миграция требует отдельного runbook**.
+Итоговая оценка: **S3-адаптер выставляет R2-совместимые флаги для обычного и multipart upload; полная миграция требует отдельного runbook**.
 
 ## Что сейчас делает Files
 
 - Проект использует AWSSDK.S3 4.0.23.5 и AWSSDK.Core 4.0.7.4: [BarkCloud.Files.csproj](../../Backend/BarkCloud.Files/BarkCloud.Files.csproj#L10-L12).
 - S3BucketRegistry читает секцию S3Buckets, создаёт AmazonS3Client с BasicAWSCredentials, ServiceURL и ForcePathStyle, а затем сопоставляет тип файла с реальным именем бакета: [S3BucketRegistry.cs](../../Backend/BarkCloud.Files/Infrastructure/S3BucketRegistry.cs#L62-L105).
 - В проекте два логических бакета: user-avatars и cloud-files. Аватары и облачные файлы выбираются через одну и ту же S3-обёртку: [S3BucketRegistry.cs](../../Backend/BarkCloud.Files/Infrastructure/S3BucketRegistry.cs#L18-L45).
-- S3Uploader использует только стандартные операции S3: PutObjectAsync, GetObjectAsync, DeleteObjectAsync и GetObjectAsync с ByteRange: [S3Uploader.cs](../../Backend/BarkCloud.Files/Infrastructure/S3Uploader.cs#L14-L86).
+- S3Uploader использует только стандартные операции S3: PutObjectAsync, multipart UploadPartAsync, GetObjectAsync, DeleteObjectAsync и GetObjectAsync с ByteRange: [S3Uploader.cs](../../Backend/BarkCloud.Files/Infrastructure/S3Uploader.cs#L14-L86).
 - Клиенты сейчас не получают S3-ссылку. Они загружают файл в HTTP endpoint Files, а сервис сам проксирует поток в S3; скачивание также идёт через FilesController: [FilesController.cs](../../Backend/BarkCloud.Files/Host/FilesController.cs#L25-L107), [FileUrlHelper.cs](../../Backend/BarkCloud.Files/Helpers/FileUrlHelper.cs#L25-L32). Поэтому для текущего сценария не нужны публичный R2 bucket или CORS.
 - S3-клиенты создаются как singleton через AddMinioS3: [ServiceCollectionExtensions.cs](../../Backend/BarkCloud.Files/Extensions/ServiceCollectionExtensions.cs#L5-L18), а бакеты проверяются при запуске приложения: [Program.cs](../../Backend/BarkCloud.Files/Program.cs#L134-L144).
 
@@ -40,7 +40,7 @@
 
 ## Обязательная правка перед R2
 
-Сейчас S3Uploader.UploadAsync создаёт PutObjectRequest без двух R2-совместимых флагов. Для первой реализации нужно добавить их в этот общий адаптер — тогда поправка автоматически покроет обычные файлы, аватары, JPEG views и все превью:
+S3Uploader и S3MultipartUploadStore выставляют оба R2-совместимых флага (`DisablePayloadSigning` и `DisableDefaultChecksumValidation`) для `PutObjectRequest` и `UploadPartRequest`; это покрывает обычные файлы, аватары, JPEG views, multipart-загрузки и все превью:
 
 ~~~csharp
 var request = new PutObjectRequest
@@ -131,7 +131,7 @@ Production compose и генератор Builder жёстко описывают
 3. Скопировать из MinIO все объекты обоих bucket в R2, сохранив UUID-ключи; отдельно проверить аватары, обычные файлы, превью и JpegView.
 4. На короткое окно остановить записи или временно запретить загрузки, чтобы MinIO и R2 не разошлись.
 5. Обновить восемь значений S3Buckets:* в Configuration DB.
-6. Внести правку в S3Uploader, задеплоить Files и перезапустить его.
+6. Задеплоить Files и перезапустить его, чтобы контейнер получил обновлённый S3-адаптер.
 7. Проверить upload/download/delete/range, SHA-256 байтов и фоновые cleanup/backfill-сервисы.
 8. Только после сверки отключать MinIO и удалять его данные.
 
@@ -143,4 +143,4 @@ Production compose и генератор Builder жёстко описывают
 
 ## Рекомендуемый следующий тикет
 
-Поддержать Cloudflare R2 в Files: добавить два флага в S3Uploader, явно задать AuthenticationRegion = "auto", покрыть registry/uploader интеграционным тестом с S3-compatible endpoint, добавить R2-поля в Builder и определить поведение storage-info при backend r2. После этого отдельно выполнить миграцию данных MinIO → R2.
+Дальнейшие задачи: явно задать AuthenticationRegion = "auto", покрыть registry/uploader интеграционным тестом с S3-compatible endpoint, добавить R2-поля в Builder и определить поведение storage-info при backend r2. После этого отдельно выполнить миграцию данных MinIO → R2.

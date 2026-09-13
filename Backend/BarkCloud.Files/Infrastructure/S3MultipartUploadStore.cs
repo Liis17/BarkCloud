@@ -52,6 +52,7 @@ public sealed class S3MultipartUploadStore : IMultipartUploadStore
                 UploadId = uploadId,
                 PartNumber = partNumber,
                 PartSize = size,
+                DisablePayloadSigning = profile.IsR2,
                 InputStream = body,
                 DisableDefaultChecksumValidation = profile.IsR2
             }, cancellationToken);
