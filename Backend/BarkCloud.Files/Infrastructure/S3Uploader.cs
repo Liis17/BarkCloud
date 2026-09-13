@@ -51,6 +51,7 @@ public class S3Uploader
             AutoCloseStream = false,
             AutoResetStreamPosition = false,
             ContentType = contentType,
+            DisablePayloadSigning = profile.IsR2,
             DisableDefaultChecksumValidation = profile.IsR2,
             Metadata = { ["original-filename"] = Path.GetFileName(key) }
         };
@@ -155,6 +156,7 @@ public class S3Uploader
                     PartNumber = partNumber,
                     PartSize = currentPartSize,
                     InputStream = data,
+                    DisablePayloadSigning = profile.IsR2,
                     DisableDefaultChecksumValidation = profile.IsR2
                 }, cancellationToken);
                 parts.Add(new PartETag(partNumber, response.ETag));

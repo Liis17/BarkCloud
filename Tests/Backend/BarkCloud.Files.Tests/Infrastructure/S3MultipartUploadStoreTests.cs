@@ -35,6 +35,23 @@ public class S3MultipartUploadStoreTests
     }
 
     [Fact]
+    public async Task UploadPartAsync_ForR2_DisablesStreamingPayloadSigning()
+    {
+        var client = new Mock<IAmazonS3>();
+        client.Setup(x => x.UploadPartAsync(It.IsAny<UploadPartRequest>(), default))
+            .ReturnsAsync(new UploadPartResponse { ETag = "etag-r2" });
+        var sut = new S3MultipartUploadStore(Registry(client, isR2: true));
+        await using var body = new MemoryStream(new byte[12]);
+
+        await sut.UploadPartAsync("profile", "file", "upload", 1, body, 12, default);
+
+        client.Verify(x => x.UploadPartAsync(
+            It.Is<UploadPartRequest>(r => r.DisablePayloadSigning == true
+                                          && r.DisableDefaultChecksumValidation == true),
+            default));
+    }
+
+    [Fact]
     public async Task ListPartsAsync_ReturnsAllPagesInPartOrder()
     {
         var client = new Mock<IAmazonS3>();
@@ -72,7 +89,7 @@ public class S3MultipartUploadStoreTests
         result.Should().BeNull();
     }
 
-    private static S3BucketRegistry Registry(Mock<IAmazonS3> client)
+    private static S3BucketRegistry Registry(Mock<IAmazonS3> client, bool isR2 = false)
     {
         var registry = new Mock<S3BucketRegistry>(new ConfigurationBuilder().Build()) { CallBase = false };
         registry.Setup(x => x.GetProfile("profile")).Returns(new StorageProfileOptions
@@ -82,7 +99,8 @@ public class S3MultipartUploadStoreTests
             ServiceUrl = "http://localhost:9000",
             AccessKey = "key",
             SecretKey = "secret",
-            BucketName = "bucket"
+            BucketName = "bucket",
+            IsR2 = isR2
         });
         registry.Setup(x => x.GetClientForProfile("profile")).Returns(client.Object);
         return registry.Object;
