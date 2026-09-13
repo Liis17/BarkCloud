@@ -1576,7 +1576,8 @@ public static class CloudApiEndpoints
         uploadedParts = session.UploadedParts.Select(x => new
         {
             partNumber = x.PartNumber,
-            size = x.Size
+            size = x.Size,
+            hasEtag = x.HasEtag
         }).ToArray()
     };
 

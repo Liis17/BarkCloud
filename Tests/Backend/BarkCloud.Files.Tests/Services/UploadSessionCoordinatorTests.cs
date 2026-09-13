@@ -155,6 +155,11 @@ public class UploadSessionCoordinatorTests : IDisposable
             created.SessionId, created.UploadToken!, 1, 0, 41, 42, body, 42, default);
 
         part.Should().Be(new MultipartUploadPart(1, 42, "part-etag"));
+        _database.Context.UploadSessionParts.Should().ContainSingle(x =>
+            x.SessionId == created.SessionId
+            && x.PartNumber == 1
+            && x.Size == 42
+            && x.Etag == "part-etag");
     }
 
     [Fact]
@@ -222,6 +227,80 @@ public class UploadSessionCoordinatorTests : IDisposable
 
         resumed.UploadToken.Should().NotBeNullOrWhiteSpace().And.NotBe(created.UploadToken);
         resumed.UploadedParts.Should().ContainSingle().Which.Should().Be(new MultipartUploadPart(1, 21, "etag-1"));
+    }
+
+    [Fact]
+    public async Task ResumeAsync_WhenProviderOmitsEtag_UsesRecordedUploadPart()
+    {
+        var sut = CreateSut();
+        var created = await sut.CreateAsync(10, "Safari", Input("upload-1", size: 42), default);
+        _objects.Setup(x => x.UploadPartAsync(
+                "universal-v1", created.FileId.ToString(), It.IsAny<string>(), 1,
+                It.IsAny<Stream>(), 42, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new MultipartUploadPart(1, 42, "upload-etag"));
+        await using var body = new MemoryStream(new byte[42]);
+        await sut.UploadPartAsync(created.SessionId, created.UploadToken!, 1, 0, 41, 42, body, 42, default);
+        _objects.Setup(x => x.ListPartsAsync(
+                "universal-v1", created.FileId.ToString(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([new MultipartUploadPart(1, 42, string.Empty)]);
+
+        var resumed = await sut.ResumeAsync(10, created.SessionId, default);
+
+        resumed.UploadedParts.Should().ContainSingle().Which.Should().Be(new MultipartUploadPart(1, 42, "upload-etag"));
+    }
+
+    [Fact]
+    public async Task CompleteAsync_WhenProviderReturnsEmptyList_UsesRecordedUploadParts()
+    {
+        var sut = CreateSut();
+        var created = await sut.CreateAsync(10, "Safari", Input("upload-1", size: 42), default);
+        _objects.Setup(x => x.UploadPartAsync(
+                "universal-v1", created.FileId.ToString(), It.IsAny<string>(), 1,
+                It.IsAny<Stream>(), 42, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new MultipartUploadPart(1, 42, "upload-etag"));
+        await using var body = new MemoryStream(new byte[42]);
+        await sut.UploadPartAsync(created.SessionId, created.UploadToken!, 1, 0, 41, 42, body, 42, default);
+        _objects.Setup(x => x.ListPartsAsync(
+                "universal-v1", created.FileId.ToString(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+        _objects.Setup(x => x.CompleteAsync(
+                "universal-v1", created.FileId.ToString(), It.IsAny<string>(),
+                It.Is<IReadOnlyList<MultipartUploadPart>>(parts =>
+                    parts.Count == 1
+                    && parts[0] == new MultipartUploadPart(1, 42, "upload-etag")),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CompletedMultipartObject("object-etag", 42));
+
+        var completed = await sut.CompleteAsync(10, created.SessionId, default);
+
+        completed.Status.Should().Be(UploadSessionStatus.Processing);
+    }
+
+    [Fact]
+    public async Task CompleteAsync_WhenProviderOmitsEtag_UsesRecordedUploadPart()
+    {
+        var sut = CreateSut();
+        var created = await sut.CreateAsync(10, "Safari", Input("upload-1", size: 42), default);
+        _objects.Setup(x => x.UploadPartAsync(
+                "universal-v1", created.FileId.ToString(), It.IsAny<string>(), 1,
+                It.IsAny<Stream>(), 42, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new MultipartUploadPart(1, 42, "upload-etag"));
+        await using var body = new MemoryStream(new byte[42]);
+        await sut.UploadPartAsync(created.SessionId, created.UploadToken!, 1, 0, 41, 42, body, 42, default);
+        _objects.Setup(x => x.ListPartsAsync(
+                "universal-v1", created.FileId.ToString(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([new MultipartUploadPart(1, 42, string.Empty)]);
+        _objects.Setup(x => x.CompleteAsync(
+                "universal-v1", created.FileId.ToString(), It.IsAny<string>(),
+                It.Is<IReadOnlyList<MultipartUploadPart>>(parts =>
+                    parts.Count == 1
+                    && parts[0] == new MultipartUploadPart(1, 42, "upload-etag")),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CompletedMultipartObject("object-etag", 42));
+
+        var completed = await sut.CompleteAsync(10, created.SessionId, default);
+
+        completed.Status.Should().Be(UploadSessionStatus.Processing);
     }
 
     [Fact]

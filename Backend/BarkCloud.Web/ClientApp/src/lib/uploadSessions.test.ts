@@ -53,6 +53,33 @@ describe('uploadMissingParts', () => {
     expect(maxActive).toBe(1);
     expect(progress[progress.length - 1]).toBe(1);
   });
+
+  it('reuploads a same-size part when Files could not confirm its ETag', async () => {
+    const sender = vi.fn(async (request: {
+      body: Blob;
+      onProgress: (loaded: number) => void;
+    }) => request.onProgress(request.body.size));
+
+    await uploadMissingParts(
+      new File(['abcdefghij'], 'ten.bin'),
+      {
+        sessionId: 'session',
+        fileId: 'file',
+        status: 'uploading',
+        fileSize: 10,
+        partSize: 10,
+        expiresAt: '',
+        uploadToken: 'secret',
+        error: null,
+        uploadedParts: [{ partNumber: 1, size: 10, hasEtag: false }],
+      },
+      undefined,
+      undefined,
+      sender,
+    );
+
+    expect(sender).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('completeUploadWithRecovery', () => {

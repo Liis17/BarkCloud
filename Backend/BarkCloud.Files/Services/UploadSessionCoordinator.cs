@@ -154,8 +154,8 @@ public sealed class UploadSessionCoordinator
             await transaction.CommitAsync(cancellationToken);
 
             _logger.LogInformation(
-                "Создана upload-сессия {SessionId} для файла {FileId}, пользователь {OwnerId}, размер {FileSize}",
-                sessionId, fileId, ownerId, descriptor.FileSize);
+                "Создана upload-сессия {SessionId} для файла {FileId}, пользователь {OwnerId}, профиль {StorageProfileId}, размер {FileSize}",
+                sessionId, fileId, ownerId, profileId, descriptor.FileSize);
             return Map(session, uploadToken);
         }
         catch
@@ -232,7 +232,7 @@ public sealed class UploadSessionCoordinator
         session.ConcurrencyToken = Guid.NewGuid();
         await _context.SaveChangesAsync(cancellationToken);
 
-        return Map(session, token, parts);
+        return Map(session, token, await ReconcilePartsAsync(session, parts, cancellationToken));
     }
 
     public async Task<MultipartUploadPart> UploadPartAsync(
@@ -278,11 +278,40 @@ public sealed class UploadSessionCoordinator
             cancellationToken);
 
         var now = UtcNow();
+        var recordedPart = await _context.UploadSessionParts
+            .FirstOrDefaultAsync(
+                x => x.SessionId == session.Id && x.PartNumber == part.PartNumber,
+                cancellationToken);
+        if (recordedPart is null)
+        {
+            _context.UploadSessionParts.Add(new UploadSessionPart
+            {
+                SessionId = session.Id,
+                PartNumber = part.PartNumber,
+                Size = part.Size,
+                Etag = part.Etag ?? string.Empty,
+                UpdatedAt = now
+            });
+        }
+        else
+        {
+            recordedPart.Size = part.Size;
+            recordedPart.Etag = part.Etag ?? string.Empty;
+            recordedPart.UpdatedAt = now;
+        }
         session.LastActivityAt = now;
         session.UpdatedAt = now;
         session.ExpiresAt = now.Add(InactivityTimeout);
         session.ConcurrencyToken = Guid.NewGuid();
         await _context.SaveChangesAsync(cancellationToken);
+        _logger.LogInformation(
+            "Принята часть upload-сессии {SessionId}, файла {FileId}, пользователя {OwnerId}: часть {PartNumber}, размер {PartSize}, ETag подтверждён {HasEtag}",
+            session.Id,
+            session.FileId,
+            session.OwnerId,
+            part.PartNumber,
+            part.Size,
+            !string.IsNullOrWhiteSpace(part.Etag));
         return part;
     }
 
@@ -432,13 +461,14 @@ public sealed class UploadSessionCoordinator
     {
         try
         {
-            var parts = (await _objects.ListPartsAsync(
+            var listedParts = (await _objects.ListPartsAsync(
                     session.StorageProfileId,
                     session.FileId.ToString(),
                     session.MultipartUploadId,
                     cancellationToken))
                 .OrderBy(x => x.PartNumber)
                 .ToArray();
+            var parts = await ReconcilePartsAsync(session, listedParts, cancellationToken);
             try
             {
                 ValidateCompleteParts(session, parts);
@@ -456,13 +486,14 @@ public sealed class UploadSessionCoordinator
                 }
 
                 _logger.LogWarning(
-                    "Multipart upload-сессии {SessionId}, файла {FileId}, пользователя {OwnerId} не готов к Complete: частей {ActualPartCount}/{ExpectedPartCount}; детали {Parts}",
+                    "Multipart upload-сессии {SessionId}, файла {FileId}, пользователя {OwnerId}, профиль {StorageProfileId} не готов к Complete: частей {ActualPartCount}/{ExpectedPartCount}; детали {Parts}",
                     session.Id,
                     session.FileId,
                     session.OwnerId,
-                    parts.Length,
+                    session.StorageProfileId,
+                    listedParts.Length,
                     ExpectedPartCount(session),
-                    string.Join(",", parts.Select(static part =>
+                    string.Join(",", listedParts.Select(static part =>
                         $"{part.PartNumber}:{part.Size}:{(string.IsNullOrWhiteSpace(part.Etag) ? "no-etag" : "etag")}")));
                 throw;
             }
@@ -526,6 +557,47 @@ public sealed class UploadSessionCoordinator
 
     private static long ExpectedPartCount(UploadSession session) =>
         (session.DeclaredSize + session.PartSize - 1) / session.PartSize;
+
+    private async Task<IReadOnlyList<MultipartUploadPart>> ReconcilePartsAsync(
+        UploadSession session,
+        IReadOnlyList<MultipartUploadPart> listedParts,
+        CancellationToken cancellationToken)
+    {
+        var recordedParts = await _context.UploadSessionParts
+            .AsNoTracking()
+            .Where(x => x.SessionId == session.Id)
+            .OrderBy(x => x.PartNumber)
+            .Select(x => new MultipartUploadPart(x.PartNumber, x.Size, x.Etag))
+            .ToArrayAsync(cancellationToken);
+        if (recordedParts.Length == 0)
+            return listedParts;
+
+        // ListParts is normally authoritative. Some S3-compatible gateways have returned
+        // an empty list or a part without ETag immediately after a successful UploadPart;
+        // the Files response from that upload is persisted, so we can safely repair only
+        // those two provider anomalies without trusting browser state.
+        if (listedParts.Count == 0)
+        {
+            _logger.LogWarning(
+                "ListParts вернул 0 частей для upload-сессии {SessionId}, файла {FileId}, профиль {StorageProfileId}; используется {RecordedPartCount} подтверждённых Files частей",
+                session.Id,
+                session.FileId,
+                session.StorageProfileId,
+                recordedParts.Length);
+            return recordedParts;
+        }
+
+        var recordedByNumber = recordedParts.ToDictionary(x => x.PartNumber);
+        return listedParts
+            .Select(part =>
+                string.IsNullOrWhiteSpace(part.Etag)
+                    && recordedByNumber.TryGetValue(part.PartNumber, out var recorded)
+                    && recorded.Size == part.Size
+                    && !string.IsNullOrWhiteSpace(recorded.Etag)
+                    ? recorded
+                    : part)
+            .ToArray();
+    }
 
     private async Task<UploadSessionResult> MoveToProcessingAsync(
         UploadSession session,
