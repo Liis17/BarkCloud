@@ -23,14 +23,20 @@ public sealed class S3MultipartUploadStore : IMultipartUploadStore
         CancellationToken cancellationToken)
     {
         var profile = _registry.GetProfile(storageProfileId);
+        var request = new InitiateMultipartUploadRequest
+        {
+            BucketName = profile.BucketName,
+            Key = key,
+            ContentType = contentType
+        };
+        // S3 user metadata is transported as HTTP headers. The original name is already
+        // persisted in UploadSession, so only keep the optional metadata for printable ASCII names.
+        var originalFileName = Path.GetFileName(fileName);
+        if (originalFileName.All(static character => character is >= ' ' and <= '~'))
+            request.Metadata["original-filename"] = originalFileName;
+
         var response = await _registry.GetClientForProfile(storageProfileId)
-            .InitiateMultipartUploadAsync(new InitiateMultipartUploadRequest
-            {
-                BucketName = profile.BucketName,
-                Key = key,
-                ContentType = contentType,
-                Metadata = { ["original-filename"] = Path.GetFileName(fileName) }
-            }, cancellationToken);
+            .InitiateMultipartUploadAsync(request, cancellationToken);
         return response.UploadId;
     }
 

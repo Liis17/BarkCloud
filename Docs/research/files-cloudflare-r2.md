@@ -36,7 +36,7 @@
 | Download | GetObject и Range поддерживаются. Это покрывает обычную загрузку, просмотр и текущий HTTP streaming: [таблица совместимости R2](https://developers.cloudflare.com/r2/api/s3/api/#implemented-object-level-operations). |
 | Delete | DeleteObject поддерживается: [таблица совместимости R2](https://developers.cloudflare.com/r2/api/s3/api/#implemented-object-level-operations). |
 | Проверка бакета | GetBucketLocation и CreateBucket отмечены как поддерживаемые R2: [bucket-level operations](https://developers.cloudflare.com/r2/api/s3/api/#implemented-bucket-level-operations). Но права на создание бакета лучше не давать рабочему token; бакеты следует создать заранее. |
-| Metadata | Content-Type поддерживается; текущая пользовательская metadata original-filename ASCII-совместима и не конфликтует с R2: [PutObject compatibility](https://developers.cloudflare.com/r2/api/s3/api/#implemented-object-level-operations), [R2 extensions](https://developers.cloudflare.com/r2/api/s3/extensions/). |
+| Metadata | Content-Type поддерживается; optional `original-filename` отправляется только для печатных ASCII-имён, потому что S3 user metadata передаётся HTTP-заголовками. Unicode-имя уже хранится в `UploadSession`: [PutObject compatibility](https://developers.cloudflare.com/r2/api/s3/api/#implemented-object-level-operations), [R2 extensions](https://developers.cloudflare.com/r2/api/s3/extensions/). |
 
 ## Обязательная правка перед R2
 

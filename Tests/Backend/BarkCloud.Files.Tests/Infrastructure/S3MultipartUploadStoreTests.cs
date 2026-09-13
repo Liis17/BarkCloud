@@ -13,6 +13,22 @@ namespace BarkCloud.Files.Tests.Infrastructure;
 public class S3MultipartUploadStoreTests
 {
     [Fact]
+    public async Task InitiateAsync_DoesNotSendNonAsciiMetadata()
+    {
+        var client = new Mock<IAmazonS3>();
+        client.Setup(x => x.InitiateMultipartUploadAsync(It.IsAny<InitiateMultipartUploadRequest>(), default))
+            .ReturnsAsync(new InitiateMultipartUploadResponse { UploadId = "upload-1" });
+        var sut = new S3MultipartUploadStore(Registry(client));
+
+        await sut.InitiateAsync("profile", "file", "image/jpeg", "Фото с обложкой.jpg", default);
+
+        client.Verify(x => x.InitiateMultipartUploadAsync(
+            It.Is<InitiateMultipartUploadRequest>(r => r.Metadata.Keys.All(key =>
+                (r.Metadata[key] ?? string.Empty).All(static character => character <= 0x7F))),
+            default));
+    }
+
+    [Fact]
     public async Task UploadPartAsync_StreamsPartToSelectedProfile()
     {
         var client = new Mock<IAmazonS3>();
