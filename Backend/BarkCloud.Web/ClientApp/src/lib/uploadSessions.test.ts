@@ -1,6 +1,37 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ApiError } from './api';
-import { completeUploadWithRecovery, uploadMissingParts, type UploadSession } from './uploadSessions';
+import {
+  completeUploadWithRecovery,
+  isValidUploadPartAcknowledgement,
+  uploadMissingParts,
+  type UploadSession,
+} from './uploadSessions';
+
+describe('isValidUploadPartAcknowledgement', () => {
+  it('rejects a successful HTML response from a misrouted data endpoint', () => {
+    expect(isValidUploadPartAcknowledgement(
+      '<!doctype html><html><body>Login</body></html>',
+      'text/html; charset=utf-8',
+      1,
+      10,
+    )).toBe(false);
+  });
+
+  it('accepts only the expected JSON part acknowledgement', () => {
+    expect(isValidUploadPartAcknowledgement(
+      '{"partNumber":1,"size":10}',
+      'application/json; charset=utf-8',
+      1,
+      10,
+    )).toBe(true);
+    expect(isValidUploadPartAcknowledgement(
+      '{"partNumber":2,"size":10}',
+      'application/json',
+      1,
+      10,
+    )).toBe(false);
+  });
+});
 
 describe('uploadMissingParts', () => {
   it('uploads only missing parts sequentially with exact ranges', async () => {

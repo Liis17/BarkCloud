@@ -241,8 +241,23 @@ function uploadPartXhr(request: UploadPartRequest): Promise<void> {
     xhr.upload.onprogress = (event) => request.onProgress(event.loaded);
     xhr.onload = () => {
       cleanup();
-      if (xhr.status >= 200 && xhr.status < 300) resolve();
-      else reject(new UploadPartHttpError(readXhrError(xhr), { status: xhr.status }));
+      if (xhr.status >= 200 && xhr.status < 300) {
+        if (isValidUploadPartAcknowledgement(
+          xhr.responseText,
+          xhr.getResponseHeader('Content-Type'),
+          request.partNumber,
+          request.body.size,
+        )) {
+          resolve();
+        } else {
+          reject(new UploadPartHttpError(
+            'Сервер не подтвердил загрузку части. Проверьте маршрут /file-upload/ в nginx.',
+            { status: xhr.status },
+          ));
+        }
+      } else {
+        reject(new UploadPartHttpError(readXhrError(xhr), { status: xhr.status }));
+      }
     };
     xhr.onerror = () => {
       cleanup();
@@ -259,6 +274,23 @@ function uploadPartXhr(request: UploadPartRequest): Promise<void> {
     request.signal?.addEventListener('abort', abort, { once: true });
     xhr.send(request.body);
   });
+}
+
+export function isValidUploadPartAcknowledgement(
+  responseText: string,
+  contentType: string | null,
+  expectedPartNumber: number,
+  expectedSize: number,
+): boolean {
+  const mediaType = contentType?.split(';', 1)[0].trim().toLowerCase();
+  if (mediaType !== 'application/json' && !mediaType?.endsWith('+json')) return false;
+
+  try {
+    const payload = JSON.parse(responseText) as { partNumber?: unknown; size?: unknown };
+    return payload.partNumber === expectedPartNumber && payload.size === expectedSize;
+  } catch {
+    return false;
+  }
 }
 
 function expectedPartSize(session: UploadSession, partNumber: number): number {

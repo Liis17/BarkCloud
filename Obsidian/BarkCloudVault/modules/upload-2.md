@@ -45,7 +45,7 @@ Web проксирует эти операции в аддитивные RPC `Fi
 - Части одного файла отправляются последовательно. Повтор номера части безопасно заменяет её в S3.
 - `Resume` использует S3 `ListParts`, а не локальный прогресс браузера. Files дополнительно хранит последний подтверждённый ETag каждой части в `UploadSessionParts`: если gateway вернул пустой `ListParts` или часть без ETag сразу после успешного `UploadPart`, сервер восстанавливает только подтверждённые Files-ответом части. `Complete` самостоятельно проверяет номера/размеры/ETag всех частей и общий размер.
 - Если ответ S3 Complete неоднозначен, `ListParts` уже пуст после завершения или Files перезапустился после него, состояние восстанавливается через `HeadObject`; неполный список безопасно логируется без токена/SHA. Повторный и конкурентный `Complete` идемпотентно перечитывает состояние после optimistic-concurrency конфликта.
-- `Backend/nginx/cloud.barkfluff.conf` направляет `/file-upload/` с 443 прямо в `cloud-files:7026`, `proxy_request_buffering off`; Vite dev proxy направляет тот же path на `localhost:7026`.
+- `Backend/nginx/cloud.barkfluff.conf` и шаблон `Tools/BarkCloud.Builder/BackendComposeGenerator.cs` направляют `/file-upload/` с 443 прямо в `cloud-files:7026`, `proxy_request_buffering off`; Vite dev proxy направляет тот же path на `localhost:7026`. XHR принимает успешной только JSON-квитанцию Files с ожидаемыми `partNumber/size`: SPA/login HTML от ошибочно настроенного proxy больше не маскируется под загруженную часть.
 
 S3 seam: `IMultipartUploadStore` / `S3MultipartUploadStore` (`InitiateAsync`, `UploadPartAsync`, `ListPartsAsync`, `CompleteAsync`, `AbortAsync`, `HeadAsync`).
 
@@ -105,4 +105,4 @@ Consumer пишет раздельные outcome-метрики `ready/failed/no
 | Quota | `Services/StorageQuotaService.cs`, `Services/LegacyUploadQuotaGuard.cs`, `Services/ILegacyUploadCompletionMarker.cs`, `Services/UsersStorageLimitProvider.cs` |
 | Processing/cleanup | `Consumers/ProcessUploadedFileConsumer.cs`, `Services/UploadSessionProcessor.cs`, `Services/ExistingUploadEnrichmentPipeline.cs`, `Services/UploadArtifactCleaner.cs`, `Services/UploadSessionMaintenance.cs` |
 | Web | `Endpoints/CloudApiEndpoints.cs`, `ClientApp/src/hooks/useUploadManager.tsx`, `ClientApp/src/lib/uploadSessions.ts`, `fileHasher.ts`, `sha256.worker.ts`, `uploadQueueStore.ts` |
-| Proxy | `Backend/nginx/cloud.barkfluff.conf`, `ClientApp/vite.config.ts` |
+| Proxy | `Backend/nginx/cloud.barkfluff.conf`, `Tools/BarkCloud.Builder/BackendComposeGenerator.cs`, `ClientApp/vite.config.ts` |
