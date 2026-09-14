@@ -71,10 +71,72 @@ public class ConfigurationManagementGatewayTests
 
         var dto = await new ConfigurationManagementGateway(
             configuration.Object,
-            new ConfigurationBuilder().Build()).GetAsync();
+            new ConfigurationBuilder().Build(),
+            new S3AccessChecker()).GetAsync();
 
         dto.Settings.Should().ContainSingle(item => item.Section == "JwtSettings" && item.Key == "Issuer");
         dto.Settings.Should().NotContain(item => item.Key == "Token");
         dto.StorageProfiles.Single().GetType().GetProperty("AccessKey").Should().BeNull();
+    }
+
+    [Fact]
+    public async Task CheckStorageProfileAccess_UsesSavedCredentialsWhenEditLeavesThemBlank()
+    {
+        var configuration = new Mock<ConfigurationApi.ConfigurationApiClient>();
+        configuration
+            .Setup(client => client.GetStorageProfilesAsync(It.IsAny<GetStorageProfilesRequest>(), null, null, default))
+            .Returns(GrpcCallHelpers.AsyncUnary(new GetStorageProfilesResponse
+            {
+                Profiles =
+                {
+                    new StorageProfileItem
+                    {
+                        ProfileId = "images-v1",
+                        Role = "images",
+                        ServiceUrl = "http://minio:9000",
+                        AccessKey = "saved-access",
+                        SecretKey = "saved-secret",
+                        BucketName = "saved-bucket",
+                        IsActive = true,
+                        Version = 1
+                    }
+                }
+            }));
+        var checker = new CapturingS3AccessChecker();
+        var gateway = new ConfigurationManagementGateway(
+            configuration.Object,
+            new ConfigurationBuilder().Build(),
+            checker);
+
+        var result = await gateway.CheckStorageProfileAccessAsync(new StorageProfileEdit(
+            "images",
+            "http://new-minio:9000",
+            "",
+            "",
+            "new-bucket",
+            false,
+            false,
+            "images-v1",
+            false));
+
+        result.Success.Should().BeTrue();
+        checker.Request.Should().NotBeNull();
+        checker.Request!.AccessKey.Should().Be("saved-access");
+        checker.Request.SecretKey.Should().Be("saved-secret");
+        checker.Request.ServiceUrl.Should().Be("http://new-minio:9000");
+        checker.Request.BucketName.Should().Be("new-bucket");
+    }
+
+    private sealed class CapturingS3AccessChecker : S3AccessChecker
+    {
+        public S3AccessCheckRequest? Request { get; private set; }
+
+        public override Task<StorageAccessCheckResult> CheckAsync(
+            S3AccessCheckRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            Request = request;
+            return Task.FromResult(new StorageAccessCheckResult(true, "ok"));
+        }
     }
 }

@@ -120,6 +120,7 @@ builder.Services.AddSingleton<DeploymentJobOptions>();
 builder.Services.AddSingleton<DeploymentJobService>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<DeploymentJobService>());
 builder.Services.AddSingleton<FeatureConfigurationGateway>();
+builder.Services.AddSingleton<S3AccessChecker>();
 builder.Services.AddSingleton<ConfigurationManagementGateway>();
 builder.Services.AddScoped<AuthGateway>();
 builder.Services.AddScoped<RegistrationGateway>();

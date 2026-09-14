@@ -120,18 +120,18 @@ public static class SettingsEndpoints
 
         api.MapPost("/server/storage/profile", (HttpContext http, AuthGateway auth, AdminGate admin, ConfigurationManagementGateway configuration, ServerStorageProfileBody body) =>
             DoAdmin(http, auth, admin, async user => Mutation(await configuration.SaveStorageProfileAsync(
-                new StorageProfileEdit(
-                    body.Role ?? string.Empty,
-                    body.ServiceUrl ?? string.Empty,
-                    body.AccessKey ?? string.Empty,
-                    body.SecretKey ?? string.Empty,
-                    body.BucketName ?? string.Empty,
-                    body.IsR2,
-                    body.IsLegacy,
-                    body.ProfileId,
-                    body.ConfirmLegacyMutation),
+                ToStorageProfileEdit(body),
                 $"user:{user.UserId}",
                 http.RequestAborted))));
+
+        api.MapPost("/server/storage/check", (HttpContext http, AuthGateway auth, AdminGate admin, ConfigurationManagementGateway configuration, ServerStorageProfileBody body) =>
+            DoAdmin(http, auth, admin, async _ =>
+            {
+                var result = await configuration.CheckStorageProfileAccessAsync(
+                    ToStorageProfileEdit(body),
+                    http.RequestAborted);
+                return result.Success ? Results.Ok(result) : Results.BadRequest(result);
+            }));
 
         api.MapPost("/server/storage/activate", (HttpContext http, AuthGateway auth, AdminGate admin, ConfigurationManagementGateway configuration, ServerStorageActivateBody body) =>
             DoAdmin(http, auth, admin, async user => Mutation(await configuration.ActivateStorageProfileAsync(
@@ -471,6 +471,17 @@ public static class SettingsEndpoints
 
     private static IResult Mutation(ConfigurationMutationResult result) =>
         result.Success ? Results.Ok(result) : Results.BadRequest(result);
+
+    private static StorageProfileEdit ToStorageProfileEdit(ServerStorageProfileBody body) => new(
+        body.Role ?? string.Empty,
+        body.ServiceUrl ?? string.Empty,
+        body.AccessKey ?? string.Empty,
+        body.SecretKey ?? string.Empty,
+        body.BucketName ?? string.Empty,
+        body.IsR2,
+        body.IsLegacy,
+        body.ProfileId,
+        body.ConfirmLegacyMutation);
 
     private static IResult MapRpc(RpcException ex)
     {
