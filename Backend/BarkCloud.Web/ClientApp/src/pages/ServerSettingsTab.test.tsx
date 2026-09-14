@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import ServerSettingsTab from './ServerSettingsTab';
 
@@ -98,5 +98,43 @@ describe('ServerSettingsTab', () => {
     const input = document.querySelector('[data-setting-id="2:UsersDb:"] input') as HTMLInputElement;
     expect(input.disabled).toBe(true);
     expect(input.getAttribute('placeholder')).toBe('');
+  });
+
+  it('проверяет доступ к бакету значениями из формы без сохранения', async () => {
+    const fetchMock = vi.fn((path: string, _init?: RequestInit) => Promise.resolve({
+      ok: true,
+      json: async () => path.endsWith('/check')
+        ? { success: true, message: 'Доступ подтверждён' }
+        : {
+          settings: [],
+          reservedNames: [],
+          storageProfiles: [{
+            profileId: 'universal-v1', role: 'universal', version: 1,
+            serviceUrl: 'http://minio:9000', hasAccessKey: true, hasSecretKey: true,
+            bucketName: 'cloud-universal', isR2: false, isActive: true, isLegacy: false,
+            editedAt: null, editedBy: 'seed', editedFrom: 'seed',
+          }],
+          storageRevisions: [],
+        },
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<ServerSettingsTab />);
+
+    const checkButtons = await screen.findAllByRole('button', { name: 'Проверить доступ' });
+    fireEvent.click(checkButtons[0]);
+
+    expect(await screen.findByText('Доступ подтверждён')).toBeTruthy();
+    const checkCall = fetchMock.mock.calls.find(([path]) => path.endsWith('/storage/check'));
+    expect(checkCall).toBeTruthy();
+    expect(JSON.parse(checkCall?.[1]?.body as string)).toMatchObject({
+      role: 'universal',
+      serviceUrl: 'http://minio:9000',
+      bucketName: 'cloud-universal',
+      accessKey: '',
+      secretKey: '',
+      profileId: 'universal-v1',
+    });
+    expect(fetchMock.mock.calls.some(([path]) => path.endsWith('/storage/profile'))).toBe(false);
   });
 });

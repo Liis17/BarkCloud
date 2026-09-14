@@ -79,7 +79,8 @@ public sealed record StorageProfileEdit(
 
 public sealed class ConfigurationManagementGateway(
     ConfigurationApi.ConfigurationApiClient configuration,
-    IConfiguration hostConfiguration)
+    IConfiguration hostConfiguration,
+    S3AccessChecker s3AccessChecker)
 {
     private readonly Metadata? _headers = BuildHeaders(hostConfiguration);
 
@@ -199,12 +200,7 @@ public sealed class ConfigurationManagementGateway(
     {
         var profiles = await configuration.GetStorageProfilesAsync(
             new GetStorageProfilesRequest(), _headers, cancellationToken: cancellationToken);
-        var current = !string.IsNullOrWhiteSpace(edit.ProfileId)
-            ? profiles.Profiles.SingleOrDefault(profile => profile.ProfileId == edit.ProfileId)
-            : profiles.Profiles.Where(profile => profile.Role == edit.Role)
-                .OrderByDescending(profile => profile.IsActive)
-                .ThenByDescending(profile => profile.Version)
-                .FirstOrDefault();
+        var current = FindStorageProfile(profiles.Profiles, edit);
         var accessKey = string.IsNullOrEmpty(edit.AccessKey) ? current?.AccessKey ?? string.Empty : edit.AccessKey;
         var response = await configuration.SaveStorageProfileAsync(new SaveStorageProfileRequest
         {
@@ -221,6 +217,27 @@ public sealed class ConfigurationManagementGateway(
             EditedFrom = "web-settings"
         }, _headers, cancellationToken: cancellationToken);
         return new ConfigurationMutationResult(response.Success, response.Message, ["files"]);
+    }
+
+    public async Task<StorageAccessCheckResult> CheckStorageProfileAccessAsync(
+        StorageProfileEdit edit,
+        CancellationToken cancellationToken = default)
+    {
+        var profiles = await configuration.GetStorageProfilesAsync(
+            new GetStorageProfilesRequest(), _headers, cancellationToken: cancellationToken);
+        var current = FindStorageProfile(profiles.Profiles, edit);
+
+        if (!string.IsNullOrWhiteSpace(edit.ProfileId) && current is null)
+            return new StorageAccessCheckResult(false, "S3-профиль не найден");
+        if (current is not null && !string.Equals(current.Role, edit.Role, StringComparison.Ordinal))
+            return new StorageAccessCheckResult(false, "S3-профиль не соответствует роли");
+
+        return await s3AccessChecker.CheckAsync(new S3AccessCheckRequest(
+            edit.ServiceUrl,
+            string.IsNullOrEmpty(edit.AccessKey) ? current?.AccessKey ?? string.Empty : edit.AccessKey,
+            string.IsNullOrEmpty(edit.SecretKey) ? current?.SecretKey ?? string.Empty : edit.SecretKey,
+            edit.BucketName,
+            edit.IsR2), cancellationToken);
     }
 
     public async Task<ConfigurationMutationResult> ActivateStorageProfileAsync(
@@ -307,6 +324,15 @@ public sealed class ConfigurationManagementGateway(
         profile.EditedAt?.ToDateTimeOffset(),
         profile.EditedBy,
         profile.EditedFrom);
+
+    private static StorageProfileItem? FindStorageProfile(
+        IEnumerable<StorageProfileItem> profiles,
+        StorageProfileEdit edit) => !string.IsNullOrWhiteSpace(edit.ProfileId)
+            ? profiles.SingleOrDefault(profile => profile.ProfileId == edit.ProfileId)
+            : profiles.Where(profile => profile.Role == edit.Role)
+                .OrderByDescending(profile => profile.IsActive)
+                .ThenByDescending(profile => profile.Version)
+                .FirstOrDefault();
 
     private static bool IsTokenSetting(ConfigurationItem item) =>
         string.Equals(item.Key, "Token", StringComparison.OrdinalIgnoreCase);

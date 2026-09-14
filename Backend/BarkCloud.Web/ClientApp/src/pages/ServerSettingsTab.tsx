@@ -30,6 +30,7 @@ interface ServerSettings {
 }
 
 interface MutationResult { success: boolean; message: string; restartTargets: string[] }
+interface StorageAccessCheckResult { success: boolean; message: string }
 interface StorageDraft { serviceUrl: string; accessKey: string; secretKey: string; bucketName: string; isR2: boolean }
 
 const SERVICE_LABELS: Record<number, string> = {
@@ -149,6 +150,7 @@ function StorageCard({ role, profiles, revisions, onChanged }: {
   const legacy = selected?.isLegacy || role.endsWith('-old');
   const [draft, setDraft] = React.useState<StorageDraft>({ serviceUrl: '', accessKey: '', secretKey: '', bucketName: '', isR2: false });
   const [message, setMessage] = React.useState('');
+  const [checking, setChecking] = React.useState(false);
   React.useEffect(() => setDraft({ serviceUrl: selected?.serviceUrl || '', accessKey: '', secretKey: '', bucketName: selected?.bucketName || '', isR2: selected?.isR2 || false }), [selected?.profileId]);
 
   async function save() {
@@ -175,6 +177,20 @@ function StorageCard({ role, profiles, revisions, onChanged }: {
       setDraft((currentDraft) => ({ ...currentDraft, accessKey: '', secretKey: '' }));
       setSelectedProfileId(null);
       onChanged(response.data?.restartTargets || ['files']);
+    }
+  }
+
+  async function checkAccess() {
+    setChecking(true);
+    try {
+      const response = await request<StorageAccessCheckResult>('/api/settings/server/storage/check', 'POST', {
+        role, ...draft, isLegacy: legacy, profileId: selected?.profileId || null, confirmLegacyMutation: legacy,
+      });
+      setMessage(response.data?.message || (response.ok ? 'Доступ проверен' : 'Не удалось проверить доступ'));
+    } catch {
+      setMessage('Не удалось проверить доступ');
+    } finally {
+      setChecking(false);
     }
   }
 
@@ -212,7 +228,7 @@ function StorageCard({ role, profiles, revisions, onChanged }: {
     </div>
     <div className="storage-profile-footer">
       <label className="server-check"><input type="checkbox" checked={draft.isR2} onChange={(event) => setDraft({ ...draft, isR2: event.target.checked })} /><span>Cloudflare R2</span></label>
-      <div className="storage-profile-actions"><button type="button" className="btn primary" onClick={save}>Сохранить</button>
+      <div className="storage-profile-actions"><button type="button" className="btn" onClick={checkAccess} disabled={checking}>{checking ? 'Проверка…' : 'Проверить доступ'}</button><button type="button" className="btn primary" onClick={save} disabled={checking}>Сохранить</button>
         {!legacy && role !== 'universal' && active && <button type="button" className="btn" onClick={disable}>Отключить роль</button>}</div>
     </div>
     {message && <div className="server-setting-message" role="status">{message}</div>}
