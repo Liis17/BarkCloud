@@ -544,7 +544,7 @@ upstream barkcloud_files {
     keepalive_timeout 60s;
 }
 
-# HTTP/1.1-пул для скачивания/загрузки файлов (/web/).
+# HTTP/1.1-пул для скачивания/загрузки файлов (/web/ и /file-upload/).
 upstream barkcloud_files_http {
     server cloud-files:{{m.FilesHttp1Port}};
     keepalive 16;
@@ -657,6 +657,22 @@ server {
     client_max_body_size 0;  # без лимита размера тела (загрузка через браузер)
     ssl_certificate /etc/nginx/certs/{{crt}};
     ssl_certificate_key /etc/nginx/certs/{{key}};
+
+    # Upload 2.0 data plane: байты минуют Web и напрямую стримятся в HTTP/1 Files.
+    location /file-upload/ {
+        proxy_pass http://barkcloud_files_http;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_request_buffering off;
+        proxy_buffering off;
+        proxy_read_timeout 7200s;
+        proxy_send_timeout 7200s;
+        client_body_timeout 7200s;
+    }
 
     location / {
         proxy_pass http://cloud-web:8080;
