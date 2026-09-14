@@ -8,8 +8,8 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="AWSSDK.Core" Version="4.0.7.4" />
-        <PackageReference Include="AWSSDK.S3" Version="4.0.23.5" />
+        <PackageReference Include="AWSSDK.Core" Version="4.0.102.6" />
+        <PackageReference Include="AWSSDK.S3" Version="4.0.103.3" />
         <PackageReference Include="FFMpegCore" Version="5.4.0" />
         <PackageReference Include="Google.Protobuf" Version="3.36.1" />
         <PackageReference Include="Grpc.AspNetCore.Server" Version="2.83.0" />
