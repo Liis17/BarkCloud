@@ -1,4 +1,5 @@
 import Foundation
+import BarkCloudKit
 
 /// Общие константы для фоновой загрузки. Используются в main app, Share Extension и
 /// Widget Extension — поэтому все строковые идентификаторы держим здесь, чтобы
@@ -20,15 +21,12 @@ enum UploadConstants {
     /// Максимальное число повторных попыток фоновой загрузки.
     static let maxUploadRetries = 3
 
-    /// Стабильный multipart boundary — пишется и в Content-Type заголовок, и в тело.
-    static let multipartBoundary = "BarkCloudUpload-Boundary-7c1f3b2a"
-
     /// Корень App Group container.
     static var appGroupURL: URL? {
         FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupID)
     }
 
-    /// Каталог для подготовленных multipart-body и временных копий оригиналов.
+    /// Каталог для staged-оригиналов и ограниченных временных part-файлов.
     /// Создаётся при первом обращении.
     static var stagingDirectory: URL? {
         guard let appGroupURL else { return nil }
@@ -40,15 +38,69 @@ enum UploadConstants {
     /// URL SwiftData-БД с очередью UploadJob. Лежит в App Group, чтобы был доступен
     /// и main app, и Share Extension.
     static var uploadQueueDatabaseURL: URL? {
+        appGroupURL?.appendingPathComponent("UploadSessionQueue.sqlite")
+    }
+
+    /// Путь прежней V1-БД. Он никогда не открывается схемой V2: запись удаляется
+    /// только в одноразовой миграции после отмены живых V1 URLSession-задач.
+    static var legacyUploadQueueDatabaseURL: URL? {
         appGroupURL?.appendingPathComponent("UploadQueue.sqlite")
     }
 
-    /// Удалить все подготовленные multipart-body и временные копии оригиналов — при
+    static let uploadMigrationMarker = "BarkCloud.upload2.ios.migration.v1"
+
+    static var uploadMigrationCompleted: Bool {
+        (UserDefaults(suiteName: appGroupID) ?? .standard).bool(forKey: uploadMigrationMarker)
+    }
+
+    static func markUploadMigrationCompleted() {
+        (UserDefaults(suiteName: appGroupID) ?? .standard).set(true, forKey: uploadMigrationMarker)
+    }
+
+    /// Потоково скопировать файл в staging. Используется fileImporter/Share
+    /// Extension и не создаёт `Data` размером с оригинал.
+    static func stageFile(_ source: URL, fileName: String? = nil) throws -> URL {
+        guard let dir = stagingDirectory else { throw FileTransferError.badURL }
+        let safeName = (fileName ?? source.lastPathComponent).isEmpty
+            ? UUID().uuidString
+            : (fileName ?? source.lastPathComponent)
+        let destination = dir.appendingPathComponent("\(UUID().uuidString)-\(safeName)")
+        let input = try FileHandle(forReadingFrom: source)
+        defer { try? input.close() }
+        FileManager.default.createFile(atPath: destination.path, contents: nil)
+        let output = try FileHandle(forWritingTo: destination)
+        defer { try? output.close() }
+        do {
+            while let chunk = try input.read(upToCount: 4 * 1024 * 1024), !chunk.isEmpty {
+                try output.write(contentsOf: chunk)
+            }
+        } catch {
+            try? FileManager.default.removeItem(at: destination)
+            throw error
+        }
+        return destination
+    }
+
+    /// Удалить staged-оригиналы и временные part-файлы — при
     /// полном сбросе, чтобы байты файлов прежнего аккаунта не оставались на диске.
     static func purgeStaging() {
         guard let dir = stagingDirectory else { return }
         let fm = FileManager.default
         guard let items = try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil) else { return }
+        for item in items { try? fm.removeItem(at: item) }
+    }
+
+    /// Удалить V1-БД и её sidecar-файлы. Вызывается только до создания первой
+    /// V2-задачи; ShareInbox намеренно не затрагивается.
+    static func removeLegacyUploadStoreAndStaging() {
+        let fm = FileManager.default
+        if let legacyURL = legacyUploadQueueDatabaseURL {
+            for suffix in ["", "-shm", "-wal"] {
+                try? fm.removeItem(at: URL(fileURLWithPath: legacyURL.path + suffix))
+            }
+        }
+        guard let dir = stagingDirectory,
+              let items = try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil) else { return }
         for item in items { try? fm.removeItem(at: item) }
     }
 

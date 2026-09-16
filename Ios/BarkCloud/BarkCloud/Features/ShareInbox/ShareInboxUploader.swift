@@ -37,7 +37,8 @@ final class ShareInboxUploader {
                         sourceFile: item,
                         fileName: item.lastPathComponent,
                         toDirectory: nil,
-                        source: .share
+                        source: .share,
+                        routeByMediaKind: true
                     )
                     ShareInbox.remove(item)
                 } catch {

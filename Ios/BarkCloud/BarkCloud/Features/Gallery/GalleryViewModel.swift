@@ -176,14 +176,18 @@ final class GalleryViewModel {
         var anyFailed = false
         for asset in targets {
             do {
-                let (data, name) = try await DeviceAssetResource.originalData(for: asset)
-                // Без явной папки: сервер раскладывает по системным «Фото»/«Видео»/
-                // «Другие документы» по типу медиа (route_by_media_kind).
-                let fileID = try await cloud.uploadFile(data: data, fileName: name, routeByMediaKind: true)
-                // Файл теперь в облаке — сразу показываем иконку.
-                presence.markPresent(asset.localIdentifier)
-                // Запоминаем связь облако↔устройство для синхронного удаления.
-                await CloudDeviceLinkStore.shared.link(fileID: fileID, localIdentifier: asset.localIdentifier)
+                guard let staging = UploadConstants.stagingDirectory else { throw DeviceAssetError.noResource }
+                let source = staging.appendingPathComponent("gallery-\(UUID().uuidString)")
+                let name = try await DeviceAssetResource.writeOriginal(asset: asset, to: source)
+                // Файл станет виден в галерее и получит device-link только после
+                // server-side ready и успешного post-ready attach.
+                _ = try await cloud.enqueueBackgroundUpload(
+                    sourceFile: source,
+                    fileName: name,
+                    source: .manual,
+                    routeByMediaKind: true,
+                    localIdentifier: asset.localIdentifier
+                )
             } catch {
                 anyFailed = true
             }
@@ -192,9 +196,10 @@ final class GalleryViewModel {
         isUploading = false
         selection.removeAll()
         isSelecting = false
-        snackbar = anyFailed
-            ? String(localized: "gallery_upload_failed")
-            : String(localized: "gallery_upload_done")
+        // При успешной постановке job байты/processing ещё не готовы: глобальный
+        // Upload 2.0 banner показывает фактический прогресс, а «готово» появится
+        // только после server-ready и attach.
+        snackbar = anyFailed ? String(localized: "gallery_upload_failed") : nil
     }
 
     // MARK: - Удаление выбранных (режим мультивыбора)
@@ -282,8 +287,16 @@ final class GalleryViewModel {
             await CloudDeviceLinkStore.shared.link(fileID: existing, localIdentifier: asset.localIdentifier)
             return existing
         }
-        let (data, name) = try await DeviceAssetResource.originalData(for: asset)
-        let id = try await cloud.uploadFile(data: data, fileName: name, routeByMediaKind: true)
+        guard let staging = UploadConstants.stagingDirectory else { throw DeviceAssetError.noResource }
+        let source = staging.appendingPathComponent("gallery-\(UUID().uuidString)")
+        let name = try await DeviceAssetResource.writeOriginal(asset: asset, to: source)
+        let id = try await cloud.enqueueAndWaitForReady(
+            sourceFile: source,
+            fileName: name,
+            source: .manual,
+            routeByMediaKind: true,
+            localIdentifier: asset.localIdentifier
+        )
         presence.markPresent(asset.localIdentifier)
         await CloudDeviceLinkStore.shared.link(fileID: id, localIdentifier: asset.localIdentifier)
         return id

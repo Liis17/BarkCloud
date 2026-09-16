@@ -1,10 +1,8 @@
 import Foundation
 import SwiftData
 
-/// Persist-очередь UploadJob поверх SwiftData. Контейнер хранится в App Group,
-/// чтобы был доступен и main app, и Share Extension (oба используют один и тот
-/// же `UploadConstants.uploadQueueDatabaseURL`). При сбое открытия откатываемся
-/// на in-memory.
+/// Отдельная App Group-БД Upload 2.0. Старый `UploadQueue.sqlite` не открывается
+/// этой схемой: при миграции он удаляется вместе с отменёнными V1-артефактами.
 actor UploadQueueStore {
     static let shared = UploadQueueStore()
 
@@ -25,68 +23,39 @@ actor UploadQueueStore {
         }
     }
 
-    // MARK: - Create
-
     @discardableResult
-    func create(
+    func createV2(
         id: String = UUID().uuidString,
-        sourceKind: UploadJobSource,
+        source: UploadJobSource,
         sourceFilePath: String,
-        multipartBodyPath: String,
         fileName: String,
         mimeType: String,
+        totalBytes: Int64,
+        sha256: String,
         directoryID: String?,
-        uploadURL: String,
-        preparedFileID: String,
-        totalBytes: Int64
+        intent: UploadPostReadyIntent,
+        albumID: String? = nil,
+        localIdentifier: String? = nil,
+        idempotencyKey: String = UUID().uuidString
     ) -> UploadJobSnapshot {
         let context = ModelContext(container)
         let job = UploadJob(
             id: id,
-            sourceKind: sourceKind.rawValue,
+            sourceKind: source.rawValue,
             sourceFilePath: sourceFilePath,
-            multipartBodyPath: multipartBodyPath,
             fileName: fileName,
             mimeType: mimeType,
             directoryID: directoryID,
-            uploadURL: uploadURL,
-            preparedFileID: preparedFileID,
-            stateRaw: UploadJobState.pending.rawValue,
+            stateRaw: UploadJobState.hashing.rawValue,
             bytesSent: 0,
             totalBytes: totalBytes,
-            sessionTaskIdentifier: -1,
-            retries: 0,
-            lastError: nil,
-            createdAt: .now,
-            updatedAt: .now
+            idempotencyKey: idempotencyKey,
+            sha256: sha256,
+            intentRaw: intent.rawValue,
+            albumID: albumID,
+            localIdentifier: localIdentifier
         )
         context.insert(job)
-        try? context.save()
-        return UploadJobSnapshot(job)
-    }
-
-    // MARK: - Update
-
-    /// Привязать taskIdentifier из URLSession к существующему job и перевести
-    /// в `running`. Возвращает `nil`, если job не найден (например, удалён).
-    @discardableResult
-    func attachTask(jobID: String, taskIdentifier: Int) -> UploadJobSnapshot? {
-        let context = ModelContext(container)
-        guard let job = fetchInContext(context, id: jobID) else { return nil }
-        job.sessionTaskIdentifier = taskIdentifier
-        job.stateRaw = UploadJobState.running.rawValue
-        job.updatedAt = .now
-        try? context.save()
-        return UploadJobSnapshot(job)
-    }
-
-    @discardableResult
-    func updateProgress(id: String, bytesSent: Int64, total: Int64) -> UploadJobSnapshot? {
-        let context = ModelContext(container)
-        guard let job = fetchInContext(context, id: id) else { return nil }
-        job.bytesSent = bytesSent
-        if total > 0 { job.totalBytes = total }
-        job.updatedAt = .now
         try? context.save()
         return UploadJobSnapshot(job)
     }
@@ -96,15 +65,78 @@ actor UploadQueueStore {
         id: String,
         state: UploadJobState,
         lastError: String? = nil,
-        returnedFileID: String? = nil
+        returnedFileID: String? = nil,
+        retryable: Bool? = nil
     ) -> UploadJobSnapshot? {
         let context = ModelContext(container)
         guard let job = fetchInContext(context, id: id) else { return nil }
         job.stateRaw = state.rawValue
         job.lastError = lastError
+        if let retryable { job.retryable = retryable }
         if let returnedFileID, !returnedFileID.isEmpty {
-            job.preparedFileID = returnedFileID
+            job.fileID = returnedFileID
         }
+        job.updatedAt = .now
+        try? context.save()
+        return UploadJobSnapshot(job)
+    }
+
+    @discardableResult
+    func updateProgress(id: String, bytesSent: Int64, total: Int64? = nil) -> UploadJobSnapshot? {
+        let context = ModelContext(container)
+        guard let job = fetchInContext(context, id: id) else { return nil }
+        job.bytesSent = max(0, bytesSent)
+        if let total, total > 0 { job.totalBytes = total }
+        job.updatedAt = .now
+        try? context.save()
+        return UploadJobSnapshot(job)
+    }
+
+    @discardableResult
+    func setSession(
+        id: String,
+        sessionID: String,
+        fileID: String,
+        partSize: Int64,
+        state: UploadJobState = .uploading
+    ) -> UploadJobSnapshot? {
+        let context = ModelContext(container)
+        guard let job = fetchInContext(context, id: id) else { return nil }
+        job.sessionID = sessionID
+        job.fileID = fileID
+        job.partSize = partSize
+        job.stateRaw = state.rawValue
+        job.lastError = nil
+        job.updatedAt = .now
+        try? context.save()
+        return UploadJobSnapshot(job)
+    }
+
+    @discardableResult
+    func setCurrentPart(id: String, part: Int) -> UploadJobSnapshot? {
+        let context = ModelContext(container)
+        guard let job = fetchInContext(context, id: id) else { return nil }
+        job.currentPart = part
+        job.updatedAt = .now
+        try? context.save()
+        return UploadJobSnapshot(job)
+    }
+
+    @discardableResult
+    func attachTask(jobID: String, taskIdentifier: Int) -> UploadJobSnapshot? {
+        let context = ModelContext(container)
+        guard let job = fetchInContext(context, id: jobID) else { return nil }
+        job.sessionTaskIdentifier = taskIdentifier
+        job.updatedAt = .now
+        try? context.save()
+        return UploadJobSnapshot(job)
+    }
+
+    @discardableResult
+    func clearTask(id: String) -> UploadJobSnapshot? {
+        let context = ModelContext(container)
+        guard let job = fetchInContext(context, id: id) else { return nil }
+        job.sessionTaskIdentifier = -1
         job.updatedAt = .now
         try? context.save()
         return UploadJobSnapshot(job)
@@ -122,14 +154,11 @@ actor UploadQueueStore {
         let context = ModelContext(container)
         guard let job = fetchInContext(context, id: id) else { return }
         job.stateRaw = UploadJobState.pending.rawValue
-        job.bytesSent = 0
         job.sessionTaskIdentifier = -1
         job.lastError = nil
         job.updatedAt = .now
         try? context.save()
     }
-
-    // MARK: - Fetch
 
     func fetch(id: String) -> UploadJobSnapshot? {
         let context = ModelContext(container)
@@ -142,25 +171,18 @@ actor UploadQueueStore {
             predicate: #Predicate { $0.sessionTaskIdentifier == taskID }
         )
         descriptor.fetchLimit = 1
-        return (try? context.fetch(descriptor).first).map { UploadJobSnapshot($0) }
+        return (try? context.fetch(descriptor).first).map(UploadJobSnapshot.init)
     }
 
-    /// Все активные (pending|preparing|running) — для re-attaching при старте.
     func activeJobs() -> [UploadJobSnapshot] {
         let context = ModelContext(container)
-        let pending = UploadJobState.pending.rawValue
-        let preparing = UploadJobState.preparing.rawValue
-        let running = UploadJobState.running.rawValue
-        let descriptor = FetchDescriptor<UploadJob>(
-            predicate: #Predicate { $0.stateRaw == pending || $0.stateRaw == preparing || $0.stateRaw == running },
-            sortBy: [SortDescriptor(\.createdAt, order: .forward)]
-        )
-        return ((try? context.fetch(descriptor)) ?? []).map(UploadJobSnapshot.init)
+        let states = Set(UploadJobState.allCases.filter { $0.isActive }.map(\.rawValue))
+        let descriptor = FetchDescriptor<UploadJob>(sortBy: [SortDescriptor(\.createdAt, order: .forward)])
+        return ((try? context.fetch(descriptor)) ?? [])
+            .map(UploadJobSnapshot.init)
+            .filter { states.contains($0.state.rawValue) }
     }
 
-    /// Все jobs созданные после указанной даты — используется Live Activity
-    /// контроллером, чтобы посчитать совокупный прогресс «N из M» по текущей
-    /// сессии загрузки (без учёта старых завершённых).
     func recentJobs(since: Date) -> [UploadJobSnapshot] {
         let context = ModelContext(container)
         let descriptor = FetchDescriptor<UploadJob>(
@@ -170,18 +192,13 @@ actor UploadQueueStore {
         return ((try? context.fetch(descriptor)) ?? []).map(UploadJobSnapshot.init)
     }
 
-    /// Все failed job для retry-логики (BGTask).
-    func failedJobs(maxRetries: Int) -> [UploadJobSnapshot] {
+    func retryableJobs(maxRetries: Int) -> [UploadJobSnapshot] {
         let context = ModelContext(container)
-        let failed = UploadJobState.failed.rawValue
-        let descriptor = FetchDescriptor<UploadJob>(
-            predicate: #Predicate { $0.stateRaw == failed && $0.retries < maxRetries },
-            sortBy: [SortDescriptor(\.createdAt, order: .forward)]
-        )
-        return ((try? context.fetch(descriptor)) ?? []).map(UploadJobSnapshot.init)
+        let descriptor = FetchDescriptor<UploadJob>(sortBy: [SortDescriptor(\.createdAt, order: .forward)])
+        return ((try? context.fetch(descriptor)) ?? [])
+            .map(UploadJobSnapshot.init)
+            .filter { ($0.state == .failed && $0.retryable && $0.retries < maxRetries) || $0.state == .uploadedNotAttached }
     }
-
-    // MARK: - Delete
 
     func delete(id: String) {
         let context = ModelContext(container)
@@ -190,8 +207,6 @@ actor UploadQueueStore {
         try? context.save()
     }
 
-    /// Удалить все завершённые job старше определённого возраста — вызывается при
-    /// старте main app для cleanup'а старых записей.
     func purgeCompleted(olderThan: Date) {
         let context = ModelContext(container)
         let completed = UploadJobState.completed.rawValue
@@ -203,18 +218,23 @@ actor UploadQueueStore {
         try? context.save()
     }
 
-    /// Полная очистка очереди — при выходе из аккаунта / полном сбросе устройства.
     func deleteAll() {
         let context = ModelContext(container)
         try? context.delete(model: UploadJob.self)
         try? context.save()
     }
 
-    // MARK: - Helpers
-
     private func fetchInContext(_ context: ModelContext, id: String) -> UploadJob? {
         var descriptor = FetchDescriptor<UploadJob>(predicate: #Predicate { $0.id == id })
         descriptor.fetchLimit = 1
         return try? context.fetch(descriptor).first
+    }
+}
+
+private extension UploadJobState {
+    static var allCases: [UploadJobState] {
+        [.pending, .preparing, .running, .hashing, .creatingSession, .uploading,
+         .completing, .processing, .attaching, .uploadedNotAttached, .completed,
+         .failed, .cancelled]
     }
 }

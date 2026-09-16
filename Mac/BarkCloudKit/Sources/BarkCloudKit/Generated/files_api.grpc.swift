@@ -33,6 +33,71 @@ public enum Barkcloud_Files_FilesApi: Sendable {
                 type: .unary
             )
         }
+        /// Namespace for "CreateUploadSession" metadata.
+        public enum CreateUploadSession: Sendable {
+            /// Request type for "CreateUploadSession".
+            public typealias Input = Barkcloud_Files_CreateUploadSessionRequest
+            /// Response type for "CreateUploadSession".
+            public typealias Output = Barkcloud_Files_UploadSessionResponse
+            /// Descriptor for "CreateUploadSession".
+            public static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.FilesApi"),
+                method: "CreateUploadSession",
+                type: .unary
+            )
+        }
+        /// Namespace for "GetUploadSession" metadata.
+        public enum GetUploadSession: Sendable {
+            /// Request type for "GetUploadSession".
+            public typealias Input = Barkcloud_Files_UploadSessionIdRequest
+            /// Response type for "GetUploadSession".
+            public typealias Output = Barkcloud_Files_UploadSessionResponse
+            /// Descriptor for "GetUploadSession".
+            public static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.FilesApi"),
+                method: "GetUploadSession",
+                type: .unary
+            )
+        }
+        /// Namespace for "ResumeUploadSession" metadata.
+        public enum ResumeUploadSession: Sendable {
+            /// Request type for "ResumeUploadSession".
+            public typealias Input = Barkcloud_Files_UploadSessionIdRequest
+            /// Response type for "ResumeUploadSession".
+            public typealias Output = Barkcloud_Files_UploadSessionResponse
+            /// Descriptor for "ResumeUploadSession".
+            public static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.FilesApi"),
+                method: "ResumeUploadSession",
+                type: .unary
+            )
+        }
+        /// Namespace for "CompleteUploadSession" metadata.
+        public enum CompleteUploadSession: Sendable {
+            /// Request type for "CompleteUploadSession".
+            public typealias Input = Barkcloud_Files_UploadSessionIdRequest
+            /// Response type for "CompleteUploadSession".
+            public typealias Output = Barkcloud_Files_UploadSessionResponse
+            /// Descriptor for "CompleteUploadSession".
+            public static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.FilesApi"),
+                method: "CompleteUploadSession",
+                type: .unary
+            )
+        }
+        /// Namespace for "CancelUploadSession" metadata.
+        public enum CancelUploadSession: Sendable {
+            /// Request type for "CancelUploadSession".
+            public typealias Input = Barkcloud_Files_UploadSessionIdRequest
+            /// Response type for "CancelUploadSession".
+            public typealias Output = Barkcloud_Files_UploadSessionResponse
+            /// Descriptor for "CancelUploadSession".
+            public static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.FilesApi"),
+                method: "CancelUploadSession",
+                type: .unary
+            )
+        }
         /// Namespace for "GetTempDownloadUrl" metadata.
         public enum GetTempDownloadUrl: Sendable {
             /// Request type for "GetTempDownloadUrl".
@@ -101,6 +166,11 @@ public enum Barkcloud_Files_FilesApi: Sendable {
         /// Descriptors for all methods in the "barkcloud.files.FilesApi" service.
         public static let descriptors: [GRPCCore.MethodDescriptor] = [
             GetUploadUrl.descriptor,
+            CreateUploadSession.descriptor,
+            GetUploadSession.descriptor,
+            ResumeUploadSession.descriptor,
+            CompleteUploadSession.descriptor,
+            CancelUploadSession.descriptor,
             GetTempDownloadUrl.descriptor,
             CheckFileHash.descriptor,
             CheckFileHashes.descriptor,
@@ -148,6 +218,96 @@ extension Barkcloud_Files_FilesApi {
             request: GRPCCore.StreamingServerRequest<Barkcloud_Files_GetUploadUrlRequest>,
             context: GRPCCore.ServerContext
         ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_GetUploadUrlResponse>
+
+        /// Handle the "CreateUploadSession" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Создать resumable upload-сессию
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Files_CreateUploadSessionRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Files_UploadSessionResponse` messages.
+        func createUploadSession(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Files_CreateUploadSessionRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_UploadSessionResponse>
+
+        /// Handle the "GetUploadSession" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Получить серверное состояние upload-сессии
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Files_UploadSessionIdRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Files_UploadSessionResponse` messages.
+        func getUploadSession(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Files_UploadSessionIdRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_UploadSessionResponse>
+
+        /// Handle the "ResumeUploadSession" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Получить новый upload-token и уже принятые части
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Files_UploadSessionIdRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Files_UploadSessionResponse` messages.
+        func resumeUploadSession(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Files_UploadSessionIdRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_UploadSessionResponse>
+
+        /// Handle the "CompleteUploadSession" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Завершить multipart и поставить файл в обработку
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Files_UploadSessionIdRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Files_UploadSessionResponse` messages.
+        func completeUploadSession(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Files_UploadSessionIdRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_UploadSessionResponse>
+
+        /// Handle the "CancelUploadSession" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Отменить незавершённую загрузку
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Files_UploadSessionIdRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Files_UploadSessionResponse` messages.
+        func cancelUploadSession(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Files_UploadSessionIdRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_UploadSessionResponse>
 
         /// Handle the "GetTempDownloadUrl" method.
         ///
@@ -266,6 +426,96 @@ extension Barkcloud_Files_FilesApi {
             context: GRPCCore.ServerContext
         ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_GetUploadUrlResponse>
 
+        /// Handle the "CreateUploadSession" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Создать resumable upload-сессию
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_CreateUploadSessionRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Files_UploadSessionResponse` message.
+        func createUploadSession(
+            request: GRPCCore.ServerRequest<Barkcloud_Files_CreateUploadSessionRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_UploadSessionResponse>
+
+        /// Handle the "GetUploadSession" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Получить серверное состояние upload-сессии
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_UploadSessionIdRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Files_UploadSessionResponse` message.
+        func getUploadSession(
+            request: GRPCCore.ServerRequest<Barkcloud_Files_UploadSessionIdRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_UploadSessionResponse>
+
+        /// Handle the "ResumeUploadSession" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Получить новый upload-token и уже принятые части
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_UploadSessionIdRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Files_UploadSessionResponse` message.
+        func resumeUploadSession(
+            request: GRPCCore.ServerRequest<Barkcloud_Files_UploadSessionIdRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_UploadSessionResponse>
+
+        /// Handle the "CompleteUploadSession" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Завершить multipart и поставить файл в обработку
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_UploadSessionIdRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Files_UploadSessionResponse` message.
+        func completeUploadSession(
+            request: GRPCCore.ServerRequest<Barkcloud_Files_UploadSessionIdRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_UploadSessionResponse>
+
+        /// Handle the "CancelUploadSession" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Отменить незавершённую загрузку
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_UploadSessionIdRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Files_UploadSessionResponse` message.
+        func cancelUploadSession(
+            request: GRPCCore.ServerRequest<Barkcloud_Files_UploadSessionIdRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_UploadSessionResponse>
+
         /// Handle the "GetTempDownloadUrl" method.
         ///
         /// > Source IDL Documentation:
@@ -381,6 +631,96 @@ extension Barkcloud_Files_FilesApi {
             context: GRPCCore.ServerContext
         ) async throws -> Barkcloud_Files_GetUploadUrlResponse
 
+        /// Handle the "CreateUploadSession" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Создать resumable upload-сессию
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Files_CreateUploadSessionRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Files_UploadSessionResponse` to respond with.
+        func createUploadSession(
+            request: Barkcloud_Files_CreateUploadSessionRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Files_UploadSessionResponse
+
+        /// Handle the "GetUploadSession" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Получить серверное состояние upload-сессии
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Files_UploadSessionIdRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Files_UploadSessionResponse` to respond with.
+        func getUploadSession(
+            request: Barkcloud_Files_UploadSessionIdRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Files_UploadSessionResponse
+
+        /// Handle the "ResumeUploadSession" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Получить новый upload-token и уже принятые части
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Files_UploadSessionIdRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Files_UploadSessionResponse` to respond with.
+        func resumeUploadSession(
+            request: Barkcloud_Files_UploadSessionIdRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Files_UploadSessionResponse
+
+        /// Handle the "CompleteUploadSession" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Завершить multipart и поставить файл в обработку
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Files_UploadSessionIdRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Files_UploadSessionResponse` to respond with.
+        func completeUploadSession(
+            request: Barkcloud_Files_UploadSessionIdRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Files_UploadSessionResponse
+
+        /// Handle the "CancelUploadSession" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Отменить незавершённую загрузку
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Files_UploadSessionIdRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Files_UploadSessionResponse` to respond with.
+        func cancelUploadSession(
+            request: Barkcloud_Files_UploadSessionIdRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Files_UploadSessionResponse
+
         /// Handle the "GetTempDownloadUrl" method.
         ///
         /// > Source IDL Documentation:
@@ -489,6 +829,61 @@ extension Barkcloud_Files_FilesApi.StreamingServiceProtocol {
             }
         )
         router.registerHandler(
+            forMethod: Barkcloud_Files_FilesApi.Method.CreateUploadSession.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_CreateUploadSessionRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_UploadSessionResponse>(),
+            handler: { request, context in
+                try await self.createUploadSession(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
+            forMethod: Barkcloud_Files_FilesApi.Method.GetUploadSession.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_UploadSessionIdRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_UploadSessionResponse>(),
+            handler: { request, context in
+                try await self.getUploadSession(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
+            forMethod: Barkcloud_Files_FilesApi.Method.ResumeUploadSession.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_UploadSessionIdRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_UploadSessionResponse>(),
+            handler: { request, context in
+                try await self.resumeUploadSession(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
+            forMethod: Barkcloud_Files_FilesApi.Method.CompleteUploadSession.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_UploadSessionIdRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_UploadSessionResponse>(),
+            handler: { request, context in
+                try await self.completeUploadSession(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
+            forMethod: Barkcloud_Files_FilesApi.Method.CancelUploadSession.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_UploadSessionIdRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_UploadSessionResponse>(),
+            handler: { request, context in
+                try await self.cancelUploadSession(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
             forMethod: Barkcloud_Files_FilesApi.Method.GetTempDownloadUrl.descriptor,
             deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_GetTempDownloadUrlRequest>(),
             serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_GetTempDownloadUrlResponse>(),
@@ -560,6 +955,61 @@ extension Barkcloud_Files_FilesApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
+    public func createUploadSession(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Files_CreateUploadSessionRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_UploadSessionResponse> {
+        let response = try await self.createUploadSession(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    public func getUploadSession(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Files_UploadSessionIdRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_UploadSessionResponse> {
+        let response = try await self.getUploadSession(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    public func resumeUploadSession(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Files_UploadSessionIdRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_UploadSessionResponse> {
+        let response = try await self.resumeUploadSession(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    public func completeUploadSession(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Files_UploadSessionIdRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_UploadSessionResponse> {
+        let response = try await self.completeUploadSession(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    public func cancelUploadSession(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Files_UploadSessionIdRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_UploadSessionResponse> {
+        let response = try await self.cancelUploadSession(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
     public func getTempDownloadUrl(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Files_GetTempDownloadUrlRequest>,
         context: GRPCCore.ServerContext
@@ -625,6 +1075,71 @@ extension Barkcloud_Files_FilesApi.SimpleServiceProtocol {
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_GetUploadUrlResponse> {
         return GRPCCore.ServerResponse<Barkcloud_Files_GetUploadUrlResponse>(
             message: try await self.getUploadUrl(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    public func createUploadSession(
+        request: GRPCCore.ServerRequest<Barkcloud_Files_CreateUploadSessionRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_UploadSessionResponse> {
+        return GRPCCore.ServerResponse<Barkcloud_Files_UploadSessionResponse>(
+            message: try await self.createUploadSession(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    public func getUploadSession(
+        request: GRPCCore.ServerRequest<Barkcloud_Files_UploadSessionIdRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_UploadSessionResponse> {
+        return GRPCCore.ServerResponse<Barkcloud_Files_UploadSessionResponse>(
+            message: try await self.getUploadSession(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    public func resumeUploadSession(
+        request: GRPCCore.ServerRequest<Barkcloud_Files_UploadSessionIdRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_UploadSessionResponse> {
+        return GRPCCore.ServerResponse<Barkcloud_Files_UploadSessionResponse>(
+            message: try await self.resumeUploadSession(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    public func completeUploadSession(
+        request: GRPCCore.ServerRequest<Barkcloud_Files_UploadSessionIdRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_UploadSessionResponse> {
+        return GRPCCore.ServerResponse<Barkcloud_Files_UploadSessionResponse>(
+            message: try await self.completeUploadSession(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    public func cancelUploadSession(
+        request: GRPCCore.ServerRequest<Barkcloud_Files_UploadSessionIdRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_UploadSessionResponse> {
+        return GRPCCore.ServerResponse<Barkcloud_Files_UploadSessionResponse>(
+            message: try await self.cancelUploadSession(
                 request: request.message,
                 context: context
             ),
@@ -728,6 +1243,121 @@ extension Barkcloud_Files_FilesApi {
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_GetUploadUrlResponse>,
             options: GRPCCore.CallOptions,
             onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_GetUploadUrlResponse>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "CreateUploadSession" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Создать resumable upload-сессию
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_CreateUploadSessionRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_CreateUploadSessionRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_UploadSessionResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func createUploadSession<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_CreateUploadSessionRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_CreateUploadSessionRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_UploadSessionResponse>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_UploadSessionResponse>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "GetUploadSession" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Получить серверное состояние upload-сессии
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_UploadSessionIdRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_UploadSessionIdRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_UploadSessionResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func getUploadSession<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_UploadSessionIdRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_UploadSessionIdRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_UploadSessionResponse>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_UploadSessionResponse>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "ResumeUploadSession" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Получить новый upload-token и уже принятые части
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_UploadSessionIdRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_UploadSessionIdRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_UploadSessionResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func resumeUploadSession<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_UploadSessionIdRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_UploadSessionIdRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_UploadSessionResponse>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_UploadSessionResponse>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "CompleteUploadSession" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Завершить multipart и поставить файл в обработку
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_UploadSessionIdRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_UploadSessionIdRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_UploadSessionResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func completeUploadSession<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_UploadSessionIdRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_UploadSessionIdRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_UploadSessionResponse>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_UploadSessionResponse>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "CancelUploadSession" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Отменить незавершённую загрузку
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_UploadSessionIdRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_UploadSessionIdRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_UploadSessionResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func cancelUploadSession<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_UploadSessionIdRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_UploadSessionIdRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_UploadSessionResponse>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_UploadSessionResponse>) async throws -> Result
         ) async throws -> Result where Result: Sendable
 
         /// Call the "GetTempDownloadUrl" method.
@@ -889,6 +1519,176 @@ extension Barkcloud_Files_FilesApi {
             try await self.client.unary(
                 request: request,
                 descriptor: Barkcloud_Files_FilesApi.Method.GetUploadUrl.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "CreateUploadSession" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Создать resumable upload-сессию
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_CreateUploadSessionRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_CreateUploadSessionRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_UploadSessionResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        public func createUploadSession<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_CreateUploadSessionRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_CreateUploadSessionRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_UploadSessionResponse>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_UploadSessionResponse>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Files_FilesApi.Method.CreateUploadSession.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "GetUploadSession" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Получить серверное состояние upload-сессии
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_UploadSessionIdRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_UploadSessionIdRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_UploadSessionResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        public func getUploadSession<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_UploadSessionIdRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_UploadSessionIdRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_UploadSessionResponse>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_UploadSessionResponse>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Files_FilesApi.Method.GetUploadSession.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "ResumeUploadSession" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Получить новый upload-token и уже принятые части
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_UploadSessionIdRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_UploadSessionIdRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_UploadSessionResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        public func resumeUploadSession<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_UploadSessionIdRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_UploadSessionIdRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_UploadSessionResponse>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_UploadSessionResponse>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Files_FilesApi.Method.ResumeUploadSession.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "CompleteUploadSession" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Завершить multipart и поставить файл в обработку
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_UploadSessionIdRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_UploadSessionIdRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_UploadSessionResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        public func completeUploadSession<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_UploadSessionIdRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_UploadSessionIdRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_UploadSessionResponse>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_UploadSessionResponse>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Files_FilesApi.Method.CompleteUploadSession.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "CancelUploadSession" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Отменить незавершённую загрузку
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_UploadSessionIdRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_UploadSessionIdRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_UploadSessionResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        public func cancelUploadSession<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_UploadSessionIdRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_UploadSessionIdRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_UploadSessionResponse>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_UploadSessionResponse>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Files_FilesApi.Method.CancelUploadSession.descriptor,
                 serializer: serializer,
                 deserializer: deserializer,
                 options: options,
@@ -1100,6 +1900,151 @@ extension Barkcloud_Files_FilesApi.ClientProtocol {
         )
     }
 
+    /// Call the "CreateUploadSession" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Создать resumable upload-сессию
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Files_CreateUploadSessionRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func createUploadSession<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Files_CreateUploadSessionRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_UploadSessionResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.createUploadSession(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_CreateUploadSessionRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_UploadSessionResponse>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "GetUploadSession" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Получить серверное состояние upload-сессии
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Files_UploadSessionIdRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func getUploadSession<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Files_UploadSessionIdRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_UploadSessionResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.getUploadSession(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_UploadSessionIdRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_UploadSessionResponse>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "ResumeUploadSession" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Получить новый upload-token и уже принятые части
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Files_UploadSessionIdRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func resumeUploadSession<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Files_UploadSessionIdRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_UploadSessionResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.resumeUploadSession(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_UploadSessionIdRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_UploadSessionResponse>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "CompleteUploadSession" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Завершить multipart и поставить файл в обработку
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Files_UploadSessionIdRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func completeUploadSession<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Files_UploadSessionIdRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_UploadSessionResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.completeUploadSession(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_UploadSessionIdRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_UploadSessionResponse>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "CancelUploadSession" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Отменить незавершённую загрузку
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Files_UploadSessionIdRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func cancelUploadSession<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Files_UploadSessionIdRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_UploadSessionResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.cancelUploadSession(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_UploadSessionIdRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_UploadSessionResponse>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
     /// Call the "GetTempDownloadUrl" method.
     ///
     /// > Source IDL Documentation:
@@ -1276,6 +2221,171 @@ extension Barkcloud_Files_FilesApi.ClientProtocol {
             metadata: metadata
         )
         return try await self.getUploadUrl(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "CreateUploadSession" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Создать resumable upload-сессию
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func createUploadSession<Result>(
+        _ message: Barkcloud_Files_CreateUploadSessionRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_UploadSessionResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Files_CreateUploadSessionRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.createUploadSession(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "GetUploadSession" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Получить серверное состояние upload-сессии
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func getUploadSession<Result>(
+        _ message: Barkcloud_Files_UploadSessionIdRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_UploadSessionResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Files_UploadSessionIdRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.getUploadSession(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "ResumeUploadSession" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Получить новый upload-token и уже принятые части
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func resumeUploadSession<Result>(
+        _ message: Barkcloud_Files_UploadSessionIdRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_UploadSessionResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Files_UploadSessionIdRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.resumeUploadSession(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "CompleteUploadSession" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Завершить multipart и поставить файл в обработку
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func completeUploadSession<Result>(
+        _ message: Barkcloud_Files_UploadSessionIdRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_UploadSessionResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Files_UploadSessionIdRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.completeUploadSession(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "CancelUploadSession" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Отменить незавершённую загрузку
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func cancelUploadSession<Result>(
+        _ message: Barkcloud_Files_UploadSessionIdRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_UploadSessionResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Files_UploadSessionIdRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.cancelUploadSession(
             request: request,
             options: options,
             onResponse: handleResponse
@@ -1613,6 +2723,19 @@ public enum Barkcloud_Files_CloudApi: Sendable {
                 type: .unary
             )
         }
+        /// Namespace for "CreateArchive" metadata.
+        public enum CreateArchive: Sendable {
+            /// Request type for "CreateArchive".
+            public typealias Input = Barkcloud_Files_CreateArchiveRequest
+            /// Response type for "CreateArchive".
+            public typealias Output = Barkcloud_Files_CreateArchiveResponse
+            /// Descriptor for "CreateArchive".
+            public static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.CloudApi"),
+                method: "CreateArchive",
+                type: .unary
+            )
+        }
         /// Namespace for "ListUserImages" metadata.
         public enum ListUserImages: Sendable {
             /// Request type for "ListUserImages".
@@ -1662,6 +2785,19 @@ public enum Barkcloud_Files_CloudApi: Sendable {
             public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.CloudApi"),
                 method: "GetPath",
+                type: .unary
+            )
+        }
+        /// Namespace for "ListFileActivity" metadata.
+        public enum ListFileActivity: Sendable {
+            /// Request type for "ListFileActivity".
+            public typealias Input = Barkcloud_Files_ListFileActivityRequest
+            /// Response type for "ListFileActivity".
+            public typealias Output = Barkcloud_Files_ListFileActivityResponse
+            /// Descriptor for "ListFileActivity".
+            public static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.CloudApi"),
+                method: "ListFileActivity",
                 type: .unary
             )
         }
@@ -2082,10 +3218,12 @@ public enum Barkcloud_Files_CloudApi: Sendable {
             MoveFileEntry.descriptor,
             DeleteFileEntry.descriptor,
             DeleteFileEntries.descriptor,
+            CreateArchive.descriptor,
             ListUserImages.descriptor,
             ListUserMedia.descriptor,
             DeleteUserMedia.descriptor,
             GetPath.descriptor,
+            ListFileActivity.descriptor,
             SetVideoThumbnail.descriptor,
             GetMemories.descriptor,
             ListMediaLocations.descriptor,
@@ -2358,6 +3496,24 @@ extension Barkcloud_Files_CloudApi {
             context: GRPCCore.ServerContext
         ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_DeleteFileEntriesResponse>
 
+        /// Handle the "CreateArchive" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > ───────── Архив (ZIP) ─────────
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Files_CreateArchiveRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Files_CreateArchiveResponse` messages.
+        func createArchive(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Files_CreateArchiveRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CreateArchiveResponse>
+
         /// Handle the "ListUserImages" method.
         ///
         /// > Source IDL Documentation:
@@ -2398,7 +3554,7 @@ extension Barkcloud_Files_CloudApi {
         ///
         /// > Source IDL Documentation:
         /// >
-        /// > Удалить медиа из галереи по file_id: живые записи каталога → в корзину; если записей нет — снять владельца (жёстко)
+        /// > Удалить медиа из галереи по file_id: живые записи каталога → в корзину; если записей нет — создать запись корзины
         ///
         /// - Parameters:
         ///   - request: A streaming request of `Barkcloud_Files_DeleteUserMediaRequest` messages.
@@ -2429,6 +3585,24 @@ extension Barkcloud_Files_CloudApi {
             request: GRPCCore.StreamingServerRequest<Barkcloud_Files_GetPathRequest>,
             context: GRPCCore.ServerContext
         ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_PathResponse>
+
+        /// Handle the "ListFileActivity" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > История действий с файлом (для «Свойства»)
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Files_ListFileActivityRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Files_ListFileActivityResponse` messages.
+        func listFileActivity(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ListFileActivityRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_ListFileActivityResponse>
 
         /// Handle the "SetVideoThumbnail" method.
         ///
@@ -3213,6 +4387,24 @@ extension Barkcloud_Files_CloudApi {
             context: GRPCCore.ServerContext
         ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_DeleteFileEntriesResponse>
 
+        /// Handle the "CreateArchive" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > ───────── Архив (ZIP) ─────────
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_CreateArchiveRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Files_CreateArchiveResponse` message.
+        func createArchive(
+            request: GRPCCore.ServerRequest<Barkcloud_Files_CreateArchiveRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CreateArchiveResponse>
+
         /// Handle the "ListUserImages" method.
         ///
         /// > Source IDL Documentation:
@@ -3253,7 +4445,7 @@ extension Barkcloud_Files_CloudApi {
         ///
         /// > Source IDL Documentation:
         /// >
-        /// > Удалить медиа из галереи по file_id: живые записи каталога → в корзину; если записей нет — снять владельца (жёстко)
+        /// > Удалить медиа из галереи по file_id: живые записи каталога → в корзину; если записей нет — создать запись корзины
         ///
         /// - Parameters:
         ///   - request: A request containing a single `Barkcloud_Files_DeleteUserMediaRequest` message.
@@ -3284,6 +4476,24 @@ extension Barkcloud_Files_CloudApi {
             request: GRPCCore.ServerRequest<Barkcloud_Files_GetPathRequest>,
             context: GRPCCore.ServerContext
         ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_PathResponse>
+
+        /// Handle the "ListFileActivity" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > История действий с файлом (для «Свойства»)
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_ListFileActivityRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Files_ListFileActivityResponse` message.
+        func listFileActivity(
+            request: GRPCCore.ServerRequest<Barkcloud_Files_ListFileActivityRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_ListFileActivityResponse>
 
         /// Handle the "SetVideoThumbnail" method.
         ///
@@ -4066,6 +5276,24 @@ extension Barkcloud_Files_CloudApi {
             context: GRPCCore.ServerContext
         ) async throws -> Barkcloud_Files_DeleteFileEntriesResponse
 
+        /// Handle the "CreateArchive" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > ───────── Архив (ZIP) ─────────
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Files_CreateArchiveRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Files_CreateArchiveResponse` to respond with.
+        func createArchive(
+            request: Barkcloud_Files_CreateArchiveRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Files_CreateArchiveResponse
+
         /// Handle the "ListUserImages" method.
         ///
         /// > Source IDL Documentation:
@@ -4106,7 +5334,7 @@ extension Barkcloud_Files_CloudApi {
         ///
         /// > Source IDL Documentation:
         /// >
-        /// > Удалить медиа из галереи по file_id: живые записи каталога → в корзину; если записей нет — снять владельца (жёстко)
+        /// > Удалить медиа из галереи по file_id: живые записи каталога → в корзину; если записей нет — создать запись корзины
         ///
         /// - Parameters:
         ///   - request: A `Barkcloud_Files_DeleteUserMediaRequest` message.
@@ -4137,6 +5365,24 @@ extension Barkcloud_Files_CloudApi {
             request: Barkcloud_Files_GetPathRequest,
             context: GRPCCore.ServerContext
         ) async throws -> Barkcloud_Files_PathResponse
+
+        /// Handle the "ListFileActivity" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > История действий с файлом (для «Свойства»)
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Files_ListFileActivityRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Files_ListFileActivityResponse` to respond with.
+        func listFileActivity(
+            request: Barkcloud_Files_ListFileActivityRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Files_ListFileActivityResponse
 
         /// Handle the "SetVideoThumbnail" method.
         ///
@@ -4835,6 +6081,17 @@ extension Barkcloud_Files_CloudApi.StreamingServiceProtocol {
             }
         )
         router.registerHandler(
+            forMethod: Barkcloud_Files_CloudApi.Method.CreateArchive.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_CreateArchiveRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_CreateArchiveResponse>(),
+            handler: { request, context in
+                try await self.createArchive(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
             forMethod: Barkcloud_Files_CloudApi.Method.ListUserImages.descriptor,
             deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_ListUserImagesRequest>(),
             serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_ListUserImagesResponse>(),
@@ -4873,6 +6130,17 @@ extension Barkcloud_Files_CloudApi.StreamingServiceProtocol {
             serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_PathResponse>(),
             handler: { request, context in
                 try await self.getPath(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
+            forMethod: Barkcloud_Files_CloudApi.Method.ListFileActivity.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_ListFileActivityRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_ListFileActivityResponse>(),
+            handler: { request, context in
+                try await self.listFileActivity(
                     request: request,
                     context: context
                 )
@@ -5357,6 +6625,17 @@ extension Barkcloud_Files_CloudApi.ServiceProtocol {
         return GRPCCore.StreamingServerResponse(single: response)
     }
 
+    public func createArchive(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Files_CreateArchiveRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CreateArchiveResponse> {
+        let response = try await self.createArchive(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
     public func listUserImages(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ListUserImagesRequest>,
         context: GRPCCore.ServerContext
@@ -5395,6 +6674,17 @@ extension Barkcloud_Files_CloudApi.ServiceProtocol {
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_PathResponse> {
         let response = try await self.getPath(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    public func listFileActivity(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ListFileActivityRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_ListFileActivityResponse> {
+        let response = try await self.listFileActivity(
             request: GRPCCore.ServerRequest(stream: request),
             context: context
         )
@@ -5902,6 +7192,19 @@ extension Barkcloud_Files_CloudApi.SimpleServiceProtocol {
         )
     }
 
+    public func createArchive(
+        request: GRPCCore.ServerRequest<Barkcloud_Files_CreateArchiveRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CreateArchiveResponse> {
+        return GRPCCore.ServerResponse<Barkcloud_Files_CreateArchiveResponse>(
+            message: try await self.createArchive(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
     public func listUserImages(
         request: GRPCCore.ServerRequest<Barkcloud_Files_ListUserImagesRequest>,
         context: GRPCCore.ServerContext
@@ -5947,6 +7250,19 @@ extension Barkcloud_Files_CloudApi.SimpleServiceProtocol {
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_PathResponse> {
         return GRPCCore.ServerResponse<Barkcloud_Files_PathResponse>(
             message: try await self.getPath(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    public func listFileActivity(
+        request: GRPCCore.ServerRequest<Barkcloud_Files_ListFileActivityRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_ListFileActivityResponse> {
+        return GRPCCore.ServerResponse<Barkcloud_Files_ListFileActivityResponse>(
+            message: try await self.listFileActivity(
                 request: request.message,
                 context: context
             ),
@@ -6643,6 +7959,29 @@ extension Barkcloud_Files_CloudApi {
             onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_DeleteFileEntriesResponse>) async throws -> Result
         ) async throws -> Result where Result: Sendable
 
+        /// Call the "CreateArchive" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > ───────── Архив (ZIP) ─────────
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_CreateArchiveRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_CreateArchiveRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_CreateArchiveResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func createArchive<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_CreateArchiveRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_CreateArchiveRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CreateArchiveResponse>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CreateArchiveResponse>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
         /// Call the "ListUserImages" method.
         ///
         /// > Source IDL Documentation:
@@ -6693,7 +8032,7 @@ extension Barkcloud_Files_CloudApi {
         ///
         /// > Source IDL Documentation:
         /// >
-        /// > Удалить медиа из галереи по file_id: живые записи каталога → в корзину; если записей нет — снять владельца (жёстко)
+        /// > Удалить медиа из галереи по file_id: живые записи каталога → в корзину; если записей нет — создать запись корзины
         ///
         /// - Parameters:
         ///   - request: A request containing a single `Barkcloud_Files_DeleteUserMediaRequest` message.
@@ -6733,6 +8072,29 @@ extension Barkcloud_Files_CloudApi {
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_PathResponse>,
             options: GRPCCore.CallOptions,
             onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_PathResponse>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "ListFileActivity" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > История действий с файлом (для «Свойства»)
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_ListFileActivityRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_ListFileActivityRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_ListFileActivityResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func listFileActivity<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_ListFileActivityRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_ListFileActivityRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_ListFileActivityResponse>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListFileActivityResponse>) async throws -> Result
         ) async throws -> Result where Result: Sendable
 
         /// Call the "SetVideoThumbnail" method.
@@ -7873,6 +9235,40 @@ extension Barkcloud_Files_CloudApi {
             )
         }
 
+        /// Call the "CreateArchive" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > ───────── Архив (ZIP) ─────────
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_CreateArchiveRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_CreateArchiveRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_CreateArchiveResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        public func createArchive<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_CreateArchiveRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_CreateArchiveRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CreateArchiveResponse>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CreateArchiveResponse>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Files_CloudApi.Method.CreateArchive.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
         /// Call the "ListUserImages" method.
         ///
         /// > Source IDL Documentation:
@@ -7945,7 +9341,7 @@ extension Barkcloud_Files_CloudApi {
         ///
         /// > Source IDL Documentation:
         /// >
-        /// > Удалить медиа из галереи по file_id: живые записи каталога → в корзину; если записей нет — снять владельца (жёстко)
+        /// > Удалить медиа из галереи по file_id: живые записи каталога → в корзину; если записей нет — создать запись корзины
         ///
         /// - Parameters:
         ///   - request: A request containing a single `Barkcloud_Files_DeleteUserMediaRequest` message.
@@ -8002,6 +9398,40 @@ extension Barkcloud_Files_CloudApi {
             try await self.client.unary(
                 request: request,
                 descriptor: Barkcloud_Files_CloudApi.Method.GetPath.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "ListFileActivity" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > История действий с файлом (для «Свойства»)
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_ListFileActivityRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_ListFileActivityRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_ListFileActivityResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        public func listFileActivity<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_ListFileActivityRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_ListFileActivityRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_ListFileActivityResponse>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListFileActivityResponse>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Files_CloudApi.Method.ListFileActivity.descriptor,
                 serializer: serializer,
                 deserializer: deserializer,
                 options: options,
@@ -9416,6 +10846,35 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
         )
     }
 
+    /// Call the "CreateArchive" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > ───────── Архив (ZIP) ─────────
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Files_CreateArchiveRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func createArchive<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Files_CreateArchiveRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CreateArchiveResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.createArchive(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_CreateArchiveRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_CreateArchiveResponse>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
     /// Call the "ListUserImages" method.
     ///
     /// > Source IDL Documentation:
@@ -9478,7 +10937,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///
     /// > Source IDL Documentation:
     /// >
-    /// > Удалить медиа из галереи по file_id: живые записи каталога → в корзину; если записей нет — снять владельца (жёстко)
+    /// > Удалить медиа из галереи по file_id: живые записи каталога → в корзину; если записей нет — создать запись корзины
     ///
     /// - Parameters:
     ///   - request: A request containing a single `Barkcloud_Files_DeleteUserMediaRequest` message.
@@ -9527,6 +10986,35 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
             request: request,
             serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_GetPathRequest>(),
             deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_PathResponse>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "ListFileActivity" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > История действий с файлом (для «Свойства»)
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Files_ListFileActivityRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func listFileActivity<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Files_ListFileActivityRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListFileActivityResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.listFileActivity(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_ListFileActivityRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_ListFileActivityResponse>(),
             options: options,
             onResponse: handleResponse
         )
@@ -10831,6 +12319,39 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
         )
     }
 
+    /// Call the "CreateArchive" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > ───────── Архив (ZIP) ─────────
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func createArchive<Result>(
+        _ message: Barkcloud_Files_CreateArchiveRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CreateArchiveResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Files_CreateArchiveRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.createArchive(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
     /// Call the "ListUserImages" method.
     ///
     /// > Source IDL Documentation:
@@ -10901,7 +12422,7 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
     ///
     /// > Source IDL Documentation:
     /// >
-    /// > Удалить медиа из галереи по file_id: живые записи каталога → в корзину; если записей нет — снять владельца (жёстко)
+    /// > Удалить медиа из галереи по file_id: живые записи каталога → в корзину; если записей нет — создать запись корзины
     ///
     /// - Parameters:
     ///   - message: request message to send.
@@ -10957,6 +12478,39 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
             metadata: metadata
         )
         return try await self.getPath(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "ListFileActivity" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > История действий с файлом (для «Свойства»)
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func listFileActivity<Result>(
+        _ message: Barkcloud_Files_ListFileActivityRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListFileActivityResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Files_ListFileActivityRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.listFileActivity(
             request: request,
             options: options,
             onResponse: handleResponse
@@ -12087,6 +13641,19 @@ public enum Barkcloud_Files_FilesServerApi: Sendable {
                 type: .unary
             )
         }
+        /// Namespace for "ResolveMusicPlaylistShare" metadata.
+        public enum ResolveMusicPlaylistShare: Sendable {
+            /// Request type for "ResolveMusicPlaylistShare".
+            public typealias Input = Barkcloud_Files_ResolveMusicPlaylistShareRequest
+            /// Response type for "ResolveMusicPlaylistShare".
+            public typealias Output = Barkcloud_Files_ResolveMusicPlaylistShareResponse
+            /// Descriptor for "ResolveMusicPlaylistShare".
+            public static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.FilesServerApi"),
+                method: "ResolveMusicPlaylistShare",
+                type: .unary
+            )
+        }
         /// Descriptors for all methods in the "barkcloud.files.FilesServerApi" service.
         public static let descriptors: [GRPCCore.MethodDescriptor] = [
             GetFileData.descriptor,
@@ -12095,7 +13662,8 @@ public enum Barkcloud_Files_FilesServerApi: Sendable {
             UploadAvatarServer.descriptor,
             ResolveShare.descriptor,
             ResolveFolderShare.descriptor,
-            ResolveAlbumShare.descriptor
+            ResolveAlbumShare.descriptor,
+            ResolveMusicPlaylistShare.descriptor
         ]
     }
 }
@@ -12246,6 +13814,24 @@ extension Barkcloud_Files_FilesServerApi {
             request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ResolveAlbumShareRequest>,
             context: GRPCCore.ServerContext
         ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_ResolveAlbumShareResponse>
+
+        /// Handle the "ResolveMusicPlaylistShare" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Резолв публичного музыкального плейлиста → треки с публичными URL
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Files_ResolveMusicPlaylistShareRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Files_ResolveMusicPlaylistShareResponse` messages.
+        func resolveMusicPlaylistShare(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ResolveMusicPlaylistShareRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_ResolveMusicPlaylistShareResponse>
     }
 
     /// Service protocol for the "barkcloud.files.FilesServerApi" service.
@@ -12381,6 +13967,24 @@ extension Barkcloud_Files_FilesServerApi {
             request: GRPCCore.ServerRequest<Barkcloud_Files_ResolveAlbumShareRequest>,
             context: GRPCCore.ServerContext
         ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_ResolveAlbumShareResponse>
+
+        /// Handle the "ResolveMusicPlaylistShare" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Резолв публичного музыкального плейлиста → треки с публичными URL
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_ResolveMusicPlaylistShareRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Files_ResolveMusicPlaylistShareResponse` message.
+        func resolveMusicPlaylistShare(
+            request: GRPCCore.ServerRequest<Barkcloud_Files_ResolveMusicPlaylistShareRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_ResolveMusicPlaylistShareResponse>
     }
 
     /// Simple service protocol for the "barkcloud.files.FilesServerApi" service.
@@ -12514,6 +14118,24 @@ extension Barkcloud_Files_FilesServerApi {
             request: Barkcloud_Files_ResolveAlbumShareRequest,
             context: GRPCCore.ServerContext
         ) async throws -> Barkcloud_Files_ResolveAlbumShareResponse
+
+        /// Handle the "ResolveMusicPlaylistShare" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Резолв публичного музыкального плейлиста → треки с публичными URL
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Files_ResolveMusicPlaylistShareRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Files_ResolveMusicPlaylistShareResponse` to respond with.
+        func resolveMusicPlaylistShare(
+            request: Barkcloud_Files_ResolveMusicPlaylistShareRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Files_ResolveMusicPlaylistShareResponse
     }
 }
 
@@ -12598,6 +14220,17 @@ extension Barkcloud_Files_FilesServerApi.StreamingServiceProtocol {
                 )
             }
         )
+        router.registerHandler(
+            forMethod: Barkcloud_Files_FilesServerApi.Method.ResolveMusicPlaylistShare.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_ResolveMusicPlaylistShareRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_ResolveMusicPlaylistShareResponse>(),
+            handler: { request, context in
+                try await self.resolveMusicPlaylistShare(
+                    request: request,
+                    context: context
+                )
+            }
+        )
     }
 }
 
@@ -12675,6 +14308,17 @@ extension Barkcloud_Files_FilesServerApi.ServiceProtocol {
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_ResolveAlbumShareResponse> {
         let response = try await self.resolveAlbumShare(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    public func resolveMusicPlaylistShare(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ResolveMusicPlaylistShareRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_ResolveMusicPlaylistShareResponse> {
+        let response = try await self.resolveMusicPlaylistShare(
             request: GRPCCore.ServerRequest(stream: request),
             context: context
         )
@@ -12769,6 +14413,19 @@ extension Barkcloud_Files_FilesServerApi.SimpleServiceProtocol {
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_ResolveAlbumShareResponse> {
         return GRPCCore.ServerResponse<Barkcloud_Files_ResolveAlbumShareResponse>(
             message: try await self.resolveAlbumShare(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    public func resolveMusicPlaylistShare(
+        request: GRPCCore.ServerRequest<Barkcloud_Files_ResolveMusicPlaylistShareRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_ResolveMusicPlaylistShareResponse> {
+        return GRPCCore.ServerResponse<Barkcloud_Files_ResolveMusicPlaylistShareResponse>(
+            message: try await self.resolveMusicPlaylistShare(
                 request: request.message,
                 context: context
             ),
@@ -12945,6 +14602,29 @@ extension Barkcloud_Files_FilesServerApi {
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_ResolveAlbumShareResponse>,
             options: GRPCCore.CallOptions,
             onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ResolveAlbumShareResponse>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "ResolveMusicPlaylistShare" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Резолв публичного музыкального плейлиста → треки с публичными URL
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_ResolveMusicPlaylistShareRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_ResolveMusicPlaylistShareRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_ResolveMusicPlaylistShareResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func resolveMusicPlaylistShare<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_ResolveMusicPlaylistShareRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_ResolveMusicPlaylistShareRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_ResolveMusicPlaylistShareResponse>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ResolveMusicPlaylistShareResponse>) async throws -> Result
         ) async throws -> Result where Result: Sendable
     }
 
@@ -13201,6 +14881,40 @@ extension Barkcloud_Files_FilesServerApi {
                 onResponse: handleResponse
             )
         }
+
+        /// Call the "ResolveMusicPlaylistShare" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Резолв публичного музыкального плейлиста → треки с публичными URL
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_ResolveMusicPlaylistShareRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_ResolveMusicPlaylistShareRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_ResolveMusicPlaylistShareResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        public func resolveMusicPlaylistShare<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_ResolveMusicPlaylistShareRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_ResolveMusicPlaylistShareRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_ResolveMusicPlaylistShareResponse>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ResolveMusicPlaylistShareResponse>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Files_FilesServerApi.Method.ResolveMusicPlaylistShare.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
     }
 }
 
@@ -13405,6 +15119,35 @@ extension Barkcloud_Files_FilesServerApi.ClientProtocol {
             request: request,
             serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_ResolveAlbumShareRequest>(),
             deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_ResolveAlbumShareResponse>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "ResolveMusicPlaylistShare" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Резолв публичного музыкального плейлиста → треки с публичными URL
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Files_ResolveMusicPlaylistShareRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func resolveMusicPlaylistShare<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Files_ResolveMusicPlaylistShareRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ResolveMusicPlaylistShareResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.resolveMusicPlaylistShare(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_ResolveMusicPlaylistShareRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_ResolveMusicPlaylistShareResponse>(),
             options: options,
             onResponse: handleResponse
         )
@@ -13639,6 +15382,39 @@ extension Barkcloud_Files_FilesServerApi.ClientProtocol {
             metadata: metadata
         )
         return try await self.resolveAlbumShare(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "ResolveMusicPlaylistShare" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Резолв публичного музыкального плейлиста → треки с публичными URL
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func resolveMusicPlaylistShare<Result>(
+        _ message: Barkcloud_Files_ResolveMusicPlaylistShareRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ResolveMusicPlaylistShareResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Files_ResolveMusicPlaylistShareRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.resolveMusicPlaylistShare(
             request: request,
             options: options,
             onResponse: handleResponse
@@ -15298,6 +17074,4786 @@ extension Barkcloud_Files_AlbumApi.ClientProtocol {
             metadata: metadata
         )
         return try await self.listAlbumItems(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+}
+
+// MARK: - barkcloud.files.MusicApi
+
+/// Namespace containing generated types for the "barkcloud.files.MusicApi" service.
+@available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+public enum Barkcloud_Files_MusicApi: Sendable {
+    /// Service descriptor for the "barkcloud.files.MusicApi" service.
+    public static let descriptor = GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.MusicApi")
+    /// Namespace for method metadata.
+    public enum Method: Sendable {
+        /// Namespace for "ListTracks" metadata.
+        public enum ListTracks: Sendable {
+            /// Request type for "ListTracks".
+            public typealias Input = Barkcloud_Files_ListMusicTracksRequest
+            /// Response type for "ListTracks".
+            public typealias Output = Barkcloud_Files_ListMusicTracksResponse
+            /// Descriptor for "ListTracks".
+            public static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.MusicApi"),
+                method: "ListTracks",
+                type: .unary
+            )
+        }
+        /// Namespace for "GetTrackDownloadUrl" metadata.
+        public enum GetTrackDownloadUrl: Sendable {
+            /// Request type for "GetTrackDownloadUrl".
+            public typealias Input = Barkcloud_Files_GetTrackDownloadUrlRequest
+            /// Response type for "GetTrackDownloadUrl".
+            public typealias Output = Barkcloud_Files_GetTrackDownloadUrlResponse
+            /// Descriptor for "GetTrackDownloadUrl".
+            public static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.MusicApi"),
+                method: "GetTrackDownloadUrl",
+                type: .unary
+            )
+        }
+        /// Namespace for "CreatePlaylist" metadata.
+        public enum CreatePlaylist: Sendable {
+            /// Request type for "CreatePlaylist".
+            public typealias Input = Barkcloud_Files_CreateMusicPlaylistRequest
+            /// Response type for "CreatePlaylist".
+            public typealias Output = Barkcloud_Files_MusicPlaylistInfo
+            /// Descriptor for "CreatePlaylist".
+            public static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.MusicApi"),
+                method: "CreatePlaylist",
+                type: .unary
+            )
+        }
+        /// Namespace for "UpdatePlaylist" metadata.
+        public enum UpdatePlaylist: Sendable {
+            /// Request type for "UpdatePlaylist".
+            public typealias Input = Barkcloud_Files_UpdateMusicPlaylistRequest
+            /// Response type for "UpdatePlaylist".
+            public typealias Output = Barkcloud_Files_MusicPlaylistInfo
+            /// Descriptor for "UpdatePlaylist".
+            public static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.MusicApi"),
+                method: "UpdatePlaylist",
+                type: .unary
+            )
+        }
+        /// Namespace for "DeletePlaylist" metadata.
+        public enum DeletePlaylist: Sendable {
+            /// Request type for "DeletePlaylist".
+            public typealias Input = Barkcloud_Files_DeleteMusicPlaylistRequest
+            /// Response type for "DeletePlaylist".
+            public typealias Output = Barkcloud_Files_CloudEmpty
+            /// Descriptor for "DeletePlaylist".
+            public static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.MusicApi"),
+                method: "DeletePlaylist",
+                type: .unary
+            )
+        }
+        /// Namespace for "ListPlaylists" metadata.
+        public enum ListPlaylists: Sendable {
+            /// Request type for "ListPlaylists".
+            public typealias Input = Barkcloud_Files_ListMusicPlaylistsRequest
+            /// Response type for "ListPlaylists".
+            public typealias Output = Barkcloud_Files_ListMusicPlaylistsResponse
+            /// Descriptor for "ListPlaylists".
+            public static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.MusicApi"),
+                method: "ListPlaylists",
+                type: .unary
+            )
+        }
+        /// Namespace for "ListPlaylistTracks" metadata.
+        public enum ListPlaylistTracks: Sendable {
+            /// Request type for "ListPlaylistTracks".
+            public typealias Input = Barkcloud_Files_ListMusicPlaylistTracksRequest
+            /// Response type for "ListPlaylistTracks".
+            public typealias Output = Barkcloud_Files_ListMusicPlaylistTracksResponse
+            /// Descriptor for "ListPlaylistTracks".
+            public static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.MusicApi"),
+                method: "ListPlaylistTracks",
+                type: .unary
+            )
+        }
+        /// Namespace for "AddPlaylistTracks" metadata.
+        public enum AddPlaylistTracks: Sendable {
+            /// Request type for "AddPlaylistTracks".
+            public typealias Input = Barkcloud_Files_AddMusicPlaylistTracksRequest
+            /// Response type for "AddPlaylistTracks".
+            public typealias Output = Barkcloud_Files_CloudEmpty
+            /// Descriptor for "AddPlaylistTracks".
+            public static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.MusicApi"),
+                method: "AddPlaylistTracks",
+                type: .unary
+            )
+        }
+        /// Namespace for "RemovePlaylistTracks" metadata.
+        public enum RemovePlaylistTracks: Sendable {
+            /// Request type for "RemovePlaylistTracks".
+            public typealias Input = Barkcloud_Files_RemoveMusicPlaylistTracksRequest
+            /// Response type for "RemovePlaylistTracks".
+            public typealias Output = Barkcloud_Files_CloudEmpty
+            /// Descriptor for "RemovePlaylistTracks".
+            public static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.MusicApi"),
+                method: "RemovePlaylistTracks",
+                type: .unary
+            )
+        }
+        /// Namespace for "ReorderPlaylistTracks" metadata.
+        public enum ReorderPlaylistTracks: Sendable {
+            /// Request type for "ReorderPlaylistTracks".
+            public typealias Input = Barkcloud_Files_ReorderMusicPlaylistTracksRequest
+            /// Response type for "ReorderPlaylistTracks".
+            public typealias Output = Barkcloud_Files_CloudEmpty
+            /// Descriptor for "ReorderPlaylistTracks".
+            public static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.MusicApi"),
+                method: "ReorderPlaylistTracks",
+                type: .unary
+            )
+        }
+        /// Namespace for "CreatePlaylistShare" metadata.
+        public enum CreatePlaylistShare: Sendable {
+            /// Request type for "CreatePlaylistShare".
+            public typealias Input = Barkcloud_Files_CreateMusicPlaylistShareRequest
+            /// Response type for "CreatePlaylistShare".
+            public typealias Output = Barkcloud_Files_MusicPlaylistShareInfo
+            /// Descriptor for "CreatePlaylistShare".
+            public static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.MusicApi"),
+                method: "CreatePlaylistShare",
+                type: .unary
+            )
+        }
+        /// Namespace for "ListMyPlaylistShares" metadata.
+        public enum ListMyPlaylistShares: Sendable {
+            /// Request type for "ListMyPlaylistShares".
+            public typealias Input = Barkcloud_Files_ListMyMusicPlaylistSharesRequest
+            /// Response type for "ListMyPlaylistShares".
+            public typealias Output = Barkcloud_Files_ListMyMusicPlaylistSharesResponse
+            /// Descriptor for "ListMyPlaylistShares".
+            public static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.MusicApi"),
+                method: "ListMyPlaylistShares",
+                type: .unary
+            )
+        }
+        /// Namespace for "RevokePlaylistShare" metadata.
+        public enum RevokePlaylistShare: Sendable {
+            /// Request type for "RevokePlaylistShare".
+            public typealias Input = Barkcloud_Files_RevokeMusicPlaylistShareRequest
+            /// Response type for "RevokePlaylistShare".
+            public typealias Output = Barkcloud_Files_CloudEmpty
+            /// Descriptor for "RevokePlaylistShare".
+            public static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.MusicApi"),
+                method: "RevokePlaylistShare",
+                type: .unary
+            )
+        }
+        /// Namespace for "SharePlaylistWithUser" metadata.
+        public enum SharePlaylistWithUser: Sendable {
+            /// Request type for "SharePlaylistWithUser".
+            public typealias Input = Barkcloud_Files_ShareMusicPlaylistWithUserRequest
+            /// Response type for "SharePlaylistWithUser".
+            public typealias Output = Barkcloud_Files_CloudEmpty
+            /// Descriptor for "SharePlaylistWithUser".
+            public static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.MusicApi"),
+                method: "SharePlaylistWithUser",
+                type: .unary
+            )
+        }
+        /// Namespace for "RevokePlaylistUserShare" metadata.
+        public enum RevokePlaylistUserShare: Sendable {
+            /// Request type for "RevokePlaylistUserShare".
+            public typealias Input = Barkcloud_Files_RevokeMusicPlaylistUserShareRequest
+            /// Response type for "RevokePlaylistUserShare".
+            public typealias Output = Barkcloud_Files_CloudEmpty
+            /// Descriptor for "RevokePlaylistUserShare".
+            public static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.MusicApi"),
+                method: "RevokePlaylistUserShare",
+                type: .unary
+            )
+        }
+        /// Namespace for "ListMyOutgoingPlaylistShares" metadata.
+        public enum ListMyOutgoingPlaylistShares: Sendable {
+            /// Request type for "ListMyOutgoingPlaylistShares".
+            public typealias Input = Barkcloud_Files_ListMyOutgoingMusicPlaylistSharesRequest
+            /// Response type for "ListMyOutgoingPlaylistShares".
+            public typealias Output = Barkcloud_Files_ListMyOutgoingMusicPlaylistSharesResponse
+            /// Descriptor for "ListMyOutgoingPlaylistShares".
+            public static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.MusicApi"),
+                method: "ListMyOutgoingPlaylistShares",
+                type: .unary
+            )
+        }
+        /// Namespace for "ListSharedPlaylistsWithMe" metadata.
+        public enum ListSharedPlaylistsWithMe: Sendable {
+            /// Request type for "ListSharedPlaylistsWithMe".
+            public typealias Input = Barkcloud_Files_ListSharedMusicPlaylistsWithMeRequest
+            /// Response type for "ListSharedPlaylistsWithMe".
+            public typealias Output = Barkcloud_Files_ListSharedMusicPlaylistsWithMeResponse
+            /// Descriptor for "ListSharedPlaylistsWithMe".
+            public static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.MusicApi"),
+                method: "ListSharedPlaylistsWithMe",
+                type: .unary
+            )
+        }
+        /// Descriptors for all methods in the "barkcloud.files.MusicApi" service.
+        public static let descriptors: [GRPCCore.MethodDescriptor] = [
+            ListTracks.descriptor,
+            GetTrackDownloadUrl.descriptor,
+            CreatePlaylist.descriptor,
+            UpdatePlaylist.descriptor,
+            DeletePlaylist.descriptor,
+            ListPlaylists.descriptor,
+            ListPlaylistTracks.descriptor,
+            AddPlaylistTracks.descriptor,
+            RemovePlaylistTracks.descriptor,
+            ReorderPlaylistTracks.descriptor,
+            CreatePlaylistShare.descriptor,
+            ListMyPlaylistShares.descriptor,
+            RevokePlaylistShare.descriptor,
+            SharePlaylistWithUser.descriptor,
+            RevokePlaylistUserShare.descriptor,
+            ListMyOutgoingPlaylistShares.descriptor,
+            ListSharedPlaylistsWithMe.descriptor
+        ]
+    }
+}
+
+@available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+extension GRPCCore.ServiceDescriptor {
+    /// Service descriptor for the "barkcloud.files.MusicApi" service.
+    public static let barkcloud_files_MusicApi = GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.MusicApi")
+}
+
+// MARK: barkcloud.files.MusicApi (server)
+
+@available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+extension Barkcloud_Files_MusicApi {
+    /// Streaming variant of the service protocol for the "barkcloud.files.MusicApi" service.
+    ///
+    /// This protocol is the lowest-level of the service protocols generated for this service
+    /// giving you the most flexibility over the implementation of your service. This comes at
+    /// the cost of more verbose and less strict APIs. Each RPC requires you to implement it in
+    /// terms of a request stream and response stream. Where only a single request or response
+    /// message is expected, you are responsible for enforcing this invariant is maintained.
+    ///
+    /// Where possible, prefer using the stricter, less-verbose ``ServiceProtocol``
+    /// or ``SimpleServiceProtocol`` instead.
+    public protocol StreamingServiceProtocol: GRPCCore.RegistrableRPCService {
+        /// Handle the "ListTracks" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Список аудиотреков пользователя с поиском
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Files_ListMusicTracksRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Files_ListMusicTracksResponse` messages.
+        func listTracks(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ListMusicTracksRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_ListMusicTracksResponse>
+
+        /// Handle the "GetTrackDownloadUrl" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Временная ссылка для проигрывания трека
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Files_GetTrackDownloadUrlRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Files_GetTrackDownloadUrlResponse` messages.
+        func getTrackDownloadUrl(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Files_GetTrackDownloadUrlRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_GetTrackDownloadUrlResponse>
+
+        /// Handle the "CreatePlaylist" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Создать плейлист
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Files_CreateMusicPlaylistRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Files_MusicPlaylistInfo` messages.
+        func createPlaylist(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Files_CreateMusicPlaylistRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_MusicPlaylistInfo>
+
+        /// Handle the "UpdatePlaylist" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Изменить имя/описание/обложку
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Files_UpdateMusicPlaylistRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Files_MusicPlaylistInfo` messages.
+        func updatePlaylist(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Files_UpdateMusicPlaylistRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_MusicPlaylistInfo>
+
+        /// Handle the "DeletePlaylist" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Удалить плейлист
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Files_DeleteMusicPlaylistRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Files_CloudEmpty` messages.
+        func deletePlaylist(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Files_DeleteMusicPlaylistRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty>
+
+        /// Handle the "ListPlaylists" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Мои плейлисты
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Files_ListMusicPlaylistsRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Files_ListMusicPlaylistsResponse` messages.
+        func listPlaylists(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ListMusicPlaylistsRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_ListMusicPlaylistsResponse>
+
+        /// Handle the "ListPlaylistTracks" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Треки плейлиста
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Files_ListMusicPlaylistTracksRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Files_ListMusicPlaylistTracksResponse` messages.
+        func listPlaylistTracks(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ListMusicPlaylistTracksRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_ListMusicPlaylistTracksResponse>
+
+        /// Handle the "AddPlaylistTracks" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Добавить треки
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Files_AddMusicPlaylistTracksRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Files_CloudEmpty` messages.
+        func addPlaylistTracks(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Files_AddMusicPlaylistTracksRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty>
+
+        /// Handle the "RemovePlaylistTracks" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Убрать треки
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Files_RemoveMusicPlaylistTracksRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Files_CloudEmpty` messages.
+        func removePlaylistTracks(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Files_RemoveMusicPlaylistTracksRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty>
+
+        /// Handle the "ReorderPlaylistTracks" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Ручной порядок треков
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Files_ReorderMusicPlaylistTracksRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Files_CloudEmpty` messages.
+        func reorderPlaylistTracks(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ReorderMusicPlaylistTracksRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty>
+
+        /// Handle the "CreatePlaylistShare" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Публичная ссылка на плейлист
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Files_CreateMusicPlaylistShareRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Files_MusicPlaylistShareInfo` messages.
+        func createPlaylistShare(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Files_CreateMusicPlaylistShareRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_MusicPlaylistShareInfo>
+
+        /// Handle the "ListMyPlaylistShares" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Мои публичные плейлисты
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Files_ListMyMusicPlaylistSharesRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Files_ListMyMusicPlaylistSharesResponse` messages.
+        func listMyPlaylistShares(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ListMyMusicPlaylistSharesRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_ListMyMusicPlaylistSharesResponse>
+
+        /// Handle the "RevokePlaylistShare" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Отозвать публичность
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Files_RevokeMusicPlaylistShareRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Files_CloudEmpty` messages.
+        func revokePlaylistShare(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Files_RevokeMusicPlaylistShareRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty>
+
+        /// Handle the "SharePlaylistWithUser" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Поделиться плейлистом с пользователем
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Files_ShareMusicPlaylistWithUserRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Files_CloudEmpty` messages.
+        func sharePlaylistWithUser(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ShareMusicPlaylistWithUserRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty>
+
+        /// Handle the "RevokePlaylistUserShare" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Отозвать грант
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Files_RevokeMusicPlaylistUserShareRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Files_CloudEmpty` messages.
+        func revokePlaylistUserShare(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Files_RevokeMusicPlaylistUserShareRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty>
+
+        /// Handle the "ListMyOutgoingPlaylistShares" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Кому доступны мои плейлисты
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Files_ListMyOutgoingMusicPlaylistSharesRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Files_ListMyOutgoingMusicPlaylistSharesResponse` messages.
+        func listMyOutgoingPlaylistShares(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ListMyOutgoingMusicPlaylistSharesRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_ListMyOutgoingMusicPlaylistSharesResponse>
+
+        /// Handle the "ListSharedPlaylistsWithMe" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Плейлисты, доступные мне
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Files_ListSharedMusicPlaylistsWithMeRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Files_ListSharedMusicPlaylistsWithMeResponse` messages.
+        func listSharedPlaylistsWithMe(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ListSharedMusicPlaylistsWithMeRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_ListSharedMusicPlaylistsWithMeResponse>
+    }
+
+    /// Service protocol for the "barkcloud.files.MusicApi" service.
+    ///
+    /// This protocol is higher level than ``StreamingServiceProtocol`` but lower level than
+    /// the ``SimpleServiceProtocol``, it provides access to request and response metadata and
+    /// trailing response metadata. If you don't need these then consider using
+    /// the ``SimpleServiceProtocol``. If you need fine grained control over your RPCs then
+    /// use ``StreamingServiceProtocol``.
+    public protocol ServiceProtocol: Barkcloud_Files_MusicApi.StreamingServiceProtocol {
+        /// Handle the "ListTracks" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Список аудиотреков пользователя с поиском
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_ListMusicTracksRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Files_ListMusicTracksResponse` message.
+        func listTracks(
+            request: GRPCCore.ServerRequest<Barkcloud_Files_ListMusicTracksRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_ListMusicTracksResponse>
+
+        /// Handle the "GetTrackDownloadUrl" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Временная ссылка для проигрывания трека
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_GetTrackDownloadUrlRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Files_GetTrackDownloadUrlResponse` message.
+        func getTrackDownloadUrl(
+            request: GRPCCore.ServerRequest<Barkcloud_Files_GetTrackDownloadUrlRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_GetTrackDownloadUrlResponse>
+
+        /// Handle the "CreatePlaylist" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Создать плейлист
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_CreateMusicPlaylistRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Files_MusicPlaylistInfo` message.
+        func createPlaylist(
+            request: GRPCCore.ServerRequest<Barkcloud_Files_CreateMusicPlaylistRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_MusicPlaylistInfo>
+
+        /// Handle the "UpdatePlaylist" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Изменить имя/описание/обложку
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_UpdateMusicPlaylistRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Files_MusicPlaylistInfo` message.
+        func updatePlaylist(
+            request: GRPCCore.ServerRequest<Barkcloud_Files_UpdateMusicPlaylistRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_MusicPlaylistInfo>
+
+        /// Handle the "DeletePlaylist" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Удалить плейлист
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_DeleteMusicPlaylistRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Files_CloudEmpty` message.
+        func deletePlaylist(
+            request: GRPCCore.ServerRequest<Barkcloud_Files_DeleteMusicPlaylistRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty>
+
+        /// Handle the "ListPlaylists" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Мои плейлисты
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_ListMusicPlaylistsRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Files_ListMusicPlaylistsResponse` message.
+        func listPlaylists(
+            request: GRPCCore.ServerRequest<Barkcloud_Files_ListMusicPlaylistsRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_ListMusicPlaylistsResponse>
+
+        /// Handle the "ListPlaylistTracks" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Треки плейлиста
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_ListMusicPlaylistTracksRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Files_ListMusicPlaylistTracksResponse` message.
+        func listPlaylistTracks(
+            request: GRPCCore.ServerRequest<Barkcloud_Files_ListMusicPlaylistTracksRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_ListMusicPlaylistTracksResponse>
+
+        /// Handle the "AddPlaylistTracks" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Добавить треки
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_AddMusicPlaylistTracksRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Files_CloudEmpty` message.
+        func addPlaylistTracks(
+            request: GRPCCore.ServerRequest<Barkcloud_Files_AddMusicPlaylistTracksRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty>
+
+        /// Handle the "RemovePlaylistTracks" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Убрать треки
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_RemoveMusicPlaylistTracksRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Files_CloudEmpty` message.
+        func removePlaylistTracks(
+            request: GRPCCore.ServerRequest<Barkcloud_Files_RemoveMusicPlaylistTracksRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty>
+
+        /// Handle the "ReorderPlaylistTracks" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Ручной порядок треков
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_ReorderMusicPlaylistTracksRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Files_CloudEmpty` message.
+        func reorderPlaylistTracks(
+            request: GRPCCore.ServerRequest<Barkcloud_Files_ReorderMusicPlaylistTracksRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty>
+
+        /// Handle the "CreatePlaylistShare" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Публичная ссылка на плейлист
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_CreateMusicPlaylistShareRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Files_MusicPlaylistShareInfo` message.
+        func createPlaylistShare(
+            request: GRPCCore.ServerRequest<Barkcloud_Files_CreateMusicPlaylistShareRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_MusicPlaylistShareInfo>
+
+        /// Handle the "ListMyPlaylistShares" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Мои публичные плейлисты
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_ListMyMusicPlaylistSharesRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Files_ListMyMusicPlaylistSharesResponse` message.
+        func listMyPlaylistShares(
+            request: GRPCCore.ServerRequest<Barkcloud_Files_ListMyMusicPlaylistSharesRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_ListMyMusicPlaylistSharesResponse>
+
+        /// Handle the "RevokePlaylistShare" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Отозвать публичность
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_RevokeMusicPlaylistShareRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Files_CloudEmpty` message.
+        func revokePlaylistShare(
+            request: GRPCCore.ServerRequest<Barkcloud_Files_RevokeMusicPlaylistShareRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty>
+
+        /// Handle the "SharePlaylistWithUser" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Поделиться плейлистом с пользователем
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_ShareMusicPlaylistWithUserRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Files_CloudEmpty` message.
+        func sharePlaylistWithUser(
+            request: GRPCCore.ServerRequest<Barkcloud_Files_ShareMusicPlaylistWithUserRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty>
+
+        /// Handle the "RevokePlaylistUserShare" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Отозвать грант
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_RevokeMusicPlaylistUserShareRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Files_CloudEmpty` message.
+        func revokePlaylistUserShare(
+            request: GRPCCore.ServerRequest<Barkcloud_Files_RevokeMusicPlaylistUserShareRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty>
+
+        /// Handle the "ListMyOutgoingPlaylistShares" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Кому доступны мои плейлисты
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_ListMyOutgoingMusicPlaylistSharesRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Files_ListMyOutgoingMusicPlaylistSharesResponse` message.
+        func listMyOutgoingPlaylistShares(
+            request: GRPCCore.ServerRequest<Barkcloud_Files_ListMyOutgoingMusicPlaylistSharesRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_ListMyOutgoingMusicPlaylistSharesResponse>
+
+        /// Handle the "ListSharedPlaylistsWithMe" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Плейлисты, доступные мне
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_ListSharedMusicPlaylistsWithMeRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Files_ListSharedMusicPlaylistsWithMeResponse` message.
+        func listSharedPlaylistsWithMe(
+            request: GRPCCore.ServerRequest<Barkcloud_Files_ListSharedMusicPlaylistsWithMeRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_ListSharedMusicPlaylistsWithMeResponse>
+    }
+
+    /// Simple service protocol for the "barkcloud.files.MusicApi" service.
+    ///
+    /// This is the highest level protocol for the service. The API is the easiest to use but
+    /// doesn't provide access to request or response metadata. If you need access to these
+    /// then use ``ServiceProtocol`` instead.
+    public protocol SimpleServiceProtocol: Barkcloud_Files_MusicApi.ServiceProtocol {
+        /// Handle the "ListTracks" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Список аудиотреков пользователя с поиском
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Files_ListMusicTracksRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Files_ListMusicTracksResponse` to respond with.
+        func listTracks(
+            request: Barkcloud_Files_ListMusicTracksRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Files_ListMusicTracksResponse
+
+        /// Handle the "GetTrackDownloadUrl" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Временная ссылка для проигрывания трека
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Files_GetTrackDownloadUrlRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Files_GetTrackDownloadUrlResponse` to respond with.
+        func getTrackDownloadUrl(
+            request: Barkcloud_Files_GetTrackDownloadUrlRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Files_GetTrackDownloadUrlResponse
+
+        /// Handle the "CreatePlaylist" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Создать плейлист
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Files_CreateMusicPlaylistRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Files_MusicPlaylistInfo` to respond with.
+        func createPlaylist(
+            request: Barkcloud_Files_CreateMusicPlaylistRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Files_MusicPlaylistInfo
+
+        /// Handle the "UpdatePlaylist" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Изменить имя/описание/обложку
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Files_UpdateMusicPlaylistRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Files_MusicPlaylistInfo` to respond with.
+        func updatePlaylist(
+            request: Barkcloud_Files_UpdateMusicPlaylistRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Files_MusicPlaylistInfo
+
+        /// Handle the "DeletePlaylist" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Удалить плейлист
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Files_DeleteMusicPlaylistRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Files_CloudEmpty` to respond with.
+        func deletePlaylist(
+            request: Barkcloud_Files_DeleteMusicPlaylistRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Files_CloudEmpty
+
+        /// Handle the "ListPlaylists" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Мои плейлисты
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Files_ListMusicPlaylistsRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Files_ListMusicPlaylistsResponse` to respond with.
+        func listPlaylists(
+            request: Barkcloud_Files_ListMusicPlaylistsRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Files_ListMusicPlaylistsResponse
+
+        /// Handle the "ListPlaylistTracks" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Треки плейлиста
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Files_ListMusicPlaylistTracksRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Files_ListMusicPlaylistTracksResponse` to respond with.
+        func listPlaylistTracks(
+            request: Barkcloud_Files_ListMusicPlaylistTracksRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Files_ListMusicPlaylistTracksResponse
+
+        /// Handle the "AddPlaylistTracks" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Добавить треки
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Files_AddMusicPlaylistTracksRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Files_CloudEmpty` to respond with.
+        func addPlaylistTracks(
+            request: Barkcloud_Files_AddMusicPlaylistTracksRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Files_CloudEmpty
+
+        /// Handle the "RemovePlaylistTracks" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Убрать треки
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Files_RemoveMusicPlaylistTracksRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Files_CloudEmpty` to respond with.
+        func removePlaylistTracks(
+            request: Barkcloud_Files_RemoveMusicPlaylistTracksRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Files_CloudEmpty
+
+        /// Handle the "ReorderPlaylistTracks" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Ручной порядок треков
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Files_ReorderMusicPlaylistTracksRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Files_CloudEmpty` to respond with.
+        func reorderPlaylistTracks(
+            request: Barkcloud_Files_ReorderMusicPlaylistTracksRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Files_CloudEmpty
+
+        /// Handle the "CreatePlaylistShare" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Публичная ссылка на плейлист
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Files_CreateMusicPlaylistShareRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Files_MusicPlaylistShareInfo` to respond with.
+        func createPlaylistShare(
+            request: Barkcloud_Files_CreateMusicPlaylistShareRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Files_MusicPlaylistShareInfo
+
+        /// Handle the "ListMyPlaylistShares" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Мои публичные плейлисты
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Files_ListMyMusicPlaylistSharesRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Files_ListMyMusicPlaylistSharesResponse` to respond with.
+        func listMyPlaylistShares(
+            request: Barkcloud_Files_ListMyMusicPlaylistSharesRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Files_ListMyMusicPlaylistSharesResponse
+
+        /// Handle the "RevokePlaylistShare" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Отозвать публичность
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Files_RevokeMusicPlaylistShareRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Files_CloudEmpty` to respond with.
+        func revokePlaylistShare(
+            request: Barkcloud_Files_RevokeMusicPlaylistShareRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Files_CloudEmpty
+
+        /// Handle the "SharePlaylistWithUser" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Поделиться плейлистом с пользователем
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Files_ShareMusicPlaylistWithUserRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Files_CloudEmpty` to respond with.
+        func sharePlaylistWithUser(
+            request: Barkcloud_Files_ShareMusicPlaylistWithUserRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Files_CloudEmpty
+
+        /// Handle the "RevokePlaylistUserShare" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Отозвать грант
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Files_RevokeMusicPlaylistUserShareRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Files_CloudEmpty` to respond with.
+        func revokePlaylistUserShare(
+            request: Barkcloud_Files_RevokeMusicPlaylistUserShareRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Files_CloudEmpty
+
+        /// Handle the "ListMyOutgoingPlaylistShares" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Кому доступны мои плейлисты
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Files_ListMyOutgoingMusicPlaylistSharesRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Files_ListMyOutgoingMusicPlaylistSharesResponse` to respond with.
+        func listMyOutgoingPlaylistShares(
+            request: Barkcloud_Files_ListMyOutgoingMusicPlaylistSharesRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Files_ListMyOutgoingMusicPlaylistSharesResponse
+
+        /// Handle the "ListSharedPlaylistsWithMe" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Плейлисты, доступные мне
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Files_ListSharedMusicPlaylistsWithMeRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Files_ListSharedMusicPlaylistsWithMeResponse` to respond with.
+        func listSharedPlaylistsWithMe(
+            request: Barkcloud_Files_ListSharedMusicPlaylistsWithMeRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Files_ListSharedMusicPlaylistsWithMeResponse
+    }
+}
+
+// Default implementation of 'registerMethods(with:)'.
+@available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+extension Barkcloud_Files_MusicApi.StreamingServiceProtocol {
+    public func registerMethods<Transport>(with router: inout GRPCCore.RPCRouter<Transport>) where Transport: GRPCCore.ServerTransport {
+        router.registerHandler(
+            forMethod: Barkcloud_Files_MusicApi.Method.ListTracks.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_ListMusicTracksRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_ListMusicTracksResponse>(),
+            handler: { request, context in
+                try await self.listTracks(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
+            forMethod: Barkcloud_Files_MusicApi.Method.GetTrackDownloadUrl.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_GetTrackDownloadUrlRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_GetTrackDownloadUrlResponse>(),
+            handler: { request, context in
+                try await self.getTrackDownloadUrl(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
+            forMethod: Barkcloud_Files_MusicApi.Method.CreatePlaylist.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_CreateMusicPlaylistRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_MusicPlaylistInfo>(),
+            handler: { request, context in
+                try await self.createPlaylist(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
+            forMethod: Barkcloud_Files_MusicApi.Method.UpdatePlaylist.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_UpdateMusicPlaylistRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_MusicPlaylistInfo>(),
+            handler: { request, context in
+                try await self.updatePlaylist(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
+            forMethod: Barkcloud_Files_MusicApi.Method.DeletePlaylist.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_DeleteMusicPlaylistRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_CloudEmpty>(),
+            handler: { request, context in
+                try await self.deletePlaylist(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
+            forMethod: Barkcloud_Files_MusicApi.Method.ListPlaylists.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_ListMusicPlaylistsRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_ListMusicPlaylistsResponse>(),
+            handler: { request, context in
+                try await self.listPlaylists(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
+            forMethod: Barkcloud_Files_MusicApi.Method.ListPlaylistTracks.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_ListMusicPlaylistTracksRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_ListMusicPlaylistTracksResponse>(),
+            handler: { request, context in
+                try await self.listPlaylistTracks(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
+            forMethod: Barkcloud_Files_MusicApi.Method.AddPlaylistTracks.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_AddMusicPlaylistTracksRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_CloudEmpty>(),
+            handler: { request, context in
+                try await self.addPlaylistTracks(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
+            forMethod: Barkcloud_Files_MusicApi.Method.RemovePlaylistTracks.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_RemoveMusicPlaylistTracksRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_CloudEmpty>(),
+            handler: { request, context in
+                try await self.removePlaylistTracks(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
+            forMethod: Barkcloud_Files_MusicApi.Method.ReorderPlaylistTracks.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_ReorderMusicPlaylistTracksRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_CloudEmpty>(),
+            handler: { request, context in
+                try await self.reorderPlaylistTracks(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
+            forMethod: Barkcloud_Files_MusicApi.Method.CreatePlaylistShare.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_CreateMusicPlaylistShareRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_MusicPlaylistShareInfo>(),
+            handler: { request, context in
+                try await self.createPlaylistShare(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
+            forMethod: Barkcloud_Files_MusicApi.Method.ListMyPlaylistShares.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_ListMyMusicPlaylistSharesRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_ListMyMusicPlaylistSharesResponse>(),
+            handler: { request, context in
+                try await self.listMyPlaylistShares(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
+            forMethod: Barkcloud_Files_MusicApi.Method.RevokePlaylistShare.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_RevokeMusicPlaylistShareRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_CloudEmpty>(),
+            handler: { request, context in
+                try await self.revokePlaylistShare(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
+            forMethod: Barkcloud_Files_MusicApi.Method.SharePlaylistWithUser.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_ShareMusicPlaylistWithUserRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_CloudEmpty>(),
+            handler: { request, context in
+                try await self.sharePlaylistWithUser(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
+            forMethod: Barkcloud_Files_MusicApi.Method.RevokePlaylistUserShare.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_RevokeMusicPlaylistUserShareRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_CloudEmpty>(),
+            handler: { request, context in
+                try await self.revokePlaylistUserShare(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
+            forMethod: Barkcloud_Files_MusicApi.Method.ListMyOutgoingPlaylistShares.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_ListMyOutgoingMusicPlaylistSharesRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_ListMyOutgoingMusicPlaylistSharesResponse>(),
+            handler: { request, context in
+                try await self.listMyOutgoingPlaylistShares(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
+            forMethod: Barkcloud_Files_MusicApi.Method.ListSharedPlaylistsWithMe.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_ListSharedMusicPlaylistsWithMeRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_ListSharedMusicPlaylistsWithMeResponse>(),
+            handler: { request, context in
+                try await self.listSharedPlaylistsWithMe(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+    }
+}
+
+// Default implementation of streaming methods from 'StreamingServiceProtocol'.
+@available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+extension Barkcloud_Files_MusicApi.ServiceProtocol {
+    public func listTracks(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ListMusicTracksRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_ListMusicTracksResponse> {
+        let response = try await self.listTracks(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    public func getTrackDownloadUrl(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Files_GetTrackDownloadUrlRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_GetTrackDownloadUrlResponse> {
+        let response = try await self.getTrackDownloadUrl(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    public func createPlaylist(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Files_CreateMusicPlaylistRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_MusicPlaylistInfo> {
+        let response = try await self.createPlaylist(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    public func updatePlaylist(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Files_UpdateMusicPlaylistRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_MusicPlaylistInfo> {
+        let response = try await self.updatePlaylist(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    public func deletePlaylist(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Files_DeleteMusicPlaylistRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty> {
+        let response = try await self.deletePlaylist(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    public func listPlaylists(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ListMusicPlaylistsRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_ListMusicPlaylistsResponse> {
+        let response = try await self.listPlaylists(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    public func listPlaylistTracks(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ListMusicPlaylistTracksRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_ListMusicPlaylistTracksResponse> {
+        let response = try await self.listPlaylistTracks(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    public func addPlaylistTracks(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Files_AddMusicPlaylistTracksRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty> {
+        let response = try await self.addPlaylistTracks(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    public func removePlaylistTracks(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Files_RemoveMusicPlaylistTracksRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty> {
+        let response = try await self.removePlaylistTracks(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    public func reorderPlaylistTracks(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ReorderMusicPlaylistTracksRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty> {
+        let response = try await self.reorderPlaylistTracks(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    public func createPlaylistShare(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Files_CreateMusicPlaylistShareRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_MusicPlaylistShareInfo> {
+        let response = try await self.createPlaylistShare(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    public func listMyPlaylistShares(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ListMyMusicPlaylistSharesRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_ListMyMusicPlaylistSharesResponse> {
+        let response = try await self.listMyPlaylistShares(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    public func revokePlaylistShare(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Files_RevokeMusicPlaylistShareRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty> {
+        let response = try await self.revokePlaylistShare(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    public func sharePlaylistWithUser(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ShareMusicPlaylistWithUserRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty> {
+        let response = try await self.sharePlaylistWithUser(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    public func revokePlaylistUserShare(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Files_RevokeMusicPlaylistUserShareRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_CloudEmpty> {
+        let response = try await self.revokePlaylistUserShare(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    public func listMyOutgoingPlaylistShares(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ListMyOutgoingMusicPlaylistSharesRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_ListMyOutgoingMusicPlaylistSharesResponse> {
+        let response = try await self.listMyOutgoingPlaylistShares(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    public func listSharedPlaylistsWithMe(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ListSharedMusicPlaylistsWithMeRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_ListSharedMusicPlaylistsWithMeResponse> {
+        let response = try await self.listSharedPlaylistsWithMe(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+}
+
+// Default implementation of methods from 'ServiceProtocol'.
+@available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+extension Barkcloud_Files_MusicApi.SimpleServiceProtocol {
+    public func listTracks(
+        request: GRPCCore.ServerRequest<Barkcloud_Files_ListMusicTracksRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_ListMusicTracksResponse> {
+        return GRPCCore.ServerResponse<Barkcloud_Files_ListMusicTracksResponse>(
+            message: try await self.listTracks(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    public func getTrackDownloadUrl(
+        request: GRPCCore.ServerRequest<Barkcloud_Files_GetTrackDownloadUrlRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_GetTrackDownloadUrlResponse> {
+        return GRPCCore.ServerResponse<Barkcloud_Files_GetTrackDownloadUrlResponse>(
+            message: try await self.getTrackDownloadUrl(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    public func createPlaylist(
+        request: GRPCCore.ServerRequest<Barkcloud_Files_CreateMusicPlaylistRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_MusicPlaylistInfo> {
+        return GRPCCore.ServerResponse<Barkcloud_Files_MusicPlaylistInfo>(
+            message: try await self.createPlaylist(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    public func updatePlaylist(
+        request: GRPCCore.ServerRequest<Barkcloud_Files_UpdateMusicPlaylistRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_MusicPlaylistInfo> {
+        return GRPCCore.ServerResponse<Barkcloud_Files_MusicPlaylistInfo>(
+            message: try await self.updatePlaylist(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    public func deletePlaylist(
+        request: GRPCCore.ServerRequest<Barkcloud_Files_DeleteMusicPlaylistRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty> {
+        return GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty>(
+            message: try await self.deletePlaylist(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    public func listPlaylists(
+        request: GRPCCore.ServerRequest<Barkcloud_Files_ListMusicPlaylistsRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_ListMusicPlaylistsResponse> {
+        return GRPCCore.ServerResponse<Barkcloud_Files_ListMusicPlaylistsResponse>(
+            message: try await self.listPlaylists(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    public func listPlaylistTracks(
+        request: GRPCCore.ServerRequest<Barkcloud_Files_ListMusicPlaylistTracksRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_ListMusicPlaylistTracksResponse> {
+        return GRPCCore.ServerResponse<Barkcloud_Files_ListMusicPlaylistTracksResponse>(
+            message: try await self.listPlaylistTracks(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    public func addPlaylistTracks(
+        request: GRPCCore.ServerRequest<Barkcloud_Files_AddMusicPlaylistTracksRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty> {
+        return GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty>(
+            message: try await self.addPlaylistTracks(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    public func removePlaylistTracks(
+        request: GRPCCore.ServerRequest<Barkcloud_Files_RemoveMusicPlaylistTracksRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty> {
+        return GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty>(
+            message: try await self.removePlaylistTracks(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    public func reorderPlaylistTracks(
+        request: GRPCCore.ServerRequest<Barkcloud_Files_ReorderMusicPlaylistTracksRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty> {
+        return GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty>(
+            message: try await self.reorderPlaylistTracks(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    public func createPlaylistShare(
+        request: GRPCCore.ServerRequest<Barkcloud_Files_CreateMusicPlaylistShareRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_MusicPlaylistShareInfo> {
+        return GRPCCore.ServerResponse<Barkcloud_Files_MusicPlaylistShareInfo>(
+            message: try await self.createPlaylistShare(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    public func listMyPlaylistShares(
+        request: GRPCCore.ServerRequest<Barkcloud_Files_ListMyMusicPlaylistSharesRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_ListMyMusicPlaylistSharesResponse> {
+        return GRPCCore.ServerResponse<Barkcloud_Files_ListMyMusicPlaylistSharesResponse>(
+            message: try await self.listMyPlaylistShares(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    public func revokePlaylistShare(
+        request: GRPCCore.ServerRequest<Barkcloud_Files_RevokeMusicPlaylistShareRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty> {
+        return GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty>(
+            message: try await self.revokePlaylistShare(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    public func sharePlaylistWithUser(
+        request: GRPCCore.ServerRequest<Barkcloud_Files_ShareMusicPlaylistWithUserRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty> {
+        return GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty>(
+            message: try await self.sharePlaylistWithUser(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    public func revokePlaylistUserShare(
+        request: GRPCCore.ServerRequest<Barkcloud_Files_RevokeMusicPlaylistUserShareRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty> {
+        return GRPCCore.ServerResponse<Barkcloud_Files_CloudEmpty>(
+            message: try await self.revokePlaylistUserShare(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    public func listMyOutgoingPlaylistShares(
+        request: GRPCCore.ServerRequest<Barkcloud_Files_ListMyOutgoingMusicPlaylistSharesRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_ListMyOutgoingMusicPlaylistSharesResponse> {
+        return GRPCCore.ServerResponse<Barkcloud_Files_ListMyOutgoingMusicPlaylistSharesResponse>(
+            message: try await self.listMyOutgoingPlaylistShares(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    public func listSharedPlaylistsWithMe(
+        request: GRPCCore.ServerRequest<Barkcloud_Files_ListSharedMusicPlaylistsWithMeRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_ListSharedMusicPlaylistsWithMeResponse> {
+        return GRPCCore.ServerResponse<Barkcloud_Files_ListSharedMusicPlaylistsWithMeResponse>(
+            message: try await self.listSharedPlaylistsWithMe(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+}
+
+// MARK: barkcloud.files.MusicApi (client)
+
+@available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+extension Barkcloud_Files_MusicApi {
+    /// Generated client protocol for the "barkcloud.files.MusicApi" service.
+    ///
+    /// You don't need to implement this protocol directly, use the generated
+    /// implementation, ``Client``.
+    public protocol ClientProtocol: Sendable {
+        /// Call the "ListTracks" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Список аудиотреков пользователя с поиском
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_ListMusicTracksRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_ListMusicTracksRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_ListMusicTracksResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func listTracks<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_ListMusicTracksRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_ListMusicTracksRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_ListMusicTracksResponse>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListMusicTracksResponse>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "GetTrackDownloadUrl" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Временная ссылка для проигрывания трека
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_GetTrackDownloadUrlRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_GetTrackDownloadUrlRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_GetTrackDownloadUrlResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func getTrackDownloadUrl<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_GetTrackDownloadUrlRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_GetTrackDownloadUrlRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_GetTrackDownloadUrlResponse>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_GetTrackDownloadUrlResponse>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "CreatePlaylist" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Создать плейлист
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_CreateMusicPlaylistRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_CreateMusicPlaylistRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_MusicPlaylistInfo` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func createPlaylist<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_CreateMusicPlaylistRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_CreateMusicPlaylistRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_MusicPlaylistInfo>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_MusicPlaylistInfo>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "UpdatePlaylist" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Изменить имя/описание/обложку
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_UpdateMusicPlaylistRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_UpdateMusicPlaylistRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_MusicPlaylistInfo` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func updatePlaylist<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_UpdateMusicPlaylistRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_UpdateMusicPlaylistRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_MusicPlaylistInfo>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_MusicPlaylistInfo>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "DeletePlaylist" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Удалить плейлист
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_DeleteMusicPlaylistRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_DeleteMusicPlaylistRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_CloudEmpty` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func deletePlaylist<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_DeleteMusicPlaylistRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_DeleteMusicPlaylistRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CloudEmpty>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "ListPlaylists" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Мои плейлисты
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_ListMusicPlaylistsRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_ListMusicPlaylistsRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_ListMusicPlaylistsResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func listPlaylists<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_ListMusicPlaylistsRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_ListMusicPlaylistsRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_ListMusicPlaylistsResponse>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListMusicPlaylistsResponse>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "ListPlaylistTracks" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Треки плейлиста
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_ListMusicPlaylistTracksRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_ListMusicPlaylistTracksRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_ListMusicPlaylistTracksResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func listPlaylistTracks<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_ListMusicPlaylistTracksRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_ListMusicPlaylistTracksRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_ListMusicPlaylistTracksResponse>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListMusicPlaylistTracksResponse>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "AddPlaylistTracks" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Добавить треки
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_AddMusicPlaylistTracksRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_AddMusicPlaylistTracksRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_CloudEmpty` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func addPlaylistTracks<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_AddMusicPlaylistTracksRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_AddMusicPlaylistTracksRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CloudEmpty>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "RemovePlaylistTracks" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Убрать треки
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_RemoveMusicPlaylistTracksRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_RemoveMusicPlaylistTracksRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_CloudEmpty` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func removePlaylistTracks<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_RemoveMusicPlaylistTracksRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_RemoveMusicPlaylistTracksRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CloudEmpty>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "ReorderPlaylistTracks" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Ручной порядок треков
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_ReorderMusicPlaylistTracksRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_ReorderMusicPlaylistTracksRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_CloudEmpty` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func reorderPlaylistTracks<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_ReorderMusicPlaylistTracksRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_ReorderMusicPlaylistTracksRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CloudEmpty>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "CreatePlaylistShare" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Публичная ссылка на плейлист
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_CreateMusicPlaylistShareRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_CreateMusicPlaylistShareRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_MusicPlaylistShareInfo` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func createPlaylistShare<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_CreateMusicPlaylistShareRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_CreateMusicPlaylistShareRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_MusicPlaylistShareInfo>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_MusicPlaylistShareInfo>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "ListMyPlaylistShares" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Мои публичные плейлисты
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_ListMyMusicPlaylistSharesRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_ListMyMusicPlaylistSharesRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_ListMyMusicPlaylistSharesResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func listMyPlaylistShares<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_ListMyMusicPlaylistSharesRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_ListMyMusicPlaylistSharesRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_ListMyMusicPlaylistSharesResponse>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListMyMusicPlaylistSharesResponse>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "RevokePlaylistShare" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Отозвать публичность
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_RevokeMusicPlaylistShareRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_RevokeMusicPlaylistShareRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_CloudEmpty` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func revokePlaylistShare<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_RevokeMusicPlaylistShareRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_RevokeMusicPlaylistShareRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CloudEmpty>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "SharePlaylistWithUser" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Поделиться плейлистом с пользователем
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_ShareMusicPlaylistWithUserRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_ShareMusicPlaylistWithUserRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_CloudEmpty` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func sharePlaylistWithUser<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_ShareMusicPlaylistWithUserRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_ShareMusicPlaylistWithUserRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CloudEmpty>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "RevokePlaylistUserShare" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Отозвать грант
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_RevokeMusicPlaylistUserShareRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_RevokeMusicPlaylistUserShareRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_CloudEmpty` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func revokePlaylistUserShare<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_RevokeMusicPlaylistUserShareRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_RevokeMusicPlaylistUserShareRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CloudEmpty>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "ListMyOutgoingPlaylistShares" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Кому доступны мои плейлисты
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_ListMyOutgoingMusicPlaylistSharesRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_ListMyOutgoingMusicPlaylistSharesRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_ListMyOutgoingMusicPlaylistSharesResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func listMyOutgoingPlaylistShares<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_ListMyOutgoingMusicPlaylistSharesRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_ListMyOutgoingMusicPlaylistSharesRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_ListMyOutgoingMusicPlaylistSharesResponse>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListMyOutgoingMusicPlaylistSharesResponse>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "ListSharedPlaylistsWithMe" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Плейлисты, доступные мне
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_ListSharedMusicPlaylistsWithMeRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_ListSharedMusicPlaylistsWithMeRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_ListSharedMusicPlaylistsWithMeResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func listSharedPlaylistsWithMe<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_ListSharedMusicPlaylistsWithMeRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_ListSharedMusicPlaylistsWithMeRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_ListSharedMusicPlaylistsWithMeResponse>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListSharedMusicPlaylistsWithMeResponse>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+    }
+
+    /// Generated client for the "barkcloud.files.MusicApi" service.
+    ///
+    /// The ``Client`` provides an implementation of ``ClientProtocol`` which wraps
+    /// a `GRPCCore.GRPCCClient`. The underlying `GRPCClient` provides the long-lived
+    /// means of communication with the remote peer.
+    public struct Client<Transport>: ClientProtocol where Transport: GRPCCore.ClientTransport {
+        private let client: GRPCCore.GRPCClient<Transport>
+
+        /// Creates a new client wrapping the provided `GRPCCore.GRPCClient`.
+        ///
+        /// - Parameters:
+        ///   - client: A `GRPCCore.GRPCClient` providing a communication channel to the service.
+        public init(wrapping client: GRPCCore.GRPCClient<Transport>) {
+            self.client = client
+        }
+
+        /// Call the "ListTracks" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Список аудиотреков пользователя с поиском
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_ListMusicTracksRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_ListMusicTracksRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_ListMusicTracksResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        public func listTracks<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_ListMusicTracksRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_ListMusicTracksRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_ListMusicTracksResponse>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListMusicTracksResponse>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Files_MusicApi.Method.ListTracks.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "GetTrackDownloadUrl" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Временная ссылка для проигрывания трека
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_GetTrackDownloadUrlRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_GetTrackDownloadUrlRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_GetTrackDownloadUrlResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        public func getTrackDownloadUrl<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_GetTrackDownloadUrlRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_GetTrackDownloadUrlRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_GetTrackDownloadUrlResponse>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_GetTrackDownloadUrlResponse>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Files_MusicApi.Method.GetTrackDownloadUrl.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "CreatePlaylist" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Создать плейлист
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_CreateMusicPlaylistRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_CreateMusicPlaylistRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_MusicPlaylistInfo` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        public func createPlaylist<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_CreateMusicPlaylistRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_CreateMusicPlaylistRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_MusicPlaylistInfo>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_MusicPlaylistInfo>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Files_MusicApi.Method.CreatePlaylist.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "UpdatePlaylist" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Изменить имя/описание/обложку
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_UpdateMusicPlaylistRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_UpdateMusicPlaylistRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_MusicPlaylistInfo` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        public func updatePlaylist<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_UpdateMusicPlaylistRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_UpdateMusicPlaylistRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_MusicPlaylistInfo>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_MusicPlaylistInfo>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Files_MusicApi.Method.UpdatePlaylist.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "DeletePlaylist" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Удалить плейлист
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_DeleteMusicPlaylistRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_DeleteMusicPlaylistRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_CloudEmpty` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        public func deletePlaylist<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_DeleteMusicPlaylistRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_DeleteMusicPlaylistRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CloudEmpty>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Files_MusicApi.Method.DeletePlaylist.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "ListPlaylists" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Мои плейлисты
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_ListMusicPlaylistsRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_ListMusicPlaylistsRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_ListMusicPlaylistsResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        public func listPlaylists<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_ListMusicPlaylistsRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_ListMusicPlaylistsRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_ListMusicPlaylistsResponse>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListMusicPlaylistsResponse>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Files_MusicApi.Method.ListPlaylists.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "ListPlaylistTracks" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Треки плейлиста
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_ListMusicPlaylistTracksRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_ListMusicPlaylistTracksRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_ListMusicPlaylistTracksResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        public func listPlaylistTracks<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_ListMusicPlaylistTracksRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_ListMusicPlaylistTracksRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_ListMusicPlaylistTracksResponse>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListMusicPlaylistTracksResponse>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Files_MusicApi.Method.ListPlaylistTracks.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "AddPlaylistTracks" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Добавить треки
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_AddMusicPlaylistTracksRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_AddMusicPlaylistTracksRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_CloudEmpty` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        public func addPlaylistTracks<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_AddMusicPlaylistTracksRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_AddMusicPlaylistTracksRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CloudEmpty>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Files_MusicApi.Method.AddPlaylistTracks.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "RemovePlaylistTracks" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Убрать треки
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_RemoveMusicPlaylistTracksRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_RemoveMusicPlaylistTracksRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_CloudEmpty` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        public func removePlaylistTracks<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_RemoveMusicPlaylistTracksRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_RemoveMusicPlaylistTracksRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CloudEmpty>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Files_MusicApi.Method.RemovePlaylistTracks.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "ReorderPlaylistTracks" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Ручной порядок треков
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_ReorderMusicPlaylistTracksRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_ReorderMusicPlaylistTracksRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_CloudEmpty` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        public func reorderPlaylistTracks<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_ReorderMusicPlaylistTracksRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_ReorderMusicPlaylistTracksRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CloudEmpty>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Files_MusicApi.Method.ReorderPlaylistTracks.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "CreatePlaylistShare" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Публичная ссылка на плейлист
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_CreateMusicPlaylistShareRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_CreateMusicPlaylistShareRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_MusicPlaylistShareInfo` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        public func createPlaylistShare<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_CreateMusicPlaylistShareRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_CreateMusicPlaylistShareRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_MusicPlaylistShareInfo>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_MusicPlaylistShareInfo>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Files_MusicApi.Method.CreatePlaylistShare.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "ListMyPlaylistShares" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Мои публичные плейлисты
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_ListMyMusicPlaylistSharesRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_ListMyMusicPlaylistSharesRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_ListMyMusicPlaylistSharesResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        public func listMyPlaylistShares<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_ListMyMusicPlaylistSharesRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_ListMyMusicPlaylistSharesRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_ListMyMusicPlaylistSharesResponse>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListMyMusicPlaylistSharesResponse>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Files_MusicApi.Method.ListMyPlaylistShares.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "RevokePlaylistShare" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Отозвать публичность
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_RevokeMusicPlaylistShareRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_RevokeMusicPlaylistShareRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_CloudEmpty` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        public func revokePlaylistShare<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_RevokeMusicPlaylistShareRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_RevokeMusicPlaylistShareRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CloudEmpty>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Files_MusicApi.Method.RevokePlaylistShare.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "SharePlaylistWithUser" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Поделиться плейлистом с пользователем
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_ShareMusicPlaylistWithUserRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_ShareMusicPlaylistWithUserRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_CloudEmpty` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        public func sharePlaylistWithUser<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_ShareMusicPlaylistWithUserRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_ShareMusicPlaylistWithUserRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CloudEmpty>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Files_MusicApi.Method.SharePlaylistWithUser.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "RevokePlaylistUserShare" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Отозвать грант
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_RevokeMusicPlaylistUserShareRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_RevokeMusicPlaylistUserShareRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_CloudEmpty` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        public func revokePlaylistUserShare<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_RevokeMusicPlaylistUserShareRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_RevokeMusicPlaylistUserShareRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_CloudEmpty>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Files_MusicApi.Method.RevokePlaylistUserShare.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "ListMyOutgoingPlaylistShares" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Кому доступны мои плейлисты
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_ListMyOutgoingMusicPlaylistSharesRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_ListMyOutgoingMusicPlaylistSharesRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_ListMyOutgoingMusicPlaylistSharesResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        public func listMyOutgoingPlaylistShares<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_ListMyOutgoingMusicPlaylistSharesRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_ListMyOutgoingMusicPlaylistSharesRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_ListMyOutgoingMusicPlaylistSharesResponse>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListMyOutgoingMusicPlaylistSharesResponse>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Files_MusicApi.Method.ListMyOutgoingPlaylistShares.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "ListSharedPlaylistsWithMe" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Плейлисты, доступные мне
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_ListSharedMusicPlaylistsWithMeRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_ListSharedMusicPlaylistsWithMeRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_ListSharedMusicPlaylistsWithMeResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        public func listSharedPlaylistsWithMe<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_ListSharedMusicPlaylistsWithMeRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_ListSharedMusicPlaylistsWithMeRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_ListSharedMusicPlaylistsWithMeResponse>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListSharedMusicPlaylistsWithMeResponse>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Files_MusicApi.Method.ListSharedPlaylistsWithMe.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+    }
+}
+
+// Helpers providing default arguments to 'ClientProtocol' methods.
+@available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+extension Barkcloud_Files_MusicApi.ClientProtocol {
+    /// Call the "ListTracks" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Список аудиотреков пользователя с поиском
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Files_ListMusicTracksRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func listTracks<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Files_ListMusicTracksRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListMusicTracksResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.listTracks(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_ListMusicTracksRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_ListMusicTracksResponse>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "GetTrackDownloadUrl" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Временная ссылка для проигрывания трека
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Files_GetTrackDownloadUrlRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func getTrackDownloadUrl<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Files_GetTrackDownloadUrlRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_GetTrackDownloadUrlResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.getTrackDownloadUrl(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_GetTrackDownloadUrlRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_GetTrackDownloadUrlResponse>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "CreatePlaylist" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Создать плейлист
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Files_CreateMusicPlaylistRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func createPlaylist<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Files_CreateMusicPlaylistRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_MusicPlaylistInfo>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.createPlaylist(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_CreateMusicPlaylistRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_MusicPlaylistInfo>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "UpdatePlaylist" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Изменить имя/описание/обложку
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Files_UpdateMusicPlaylistRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func updatePlaylist<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Files_UpdateMusicPlaylistRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_MusicPlaylistInfo>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.updatePlaylist(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_UpdateMusicPlaylistRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_MusicPlaylistInfo>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "DeletePlaylist" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Удалить плейлист
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Files_DeleteMusicPlaylistRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func deletePlaylist<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Files_DeleteMusicPlaylistRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.deletePlaylist(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_DeleteMusicPlaylistRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_CloudEmpty>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "ListPlaylists" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Мои плейлисты
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Files_ListMusicPlaylistsRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func listPlaylists<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Files_ListMusicPlaylistsRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListMusicPlaylistsResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.listPlaylists(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_ListMusicPlaylistsRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_ListMusicPlaylistsResponse>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "ListPlaylistTracks" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Треки плейлиста
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Files_ListMusicPlaylistTracksRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func listPlaylistTracks<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Files_ListMusicPlaylistTracksRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListMusicPlaylistTracksResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.listPlaylistTracks(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_ListMusicPlaylistTracksRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_ListMusicPlaylistTracksResponse>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "AddPlaylistTracks" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Добавить треки
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Files_AddMusicPlaylistTracksRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func addPlaylistTracks<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Files_AddMusicPlaylistTracksRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.addPlaylistTracks(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_AddMusicPlaylistTracksRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_CloudEmpty>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "RemovePlaylistTracks" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Убрать треки
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Files_RemoveMusicPlaylistTracksRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func removePlaylistTracks<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Files_RemoveMusicPlaylistTracksRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.removePlaylistTracks(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_RemoveMusicPlaylistTracksRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_CloudEmpty>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "ReorderPlaylistTracks" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Ручной порядок треков
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Files_ReorderMusicPlaylistTracksRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func reorderPlaylistTracks<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Files_ReorderMusicPlaylistTracksRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.reorderPlaylistTracks(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_ReorderMusicPlaylistTracksRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_CloudEmpty>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "CreatePlaylistShare" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Публичная ссылка на плейлист
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Files_CreateMusicPlaylistShareRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func createPlaylistShare<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Files_CreateMusicPlaylistShareRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_MusicPlaylistShareInfo>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.createPlaylistShare(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_CreateMusicPlaylistShareRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_MusicPlaylistShareInfo>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "ListMyPlaylistShares" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Мои публичные плейлисты
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Files_ListMyMusicPlaylistSharesRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func listMyPlaylistShares<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Files_ListMyMusicPlaylistSharesRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListMyMusicPlaylistSharesResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.listMyPlaylistShares(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_ListMyMusicPlaylistSharesRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_ListMyMusicPlaylistSharesResponse>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "RevokePlaylistShare" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Отозвать публичность
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Files_RevokeMusicPlaylistShareRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func revokePlaylistShare<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Files_RevokeMusicPlaylistShareRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.revokePlaylistShare(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_RevokeMusicPlaylistShareRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_CloudEmpty>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "SharePlaylistWithUser" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Поделиться плейлистом с пользователем
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Files_ShareMusicPlaylistWithUserRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func sharePlaylistWithUser<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Files_ShareMusicPlaylistWithUserRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.sharePlaylistWithUser(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_ShareMusicPlaylistWithUserRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_CloudEmpty>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "RevokePlaylistUserShare" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Отозвать грант
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Files_RevokeMusicPlaylistUserShareRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func revokePlaylistUserShare<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Files_RevokeMusicPlaylistUserShareRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.revokePlaylistUserShare(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_RevokeMusicPlaylistUserShareRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_CloudEmpty>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "ListMyOutgoingPlaylistShares" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Кому доступны мои плейлисты
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Files_ListMyOutgoingMusicPlaylistSharesRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func listMyOutgoingPlaylistShares<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Files_ListMyOutgoingMusicPlaylistSharesRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListMyOutgoingMusicPlaylistSharesResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.listMyOutgoingPlaylistShares(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_ListMyOutgoingMusicPlaylistSharesRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_ListMyOutgoingMusicPlaylistSharesResponse>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "ListSharedPlaylistsWithMe" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Плейлисты, доступные мне
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Files_ListSharedMusicPlaylistsWithMeRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func listSharedPlaylistsWithMe<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Files_ListSharedMusicPlaylistsWithMeRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListSharedMusicPlaylistsWithMeResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.listSharedPlaylistsWithMe(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_ListSharedMusicPlaylistsWithMeRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_ListSharedMusicPlaylistsWithMeResponse>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+}
+
+// Helpers providing sugared APIs for 'ClientProtocol' methods.
+@available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+extension Barkcloud_Files_MusicApi.ClientProtocol {
+    /// Call the "ListTracks" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Список аудиотреков пользователя с поиском
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func listTracks<Result>(
+        _ message: Barkcloud_Files_ListMusicTracksRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListMusicTracksResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Files_ListMusicTracksRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.listTracks(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "GetTrackDownloadUrl" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Временная ссылка для проигрывания трека
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func getTrackDownloadUrl<Result>(
+        _ message: Barkcloud_Files_GetTrackDownloadUrlRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_GetTrackDownloadUrlResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Files_GetTrackDownloadUrlRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.getTrackDownloadUrl(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "CreatePlaylist" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Создать плейлист
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func createPlaylist<Result>(
+        _ message: Barkcloud_Files_CreateMusicPlaylistRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_MusicPlaylistInfo>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Files_CreateMusicPlaylistRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.createPlaylist(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "UpdatePlaylist" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Изменить имя/описание/обложку
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func updatePlaylist<Result>(
+        _ message: Barkcloud_Files_UpdateMusicPlaylistRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_MusicPlaylistInfo>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Files_UpdateMusicPlaylistRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.updatePlaylist(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "DeletePlaylist" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Удалить плейлист
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func deletePlaylist<Result>(
+        _ message: Barkcloud_Files_DeleteMusicPlaylistRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Files_DeleteMusicPlaylistRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.deletePlaylist(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "ListPlaylists" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Мои плейлисты
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func listPlaylists<Result>(
+        _ message: Barkcloud_Files_ListMusicPlaylistsRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListMusicPlaylistsResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Files_ListMusicPlaylistsRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.listPlaylists(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "ListPlaylistTracks" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Треки плейлиста
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func listPlaylistTracks<Result>(
+        _ message: Barkcloud_Files_ListMusicPlaylistTracksRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListMusicPlaylistTracksResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Files_ListMusicPlaylistTracksRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.listPlaylistTracks(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "AddPlaylistTracks" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Добавить треки
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func addPlaylistTracks<Result>(
+        _ message: Barkcloud_Files_AddMusicPlaylistTracksRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Files_AddMusicPlaylistTracksRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.addPlaylistTracks(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "RemovePlaylistTracks" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Убрать треки
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func removePlaylistTracks<Result>(
+        _ message: Barkcloud_Files_RemoveMusicPlaylistTracksRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Files_RemoveMusicPlaylistTracksRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.removePlaylistTracks(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "ReorderPlaylistTracks" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Ручной порядок треков
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func reorderPlaylistTracks<Result>(
+        _ message: Barkcloud_Files_ReorderMusicPlaylistTracksRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Files_ReorderMusicPlaylistTracksRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.reorderPlaylistTracks(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "CreatePlaylistShare" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Публичная ссылка на плейлист
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func createPlaylistShare<Result>(
+        _ message: Barkcloud_Files_CreateMusicPlaylistShareRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_MusicPlaylistShareInfo>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Files_CreateMusicPlaylistShareRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.createPlaylistShare(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "ListMyPlaylistShares" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Мои публичные плейлисты
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func listMyPlaylistShares<Result>(
+        _ message: Barkcloud_Files_ListMyMusicPlaylistSharesRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListMyMusicPlaylistSharesResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Files_ListMyMusicPlaylistSharesRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.listMyPlaylistShares(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "RevokePlaylistShare" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Отозвать публичность
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func revokePlaylistShare<Result>(
+        _ message: Barkcloud_Files_RevokeMusicPlaylistShareRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Files_RevokeMusicPlaylistShareRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.revokePlaylistShare(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "SharePlaylistWithUser" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Поделиться плейлистом с пользователем
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func sharePlaylistWithUser<Result>(
+        _ message: Barkcloud_Files_ShareMusicPlaylistWithUserRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Files_ShareMusicPlaylistWithUserRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.sharePlaylistWithUser(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "RevokePlaylistUserShare" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Отозвать грант
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func revokePlaylistUserShare<Result>(
+        _ message: Barkcloud_Files_RevokeMusicPlaylistUserShareRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_CloudEmpty>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Files_RevokeMusicPlaylistUserShareRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.revokePlaylistUserShare(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "ListMyOutgoingPlaylistShares" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Кому доступны мои плейлисты
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func listMyOutgoingPlaylistShares<Result>(
+        _ message: Barkcloud_Files_ListMyOutgoingMusicPlaylistSharesRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListMyOutgoingMusicPlaylistSharesResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Files_ListMyOutgoingMusicPlaylistSharesRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.listMyOutgoingPlaylistShares(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "ListSharedPlaylistsWithMe" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Плейлисты, доступные мне
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func listSharedPlaylistsWithMe<Result>(
+        _ message: Barkcloud_Files_ListSharedMusicPlaylistsWithMeRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListSharedMusicPlaylistsWithMeResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Files_ListSharedMusicPlaylistsWithMeRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.listSharedPlaylistsWithMe(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+}
+
+// MARK: - barkcloud.files.SearchApi
+
+/// Namespace containing generated types for the "barkcloud.files.SearchApi" service.
+@available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+public enum Barkcloud_Files_SearchApi: Sendable {
+    /// Service descriptor for the "barkcloud.files.SearchApi" service.
+    public static let descriptor = GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.SearchApi")
+    /// Namespace for method metadata.
+    public enum Method: Sendable {
+        /// Namespace for "Search" metadata.
+        public enum Search: Sendable {
+            /// Request type for "Search".
+            public typealias Input = Barkcloud_Files_SearchRequest
+            /// Response type for "Search".
+            public typealias Output = Barkcloud_Files_SearchResponse
+            /// Descriptor for "Search".
+            public static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.SearchApi"),
+                method: "Search",
+                type: .unary
+            )
+        }
+        /// Namespace for "ResolveHit" metadata.
+        public enum ResolveHit: Sendable {
+            /// Request type for "ResolveHit".
+            public typealias Input = Barkcloud_Files_SearchHitReference
+            /// Response type for "ResolveHit".
+            public typealias Output = Barkcloud_Files_SearchHit
+            /// Descriptor for "ResolveHit".
+            public static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.SearchApi"),
+                method: "ResolveHit",
+                type: .unary
+            )
+        }
+        /// Namespace for "GetFileSearchMetadata" metadata.
+        public enum GetFileSearchMetadata: Sendable {
+            /// Request type for "GetFileSearchMetadata".
+            public typealias Input = Barkcloud_Files_GetFileSearchMetadataRequest
+            /// Response type for "GetFileSearchMetadata".
+            public typealias Output = Barkcloud_Files_FileSearchMetadata
+            /// Descriptor for "GetFileSearchMetadata".
+            public static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.SearchApi"),
+                method: "GetFileSearchMetadata",
+                type: .unary
+            )
+        }
+        /// Namespace for "ReplaceFileSearchMetadata" metadata.
+        public enum ReplaceFileSearchMetadata: Sendable {
+            /// Request type for "ReplaceFileSearchMetadata".
+            public typealias Input = Barkcloud_Files_ReplaceFileSearchMetadataRequest
+            /// Response type for "ReplaceFileSearchMetadata".
+            public typealias Output = Barkcloud_Files_FileSearchMetadata
+            /// Descriptor for "ReplaceFileSearchMetadata".
+            public static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.SearchApi"),
+                method: "ReplaceFileSearchMetadata",
+                type: .unary
+            )
+        }
+        /// Descriptors for all methods in the "barkcloud.files.SearchApi" service.
+        public static let descriptors: [GRPCCore.MethodDescriptor] = [
+            Search.descriptor,
+            ResolveHit.descriptor,
+            GetFileSearchMetadata.descriptor,
+            ReplaceFileSearchMetadata.descriptor
+        ]
+    }
+}
+
+@available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+extension GRPCCore.ServiceDescriptor {
+    /// Service descriptor for the "barkcloud.files.SearchApi" service.
+    public static let barkcloud_files_SearchApi = GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.SearchApi")
+}
+
+// MARK: barkcloud.files.SearchApi (server)
+
+@available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+extension Barkcloud_Files_SearchApi {
+    /// Streaming variant of the service protocol for the "barkcloud.files.SearchApi" service.
+    ///
+    /// This protocol is the lowest-level of the service protocols generated for this service
+    /// giving you the most flexibility over the implementation of your service. This comes at
+    /// the cost of more verbose and less strict APIs. Each RPC requires you to implement it in
+    /// terms of a request stream and response stream. Where only a single request or response
+    /// message is expected, you are responsible for enforcing this invariant is maintained.
+    ///
+    /// Where possible, prefer using the stricter, less-verbose ``ServiceProtocol``
+    /// or ``SimpleServiceProtocol`` instead.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Единый поиск по данным файлового сервиса. Торренты добавляет Web BFF отдельным вызовом.
+    public protocol StreamingServiceProtocol: GRPCCore.RegistrableRPCService {
+        /// Handle the "Search" method.
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Files_SearchRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Files_SearchResponse` messages.
+        func search(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Files_SearchRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_SearchResponse>
+
+        /// Handle the "ResolveHit" method.
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Files_SearchHitReference` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Files_SearchHit` messages.
+        func resolveHit(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Files_SearchHitReference>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_SearchHit>
+
+        /// Handle the "GetFileSearchMetadata" method.
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Files_GetFileSearchMetadataRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Files_FileSearchMetadata` messages.
+        func getFileSearchMetadata(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Files_GetFileSearchMetadataRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_FileSearchMetadata>
+
+        /// Handle the "ReplaceFileSearchMetadata" method.
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Files_ReplaceFileSearchMetadataRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Files_FileSearchMetadata` messages.
+        func replaceFileSearchMetadata(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ReplaceFileSearchMetadataRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_FileSearchMetadata>
+    }
+
+    /// Service protocol for the "barkcloud.files.SearchApi" service.
+    ///
+    /// This protocol is higher level than ``StreamingServiceProtocol`` but lower level than
+    /// the ``SimpleServiceProtocol``, it provides access to request and response metadata and
+    /// trailing response metadata. If you don't need these then consider using
+    /// the ``SimpleServiceProtocol``. If you need fine grained control over your RPCs then
+    /// use ``StreamingServiceProtocol``.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Единый поиск по данным файлового сервиса. Торренты добавляет Web BFF отдельным вызовом.
+    public protocol ServiceProtocol: Barkcloud_Files_SearchApi.StreamingServiceProtocol {
+        /// Handle the "Search" method.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_SearchRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Files_SearchResponse` message.
+        func search(
+            request: GRPCCore.ServerRequest<Barkcloud_Files_SearchRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_SearchResponse>
+
+        /// Handle the "ResolveHit" method.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_SearchHitReference` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Files_SearchHit` message.
+        func resolveHit(
+            request: GRPCCore.ServerRequest<Barkcloud_Files_SearchHitReference>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_SearchHit>
+
+        /// Handle the "GetFileSearchMetadata" method.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_GetFileSearchMetadataRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Files_FileSearchMetadata` message.
+        func getFileSearchMetadata(
+            request: GRPCCore.ServerRequest<Barkcloud_Files_GetFileSearchMetadataRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_FileSearchMetadata>
+
+        /// Handle the "ReplaceFileSearchMetadata" method.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_ReplaceFileSearchMetadataRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Files_FileSearchMetadata` message.
+        func replaceFileSearchMetadata(
+            request: GRPCCore.ServerRequest<Barkcloud_Files_ReplaceFileSearchMetadataRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_FileSearchMetadata>
+    }
+
+    /// Simple service protocol for the "barkcloud.files.SearchApi" service.
+    ///
+    /// This is the highest level protocol for the service. The API is the easiest to use but
+    /// doesn't provide access to request or response metadata. If you need access to these
+    /// then use ``ServiceProtocol`` instead.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Единый поиск по данным файлового сервиса. Торренты добавляет Web BFF отдельным вызовом.
+    public protocol SimpleServiceProtocol: Barkcloud_Files_SearchApi.ServiceProtocol {
+        /// Handle the "Search" method.
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Files_SearchRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Files_SearchResponse` to respond with.
+        func search(
+            request: Barkcloud_Files_SearchRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Files_SearchResponse
+
+        /// Handle the "ResolveHit" method.
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Files_SearchHitReference` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Files_SearchHit` to respond with.
+        func resolveHit(
+            request: Barkcloud_Files_SearchHitReference,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Files_SearchHit
+
+        /// Handle the "GetFileSearchMetadata" method.
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Files_GetFileSearchMetadataRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Files_FileSearchMetadata` to respond with.
+        func getFileSearchMetadata(
+            request: Barkcloud_Files_GetFileSearchMetadataRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Files_FileSearchMetadata
+
+        /// Handle the "ReplaceFileSearchMetadata" method.
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Files_ReplaceFileSearchMetadataRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Files_FileSearchMetadata` to respond with.
+        func replaceFileSearchMetadata(
+            request: Barkcloud_Files_ReplaceFileSearchMetadataRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Files_FileSearchMetadata
+    }
+}
+
+// Default implementation of 'registerMethods(with:)'.
+@available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+extension Barkcloud_Files_SearchApi.StreamingServiceProtocol {
+    public func registerMethods<Transport>(with router: inout GRPCCore.RPCRouter<Transport>) where Transport: GRPCCore.ServerTransport {
+        router.registerHandler(
+            forMethod: Barkcloud_Files_SearchApi.Method.Search.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_SearchRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_SearchResponse>(),
+            handler: { request, context in
+                try await self.search(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
+            forMethod: Barkcloud_Files_SearchApi.Method.ResolveHit.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_SearchHitReference>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_SearchHit>(),
+            handler: { request, context in
+                try await self.resolveHit(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
+            forMethod: Barkcloud_Files_SearchApi.Method.GetFileSearchMetadata.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_GetFileSearchMetadataRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_FileSearchMetadata>(),
+            handler: { request, context in
+                try await self.getFileSearchMetadata(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
+            forMethod: Barkcloud_Files_SearchApi.Method.ReplaceFileSearchMetadata.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_ReplaceFileSearchMetadataRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_FileSearchMetadata>(),
+            handler: { request, context in
+                try await self.replaceFileSearchMetadata(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+    }
+}
+
+// Default implementation of streaming methods from 'StreamingServiceProtocol'.
+@available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+extension Barkcloud_Files_SearchApi.ServiceProtocol {
+    public func search(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Files_SearchRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_SearchResponse> {
+        let response = try await self.search(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    public func resolveHit(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Files_SearchHitReference>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_SearchHit> {
+        let response = try await self.resolveHit(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    public func getFileSearchMetadata(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Files_GetFileSearchMetadataRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_FileSearchMetadata> {
+        let response = try await self.getFileSearchMetadata(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    public func replaceFileSearchMetadata(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ReplaceFileSearchMetadataRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_FileSearchMetadata> {
+        let response = try await self.replaceFileSearchMetadata(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+}
+
+// Default implementation of methods from 'ServiceProtocol'.
+@available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+extension Barkcloud_Files_SearchApi.SimpleServiceProtocol {
+    public func search(
+        request: GRPCCore.ServerRequest<Barkcloud_Files_SearchRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_SearchResponse> {
+        return GRPCCore.ServerResponse<Barkcloud_Files_SearchResponse>(
+            message: try await self.search(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    public func resolveHit(
+        request: GRPCCore.ServerRequest<Barkcloud_Files_SearchHitReference>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_SearchHit> {
+        return GRPCCore.ServerResponse<Barkcloud_Files_SearchHit>(
+            message: try await self.resolveHit(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    public func getFileSearchMetadata(
+        request: GRPCCore.ServerRequest<Barkcloud_Files_GetFileSearchMetadataRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_FileSearchMetadata> {
+        return GRPCCore.ServerResponse<Barkcloud_Files_FileSearchMetadata>(
+            message: try await self.getFileSearchMetadata(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    public func replaceFileSearchMetadata(
+        request: GRPCCore.ServerRequest<Barkcloud_Files_ReplaceFileSearchMetadataRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_FileSearchMetadata> {
+        return GRPCCore.ServerResponse<Barkcloud_Files_FileSearchMetadata>(
+            message: try await self.replaceFileSearchMetadata(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+}
+
+// MARK: barkcloud.files.SearchApi (client)
+
+@available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+extension Barkcloud_Files_SearchApi {
+    /// Generated client protocol for the "barkcloud.files.SearchApi" service.
+    ///
+    /// You don't need to implement this protocol directly, use the generated
+    /// implementation, ``Client``.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Единый поиск по данным файлового сервиса. Торренты добавляет Web BFF отдельным вызовом.
+    public protocol ClientProtocol: Sendable {
+        /// Call the "Search" method.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_SearchRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_SearchRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_SearchResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func search<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_SearchRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_SearchRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_SearchResponse>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_SearchResponse>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "ResolveHit" method.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_SearchHitReference` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_SearchHitReference` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_SearchHit` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func resolveHit<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_SearchHitReference>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_SearchHitReference>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_SearchHit>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_SearchHit>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "GetFileSearchMetadata" method.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_GetFileSearchMetadataRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_GetFileSearchMetadataRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_FileSearchMetadata` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func getFileSearchMetadata<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_GetFileSearchMetadataRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_GetFileSearchMetadataRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_FileSearchMetadata>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_FileSearchMetadata>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "ReplaceFileSearchMetadata" method.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_ReplaceFileSearchMetadataRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_ReplaceFileSearchMetadataRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_FileSearchMetadata` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func replaceFileSearchMetadata<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_ReplaceFileSearchMetadataRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_ReplaceFileSearchMetadataRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_FileSearchMetadata>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_FileSearchMetadata>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+    }
+
+    /// Generated client for the "barkcloud.files.SearchApi" service.
+    ///
+    /// The ``Client`` provides an implementation of ``ClientProtocol`` which wraps
+    /// a `GRPCCore.GRPCCClient`. The underlying `GRPCClient` provides the long-lived
+    /// means of communication with the remote peer.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Единый поиск по данным файлового сервиса. Торренты добавляет Web BFF отдельным вызовом.
+    public struct Client<Transport>: ClientProtocol where Transport: GRPCCore.ClientTransport {
+        private let client: GRPCCore.GRPCClient<Transport>
+
+        /// Creates a new client wrapping the provided `GRPCCore.GRPCClient`.
+        ///
+        /// - Parameters:
+        ///   - client: A `GRPCCore.GRPCClient` providing a communication channel to the service.
+        public init(wrapping client: GRPCCore.GRPCClient<Transport>) {
+            self.client = client
+        }
+
+        /// Call the "Search" method.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_SearchRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_SearchRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_SearchResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        public func search<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_SearchRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_SearchRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_SearchResponse>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_SearchResponse>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Files_SearchApi.Method.Search.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "ResolveHit" method.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_SearchHitReference` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_SearchHitReference` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_SearchHit` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        public func resolveHit<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_SearchHitReference>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_SearchHitReference>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_SearchHit>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_SearchHit>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Files_SearchApi.Method.ResolveHit.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "GetFileSearchMetadata" method.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_GetFileSearchMetadataRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_GetFileSearchMetadataRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_FileSearchMetadata` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        public func getFileSearchMetadata<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_GetFileSearchMetadataRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_GetFileSearchMetadataRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_FileSearchMetadata>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_FileSearchMetadata>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Files_SearchApi.Method.GetFileSearchMetadata.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "ReplaceFileSearchMetadata" method.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_ReplaceFileSearchMetadataRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_ReplaceFileSearchMetadataRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_FileSearchMetadata` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        public func replaceFileSearchMetadata<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_ReplaceFileSearchMetadataRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_ReplaceFileSearchMetadataRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_FileSearchMetadata>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_FileSearchMetadata>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Files_SearchApi.Method.ReplaceFileSearchMetadata.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+    }
+}
+
+// Helpers providing default arguments to 'ClientProtocol' methods.
+@available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+extension Barkcloud_Files_SearchApi.ClientProtocol {
+    /// Call the "Search" method.
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Files_SearchRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func search<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Files_SearchRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_SearchResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.search(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_SearchRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_SearchResponse>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "ResolveHit" method.
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Files_SearchHitReference` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func resolveHit<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Files_SearchHitReference>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_SearchHit>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.resolveHit(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_SearchHitReference>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_SearchHit>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "GetFileSearchMetadata" method.
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Files_GetFileSearchMetadataRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func getFileSearchMetadata<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Files_GetFileSearchMetadataRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_FileSearchMetadata>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.getFileSearchMetadata(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_GetFileSearchMetadataRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_FileSearchMetadata>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "ReplaceFileSearchMetadata" method.
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Files_ReplaceFileSearchMetadataRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func replaceFileSearchMetadata<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Files_ReplaceFileSearchMetadataRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_FileSearchMetadata>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.replaceFileSearchMetadata(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_ReplaceFileSearchMetadataRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_FileSearchMetadata>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+}
+
+// Helpers providing sugared APIs for 'ClientProtocol' methods.
+@available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+extension Barkcloud_Files_SearchApi.ClientProtocol {
+    /// Call the "Search" method.
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func search<Result>(
+        _ message: Barkcloud_Files_SearchRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_SearchResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Files_SearchRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.search(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "ResolveHit" method.
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func resolveHit<Result>(
+        _ message: Barkcloud_Files_SearchHitReference,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_SearchHit>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Files_SearchHitReference>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.resolveHit(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "GetFileSearchMetadata" method.
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func getFileSearchMetadata<Result>(
+        _ message: Barkcloud_Files_GetFileSearchMetadataRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_FileSearchMetadata>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Files_GetFileSearchMetadataRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.getFileSearchMetadata(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "ReplaceFileSearchMetadata" method.
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func replaceFileSearchMetadata<Result>(
+        _ message: Barkcloud_Files_ReplaceFileSearchMetadataRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_FileSearchMetadata>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Files_ReplaceFileSearchMetadataRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.replaceFileSearchMetadata(
             request: request,
             options: options,
             onResponse: handleResponse

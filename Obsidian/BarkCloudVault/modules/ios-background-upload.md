@@ -2,7 +2,44 @@
 
 Parent: [[ios-app]]
 
-## Контекст
+## Актуально: Upload 2.0 для `CLOUD_FILE`
+
+Все iOS-загрузки файлов (основное приложение и Share Extension) теперь используют
+возобновляемые Files Upload 2.0-сессии. Аватар остаётся на V1. Координатор создаёт
+идемпотентную сессию через `BarkCloudKit.FileTransferService`, а байты отправляет
+последовательными bounded-part файлами напрямую на
+`GrpcEndpoint.webHost/file-upload/{session}/parts/{part}`. Web/gRPC не буферизует
+оригинал.
+
+`UploadSessionJob` (в исходниках совместимое имя `UploadJob`) хранится в `<App Group>/UploadSessionQueue.sqlite` и содержит только
+метаданные: idempotency key, staged path, имя/MIME/размер/SHA-256, session/file id,
+part size, прогресс и post-ready intent. Token, URLSessionTask и multipart body в
+SwiftData не сохраняются. SHA считается потоково блоками 4 MiB; части также
+материализуются по 4 MiB и удаляются после подтверждённой JSON-квитанции.
+
+Состояния: `hashing → creatingSession → uploading → completing → processing →
+attaching → completed`; terminal `failed/cancelled`, а ошибка post-ready действия
+даёт `uploadedNotAttached`. Retry этого состояния вызывает только AttachFile или
+добавление в альбом. `FileAlreadyAttached` считается успешным replay. Attach и
+album выполняются только после серверного `ready`; в `processing/attaching`
+прогресс UI остаётся 100%, но job не считается готовым.
+
+При первом запуске новой версии main app отменяет старые V1 URLSession-задачи,
+удаляет старую `UploadQueue.sqlite` и только её staging-артефакты, затем ставит
+marker `BarkCloud.upload2.ios.migration.v1`. Share Extension до marker складывает
+вложения в `<App Group>/ShareInbox/<uuid>/<name>` и не создаёт V2 job; после marker
+ставит job сразу. PhotosPicker использует `FileRepresentation`, importer/share
+копируют security-scoped URL потоково — `Data(contentsOf:)` и `originalData` для
+массовых файлов не используются.
+
+Основные маршруты используют один transport: Cloud Browser attach к каталогу,
+Gallery/Photos/Backup route-by-media-kind, Album Detail add-to-album, Share
+Extension выбранная папка или media-kind route. `ensureCloudFileID` ждёт `ready`.
+Одновременно выполняется максимум четыре файла, части одного файла идут строго
+последовательно; Resume всегда сверяет фактические S3 parts. Подробнее о сервере:
+[[upload-2]], [[api/files-api]].
+
+## Исторический контекст
 
 До этой работы:
 - Все загрузки (Share Extension, BackupManager, ручные из Cloud Browser) шли через
@@ -17,7 +54,7 @@ Parent: [[ios-app]]
 Цель: загрузка переживает kill main app; Share Extension стартует upload прямо в
 момент шеринга; пользователь видит прогресс в Lock Screen / Dynamic Island.
 
-## Архитектура
+## Архитектура (справочно; актуальные правила выше)
 
 ### Background URLSession (singleton координатор)
 

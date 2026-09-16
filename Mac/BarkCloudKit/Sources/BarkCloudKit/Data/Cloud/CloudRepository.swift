@@ -452,7 +452,9 @@ public final class CloudRepository: Sendable {
         fileID: String,
         directoryID: String,
         name: String,
-        routeByMediaKind: Bool = false
+        routeByMediaKind: Bool = false,
+        uploadSessionID: String? = nil,
+        isUploadRetry: Bool = false
     ) async throws {
         let stub = try await grpc.cloudStub()
         var req = Barkcloud_Files_AttachFileRequest()
@@ -460,6 +462,10 @@ public final class CloudRepository: Sendable {
         req.directoryID = directoryID
         req.name = name
         req.routeByMediaKind = routeByMediaKind
+        if let uploadSessionID, !uploadSessionID.isEmpty {
+            req.uploadSessionID = uploadSessionID
+        }
+        req.isUploadRetry = isUploadRetry
         _ = try await stub.attachFile(req)
     }
 

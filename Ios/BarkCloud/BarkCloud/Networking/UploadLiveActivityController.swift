@@ -64,8 +64,7 @@ final class UploadLiveActivityController {
             return
         }
 
-        let activeStates: Set<UploadJobState> = [.pending, .preparing, .running]
-        let activeJobs = jobs.filter { activeStates.contains($0.state) }
+        let activeJobs = jobs.filter { $0.state.isActive }
         // Осиротевшие `.running` (их background-task умер) Activity не держат —
         // иначе зомби-загрузка вечно висит в Dynamic Island после завершения.
         let blockingJobs = await BackgroundUploadCoordinator.shared.blockingActiveJobs(from: activeJobs)
@@ -80,7 +79,7 @@ final class UploadLiveActivityController {
         let total = jobs.count
         let completed = jobs.filter { $0.state == .completed }.count
         let failed = jobs.filter { $0.state == .failed }.count
-        let running = jobs.first { $0.state == .running || $0.state == .preparing }
+        let running = jobs.first { $0.state.isActive }
 
         let currentFileName = running?.fileName ?? ""
         let currentProgress: Double

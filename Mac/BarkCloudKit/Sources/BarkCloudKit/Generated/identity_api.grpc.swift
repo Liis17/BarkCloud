@@ -215,6 +215,84 @@ public enum Barkcloud_Identity_IdentityApi: Sendable {
                 type: .unary
             )
         }
+        /// Namespace for "BeginWebAuthnRegistration" metadata.
+        public enum BeginWebAuthnRegistration: Sendable {
+            /// Request type for "BeginWebAuthnRegistration".
+            public typealias Input = Barkcloud_Identity_BeginWebAuthnRegistrationRequest
+            /// Response type for "BeginWebAuthnRegistration".
+            public typealias Output = Barkcloud_Identity_BeginWebAuthnRegistrationResponse
+            /// Descriptor for "BeginWebAuthnRegistration".
+            public static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.identity.IdentityApi"),
+                method: "BeginWebAuthnRegistration",
+                type: .unary
+            )
+        }
+        /// Namespace for "CompleteWebAuthnRegistration" metadata.
+        public enum CompleteWebAuthnRegistration: Sendable {
+            /// Request type for "CompleteWebAuthnRegistration".
+            public typealias Input = Barkcloud_Identity_CompleteWebAuthnRegistrationRequest
+            /// Response type for "CompleteWebAuthnRegistration".
+            public typealias Output = Barkcloud_Identity_CompleteWebAuthnRegistrationResponse
+            /// Descriptor for "CompleteWebAuthnRegistration".
+            public static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.identity.IdentityApi"),
+                method: "CompleteWebAuthnRegistration",
+                type: .unary
+            )
+        }
+        /// Namespace for "BeginWebAuthnAssertion" metadata.
+        public enum BeginWebAuthnAssertion: Sendable {
+            /// Request type for "BeginWebAuthnAssertion".
+            public typealias Input = Barkcloud_Identity_BeginWebAuthnAssertionRequest
+            /// Response type for "BeginWebAuthnAssertion".
+            public typealias Output = Barkcloud_Identity_BeginWebAuthnAssertionResponse
+            /// Descriptor for "BeginWebAuthnAssertion".
+            public static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.identity.IdentityApi"),
+                method: "BeginWebAuthnAssertion",
+                type: .unary
+            )
+        }
+        /// Namespace for "CompleteWebAuthnAssertion" metadata.
+        public enum CompleteWebAuthnAssertion: Sendable {
+            /// Request type for "CompleteWebAuthnAssertion".
+            public typealias Input = Barkcloud_Identity_CompleteWebAuthnAssertionRequest
+            /// Response type for "CompleteWebAuthnAssertion".
+            public typealias Output = Barkcloud_Identity_AuthResponse
+            /// Descriptor for "CompleteWebAuthnAssertion".
+            public static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.identity.IdentityApi"),
+                method: "CompleteWebAuthnAssertion",
+                type: .unary
+            )
+        }
+        /// Namespace for "ListWebAuthnCredentials" metadata.
+        public enum ListWebAuthnCredentials: Sendable {
+            /// Request type for "ListWebAuthnCredentials".
+            public typealias Input = Barkcloud_Identity_ListWebAuthnCredentialsRequest
+            /// Response type for "ListWebAuthnCredentials".
+            public typealias Output = Barkcloud_Identity_ListWebAuthnCredentialsResponse
+            /// Descriptor for "ListWebAuthnCredentials".
+            public static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.identity.IdentityApi"),
+                method: "ListWebAuthnCredentials",
+                type: .unary
+            )
+        }
+        /// Namespace for "RemoveWebAuthnCredential" metadata.
+        public enum RemoveWebAuthnCredential: Sendable {
+            /// Request type for "RemoveWebAuthnCredential".
+            public typealias Input = Barkcloud_Identity_RemoveWebAuthnCredentialRequest
+            /// Response type for "RemoveWebAuthnCredential".
+            public typealias Output = Barkcloud_Identity_RemoveWebAuthnCredentialResponse
+            /// Descriptor for "RemoveWebAuthnCredential".
+            public static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.identity.IdentityApi"),
+                method: "RemoveWebAuthnCredential",
+                type: .unary
+            )
+        }
         /// Descriptors for all methods in the "barkcloud.identity.IdentityApi" service.
         public static let descriptors: [GRPCCore.MethodDescriptor] = [
             Auth.descriptor,
@@ -231,7 +309,13 @@ public enum Barkcloud_Identity_IdentityApi: Sendable {
             ResetPassword.descriptor,
             ConfirmResetPassword.descriptor,
             SetPassword.descriptor,
-            Logout.descriptor
+            Logout.descriptor,
+            BeginWebAuthnRegistration.descriptor,
+            CompleteWebAuthnRegistration.descriptor,
+            BeginWebAuthnAssertion.descriptor,
+            CompleteWebAuthnAssertion.descriptor,
+            ListWebAuthnCredentials.descriptor,
+            RemoveWebAuthnCredential.descriptor
         ]
     }
 }
@@ -526,6 +610,114 @@ extension Barkcloud_Identity_IdentityApi {
             request: GRPCCore.StreamingServerRequest<Barkcloud_Identity_LogoutRequest>,
             context: GRPCCore.ServerContext
         ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Identity_LogoutResponse>
+
+        /// Handle the "BeginWebAuthnRegistration" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Привязать ключ безопасности (FIDO2/WebAuthn) — начать регистрацию
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Identity_BeginWebAuthnRegistrationRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Identity_BeginWebAuthnRegistrationResponse` messages.
+        func beginWebAuthnRegistration(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Identity_BeginWebAuthnRegistrationRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Identity_BeginWebAuthnRegistrationResponse>
+
+        /// Handle the "CompleteWebAuthnRegistration" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Завершить привязку ключа безопасности
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Identity_CompleteWebAuthnRegistrationRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Identity_CompleteWebAuthnRegistrationResponse` messages.
+        func completeWebAuthnRegistration(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Identity_CompleteWebAuthnRegistrationRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Identity_CompleteWebAuthnRegistrationResponse>
+
+        /// Handle the "BeginWebAuthnAssertion" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Вход ключом безопасности — начать (вернуть challenge/allowCredentials)
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Identity_BeginWebAuthnAssertionRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Identity_BeginWebAuthnAssertionResponse` messages.
+        func beginWebAuthnAssertion(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Identity_BeginWebAuthnAssertionRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Identity_BeginWebAuthnAssertionResponse>
+
+        /// Handle the "CompleteWebAuthnAssertion" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Вход ключом безопасности — завершить (проверить assertion, выдать токены)
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Identity_CompleteWebAuthnAssertionRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Identity_AuthResponse` messages.
+        func completeWebAuthnAssertion(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Identity_CompleteWebAuthnAssertionRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Identity_AuthResponse>
+
+        /// Handle the "ListWebAuthnCredentials" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Список привязанных ключей безопасности
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Identity_ListWebAuthnCredentialsRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Identity_ListWebAuthnCredentialsResponse` messages.
+        func listWebAuthnCredentials(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Identity_ListWebAuthnCredentialsRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Identity_ListWebAuthnCredentialsResponse>
+
+        /// Handle the "RemoveWebAuthnCredential" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Удалить привязанный ключ безопасности
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Identity_RemoveWebAuthnCredentialRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Identity_RemoveWebAuthnCredentialResponse` messages.
+        func removeWebAuthnCredential(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Identity_RemoveWebAuthnCredentialRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Identity_RemoveWebAuthnCredentialResponse>
     }
 
     /// Service protocol for the "barkcloud.identity.IdentityApi" service.
@@ -805,6 +997,114 @@ extension Barkcloud_Identity_IdentityApi {
             request: GRPCCore.ServerRequest<Barkcloud_Identity_LogoutRequest>,
             context: GRPCCore.ServerContext
         ) async throws -> GRPCCore.ServerResponse<Barkcloud_Identity_LogoutResponse>
+
+        /// Handle the "BeginWebAuthnRegistration" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Привязать ключ безопасности (FIDO2/WebAuthn) — начать регистрацию
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Identity_BeginWebAuthnRegistrationRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Identity_BeginWebAuthnRegistrationResponse` message.
+        func beginWebAuthnRegistration(
+            request: GRPCCore.ServerRequest<Barkcloud_Identity_BeginWebAuthnRegistrationRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Identity_BeginWebAuthnRegistrationResponse>
+
+        /// Handle the "CompleteWebAuthnRegistration" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Завершить привязку ключа безопасности
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Identity_CompleteWebAuthnRegistrationRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Identity_CompleteWebAuthnRegistrationResponse` message.
+        func completeWebAuthnRegistration(
+            request: GRPCCore.ServerRequest<Barkcloud_Identity_CompleteWebAuthnRegistrationRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Identity_CompleteWebAuthnRegistrationResponse>
+
+        /// Handle the "BeginWebAuthnAssertion" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Вход ключом безопасности — начать (вернуть challenge/allowCredentials)
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Identity_BeginWebAuthnAssertionRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Identity_BeginWebAuthnAssertionResponse` message.
+        func beginWebAuthnAssertion(
+            request: GRPCCore.ServerRequest<Barkcloud_Identity_BeginWebAuthnAssertionRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Identity_BeginWebAuthnAssertionResponse>
+
+        /// Handle the "CompleteWebAuthnAssertion" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Вход ключом безопасности — завершить (проверить assertion, выдать токены)
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Identity_CompleteWebAuthnAssertionRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Identity_AuthResponse` message.
+        func completeWebAuthnAssertion(
+            request: GRPCCore.ServerRequest<Barkcloud_Identity_CompleteWebAuthnAssertionRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Identity_AuthResponse>
+
+        /// Handle the "ListWebAuthnCredentials" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Список привязанных ключей безопасности
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Identity_ListWebAuthnCredentialsRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Identity_ListWebAuthnCredentialsResponse` message.
+        func listWebAuthnCredentials(
+            request: GRPCCore.ServerRequest<Barkcloud_Identity_ListWebAuthnCredentialsRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Identity_ListWebAuthnCredentialsResponse>
+
+        /// Handle the "RemoveWebAuthnCredential" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Удалить привязанный ключ безопасности
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Identity_RemoveWebAuthnCredentialRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Identity_RemoveWebAuthnCredentialResponse` message.
+        func removeWebAuthnCredential(
+            request: GRPCCore.ServerRequest<Barkcloud_Identity_RemoveWebAuthnCredentialRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Identity_RemoveWebAuthnCredentialResponse>
     }
 
     /// Simple service protocol for the "barkcloud.identity.IdentityApi" service.
@@ -1082,6 +1382,114 @@ extension Barkcloud_Identity_IdentityApi {
             request: Barkcloud_Identity_LogoutRequest,
             context: GRPCCore.ServerContext
         ) async throws -> Barkcloud_Identity_LogoutResponse
+
+        /// Handle the "BeginWebAuthnRegistration" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Привязать ключ безопасности (FIDO2/WebAuthn) — начать регистрацию
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Identity_BeginWebAuthnRegistrationRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Identity_BeginWebAuthnRegistrationResponse` to respond with.
+        func beginWebAuthnRegistration(
+            request: Barkcloud_Identity_BeginWebAuthnRegistrationRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Identity_BeginWebAuthnRegistrationResponse
+
+        /// Handle the "CompleteWebAuthnRegistration" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Завершить привязку ключа безопасности
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Identity_CompleteWebAuthnRegistrationRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Identity_CompleteWebAuthnRegistrationResponse` to respond with.
+        func completeWebAuthnRegistration(
+            request: Barkcloud_Identity_CompleteWebAuthnRegistrationRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Identity_CompleteWebAuthnRegistrationResponse
+
+        /// Handle the "BeginWebAuthnAssertion" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Вход ключом безопасности — начать (вернуть challenge/allowCredentials)
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Identity_BeginWebAuthnAssertionRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Identity_BeginWebAuthnAssertionResponse` to respond with.
+        func beginWebAuthnAssertion(
+            request: Barkcloud_Identity_BeginWebAuthnAssertionRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Identity_BeginWebAuthnAssertionResponse
+
+        /// Handle the "CompleteWebAuthnAssertion" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Вход ключом безопасности — завершить (проверить assertion, выдать токены)
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Identity_CompleteWebAuthnAssertionRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Identity_AuthResponse` to respond with.
+        func completeWebAuthnAssertion(
+            request: Barkcloud_Identity_CompleteWebAuthnAssertionRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Identity_AuthResponse
+
+        /// Handle the "ListWebAuthnCredentials" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Список привязанных ключей безопасности
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Identity_ListWebAuthnCredentialsRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Identity_ListWebAuthnCredentialsResponse` to respond with.
+        func listWebAuthnCredentials(
+            request: Barkcloud_Identity_ListWebAuthnCredentialsRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Identity_ListWebAuthnCredentialsResponse
+
+        /// Handle the "RemoveWebAuthnCredential" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Удалить привязанный ключ безопасности
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Identity_RemoveWebAuthnCredentialRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Identity_RemoveWebAuthnCredentialResponse` to respond with.
+        func removeWebAuthnCredential(
+            request: Barkcloud_Identity_RemoveWebAuthnCredentialRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Identity_RemoveWebAuthnCredentialResponse
     }
 }
 
@@ -1254,6 +1662,72 @@ extension Barkcloud_Identity_IdentityApi.StreamingServiceProtocol {
                 )
             }
         )
+        router.registerHandler(
+            forMethod: Barkcloud_Identity_IdentityApi.Method.BeginWebAuthnRegistration.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Identity_BeginWebAuthnRegistrationRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Identity_BeginWebAuthnRegistrationResponse>(),
+            handler: { request, context in
+                try await self.beginWebAuthnRegistration(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
+            forMethod: Barkcloud_Identity_IdentityApi.Method.CompleteWebAuthnRegistration.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Identity_CompleteWebAuthnRegistrationRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Identity_CompleteWebAuthnRegistrationResponse>(),
+            handler: { request, context in
+                try await self.completeWebAuthnRegistration(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
+            forMethod: Barkcloud_Identity_IdentityApi.Method.BeginWebAuthnAssertion.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Identity_BeginWebAuthnAssertionRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Identity_BeginWebAuthnAssertionResponse>(),
+            handler: { request, context in
+                try await self.beginWebAuthnAssertion(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
+            forMethod: Barkcloud_Identity_IdentityApi.Method.CompleteWebAuthnAssertion.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Identity_CompleteWebAuthnAssertionRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Identity_AuthResponse>(),
+            handler: { request, context in
+                try await self.completeWebAuthnAssertion(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
+            forMethod: Barkcloud_Identity_IdentityApi.Method.ListWebAuthnCredentials.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Identity_ListWebAuthnCredentialsRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Identity_ListWebAuthnCredentialsResponse>(),
+            handler: { request, context in
+                try await self.listWebAuthnCredentials(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
+            forMethod: Barkcloud_Identity_IdentityApi.Method.RemoveWebAuthnCredential.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Identity_RemoveWebAuthnCredentialRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Identity_RemoveWebAuthnCredentialResponse>(),
+            handler: { request, context in
+                try await self.removeWebAuthnCredential(
+                    request: request,
+                    context: context
+                )
+            }
+        )
     }
 }
 
@@ -1419,6 +1893,72 @@ extension Barkcloud_Identity_IdentityApi.ServiceProtocol {
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Identity_LogoutResponse> {
         let response = try await self.logout(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    public func beginWebAuthnRegistration(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Identity_BeginWebAuthnRegistrationRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Identity_BeginWebAuthnRegistrationResponse> {
+        let response = try await self.beginWebAuthnRegistration(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    public func completeWebAuthnRegistration(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Identity_CompleteWebAuthnRegistrationRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Identity_CompleteWebAuthnRegistrationResponse> {
+        let response = try await self.completeWebAuthnRegistration(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    public func beginWebAuthnAssertion(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Identity_BeginWebAuthnAssertionRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Identity_BeginWebAuthnAssertionResponse> {
+        let response = try await self.beginWebAuthnAssertion(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    public func completeWebAuthnAssertion(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Identity_CompleteWebAuthnAssertionRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Identity_AuthResponse> {
+        let response = try await self.completeWebAuthnAssertion(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    public func listWebAuthnCredentials(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Identity_ListWebAuthnCredentialsRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Identity_ListWebAuthnCredentialsResponse> {
+        let response = try await self.listWebAuthnCredentials(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    public func removeWebAuthnCredential(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Identity_RemoveWebAuthnCredentialRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Identity_RemoveWebAuthnCredentialResponse> {
+        let response = try await self.removeWebAuthnCredential(
             request: GRPCCore.ServerRequest(stream: request),
             context: context
         )
@@ -1617,6 +2157,84 @@ extension Barkcloud_Identity_IdentityApi.SimpleServiceProtocol {
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Identity_LogoutResponse> {
         return GRPCCore.ServerResponse<Barkcloud_Identity_LogoutResponse>(
             message: try await self.logout(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    public func beginWebAuthnRegistration(
+        request: GRPCCore.ServerRequest<Barkcloud_Identity_BeginWebAuthnRegistrationRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Identity_BeginWebAuthnRegistrationResponse> {
+        return GRPCCore.ServerResponse<Barkcloud_Identity_BeginWebAuthnRegistrationResponse>(
+            message: try await self.beginWebAuthnRegistration(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    public func completeWebAuthnRegistration(
+        request: GRPCCore.ServerRequest<Barkcloud_Identity_CompleteWebAuthnRegistrationRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Identity_CompleteWebAuthnRegistrationResponse> {
+        return GRPCCore.ServerResponse<Barkcloud_Identity_CompleteWebAuthnRegistrationResponse>(
+            message: try await self.completeWebAuthnRegistration(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    public func beginWebAuthnAssertion(
+        request: GRPCCore.ServerRequest<Barkcloud_Identity_BeginWebAuthnAssertionRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Identity_BeginWebAuthnAssertionResponse> {
+        return GRPCCore.ServerResponse<Barkcloud_Identity_BeginWebAuthnAssertionResponse>(
+            message: try await self.beginWebAuthnAssertion(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    public func completeWebAuthnAssertion(
+        request: GRPCCore.ServerRequest<Barkcloud_Identity_CompleteWebAuthnAssertionRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Identity_AuthResponse> {
+        return GRPCCore.ServerResponse<Barkcloud_Identity_AuthResponse>(
+            message: try await self.completeWebAuthnAssertion(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    public func listWebAuthnCredentials(
+        request: GRPCCore.ServerRequest<Barkcloud_Identity_ListWebAuthnCredentialsRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Identity_ListWebAuthnCredentialsResponse> {
+        return GRPCCore.ServerResponse<Barkcloud_Identity_ListWebAuthnCredentialsResponse>(
+            message: try await self.listWebAuthnCredentials(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    public func removeWebAuthnCredential(
+        request: GRPCCore.ServerRequest<Barkcloud_Identity_RemoveWebAuthnCredentialRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Identity_RemoveWebAuthnCredentialResponse> {
+        return GRPCCore.ServerResponse<Barkcloud_Identity_RemoveWebAuthnCredentialResponse>(
+            message: try await self.removeWebAuthnCredential(
                 request: request.message,
                 context: context
             ),
@@ -1977,6 +2595,144 @@ extension Barkcloud_Identity_IdentityApi {
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Identity_LogoutResponse>,
             options: GRPCCore.CallOptions,
             onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Identity_LogoutResponse>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "BeginWebAuthnRegistration" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Привязать ключ безопасности (FIDO2/WebAuthn) — начать регистрацию
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Identity_BeginWebAuthnRegistrationRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Identity_BeginWebAuthnRegistrationRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Identity_BeginWebAuthnRegistrationResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func beginWebAuthnRegistration<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Identity_BeginWebAuthnRegistrationRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Identity_BeginWebAuthnRegistrationRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Identity_BeginWebAuthnRegistrationResponse>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Identity_BeginWebAuthnRegistrationResponse>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "CompleteWebAuthnRegistration" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Завершить привязку ключа безопасности
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Identity_CompleteWebAuthnRegistrationRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Identity_CompleteWebAuthnRegistrationRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Identity_CompleteWebAuthnRegistrationResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func completeWebAuthnRegistration<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Identity_CompleteWebAuthnRegistrationRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Identity_CompleteWebAuthnRegistrationRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Identity_CompleteWebAuthnRegistrationResponse>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Identity_CompleteWebAuthnRegistrationResponse>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "BeginWebAuthnAssertion" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Вход ключом безопасности — начать (вернуть challenge/allowCredentials)
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Identity_BeginWebAuthnAssertionRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Identity_BeginWebAuthnAssertionRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Identity_BeginWebAuthnAssertionResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func beginWebAuthnAssertion<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Identity_BeginWebAuthnAssertionRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Identity_BeginWebAuthnAssertionRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Identity_BeginWebAuthnAssertionResponse>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Identity_BeginWebAuthnAssertionResponse>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "CompleteWebAuthnAssertion" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Вход ключом безопасности — завершить (проверить assertion, выдать токены)
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Identity_CompleteWebAuthnAssertionRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Identity_CompleteWebAuthnAssertionRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Identity_AuthResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func completeWebAuthnAssertion<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Identity_CompleteWebAuthnAssertionRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Identity_CompleteWebAuthnAssertionRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Identity_AuthResponse>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Identity_AuthResponse>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "ListWebAuthnCredentials" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Список привязанных ключей безопасности
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Identity_ListWebAuthnCredentialsRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Identity_ListWebAuthnCredentialsRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Identity_ListWebAuthnCredentialsResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func listWebAuthnCredentials<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Identity_ListWebAuthnCredentialsRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Identity_ListWebAuthnCredentialsRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Identity_ListWebAuthnCredentialsResponse>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Identity_ListWebAuthnCredentialsResponse>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "RemoveWebAuthnCredential" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Удалить привязанный ключ безопасности
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Identity_RemoveWebAuthnCredentialRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Identity_RemoveWebAuthnCredentialRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Identity_RemoveWebAuthnCredentialResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func removeWebAuthnCredential<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Identity_RemoveWebAuthnCredentialRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Identity_RemoveWebAuthnCredentialRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Identity_RemoveWebAuthnCredentialResponse>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Identity_RemoveWebAuthnCredentialResponse>) async throws -> Result
         ) async throws -> Result where Result: Sendable
     }
 
@@ -2505,6 +3261,210 @@ extension Barkcloud_Identity_IdentityApi {
                 onResponse: handleResponse
             )
         }
+
+        /// Call the "BeginWebAuthnRegistration" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Привязать ключ безопасности (FIDO2/WebAuthn) — начать регистрацию
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Identity_BeginWebAuthnRegistrationRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Identity_BeginWebAuthnRegistrationRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Identity_BeginWebAuthnRegistrationResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        public func beginWebAuthnRegistration<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Identity_BeginWebAuthnRegistrationRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Identity_BeginWebAuthnRegistrationRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Identity_BeginWebAuthnRegistrationResponse>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Identity_BeginWebAuthnRegistrationResponse>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Identity_IdentityApi.Method.BeginWebAuthnRegistration.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "CompleteWebAuthnRegistration" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Завершить привязку ключа безопасности
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Identity_CompleteWebAuthnRegistrationRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Identity_CompleteWebAuthnRegistrationRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Identity_CompleteWebAuthnRegistrationResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        public func completeWebAuthnRegistration<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Identity_CompleteWebAuthnRegistrationRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Identity_CompleteWebAuthnRegistrationRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Identity_CompleteWebAuthnRegistrationResponse>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Identity_CompleteWebAuthnRegistrationResponse>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Identity_IdentityApi.Method.CompleteWebAuthnRegistration.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "BeginWebAuthnAssertion" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Вход ключом безопасности — начать (вернуть challenge/allowCredentials)
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Identity_BeginWebAuthnAssertionRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Identity_BeginWebAuthnAssertionRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Identity_BeginWebAuthnAssertionResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        public func beginWebAuthnAssertion<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Identity_BeginWebAuthnAssertionRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Identity_BeginWebAuthnAssertionRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Identity_BeginWebAuthnAssertionResponse>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Identity_BeginWebAuthnAssertionResponse>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Identity_IdentityApi.Method.BeginWebAuthnAssertion.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "CompleteWebAuthnAssertion" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Вход ключом безопасности — завершить (проверить assertion, выдать токены)
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Identity_CompleteWebAuthnAssertionRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Identity_CompleteWebAuthnAssertionRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Identity_AuthResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        public func completeWebAuthnAssertion<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Identity_CompleteWebAuthnAssertionRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Identity_CompleteWebAuthnAssertionRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Identity_AuthResponse>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Identity_AuthResponse>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Identity_IdentityApi.Method.CompleteWebAuthnAssertion.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "ListWebAuthnCredentials" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Список привязанных ключей безопасности
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Identity_ListWebAuthnCredentialsRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Identity_ListWebAuthnCredentialsRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Identity_ListWebAuthnCredentialsResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        public func listWebAuthnCredentials<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Identity_ListWebAuthnCredentialsRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Identity_ListWebAuthnCredentialsRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Identity_ListWebAuthnCredentialsResponse>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Identity_ListWebAuthnCredentialsResponse>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Identity_IdentityApi.Method.ListWebAuthnCredentials.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "RemoveWebAuthnCredential" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Удалить привязанный ключ безопасности
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Identity_RemoveWebAuthnCredentialRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Identity_RemoveWebAuthnCredentialRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Identity_RemoveWebAuthnCredentialResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        public func removeWebAuthnCredential<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Identity_RemoveWebAuthnCredentialRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Identity_RemoveWebAuthnCredentialRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Identity_RemoveWebAuthnCredentialResponse>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Identity_RemoveWebAuthnCredentialResponse>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Identity_IdentityApi.Method.RemoveWebAuthnCredential.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
     }
 }
 
@@ -2941,6 +3901,180 @@ extension Barkcloud_Identity_IdentityApi.ClientProtocol {
             request: request,
             serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Identity_LogoutRequest>(),
             deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Identity_LogoutResponse>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "BeginWebAuthnRegistration" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Привязать ключ безопасности (FIDO2/WebAuthn) — начать регистрацию
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Identity_BeginWebAuthnRegistrationRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func beginWebAuthnRegistration<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Identity_BeginWebAuthnRegistrationRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Identity_BeginWebAuthnRegistrationResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.beginWebAuthnRegistration(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Identity_BeginWebAuthnRegistrationRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Identity_BeginWebAuthnRegistrationResponse>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "CompleteWebAuthnRegistration" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Завершить привязку ключа безопасности
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Identity_CompleteWebAuthnRegistrationRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func completeWebAuthnRegistration<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Identity_CompleteWebAuthnRegistrationRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Identity_CompleteWebAuthnRegistrationResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.completeWebAuthnRegistration(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Identity_CompleteWebAuthnRegistrationRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Identity_CompleteWebAuthnRegistrationResponse>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "BeginWebAuthnAssertion" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Вход ключом безопасности — начать (вернуть challenge/allowCredentials)
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Identity_BeginWebAuthnAssertionRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func beginWebAuthnAssertion<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Identity_BeginWebAuthnAssertionRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Identity_BeginWebAuthnAssertionResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.beginWebAuthnAssertion(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Identity_BeginWebAuthnAssertionRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Identity_BeginWebAuthnAssertionResponse>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "CompleteWebAuthnAssertion" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Вход ключом безопасности — завершить (проверить assertion, выдать токены)
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Identity_CompleteWebAuthnAssertionRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func completeWebAuthnAssertion<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Identity_CompleteWebAuthnAssertionRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Identity_AuthResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.completeWebAuthnAssertion(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Identity_CompleteWebAuthnAssertionRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Identity_AuthResponse>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "ListWebAuthnCredentials" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Список привязанных ключей безопасности
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Identity_ListWebAuthnCredentialsRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func listWebAuthnCredentials<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Identity_ListWebAuthnCredentialsRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Identity_ListWebAuthnCredentialsResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.listWebAuthnCredentials(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Identity_ListWebAuthnCredentialsRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Identity_ListWebAuthnCredentialsResponse>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "RemoveWebAuthnCredential" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Удалить привязанный ключ безопасности
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Identity_RemoveWebAuthnCredentialRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func removeWebAuthnCredential<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Identity_RemoveWebAuthnCredentialRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Identity_RemoveWebAuthnCredentialResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.removeWebAuthnCredential(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Identity_RemoveWebAuthnCredentialRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Identity_RemoveWebAuthnCredentialResponse>(),
             options: options,
             onResponse: handleResponse
         )
@@ -3439,6 +4573,204 @@ extension Barkcloud_Identity_IdentityApi.ClientProtocol {
             metadata: metadata
         )
         return try await self.logout(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "BeginWebAuthnRegistration" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Привязать ключ безопасности (FIDO2/WebAuthn) — начать регистрацию
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func beginWebAuthnRegistration<Result>(
+        _ message: Barkcloud_Identity_BeginWebAuthnRegistrationRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Identity_BeginWebAuthnRegistrationResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Identity_BeginWebAuthnRegistrationRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.beginWebAuthnRegistration(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "CompleteWebAuthnRegistration" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Завершить привязку ключа безопасности
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func completeWebAuthnRegistration<Result>(
+        _ message: Barkcloud_Identity_CompleteWebAuthnRegistrationRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Identity_CompleteWebAuthnRegistrationResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Identity_CompleteWebAuthnRegistrationRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.completeWebAuthnRegistration(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "BeginWebAuthnAssertion" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Вход ключом безопасности — начать (вернуть challenge/allowCredentials)
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func beginWebAuthnAssertion<Result>(
+        _ message: Barkcloud_Identity_BeginWebAuthnAssertionRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Identity_BeginWebAuthnAssertionResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Identity_BeginWebAuthnAssertionRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.beginWebAuthnAssertion(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "CompleteWebAuthnAssertion" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Вход ключом безопасности — завершить (проверить assertion, выдать токены)
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func completeWebAuthnAssertion<Result>(
+        _ message: Barkcloud_Identity_CompleteWebAuthnAssertionRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Identity_AuthResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Identity_CompleteWebAuthnAssertionRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.completeWebAuthnAssertion(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "ListWebAuthnCredentials" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Список привязанных ключей безопасности
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func listWebAuthnCredentials<Result>(
+        _ message: Barkcloud_Identity_ListWebAuthnCredentialsRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Identity_ListWebAuthnCredentialsResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Identity_ListWebAuthnCredentialsRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.listWebAuthnCredentials(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "RemoveWebAuthnCredential" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Удалить привязанный ключ безопасности
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func removeWebAuthnCredential<Result>(
+        _ message: Barkcloud_Identity_RemoveWebAuthnCredentialRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Identity_RemoveWebAuthnCredentialResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Identity_RemoveWebAuthnCredentialRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.removeWebAuthnCredential(
             request: request,
             options: options,
             onResponse: handleResponse
