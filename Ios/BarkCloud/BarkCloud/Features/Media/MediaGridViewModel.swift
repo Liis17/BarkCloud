@@ -119,12 +119,18 @@ final class MediaGridViewModel {
         var anyFailed = false
         for asset in assets {
             do {
-                let (data, name) = try await DeviceAssetResource.originalData(for: asset)
+                guard let staging = UploadConstants.stagingDirectory else { throw DeviceAssetError.noResource }
+                let source = staging.appendingPathComponent("asset-\(UUID().uuidString)")
+                let name = try await DeviceAssetResource.writeOriginal(asset: asset, to: source)
                 // Без явной папки: сервер раскладывает по системным «Фото»/«Видео»/
-                // «Другие документы» по типу медиа (route_by_media_kind).
-                let fileID = try await cloud.uploadFile(data: data, fileName: name, routeByMediaKind: true)
-                // Связь облако↔устройство для синхронного удаления.
-                await CloudDeviceLinkStore.shared.link(fileID: fileID, localIdentifier: asset.localIdentifier)
+                // «Другие документы» после перехода сессии в ready.
+                _ = try await cloud.enqueueBackgroundUpload(
+                    sourceFile: source,
+                    fileName: name,
+                    source: .manual,
+                    routeByMediaKind: true,
+                    localIdentifier: asset.localIdentifier
+                )
             } catch {
                 anyFailed = true
             }

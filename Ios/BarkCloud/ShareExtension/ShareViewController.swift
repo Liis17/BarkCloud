@@ -1,5 +1,6 @@
 import UIKit
 import UniformTypeIdentifiers
+import GRPCCore
 import BarkCloudKit
 
 /// Share Extension «Сохранить в BarkCloud». Принятые из системного share sheet
@@ -16,8 +17,9 @@ import BarkCloudKit
 /// 3. Подгрузить список папок корня + создать/найти «Недавно загруженные» (default).
 /// 4. Показать UI: иконка, имя файла(ов), кнопка-чип «Папка: ...» и кнопка
 ///    «Загрузить».
-/// 5. По «Загрузить» — для каждого attachment: getUploadURL, multipart body
-///    в App Group, UploadJob в `UploadQueueStore`, submit в координатор.
+/// 5. По «Загрузить» — для каждого attachment создаётся Upload 2.0-сессия,
+///    части идут напрямую в Files data-plane, а post-ready attach выполняется
+///    только после серверного `ready`.
 /// 6. `notifyChanged()` на координаторе → стартует Live Activity (Dynamic Island).
 /// 7. `extensionContext.completeRequest(...)` закрывает расширение.
 final class ShareViewController: UIViewController {
@@ -26,6 +28,7 @@ final class ShareViewController: UIViewController {
     private let sessionStore = SessionStore()
     private lazy var grpc = GrpcManager(session: sessionStore)
     private lazy var transfer = FileTransferService(grpc: grpc)
+    private lazy var cloud = CloudRepository(grpc: grpc, transfer: transfer)
 
     // MARK: - UI
 
@@ -65,10 +68,37 @@ final class ShareViewController: UIViewController {
         super.viewDidLoad()
         TemporaryFileCleanup.purgeStale()
         setupUI()
-        // tokenProvider у координатора может быть не установлен (Share Extension
-        // живёт в своём процессе) — поставим свой, чтобы запрос имел `x-auth-token`.
-        BackgroundUploadCoordinator.shared.tokenProvider = { [transfer] in
-            await transfer.validAccessToken()
+        BackgroundUploadCoordinator.shared.configure(transfer: transfer) { [weak self] snapshot, retry in
+            guard let self else { return .failed("Share Extension завершён") }
+            do {
+                switch snapshot.intent {
+                case .attachDirectory:
+                    guard let directoryID = snapshot.directoryID, !directoryID.isEmpty else { break }
+                    try await self.cloud.attachFile(
+                        fileID: snapshot.fileID,
+                        directoryID: directoryID,
+                        name: snapshot.fileName,
+                        uploadSessionID: snapshot.sessionID,
+                        isUploadRetry: retry
+                    )
+                case .routeByMediaKind:
+                    try await self.cloud.attachFile(
+                        fileID: snapshot.fileID,
+                        directoryID: "",
+                        name: snapshot.fileName,
+                        routeByMediaKind: true,
+                        uploadSessionID: snapshot.sessionID,
+                        isUploadRetry: retry
+                    )
+                case .none, .addToAlbum:
+                    break
+                }
+                return .completed
+            } catch let error as RPCError where error.errorCode == DomainErrorCodes.fileAlreadyAttached {
+                return .completed
+            } catch {
+                return .failed(error.localizedDescription)
+            }
         }
         Task { await prepare() }
     }
@@ -185,6 +215,15 @@ final class ShareViewController: UIViewController {
             return
         }
         preparedAttachments = raw
+
+        // Основное приложение сначала отменяет legacy V1 queue и выставляет
+        // marker миграции. До этого момента extension только сохраняет входящие
+        // файлы в общий inbox; следующая активация main app загрузит их через V2.
+        guard UploadConstants.uploadMigrationCompleted else {
+            for prepared in raw { storeInShareInbox(prepared) }
+            await showTerminal("Файл сохранён и будет загружен при открытии BarkCloud.", autoClose: 1.2)
+            return
+        }
         subtitleLabel.text = previewSubtitle(for: raw)
 
         // 2. Подгрузить список папок корня (с default = «Недавно загруженные»).
@@ -396,7 +435,7 @@ final class ShareViewController: UIViewController {
             if let snap = await UploadQueueStore.shared.fetch(id: id) {
                 switch snap.state {
                 case .completed: done += 1
-                case .failed:    failed += 1
+                case .failed, .cancelled: failed += 1
                 default:         break
                 }
             }
@@ -475,76 +514,63 @@ final class ShareViewController: UIViewController {
 
     private func loadItem(provider: NSItemProvider, typeID: String) async -> URL? {
         await withCheckedContinuation { continuation in
-            provider.loadItem(forTypeIdentifier: typeID, options: nil) { item, _ in
-                switch item {
-                case let url as URL:
-                    continuation.resume(returning: url)
-                case let data as Data:
-                    let ext = UTType(typeID)?.preferredFilenameExtension ?? "dat"
-                    continuation.resume(returning: Self.writeTemp(data, ext: ext))
-                case let image as UIImage:
-                    continuation.resume(returning: image.jpegData(compressionQuality: 0.95).flatMap { Self.writeTemp($0, ext: "jpg") })
-                default:
+            provider.loadFileRepresentation(forTypeIdentifier: typeID) { url, _ in
+                guard let url else {
+                    continuation.resume(returning: nil)
+                    return
+                }
+                // Apple гарантирует жизнь provider-файла только внутри callback.
+                // Делаем потоковую файловую копию до выхода из closure, не
+                // превращая вложение в Data.
+                let ext = url.pathExtension.isEmpty
+                    ? (UTType(typeID)?.preferredFilenameExtension ?? "dat")
+                    : url.pathExtension
+                let stable = FileManager.default.temporaryDirectory
+                    .appendingPathComponent(UUID().uuidString)
+                    .appendingPathExtension(ext)
+                do {
+                    try FileManager.default.copyItem(at: url, to: stable)
+                    continuation.resume(returning: stable)
+                } catch {
                     continuation.resume(returning: nil)
                 }
             }
         }
     }
 
-    private static func writeTemp(_ data: Data, ext: String) -> URL? {
-        let tmp = FileManager.default.temporaryDirectory
-            .appendingPathComponent(UUID().uuidString)
-            .appendingPathExtension(ext)
-        do { try data.write(to: tmp); return tmp } catch { return nil }
-    }
-
     // MARK: - Постановка в фоновую очередь
 
     private func enqueue(_ prepared: PreparedAttachment) async -> String? {
-        guard let stagingDir = UploadConstants.stagingDirectory else { return nil }
-
-        // 1. Получить uploadURL через gRPC.
-        let upload: (url: String, fileID: String)
         do {
-            upload = try await transfer.getUploadURL(type: .cloudFile)
-        } catch {
-            try? FileManager.default.removeItem(at: prepared.stagedURL)
-            return nil
-        }
-
-        // 2. Подготовить multipart body файл в App Group.
-        let multipartURL = stagingDir.appendingPathComponent("\(UUID().uuidString).body")
-        let totalBytes: Int64
-        do {
-            totalBytes = try MultipartBodyBuilder.writeMultipartFile(
-                boundary: UploadConstants.multipartBoundary,
+            return try await cloud.enqueueBackgroundUpload(
+                sourceFile: prepared.stagedURL,
                 fileName: prepared.fileName,
                 mimeType: prepared.mimeType,
-                sourceFile: prepared.stagedURL,
-                destination: multipartURL
+                toDirectory: selectedFolder?.id,
+                source: .share,
+                routeByMediaKind: selectedFolder == nil
             )
         } catch {
             try? FileManager.default.removeItem(at: prepared.stagedURL)
-            try? FileManager.default.removeItem(at: multipartURL)
             return nil
         }
+    }
 
-        // 3. Создать UploadJob и submit. directoryID нужен — координатор сам
-        // attachFile сделать не может (это в main app), но мы записываем его в
-        // UploadJob; AppEnvironment.onJobCompleted в main app выполнит attach.
-        let snapshot = await UploadQueueStore.shared.create(
-            sourceKind: .share,
-            sourceFilePath: prepared.stagedURL.path,
-            multipartBodyPath: multipartURL.path,
-            fileName: prepared.fileName,
-            mimeType: prepared.mimeType,
-            directoryID: selectedFolder?.id,
-            uploadURL: upload.url,
-            preparedFileID: upload.fileID,
-            totalBytes: totalBytes
-        )
-        await BackgroundUploadCoordinator.shared.submit(jobID: snapshot.id)
-        return snapshot.id
+    private func storeInShareInbox(_ prepared: PreparedAttachment) {
+        guard let root = FileManager.default.containerURL(
+            forSecurityApplicationGroupIdentifier: appGroupID
+        ) else { return }
+        let directory = root.appendingPathComponent("ShareInbox", isDirectory: true)
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        do {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            try FileManager.default.moveItem(
+                at: prepared.stagedURL,
+                to: directory.appendingPathComponent(prepared.fileName)
+            )
+        } catch {
+            try? FileManager.default.removeItem(at: directory)
+        }
     }
 
     private func inferMime(for fileName: String) -> String {

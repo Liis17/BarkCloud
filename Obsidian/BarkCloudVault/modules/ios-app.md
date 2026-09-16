@@ -2,6 +2,23 @@
 
 Parent: [[index]]
 
+## Upload 2.0 (актуально)
+
+`CLOUD_FILE` в iOS загружается через общий `BackgroundUploadCoordinator` и
+`UploadSessionQueue.sqlite`: исходники копируются потоково в App Group, SHA-256
+считается блоками 4 MiB, а последовательные части уходят напрямую в Files
+`/file-upload/{session}/parts/{part}`. Основное приложение и Share Extension
+используют одинаковый data-plane transport; аватар остаётся legacy V1.
+
+Post-ready intents (каталог, media-kind, альбом или none) выполняются только после
+серверного `ready`. Ошибка attach хранит задачу как `uploadedNotAttached` и при
+Retry повторяет только привязку. Token сессии отсутствует в SwiftData и берётся
+заново через Resume после перезапуска. Одновременно допускается четыре файла.
+
+Одноразовая миграция отменяет старую iOS V1 queue и удаляет её staging-артефакты;
+Share Extension до migration marker складывает входящие файлы в ShareInbox.
+Подробности: [[ios-background-upload]], [[upload-2]], [[api/files-api]].
+
 > 🛡 Методология проверки клиента (безопасность · производительность · качество кода):
 > `Docs/audit/IOS_SECURITY_PERFORMANCE_AUDIT.md`.
 
@@ -25,8 +42,9 @@ Parent: [[index]]
 > ниже эти файлы помечают **логическую** структуру, но живут в пакете. Остаются в iOS-таргете:
 > `Networking/{BackgroundUploadCoordinator,UploadConstants,UploadLiveActivityController,
 > UploadProgressObserver}.swift`, `Data/Cache/{UploadJob,UploadQueueStore}.swift` (см.
-> [[ios-background-upload]]) и `Data/Cloud/CloudRepository+BackgroundUpload.swift` (фоновая
-> загрузка — расширение над пакетным `CloudRepository`). App Group id для `ServerConfig`/
+> [[ios-background-upload]]). Фоновый V2 enqueue API находится в общем исходнике
+> `Networking/BackgroundUploadCoordinator.swift`, который включён в main app и Share
+> Extension. App Group id для `ServerConfig`/
 > `SessionStore` в пакете задаёт `BarkCloudAppGroup` (на macOS — своя ветка).
 
 ```
@@ -274,9 +292,10 @@ BarkCloud/
   фото/видео ловит свой `PHPhotoLibraryChangeObserver`** (`BackupPhotoLibraryObserver` → `refreshScanForNewAssets`)
   — автозагрузка стартует сразу, без перезапуска и смены вкладки (раньше скан дёргался только на
   старте/возврате в foreground/смене таба, и новое фото на открытом таб-Галереи не грузилось).
-  **Очистка осиротевших jobs** (`attachAndResubmitOrphans` на старте и каждом возврате в foreground):
-  job без живого URLSession-task **удаляется** (не перезаливается — `uploadURL` одноразовый), но только
-  если старше 60с — свежие jobs текущей сессии не трогаем (иначе гонка с submit «съедала» новые загрузки).
+  **Восстановление очереди** (`attachAndResubmitOrphans` на старте): живые
+  URLSession-задачи резервируют свои слоты, а job без живой задачи продолжает
+  существующую Upload 2.0-сессию через Resume и список фактических частей; новая
+  сессия создаётся только после серверного `failed/expired`.
   **«Освободить место»** — `PHPhotoLibrary.shared().performChanges { PHAssetChangeRequest.deleteAssets }`
   (iOS сам показывает системное подтверждение; отмена → throw, без эффекта); при успехе показывается
   `SpaceFreedView` — оверлей с пиксель-лисой `BarkMascot` + радиальный «glow» под ним (оранжевый

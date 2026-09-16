@@ -134,7 +134,8 @@ final class UploadProgressObserver {
             _ = m.remainingCount
             _ = m.currentFileName
         } onChange: { [weak self] in
-            Task { @MainActor in self?.recomputeNow() }
+            let observer = self
+            Task { @MainActor in observer?.recomputeNow() }
         }
     }
 
@@ -150,8 +151,7 @@ final class UploadProgressObserver {
             return nil
         }
 
-        let activeStates: Set<UploadJobState> = [.pending, .preparing, .running]
-        let activeJobs = jobs.filter { activeStates.contains($0.state) }
+        let activeJobs = jobs.filter { $0.state.isActive }
         // Осиротевшие `.running` (их background-task умер) баннер не держат —
         // иначе один такой job навсегда оставлял бы баннер.
         let blockingJobs = await BackgroundUploadCoordinator.shared.blockingActiveJobs(from: activeJobs)
@@ -168,7 +168,7 @@ final class UploadProgressObserver {
         let total = jobs.count
         let completed = jobs.filter { $0.state == .completed }.count
         let failed = jobs.filter { $0.state == .failed }.count
-        let running = jobs.first { $0.state == .running || $0.state == .preparing }
+        let running = jobs.first { $0.state.isActive }
 
         let totalBytes = jobs.reduce(Int64(0)) { $0 + max($1.totalBytes, 0) }
         let sentBytes = jobs.reduce(Int64(0)) { acc, j in

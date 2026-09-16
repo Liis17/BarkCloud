@@ -300,7 +300,7 @@ final class BackupManager {
     /// Максимум одновременных background-задач, которые мы держим в очереди — чтобы
     /// диск не забивался multipart-копиями. Демон iOS сам решает, сколько грузить
     /// параллельно (обычно 2–4); мы лишь регулируем поток постановки.
-    private let inFlightLimit = 5
+    private let inFlightLimit = 4
 
     private func uploadLoop() async {
         while autoUploadEnabled, !Task.isCancelled {
@@ -343,6 +343,12 @@ final class BackupManager {
     private func backupJobFinished(_ snapshot: UploadJobSnapshot, success: Bool) {
         guard snapshot.source == .backup,
               let asset = assetByJobID.removeValue(forKey: snapshot.id) else { return }
+        if snapshot.state == .uploadedNotAttached {
+            // Байты и processing завершились, но post-ready attach временно
+            // не прошёл. Оставляем job/asset для отдельного attach retry.
+            assetByJobID[snapshot.id] = asset
+            return
+        }
         inFlightCount = max(0, inFlightCount - 1)
         guard success else {
             uploadFailed += 1
@@ -355,7 +361,7 @@ final class BackupManager {
             reclaimableBytes += DeviceAssetResource.originalByteSize(for: asset)
         }
         // Связь облако↔устройство — для синхронного удаления с устройства.
-        let fileID = snapshot.preparedFileID
+        let fileID = snapshot.fileID
         if !fileID.isEmpty {
             Task { await CloudDeviceLinkStore.shared.link(fileID: fileID, localIdentifier: id) }
         }
@@ -367,8 +373,8 @@ final class BackupManager {
         Task { await loadStorageInfo() }
     }
 
-    /// Подготовить файл оригинала ассета в App Group container стримом (без RAM),
-    /// получить uploadURL и поставить UploadJob в координатор. Фактическая
+    /// Подготовить файл оригинала ассета в App Group container стримом (без RAM)
+    /// и поставить Upload 2.0 job в координатор. Фактическая
     /// передача идёт в фоне — переживает сворачивание и kill main app.
     /// Возвращает id созданного UploadJob (ключ для `assetByJobID`).
     private func enqueueAssetForBackup(_ asset: PHAsset) async throws -> String {
@@ -388,7 +394,9 @@ final class BackupManager {
                 fileName: fileName,
                 mimeType: nil,
                 toDirectory: nil,
-                source: .backup
+                source: .backup,
+                routeByMediaKind: true,
+                localIdentifier: asset.localIdentifier
             )
         } catch {
             try? FileManager.default.removeItem(at: sourcePath)

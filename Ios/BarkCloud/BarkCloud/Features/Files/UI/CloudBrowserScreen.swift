@@ -1,7 +1,23 @@
 import SwiftUI
 import PhotosUI
 import UniformTypeIdentifiers
+import CoreTransferable
 import BarkCloudKit
+
+private struct CloudPickerFile: Transferable {
+    let url: URL
+    let fileName: String
+
+    static var transferRepresentation: some TransferRepresentation {
+        FileRepresentation(contentType: .item) { value in
+            SentTransferredFile(value.url)
+        } importing: { received in
+            let name = received.file.lastPathComponent.isEmpty ? "file" : received.file.lastPathComponent
+            let staged = try UploadConstants.stageFile(received.file, fileName: name)
+            return CloudPickerFile(url: staged, fileName: name)
+        }
+    }
+}
 
 /// Браузер облачного хранилища: навигация по папкам, операции CRUD, загрузка
 /// и открытие файлов. Рекурсивно переиспользует себя для вложенных папок.
@@ -504,11 +520,10 @@ struct CloudBrowserScreen: View {
     private func handlePhotos(_ items: [PhotosPickerItem]) {
         guard !items.isEmpty else { return }
         Task {
-            var files: [(data: Data, fileName: String)] = []
+            var files: [(url: URL, fileName: String)] = []
             for item in items {
-                if let data = try? await item.loadTransferable(type: Data.self) {
-                    let ext = item.supportedContentTypes.first?.preferredFilenameExtension ?? "dat"
-                    files.append((data, "\(UUID().uuidString).\(ext)"))
+                if let file = try? await item.loadTransferable(type: CloudPickerFile.self) {
+                    files.append((file.url, file.fileName))
                 }
             }
             pickerItems = []
@@ -519,12 +534,12 @@ struct CloudBrowserScreen: View {
     private func handleDocuments(_ result: Result<[URL], Error>) {
         guard case .success(let urls) = result, !urls.isEmpty else { return }
         Task {
-            var files: [(data: Data, fileName: String)] = []
+            var files: [(url: URL, fileName: String)] = []
             for url in urls {
                 let scoped = url.startAccessingSecurityScopedResource()
                 defer { if scoped { url.stopAccessingSecurityScopedResource() } }
-                if let data = try? Data(contentsOf: url) {
-                    files.append((data, url.lastPathComponent))
+                if let staged = try? UploadConstants.stageFile(url, fileName: url.lastPathComponent) {
+                    files.append((staged, url.lastPathComponent))
                 }
             }
             await vm?.upload(files)

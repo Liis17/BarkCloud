@@ -1,6 +1,7 @@
 import Foundation
 import Observation
 import SwiftData
+import GRPCCore
 import BarkCloudKit
 
 @MainActor
@@ -79,8 +80,6 @@ final class AppEnvironment {
         self.backupManager = BackupManager(cloud: self.cloudRepository, settings: autoUpload)
 
         Task { await cache.runStartupSweepIfNeeded() }
-        // Если автозагрузка включена — продолжить скан/докачку на переднем плане.
-        backupManager.resumeIfEnabled()
         self.vault = VaultStore()
         self.biometric = BiometricGate()
         let lockSettings = AppLockSettings()
@@ -95,43 +94,52 @@ final class AppEnvironment {
         self.backgroundUploads = uploads
         let transferRef = self.fileTransfer
         let cloudRef = self.cloudRepository
-        uploads.tokenProvider = { [weak transferRef] in
-            await transferRef?.validAccessToken()
-        }
-        uploads.onPersistentFailure = {
-            scheduleRetryBGTaskIfNeeded()
-        }
-        // Системный observer: при completed — привязать файл к каталогу. Через
-        // addObserver, чтобы UI-наблюдатели (UploadProgressObserver) могли
-        // подписаться независимо, не перетирая друг друга.
-        //
-        // Куда привязывать:
-        // - `.backup` (автозагрузка медиатеки) и `.share` без выбранной папки —
-        //   по типу медиа: сервер сам кладёт в «Фото»/«Видео»/«Другие документы»
-        //   (`route_by_media_kind`). Папка «Недавно загруженные» больше не нужна.
-        // - всё остальное (ручная загрузка в Cloud Browser, шаринг с выбранной
-        //   папкой) — в конкретный `directoryID`.
-        uploads.addObserver(completion: { snapshot in
-            Task { [weak cloudRef] in
-                guard let cloudRef, !snapshot.preparedFileID.isEmpty else { return }
-                let directoryID = snapshot.directoryID ?? ""
-                let routeByMediaKind = snapshot.source == .backup
-                    || (snapshot.source == .share && directoryID.isEmpty)
-                if routeByMediaKind {
-                    try? await cloudRef.attachFile(
-                        fileID: snapshot.preparedFileID,
+        let albumRef = self.albumRepository
+        uploads.configure(transfer: transferRef) { snapshot, retry in
+            do {
+                switch snapshot.intent {
+                case .none:
+                    break
+                case .attachDirectory:
+                    guard let directoryID = snapshot.directoryID, !directoryID.isEmpty else { break }
+                    try await cloudRef.attachFile(
+                        fileID: snapshot.fileID,
+                        directoryID: directoryID,
+                        name: snapshot.fileName,
+                        uploadSessionID: snapshot.sessionID,
+                        isUploadRetry: retry
+                    )
+                case .routeByMediaKind:
+                    try await cloudRef.attachFile(
+                        fileID: snapshot.fileID,
                         directoryID: "",
                         name: snapshot.fileName,
-                        routeByMediaKind: true
+                        routeByMediaKind: true,
+                        uploadSessionID: snapshot.sessionID,
+                        isUploadRetry: retry
                     )
-                } else if !directoryID.isEmpty {
-                    try? await cloudRef.attachFile(
-                        fileID: snapshot.preparedFileID,
-                        directoryID: directoryID,
-                        name: snapshot.fileName
+                case .addToAlbum:
+                    guard let albumID = snapshot.albumID, !albumID.isEmpty else { break }
+                    try await albumRef.addItems(albumID: albumID, fileIDs: [snapshot.fileID])
+                }
+                if let localIdentifier = snapshot.localIdentifier, !localIdentifier.isEmpty {
+                    await CloudDeviceLinkStore.shared.link(
+                        fileID: snapshot.fileID,
+                        localIdentifier: localIdentifier
                     )
                 }
+                return .completed
+            } catch let error as RPCError where error.errorCode == DomainErrorCodes.fileAlreadyAttached {
+                return .completed
+            } catch {
+                return .failed(domainErrorMessage(error))
             }
+        }
+        uploads.addObserver(failure: { snapshot in
+            guard snapshot.state == .failed,
+                  snapshot.retryable,
+                  snapshot.retries < UploadConstants.maxUploadRetries else { return }
+            scheduleRetryBGTaskIfNeeded()
         })
 
         // Глобальный баннер прогресса над TabBar.
@@ -146,11 +154,16 @@ final class AppEnvironment {
         }
 
         Task { await cache.runStartupSweepIfNeeded() }
-        // Догрузить то, что Share Extension сложил в общий контейнер.
-        shareInboxUploader.uploadPendingIfNeeded()
-        // Прицепиться к существующей background-сессии: подобрать недозавершённые
-        // jobs (running без живой task) — это случается после kill main app.
-        Task { await uploads.attachAndResubmitOrphans() }
+        // Сначала миграция отменяет V1 queue и удаляет только её артефакты.
+        // Затем возобновляем V2 jobs, backup и Share Inbox.
+        Task {
+            await uploads.migrateLegacyQueueIfNeeded()
+            await uploads.attachAndResubmitOrphans()
+            await MainActor.run {
+                backupManager.resumeIfEnabled()
+                shareInboxUploader.uploadPendingIfNeeded()
+            }
+        }
     }
 
     /// Контейнер SwiftData для метаданных кеша (`BarkCloudCache.sqlite` в Application

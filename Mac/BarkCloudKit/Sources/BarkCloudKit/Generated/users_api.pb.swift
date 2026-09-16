@@ -131,7 +131,7 @@ public struct Barkcloud_Users_UpdateStorageLimitRequest: Sendable {
 
   public var userID: Int64 = 0
 
-  /// 1-250
+  /// 0 = весь диск, иначе лимит в ГБ
   public var storageLimitGb: Int32 = 0
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
@@ -793,7 +793,7 @@ public struct Barkcloud_Users_User: Sendable {
   /// ссылка на превью аватарки
   public var profilePicturePreview: String = String()
 
-  /// лимит хранилища в гигабайтах
+  /// лимит хранилища в гигабайтах; 0 = весь диск
   public var storageLimitGb: Int32 = 0
 
   /// описание профиля (о себе)

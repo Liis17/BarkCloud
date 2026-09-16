@@ -163,16 +163,16 @@ final class CloudBrowserViewModel {
         catch { state.snackbar = domainErrorMessage(error) }
     }
 
-    /// Поставить файлы в фоновую очередь (`BackgroundUploadCoordinator`). UI не
-    /// ждёт завершения — загрузка переживёт сворачивание/kill приложения. По
-    /// событию `onJobCompleted` в `AppEnvironment` файл будет привязан к папке.
-    func upload(_ files: [(data: Data, fileName: String)]) async {
+    /// Поставить файлы в Upload 2.0 очередь (`BackgroundUploadCoordinator`). UI не
+    /// ждёт завершения — загрузка переживёт сворачивание/kill приложения, а
+    /// привязка к текущей папке выполняется координатором после `ready`.
+    func upload(_ files: [(url: URL, fileName: String)]) async {
         guard !files.isEmpty else { return }
         var anyFailed = false
         for file in files {
             do {
                 _ = try await cloud.enqueueBackgroundUpload(
-                    data: file.data,
+                    sourceFile: file.url,
                     fileName: file.fileName,
                     toDirectory: state.directoryID,
                     source: .manual

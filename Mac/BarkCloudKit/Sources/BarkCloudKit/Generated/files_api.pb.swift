@@ -71,6 +71,60 @@ public enum Barkcloud_Files_MediaKind: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
+public enum Barkcloud_Files_UploadSessionStatus: SwiftProtobuf.Enum, Swift.CaseIterable {
+  public typealias RawValue = Int
+  case unspecified // = 0
+  case uploading // = 1
+  case processing // = 2
+  case ready // = 3
+  case failed // = 4
+  case cancelled // = 5
+  case expired // = 6
+  case UNRECOGNIZED(Int)
+
+  public init() {
+    self = .unspecified
+  }
+
+  public init?(rawValue: Int) {
+    switch rawValue {
+    case 0: self = .unspecified
+    case 1: self = .uploading
+    case 2: self = .processing
+    case 3: self = .ready
+    case 4: self = .failed
+    case 5: self = .cancelled
+    case 6: self = .expired
+    default: self = .UNRECOGNIZED(rawValue)
+    }
+  }
+
+  public var rawValue: Int {
+    switch self {
+    case .unspecified: return 0
+    case .uploading: return 1
+    case .processing: return 2
+    case .ready: return 3
+    case .failed: return 4
+    case .cancelled: return 5
+    case .expired: return 6
+    case .UNRECOGNIZED(let i): return i
+    }
+  }
+
+  // The compiler won't synthesize support with the UNRECOGNIZED case.
+  public static let allCases: [Barkcloud_Files_UploadSessionStatus] = [
+    .unspecified,
+    .uploading,
+    .processing,
+    .ready,
+    .failed,
+    .cancelled,
+    .expired,
+  ]
+
+}
+
 public enum Barkcloud_Files_UploadFileType: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unknown // = 0
@@ -363,6 +417,195 @@ public enum Barkcloud_Files_DfViewMode: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
+public enum Barkcloud_Files_SearchSection: SwiftProtobuf.Enum, Swift.CaseIterable {
+  public typealias RawValue = Int
+  case unspecified // = 0
+  case photos // = 1
+  case videos // = 2
+  case files // = 3
+  case tracks // = 4
+  case albums // = 5
+  case playlists // = 6
+  case folders // = 7
+  case shared // = 8
+  case trash // = 9
+  case UNRECOGNIZED(Int)
+
+  public init() {
+    self = .unspecified
+  }
+
+  public init?(rawValue: Int) {
+    switch rawValue {
+    case 0: self = .unspecified
+    case 1: self = .photos
+    case 2: self = .videos
+    case 3: self = .files
+    case 4: self = .tracks
+    case 5: self = .albums
+    case 6: self = .playlists
+    case 7: self = .folders
+    case 8: self = .shared
+    case 9: self = .trash
+    default: self = .UNRECOGNIZED(rawValue)
+    }
+  }
+
+  public var rawValue: Int {
+    switch self {
+    case .unspecified: return 0
+    case .photos: return 1
+    case .videos: return 2
+    case .files: return 3
+    case .tracks: return 4
+    case .albums: return 5
+    case .playlists: return 6
+    case .folders: return 7
+    case .shared: return 8
+    case .trash: return 9
+    case .UNRECOGNIZED(let i): return i
+    }
+  }
+
+  // The compiler won't synthesize support with the UNRECOGNIZED case.
+  public static let allCases: [Barkcloud_Files_SearchSection] = [
+    .unspecified,
+    .photos,
+    .videos,
+    .files,
+    .tracks,
+    .albums,
+    .playlists,
+    .folders,
+    .shared,
+    .trash,
+  ]
+
+}
+
+public enum Barkcloud_Files_SearchHitKind: SwiftProtobuf.Enum, Swift.CaseIterable {
+  public typealias RawValue = Int
+  case unspecified // = 0
+  case photo // = 1
+  case video // = 2
+  case file // = 3
+  case track // = 4
+  case album // = 5
+  case playlist // = 6
+  case folder // = 7
+  case dynamicFolder // = 8
+  case sharedFile // = 9
+  case sharedFolder // = 10
+  case sharedPlaylist // = 11
+  case trash // = 12
+  case UNRECOGNIZED(Int)
+
+  public init() {
+    self = .unspecified
+  }
+
+  public init?(rawValue: Int) {
+    switch rawValue {
+    case 0: self = .unspecified
+    case 1: self = .photo
+    case 2: self = .video
+    case 3: self = .file
+    case 4: self = .track
+    case 5: self = .album
+    case 6: self = .playlist
+    case 7: self = .folder
+    case 8: self = .dynamicFolder
+    case 9: self = .sharedFile
+    case 10: self = .sharedFolder
+    case 11: self = .sharedPlaylist
+    case 12: self = .trash
+    default: self = .UNRECOGNIZED(rawValue)
+    }
+  }
+
+  public var rawValue: Int {
+    switch self {
+    case .unspecified: return 0
+    case .photo: return 1
+    case .video: return 2
+    case .file: return 3
+    case .track: return 4
+    case .album: return 5
+    case .playlist: return 6
+    case .folder: return 7
+    case .dynamicFolder: return 8
+    case .sharedFile: return 9
+    case .sharedFolder: return 10
+    case .sharedPlaylist: return 11
+    case .trash: return 12
+    case .UNRECOGNIZED(let i): return i
+    }
+  }
+
+  // The compiler won't synthesize support with the UNRECOGNIZED case.
+  public static let allCases: [Barkcloud_Files_SearchHitKind] = [
+    .unspecified,
+    .photo,
+    .video,
+    .file,
+    .track,
+    .album,
+    .playlist,
+    .folder,
+    .dynamicFolder,
+    .sharedFile,
+    .sharedFolder,
+    .sharedPlaylist,
+    .trash,
+  ]
+
+}
+
+/// Источники могут комбинироваться: всё, что задано, попадает в один архив.
+public struct Barkcloud_Files_CreateArchiveRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  /// Записи иерархии (выделение во вкладке «Файлы»)
+  public var entryIds: [String] = []
+
+  /// Блобы напрямую (выделение в галерее Фото/Видео)
+  public var fileIds: [String] = []
+
+  /// Вся папка рекурсивно (пусто — не задано)
+  public var directoryID: String = String()
+
+  /// Весь альбом (пусто — не задано)
+  public var albumID: String = String()
+
+  /// Желаемое имя архива без расширения (необяз.)
+  public var archiveName: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public struct Barkcloud_Files_CreateArchiveResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  /// Идентификатор блоба-архива (лежит в корзине)
+  public var fileID: String = String()
+
+  /// Временная ссылка для немедленного скачивания
+  public var url: String = String()
+
+  /// Итоговое имя архива (с .zip)
+  public var fileName: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
 public struct Barkcloud_Files_GetTempDownloadUrlRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -582,11 +825,88 @@ public struct Barkcloud_Files_UploadFileInfo: @unchecked Sendable {
     set {_uniqueStorage()._jpegViewURL = newValue}
   }
 
+  /// Тех-метаданные видео для тайла галереи (только media_kind=VIDEO); присутствие — через HasVideoMeta
+  public var videoMeta: Barkcloud_Files_VideoMeta {
+    get {_storage._videoMeta ?? Barkcloud_Files_VideoMeta()}
+    set {_uniqueStorage()._videoMeta = newValue}
+  }
+  /// Returns true if `videoMeta` has been explicitly set.
+  public var hasVideoMeta: Bool {_storage._videoMeta != nil}
+  /// Clears the value of `videoMeta`. Subsequent reads from it will return its default value.
+  public mutating func clearVideoMeta() {_uniqueStorage()._videoMeta = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
   fileprivate var _storage = _StorageClass.defaultInstance
+}
+
+/// Краткие тех-параметры видео для отображения на тайле галереи (подмножество FileMetadataInfo).
+public struct Barkcloud_Files_VideoMeta: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  /// Длительность, сек
+  public var durationSeconds: Double {
+    get {_durationSeconds ?? 0}
+    set {_durationSeconds = newValue}
+  }
+  /// Returns true if `durationSeconds` has been explicitly set.
+  public var hasDurationSeconds: Bool {self._durationSeconds != nil}
+  /// Clears the value of `durationSeconds`. Subsequent reads from it will return its default value.
+  public mutating func clearDurationSeconds() {self._durationSeconds = nil}
+
+  /// Кодек видео (h264, hevc, av1 …)
+  public var videoCodec: String {
+    get {_videoCodec ?? String()}
+    set {_videoCodec = newValue}
+  }
+  /// Returns true if `videoCodec` has been explicitly set.
+  public var hasVideoCodec: Bool {self._videoCodec != nil}
+  /// Clears the value of `videoCodec`. Subsequent reads from it will return its default value.
+  public mutating func clearVideoCodec() {self._videoCodec = nil}
+
+  /// Кодек аудио (aac, opus …)
+  public var audioCodec: String {
+    get {_audioCodec ?? String()}
+    set {_audioCodec = newValue}
+  }
+  /// Returns true if `audioCodec` has been explicitly set.
+  public var hasAudioCodec: Bool {self._audioCodec != nil}
+  /// Clears the value of `audioCodec`. Subsequent reads from it will return its default value.
+  public mutating func clearAudioCodec() {self._audioCodec = nil}
+
+  /// Битрейт контейнера, бит/с (≈ сумма аудио+видео)
+  public var bitrate: Int64 {
+    get {_bitrate ?? 0}
+    set {_bitrate = newValue}
+  }
+  /// Returns true if `bitrate` has been explicitly set.
+  public var hasBitrate: Bool {self._bitrate != nil}
+  /// Clears the value of `bitrate`. Subsequent reads from it will return its default value.
+  public mutating func clearBitrate() {self._bitrate = nil}
+
+  /// HDR-видео
+  public var hdr: Bool {
+    get {_hdr ?? false}
+    set {_hdr = newValue}
+  }
+  /// Returns true if `hdr` has been explicitly set.
+  public var hasHdr: Bool {self._hdr != nil}
+  /// Clears the value of `hdr`. Subsequent reads from it will return its default value.
+  public mutating func clearHdr() {self._hdr = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _durationSeconds: Double? = nil
+  fileprivate var _videoCodec: String? = nil
+  fileprivate var _audioCodec: String? = nil
+  fileprivate var _bitrate: Int64? = nil
+  fileprivate var _hdr: Bool? = nil
 }
 
 public struct Barkcloud_Files_FilePreviewInfo: Sendable {
@@ -837,6 +1157,53 @@ public struct Barkcloud_Files_FileMetadataInfo: @unchecked Sendable {
   /// Clears the value of `frameRate`. Subsequent reads from it will return its default value.
   public mutating func clearFrameRate() {_uniqueStorage()._frameRate = nil}
 
+  /// HDR-видео (выведено из color_transfer: PQ smpte2084 / HLG arib-std-b67)
+  public var isHdr: Bool {
+    get {_storage._isHdr ?? false}
+    set {_uniqueStorage()._isHdr = newValue}
+  }
+  /// Returns true if `isHdr` has been explicitly set.
+  public var hasIsHdr: Bool {_storage._isHdr != nil}
+  /// Clears the value of `isHdr`. Subsequent reads from it will return its default value.
+  public mutating func clearIsHdr() {_uniqueStorage()._isHdr = nil}
+
+  /// Аудио
+  public var audioTitle: String {
+    get {_storage._audioTitle ?? String()}
+    set {_uniqueStorage()._audioTitle = newValue}
+  }
+  /// Returns true if `audioTitle` has been explicitly set.
+  public var hasAudioTitle: Bool {_storage._audioTitle != nil}
+  /// Clears the value of `audioTitle`. Subsequent reads from it will return its default value.
+  public mutating func clearAudioTitle() {_uniqueStorage()._audioTitle = nil}
+
+  public var audioArtist: String {
+    get {_storage._audioArtist ?? String()}
+    set {_uniqueStorage()._audioArtist = newValue}
+  }
+  /// Returns true if `audioArtist` has been explicitly set.
+  public var hasAudioArtist: Bool {_storage._audioArtist != nil}
+  /// Clears the value of `audioArtist`. Subsequent reads from it will return its default value.
+  public mutating func clearAudioArtist() {_uniqueStorage()._audioArtist = nil}
+
+  public var audioAlbum: String {
+    get {_storage._audioAlbum ?? String()}
+    set {_uniqueStorage()._audioAlbum = newValue}
+  }
+  /// Returns true if `audioAlbum` has been explicitly set.
+  public var hasAudioAlbum: Bool {_storage._audioAlbum != nil}
+  /// Clears the value of `audioAlbum`. Subsequent reads from it will return its default value.
+  public mutating func clearAudioAlbum() {_uniqueStorage()._audioAlbum = nil}
+
+  public var audioTrackNumber: Int32 {
+    get {_storage._audioTrackNumber ?? 0}
+    set {_uniqueStorage()._audioTrackNumber = newValue}
+  }
+  /// Returns true if `audioTrackNumber` has been explicitly set.
+  public var hasAudioTrackNumber: Bool {_storage._audioTrackNumber != nil}
+  /// Clears the value of `audioTrackNumber`. Subsequent reads from it will return its default value.
+  public mutating func clearAudioTrackNumber() {_uniqueStorage()._audioTrackNumber = nil}
+
   /// Документ
   public var documentAuthor: String {
     get {_storage._documentAuthor ?? String()}
@@ -908,6 +1275,94 @@ public struct Barkcloud_Files_GetUploadUrlResponse: Sendable {
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
+}
+
+public struct Barkcloud_Files_CreateUploadSessionRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var idempotencyKey: String = String()
+
+  public var fileName: String = String()
+
+  public var fileSize: Int64 = 0
+
+  public var contentType: String = String()
+
+  public var sha256: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public struct Barkcloud_Files_UploadSessionIdRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var sessionID: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public struct Barkcloud_Files_UploadPartInfo: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var partNumber: Int32 = 0
+
+  public var size: Int64 = 0
+
+  /// ETag подтверждён Files/S3; без него часть нужно повторить
+  public var hasEtag_p: Bool = false
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public struct Barkcloud_Files_UploadSessionResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var sessionID: String = String()
+
+  public var fileID: String = String()
+
+  public var status: Barkcloud_Files_UploadSessionStatus = .unspecified
+
+  public var fileSize: Int64 = 0
+
+  public var partSize: Int64 = 0
+
+  public var expiresAt: SwiftProtobuf.Google_Protobuf_Timestamp {
+    get {_expiresAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_expiresAt = newValue}
+  }
+  /// Returns true if `expiresAt` has been explicitly set.
+  public var hasExpiresAt: Bool {self._expiresAt != nil}
+  /// Clears the value of `expiresAt`. Subsequent reads from it will return its default value.
+  public mutating func clearExpiresAt() {self._expiresAt = nil}
+
+  public var uploadToken: String = String()
+
+  public var uploadedParts: [Barkcloud_Files_UploadPartInfo] = []
+
+  public var errorCode: String = String()
+
+  public var errorMessage: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _expiresAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
 }
 
 public struct Barkcloud_Files_GetUserStorageInfoServerRequest: Sendable {
@@ -1254,6 +1709,12 @@ public struct Barkcloud_Files_AttachFileRequest: Sendable {
   /// true → сервер кладёт файл в системную папку Фото/Видео/Другие документы по типу медиа
   public var routeByMediaKind: Bool = false
 
+  /// Корреляция Upload 2.0; пусто для legacy/обычного AttachFile
+  public var uploadSessionID: String = String()
+
+  /// Retry после uploaded_not_attached
+  public var isUploadRetry: Bool = false
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -1437,6 +1898,9 @@ public struct Barkcloud_Files_UserImageItem: Sendable {
 
   /// id записей каталога владельца (для rename/delete из галереи)
   public var entryIds: [String] = []
+
+  /// SHA256-группа для системных папок дубликатов; пусто для обычных листингов
+  public var duplicateGroupKey: String = String()
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -1901,6 +2365,97 @@ public struct Barkcloud_Files_PathResponse: Sendable {
   public init() {}
 }
 
+public struct Barkcloud_Files_ListFileActivityRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var fileID: String = String()
+
+  /// 1..100, default 30
+  public var limit: Int32 = 0
+
+  /// exclusive; пусто = с самых свежих
+  public var cursorCreatedAt: SwiftProtobuf.Google_Protobuf_Timestamp {
+    get {_cursorCreatedAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_cursorCreatedAt = newValue}
+  }
+  /// Returns true if `cursorCreatedAt` has been explicitly set.
+  public var hasCursorCreatedAt: Bool {self._cursorCreatedAt != nil}
+  /// Clears the value of `cursorCreatedAt`. Subsequent reads from it will return its default value.
+  public mutating func clearCursorCreatedAt() {self._cursorCreatedAt = nil}
+
+  /// tie-breaker для стабильной cursor-пагинации
+  public var cursorEventID: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _cursorCreatedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+}
+
+public struct Barkcloud_Files_FileActivityInfo: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var id: String = String()
+
+  public var fileID: String = String()
+
+  public var entryID: String = String()
+
+  public var actorUserID: Int64 = 0
+
+  public var kind: String = String()
+
+  public var summary: String = String()
+
+  public var detailsJson: String = String()
+
+  public var createdAt: SwiftProtobuf.Google_Protobuf_Timestamp {
+    get {_createdAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_createdAt = newValue}
+  }
+  /// Returns true if `createdAt` has been explicitly set.
+  public var hasCreatedAt: Bool {self._createdAt != nil}
+  /// Clears the value of `createdAt`. Subsequent reads from it will return its default value.
+  public mutating func clearCreatedAt() {self._createdAt = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _createdAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+}
+
+public struct Barkcloud_Files_ListFileActivityResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var items: [Barkcloud_Files_FileActivityInfo] = []
+
+  /// пусто = больше нет страниц
+  public var nextCursorCreatedAt: SwiftProtobuf.Google_Protobuf_Timestamp {
+    get {_nextCursorCreatedAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_nextCursorCreatedAt = newValue}
+  }
+  /// Returns true if `nextCursorCreatedAt` has been explicitly set.
+  public var hasNextCursorCreatedAt: Bool {self._nextCursorCreatedAt != nil}
+  /// Clears the value of `nextCursorCreatedAt`. Subsequent reads from it will return its default value.
+  public mutating func clearNextCursorCreatedAt() {self._nextCursorCreatedAt = nil}
+
+  public var nextCursorEventID: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _nextCursorCreatedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+}
+
 public struct Barkcloud_Files_GetUserStorageInfoResponse: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -1923,6 +2478,9 @@ public struct Barkcloud_Files_GetUserStorageInfoResponse: Sendable {
 
   /// Занято S3-данными в байтах
   public var s3UsedStorage: Int64 = 0
+
+  /// Зарезервировано активными upload-сессиями
+  public var reservedStorage: Int64 = 0
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -2243,6 +2801,688 @@ public struct Barkcloud_Files_ListAlbumItemsResponse: Sendable {
   public init() {}
 
   fileprivate var _nextCursorAddedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+}
+
+public struct Barkcloud_Files_MusicTrackInfo: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var file: Barkcloud_Files_UploadFileInfo {
+    get {_file ?? Barkcloud_Files_UploadFileInfo()}
+    set {_file = newValue}
+  }
+  /// Returns true if `file` has been explicitly set.
+  public var hasFile: Bool {self._file != nil}
+  /// Clears the value of `file`. Subsequent reads from it will return its default value.
+  public mutating func clearFile() {self._file = nil}
+
+  public var metadata: Barkcloud_Files_FileMetadataInfo {
+    get {_metadata ?? Barkcloud_Files_FileMetadataInfo()}
+    set {_metadata = newValue}
+  }
+  /// Returns true if `metadata` has been explicitly set.
+  public var hasMetadata: Bool {self._metadata != nil}
+  /// Clears the value of `metadata`. Subsequent reads from it will return its default value.
+  public mutating func clearMetadata() {self._metadata = nil}
+
+  public var title: String = String()
+
+  public var artist: String = String()
+
+  public var album: String = String()
+
+  public var durationSeconds: Double = 0
+
+  /// малая обложка (~128)
+  public var coverURL: String = String()
+
+  /// крупная обложка (~512)
+  public var largeCoverURL: String = String()
+
+  /// живые записи файла в папках владельца
+  public var entryIds: [String] = []
+
+  /// имена этих записей в папках
+  public var entryNames: [String] = []
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _file: Barkcloud_Files_UploadFileInfo? = nil
+  fileprivate var _metadata: Barkcloud_Files_FileMetadataInfo? = nil
+}
+
+public struct Barkcloud_Files_ListMusicTracksRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var query: String = String()
+
+  public var limit: Int32 = 0
+
+  public var cursorCreatedAt: SwiftProtobuf.Google_Protobuf_Timestamp {
+    get {_cursorCreatedAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_cursorCreatedAt = newValue}
+  }
+  /// Returns true if `cursorCreatedAt` has been explicitly set.
+  public var hasCursorCreatedAt: Bool {self._cursorCreatedAt != nil}
+  /// Clears the value of `cursorCreatedAt`. Subsequent reads from it will return its default value.
+  public mutating func clearCursorCreatedAt() {self._cursorCreatedAt = nil}
+
+  public var cursorFileID: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _cursorCreatedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+}
+
+public struct Barkcloud_Files_ListMusicTracksResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var items: [Barkcloud_Files_MusicTrackInfo] = []
+
+  public var nextCursorCreatedAt: SwiftProtobuf.Google_Protobuf_Timestamp {
+    get {_nextCursorCreatedAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_nextCursorCreatedAt = newValue}
+  }
+  /// Returns true if `nextCursorCreatedAt` has been explicitly set.
+  public var hasNextCursorCreatedAt: Bool {self._nextCursorCreatedAt != nil}
+  /// Clears the value of `nextCursorCreatedAt`. Subsequent reads from it will return its default value.
+  public mutating func clearNextCursorCreatedAt() {self._nextCursorCreatedAt = nil}
+
+  public var nextCursorFileID: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _nextCursorCreatedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+}
+
+public struct Barkcloud_Files_GetTrackDownloadUrlRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var fileID: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public struct Barkcloud_Files_GetTrackDownloadUrlResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var downloadURL: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public struct Barkcloud_Files_MusicPlaylistInfo: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var id: String = String()
+
+  public var name: String = String()
+
+  public var description_p: String = String()
+
+  public var coverFileID: String = String()
+
+  public var coverPreviewURL: String = String()
+
+  public var itemsCount: Int32 = 0
+
+  public var ownerUserID: Int64 = 0
+
+  public var canReorder: Bool = false
+
+  public var createdAt: SwiftProtobuf.Google_Protobuf_Timestamp {
+    get {_createdAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_createdAt = newValue}
+  }
+  /// Returns true if `createdAt` has been explicitly set.
+  public var hasCreatedAt: Bool {self._createdAt != nil}
+  /// Clears the value of `createdAt`. Subsequent reads from it will return its default value.
+  public mutating func clearCreatedAt() {self._createdAt = nil}
+
+  public var updatedAt: SwiftProtobuf.Google_Protobuf_Timestamp {
+    get {_updatedAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_updatedAt = newValue}
+  }
+  /// Returns true if `updatedAt` has been explicitly set.
+  public var hasUpdatedAt: Bool {self._updatedAt != nil}
+  /// Clears the value of `updatedAt`. Subsequent reads from it will return its default value.
+  public mutating func clearUpdatedAt() {self._updatedAt = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _createdAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+  fileprivate var _updatedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+}
+
+public struct Barkcloud_Files_CreateMusicPlaylistRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var name: String = String()
+
+  public var description_p: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public struct Barkcloud_Files_UpdateMusicPlaylistRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var playlistID: String = String()
+
+  public var name: String {
+    get {_name ?? String()}
+    set {_name = newValue}
+  }
+  /// Returns true if `name` has been explicitly set.
+  public var hasName: Bool {self._name != nil}
+  /// Clears the value of `name`. Subsequent reads from it will return its default value.
+  public mutating func clearName() {self._name = nil}
+
+  public var description_p: String {
+    get {_description_p ?? String()}
+    set {_description_p = newValue}
+  }
+  /// Returns true if `description_p` has been explicitly set.
+  public var hasDescription_p: Bool {self._description_p != nil}
+  /// Clears the value of `description_p`. Subsequent reads from it will return its default value.
+  public mutating func clearDescription_p() {self._description_p = nil}
+
+  /// пустая строка = сбросить кастомную обложку
+  public var coverFileID: String {
+    get {_coverFileID ?? String()}
+    set {_coverFileID = newValue}
+  }
+  /// Returns true if `coverFileID` has been explicitly set.
+  public var hasCoverFileID: Bool {self._coverFileID != nil}
+  /// Clears the value of `coverFileID`. Subsequent reads from it will return its default value.
+  public mutating func clearCoverFileID() {self._coverFileID = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _name: String? = nil
+  fileprivate var _description_p: String? = nil
+  fileprivate var _coverFileID: String? = nil
+}
+
+public struct Barkcloud_Files_DeleteMusicPlaylistRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var playlistID: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public struct Barkcloud_Files_ListMusicPlaylistsRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var limit: Int32 = 0
+
+  public var cursorUpdatedAt: SwiftProtobuf.Google_Protobuf_Timestamp {
+    get {_cursorUpdatedAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_cursorUpdatedAt = newValue}
+  }
+  /// Returns true if `cursorUpdatedAt` has been explicitly set.
+  public var hasCursorUpdatedAt: Bool {self._cursorUpdatedAt != nil}
+  /// Clears the value of `cursorUpdatedAt`. Subsequent reads from it will return its default value.
+  public mutating func clearCursorUpdatedAt() {self._cursorUpdatedAt = nil}
+
+  public var cursorPlaylistID: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _cursorUpdatedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+}
+
+public struct Barkcloud_Files_ListMusicPlaylistsResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var items: [Barkcloud_Files_MusicPlaylistInfo] = []
+
+  public var nextCursorUpdatedAt: SwiftProtobuf.Google_Protobuf_Timestamp {
+    get {_nextCursorUpdatedAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_nextCursorUpdatedAt = newValue}
+  }
+  /// Returns true if `nextCursorUpdatedAt` has been explicitly set.
+  public var hasNextCursorUpdatedAt: Bool {self._nextCursorUpdatedAt != nil}
+  /// Clears the value of `nextCursorUpdatedAt`. Subsequent reads from it will return its default value.
+  public mutating func clearNextCursorUpdatedAt() {self._nextCursorUpdatedAt = nil}
+
+  public var nextCursorPlaylistID: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _nextCursorUpdatedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+}
+
+public struct Barkcloud_Files_MusicPlaylistTrackEntry: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var track: Barkcloud_Files_MusicTrackInfo {
+    get {_track ?? Barkcloud_Files_MusicTrackInfo()}
+    set {_track = newValue}
+  }
+  /// Returns true if `track` has been explicitly set.
+  public var hasTrack: Bool {self._track != nil}
+  /// Clears the value of `track`. Subsequent reads from it will return its default value.
+  public mutating func clearTrack() {self._track = nil}
+
+  public var position: Int32 = 0
+
+  public var addedAt: SwiftProtobuf.Google_Protobuf_Timestamp {
+    get {_addedAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_addedAt = newValue}
+  }
+  /// Returns true if `addedAt` has been explicitly set.
+  public var hasAddedAt: Bool {self._addedAt != nil}
+  /// Clears the value of `addedAt`. Subsequent reads from it will return its default value.
+  public mutating func clearAddedAt() {self._addedAt = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _track: Barkcloud_Files_MusicTrackInfo? = nil
+  fileprivate var _addedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+}
+
+public struct Barkcloud_Files_ListMusicPlaylistTracksRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var playlistID: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public struct Barkcloud_Files_ListMusicPlaylistTracksResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var playlist: Barkcloud_Files_MusicPlaylistInfo {
+    get {_playlist ?? Barkcloud_Files_MusicPlaylistInfo()}
+    set {_playlist = newValue}
+  }
+  /// Returns true if `playlist` has been explicitly set.
+  public var hasPlaylist: Bool {self._playlist != nil}
+  /// Clears the value of `playlist`. Subsequent reads from it will return its default value.
+  public mutating func clearPlaylist() {self._playlist = nil}
+
+  public var items: [Barkcloud_Files_MusicPlaylistTrackEntry] = []
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _playlist: Barkcloud_Files_MusicPlaylistInfo? = nil
+}
+
+public struct Barkcloud_Files_AddMusicPlaylistTracksRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var playlistID: String = String()
+
+  public var fileIds: [String] = []
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public struct Barkcloud_Files_RemoveMusicPlaylistTracksRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var playlistID: String = String()
+
+  public var fileIds: [String] = []
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public struct Barkcloud_Files_ReorderMusicPlaylistTracksRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var playlistID: String = String()
+
+  /// полный новый порядок
+  public var fileIds: [String] = []
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public struct Barkcloud_Files_MusicPlaylistShareInfo: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var id: String = String()
+
+  public var token: String = String()
+
+  public var playlistID: String = String()
+
+  public var name: String = String()
+
+  public var createdAt: SwiftProtobuf.Google_Protobuf_Timestamp {
+    get {_createdAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_createdAt = newValue}
+  }
+  /// Returns true if `createdAt` has been explicitly set.
+  public var hasCreatedAt: Bool {self._createdAt != nil}
+  /// Clears the value of `createdAt`. Subsequent reads from it will return its default value.
+  public mutating func clearCreatedAt() {self._createdAt = nil}
+
+  public var clickCount: Int64 = 0
+
+  public var coverPreviewURL: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _createdAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+}
+
+public struct Barkcloud_Files_CreateMusicPlaylistShareRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var playlistID: String = String()
+
+  public var name: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public struct Barkcloud_Files_ListMyMusicPlaylistSharesRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var limit: Int32 = 0
+
+  public var cursorCreatedAt: SwiftProtobuf.Google_Protobuf_Timestamp {
+    get {_cursorCreatedAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_cursorCreatedAt = newValue}
+  }
+  /// Returns true if `cursorCreatedAt` has been explicitly set.
+  public var hasCursorCreatedAt: Bool {self._cursorCreatedAt != nil}
+  /// Clears the value of `cursorCreatedAt`. Subsequent reads from it will return its default value.
+  public mutating func clearCursorCreatedAt() {self._cursorCreatedAt = nil}
+
+  public var cursorShareID: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _cursorCreatedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+}
+
+public struct Barkcloud_Files_ListMyMusicPlaylistSharesResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var shares: [Barkcloud_Files_MusicPlaylistShareInfo] = []
+
+  public var nextCursorCreatedAt: SwiftProtobuf.Google_Protobuf_Timestamp {
+    get {_nextCursorCreatedAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_nextCursorCreatedAt = newValue}
+  }
+  /// Returns true if `nextCursorCreatedAt` has been explicitly set.
+  public var hasNextCursorCreatedAt: Bool {self._nextCursorCreatedAt != nil}
+  /// Clears the value of `nextCursorCreatedAt`. Subsequent reads from it will return its default value.
+  public mutating func clearNextCursorCreatedAt() {self._nextCursorCreatedAt = nil}
+
+  public var nextCursorShareID: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _nextCursorCreatedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+}
+
+public struct Barkcloud_Files_RevokeMusicPlaylistShareRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var shareID: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public struct Barkcloud_Files_ShareMusicPlaylistWithUserRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var playlistID: String = String()
+
+  public var recipientUserID: Int64 = 0
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public struct Barkcloud_Files_RevokeMusicPlaylistUserShareRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var grantID: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public struct Barkcloud_Files_ListMyOutgoingMusicPlaylistSharesRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var playlistID: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public struct Barkcloud_Files_OutgoingMusicPlaylistShare: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var grantID: String = String()
+
+  public var playlistID: String = String()
+
+  public var name: String = String()
+
+  public var recipientUserID: Int64 = 0
+
+  public var sharedAt: SwiftProtobuf.Google_Protobuf_Timestamp {
+    get {_sharedAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_sharedAt = newValue}
+  }
+  /// Returns true if `sharedAt` has been explicitly set.
+  public var hasSharedAt: Bool {self._sharedAt != nil}
+  /// Clears the value of `sharedAt`. Subsequent reads from it will return its default value.
+  public mutating func clearSharedAt() {self._sharedAt = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _sharedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+}
+
+public struct Barkcloud_Files_ListMyOutgoingMusicPlaylistSharesResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var items: [Barkcloud_Files_OutgoingMusicPlaylistShare] = []
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public struct Barkcloud_Files_ListSharedMusicPlaylistsWithMeRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public struct Barkcloud_Files_SharedMusicPlaylistEntry: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var grantID: String = String()
+
+  public var playlist: Barkcloud_Files_MusicPlaylistInfo {
+    get {_playlist ?? Barkcloud_Files_MusicPlaylistInfo()}
+    set {_playlist = newValue}
+  }
+  /// Returns true if `playlist` has been explicitly set.
+  public var hasPlaylist: Bool {self._playlist != nil}
+  /// Clears the value of `playlist`. Subsequent reads from it will return its default value.
+  public mutating func clearPlaylist() {self._playlist = nil}
+
+  public var ownerUserID: Int64 = 0
+
+  public var sharedAt: SwiftProtobuf.Google_Protobuf_Timestamp {
+    get {_sharedAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_sharedAt = newValue}
+  }
+  /// Returns true if `sharedAt` has been explicitly set.
+  public var hasSharedAt: Bool {self._sharedAt != nil}
+  /// Clears the value of `sharedAt`. Subsequent reads from it will return its default value.
+  public mutating func clearSharedAt() {self._sharedAt = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _playlist: Barkcloud_Files_MusicPlaylistInfo? = nil
+  fileprivate var _sharedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+}
+
+public struct Barkcloud_Files_ListSharedMusicPlaylistsWithMeResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var items: [Barkcloud_Files_SharedMusicPlaylistEntry] = []
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public struct Barkcloud_Files_ResolveMusicPlaylistShareRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var token: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public struct Barkcloud_Files_ResolveMusicPlaylistShareResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var found: Bool = false
+
+  public var playlistName: String = String()
+
+  public var description_p: String = String()
+
+  public var coverPreviewURL: String = String()
+
+  public var items: [Barkcloud_Files_MusicTrackInfo] = []
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
 }
 
 public struct Barkcloud_Files_DfRule: Sendable {
@@ -2682,6 +3922,9 @@ public struct Barkcloud_Files_SearchFilesRequest: Sendable {
   /// tie-breaker для стабильной cursor-пагинации
   public var cursorEntryID: String = String()
 
+  /// пусто = все типы; иначе только перечисленные (напр. PHOTO+VIDEO)
+  public var kindFilter: [Barkcloud_Files_MediaKind] = []
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -2716,6 +3959,170 @@ public struct Barkcloud_Files_SearchFilesResponse: Sendable {
   fileprivate var _nextCursorCreatedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
 }
 
+public struct Barkcloud_Files_SearchSectionPage: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var section: Barkcloud_Files_SearchSection = .unspecified
+
+  public var limit: Int32 = 0
+
+  public var cursor: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public struct Barkcloud_Files_SearchRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var query: String = String()
+
+  public var pages: [Barkcloud_Files_SearchSectionPage] = []
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public struct Barkcloud_Files_SearchResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var sections: [Barkcloud_Files_SearchSectionResult] = []
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public struct Barkcloud_Files_SearchSectionResult: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var section: Barkcloud_Files_SearchSection = .unspecified
+
+  public var hits: [Barkcloud_Files_SearchHit] = []
+
+  public var nextCursor: String = String()
+
+  public var hasMore_p: Bool = false
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public struct Barkcloud_Files_SearchHitReference: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var kind: Barkcloud_Files_SearchHitKind = .unspecified
+
+  public var id: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public struct Barkcloud_Files_SearchHit: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var kind: Barkcloud_Files_SearchHitKind = .unspecified
+
+  public var id: String = String()
+
+  public var fileID: String = String()
+
+  public var entryID: String = String()
+
+  public var title: String = String()
+
+  public var subtitle: String = String()
+
+  public var previewURL: String = String()
+
+  public var mediaKind: Barkcloud_Files_MediaKind = .other
+
+  public var favorite: Bool = false
+
+  public var matchField: String = String()
+
+  public var matchValue: String = String()
+
+  public var createdAt: SwiftProtobuf.Google_Protobuf_Timestamp {
+    get {_createdAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_createdAt = newValue}
+  }
+  /// Returns true if `createdAt` has been explicitly set.
+  public var hasCreatedAt: Bool {self._createdAt != nil}
+  /// Clears the value of `createdAt`. Subsequent reads from it will return its default value.
+  public mutating func clearCreatedAt() {self._createdAt = nil}
+
+  public var size: Int64 = 0
+
+  public var ownerName: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _createdAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+}
+
+public struct Barkcloud_Files_GetFileSearchMetadataRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var fileID: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public struct Barkcloud_Files_ReplaceFileSearchMetadataRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var fileID: String = String()
+
+  /// пусто = удалить алиас
+  public var alias: String = String()
+
+  public var tags: [String] = []
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public struct Barkcloud_Files_FileSearchMetadata: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var alias: String = String()
+
+  public var tags: [String] = []
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
 public struct Barkcloud_Files_ShareInfo: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -2745,6 +4152,12 @@ public struct Barkcloud_Files_ShareInfo: Sendable {
 
   /// Сколько раз по ссылке переходили
   public var clickCount: Int64 = 0
+
+  /// Тип медиа файла (для отрисовки карточки)
+  public var mediaKind: Barkcloud_Files_MediaKind = .other
+
+  /// Публичный URL превью (фото/видео); пусто — превью нет
+  public var previewURL: String = String()
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -3396,6 +4809,9 @@ public struct Barkcloud_Files_AlbumShareInfo: Sendable {
   /// Сколько раз открывали
   public var clickCount: Int64 = 0
 
+  /// URL превью обложки альбома (пусто, если нет)
+  public var coverPreviewURL: String = String()
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -3727,6 +5143,10 @@ extension Barkcloud_Files_MediaKind: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0MEDIA_KIND_OTHER\0\u{1}MEDIA_KIND_PHOTO\0\u{1}MEDIA_KIND_VIDEO\0\u{1}MEDIA_KIND_DOCUMENT\0\u{1}MEDIA_KIND_AUDIO\0")
 }
 
+extension Barkcloud_Files_UploadSessionStatus: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0UPLOAD_SESSION_STATUS_UNSPECIFIED\0\u{1}UPLOAD_SESSION_STATUS_UPLOADING\0\u{1}UPLOAD_SESSION_STATUS_PROCESSING\0\u{1}UPLOAD_SESSION_STATUS_READY\0\u{1}UPLOAD_SESSION_STATUS_FAILED\0\u{1}UPLOAD_SESSION_STATUS_CANCELLED\0\u{1}UPLOAD_SESSION_STATUS_EXPIRED\0")
+}
+
 extension Barkcloud_Files_UploadFileType: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0UPLOAD_FILE_TYPE_UNKNOWN\0\u{1}USER_AVATAR\0\u{1}CLOUD_FILE\0")
 }
@@ -3745,6 +5165,104 @@ extension Barkcloud_Files_DfCombinator: SwiftProtobuf._ProtoNameProviding {
 
 extension Barkcloud_Files_DfViewMode: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0DF_VIEW_GRID\0\u{1}DF_VIEW_LIST\0")
+}
+
+extension Barkcloud_Files_SearchSection: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0SEARCH_SECTION_UNSPECIFIED\0\u{1}SEARCH_SECTION_PHOTOS\0\u{1}SEARCH_SECTION_VIDEOS\0\u{1}SEARCH_SECTION_FILES\0\u{1}SEARCH_SECTION_TRACKS\0\u{1}SEARCH_SECTION_ALBUMS\0\u{1}SEARCH_SECTION_PLAYLISTS\0\u{1}SEARCH_SECTION_FOLDERS\0\u{1}SEARCH_SECTION_SHARED\0\u{1}SEARCH_SECTION_TRASH\0")
+}
+
+extension Barkcloud_Files_SearchHitKind: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0SEARCH_HIT_KIND_UNSPECIFIED\0\u{1}SEARCH_HIT_KIND_PHOTO\0\u{1}SEARCH_HIT_KIND_VIDEO\0\u{1}SEARCH_HIT_KIND_FILE\0\u{1}SEARCH_HIT_KIND_TRACK\0\u{1}SEARCH_HIT_KIND_ALBUM\0\u{1}SEARCH_HIT_KIND_PLAYLIST\0\u{1}SEARCH_HIT_KIND_FOLDER\0\u{1}SEARCH_HIT_KIND_DYNAMIC_FOLDER\0\u{1}SEARCH_HIT_KIND_SHARED_FILE\0\u{1}SEARCH_HIT_KIND_SHARED_FOLDER\0\u{1}SEARCH_HIT_KIND_SHARED_PLAYLIST\0\u{1}SEARCH_HIT_KIND_TRASH\0")
+}
+
+extension Barkcloud_Files_CreateArchiveRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".CreateArchiveRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}entry_ids\0\u{3}file_ids\0\u{3}directory_id\0\u{3}album_id\0\u{3}archive_name\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeRepeatedStringField(value: &self.entryIds) }()
+      case 2: try { try decoder.decodeRepeatedStringField(value: &self.fileIds) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.directoryID) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self.albumID) }()
+      case 5: try { try decoder.decodeSingularStringField(value: &self.archiveName) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.entryIds.isEmpty {
+      try visitor.visitRepeatedStringField(value: self.entryIds, fieldNumber: 1)
+    }
+    if !self.fileIds.isEmpty {
+      try visitor.visitRepeatedStringField(value: self.fileIds, fieldNumber: 2)
+    }
+    if !self.directoryID.isEmpty {
+      try visitor.visitSingularStringField(value: self.directoryID, fieldNumber: 3)
+    }
+    if !self.albumID.isEmpty {
+      try visitor.visitSingularStringField(value: self.albumID, fieldNumber: 4)
+    }
+    if !self.archiveName.isEmpty {
+      try visitor.visitSingularStringField(value: self.archiveName, fieldNumber: 5)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Barkcloud_Files_CreateArchiveRequest, rhs: Barkcloud_Files_CreateArchiveRequest) -> Bool {
+    if lhs.entryIds != rhs.entryIds {return false}
+    if lhs.fileIds != rhs.fileIds {return false}
+    if lhs.directoryID != rhs.directoryID {return false}
+    if lhs.albumID != rhs.albumID {return false}
+    if lhs.archiveName != rhs.archiveName {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Barkcloud_Files_CreateArchiveResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".CreateArchiveResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}file_id\0\u{1}url\0\u{3}file_name\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.fileID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.url) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.fileName) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.fileID.isEmpty {
+      try visitor.visitSingularStringField(value: self.fileID, fieldNumber: 1)
+    }
+    if !self.url.isEmpty {
+      try visitor.visitSingularStringField(value: self.url, fieldNumber: 2)
+    }
+    if !self.fileName.isEmpty {
+      try visitor.visitSingularStringField(value: self.fileName, fieldNumber: 3)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Barkcloud_Files_CreateArchiveResponse, rhs: Barkcloud_Files_CreateArchiveResponse) -> Bool {
+    if lhs.fileID != rhs.fileID {return false}
+    if lhs.url != rhs.url {return false}
+    if lhs.fileName != rhs.fileName {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
 }
 
 extension Barkcloud_Files_GetTempDownloadUrlRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
@@ -3973,7 +5491,7 @@ extension Barkcloud_Files_GetFileDataResponse: SwiftProtobuf.Message, SwiftProto
 
 extension Barkcloud_Files_UploadFileInfo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".UploadFileInfo"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}uploaders\0\u{3}created_at\0\u{3}uploaded_at\0\u{1}etag\0\u{1}type\0\u{3}file_name\0\u{3}file_url\0\u{3}preview_url\0\u{3}file_size\0\u{1}previews\0\u{3}image_width\0\u{3}image_height\0\u{3}media_kind\0\u{3}upload_device_name\0\u{3}jpeg_view_file_id\0\u{3}jpeg_view_url\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}uploaders\0\u{3}created_at\0\u{3}uploaded_at\0\u{1}etag\0\u{1}type\0\u{3}file_name\0\u{3}file_url\0\u{3}preview_url\0\u{3}file_size\0\u{1}previews\0\u{3}image_width\0\u{3}image_height\0\u{3}media_kind\0\u{3}upload_device_name\0\u{3}jpeg_view_file_id\0\u{3}jpeg_view_url\0\u{3}video_meta\0")
 
   fileprivate class _StorageClass {
     var _id: String = String()
@@ -3993,6 +5511,7 @@ extension Barkcloud_Files_UploadFileInfo: SwiftProtobuf.Message, SwiftProtobuf._
     var _uploadDeviceName: String = String()
     var _jpegViewFileID: String = String()
     var _jpegViewURL: String = String()
+    var _videoMeta: Barkcloud_Files_VideoMeta? = nil
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -4020,6 +5539,7 @@ extension Barkcloud_Files_UploadFileInfo: SwiftProtobuf.Message, SwiftProtobuf._
       _uploadDeviceName = source._uploadDeviceName
       _jpegViewFileID = source._jpegViewFileID
       _jpegViewURL = source._jpegViewURL
+      _videoMeta = source._videoMeta
     }
   }
 
@@ -4055,6 +5575,7 @@ extension Barkcloud_Files_UploadFileInfo: SwiftProtobuf.Message, SwiftProtobuf._
         case 15: try { try decoder.decodeSingularStringField(value: &_storage._uploadDeviceName) }()
         case 16: try { try decoder.decodeSingularStringField(value: &_storage._jpegViewFileID) }()
         case 17: try { try decoder.decodeSingularStringField(value: &_storage._jpegViewURL) }()
+        case 18: try { try decoder.decodeSingularMessageField(value: &_storage._videoMeta) }()
         default: break
         }
       }
@@ -4118,6 +5639,9 @@ extension Barkcloud_Files_UploadFileInfo: SwiftProtobuf.Message, SwiftProtobuf._
       if !_storage._jpegViewURL.isEmpty {
         try visitor.visitSingularStringField(value: _storage._jpegViewURL, fieldNumber: 17)
       }
+      try { if let v = _storage._videoMeta {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 18)
+      } }()
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -4144,10 +5668,65 @@ extension Barkcloud_Files_UploadFileInfo: SwiftProtobuf.Message, SwiftProtobuf._
         if _storage._uploadDeviceName != rhs_storage._uploadDeviceName {return false}
         if _storage._jpegViewFileID != rhs_storage._jpegViewFileID {return false}
         if _storage._jpegViewURL != rhs_storage._jpegViewURL {return false}
+        if _storage._videoMeta != rhs_storage._videoMeta {return false}
         return true
       }
       if !storagesAreEqual {return false}
     }
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Barkcloud_Files_VideoMeta: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".VideoMeta"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}duration_seconds\0\u{3}video_codec\0\u{3}audio_codec\0\u{1}bitrate\0\u{1}hdr\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularDoubleField(value: &self._durationSeconds) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self._videoCodec) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self._audioCodec) }()
+      case 4: try { try decoder.decodeSingularInt64Field(value: &self._bitrate) }()
+      case 5: try { try decoder.decodeSingularBoolField(value: &self._hdr) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    try { if let v = self._durationSeconds {
+      try visitor.visitSingularDoubleField(value: v, fieldNumber: 1)
+    } }()
+    try { if let v = self._videoCodec {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 2)
+    } }()
+    try { if let v = self._audioCodec {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 3)
+    } }()
+    try { if let v = self._bitrate {
+      try visitor.visitSingularInt64Field(value: v, fieldNumber: 4)
+    } }()
+    try { if let v = self._hdr {
+      try visitor.visitSingularBoolField(value: v, fieldNumber: 5)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Barkcloud_Files_VideoMeta, rhs: Barkcloud_Files_VideoMeta) -> Bool {
+    if lhs._durationSeconds != rhs._durationSeconds {return false}
+    if lhs._videoCodec != rhs._videoCodec {return false}
+    if lhs._audioCodec != rhs._audioCodec {return false}
+    if lhs._bitrate != rhs._bitrate {return false}
+    if lhs._hdr != rhs._hdr {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -4274,7 +5853,7 @@ extension Barkcloud_Files_GetFileMetadataResponse: SwiftProtobuf.Message, SwiftP
 
 extension Barkcloud_Files_FileMetadataInfo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".FileMetadataInfo"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}taken_at\0\u{3}creator_tool\0\u{1}latitude\0\u{1}longitude\0\u{1}altitude\0\u{3}camera_make\0\u{3}camera_model\0\u{3}lens_model\0\u{3}focal_length_mm\0\u{3}f_number\0\u{3}exposure_time_seconds\0\u{1}iso\0\u{1}orientation\0\u{1}flash\0\u{3}duration_seconds\0\u{3}video_codec\0\u{3}audio_codec\0\u{1}bitrate\0\u{3}frame_rate\0\u{3}document_author\0\u{3}document_title\0\u{3}document_subject\0\u{3}document_page_count\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}taken_at\0\u{3}creator_tool\0\u{1}latitude\0\u{1}longitude\0\u{1}altitude\0\u{3}camera_make\0\u{3}camera_model\0\u{3}lens_model\0\u{3}focal_length_mm\0\u{3}f_number\0\u{3}exposure_time_seconds\0\u{1}iso\0\u{1}orientation\0\u{1}flash\0\u{3}duration_seconds\0\u{3}video_codec\0\u{3}audio_codec\0\u{1}bitrate\0\u{3}frame_rate\0\u{3}document_author\0\u{3}document_title\0\u{3}document_subject\0\u{3}document_page_count\0\u{3}is_hdr\0\u{3}audio_title\0\u{3}audio_artist\0\u{3}audio_album\0\u{3}audio_track_number\0")
 
   fileprivate class _StorageClass {
     var _takenAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
@@ -4296,6 +5875,11 @@ extension Barkcloud_Files_FileMetadataInfo: SwiftProtobuf.Message, SwiftProtobuf
     var _audioCodec: String? = nil
     var _bitrate: Int64? = nil
     var _frameRate: Double? = nil
+    var _isHdr: Bool? = nil
+    var _audioTitle: String? = nil
+    var _audioArtist: String? = nil
+    var _audioAlbum: String? = nil
+    var _audioTrackNumber: Int32? = nil
     var _documentAuthor: String? = nil
     var _documentTitle: String? = nil
     var _documentSubject: String? = nil
@@ -4329,6 +5913,11 @@ extension Barkcloud_Files_FileMetadataInfo: SwiftProtobuf.Message, SwiftProtobuf
       _audioCodec = source._audioCodec
       _bitrate = source._bitrate
       _frameRate = source._frameRate
+      _isHdr = source._isHdr
+      _audioTitle = source._audioTitle
+      _audioArtist = source._audioArtist
+      _audioAlbum = source._audioAlbum
+      _audioTrackNumber = source._audioTrackNumber
       _documentAuthor = source._documentAuthor
       _documentTitle = source._documentTitle
       _documentSubject = source._documentSubject
@@ -4374,6 +5963,11 @@ extension Barkcloud_Files_FileMetadataInfo: SwiftProtobuf.Message, SwiftProtobuf
         case 21: try { try decoder.decodeSingularStringField(value: &_storage._documentTitle) }()
         case 22: try { try decoder.decodeSingularStringField(value: &_storage._documentSubject) }()
         case 23: try { try decoder.decodeSingularInt32Field(value: &_storage._documentPageCount) }()
+        case 24: try { try decoder.decodeSingularBoolField(value: &_storage._isHdr) }()
+        case 25: try { try decoder.decodeSingularStringField(value: &_storage._audioTitle) }()
+        case 26: try { try decoder.decodeSingularStringField(value: &_storage._audioArtist) }()
+        case 27: try { try decoder.decodeSingularStringField(value: &_storage._audioAlbum) }()
+        case 28: try { try decoder.decodeSingularInt32Field(value: &_storage._audioTrackNumber) }()
         default: break
         }
       }
@@ -4455,6 +6049,21 @@ extension Barkcloud_Files_FileMetadataInfo: SwiftProtobuf.Message, SwiftProtobuf
       try { if let v = _storage._documentPageCount {
         try visitor.visitSingularInt32Field(value: v, fieldNumber: 23)
       } }()
+      try { if let v = _storage._isHdr {
+        try visitor.visitSingularBoolField(value: v, fieldNumber: 24)
+      } }()
+      try { if let v = _storage._audioTitle {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 25)
+      } }()
+      try { if let v = _storage._audioArtist {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 26)
+      } }()
+      try { if let v = _storage._audioAlbum {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 27)
+      } }()
+      try { if let v = _storage._audioTrackNumber {
+        try visitor.visitSingularInt32Field(value: v, fieldNumber: 28)
+      } }()
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -4483,6 +6092,11 @@ extension Barkcloud_Files_FileMetadataInfo: SwiftProtobuf.Message, SwiftProtobuf
         if _storage._audioCodec != rhs_storage._audioCodec {return false}
         if _storage._bitrate != rhs_storage._bitrate {return false}
         if _storage._frameRate != rhs_storage._frameRate {return false}
+        if _storage._isHdr != rhs_storage._isHdr {return false}
+        if _storage._audioTitle != rhs_storage._audioTitle {return false}
+        if _storage._audioArtist != rhs_storage._audioArtist {return false}
+        if _storage._audioAlbum != rhs_storage._audioAlbum {return false}
+        if _storage._audioTrackNumber != rhs_storage._audioTrackNumber {return false}
         if _storage._documentAuthor != rhs_storage._documentAuthor {return false}
         if _storage._documentTitle != rhs_storage._documentTitle {return false}
         if _storage._documentSubject != rhs_storage._documentSubject {return false}
@@ -4556,6 +6170,205 @@ extension Barkcloud_Files_GetUploadUrlResponse: SwiftProtobuf.Message, SwiftProt
   public static func ==(lhs: Barkcloud_Files_GetUploadUrlResponse, rhs: Barkcloud_Files_GetUploadUrlResponse) -> Bool {
     if lhs.url != rhs.url {return false}
     if lhs.fileID != rhs.fileID {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Barkcloud_Files_CreateUploadSessionRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".CreateUploadSessionRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}idempotency_key\0\u{3}file_name\0\u{3}file_size\0\u{3}content_type\0\u{1}sha256\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.idempotencyKey) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.fileName) }()
+      case 3: try { try decoder.decodeSingularInt64Field(value: &self.fileSize) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self.contentType) }()
+      case 5: try { try decoder.decodeSingularStringField(value: &self.sha256) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.idempotencyKey.isEmpty {
+      try visitor.visitSingularStringField(value: self.idempotencyKey, fieldNumber: 1)
+    }
+    if !self.fileName.isEmpty {
+      try visitor.visitSingularStringField(value: self.fileName, fieldNumber: 2)
+    }
+    if self.fileSize != 0 {
+      try visitor.visitSingularInt64Field(value: self.fileSize, fieldNumber: 3)
+    }
+    if !self.contentType.isEmpty {
+      try visitor.visitSingularStringField(value: self.contentType, fieldNumber: 4)
+    }
+    if !self.sha256.isEmpty {
+      try visitor.visitSingularStringField(value: self.sha256, fieldNumber: 5)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Barkcloud_Files_CreateUploadSessionRequest, rhs: Barkcloud_Files_CreateUploadSessionRequest) -> Bool {
+    if lhs.idempotencyKey != rhs.idempotencyKey {return false}
+    if lhs.fileName != rhs.fileName {return false}
+    if lhs.fileSize != rhs.fileSize {return false}
+    if lhs.contentType != rhs.contentType {return false}
+    if lhs.sha256 != rhs.sha256 {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Barkcloud_Files_UploadSessionIdRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".UploadSessionIdRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}session_id\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.sessionID) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.sessionID.isEmpty {
+      try visitor.visitSingularStringField(value: self.sessionID, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Barkcloud_Files_UploadSessionIdRequest, rhs: Barkcloud_Files_UploadSessionIdRequest) -> Bool {
+    if lhs.sessionID != rhs.sessionID {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Barkcloud_Files_UploadPartInfo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".UploadPartInfo"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}part_number\0\u{1}size\0\u{3}has_etag\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularInt32Field(value: &self.partNumber) }()
+      case 2: try { try decoder.decodeSingularInt64Field(value: &self.size) }()
+      case 3: try { try decoder.decodeSingularBoolField(value: &self.hasEtag_p) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.partNumber != 0 {
+      try visitor.visitSingularInt32Field(value: self.partNumber, fieldNumber: 1)
+    }
+    if self.size != 0 {
+      try visitor.visitSingularInt64Field(value: self.size, fieldNumber: 2)
+    }
+    if self.hasEtag_p != false {
+      try visitor.visitSingularBoolField(value: self.hasEtag_p, fieldNumber: 3)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Barkcloud_Files_UploadPartInfo, rhs: Barkcloud_Files_UploadPartInfo) -> Bool {
+    if lhs.partNumber != rhs.partNumber {return false}
+    if lhs.size != rhs.size {return false}
+    if lhs.hasEtag_p != rhs.hasEtag_p {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Barkcloud_Files_UploadSessionResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".UploadSessionResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}session_id\0\u{3}file_id\0\u{1}status\0\u{3}file_size\0\u{3}part_size\0\u{3}expires_at\0\u{3}upload_token\0\u{3}uploaded_parts\0\u{3}error_code\0\u{3}error_message\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.sessionID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.fileID) }()
+      case 3: try { try decoder.decodeSingularEnumField(value: &self.status) }()
+      case 4: try { try decoder.decodeSingularInt64Field(value: &self.fileSize) }()
+      case 5: try { try decoder.decodeSingularInt64Field(value: &self.partSize) }()
+      case 6: try { try decoder.decodeSingularMessageField(value: &self._expiresAt) }()
+      case 7: try { try decoder.decodeSingularStringField(value: &self.uploadToken) }()
+      case 8: try { try decoder.decodeRepeatedMessageField(value: &self.uploadedParts) }()
+      case 9: try { try decoder.decodeSingularStringField(value: &self.errorCode) }()
+      case 10: try { try decoder.decodeSingularStringField(value: &self.errorMessage) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.sessionID.isEmpty {
+      try visitor.visitSingularStringField(value: self.sessionID, fieldNumber: 1)
+    }
+    if !self.fileID.isEmpty {
+      try visitor.visitSingularStringField(value: self.fileID, fieldNumber: 2)
+    }
+    if self.status != .unspecified {
+      try visitor.visitSingularEnumField(value: self.status, fieldNumber: 3)
+    }
+    if self.fileSize != 0 {
+      try visitor.visitSingularInt64Field(value: self.fileSize, fieldNumber: 4)
+    }
+    if self.partSize != 0 {
+      try visitor.visitSingularInt64Field(value: self.partSize, fieldNumber: 5)
+    }
+    try { if let v = self._expiresAt {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 6)
+    } }()
+    if !self.uploadToken.isEmpty {
+      try visitor.visitSingularStringField(value: self.uploadToken, fieldNumber: 7)
+    }
+    if !self.uploadedParts.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.uploadedParts, fieldNumber: 8)
+    }
+    if !self.errorCode.isEmpty {
+      try visitor.visitSingularStringField(value: self.errorCode, fieldNumber: 9)
+    }
+    if !self.errorMessage.isEmpty {
+      try visitor.visitSingularStringField(value: self.errorMessage, fieldNumber: 10)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Barkcloud_Files_UploadSessionResponse, rhs: Barkcloud_Files_UploadSessionResponse) -> Bool {
+    if lhs.sessionID != rhs.sessionID {return false}
+    if lhs.fileID != rhs.fileID {return false}
+    if lhs.status != rhs.status {return false}
+    if lhs.fileSize != rhs.fileSize {return false}
+    if lhs.partSize != rhs.partSize {return false}
+    if lhs._expiresAt != rhs._expiresAt {return false}
+    if lhs.uploadToken != rhs.uploadToken {return false}
+    if lhs.uploadedParts != rhs.uploadedParts {return false}
+    if lhs.errorCode != rhs.errorCode {return false}
+    if lhs.errorMessage != rhs.errorMessage {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -5233,7 +7046,7 @@ extension Barkcloud_Files_DirectoryListing: SwiftProtobuf.Message, SwiftProtobuf
 
 extension Barkcloud_Files_AttachFileRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".AttachFileRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}directory_id\0\u{3}file_id\0\u{1}name\0\u{3}route_by_media_kind\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}directory_id\0\u{3}file_id\0\u{1}name\0\u{3}route_by_media_kind\0\u{3}upload_session_id\0\u{3}is_upload_retry\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -5245,6 +7058,8 @@ extension Barkcloud_Files_AttachFileRequest: SwiftProtobuf.Message, SwiftProtobu
       case 2: try { try decoder.decodeSingularStringField(value: &self.fileID) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.name) }()
       case 4: try { try decoder.decodeSingularBoolField(value: &self.routeByMediaKind) }()
+      case 5: try { try decoder.decodeSingularStringField(value: &self.uploadSessionID) }()
+      case 6: try { try decoder.decodeSingularBoolField(value: &self.isUploadRetry) }()
       default: break
       }
     }
@@ -5263,6 +7078,12 @@ extension Barkcloud_Files_AttachFileRequest: SwiftProtobuf.Message, SwiftProtobu
     if self.routeByMediaKind != false {
       try visitor.visitSingularBoolField(value: self.routeByMediaKind, fieldNumber: 4)
     }
+    if !self.uploadSessionID.isEmpty {
+      try visitor.visitSingularStringField(value: self.uploadSessionID, fieldNumber: 5)
+    }
+    if self.isUploadRetry != false {
+      try visitor.visitSingularBoolField(value: self.isUploadRetry, fieldNumber: 6)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -5271,6 +7092,8 @@ extension Barkcloud_Files_AttachFileRequest: SwiftProtobuf.Message, SwiftProtobu
     if lhs.fileID != rhs.fileID {return false}
     if lhs.name != rhs.name {return false}
     if lhs.routeByMediaKind != rhs.routeByMediaKind {return false}
+    if lhs.uploadSessionID != rhs.uploadSessionID {return false}
+    if lhs.isUploadRetry != rhs.isUploadRetry {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -5586,7 +7409,7 @@ extension Barkcloud_Files_ListUserImagesRequest: SwiftProtobuf.Message, SwiftPro
 
 extension Barkcloud_Files_UserImageItem: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".UserImageItem"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}file\0\u{3}entries_count\0\u{3}entry_names\0\u{3}entry_ids\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}file\0\u{3}entries_count\0\u{3}entry_names\0\u{3}entry_ids\0\u{3}duplicate_group_key\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -5598,6 +7421,7 @@ extension Barkcloud_Files_UserImageItem: SwiftProtobuf.Message, SwiftProtobuf._M
       case 2: try { try decoder.decodeSingularInt32Field(value: &self.entriesCount) }()
       case 3: try { try decoder.decodeRepeatedStringField(value: &self.entryNames) }()
       case 4: try { try decoder.decodeRepeatedStringField(value: &self.entryIds) }()
+      case 5: try { try decoder.decodeSingularStringField(value: &self.duplicateGroupKey) }()
       default: break
       }
     }
@@ -5620,6 +7444,9 @@ extension Barkcloud_Files_UserImageItem: SwiftProtobuf.Message, SwiftProtobuf._M
     if !self.entryIds.isEmpty {
       try visitor.visitRepeatedStringField(value: self.entryIds, fieldNumber: 4)
     }
+    if !self.duplicateGroupKey.isEmpty {
+      try visitor.visitSingularStringField(value: self.duplicateGroupKey, fieldNumber: 5)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -5628,6 +7455,7 @@ extension Barkcloud_Files_UserImageItem: SwiftProtobuf.Message, SwiftProtobuf._M
     if lhs.entriesCount != rhs.entriesCount {return false}
     if lhs.entryNames != rhs.entryNames {return false}
     if lhs.entryIds != rhs.entryIds {return false}
+    if lhs.duplicateGroupKey != rhs.duplicateGroupKey {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -6393,9 +8221,171 @@ extension Barkcloud_Files_PathResponse: SwiftProtobuf.Message, SwiftProtobuf._Me
   }
 }
 
+extension Barkcloud_Files_ListFileActivityRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ListFileActivityRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}file_id\0\u{1}limit\0\u{3}cursor_created_at\0\u{3}cursor_event_id\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.fileID) }()
+      case 2: try { try decoder.decodeSingularInt32Field(value: &self.limit) }()
+      case 3: try { try decoder.decodeSingularMessageField(value: &self._cursorCreatedAt) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self.cursorEventID) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.fileID.isEmpty {
+      try visitor.visitSingularStringField(value: self.fileID, fieldNumber: 1)
+    }
+    if self.limit != 0 {
+      try visitor.visitSingularInt32Field(value: self.limit, fieldNumber: 2)
+    }
+    try { if let v = self._cursorCreatedAt {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
+    } }()
+    if !self.cursorEventID.isEmpty {
+      try visitor.visitSingularStringField(value: self.cursorEventID, fieldNumber: 4)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Barkcloud_Files_ListFileActivityRequest, rhs: Barkcloud_Files_ListFileActivityRequest) -> Bool {
+    if lhs.fileID != rhs.fileID {return false}
+    if lhs.limit != rhs.limit {return false}
+    if lhs._cursorCreatedAt != rhs._cursorCreatedAt {return false}
+    if lhs.cursorEventID != rhs.cursorEventID {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Barkcloud_Files_FileActivityInfo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".FileActivityInfo"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{3}file_id\0\u{3}entry_id\0\u{3}actor_user_id\0\u{1}kind\0\u{1}summary\0\u{3}details_json\0\u{3}created_at\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.id) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.fileID) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.entryID) }()
+      case 4: try { try decoder.decodeSingularInt64Field(value: &self.actorUserID) }()
+      case 5: try { try decoder.decodeSingularStringField(value: &self.kind) }()
+      case 6: try { try decoder.decodeSingularStringField(value: &self.summary) }()
+      case 7: try { try decoder.decodeSingularStringField(value: &self.detailsJson) }()
+      case 8: try { try decoder.decodeSingularMessageField(value: &self._createdAt) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.id.isEmpty {
+      try visitor.visitSingularStringField(value: self.id, fieldNumber: 1)
+    }
+    if !self.fileID.isEmpty {
+      try visitor.visitSingularStringField(value: self.fileID, fieldNumber: 2)
+    }
+    if !self.entryID.isEmpty {
+      try visitor.visitSingularStringField(value: self.entryID, fieldNumber: 3)
+    }
+    if self.actorUserID != 0 {
+      try visitor.visitSingularInt64Field(value: self.actorUserID, fieldNumber: 4)
+    }
+    if !self.kind.isEmpty {
+      try visitor.visitSingularStringField(value: self.kind, fieldNumber: 5)
+    }
+    if !self.summary.isEmpty {
+      try visitor.visitSingularStringField(value: self.summary, fieldNumber: 6)
+    }
+    if !self.detailsJson.isEmpty {
+      try visitor.visitSingularStringField(value: self.detailsJson, fieldNumber: 7)
+    }
+    try { if let v = self._createdAt {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 8)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Barkcloud_Files_FileActivityInfo, rhs: Barkcloud_Files_FileActivityInfo) -> Bool {
+    if lhs.id != rhs.id {return false}
+    if lhs.fileID != rhs.fileID {return false}
+    if lhs.entryID != rhs.entryID {return false}
+    if lhs.actorUserID != rhs.actorUserID {return false}
+    if lhs.kind != rhs.kind {return false}
+    if lhs.summary != rhs.summary {return false}
+    if lhs.detailsJson != rhs.detailsJson {return false}
+    if lhs._createdAt != rhs._createdAt {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Barkcloud_Files_ListFileActivityResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ListFileActivityResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}items\0\u{3}next_cursor_created_at\0\u{3}next_cursor_event_id\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeRepeatedMessageField(value: &self.items) }()
+      case 2: try { try decoder.decodeSingularMessageField(value: &self._nextCursorCreatedAt) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.nextCursorEventID) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.items.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.items, fieldNumber: 1)
+    }
+    try { if let v = self._nextCursorCreatedAt {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+    } }()
+    if !self.nextCursorEventID.isEmpty {
+      try visitor.visitSingularStringField(value: self.nextCursorEventID, fieldNumber: 3)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Barkcloud_Files_ListFileActivityResponse, rhs: Barkcloud_Files_ListFileActivityResponse) -> Bool {
+    if lhs.items != rhs.items {return false}
+    if lhs._nextCursorCreatedAt != rhs._nextCursorCreatedAt {return false}
+    if lhs.nextCursorEventID != rhs.nextCursorEventID {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
 extension Barkcloud_Files_GetUserStorageInfoResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".GetUserStorageInfoResponse"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}total_used_storage\0\u{3}storage_limit\0\u{3}storage_by_types\0\u{3}total_available_storage\0\u{3}disk_used_storage\0\u{3}s3_used_storage\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}total_used_storage\0\u{3}storage_limit\0\u{3}storage_by_types\0\u{3}total_available_storage\0\u{3}disk_used_storage\0\u{3}s3_used_storage\0\u{3}reserved_storage\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -6409,6 +8399,7 @@ extension Barkcloud_Files_GetUserStorageInfoResponse: SwiftProtobuf.Message, Swi
       case 4: try { try decoder.decodeSingularInt64Field(value: &self.totalAvailableStorage) }()
       case 5: try { try decoder.decodeSingularInt64Field(value: &self.diskUsedStorage) }()
       case 6: try { try decoder.decodeSingularInt64Field(value: &self.s3UsedStorage) }()
+      case 7: try { try decoder.decodeSingularInt64Field(value: &self.reservedStorage) }()
       default: break
       }
     }
@@ -6433,6 +8424,9 @@ extension Barkcloud_Files_GetUserStorageInfoResponse: SwiftProtobuf.Message, Swi
     if self.s3UsedStorage != 0 {
       try visitor.visitSingularInt64Field(value: self.s3UsedStorage, fieldNumber: 6)
     }
+    if self.reservedStorage != 0 {
+      try visitor.visitSingularInt64Field(value: self.reservedStorage, fieldNumber: 7)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -6443,6 +8437,7 @@ extension Barkcloud_Files_GetUserStorageInfoResponse: SwiftProtobuf.Message, Swi
     if lhs.totalAvailableStorage != rhs.totalAvailableStorage {return false}
     if lhs.diskUsedStorage != rhs.diskUsedStorage {return false}
     if lhs.s3UsedStorage != rhs.s3UsedStorage {return false}
+    if lhs.reservedStorage != rhs.reservedStorage {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -6956,6 +8951,1311 @@ extension Barkcloud_Files_ListAlbumItemsResponse: SwiftProtobuf.Message, SwiftPr
     if lhs.items != rhs.items {return false}
     if lhs._nextCursorAddedAt != rhs._nextCursorAddedAt {return false}
     if lhs.nextCursorFileID != rhs.nextCursorFileID {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Barkcloud_Files_MusicTrackInfo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".MusicTrackInfo"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}file\0\u{1}metadata\0\u{1}title\0\u{1}artist\0\u{1}album\0\u{3}duration_seconds\0\u{3}cover_url\0\u{3}large_cover_url\0\u{3}entry_ids\0\u{3}entry_names\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularMessageField(value: &self._file) }()
+      case 2: try { try decoder.decodeSingularMessageField(value: &self._metadata) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.title) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self.artist) }()
+      case 5: try { try decoder.decodeSingularStringField(value: &self.album) }()
+      case 6: try { try decoder.decodeSingularDoubleField(value: &self.durationSeconds) }()
+      case 7: try { try decoder.decodeSingularStringField(value: &self.coverURL) }()
+      case 8: try { try decoder.decodeSingularStringField(value: &self.largeCoverURL) }()
+      case 9: try { try decoder.decodeRepeatedStringField(value: &self.entryIds) }()
+      case 10: try { try decoder.decodeRepeatedStringField(value: &self.entryNames) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    try { if let v = self._file {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+    } }()
+    try { if let v = self._metadata {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+    } }()
+    if !self.title.isEmpty {
+      try visitor.visitSingularStringField(value: self.title, fieldNumber: 3)
+    }
+    if !self.artist.isEmpty {
+      try visitor.visitSingularStringField(value: self.artist, fieldNumber: 4)
+    }
+    if !self.album.isEmpty {
+      try visitor.visitSingularStringField(value: self.album, fieldNumber: 5)
+    }
+    if self.durationSeconds.bitPattern != 0 {
+      try visitor.visitSingularDoubleField(value: self.durationSeconds, fieldNumber: 6)
+    }
+    if !self.coverURL.isEmpty {
+      try visitor.visitSingularStringField(value: self.coverURL, fieldNumber: 7)
+    }
+    if !self.largeCoverURL.isEmpty {
+      try visitor.visitSingularStringField(value: self.largeCoverURL, fieldNumber: 8)
+    }
+    if !self.entryIds.isEmpty {
+      try visitor.visitRepeatedStringField(value: self.entryIds, fieldNumber: 9)
+    }
+    if !self.entryNames.isEmpty {
+      try visitor.visitRepeatedStringField(value: self.entryNames, fieldNumber: 10)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Barkcloud_Files_MusicTrackInfo, rhs: Barkcloud_Files_MusicTrackInfo) -> Bool {
+    if lhs._file != rhs._file {return false}
+    if lhs._metadata != rhs._metadata {return false}
+    if lhs.title != rhs.title {return false}
+    if lhs.artist != rhs.artist {return false}
+    if lhs.album != rhs.album {return false}
+    if lhs.durationSeconds != rhs.durationSeconds {return false}
+    if lhs.coverURL != rhs.coverURL {return false}
+    if lhs.largeCoverURL != rhs.largeCoverURL {return false}
+    if lhs.entryIds != rhs.entryIds {return false}
+    if lhs.entryNames != rhs.entryNames {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Barkcloud_Files_ListMusicTracksRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ListMusicTracksRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}query\0\u{1}limit\0\u{3}cursor_created_at\0\u{3}cursor_file_id\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.query) }()
+      case 2: try { try decoder.decodeSingularInt32Field(value: &self.limit) }()
+      case 3: try { try decoder.decodeSingularMessageField(value: &self._cursorCreatedAt) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self.cursorFileID) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.query.isEmpty {
+      try visitor.visitSingularStringField(value: self.query, fieldNumber: 1)
+    }
+    if self.limit != 0 {
+      try visitor.visitSingularInt32Field(value: self.limit, fieldNumber: 2)
+    }
+    try { if let v = self._cursorCreatedAt {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
+    } }()
+    if !self.cursorFileID.isEmpty {
+      try visitor.visitSingularStringField(value: self.cursorFileID, fieldNumber: 4)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Barkcloud_Files_ListMusicTracksRequest, rhs: Barkcloud_Files_ListMusicTracksRequest) -> Bool {
+    if lhs.query != rhs.query {return false}
+    if lhs.limit != rhs.limit {return false}
+    if lhs._cursorCreatedAt != rhs._cursorCreatedAt {return false}
+    if lhs.cursorFileID != rhs.cursorFileID {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Barkcloud_Files_ListMusicTracksResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ListMusicTracksResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}items\0\u{3}next_cursor_created_at\0\u{3}next_cursor_file_id\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeRepeatedMessageField(value: &self.items) }()
+      case 2: try { try decoder.decodeSingularMessageField(value: &self._nextCursorCreatedAt) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.nextCursorFileID) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.items.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.items, fieldNumber: 1)
+    }
+    try { if let v = self._nextCursorCreatedAt {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+    } }()
+    if !self.nextCursorFileID.isEmpty {
+      try visitor.visitSingularStringField(value: self.nextCursorFileID, fieldNumber: 3)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Barkcloud_Files_ListMusicTracksResponse, rhs: Barkcloud_Files_ListMusicTracksResponse) -> Bool {
+    if lhs.items != rhs.items {return false}
+    if lhs._nextCursorCreatedAt != rhs._nextCursorCreatedAt {return false}
+    if lhs.nextCursorFileID != rhs.nextCursorFileID {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Barkcloud_Files_GetTrackDownloadUrlRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".GetTrackDownloadUrlRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}file_id\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.fileID) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.fileID.isEmpty {
+      try visitor.visitSingularStringField(value: self.fileID, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Barkcloud_Files_GetTrackDownloadUrlRequest, rhs: Barkcloud_Files_GetTrackDownloadUrlRequest) -> Bool {
+    if lhs.fileID != rhs.fileID {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Barkcloud_Files_GetTrackDownloadUrlResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".GetTrackDownloadUrlResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}download_url\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.downloadURL) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.downloadURL.isEmpty {
+      try visitor.visitSingularStringField(value: self.downloadURL, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Barkcloud_Files_GetTrackDownloadUrlResponse, rhs: Barkcloud_Files_GetTrackDownloadUrlResponse) -> Bool {
+    if lhs.downloadURL != rhs.downloadURL {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Barkcloud_Files_MusicPlaylistInfo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".MusicPlaylistInfo"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}name\0\u{1}description\0\u{3}cover_file_id\0\u{3}cover_preview_url\0\u{3}items_count\0\u{3}owner_user_id\0\u{3}can_reorder\0\u{3}created_at\0\u{3}updated_at\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.id) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.name) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.description_p) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self.coverFileID) }()
+      case 5: try { try decoder.decodeSingularStringField(value: &self.coverPreviewURL) }()
+      case 6: try { try decoder.decodeSingularInt32Field(value: &self.itemsCount) }()
+      case 7: try { try decoder.decodeSingularInt64Field(value: &self.ownerUserID) }()
+      case 8: try { try decoder.decodeSingularBoolField(value: &self.canReorder) }()
+      case 9: try { try decoder.decodeSingularMessageField(value: &self._createdAt) }()
+      case 10: try { try decoder.decodeSingularMessageField(value: &self._updatedAt) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.id.isEmpty {
+      try visitor.visitSingularStringField(value: self.id, fieldNumber: 1)
+    }
+    if !self.name.isEmpty {
+      try visitor.visitSingularStringField(value: self.name, fieldNumber: 2)
+    }
+    if !self.description_p.isEmpty {
+      try visitor.visitSingularStringField(value: self.description_p, fieldNumber: 3)
+    }
+    if !self.coverFileID.isEmpty {
+      try visitor.visitSingularStringField(value: self.coverFileID, fieldNumber: 4)
+    }
+    if !self.coverPreviewURL.isEmpty {
+      try visitor.visitSingularStringField(value: self.coverPreviewURL, fieldNumber: 5)
+    }
+    if self.itemsCount != 0 {
+      try visitor.visitSingularInt32Field(value: self.itemsCount, fieldNumber: 6)
+    }
+    if self.ownerUserID != 0 {
+      try visitor.visitSingularInt64Field(value: self.ownerUserID, fieldNumber: 7)
+    }
+    if self.canReorder != false {
+      try visitor.visitSingularBoolField(value: self.canReorder, fieldNumber: 8)
+    }
+    try { if let v = self._createdAt {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 9)
+    } }()
+    try { if let v = self._updatedAt {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 10)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Barkcloud_Files_MusicPlaylistInfo, rhs: Barkcloud_Files_MusicPlaylistInfo) -> Bool {
+    if lhs.id != rhs.id {return false}
+    if lhs.name != rhs.name {return false}
+    if lhs.description_p != rhs.description_p {return false}
+    if lhs.coverFileID != rhs.coverFileID {return false}
+    if lhs.coverPreviewURL != rhs.coverPreviewURL {return false}
+    if lhs.itemsCount != rhs.itemsCount {return false}
+    if lhs.ownerUserID != rhs.ownerUserID {return false}
+    if lhs.canReorder != rhs.canReorder {return false}
+    if lhs._createdAt != rhs._createdAt {return false}
+    if lhs._updatedAt != rhs._updatedAt {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Barkcloud_Files_CreateMusicPlaylistRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".CreateMusicPlaylistRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0\u{1}description\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.name) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.description_p) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.name.isEmpty {
+      try visitor.visitSingularStringField(value: self.name, fieldNumber: 1)
+    }
+    if !self.description_p.isEmpty {
+      try visitor.visitSingularStringField(value: self.description_p, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Barkcloud_Files_CreateMusicPlaylistRequest, rhs: Barkcloud_Files_CreateMusicPlaylistRequest) -> Bool {
+    if lhs.name != rhs.name {return false}
+    if lhs.description_p != rhs.description_p {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Barkcloud_Files_UpdateMusicPlaylistRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".UpdateMusicPlaylistRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}playlist_id\0\u{1}name\0\u{1}description\0\u{3}cover_file_id\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.playlistID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self._name) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self._description_p) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self._coverFileID) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.playlistID.isEmpty {
+      try visitor.visitSingularStringField(value: self.playlistID, fieldNumber: 1)
+    }
+    try { if let v = self._name {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 2)
+    } }()
+    try { if let v = self._description_p {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 3)
+    } }()
+    try { if let v = self._coverFileID {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 4)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Barkcloud_Files_UpdateMusicPlaylistRequest, rhs: Barkcloud_Files_UpdateMusicPlaylistRequest) -> Bool {
+    if lhs.playlistID != rhs.playlistID {return false}
+    if lhs._name != rhs._name {return false}
+    if lhs._description_p != rhs._description_p {return false}
+    if lhs._coverFileID != rhs._coverFileID {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Barkcloud_Files_DeleteMusicPlaylistRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".DeleteMusicPlaylistRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}playlist_id\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.playlistID) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.playlistID.isEmpty {
+      try visitor.visitSingularStringField(value: self.playlistID, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Barkcloud_Files_DeleteMusicPlaylistRequest, rhs: Barkcloud_Files_DeleteMusicPlaylistRequest) -> Bool {
+    if lhs.playlistID != rhs.playlistID {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Barkcloud_Files_ListMusicPlaylistsRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ListMusicPlaylistsRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}limit\0\u{3}cursor_updated_at\0\u{3}cursor_playlist_id\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularInt32Field(value: &self.limit) }()
+      case 2: try { try decoder.decodeSingularMessageField(value: &self._cursorUpdatedAt) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.cursorPlaylistID) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if self.limit != 0 {
+      try visitor.visitSingularInt32Field(value: self.limit, fieldNumber: 1)
+    }
+    try { if let v = self._cursorUpdatedAt {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+    } }()
+    if !self.cursorPlaylistID.isEmpty {
+      try visitor.visitSingularStringField(value: self.cursorPlaylistID, fieldNumber: 3)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Barkcloud_Files_ListMusicPlaylistsRequest, rhs: Barkcloud_Files_ListMusicPlaylistsRequest) -> Bool {
+    if lhs.limit != rhs.limit {return false}
+    if lhs._cursorUpdatedAt != rhs._cursorUpdatedAt {return false}
+    if lhs.cursorPlaylistID != rhs.cursorPlaylistID {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Barkcloud_Files_ListMusicPlaylistsResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ListMusicPlaylistsResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}items\0\u{3}next_cursor_updated_at\0\u{3}next_cursor_playlist_id\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeRepeatedMessageField(value: &self.items) }()
+      case 2: try { try decoder.decodeSingularMessageField(value: &self._nextCursorUpdatedAt) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.nextCursorPlaylistID) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.items.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.items, fieldNumber: 1)
+    }
+    try { if let v = self._nextCursorUpdatedAt {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+    } }()
+    if !self.nextCursorPlaylistID.isEmpty {
+      try visitor.visitSingularStringField(value: self.nextCursorPlaylistID, fieldNumber: 3)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Barkcloud_Files_ListMusicPlaylistsResponse, rhs: Barkcloud_Files_ListMusicPlaylistsResponse) -> Bool {
+    if lhs.items != rhs.items {return false}
+    if lhs._nextCursorUpdatedAt != rhs._nextCursorUpdatedAt {return false}
+    if lhs.nextCursorPlaylistID != rhs.nextCursorPlaylistID {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Barkcloud_Files_MusicPlaylistTrackEntry: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".MusicPlaylistTrackEntry"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}track\0\u{1}position\0\u{3}added_at\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularMessageField(value: &self._track) }()
+      case 2: try { try decoder.decodeSingularInt32Field(value: &self.position) }()
+      case 3: try { try decoder.decodeSingularMessageField(value: &self._addedAt) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    try { if let v = self._track {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+    } }()
+    if self.position != 0 {
+      try visitor.visitSingularInt32Field(value: self.position, fieldNumber: 2)
+    }
+    try { if let v = self._addedAt {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Barkcloud_Files_MusicPlaylistTrackEntry, rhs: Barkcloud_Files_MusicPlaylistTrackEntry) -> Bool {
+    if lhs._track != rhs._track {return false}
+    if lhs.position != rhs.position {return false}
+    if lhs._addedAt != rhs._addedAt {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Barkcloud_Files_ListMusicPlaylistTracksRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ListMusicPlaylistTracksRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}playlist_id\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.playlistID) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.playlistID.isEmpty {
+      try visitor.visitSingularStringField(value: self.playlistID, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Barkcloud_Files_ListMusicPlaylistTracksRequest, rhs: Barkcloud_Files_ListMusicPlaylistTracksRequest) -> Bool {
+    if lhs.playlistID != rhs.playlistID {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Barkcloud_Files_ListMusicPlaylistTracksResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ListMusicPlaylistTracksResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}playlist\0\u{1}items\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularMessageField(value: &self._playlist) }()
+      case 2: try { try decoder.decodeRepeatedMessageField(value: &self.items) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    try { if let v = self._playlist {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+    } }()
+    if !self.items.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.items, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Barkcloud_Files_ListMusicPlaylistTracksResponse, rhs: Barkcloud_Files_ListMusicPlaylistTracksResponse) -> Bool {
+    if lhs._playlist != rhs._playlist {return false}
+    if lhs.items != rhs.items {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Barkcloud_Files_AddMusicPlaylistTracksRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".AddMusicPlaylistTracksRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}playlist_id\0\u{3}file_ids\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.playlistID) }()
+      case 2: try { try decoder.decodeRepeatedStringField(value: &self.fileIds) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.playlistID.isEmpty {
+      try visitor.visitSingularStringField(value: self.playlistID, fieldNumber: 1)
+    }
+    if !self.fileIds.isEmpty {
+      try visitor.visitRepeatedStringField(value: self.fileIds, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Barkcloud_Files_AddMusicPlaylistTracksRequest, rhs: Barkcloud_Files_AddMusicPlaylistTracksRequest) -> Bool {
+    if lhs.playlistID != rhs.playlistID {return false}
+    if lhs.fileIds != rhs.fileIds {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Barkcloud_Files_RemoveMusicPlaylistTracksRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".RemoveMusicPlaylistTracksRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}playlist_id\0\u{3}file_ids\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.playlistID) }()
+      case 2: try { try decoder.decodeRepeatedStringField(value: &self.fileIds) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.playlistID.isEmpty {
+      try visitor.visitSingularStringField(value: self.playlistID, fieldNumber: 1)
+    }
+    if !self.fileIds.isEmpty {
+      try visitor.visitRepeatedStringField(value: self.fileIds, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Barkcloud_Files_RemoveMusicPlaylistTracksRequest, rhs: Barkcloud_Files_RemoveMusicPlaylistTracksRequest) -> Bool {
+    if lhs.playlistID != rhs.playlistID {return false}
+    if lhs.fileIds != rhs.fileIds {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Barkcloud_Files_ReorderMusicPlaylistTracksRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ReorderMusicPlaylistTracksRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}playlist_id\0\u{3}file_ids\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.playlistID) }()
+      case 2: try { try decoder.decodeRepeatedStringField(value: &self.fileIds) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.playlistID.isEmpty {
+      try visitor.visitSingularStringField(value: self.playlistID, fieldNumber: 1)
+    }
+    if !self.fileIds.isEmpty {
+      try visitor.visitRepeatedStringField(value: self.fileIds, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Barkcloud_Files_ReorderMusicPlaylistTracksRequest, rhs: Barkcloud_Files_ReorderMusicPlaylistTracksRequest) -> Bool {
+    if lhs.playlistID != rhs.playlistID {return false}
+    if lhs.fileIds != rhs.fileIds {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Barkcloud_Files_MusicPlaylistShareInfo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".MusicPlaylistShareInfo"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}token\0\u{3}playlist_id\0\u{1}name\0\u{3}created_at\0\u{3}click_count\0\u{3}cover_preview_url\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.id) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.token) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.playlistID) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self.name) }()
+      case 5: try { try decoder.decodeSingularMessageField(value: &self._createdAt) }()
+      case 6: try { try decoder.decodeSingularInt64Field(value: &self.clickCount) }()
+      case 7: try { try decoder.decodeSingularStringField(value: &self.coverPreviewURL) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.id.isEmpty {
+      try visitor.visitSingularStringField(value: self.id, fieldNumber: 1)
+    }
+    if !self.token.isEmpty {
+      try visitor.visitSingularStringField(value: self.token, fieldNumber: 2)
+    }
+    if !self.playlistID.isEmpty {
+      try visitor.visitSingularStringField(value: self.playlistID, fieldNumber: 3)
+    }
+    if !self.name.isEmpty {
+      try visitor.visitSingularStringField(value: self.name, fieldNumber: 4)
+    }
+    try { if let v = self._createdAt {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
+    } }()
+    if self.clickCount != 0 {
+      try visitor.visitSingularInt64Field(value: self.clickCount, fieldNumber: 6)
+    }
+    if !self.coverPreviewURL.isEmpty {
+      try visitor.visitSingularStringField(value: self.coverPreviewURL, fieldNumber: 7)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Barkcloud_Files_MusicPlaylistShareInfo, rhs: Barkcloud_Files_MusicPlaylistShareInfo) -> Bool {
+    if lhs.id != rhs.id {return false}
+    if lhs.token != rhs.token {return false}
+    if lhs.playlistID != rhs.playlistID {return false}
+    if lhs.name != rhs.name {return false}
+    if lhs._createdAt != rhs._createdAt {return false}
+    if lhs.clickCount != rhs.clickCount {return false}
+    if lhs.coverPreviewURL != rhs.coverPreviewURL {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Barkcloud_Files_CreateMusicPlaylistShareRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".CreateMusicPlaylistShareRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}playlist_id\0\u{1}name\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.playlistID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.name) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.playlistID.isEmpty {
+      try visitor.visitSingularStringField(value: self.playlistID, fieldNumber: 1)
+    }
+    if !self.name.isEmpty {
+      try visitor.visitSingularStringField(value: self.name, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Barkcloud_Files_CreateMusicPlaylistShareRequest, rhs: Barkcloud_Files_CreateMusicPlaylistShareRequest) -> Bool {
+    if lhs.playlistID != rhs.playlistID {return false}
+    if lhs.name != rhs.name {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Barkcloud_Files_ListMyMusicPlaylistSharesRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ListMyMusicPlaylistSharesRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}limit\0\u{3}cursor_created_at\0\u{3}cursor_share_id\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularInt32Field(value: &self.limit) }()
+      case 2: try { try decoder.decodeSingularMessageField(value: &self._cursorCreatedAt) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.cursorShareID) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if self.limit != 0 {
+      try visitor.visitSingularInt32Field(value: self.limit, fieldNumber: 1)
+    }
+    try { if let v = self._cursorCreatedAt {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+    } }()
+    if !self.cursorShareID.isEmpty {
+      try visitor.visitSingularStringField(value: self.cursorShareID, fieldNumber: 3)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Barkcloud_Files_ListMyMusicPlaylistSharesRequest, rhs: Barkcloud_Files_ListMyMusicPlaylistSharesRequest) -> Bool {
+    if lhs.limit != rhs.limit {return false}
+    if lhs._cursorCreatedAt != rhs._cursorCreatedAt {return false}
+    if lhs.cursorShareID != rhs.cursorShareID {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Barkcloud_Files_ListMyMusicPlaylistSharesResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ListMyMusicPlaylistSharesResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}shares\0\u{3}next_cursor_created_at\0\u{3}next_cursor_share_id\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeRepeatedMessageField(value: &self.shares) }()
+      case 2: try { try decoder.decodeSingularMessageField(value: &self._nextCursorCreatedAt) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.nextCursorShareID) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.shares.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.shares, fieldNumber: 1)
+    }
+    try { if let v = self._nextCursorCreatedAt {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+    } }()
+    if !self.nextCursorShareID.isEmpty {
+      try visitor.visitSingularStringField(value: self.nextCursorShareID, fieldNumber: 3)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Barkcloud_Files_ListMyMusicPlaylistSharesResponse, rhs: Barkcloud_Files_ListMyMusicPlaylistSharesResponse) -> Bool {
+    if lhs.shares != rhs.shares {return false}
+    if lhs._nextCursorCreatedAt != rhs._nextCursorCreatedAt {return false}
+    if lhs.nextCursorShareID != rhs.nextCursorShareID {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Barkcloud_Files_RevokeMusicPlaylistShareRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".RevokeMusicPlaylistShareRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}share_id\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.shareID) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.shareID.isEmpty {
+      try visitor.visitSingularStringField(value: self.shareID, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Barkcloud_Files_RevokeMusicPlaylistShareRequest, rhs: Barkcloud_Files_RevokeMusicPlaylistShareRequest) -> Bool {
+    if lhs.shareID != rhs.shareID {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Barkcloud_Files_ShareMusicPlaylistWithUserRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ShareMusicPlaylistWithUserRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}playlist_id\0\u{3}recipient_user_id\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.playlistID) }()
+      case 2: try { try decoder.decodeSingularInt64Field(value: &self.recipientUserID) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.playlistID.isEmpty {
+      try visitor.visitSingularStringField(value: self.playlistID, fieldNumber: 1)
+    }
+    if self.recipientUserID != 0 {
+      try visitor.visitSingularInt64Field(value: self.recipientUserID, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Barkcloud_Files_ShareMusicPlaylistWithUserRequest, rhs: Barkcloud_Files_ShareMusicPlaylistWithUserRequest) -> Bool {
+    if lhs.playlistID != rhs.playlistID {return false}
+    if lhs.recipientUserID != rhs.recipientUserID {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Barkcloud_Files_RevokeMusicPlaylistUserShareRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".RevokeMusicPlaylistUserShareRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}grant_id\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.grantID) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.grantID.isEmpty {
+      try visitor.visitSingularStringField(value: self.grantID, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Barkcloud_Files_RevokeMusicPlaylistUserShareRequest, rhs: Barkcloud_Files_RevokeMusicPlaylistUserShareRequest) -> Bool {
+    if lhs.grantID != rhs.grantID {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Barkcloud_Files_ListMyOutgoingMusicPlaylistSharesRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ListMyOutgoingMusicPlaylistSharesRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}playlist_id\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.playlistID) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.playlistID.isEmpty {
+      try visitor.visitSingularStringField(value: self.playlistID, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Barkcloud_Files_ListMyOutgoingMusicPlaylistSharesRequest, rhs: Barkcloud_Files_ListMyOutgoingMusicPlaylistSharesRequest) -> Bool {
+    if lhs.playlistID != rhs.playlistID {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Barkcloud_Files_OutgoingMusicPlaylistShare: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".OutgoingMusicPlaylistShare"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}grant_id\0\u{3}playlist_id\0\u{1}name\0\u{3}recipient_user_id\0\u{3}shared_at\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.grantID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.playlistID) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.name) }()
+      case 4: try { try decoder.decodeSingularInt64Field(value: &self.recipientUserID) }()
+      case 5: try { try decoder.decodeSingularMessageField(value: &self._sharedAt) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.grantID.isEmpty {
+      try visitor.visitSingularStringField(value: self.grantID, fieldNumber: 1)
+    }
+    if !self.playlistID.isEmpty {
+      try visitor.visitSingularStringField(value: self.playlistID, fieldNumber: 2)
+    }
+    if !self.name.isEmpty {
+      try visitor.visitSingularStringField(value: self.name, fieldNumber: 3)
+    }
+    if self.recipientUserID != 0 {
+      try visitor.visitSingularInt64Field(value: self.recipientUserID, fieldNumber: 4)
+    }
+    try { if let v = self._sharedAt {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Barkcloud_Files_OutgoingMusicPlaylistShare, rhs: Barkcloud_Files_OutgoingMusicPlaylistShare) -> Bool {
+    if lhs.grantID != rhs.grantID {return false}
+    if lhs.playlistID != rhs.playlistID {return false}
+    if lhs.name != rhs.name {return false}
+    if lhs.recipientUserID != rhs.recipientUserID {return false}
+    if lhs._sharedAt != rhs._sharedAt {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Barkcloud_Files_ListMyOutgoingMusicPlaylistSharesResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ListMyOutgoingMusicPlaylistSharesResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}items\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeRepeatedMessageField(value: &self.items) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.items.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.items, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Barkcloud_Files_ListMyOutgoingMusicPlaylistSharesResponse, rhs: Barkcloud_Files_ListMyOutgoingMusicPlaylistSharesResponse) -> Bool {
+    if lhs.items != rhs.items {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Barkcloud_Files_ListSharedMusicPlaylistsWithMeRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ListSharedMusicPlaylistsWithMeRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap()
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    // Load everything into unknown fields
+    while try decoder.nextFieldNumber() != nil {}
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Barkcloud_Files_ListSharedMusicPlaylistsWithMeRequest, rhs: Barkcloud_Files_ListSharedMusicPlaylistsWithMeRequest) -> Bool {
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Barkcloud_Files_SharedMusicPlaylistEntry: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".SharedMusicPlaylistEntry"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}grant_id\0\u{1}playlist\0\u{3}owner_user_id\0\u{3}shared_at\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.grantID) }()
+      case 2: try { try decoder.decodeSingularMessageField(value: &self._playlist) }()
+      case 3: try { try decoder.decodeSingularInt64Field(value: &self.ownerUserID) }()
+      case 4: try { try decoder.decodeSingularMessageField(value: &self._sharedAt) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.grantID.isEmpty {
+      try visitor.visitSingularStringField(value: self.grantID, fieldNumber: 1)
+    }
+    try { if let v = self._playlist {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+    } }()
+    if self.ownerUserID != 0 {
+      try visitor.visitSingularInt64Field(value: self.ownerUserID, fieldNumber: 3)
+    }
+    try { if let v = self._sharedAt {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Barkcloud_Files_SharedMusicPlaylistEntry, rhs: Barkcloud_Files_SharedMusicPlaylistEntry) -> Bool {
+    if lhs.grantID != rhs.grantID {return false}
+    if lhs._playlist != rhs._playlist {return false}
+    if lhs.ownerUserID != rhs.ownerUserID {return false}
+    if lhs._sharedAt != rhs._sharedAt {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Barkcloud_Files_ListSharedMusicPlaylistsWithMeResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ListSharedMusicPlaylistsWithMeResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}items\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeRepeatedMessageField(value: &self.items) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.items.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.items, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Barkcloud_Files_ListSharedMusicPlaylistsWithMeResponse, rhs: Barkcloud_Files_ListSharedMusicPlaylistsWithMeResponse) -> Bool {
+    if lhs.items != rhs.items {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Barkcloud_Files_ResolveMusicPlaylistShareRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ResolveMusicPlaylistShareRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}token\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.token) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.token.isEmpty {
+      try visitor.visitSingularStringField(value: self.token, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Barkcloud_Files_ResolveMusicPlaylistShareRequest, rhs: Barkcloud_Files_ResolveMusicPlaylistShareRequest) -> Bool {
+    if lhs.token != rhs.token {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Barkcloud_Files_ResolveMusicPlaylistShareResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ResolveMusicPlaylistShareResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}found\0\u{3}playlist_name\0\u{1}description\0\u{3}cover_preview_url\0\u{1}items\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularBoolField(value: &self.found) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.playlistName) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.description_p) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self.coverPreviewURL) }()
+      case 5: try { try decoder.decodeRepeatedMessageField(value: &self.items) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.found != false {
+      try visitor.visitSingularBoolField(value: self.found, fieldNumber: 1)
+    }
+    if !self.playlistName.isEmpty {
+      try visitor.visitSingularStringField(value: self.playlistName, fieldNumber: 2)
+    }
+    if !self.description_p.isEmpty {
+      try visitor.visitSingularStringField(value: self.description_p, fieldNumber: 3)
+    }
+    if !self.coverPreviewURL.isEmpty {
+      try visitor.visitSingularStringField(value: self.coverPreviewURL, fieldNumber: 4)
+    }
+    if !self.items.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.items, fieldNumber: 5)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Barkcloud_Files_ResolveMusicPlaylistShareResponse, rhs: Barkcloud_Files_ResolveMusicPlaylistShareResponse) -> Bool {
+    if lhs.found != rhs.found {return false}
+    if lhs.playlistName != rhs.playlistName {return false}
+    if lhs.description_p != rhs.description_p {return false}
+    if lhs.coverPreviewURL != rhs.coverPreviewURL {return false}
+    if lhs.items != rhs.items {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -7660,7 +10960,7 @@ extension Barkcloud_Files_ListMediaLocationsResponse: SwiftProtobuf.Message, Swi
 
 extension Barkcloud_Files_SearchFilesRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".SearchFilesRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}query\0\u{1}limit\0\u{3}cursor_created_at\0\u{3}cursor_entry_id\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}query\0\u{1}limit\0\u{3}cursor_created_at\0\u{3}cursor_entry_id\0\u{3}kind_filter\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -7672,6 +10972,7 @@ extension Barkcloud_Files_SearchFilesRequest: SwiftProtobuf.Message, SwiftProtob
       case 2: try { try decoder.decodeSingularInt32Field(value: &self.limit) }()
       case 3: try { try decoder.decodeSingularMessageField(value: &self._cursorCreatedAt) }()
       case 4: try { try decoder.decodeSingularStringField(value: &self.cursorEntryID) }()
+      case 5: try { try decoder.decodeRepeatedEnumField(value: &self.kindFilter) }()
       default: break
       }
     }
@@ -7694,6 +10995,9 @@ extension Barkcloud_Files_SearchFilesRequest: SwiftProtobuf.Message, SwiftProtob
     if !self.cursorEntryID.isEmpty {
       try visitor.visitSingularStringField(value: self.cursorEntryID, fieldNumber: 4)
     }
+    if !self.kindFilter.isEmpty {
+      try visitor.visitPackedEnumField(value: self.kindFilter, fieldNumber: 5)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -7702,6 +11006,7 @@ extension Barkcloud_Files_SearchFilesRequest: SwiftProtobuf.Message, SwiftProtob
     if lhs.limit != rhs.limit {return false}
     if lhs._cursorCreatedAt != rhs._cursorCreatedAt {return false}
     if lhs.cursorEntryID != rhs.cursorEntryID {return false}
+    if lhs.kindFilter != rhs.kindFilter {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -7751,9 +11056,398 @@ extension Barkcloud_Files_SearchFilesResponse: SwiftProtobuf.Message, SwiftProto
   }
 }
 
+extension Barkcloud_Files_SearchSectionPage: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".SearchSectionPage"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}section\0\u{1}limit\0\u{1}cursor\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularEnumField(value: &self.section) }()
+      case 2: try { try decoder.decodeSingularInt32Field(value: &self.limit) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.cursor) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.section != .unspecified {
+      try visitor.visitSingularEnumField(value: self.section, fieldNumber: 1)
+    }
+    if self.limit != 0 {
+      try visitor.visitSingularInt32Field(value: self.limit, fieldNumber: 2)
+    }
+    if !self.cursor.isEmpty {
+      try visitor.visitSingularStringField(value: self.cursor, fieldNumber: 3)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Barkcloud_Files_SearchSectionPage, rhs: Barkcloud_Files_SearchSectionPage) -> Bool {
+    if lhs.section != rhs.section {return false}
+    if lhs.limit != rhs.limit {return false}
+    if lhs.cursor != rhs.cursor {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Barkcloud_Files_SearchRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".SearchRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}query\0\u{1}pages\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.query) }()
+      case 2: try { try decoder.decodeRepeatedMessageField(value: &self.pages) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.query.isEmpty {
+      try visitor.visitSingularStringField(value: self.query, fieldNumber: 1)
+    }
+    if !self.pages.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.pages, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Barkcloud_Files_SearchRequest, rhs: Barkcloud_Files_SearchRequest) -> Bool {
+    if lhs.query != rhs.query {return false}
+    if lhs.pages != rhs.pages {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Barkcloud_Files_SearchResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".SearchResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}sections\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeRepeatedMessageField(value: &self.sections) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.sections.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.sections, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Barkcloud_Files_SearchResponse, rhs: Barkcloud_Files_SearchResponse) -> Bool {
+    if lhs.sections != rhs.sections {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Barkcloud_Files_SearchSectionResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".SearchSectionResult"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}section\0\u{1}hits\0\u{3}next_cursor\0\u{3}has_more\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularEnumField(value: &self.section) }()
+      case 2: try { try decoder.decodeRepeatedMessageField(value: &self.hits) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.nextCursor) }()
+      case 4: try { try decoder.decodeSingularBoolField(value: &self.hasMore_p) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.section != .unspecified {
+      try visitor.visitSingularEnumField(value: self.section, fieldNumber: 1)
+    }
+    if !self.hits.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.hits, fieldNumber: 2)
+    }
+    if !self.nextCursor.isEmpty {
+      try visitor.visitSingularStringField(value: self.nextCursor, fieldNumber: 3)
+    }
+    if self.hasMore_p != false {
+      try visitor.visitSingularBoolField(value: self.hasMore_p, fieldNumber: 4)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Barkcloud_Files_SearchSectionResult, rhs: Barkcloud_Files_SearchSectionResult) -> Bool {
+    if lhs.section != rhs.section {return false}
+    if lhs.hits != rhs.hits {return false}
+    if lhs.nextCursor != rhs.nextCursor {return false}
+    if lhs.hasMore_p != rhs.hasMore_p {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Barkcloud_Files_SearchHitReference: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".SearchHitReference"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}kind\0\u{1}id\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularEnumField(value: &self.kind) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.id) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.kind != .unspecified {
+      try visitor.visitSingularEnumField(value: self.kind, fieldNumber: 1)
+    }
+    if !self.id.isEmpty {
+      try visitor.visitSingularStringField(value: self.id, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Barkcloud_Files_SearchHitReference, rhs: Barkcloud_Files_SearchHitReference) -> Bool {
+    if lhs.kind != rhs.kind {return false}
+    if lhs.id != rhs.id {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Barkcloud_Files_SearchHit: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".SearchHit"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}kind\0\u{1}id\0\u{3}file_id\0\u{3}entry_id\0\u{1}title\0\u{1}subtitle\0\u{3}preview_url\0\u{3}media_kind\0\u{1}favorite\0\u{3}match_field\0\u{3}match_value\0\u{3}created_at\0\u{1}size\0\u{3}owner_name\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularEnumField(value: &self.kind) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.id) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.fileID) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self.entryID) }()
+      case 5: try { try decoder.decodeSingularStringField(value: &self.title) }()
+      case 6: try { try decoder.decodeSingularStringField(value: &self.subtitle) }()
+      case 7: try { try decoder.decodeSingularStringField(value: &self.previewURL) }()
+      case 8: try { try decoder.decodeSingularEnumField(value: &self.mediaKind) }()
+      case 9: try { try decoder.decodeSingularBoolField(value: &self.favorite) }()
+      case 10: try { try decoder.decodeSingularStringField(value: &self.matchField) }()
+      case 11: try { try decoder.decodeSingularStringField(value: &self.matchValue) }()
+      case 12: try { try decoder.decodeSingularMessageField(value: &self._createdAt) }()
+      case 13: try { try decoder.decodeSingularInt64Field(value: &self.size) }()
+      case 14: try { try decoder.decodeSingularStringField(value: &self.ownerName) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if self.kind != .unspecified {
+      try visitor.visitSingularEnumField(value: self.kind, fieldNumber: 1)
+    }
+    if !self.id.isEmpty {
+      try visitor.visitSingularStringField(value: self.id, fieldNumber: 2)
+    }
+    if !self.fileID.isEmpty {
+      try visitor.visitSingularStringField(value: self.fileID, fieldNumber: 3)
+    }
+    if !self.entryID.isEmpty {
+      try visitor.visitSingularStringField(value: self.entryID, fieldNumber: 4)
+    }
+    if !self.title.isEmpty {
+      try visitor.visitSingularStringField(value: self.title, fieldNumber: 5)
+    }
+    if !self.subtitle.isEmpty {
+      try visitor.visitSingularStringField(value: self.subtitle, fieldNumber: 6)
+    }
+    if !self.previewURL.isEmpty {
+      try visitor.visitSingularStringField(value: self.previewURL, fieldNumber: 7)
+    }
+    if self.mediaKind != .other {
+      try visitor.visitSingularEnumField(value: self.mediaKind, fieldNumber: 8)
+    }
+    if self.favorite != false {
+      try visitor.visitSingularBoolField(value: self.favorite, fieldNumber: 9)
+    }
+    if !self.matchField.isEmpty {
+      try visitor.visitSingularStringField(value: self.matchField, fieldNumber: 10)
+    }
+    if !self.matchValue.isEmpty {
+      try visitor.visitSingularStringField(value: self.matchValue, fieldNumber: 11)
+    }
+    try { if let v = self._createdAt {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 12)
+    } }()
+    if self.size != 0 {
+      try visitor.visitSingularInt64Field(value: self.size, fieldNumber: 13)
+    }
+    if !self.ownerName.isEmpty {
+      try visitor.visitSingularStringField(value: self.ownerName, fieldNumber: 14)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Barkcloud_Files_SearchHit, rhs: Barkcloud_Files_SearchHit) -> Bool {
+    if lhs.kind != rhs.kind {return false}
+    if lhs.id != rhs.id {return false}
+    if lhs.fileID != rhs.fileID {return false}
+    if lhs.entryID != rhs.entryID {return false}
+    if lhs.title != rhs.title {return false}
+    if lhs.subtitle != rhs.subtitle {return false}
+    if lhs.previewURL != rhs.previewURL {return false}
+    if lhs.mediaKind != rhs.mediaKind {return false}
+    if lhs.favorite != rhs.favorite {return false}
+    if lhs.matchField != rhs.matchField {return false}
+    if lhs.matchValue != rhs.matchValue {return false}
+    if lhs._createdAt != rhs._createdAt {return false}
+    if lhs.size != rhs.size {return false}
+    if lhs.ownerName != rhs.ownerName {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Barkcloud_Files_GetFileSearchMetadataRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".GetFileSearchMetadataRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}file_id\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.fileID) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.fileID.isEmpty {
+      try visitor.visitSingularStringField(value: self.fileID, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Barkcloud_Files_GetFileSearchMetadataRequest, rhs: Barkcloud_Files_GetFileSearchMetadataRequest) -> Bool {
+    if lhs.fileID != rhs.fileID {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Barkcloud_Files_ReplaceFileSearchMetadataRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ReplaceFileSearchMetadataRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}file_id\0\u{1}alias\0\u{1}tags\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.fileID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.alias) }()
+      case 3: try { try decoder.decodeRepeatedStringField(value: &self.tags) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.fileID.isEmpty {
+      try visitor.visitSingularStringField(value: self.fileID, fieldNumber: 1)
+    }
+    if !self.alias.isEmpty {
+      try visitor.visitSingularStringField(value: self.alias, fieldNumber: 2)
+    }
+    if !self.tags.isEmpty {
+      try visitor.visitRepeatedStringField(value: self.tags, fieldNumber: 3)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Barkcloud_Files_ReplaceFileSearchMetadataRequest, rhs: Barkcloud_Files_ReplaceFileSearchMetadataRequest) -> Bool {
+    if lhs.fileID != rhs.fileID {return false}
+    if lhs.alias != rhs.alias {return false}
+    if lhs.tags != rhs.tags {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Barkcloud_Files_FileSearchMetadata: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".FileSearchMetadata"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}alias\0\u{1}tags\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.alias) }()
+      case 2: try { try decoder.decodeRepeatedStringField(value: &self.tags) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.alias.isEmpty {
+      try visitor.visitSingularStringField(value: self.alias, fieldNumber: 1)
+    }
+    if !self.tags.isEmpty {
+      try visitor.visitRepeatedStringField(value: self.tags, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Barkcloud_Files_FileSearchMetadata, rhs: Barkcloud_Files_FileSearchMetadata) -> Bool {
+    if lhs.alias != rhs.alias {return false}
+    if lhs.tags != rhs.tags {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
 extension Barkcloud_Files_ShareInfo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ShareInfo"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}token\0\u{3}file_id\0\u{1}name\0\u{3}created_at\0\u{3}click_count\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}token\0\u{3}file_id\0\u{1}name\0\u{3}created_at\0\u{3}click_count\0\u{3}media_kind\0\u{3}preview_url\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -7767,6 +11461,8 @@ extension Barkcloud_Files_ShareInfo: SwiftProtobuf.Message, SwiftProtobuf._Messa
       case 4: try { try decoder.decodeSingularStringField(value: &self.name) }()
       case 5: try { try decoder.decodeSingularMessageField(value: &self._createdAt) }()
       case 6: try { try decoder.decodeSingularInt64Field(value: &self.clickCount) }()
+      case 7: try { try decoder.decodeSingularEnumField(value: &self.mediaKind) }()
+      case 8: try { try decoder.decodeSingularStringField(value: &self.previewURL) }()
       default: break
       }
     }
@@ -7795,6 +11491,12 @@ extension Barkcloud_Files_ShareInfo: SwiftProtobuf.Message, SwiftProtobuf._Messa
     if self.clickCount != 0 {
       try visitor.visitSingularInt64Field(value: self.clickCount, fieldNumber: 6)
     }
+    if self.mediaKind != .other {
+      try visitor.visitSingularEnumField(value: self.mediaKind, fieldNumber: 7)
+    }
+    if !self.previewURL.isEmpty {
+      try visitor.visitSingularStringField(value: self.previewURL, fieldNumber: 8)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -7805,6 +11507,8 @@ extension Barkcloud_Files_ShareInfo: SwiftProtobuf.Message, SwiftProtobuf._Messa
     if lhs.name != rhs.name {return false}
     if lhs._createdAt != rhs._createdAt {return false}
     if lhs.clickCount != rhs.clickCount {return false}
+    if lhs.mediaKind != rhs.mediaKind {return false}
+    if lhs.previewURL != rhs.previewURL {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -8970,7 +12674,7 @@ extension Barkcloud_Files_ResolveFolderShareResponse: SwiftProtobuf.Message, Swi
 
 extension Barkcloud_Files_AlbumShareInfo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".AlbumShareInfo"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}token\0\u{3}album_id\0\u{1}name\0\u{3}created_at\0\u{3}click_count\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}token\0\u{3}album_id\0\u{1}name\0\u{3}created_at\0\u{3}click_count\0\u{3}cover_preview_url\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -8984,6 +12688,7 @@ extension Barkcloud_Files_AlbumShareInfo: SwiftProtobuf.Message, SwiftProtobuf._
       case 4: try { try decoder.decodeSingularStringField(value: &self.name) }()
       case 5: try { try decoder.decodeSingularMessageField(value: &self._createdAt) }()
       case 6: try { try decoder.decodeSingularInt64Field(value: &self.clickCount) }()
+      case 7: try { try decoder.decodeSingularStringField(value: &self.coverPreviewURL) }()
       default: break
       }
     }
@@ -9012,6 +12717,9 @@ extension Barkcloud_Files_AlbumShareInfo: SwiftProtobuf.Message, SwiftProtobuf._
     if self.clickCount != 0 {
       try visitor.visitSingularInt64Field(value: self.clickCount, fieldNumber: 6)
     }
+    if !self.coverPreviewURL.isEmpty {
+      try visitor.visitSingularStringField(value: self.coverPreviewURL, fieldNumber: 7)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -9022,6 +12730,7 @@ extension Barkcloud_Files_AlbumShareInfo: SwiftProtobuf.Message, SwiftProtobuf._
     if lhs.name != rhs.name {return false}
     if lhs._createdAt != rhs._createdAt {return false}
     if lhs.clickCount != rhs.clickCount {return false}
+    if lhs.coverPreviewURL != rhs.coverPreviewURL {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

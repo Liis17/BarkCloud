@@ -86,30 +86,28 @@ final class AlbumDetailViewModel {
     }
 
     /// Загрузить выбранные в кастомном пикере ассеты устройства и добавить их в
-    /// альбом. Читаем оригинал через `DeviceAssetResource`; `uploadFile` дедуплицирует
-    /// блоб по хешу и возвращает существующий `file_id`, так что «уже загруженное»
-    /// фото можно добавить в альбом без повторной заливки.
+    /// альбом. Файлы ставятся в V2-очередь, а добавление в альбом выполняется
+    /// координатором только после server-side `ready`.
     func uploadAndAddAssets(_ assets: [PHAsset]) async {
         guard !assets.isEmpty else { return }
         state.isUploading = true
-        var fileIDs: [String] = []
         for asset in assets {
-            if let pair = try? await DeviceAssetResource.originalData(for: asset),
-               let id = try? await cloud.uploadFile(data: pair.0, fileName: pair.1) {
-                fileIDs.append(id)
-                // Связь облако↔устройство для синхронного удаления.
-                await CloudDeviceLinkStore.shared.link(fileID: id, localIdentifier: asset.localIdentifier)
+            do {
+                guard let staging = UploadConstants.stagingDirectory else { throw DeviceAssetError.noResource }
+                let source = staging.appendingPathComponent("album-\(UUID().uuidString)")
+                let name = try await DeviceAssetResource.writeOriginal(asset: asset, to: source)
+                _ = try await cloud.enqueueBackgroundUpload(
+                    sourceFile: source,
+                    fileName: name,
+                    source: .manual,
+                    albumID: state.album.id,
+                    localIdentifier: asset.localIdentifier
+                )
+            } catch {
+                state.snackbar = domainErrorMessage(error)
             }
-        }
-        do {
-            if !fileIDs.isEmpty {
-                try await albums.addItems(albumID: state.album.id, fileIDs: fileIDs)
-            }
-        } catch {
-            state.snackbar = domainErrorMessage(error)
         }
         state.isUploading = false
-        await reload()
     }
 
     func setCover(fileID: String) async {

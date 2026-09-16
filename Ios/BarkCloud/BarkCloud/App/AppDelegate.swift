@@ -36,16 +36,28 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
     // MARK: - BGTask retry
 
     /// iOS просыпается по нашему BGProcessingTaskRequest (запланирован после
-    /// падения загрузки). Перевыставляем все failed jobs с `retries < maxRetries`
-    /// в pending и пере-submit'им. Реальная передача байт уйдёт в background
+    /// падения загрузки). Перевыставляем сетевые failed jobs с `retries < maxRetries`
+    /// в pending, а для `uploadedNotAttached` повторяем только AttachFile.
+    /// Реальная передача байт уйдёт в background
     /// URLSession, которая работает независимо от life-cycle'а нашего процесса.
     private func handleRetryTask(_ task: BGProcessingTask) {
         let work = Task {
-            let failed = await UploadQueueStore.shared.failedJobs(maxRetries: UploadConstants.maxUploadRetries)
-            for snapshot in failed {
-                await UploadQueueStore.shared.incrementRetries(id: snapshot.id)
-                await UploadQueueStore.shared.resetForRetry(id: snapshot.id)
-                await BackgroundUploadCoordinator.shared.submit(jobID: snapshot.id)
+            let retryable = await UploadQueueStore.shared.retryableJobs(maxRetries: UploadConstants.maxUploadRetries)
+            for snapshot in retryable {
+                let started: Bool
+                if snapshot.state == .uploadedNotAttached {
+                    started = await BackgroundUploadCoordinator.shared.submitAndWaitForBackgroundStart(jobID: snapshot.id)
+                } else {
+                    await UploadQueueStore.shared.incrementRetries(id: snapshot.id)
+                    await UploadQueueStore.shared.resetForRetry(id: snapshot.id)
+                    started = await BackgroundUploadCoordinator.shared.submitAndWaitForBackgroundStart(jobID: snapshot.id)
+                }
+                if !started {
+                    // Four transfer slots may still be occupied. Keep the
+                    // retry request alive; the normal scheduler intentionally
+                    // does not auto-pick uploadedNotAttached jobs.
+                    scheduleRetryBGTaskIfNeeded()
+                }
             }
             task.setTaskCompleted(success: true)
         }
@@ -54,7 +66,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
 }
 
 /// Запросить у системы повторный заход для retry. Безопасно идемпотентен —
-/// BGTaskScheduler сам дедуплицирует запросы по identifier'у.
+    /// BGTaskScheduler сам дедуплицирует запросы по identifier'у.
 @MainActor
 func scheduleRetryBGTaskIfNeeded() {
     let request = BGProcessingTaskRequest(identifier: UploadConstants.retryBGTaskIdentifier)

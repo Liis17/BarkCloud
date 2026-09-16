@@ -9,6 +9,16 @@ package barkcloud.files;
 service FilesApi {
   rpc GetUploadUrl(GetUploadUrlRequest) returns(GetUploadUrlResponse); // Получить ссылку для загрузки файла
 
+  rpc CreateUploadSession(CreateUploadSessionRequest) returns(UploadSessionResponse); // Создать resumable upload-сессию
+
+  rpc GetUploadSession(UploadSessionIdRequest) returns(UploadSessionResponse); // Получить серверное состояние upload-сессии
+
+  rpc ResumeUploadSession(UploadSessionIdRequest) returns(UploadSessionResponse); // Получить новый upload-token и уже принятые части
+
+  rpc CompleteUploadSession(UploadSessionIdRequest) returns(UploadSessionResponse); // Завершить multipart и поставить файл в обработку
+
+  rpc CancelUploadSession(UploadSessionIdRequest) returns(UploadSessionResponse); // Отменить незавершённую загрузку
+
   rpc GetTempDownloadUrl(GetTempDownloadUrlRequest) returns(GetTempDownloadUrlResponse); // Получить ссылку для скачивания файла
 
   rpc CheckFileHash(CheckFileHashRequest) returns(CheckFileHashResponse); // Проверить существует ли файл с таким хешем
@@ -35,11 +45,15 @@ service CloudApi {
   rpc DeleteFileEntry      (DeleteFileEntryRequest)      returns (CloudEmpty);               // Удалить запись о файле
   rpc DeleteFileEntries    (DeleteFileEntriesRequest)    returns (DeleteFileEntriesResponse); // Массовое удаление записей в корзину (до 100 за запрос)
 
+  // ───────── Архив (ZIP) ─────────
+  rpc CreateArchive        (CreateArchiveRequest)        returns (CreateArchiveResponse);     // Собрать выбранное/папку/альбом в ZIP, положить в корзину (3 дня) и вернуть временную ссылку
+
   rpc ListUserImages       (ListUserImagesRequest)       returns (ListUserImagesResponse);   // [DEPRECATED] Все изображения пользователя; используйте ListUserMedia(PHOTO)
   rpc ListUserMedia        (ListUserMediaRequest)        returns (ListUserMediaResponse);     // Медиа пользователя по типу (фото / видео) от новых к старым (cursor pagination)
-  rpc DeleteUserMedia      (DeleteUserMediaRequest)      returns (CloudEmpty);                // Удалить медиа из галереи по file_id: живые записи каталога → в корзину; если записей нет — снять владельца (жёстко)
+  rpc DeleteUserMedia      (DeleteUserMediaRequest)      returns (CloudEmpty);                // Удалить медиа из галереи по file_id: живые записи каталога → в корзину; если записей нет — создать запись корзины
 
   rpc GetPath              (GetPathRequest)              returns (PathResponse);             // Построить путь до объекта в иерархии
+  rpc ListFileActivity     (ListFileActivityRequest)     returns (ListFileActivityResponse); // История действий с файлом (для «Свойства»)
 
   rpc SetVideoThumbnail    (SetVideoThumbnailRequest)    returns (CloudEmpty);               // Заменить превью видео загруженной картинкой
 
@@ -104,6 +118,8 @@ service FilesServerApi {
   rpc ResolveFolderShare(ResolveFolderShareRequest) returns(ResolveFolderShareResponse); // Резолв публичной папки → листинг (подпапки + файлы с публичными URL)
 
   rpc ResolveAlbumShare(ResolveAlbumShareRequest) returns(ResolveAlbumShareResponse); // Резолв публичного альбома → элементы (фото/видео с публичными URL)
+
+  rpc ResolveMusicPlaylistShare(ResolveMusicPlaylistShareRequest) returns(ResolveMusicPlaylistShareResponse); // Резолв публичного музыкального плейлиста → треки с публичными URL
 }
 
 service AlbumApi {
@@ -116,12 +132,55 @@ service AlbumApi {
   rpc ListAlbumItems      (ListAlbumItemsRequest)      returns (ListAlbumItemsResponse); // Содержимое альбома (фото/видео с превью)
 }
 
+service MusicApi {
+  rpc ListTracks                 (ListMusicTracksRequest)                 returns (ListMusicTracksResponse);          // Список аудиотреков пользователя с поиском
+  rpc GetTrackDownloadUrl        (GetTrackDownloadUrlRequest)             returns (GetTrackDownloadUrlResponse);      // Временная ссылка для проигрывания трека
+  rpc CreatePlaylist             (CreateMusicPlaylistRequest)             returns (MusicPlaylistInfo);               // Создать плейлист
+  rpc UpdatePlaylist             (UpdateMusicPlaylistRequest)             returns (MusicPlaylistInfo);               // Изменить имя/описание/обложку
+  rpc DeletePlaylist             (DeleteMusicPlaylistRequest)             returns (CloudEmpty);                      // Удалить плейлист
+  rpc ListPlaylists              (ListMusicPlaylistsRequest)              returns (ListMusicPlaylistsResponse);       // Мои плейлисты
+  rpc ListPlaylistTracks         (ListMusicPlaylistTracksRequest)         returns (ListMusicPlaylistTracksResponse);  // Треки плейлиста
+  rpc AddPlaylistTracks          (AddMusicPlaylistTracksRequest)          returns (CloudEmpty);                      // Добавить треки
+  rpc RemovePlaylistTracks       (RemoveMusicPlaylistTracksRequest)       returns (CloudEmpty);                      // Убрать треки
+  rpc ReorderPlaylistTracks      (ReorderMusicPlaylistTracksRequest)      returns (CloudEmpty);                      // Ручной порядок треков
+  rpc CreatePlaylistShare        (CreateMusicPlaylistShareRequest)        returns (MusicPlaylistShareInfo);          // Публичная ссылка на плейлист
+  rpc ListMyPlaylistShares       (ListMyMusicPlaylistSharesRequest)       returns (ListMyMusicPlaylistSharesResponse);// Мои публичные плейлисты
+  rpc RevokePlaylistShare        (RevokeMusicPlaylistShareRequest)        returns (CloudEmpty);                      // Отозвать публичность
+  rpc SharePlaylistWithUser      (ShareMusicPlaylistWithUserRequest)      returns (CloudEmpty);                      // Поделиться плейлистом с пользователем
+  rpc RevokePlaylistUserShare    (RevokeMusicPlaylistUserShareRequest)    returns (CloudEmpty);                      // Отозвать грант
+  rpc ListMyOutgoingPlaylistShares(ListMyOutgoingMusicPlaylistSharesRequest) returns (ListMyOutgoingMusicPlaylistSharesResponse); // Кому доступны мои плейлисты
+  rpc ListSharedPlaylistsWithMe  (ListSharedMusicPlaylistsWithMeRequest)  returns (ListSharedMusicPlaylistsWithMeResponse); // Плейлисты, доступные мне
+}
+
+// Единый поиск по данным файлового сервиса. Торренты добавляет Web BFF отдельным вызовом.
+service SearchApi {
+  rpc Search                    (SearchRequest)                    returns (SearchResponse);
+  rpc ResolveHit                (SearchHitReference)               returns (SearchHit);
+  rpc GetFileSearchMetadata     (GetFileSearchMetadataRequest)     returns (FileSearchMetadata);
+  rpc ReplaceFileSearchMetadata (ReplaceFileSearchMetadataRequest) returns (FileSearchMetadata);
+}
+
 service DynamicFolderApi {
   rpc CreateDynamicFolder    (CreateDynamicFolderRequest)    returns (DynamicFolderInfo);            // Создать умную папку
   rpc UpdateDynamicFolder    (UpdateDynamicFolderRequest)    returns (DynamicFolderInfo);            // Изменить имя / критерии / иконку
   rpc DeleteDynamicFolder    (DeleteDynamicFolderRequest)    returns (CloudEmpty);                   // Удалить умную папку
   rpc ListDynamicFolders     (ListDynamicFoldersRequest)     returns (ListDynamicFoldersResponse);   // Системные + пользовательские (обложка / счётчик)
   rpc ListDynamicFolderItems (ListDynamicFolderItemsRequest) returns (ListDynamicFolderItemsResponse); // Содержимое папки (файлы по критериям)
+}
+
+// Источники могут комбинироваться: всё, что задано, попадает в один архив.
+message CreateArchiveRequest {
+  repeated string entry_ids   = 1; // Записи иерархии (выделение во вкладке «Файлы»)
+  repeated string file_ids    = 2; // Блобы напрямую (выделение в галерее Фото/Видео)
+  string directory_id         = 3; // Вся папка рекурсивно (пусто — не задано)
+  string album_id             = 4; // Весь альбом (пусто — не задано)
+  string archive_name         = 5; // Желаемое имя архива без расширения (необяз.)
+}
+
+message CreateArchiveResponse {
+  string file_id   = 1; // Идентификатор блоба-архива (лежит в корзине)
+  string url       = 2; // Временная ссылка для немедленного скачивания
+  string file_name = 3; // Итоговое имя архива (с .zip)
 }
 
 message GetTempDownloadUrlRequest {
@@ -174,6 +233,16 @@ message UploadFileInfo {
   string upload_device_name = 15; // Имя устройства, с которого файл был загружен (первая успешная загрузка блоба)
   string jpeg_view_file_id = 16; // file_id полноразмерного JPEG-вида для просмотра (web/не-Apple); пусто — нет (видео/документ/легаси)
   string jpeg_view_url = 17; // Ссылка на скачивание JPEG-вида (для отображения в фуллвьювере). Оригинал — отдельной кнопкой «скачать»
+  VideoMeta video_meta = 18; // Тех-метаданные видео для тайла галереи (только media_kind=VIDEO); присутствие — через HasVideoMeta
+}
+
+// Краткие тех-параметры видео для отображения на тайле галереи (подмножество FileMetadataInfo).
+message VideoMeta {
+  optional double duration_seconds = 1; // Длительность, сек
+  optional string video_codec = 2;      // Кодек видео (h264, hevc, av1 …)
+  optional string audio_codec = 3;      // Кодек аудио (aac, opus …)
+  optional int64 bitrate = 4;           // Битрейт контейнера, бит/с (≈ сумма аудио+видео)
+  optional bool hdr = 5;                // HDR-видео
 }
 
 enum MediaKind {
@@ -233,6 +302,13 @@ message FileMetadataInfo {
   optional string audio_codec = 17;
   optional int64 bitrate = 18;                     // бит/с
   optional double frame_rate = 19;
+  optional bool is_hdr = 24;                       // HDR-видео (выведено из color_transfer: PQ smpte2084 / HLG arib-std-b67)
+
+  // Аудио
+  optional string audio_title = 25;
+  optional string audio_artist = 26;
+  optional string audio_album = 27;
+  optional int32 audio_track_number = 28;
 
   // Документ
   optional string document_author = 20;
@@ -248,6 +324,47 @@ message GetUploadUrlRequest {
 message GetUploadUrlResponse {
   string url = 1; // адрес для загрузки файла
   string file_id = 2; // идентификатор файла
+}
+
+message CreateUploadSessionRequest {
+  string idempotency_key = 1;
+  string file_name = 2;
+  int64 file_size = 3;
+  string content_type = 4;
+  string sha256 = 5;
+}
+
+message UploadSessionIdRequest {
+  string session_id = 1;
+}
+
+enum UploadSessionStatus {
+  UPLOAD_SESSION_STATUS_UNSPECIFIED = 0;
+  UPLOAD_SESSION_STATUS_UPLOADING = 1;
+  UPLOAD_SESSION_STATUS_PROCESSING = 2;
+  UPLOAD_SESSION_STATUS_READY = 3;
+  UPLOAD_SESSION_STATUS_FAILED = 4;
+  UPLOAD_SESSION_STATUS_CANCELLED = 5;
+  UPLOAD_SESSION_STATUS_EXPIRED = 6;
+}
+
+message UploadPartInfo {
+  int32 part_number = 1;
+  int64 size = 2;
+  bool has_etag = 3; // ETag подтверждён Files/S3; без него часть нужно повторить
+}
+
+message UploadSessionResponse {
+  string session_id = 1;
+  string file_id = 2;
+  UploadSessionStatus status = 3;
+  int64 file_size = 4;
+  int64 part_size = 5;
+  google.protobuf.Timestamp expires_at = 6;
+  string upload_token = 7;
+  repeated UploadPartInfo uploaded_parts = 8;
+  string error_code = 9;
+  string error_message = 10;
 }
 
 enum UploadFileType {
@@ -360,6 +477,8 @@ message AttachFileRequest {
   string file_id = 2;
   string name = 3;
   bool route_by_media_kind = 4; // true → сервер кладёт файл в системную папку Фото/Видео/Другие документы по типу медиа
+  string upload_session_id = 5; // Корреляция Upload 2.0; пусто для legacy/обычного AttachFile
+  bool is_upload_retry = 6; // Retry после uploaded_not_attached
 }
 
 message RenameFileEntryRequest {
@@ -411,6 +530,7 @@ message UserImageItem {
   int32 entries_count = 2;          // сколько копий записи у владельца
   repeated string entry_names = 3;  // имена в папках, до 5 шт.
   repeated string entry_ids = 4;    // id записей каталога владельца (для rename/delete из галереи)
+  string duplicate_group_key = 5;   // SHA256-группа для системных папок дубликатов; пусто для обычных листингов
 }
 
 message ListUserImagesResponse {
@@ -524,6 +644,32 @@ message PathResponse {
   string full_path = 2;
 }
 
+// ============ История активности файла ============
+
+message ListFileActivityRequest {
+  string file_id = 1;
+  int32 limit = 2;                                  // 1..100, default 30
+  google.protobuf.Timestamp cursor_created_at = 3;  // exclusive; пусто = с самых свежих
+  string cursor_event_id = 4;                       // tie-breaker для стабильной cursor-пагинации
+}
+
+message FileActivityInfo {
+  string id = 1;
+  string file_id = 2;
+  string entry_id = 3;
+  int64 actor_user_id = 4;
+  string kind = 5;
+  string summary = 6;
+  string details_json = 7;
+  google.protobuf.Timestamp created_at = 8;
+}
+
+message ListFileActivityResponse {
+  repeated FileActivityInfo items = 1;
+  google.protobuf.Timestamp next_cursor_created_at = 2; // пусто = больше нет страниц
+  string next_cursor_event_id = 3;
+}
+
 message GetUserStorageInfoResponse {
   message StorageByType {
     UploadFileType file_type = 1; // Тип файла
@@ -533,6 +679,10 @@ message GetUserStorageInfoResponse {
   int64 total_used_storage = 1; // Общее занятое пространство в байтах
   int64 storage_limit = 2; // Лимит хранилища в байтах
   repeated StorageByType storage_by_types = 3; // Использованное пространство по типам файлов
+  int64 total_available_storage = 4; // Общий доступный размер диска/хранилища в байтах
+  int64 disk_used_storage = 5; // Занято на диске без учета S3-данных в байтах
+  int64 s3_used_storage = 6; // Занято S3-данными в байтах
+  int64 reserved_storage = 7; // Зарезервировано активными upload-сессиями
 }
 
 // ============ AlbumApi messages ============
@@ -603,6 +753,194 @@ message ListAlbumItemsResponse {
   repeated AlbumItemEntry items = 1;
   google.protobuf.Timestamp next_cursor_added_at = 2; // пусто = больше нет страниц
   string next_cursor_file_id = 3;
+}
+
+// ============ MusicApi messages ============
+
+message MusicTrackInfo {
+  UploadFileInfo file = 1;
+  FileMetadataInfo metadata = 2;
+  string title = 3;
+  string artist = 4;
+  string album = 5;
+  double duration_seconds = 6;
+  string cover_url = 7;       // малая обложка (~128)
+  string large_cover_url = 8; // крупная обложка (~512)
+  repeated string entry_ids = 9;   // живые записи файла в папках владельца
+  repeated string entry_names = 10; // имена этих записей в папках
+}
+
+message ListMusicTracksRequest {
+  string query = 1;
+  int32 limit = 2;
+  google.protobuf.Timestamp cursor_created_at = 3;
+  string cursor_file_id = 4;
+}
+
+message ListMusicTracksResponse {
+  repeated MusicTrackInfo items = 1;
+  google.protobuf.Timestamp next_cursor_created_at = 2;
+  string next_cursor_file_id = 3;
+}
+
+message GetTrackDownloadUrlRequest {
+  string file_id = 1;
+}
+
+message GetTrackDownloadUrlResponse {
+  string download_url = 1;
+}
+
+message MusicPlaylistInfo {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  string cover_file_id = 4;
+  string cover_preview_url = 5;
+  int32 items_count = 6;
+  int64 owner_user_id = 7;
+  bool can_reorder = 8;
+  google.protobuf.Timestamp created_at = 9;
+  google.protobuf.Timestamp updated_at = 10;
+}
+
+message CreateMusicPlaylistRequest {
+  string name = 1;
+  string description = 2;
+}
+
+message UpdateMusicPlaylistRequest {
+  string playlist_id = 1;
+  optional string name = 2;
+  optional string description = 3;
+  optional string cover_file_id = 4; // пустая строка = сбросить кастомную обложку
+}
+
+message DeleteMusicPlaylistRequest {
+  string playlist_id = 1;
+}
+
+message ListMusicPlaylistsRequest {
+  int32 limit = 1;
+  google.protobuf.Timestamp cursor_updated_at = 2;
+  string cursor_playlist_id = 3;
+}
+
+message ListMusicPlaylistsResponse {
+  repeated MusicPlaylistInfo items = 1;
+  google.protobuf.Timestamp next_cursor_updated_at = 2;
+  string next_cursor_playlist_id = 3;
+}
+
+message MusicPlaylistTrackEntry {
+  MusicTrackInfo track = 1;
+  int32 position = 2;
+  google.protobuf.Timestamp added_at = 3;
+}
+
+message ListMusicPlaylistTracksRequest {
+  string playlist_id = 1;
+}
+
+message ListMusicPlaylistTracksResponse {
+  MusicPlaylistInfo playlist = 1;
+  repeated MusicPlaylistTrackEntry items = 2;
+}
+
+message AddMusicPlaylistTracksRequest {
+  string playlist_id = 1;
+  repeated string file_ids = 2;
+}
+
+message RemoveMusicPlaylistTracksRequest {
+  string playlist_id = 1;
+  repeated string file_ids = 2;
+}
+
+message ReorderMusicPlaylistTracksRequest {
+  string playlist_id = 1;
+  repeated string file_ids = 2; // полный новый порядок
+}
+
+message MusicPlaylistShareInfo {
+  string id = 1;
+  string token = 2;
+  string playlist_id = 3;
+  string name = 4;
+  google.protobuf.Timestamp created_at = 5;
+  int64 click_count = 6;
+  string cover_preview_url = 7;
+}
+
+message CreateMusicPlaylistShareRequest {
+  string playlist_id = 1;
+  string name = 2;
+}
+
+message ListMyMusicPlaylistSharesRequest {
+  int32 limit = 1;
+  google.protobuf.Timestamp cursor_created_at = 2;
+  string cursor_share_id = 3;
+}
+
+message ListMyMusicPlaylistSharesResponse {
+  repeated MusicPlaylistShareInfo shares = 1;
+  google.protobuf.Timestamp next_cursor_created_at = 2;
+  string next_cursor_share_id = 3;
+}
+
+message RevokeMusicPlaylistShareRequest {
+  string share_id = 1;
+}
+
+message ShareMusicPlaylistWithUserRequest {
+  string playlist_id = 1;
+  int64 recipient_user_id = 2;
+}
+
+message RevokeMusicPlaylistUserShareRequest {
+  string grant_id = 1;
+}
+
+message ListMyOutgoingMusicPlaylistSharesRequest {
+  string playlist_id = 1;
+}
+
+message OutgoingMusicPlaylistShare {
+  string grant_id = 1;
+  string playlist_id = 2;
+  string name = 3;
+  int64 recipient_user_id = 4;
+  google.protobuf.Timestamp shared_at = 5;
+}
+
+message ListMyOutgoingMusicPlaylistSharesResponse {
+  repeated OutgoingMusicPlaylistShare items = 1;
+}
+
+message ListSharedMusicPlaylistsWithMeRequest {}
+
+message SharedMusicPlaylistEntry {
+  string grant_id = 1;
+  MusicPlaylistInfo playlist = 2;
+  int64 owner_user_id = 3;
+  google.protobuf.Timestamp shared_at = 4;
+}
+
+message ListSharedMusicPlaylistsWithMeResponse {
+  repeated SharedMusicPlaylistEntry items = 1;
+}
+
+message ResolveMusicPlaylistShareRequest {
+  string token = 1;
+}
+
+message ResolveMusicPlaylistShareResponse {
+  bool found = 1;
+  string playlist_name = 2;
+  string description = 3;
+  string cover_preview_url = 4;
+  repeated MusicTrackInfo items = 5;
 }
 
 // ============ DynamicFolderApi messages ============
@@ -761,12 +1099,103 @@ message SearchFilesRequest {
   int32 limit = 2;                                  // 1..200, default 50
   google.protobuf.Timestamp cursor_created_at = 3;  // exclusive; пусто = с самых свежих
   string cursor_entry_id = 4;                       // tie-breaker для стабильной cursor-пагинации
+  repeated MediaKind kind_filter = 5;               // пусто = все типы; иначе только перечисленные (напр. PHOTO+VIDEO)
 }
 
 message SearchFilesResponse {
   repeated FileEntryDetailed files = 1;                 // совпавшие записи (entry + файл с превью/URL)
   google.protobuf.Timestamp next_cursor_created_at = 2; // пусто = больше нет страниц
   string next_cursor_entry_id = 3;
+}
+
+// ============ Единый поиск ============
+
+enum SearchSection {
+  SEARCH_SECTION_UNSPECIFIED = 0;
+  SEARCH_SECTION_PHOTOS = 1;
+  SEARCH_SECTION_VIDEOS = 2;
+  SEARCH_SECTION_FILES = 3;
+  SEARCH_SECTION_TRACKS = 4;
+  SEARCH_SECTION_ALBUMS = 5;
+  SEARCH_SECTION_PLAYLISTS = 6;
+  SEARCH_SECTION_FOLDERS = 7;
+  SEARCH_SECTION_SHARED = 8;
+  SEARCH_SECTION_TRASH = 9;
+}
+
+enum SearchHitKind {
+  SEARCH_HIT_KIND_UNSPECIFIED = 0;
+  SEARCH_HIT_KIND_PHOTO = 1;
+  SEARCH_HIT_KIND_VIDEO = 2;
+  SEARCH_HIT_KIND_FILE = 3;
+  SEARCH_HIT_KIND_TRACK = 4;
+  SEARCH_HIT_KIND_ALBUM = 5;
+  SEARCH_HIT_KIND_PLAYLIST = 6;
+  SEARCH_HIT_KIND_FOLDER = 7;
+  SEARCH_HIT_KIND_DYNAMIC_FOLDER = 8;
+  SEARCH_HIT_KIND_SHARED_FILE = 9;
+  SEARCH_HIT_KIND_SHARED_FOLDER = 10;
+  SEARCH_HIT_KIND_SHARED_PLAYLIST = 11;
+  SEARCH_HIT_KIND_TRASH = 12;
+}
+
+message SearchSectionPage {
+  SearchSection section = 1;
+  int32 limit = 2;
+  string cursor = 3;
+}
+
+message SearchRequest {
+  string query = 1;
+  repeated SearchSectionPage pages = 2;
+}
+
+message SearchResponse {
+  repeated SearchSectionResult sections = 1;
+}
+
+message SearchSectionResult {
+  SearchSection section = 1;
+  repeated SearchHit hits = 2;
+  string next_cursor = 3;
+  bool has_more = 4;
+}
+
+message SearchHitReference {
+  SearchHitKind kind = 1;
+  string id = 2;
+}
+
+message SearchHit {
+  SearchHitKind kind = 1;
+  string id = 2;
+  string file_id = 3;
+  string entry_id = 4;
+  string title = 5;
+  string subtitle = 6;
+  string preview_url = 7;
+  MediaKind media_kind = 8;
+  bool favorite = 9;
+  string match_field = 10;
+  string match_value = 11;
+  google.protobuf.Timestamp created_at = 12;
+  int64 size = 13;
+  string owner_name = 14;
+}
+
+message GetFileSearchMetadataRequest {
+  string file_id = 1;
+}
+
+message ReplaceFileSearchMetadataRequest {
+  string file_id = 1;
+  string alias = 2; // пусто = удалить алиас
+  repeated string tags = 3;
+}
+
+message FileSearchMetadata {
+  string alias = 1;
+  repeated string tags = 2;
 }
 
 // ============ Публичные ссылки ============
@@ -778,6 +1207,8 @@ message ShareInfo {
   string name = 4;                          // Имя файла на момент создания ссылки
   google.protobuf.Timestamp created_at = 5; // Когда создана ссылка
   int64 click_count = 6;                    // Сколько раз по ссылке переходили
+  MediaKind media_kind = 7;                 // Тип медиа файла (для отрисовки карточки)
+  string preview_url = 8;                   // Публичный URL превью (фото/видео); пусто — превью нет
 }
 
 message CreateShareRequest {
@@ -959,6 +1390,7 @@ message AlbumShareInfo {
   string name = 4;                          // Имя альбома на момент публикации
   google.protobuf.Timestamp created_at = 5; // Когда опубликован
   int64 click_count = 6;                    // Сколько раз открывали
+  string cover_preview_url = 7;             // URL превью обложки альбома (пусто, если нет)
 }
 
 message CreateAlbumShareRequest {

@@ -82,11 +82,11 @@ final class CacheSettingsViewModel {
         state.isWorking = true
         await cache.clearAll()
         let activeJobs = await UploadQueueStore.shared.activeJobs()
-        let retryableJobs = await UploadQueueStore.shared.failedJobs(
+        let retryableJobs = await UploadQueueStore.shared.retryableJobs(
             maxRetries: UploadConstants.maxUploadRetries
         )
         let referencedPaths = Set((activeJobs + retryableJobs).flatMap {
-            [$0.sourceFilePath, $0.multipartBodyPath]
+            [$0.sourceFilePath]
         })
         UploadConstants.purgeOrphanedStaging(
             referencedPaths: referencedPaths,
