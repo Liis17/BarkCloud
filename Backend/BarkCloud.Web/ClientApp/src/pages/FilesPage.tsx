@@ -273,6 +273,8 @@ export function FilesPage() {
   const [creatingSmart, setCreatingSmart] = React.useState(false);
   const [directoryCursor, setDirectoryCursor] = React.useState<DirectoryCursor | null>(null);
   const [directoryMore, setDirectoryMore] = React.useState(false);
+  const directorySentinelRef = React.useRef<HTMLDivElement | null>(null);
+  const loadMoreDirectoryRef = React.useRef<() => void>(() => {});
   const [searchCursor, setSearchCursor] = React.useState<{ at: string; id: string } | null>(null);
   const [searchMore, setSearchMore] = React.useState(false);
   const [toastNode, toast] = useToast();
@@ -409,6 +411,21 @@ export function FilesPage() {
       .catch((e) => toast((e as Error).message, 'err'))
       .finally(() => setDirectoryMore(false));
   }
+
+  loadMoreDirectoryRef.current = loadMoreDirectory;
+  React.useEffect(() => {
+    const sentinel = directorySentinelRef.current;
+    if (!sentinel || !directoryCursor || searchQuery || typeof IntersectionObserver === 'undefined') return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) loadMoreDirectoryRef.current();
+      },
+      { rootMargin: '400px 0px' },
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [directoryCursor, searchQuery]);
 
   const openDir = (dir: DirInfo) => setStack((s) => [...s, { id: dir.id, name: dir.name }]);
   const gotoIndex = (i: number) => setStack((s) => s.slice(0, i + 1));
@@ -837,10 +854,13 @@ export function FilesPage() {
               </div>
             )}
             {!searchQuery && directoryCursor && (
-              <div style={{ display: 'flex', justifyContent: 'center', padding: '14px 0' }}>
-                <button className="btn outlined" onClick={loadMoreDirectory} disabled={directoryMore}>
-                  {directoryMore ? 'Загрузка…' : 'Показать ещё'}
-                </button>
+              <div
+                ref={directorySentinelRef}
+                role={directoryMore ? 'status' : undefined}
+                aria-label={directoryMore ? 'Загрузка файлов' : undefined}
+                style={{ display: 'flex', justifyContent: 'center', minHeight: 24, padding: '14px 0' }}
+              >
+                {directoryMore && <span>Загрузка…</span>}
               </div>
             )}
           </div>

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FilesPage } from './FilesPage';
@@ -8,6 +8,8 @@ const mocks = vi.hoisted(() => ({
   apiPost: vi.fn(),
   enqueue: vi.fn(),
 }));
+
+let intersectionCallback: IntersectionObserverCallback | null = null;
 
 vi.mock('../lib/api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../lib/api')>()),
@@ -22,9 +24,20 @@ vi.mock('../hooks/useAudioPlayer', () => ({
 }));
 vi.mock('../hooks/usePageHeader', () => ({ usePageHeader: vi.fn() }));
 
-afterEach(() => vi.clearAllMocks());
+afterEach(() => {
+  vi.clearAllMocks();
+  vi.unstubAllGlobals();
+  intersectionCallback = null;
+});
 
 beforeEach(() => {
+  vi.stubGlobal('IntersectionObserver', vi.fn().mockImplementation((callback: IntersectionObserverCallback) => {
+    intersectionCallback = callback;
+    return {
+      observe: vi.fn(),
+      disconnect: vi.fn(),
+    } as unknown as IntersectionObserver;
+  }));
   mocks.apiGet.mockImplementation((url: string) => {
     if (url.startsWith('/api/cloud/list')) {
       return Promise.resolve({
@@ -55,6 +68,10 @@ function fileEntry(entryId: string, name: string) {
     createdAt: '2026-01-01T00:00:00Z',
     media: null,
   };
+}
+
+function triggerDirectoryEnd() {
+  intersectionCallback?.([{ isIntersecting: true } as IntersectionObserverEntry], {} as IntersectionObserver);
 }
 
 describe('FilesPage drag-and-drop', () => {
@@ -111,7 +128,7 @@ describe('FilesPage directory pagination', () => {
 
     const firstRow = (await screen.findByText('a.txt')).closest('tr')!;
     fireEvent.click(firstRow);
-    fireEvent.click(await screen.findByRole('button', { name: 'Показать ещё' }));
+    await act(async () => triggerDirectoryEnd());
 
     expect(await screen.findByText('b.txt')).toBeTruthy();
     expect(firstRow.className).toContain('selected');
