@@ -53,7 +53,7 @@ class ProfileViewModel(
                 val user = userRepository.getUser()
                 val display = "${user.firstName} ${user.lastName}".trim()
                     .ifEmpty { user.username }
-                val avatar = user.profilePicturePreview.ifEmpty { user.profilePicture }.ifEmpty { null }
+                val avatar = user.profilePicture.ifEmpty { user.profilePicturePreview }.ifEmpty { null }
                 val storage = runCatching { transfer.storageInfo() }.getOrNull()
                 if (storage != null) StorageWidgetBridge.update(appContext, storage.used, storage.limit)
                 _state.update {

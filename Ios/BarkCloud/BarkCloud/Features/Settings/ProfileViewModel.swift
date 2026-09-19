@@ -27,13 +27,13 @@ final class ProfileViewModel {
             !(user?.profilePicture.isEmpty ?? true)
         }
 
-        /// Кандидаты для загрузки аватара по приоритету: сначала превью (легче),
-        /// затем полное изображение. Каждый URL нормализуется на актуальный хост
+        /// Кандидаты для загрузки аватара по приоритету: сначала оригинал,
+        /// затем превью как fallback. Каждый URL нормализуется на актуальный хост
         /// Files (сохранённая в БД ссылка могла указывать на устаревший хост).
         var avatarCandidateURLs: [URL] {
             guard let user else { return [] }
             var result: [URL] = []
-            for raw in [user.profilePicturePreview, user.profilePicture] {
+            for raw in [user.profilePicture, user.profilePicturePreview] {
                 if let url = GrpcEndpoint.normalizedFileDownloadURL(raw), !result.contains(url) {
                     result.append(url)
                 }

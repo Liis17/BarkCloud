@@ -177,8 +177,8 @@ BarkCloud/
   и `RootView` уводит на экран логина. Успешная авторизация сбрасывает флаг (`AuthRepository.persist`).
 - **Настройки** (`Features/Settings/`) — таб «Настройки» вместо заглушки: профиль (`GetUser`),
   аватар через PhotosPicker (`USER_AVATAR` → upload → `SetProfilePicture`; удаление — `SetProfilePicture("")`).
-  Отображение аватара устойчиво: `FallbackRemoteImage` пробует по очереди `profile_picture_preview`,
-  затем `profile_picture` (с проверкой HTTP-статуса), а каждый URL прогоняется через
+  Отображение аватара устойчиво: `FallbackRemoteImage` пробует по очереди `profile_picture`,
+  затем `profile_picture_preview` как fallback (с проверкой HTTP-статуса), а каждый URL прогоняется через
   `GrpcEndpoint.normalizedFileDownloadURL` — сохранённая в БД ссылка могла быть сгенерирована при
   прежней конфигурации `ExternalEndpoint:Host`, поэтому хост/порт пересобираются на актуальный
   `cloud.barkfluff.com:7025/web/download/{id}`.

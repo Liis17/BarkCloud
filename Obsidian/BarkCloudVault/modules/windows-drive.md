@@ -62,7 +62,7 @@
   `TokenManager` (логин `Identity.Auth` + проактивный refresh `CreateToken`; `Logout()` чистит токены+refresh.bin),
   `TokenStore` (refresh-токен в **DPAPI**, восстановление сессии на старте),
   `UserProfile` (имя + URL аватара через `UsersApi.GetUser(0)`, кэш до logout; почту клиентский API не отдаёт;
-  аватар — `profile_picture_preview`→full, готовый /download-URL, качается напрямую `CloudGateway.DownloadAvatarAsync`),
+  аватар — `profile_picture`→preview fallback, готовый /download-URL, качается напрямую `CloudGateway.DownloadAvatarAsync`),
   `MetadataInterceptor` (device-заголовки base64 + динамический токен),
   ФС Dokany (метка тома `VolumeLabel` settable → имя диска), `MountManager`, IPC-сервер (named pipe + StreamJsonRpc).
   Один экземпляр на пользователя (Mutex). Download-URL нормализуется на актуальный Files-эндпоинт.
