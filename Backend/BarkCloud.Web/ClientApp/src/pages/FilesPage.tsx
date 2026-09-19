@@ -235,7 +235,7 @@ export function FilesPage() {
   const searchQuery = (new URLSearchParams(location.search).get('q') || '').trim();
   const directDirectoryId = new URLSearchParams(location.search).get('dir') || '';
   const smartFolderId = new URLSearchParams(location.search).get('smart') || '';
-  const [stack, setStack] = React.useState<{ id: string; name: string }[]>(navState.stack || (directDirectoryId ? [{ id: directDirectoryId, name: 'Папка' }] : []));
+  const [stack, setStack] = React.useState<{ id: string; name: string }[]>(directDirectoryId ? [{ id: directDirectoryId, name: 'Папка' }] : (navState.stack || []));
   const pendingSelect = React.useRef<string | null>(navState.selectEntryId || null);
   const [listing, setListing] = React.useState<Listing | null>(null);
   const [sel, setSel] = React.useState<Entry | null>(null);
@@ -313,8 +313,13 @@ export function FilesPage() {
   }, [currentDir, searchQuery, toast, fsel.clear]);
   React.useEffect(load, [load]);
   React.useEffect(() => {
-    if (directDirectoryId && directDirectoryId !== currentDir) setStack([{ id: directDirectoryId, name: 'Папка' }]);
-  }, [directDirectoryId, currentDir]);
+    if (directDirectoryId) setStack([{ id: directDirectoryId, name: 'Папка' }]);
+    else if (navState.stack) setStack(navState.stack);
+    else setStack([]);
+    // location.key меняется при навигации, но не при переходах по локальным хлебным крошкам.
+    // Поэтому стек синхронизируется с URL/state и не сбрасывается при обычном открытии подпапки.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.key, directDirectoryId, navState.stack]);
   const loadRef = React.useRef(load);
   loadRef.current = load;
   React.useEffect(() => { loadRef.current(); }, [attachVersion]);
@@ -697,7 +702,7 @@ export function FilesPage() {
             )}
           </div>
 
-          {!openSmart && !searchQuery && smartFolders.length > 0 && (
+          {!openSmart && !searchQuery && !currentDir && smartFolders.length > 0 && (
             <DynamicFoldersStrip folders={smartFolders} onOpen={setOpenSmart} onCreate={() => setCreatingSmart(true)} />
           )}
 
