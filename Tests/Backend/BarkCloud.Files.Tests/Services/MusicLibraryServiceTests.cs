@@ -5,6 +5,8 @@ using BarkCloud.Files.Tests._Helpers;
 using BarkCloud.GrpcServer.Settings;
 using BarkCloud.Shared.Exceptions.Files;
 
+using Microsoft.EntityFrameworkCore;
+
 namespace BarkCloud.Files.Tests.Services;
 
 public class MusicLibraryServiceTests : IDisposable
@@ -67,6 +69,73 @@ public class MusicLibraryServiceTests : IDisposable
 
         await act.Should().ThrowAsync<FileNotReadyException>();
         tempFiles.Verify(x => x.CreateTempFile(It.IsAny<Guid>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task AddPlaylistTracks_IgnoresOwnedNonAudioFiles()
+    {
+        var playlistId = Guid.NewGuid();
+        var audioId = Guid.NewGuid();
+        var photoId = Guid.NewGuid();
+        _db.Context.MusicPlaylists.Add(new MusicPlaylist
+        {
+            Id = playlistId,
+            OwnerId = OwnerId,
+            Name = "Playlist",
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
+        });
+        await _db.Context.SaveChangesAsync();
+
+        var audio = new UploadFile { Id = audioId, Uploaders = [OwnerId], MediaKind = MediaKind.Audio };
+        var photo = new UploadFile { Id = photoId, Uploaders = [OwnerId], MediaKind = MediaKind.Photo };
+        var files = new Mock<IUploadedFilesStorage>();
+        files.Setup(x => x.GetFiles(It.IsAny<List<Guid>>())).ReturnsAsync([audio, photo]);
+        var service = new MusicLibraryService(
+            _db.Context,
+            files.Object,
+            new Mock<ITempFilesStorage>().Object,
+            UserContextFactory.Create(OwnerId),
+            new RunSettings { Host = "http://localhost", Http1Port = 7026 },
+            TestConfiguration.Empty());
+
+        await service.AddPlaylistTracks(playlistId, [audioId, photoId], default);
+
+        var items = await _db.Context.MusicPlaylistItems.ToListAsync();
+        items.Should().ContainSingle().Which.FileId.Should().Be(audioId);
+    }
+
+    [Fact]
+    public async Task AddPlaylistTracks_RejectsMissingFiles()
+    {
+        var playlistId = Guid.NewGuid();
+        var audioId = Guid.NewGuid();
+        var missingId = Guid.NewGuid();
+        _db.Context.MusicPlaylists.Add(new MusicPlaylist
+        {
+            Id = playlistId,
+            OwnerId = OwnerId,
+            Name = "Playlist",
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
+        });
+        await _db.Context.SaveChangesAsync();
+
+        var files = new Mock<IUploadedFilesStorage>();
+        files.Setup(x => x.GetFiles(It.IsAny<List<Guid>>())).ReturnsAsync([
+            new UploadFile { Id = audioId, Uploaders = [OwnerId], MediaKind = MediaKind.Audio },
+        ]);
+        var service = new MusicLibraryService(
+            _db.Context,
+            files.Object,
+            new Mock<ITempFilesStorage>().Object,
+            UserContextFactory.Create(OwnerId),
+            new RunSettings { Host = "http://localhost", Http1Port = 7026 },
+            TestConfiguration.Empty());
+
+        var act = () => service.AddPlaylistTracks(playlistId, [audioId, missingId], default);
+
+        await act.Should().ThrowAsync<CloudAccessDeniedException>();
     }
 
     public void Dispose() => _db.Dispose();

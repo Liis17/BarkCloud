@@ -134,6 +134,7 @@ public class AttachFileCommandHandler : IRequestHandler<AttachFileCommand, Cloud
     {
         MediaKind.Photo => (CloudDirectorySystemKind.Photos, "Фото"),
         MediaKind.Video => (CloudDirectorySystemKind.Videos, "Видео"),
+        MediaKind.Audio => (CloudDirectorySystemKind.Music, "Музыка"),
         _ => (CloudDirectorySystemKind.OtherDocuments, "Другие документы"),
     };
 }

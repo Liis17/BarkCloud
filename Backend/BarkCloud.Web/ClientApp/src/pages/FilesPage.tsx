@@ -9,11 +9,12 @@ import { PropertiesModal } from '../components/ui/PropertiesModal';
 import { ShareWithUserModal } from '../components/ui/ShareWithUserModal';
 import { MoveToFolderModal } from '../components/ui/MoveToFolderModal';
 import { EmptyState, Loading } from '../components/ui/EmptyState';
+import { FileDropOverlay } from '../components/ui/FileDropOverlay';
 import { useContextMenu, type ContextItem } from '../components/ui/ContextMenu';
 import { SelectionBar } from '../components/ui/SelectionBar';
 import { useToast } from '../hooks/useToast';
 import { useAlbumMembership } from '../hooks/useAlbumMembership';
-import { useFileDrop } from '../hooks/useFileDrop';
+import { useFileDrop, type FileDropHandlers, type FileDropTarget } from '../hooks/useFileDrop';
 import { useSelection } from '../hooks/useSelection';
 import { usePageHeader } from '../hooks/usePageHeader';
 import { useAudioPlayer } from '../hooks/useAudioPlayer';
@@ -49,15 +50,22 @@ function isTextFile(m: CardFile | null | undefined): boolean {
 
 type RenameTarget = { isDir: boolean; target: DirInfo | Entry };
 
-function DirRow({ dir, onOpen, onRename, onDelete, onMenu }: {
+function DirRow({ dir, onOpen, onRename, onDelete, onMenu, dropHandlers, active }: {
   dir: DirInfo;
   onOpen: (d: DirInfo) => void;
   onRename: (d: DirInfo) => void;
   onDelete: (d: DirInfo) => void;
   onMenu: (e: React.MouseEvent, d: DirInfo) => void;
+  dropHandlers: FileDropHandlers;
+  active: boolean;
 }) {
   return (
-    <tr onClick={() => onOpen(dir)} onContextMenu={(e) => onMenu(e, dir)}>
+    <tr
+      className={active ? 'drop-target' : ''}
+      {...dropHandlers}
+      onClick={() => onOpen(dir)}
+      onContextMenu={(e) => onMenu(e, dir)}
+    >
       <td className="selcell" />
       <td className="name">
         <div className="file-icon folder">DIR</div>
@@ -261,7 +269,7 @@ export function FilesPage() {
   const audioPlayer = useAudioPlayer();
   const { menu, openAt } = useContextMenu();
   const membership = useAlbumMembership(albums);
-  const { over, dropHandlers } = useFileDrop((f) => doUpload(f));
+  const { over, target: dropTarget, dropHandlers, getTargetHandlers } = useFileDrop((files, target) => doUpload(files, target));
   const fsel = useSelection();
 
   const currentDir = stack.length ? stack[stack.length - 1].id : '';
@@ -537,10 +545,10 @@ export function FilesPage() {
       { label: 'Удалить', icon: 'trash', danger: true, onClick: () => requestDelete(dir, true) },
     ];
   }
-  async function doUpload(dropped?: File[]) {
+  async function doUpload(dropped?: File[], target: FileDropTarget | null = null) {
     const files = dropped && dropped.length ? dropped : await pickFiles({});
     if (!files.length) return;
-    enqueue(files, { dir: currentDir });
+    enqueue(files, { dir: target?.id || currentDir });
   }
 
   async function bulkDelete() {
@@ -650,6 +658,7 @@ export function FilesPage() {
   const files = listing ? listing.files : [];
   const isEmpty = listing && !dirs.length && !files.length;
   const allChecked = files.length > 0 && files.every((e) => fsel.has(e.entryId));
+  const dropDirectoryName = dropTarget?.label || (stack.length ? stack[stack.length - 1].name : 'корень облака');
 
   return (
     <>
@@ -665,12 +674,7 @@ export function FilesPage() {
         ]}
       />
       <div className={'files-shell' + (over ? ' drop-over' : '')} {...dropHandlers}>
-        {over && (
-          <div className="drop-overlay">
-            <Icon.upload size={40} />
-            <span>Отпустите файлы для загрузки</span>
-          </div>
-        )}
+        {over && <FileDropOverlay detail={`Файлы будут загружены в папку «${dropDirectoryName}»`} />}
         <div className="files-main">
           <div className="files-bar">
             {searchQuery ? (
@@ -763,6 +767,8 @@ export function FilesPage() {
                     <DirRow
                       key={d.id}
                       dir={d}
+                      active={dropTarget?.id === d.id}
+                      dropHandlers={getTargetHandlers({ id: d.id, label: d.name })}
                       onOpen={openDir}
                       onRename={(t) => startRename(t, true)}
                       onDelete={(t) => requestDelete(t, true)}

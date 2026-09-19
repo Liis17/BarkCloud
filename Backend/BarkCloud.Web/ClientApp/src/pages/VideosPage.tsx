@@ -4,6 +4,7 @@ import { Icon } from '../components/Icon';
 import { MediaThumb } from '../components/media/MediaThumb';
 import { Lightbox } from '../components/media/Lightbox';
 import { EmptyState, Loading } from '../components/ui/EmptyState';
+import { FileDropOverlay } from '../components/ui/FileDropOverlay';
 import { MediaSearchResults } from '../components/search/MediaSearchResults';
 import { useToast } from '../hooks/useToast';
 import { useInfiniteMedia } from '../hooks/useInfiniteMedia';
@@ -245,12 +246,7 @@ export function VideosPage() {
       {bulk.overlay}
 
       <div className={'dropzone' + (over ? ' drop-over' : '')} {...dropHandlers}>
-        {over && (
-          <div className="drop-overlay">
-            <Icon.upload size={40} />
-            <span>Отпустите видео для загрузки</span>
-          </div>
-        )}
+        {over && <FileDropOverlay detail="Файлы будут распределены по стандартным папкам по формату" />}
 
       <div className="stat-strip">
         {stats.map((s, i) => (

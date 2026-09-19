@@ -10,5 +10,6 @@ public enum CloudDirectorySystemKind
     None = 0,
     Photos = 1,
     Videos = 2,
-    OtherDocuments = 3
+    OtherDocuments = 3,
+    Music = 4
 }

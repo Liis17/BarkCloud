@@ -2,6 +2,7 @@ import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import { EmptyState, Loading } from '../components/ui/EmptyState';
+import { FileDropOverlay } from '../components/ui/FileDropOverlay';
 import { ConfirmModal } from '../components/ui/ConfirmModal';
 import { useContextMenu, type ContextItem } from '../components/ui/ContextMenu';
 import { Modal } from '../components/ui/Modal';
@@ -11,6 +12,8 @@ import { ShareWithUserModal } from '../components/ui/ShareWithUserModal';
 import { useAudioPlayer } from '../hooks/useAudioPlayer';
 import { usePageHeader } from '../hooks/usePageHeader';
 import { useToast } from '../hooks/useToast';
+import { useFileDrop, type FileDropHandlers } from '../hooks/useFileDrop';
+import { useUploadActions } from '../hooks/useUploadManager';
 import { apiGet, apiPost, pickFiles } from '../lib/api';
 import { uploadFile } from '../lib/uploadSessions';
 import { formatDuration } from '../lib/format';
@@ -61,6 +64,15 @@ export function MusicPage() {
   const [toastNode, toast] = useToast();
   const { menu, openAt } = useContextMenu();
   const player = useAudioPlayer();
+  const { enqueue, attachVersion } = useUploadActions();
+  const { over, target: dropTarget, dropHandlers, getTargetHandlers } = useFileDrop((files, target) => {
+    enqueue(files, {
+      routeByMediaKind: true,
+      playlistId: tab === 'playlists'
+        ? target?.id || (detail?.playlist.canReorder ? detail.playlist.id : undefined)
+        : undefined,
+    });
+  });
   const trackCursorRef = React.useRef<{ at: string; id: string } | null>(null);
   const trackBusyRef = React.useRef(false);
   const trackRequestRef = React.useRef(0);
@@ -195,6 +207,15 @@ export function MusicPage() {
     );
     setDetail(resp);
   }
+
+  React.useEffect(() => {
+    if (!attachVersion) return;
+    if (tab === 'tracks') loadTracks(false).catch(() => {});
+    else loadPlaylists().catch(() => {});
+    if (detail?.playlist.canReorder) openPlaylist(detail.playlist).catch(() => {});
+    // Загрузка может завершиться отдельным post-attach действием коллекции.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [attachVersion]);
 
   React.useEffect(() => {
     if (!openPlaylistId || !playlists.length || resolvedDeepLink.current === `playlist:${openPlaylistId}`) return;
@@ -430,8 +451,18 @@ export function MusicPage() {
     createMusicPlaylistShare(playlist.id, playlist.name, toast);
   }
 
+  const activePlaylistTarget = tab === 'playlists' && detail?.playlist.canReorder ? detail.playlist : null;
+  const activeDropTarget = tab === 'playlists' ? dropTarget : null;
+
   return (
-    <div className="music-page">
+    <div className={'music-page dropzone' + (over ? ' drop-over' : '')} {...dropHandlers}>
+      {over && (
+        <FileDropOverlay
+          detail={activeDropTarget || activePlaylistTarget
+            ? `Аудиофайлы будут добавлены в плейлист «${activeDropTarget?.label || activePlaylistTarget?.name}», остальные файлы загрузятся автоматически`
+            : 'Файлы будут распределены по стандартным папкам по формату'}
+        />
+      )}
       <div className="music-tabs">
         <button className={tab === 'tracks' ? 'active' : ''} onClick={() => setTab('tracks')}>Треки</button>
         <button className={tab === 'playlists' ? 'active' : ''} onClick={() => setTab('playlists')}>Плейлисты</button>
@@ -452,24 +483,32 @@ export function MusicPage() {
           sentinelRef={trackSentinelRef}
         />
       ) : detail ? (
-        <PlaylistDetail
-          detail={detail}
-          currentId={player.current?.file.id}
-          isPlaying={player.isPlaying}
-          onBack={() => setDetail(null)}
-          onPlay={(track) => play(track, detail.items.map((i) => i.track))}
-          onRemove={removeFromPlaylist}
-          onMove={moveTrack}
-          onCover={() => openCoverPicker(detail.playlist)}
-          onPublicShare={() => createPublicShare(detail.playlist)}
-          onShareWith={() => setShareWith(detail.playlist)}
-          onTrackMenu={(e, track) => openAt(e, trackMenu(track, { canManageFile: detail.playlist.canReorder, canRemoveFromPlaylist: detail.playlist.canReorder }))}
-          onPlaylistMenu={(e) => openAt(e, playlistMenu(detail.playlist))}
-        />
+        <div
+          {...(detail.playlist.canReorder
+            ? getTargetHandlers({ id: detail.playlist.id, label: detail.playlist.name })
+            : {})}
+        >
+          <PlaylistDetail
+            detail={detail}
+            currentId={player.current?.file.id}
+            isPlaying={player.isPlaying}
+            onBack={() => setDetail(null)}
+            onPlay={(track) => play(track, detail.items.map((i) => i.track))}
+            onRemove={removeFromPlaylist}
+            onMove={moveTrack}
+            onCover={() => openCoverPicker(detail.playlist)}
+            onPublicShare={() => createPublicShare(detail.playlist)}
+            onShareWith={() => setShareWith(detail.playlist)}
+            onTrackMenu={(e, track) => openAt(e, trackMenu(track, { canManageFile: detail.playlist.canReorder, canRemoveFromPlaylist: detail.playlist.canReorder }))}
+            onPlaylistMenu={(e) => openAt(e, playlistMenu(detail.playlist))}
+          />
+        </div>
       ) : (
         <PlaylistsView
           playlists={playlists}
           shared={sharedPlaylists}
+          getTargetHandlers={getTargetHandlers}
+          dropTargetId={dropTarget?.id}
           onOpen={openPlaylist}
           onCover={openCoverPicker}
           onPublicShare={createPublicShare}
@@ -644,9 +683,11 @@ function TrackRow({ track, index, active, playing, onPlay, onAdd, onMenu }: {
   );
 }
 
-function PlaylistsView({ playlists, shared, onOpen, onCover, onPublicShare, onShareWith, onMenu }: {
+function PlaylistsView({ playlists, shared, getTargetHandlers, dropTargetId, onOpen, onCover, onPublicShare, onShareWith, onMenu }: {
   playlists: MusicPlaylist[];
   shared: SharedMusicPlaylist[];
+  getTargetHandlers: (target: { id: string; label: string }) => FileDropHandlers;
+  dropTargetId?: string;
   onOpen: (playlist: MusicPlaylist) => void;
   onCover: (playlist: MusicPlaylist) => void;
   onPublicShare: (playlist: MusicPlaylist) => void;
@@ -664,6 +705,8 @@ function PlaylistsView({ playlists, shared, onOpen, onCover, onPublicShare, onSh
               <PlaylistCard
                 key={p.id}
                 playlist={p}
+                active={dropTargetId === p.id}
+                dropHandlers={getTargetHandlers({ id: p.id, label: p.name })}
                 onOpen={onOpen}
                 onMenu={(e) => onMenu(e, p)}
                 actions={
@@ -697,15 +740,17 @@ function PlaylistsView({ playlists, shared, onOpen, onCover, onPublicShare, onSh
   );
 }
 
-function PlaylistCard({ playlist, onOpen, actions, meta, onMenu }: {
+function PlaylistCard({ playlist, onOpen, actions, meta, onMenu, dropHandlers, active }: {
   playlist: MusicPlaylist;
   onOpen: (playlist: MusicPlaylist) => void;
   actions?: React.ReactNode;
   meta?: string;
   onMenu?: (e: React.MouseEvent) => void;
+  dropHandlers?: FileDropHandlers;
+  active?: boolean;
 }) {
   return (
-    <div className="music-playlist-card" onContextMenu={onMenu}>
+    <div className={'music-playlist-card' + (active ? ' drop-target' : '')} {...dropHandlers} onContextMenu={onMenu}>
       <button className="music-playlist-cover" onClick={() => onOpen(playlist)}>
         {playlist.coverUrl ? <img src={playlist.coverUrl} alt="" /> : <Icon.music size={34} />}
       </button>

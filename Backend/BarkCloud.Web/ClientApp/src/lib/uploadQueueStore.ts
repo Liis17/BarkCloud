@@ -23,7 +23,12 @@ export interface PersistedUploadTask {
   sessionId: string | null;
   fileId: string | null;
   status: PersistedUploadStatus;
-  attachOptions: { dir?: string; routeByMediaKind?: boolean };
+  attachOptions: {
+    dir?: string;
+    routeByMediaKind?: boolean;
+    albumId?: string;
+    playlistId?: string;
+  };
   progress: number;
   error: string | null;
   createdAt: number;

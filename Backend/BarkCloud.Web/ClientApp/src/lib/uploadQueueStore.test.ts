@@ -21,7 +21,7 @@ describe('uploadQueueStore', () => {
       sessionId: 'session-1',
       fileId: 'file-1',
       status: 'uploading',
-      attachOptions: { routeByMediaKind: true },
+      attachOptions: { routeByMediaKind: true, albumId: 'album-1', playlistId: 'playlist-1' },
       progress: 0.5,
       error: null,
       createdAt: 1,
@@ -32,7 +32,12 @@ describe('uploadQueueStore', () => {
     } as never);
 
     const [stored] = await loadUploadTasks();
-    expect(stored).toMatchObject({ id: 'task-1', sessionId: 'session-1', progress: 0.5 });
+    expect(stored).toMatchObject({
+      id: 'task-1',
+      sessionId: 'session-1',
+      progress: 0.5,
+      attachOptions: { routeByMediaKind: true, albumId: 'album-1', playlistId: 'playlist-1' },
+    });
     expect(stored).not.toHaveProperty('uploadToken');
     expect(stored).not.toHaveProperty('file');
     expect(stored).not.toHaveProperty('abortCtrl');

@@ -134,6 +134,7 @@ public class DeleteUserMediaCommandHandler : IRequestHandler<DeleteUserMediaComm
     {
         DomainMediaKind.Photo => (CloudDirectorySystemKind.Photos, "Фото"),
         DomainMediaKind.Video => (CloudDirectorySystemKind.Videos, "Видео"),
+        DomainMediaKind.Audio => (CloudDirectorySystemKind.Music, "Музыка"),
         _ => (CloudDirectorySystemKind.OtherDocuments, "Другие документы"),
     };
 }

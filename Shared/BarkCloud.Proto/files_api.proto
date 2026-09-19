@@ -476,7 +476,7 @@ message AttachFileRequest {
   string directory_id = 1; // Пустая строка означает корень владельца (игнорируется при route_by_media_kind)
   string file_id = 2;
   string name = 3;
-  bool route_by_media_kind = 4; // true → сервер кладёт файл в системную папку Фото/Видео/Другие документы по типу медиа
+  bool route_by_media_kind = 4; // true → сервер кладёт файл в системную папку Фото/Видео/Музыка/Другие документы по типу медиа
   string upload_session_id = 5; // Корреляция Upload 2.0; пусто для legacy/обычного AttachFile
   bool is_upload_retry = 6; // Retry после uploaded_not_attached
 }
