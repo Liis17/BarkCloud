@@ -14,6 +14,9 @@ namespace BarkCloud.Files.Features.Cloud.ListDirectory;
 
 public class ListDirectoryCommandHandler : IRequestHandler<ListDirectoryCommand, DirectoryListing>
 {
+    private const int DefaultLimit = 50;
+    private const int MaxLimit = 200;
+
     private readonly ICloudHierarchyStorage _storage;
     private readonly IUploadedFilesStorage _filesStorage;
     private readonly UserContext _userContext;
@@ -52,11 +55,15 @@ public class ListDirectoryCommandHandler : IRequestHandler<ListDirectoryCommand,
             fileDirectoryId = CloudHierarchyStorage.RootDirectoryId;
         }
 
+        var limit = request.Limit <= 0 ? DefaultLimit : Math.Min(request.Limit, MaxLimit);
+        var files = await _storage.ListFilesInDirectoryPage(
+            ownerId, fileDirectoryId, request.CursorName, request.CursorEntryId, limit, cancellationToken);
+        var hasMore = files.Count > limit;
+        var page = hasMore ? files.Take(limit).ToList() : files;
         var subdirs = await _storage.ListSubdirectories(ownerId, request.DirectoryId, cancellationToken);
-        var files = await _storage.ListFilesInDirectory(ownerId, fileDirectoryId, cancellationToken);
-        var readyFileIds = files.Count == 0
+        var readyFileIds = page.Count == 0
             ? new HashSet<Guid>()
-            : (await _filesStorage.GetFiles(files.Select(x => x.FileId).Distinct().ToList()))
+            : (await _filesStorage.GetFiles(page.Select(x => x.FileId).Distinct().ToList()))
                 .Select(x => x.Id)
                 .ToHashSet();
 
@@ -72,7 +79,7 @@ public class ListDirectoryCommandHandler : IRequestHandler<ListDirectoryCommand,
                 UpdatedAt = Timestamp.FromDateTime(DateTime.SpecifyKind(d.UpdatedAt, DateTimeKind.Utc))
             });
         }
-        foreach (var f in files.Where(x => readyFileIds.Contains(x.FileId)))
+        foreach (var f in page.Where(x => readyFileIds.Contains(x.FileId)))
         {
             response.Files.Add(new FileEntryInfo
             {
@@ -82,6 +89,13 @@ public class ListDirectoryCommandHandler : IRequestHandler<ListDirectoryCommand,
                 Name = f.Name,
                 CreatedAt = Timestamp.FromDateTime(DateTime.SpecifyKind(f.CreatedAt, DateTimeKind.Utc))
             });
+        }
+
+        if (hasMore && page.Count > 0)
+        {
+            var last = page[^1];
+            response.NextCursorName = last.Name;
+            response.NextCursorEntryId = last.Id.ToString();
         }
 
         return response;

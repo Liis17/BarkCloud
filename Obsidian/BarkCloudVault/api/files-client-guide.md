@@ -70,7 +70,8 @@ CLOUD_FILE = 2;   // обычный файл пользовательского 
 - Первый запрос: `limit` (1..200, по умолчанию 50), курсорные поля **пустые/не заданы**.
 - Ответ содержит `next_cursor_*`. Если они **пустые** — страниц больше нет.
 - Следующая страница: передать значения `next_cursor_*` из предыдущего ответа в соответствующие `cursor_*` поля.
-- Сортировка — от новых к старым.
+- Для обычных списков сортировка — от новых к старым; `ListDirectory` и
+  `ListDirectoryDetailed` сортируют файлы по имени, затем по `entry_id`.
 
 ---
 
@@ -142,8 +143,8 @@ CLOUD_FILE = 2;   // обычный файл пользовательского 
 | `RenameDirectory` | `{ directory_id, new_name }` | `CloudEmpty` |
 | `MoveDirectory` | `{ directory_id, new_parent_id }` (""=корень) | `CloudEmpty` |
 | `DeleteDirectory` | `{ directory_id }` | `CloudEmpty` (рекурсивно) |
-| `ListDirectory` | `{ directory_id }` (optional; не задано/""=корень) | `DirectoryListing { subdirs[DirectoryInfo], files[FileEntryInfo] }` — только метаданные |
-| `ListDirectoryDetailed` | то же | `DirectoryListingDetailed { subdirs[DirectoryInfo], files[FileEntryDetailed] }` — с полным `UploadFileInfo` (URL/превью/размеры) |
+| `ListDirectory` | `{ directory_id, limit, cursor_name, cursor_entry_id }` (directory optional; не задано/""=корень) | Страница `DirectoryListing { subdirs[DirectoryInfo], files[FileEntryInfo], next_cursor_* }` — только метаданные |
+| `ListDirectoryDetailed` | то же | Страница `DirectoryListingDetailed { subdirs[DirectoryInfo], files[FileEntryDetailed], next_cursor_* }` — с полным `UploadFileInfo` (URL/превью/размеры) |
 | `AttachFile` | `{ directory_id, file_id, name }` | `CloudEmpty` |
 | `RenameFileEntry` | `{ entry_id, new_name }` | `CloudEmpty` |
 | `MoveFileEntry` | `{ entry_id, new_directory_id }` (""=корень) | `CloudEmpty` |
@@ -156,6 +157,9 @@ CLOUD_FILE = 2;   // обычный файл пользовательского 
 - `FileEntryDetailed { entry: FileEntryInfo, file: UploadFileInfo }`
 
 > Для миниатюр в листинге каталога используйте `ListDirectoryDetailed` (там сразу есть превью). `ListDirectory` — для дешёвой навигации без картинок.
+> В листингах каталогов пагинация применяется только к файлам: подпапки возвращаются
+> целиком на каждой странице. Размер страницы по умолчанию — 50, максимум — 200;
+> следующую страницу запрашивайте, передав `next_cursor_name` и `next_cursor_entry_id`.
 
 ---
 

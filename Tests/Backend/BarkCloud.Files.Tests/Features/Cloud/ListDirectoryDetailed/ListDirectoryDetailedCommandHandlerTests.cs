@@ -42,7 +42,8 @@ public class ListDirectoryDetailedCommandHandlerTests
         var orphanFile = Guid.NewGuid();
         _storage.Setup(s => s.ListSubdirectories(OwnerId, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<CloudDirectory>());
-        _storage.Setup(s => s.ListFilesInDirectory(OwnerId, CloudHierarchyStorage.RootDirectoryId, It.IsAny<CancellationToken>()))
+        _storage.Setup(s => s.ListFilesInDirectoryPage(
+                OwnerId, CloudHierarchyStorage.RootDirectoryId, null, null, 50, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<CloudFileEntry>
             {
                 new() { Id = Guid.NewGuid(), OwnerId = OwnerId, FileId = liveFile, Name = "live.jpg" },
@@ -57,5 +58,34 @@ public class ListDirectoryDetailedCommandHandlerTests
 
         response.Files.Should().ContainSingle();
         response.Files[0].File.Id.Should().Be(liveFile.ToString());
+    }
+
+    [Fact]
+    public async Task Handle_ReturnsCursorWhenStorageHasAnotherPage()
+    {
+        var first = new CloudFileEntry
+        {
+            Id = Guid.NewGuid(), OwnerId = OwnerId, FileId = Guid.NewGuid(), Name = "a.txt"
+        };
+        var second = new CloudFileEntry
+        {
+            Id = Guid.NewGuid(), OwnerId = OwnerId, FileId = Guid.NewGuid(), Name = "b.txt"
+        };
+        _storage.Setup(s => s.ListSubdirectories(OwnerId, null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+        _storage.Setup(s => s.ListFilesInDirectoryPage(
+                OwnerId, CloudHierarchyStorage.RootDirectoryId, null, null, 1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([first, second]);
+        _files.Setup(s => s.GetFiles(It.IsAny<List<Guid>>()))
+            .ReturnsAsync([new UploadFileEntity { Id = first.FileId, MediaKind = MediaKind.Other }]);
+        _files.Setup(s => s.GetPreviewsForFiles(It.IsAny<IEnumerable<Guid>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<Guid, List<FilePreview>>());
+
+        var response = await CreateSut().Handle(new ListDirectoryDetailedCommand { Limit = 1 }, default);
+
+        response.Files.Should().ContainSingle();
+        response.Files[0].Entry.Name.Should().Be("a.txt");
+        response.NextCursorName.Should().Be("a.txt");
+        response.NextCursorEntryId.Should().Be(first.Id.ToString());
     }
 }

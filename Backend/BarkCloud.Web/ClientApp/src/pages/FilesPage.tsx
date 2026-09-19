@@ -38,6 +38,15 @@ function kindLabel(k: string | undefined): string {
   return k === 'photo' ? 'фото' : k === 'video' ? 'видео' : k === 'audio' ? 'аудио' : k === 'document' ? 'документ' : 'файл';
 }
 
+const DIRECTORY_PAGE_SIZE = 50;
+type DirectoryCursor = { name: string; id: string };
+
+function directoryCursorOf(listing: Listing): DirectoryCursor | null {
+  return listing.nextCursorName && listing.nextCursorId
+    ? { name: listing.nextCursorName, id: listing.nextCursorId }
+    : null;
+}
+
 // Расширения, которые браузер показывает как текст — их открываем во вкладке (inline-прокси), не скачиваем.
 const TEXT_EXTS = new Set([
   'txt', 'md', 'markdown', 'log', 'csv', 'tsv', 'json', 'xml', 'yaml', 'yml', 'ini', 'conf', 'cfg', 'env',
@@ -262,6 +271,8 @@ export function FilesPage() {
   const [smartFolders, setSmartFolders] = React.useState<DynamicFolder[]>([]);
   const [openSmart, setOpenSmart] = React.useState<DynamicFolder | null>(null);
   const [creatingSmart, setCreatingSmart] = React.useState(false);
+  const [directoryCursor, setDirectoryCursor] = React.useState<DirectoryCursor | null>(null);
+  const [directoryMore, setDirectoryMore] = React.useState(false);
   const [searchCursor, setSearchCursor] = React.useState<{ at: string; id: string } | null>(null);
   const [searchMore, setSearchMore] = React.useState(false);
   const [toastNode, toast] = useToast();
@@ -289,6 +300,8 @@ export function FilesPage() {
     setListing(null);
     setSel(null);
     fsel.clear();
+    setDirectoryCursor(null);
+    setDirectoryMore(false);
     // Режим поиска: результаты по имени (по всему облаку), без подпапок; cursor-пагинация.
     if (searchQuery) {
       setSearchCursor(null);
@@ -305,9 +318,12 @@ export function FilesPage() {
         });
       return;
     }
-    apiGet<Listing>('/api/cloud/list?dir=' + encodeURIComponent(currentDir))
+    apiGet<Listing>(
+      '/api/cloud/list?dir=' + encodeURIComponent(currentDir) + '&limit=' + DIRECTORY_PAGE_SIZE,
+    )
       .then((d) => {
         setListing(d);
+        setDirectoryCursor(directoryCursorOf(d));
         if (pendingSelect.current) {
           const hit = d.files.find((e) => e.entryId === pendingSelect.current);
           pendingSelect.current = null;
@@ -372,6 +388,26 @@ export function FilesPage() {
       })
       .catch((e) => toast((e as Error).message, 'err'))
       .finally(() => setSearchMore(false));
+  }
+
+  function loadMoreDirectory() {
+    if (!directoryCursor || directoryMore || searchQuery) return;
+    setDirectoryMore(true);
+    apiGet<Listing>(
+      `/api/cloud/list?dir=${encodeURIComponent(currentDir)}&limit=${DIRECTORY_PAGE_SIZE}`
+        + `&cursorName=${encodeURIComponent(directoryCursor.name)}&cursorId=${encodeURIComponent(directoryCursor.id)}`,
+    )
+      .then((d) => {
+        setListing((prev) => ({
+          dirs: prev?.dirs || d.dirs || [],
+          files: [...(prev?.files || []), ...(d.files || [])],
+          nextCursorName: d.nextCursorName,
+          nextCursorId: d.nextCursorId,
+        }));
+        setDirectoryCursor(directoryCursorOf(d));
+      })
+      .catch((e) => toast((e as Error).message, 'err'))
+      .finally(() => setDirectoryMore(false));
   }
 
   const openDir = (dir: DirInfo) => setStack((s) => [...s, { id: dir.id, name: dir.name }]);
@@ -656,7 +692,7 @@ export function FilesPage() {
 
   const dirs = listing ? listing.dirs : [];
   const files = listing ? listing.files : [];
-  const isEmpty = listing && !dirs.length && !files.length;
+  const isEmpty = listing && !dirs.length && !files.length && !directoryCursor;
   const allChecked = files.length > 0 && files.every((e) => fsel.has(e.entryId));
   const dropDirectoryName = dropTarget?.label || (stack.length ? stack[stack.length - 1].name : 'корень облака');
 
@@ -797,6 +833,13 @@ export function FilesPage() {
               <div style={{ display: 'flex', justifyContent: 'center', padding: '14px 0' }}>
                 <button className="btn outlined" onClick={loadMoreSearch} disabled={searchMore}>
                   {searchMore ? 'Загрузка…' : 'Показать ещё'}
+                </button>
+              </div>
+            )}
+            {!searchQuery && directoryCursor && (
+              <div style={{ display: 'flex', justifyContent: 'center', padding: '14px 0' }}>
+                <button className="btn outlined" onClick={loadMoreDirectory} disabled={directoryMore}>
+                  {directoryMore ? 'Загрузка…' : 'Показать ещё'}
                 </button>
               </div>
             )}

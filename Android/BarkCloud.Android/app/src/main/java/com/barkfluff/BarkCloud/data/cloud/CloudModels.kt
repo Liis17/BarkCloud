@@ -109,6 +109,16 @@ data class CloudFileEntry(
 /** Содержимое папки. */
 data class CloudListing(val subdirs: List<CloudDirectory>, val files: List<CloudFileEntry>)
 
+/** Страница содержимого папки с cursor-пагинацией файлов. */
+data class CloudDirectoryPage(
+    val subdirs: List<CloudDirectory>,
+    val files: List<CloudFileEntry>,
+    val nextCursorName: String?,
+    val nextCursorEntryId: String,
+) {
+    val hasMore: Boolean get() = nextCursorName != null && nextCursorEntryId.isNotEmpty()
+}
+
 /** Сегмент хлебных крошек. */
 data class PathCrumb(val id: String, val name: String)
 

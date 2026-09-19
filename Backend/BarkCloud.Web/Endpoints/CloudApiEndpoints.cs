@@ -86,17 +86,25 @@ public static class CloudApiEndpoints
 
         // ───────────────────────── Каталоги ─────────────────────────
 
-        api.MapGet("/cloud/list", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud, string? dir) =>
+        api.MapGet("/cloud/list", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud,
+            string? dir, int? limit, string? cursorName, string? cursorId) =>
             await Guarded(http, auth, async token =>
             {
-                var req = new ListDirectoryRequest();
+                var req = new ListDirectoryRequest
+                {
+                    Limit = limit is > 0 ? Math.Min(limit.Value, 200) : 50
+                };
                 if (!string.IsNullOrEmpty(dir)) req.DirectoryId = dir;
+                if (!string.IsNullOrWhiteSpace(cursorName)) req.CursorName = cursorName;
+                if (!string.IsNullOrWhiteSpace(cursorId)) req.CursorEntryId = cursorId;
 
                 var listing = await cloud.ListDirectoryDetailedAsync(req, token);
                 return Results.Json(new
                 {
                     dirs = listing.Subdirs.Select(CloudJson.Dir).ToArray(),
-                    files = listing.Files.Select(CloudJson.Entry).ToArray()
+                    files = listing.Files.Select(CloudJson.Entry).ToArray(),
+                    nextCursorName = listing.NextCursorName,
+                    nextCursorId = listing.NextCursorEntryId
                 }, Json);
             }));
 

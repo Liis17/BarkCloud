@@ -29,6 +29,7 @@ internal sealed class CloudGateway : IDisposable
 {
     private static readonly TimeSpan ListTtl = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan StorageTtl = TimeSpan.FromSeconds(10);
+    private const int DirectoryPageSize = 200;
 
     private readonly CloudApi.CloudApiClient _cloud;
     private readonly FilesApi.FilesApiClient _files;
@@ -107,7 +108,29 @@ internal sealed class CloudGateway : IDisposable
             return HidePending(c.Listing);
 
         _listGen.TryGetValue(dirId, out var gen);
-        var listing = _cloud.ListDirectoryDetailed(new ListDirectoryRequest { DirectoryId = dirId });
+        var listing = new DirectoryListingDetailed();
+        var cursorName = "";
+        var cursorEntryId = "";
+        while (true)
+        {
+            var request = new ListDirectoryRequest
+            {
+                DirectoryId = dirId,
+                Limit = DirectoryPageSize,
+                CursorEntryId = cursorEntryId,
+            };
+            if (!string.IsNullOrEmpty(cursorName)) request.CursorName = cursorName;
+
+            var page = _cloud.ListDirectoryDetailed(request);
+            if (listing.Subdirs.Count == 0) listing.Subdirs.AddRange(page.Subdirs);
+            listing.Files.AddRange(page.Files);
+
+            if (string.IsNullOrEmpty(page.NextCursorName) || string.IsNullOrEmpty(page.NextCursorEntryId))
+                break;
+
+            cursorName = page.NextCursorName;
+            cursorEntryId = page.NextCursorEntryId;
+        }
 
         // Кэшируем только если за время RPC папку не инвалидировали: иначе ответ устарел
         // (например, запись удалена и тумбстон уже снят) и не должен затирать инвалидацию,
@@ -132,6 +155,8 @@ internal sealed class CloudGateway : IDisposable
         var copy = new DirectoryListingDetailed();
         copy.Subdirs.AddRange(listing.Subdirs);
         copy.Files.AddRange(listing.Files.Where(f => !_delTombstones.ContainsKey(f.Entry.Id)));
+        copy.NextCursorName = listing.NextCursorName;
+        copy.NextCursorEntryId = listing.NextCursorEntryId;
         return copy;
     }
 

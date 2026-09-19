@@ -309,6 +309,7 @@ final class ShareViewController: UIViewController {
             let stub = try await grpc.cloudStub()
             var req = Barkcloud_Files_ListDirectoryRequest()
             req.directoryID = ""
+            req.limit = 1
             let resp = try await stub.listDirectoryDetailed(req)
             let folders = resp.subdirs.map { FolderItem(id: $0.id, name: $0.name) }
             self.availableFolders = folders

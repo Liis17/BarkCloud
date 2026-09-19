@@ -54,7 +54,7 @@ fun CloudMovePicker(
     val currentId = stack.lastOrNull()?.id ?: ""
 
     androidx.compose.runtime.LaunchedEffect(currentId) {
-        subdirs = runCatching { app.cloudRepository.listDirectory(currentId).subdirs }
+        subdirs = runCatching { app.cloudRepository.listDirectoryPage(currentId, limit = 1).subdirs }
             .getOrDefault(emptyList())
             .filter { it.id != excludeId }
     }

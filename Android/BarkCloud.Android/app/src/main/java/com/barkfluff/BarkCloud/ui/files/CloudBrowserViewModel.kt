@@ -24,13 +24,15 @@ import kotlinx.coroutines.launch
 
 data class CloudBrowserUiState(
     val isLoading: Boolean = true,
+    val isLoadingMore: Boolean = false,
+    val canLoadMore: Boolean = false,
     val crumbs: List<PathCrumb> = emptyList(),
     val subdirs: List<CloudDirectory> = emptyList(),
     val files: List<CloudFileEntry> = emptyList(),
     val isUploading: Boolean = false,
     val snackbar: String? = null,
 ) {
-    val isEmpty: Boolean get() = !isLoading && subdirs.isEmpty() && files.isEmpty()
+    val isEmpty: Boolean get() = !isLoading && !isLoadingMore && !canLoadMore && subdirs.isEmpty() && files.isEmpty()
 }
 
 class CloudBrowserViewModel(
@@ -43,6 +45,8 @@ class CloudBrowserViewModel(
 
     private var directoryId: String = ""
     private var started = false
+    private var cursorName: String? = null
+    private var cursorEntryId = ""
     private val observedCompleted = mutableSetOf<String>()
 
     init {
@@ -68,15 +72,21 @@ class CloudBrowserViewModel(
     }
 
     fun reload() {
+        cursorName = null
+        cursorEntryId = ""
         viewModelScope.launch {
-            _state.update { it.copy(isLoading = true) }
+            _state.update { it.copy(isLoading = true, isLoadingMore = false, canLoadMore = false) }
             try {
-                val listing = cloudRepository.listDirectory(directoryId)
+                val listing = cloudRepository.listDirectoryPage(directoryId, limit = DIRECTORY_PAGE_SIZE)
+                cursorName = listing.nextCursorName
+                cursorEntryId = listing.nextCursorEntryId
                 val crumbs = if (directoryId.isEmpty()) emptyList()
                 else runCatching { cloudRepository.path(directoryId) }.getOrDefault(emptyList())
                 _state.update {
                     it.copy(
                         isLoading = false,
+                        isLoadingMore = false,
+                        canLoadMore = listing.hasMore,
                         subdirs = listing.subdirs,
                         files = listing.files,
                         crumbs = crumbs,
@@ -84,6 +94,34 @@ class CloudBrowserViewModel(
                 }
             } catch (e: Exception) {
                 _state.update { it.copy(isLoading = false, snackbar = e.message) }
+            }
+        }
+    }
+
+    fun loadMore() {
+        val current = _state.value
+        if (!current.canLoadMore || current.isLoading || current.isLoadingMore) return
+
+        _state.update { it.copy(isLoadingMore = true) }
+        viewModelScope.launch {
+            try {
+                val page = cloudRepository.listDirectoryPage(
+                    directoryId = directoryId,
+                    limit = DIRECTORY_PAGE_SIZE,
+                    cursorName = cursorName,
+                    cursorEntryId = cursorEntryId,
+                )
+                cursorName = page.nextCursorName
+                cursorEntryId = page.nextCursorEntryId
+                _state.update {
+                    it.copy(
+                        isLoadingMore = false,
+                        files = it.files + page.files,
+                        canLoadMore = page.hasMore,
+                    )
+                }
+            } catch (e: Exception) {
+                _state.update { it.copy(isLoadingMore = false, snackbar = e.message) }
             }
         }
     }
@@ -132,6 +170,7 @@ class CloudBrowserViewModel(
     fun snackbarShown() = _state.update { it.copy(snackbar = null) }
 
     companion object {
+        private const val DIRECTORY_PAGE_SIZE = 50
         private const val UPLOAD_PARTIAL = "Часть файлов не загрузилась"
         private const val UPLOAD_QUEUED = "Загрузка поставлена в очередь"
 

@@ -46,7 +46,7 @@ fileproviderd удерживает домен).
 | Dokany (`BarkCloudFileSystem.cs`) | File Provider (`NSFileProviderReplicatedExtension`) | BarkCloud |
 |---|---|---|
 | монтирование | `NSFileProviderManager.add(domain:)` | контейнер-app: enable |
-| `FindFiles` | `NSFileProviderEnumerator.enumerateItems` | `CloudRepository.listDirectory` |
+| `FindFiles` | `NSFileProviderEnumerator.enumerateItems` | `CloudRepository.listDirectory` (последовательно собирает все страницы) |
 | `GetFileInformation` | `NSFileProviderReplicatedExtension.item(for:)` | из in-memory кэша |
 | `CreateFile`(open) | (нет аналога — материализация по `fetchContents`) | — |
 | `ReadFile(offset)` | `fetchContents(for:version:request:)` — **полная материализация** | `tempDownloadURLs` + `download` |
@@ -190,8 +190,9 @@ read/write/listing в Finder, поведение cache после рестарт
 - **Большие файлы и память.** `createItem`/`modifyItem` читают файл целиком в
   `Data` и клеят multipart в памяти; у многогигабайтных файлов будет пик RSS.
   Нужен streaming upload (URLSession uploadTask с файлом).
-- **Очень большие папки.** `ListDirectoryDetailed` не пагинируется; на тысячах
-  файлов ответ может упереться в лимит receive-message gRPC — мониторить.
+- **Очень большие папки.** `CloudRepository.listDirectory` последовательно
+  обходит cursor-страницы `ListDirectoryDetailed` по 200 файлов и только затем
+  заполняет кэш FileProvider; отдельные UI-клиенты загружают страницы по 50.
 - **Прогресс в Finder.** `fetchContents`/`createItem` возвращают фиктивный
   `Progress` — у больших файлов индикатор неинформативен. Можно пробросить
   прогресс URLSession.

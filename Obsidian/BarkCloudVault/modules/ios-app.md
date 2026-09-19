@@ -73,7 +73,7 @@ BarkCloud/
 │   └── UserRepository.swift        UsersApi: профиль, имя/юзернейм/bio, приватность, устройства, удаление аккаунта, аватар (через FileTransferService)
 ├── Data/Cloud/
 │   ├── CloudModels.swift           доменные модели UI: MediaAsset, MediaPage, CloudDirectory, CloudFileEntry, AlbumCard, PathCrumb, **CloudFileMetadata** (плоская копия `FileMetadataInfo` с optional-полями) (+ Timestamp.date)
-│   ├── CloudRepository.swift       CloudApi: ListUserMedia, ListDirectoryDetailed, GetPath, CRUD папок/записей, uploadFile, **getFileMetadata(fileID:)** (nil при `has_metadata=false`)
+│   ├── CloudRepository.swift       CloudApi: ListUserMedia, cursor-страницы `ListDirectoryDetailed`, полный обход `listDirectory` для системных потребителей, GetPath, CRUD папок/записей, uploadFile, **getFileMetadata(fileID:)** (nil при `has_metadata=false`)
 │   └── AlbumRepository.swift       AlbumApi: список/содержимое альбомов, create/update/delete, add/remove items
 ├── Data/Cache/                     **постоянный дисковый кеш файлов** ([[ios-file-cache]]): CacheVariant, CachedFileEntry (SwiftData @Model), FileCacheService (actor), FileCacheSettings
 ├── Features/
@@ -351,7 +351,7 @@ BarkCloud/
   (спиннер первого показа даёт дефолт `isLoading=true`; индикатор потягивания — фирменная лиса в overlay).
 - **Файлы** (`Features/Files/`, таб №2) — секции: «На устройстве» (`LocalBrowserScreen`),
   «Облачное хранилище» (карточка-вход в `CloudBrowserScreen`: навигация по папкам
-  `ListDirectoryDetailed`, хлебные крошки `GetPath`, CRUD папок/записей, перемещение через
+  `ListDirectoryDetailed` (страницы файлов по 50 с автоподгрузкой у конца списка и нижним индикатором), хлебные крошки `GetPath`, CRUD папок/записей, перемещение через
   `CloudMovePicker`, загрузка фото/видео (PhotosPicker) и документов (`.fileImporter`), открытие/скачивание
   в QuickLook, **swipe-actions только иконками** (`trash`/`folder`/`pencil`, без подписей), удаление
   файла/папки — оптимистичное через [[#PendingDelete]] (внизу snackbar 5 с с «Отменить»),

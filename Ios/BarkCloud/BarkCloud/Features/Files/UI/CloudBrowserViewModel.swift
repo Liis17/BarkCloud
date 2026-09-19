@@ -9,6 +9,8 @@ struct CloudBrowserUiState {
     var subdirs: [CloudDirectory] = []
     var files: [CloudFileEntry] = []
     var isLoading = true
+    var isLoadingMore = false
+    var canLoadMore = false
     var isUploading = false
     var snackbar: String?
     /// URL созданной публичной ссылки → системный Share Sheet.
@@ -30,7 +32,7 @@ struct CloudBrowserUiState {
     var isSearchLoading = false
     var isSearching: Bool { !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
 
-    var isEmpty: Bool { subdirs.isEmpty && files.isEmpty }
+    var isEmpty: Bool { !isLoading && !isLoadingMore && !canLoadMore && subdirs.isEmpty && files.isEmpty }
     var selectedCount: Int { selectedFiles.count + selectedDirs.count }
     var hasSelection: Bool { selectedCount > 0 }
 }
@@ -46,6 +48,8 @@ final class CloudBrowserViewModel {
 
     private let cloud: CloudRepository
     private var didLoad = false
+    private var cursorName: String?
+    private var cursorEntryID = ""
 
     init(directoryID: String, title: String, cloud: CloudRepository) {
         self.cloud = cloud
@@ -71,11 +75,18 @@ final class CloudBrowserViewModel {
         // иначе сервер вернёт нам обратно файл, который пользователь только что
         // визуально убрал.
         await pendingDelete.flushIfAny()
+        cursorName = nil
+        cursorEntryID = ""
+        state.canLoadMore = false
+        state.isLoadingMore = false
         if showSpinner { state.isLoading = true }
         do {
-            let listing = try await cloud.listDirectory(state.directoryID)
-            state.subdirs = listing.subdirs
-            state.files = listing.files
+            let page = try await cloud.listDirectoryPage(state.directoryID, limit: 50)
+            cursorName = page.nextCursorName
+            cursorEntryID = page.nextCursorEntryID
+            state.subdirs = page.subdirs
+            state.files = page.files
+            state.canLoadMore = page.hasMore
             if !isRoot {
                 state.crumbs = (try? await cloud.path(directoryID: state.directoryID)) ?? []
             }
@@ -83,6 +94,38 @@ final class CloudBrowserViewModel {
             state.snackbar = domainErrorMessage(error)
         }
         state.isLoading = false
+    }
+
+    func loadMoreIfNeeded(current item: CloudFileEntry) async {
+        guard item.id == state.files.last?.id else { return }
+        await loadMore()
+    }
+
+    func loadMore() async {
+        guard state.canLoadMore, !state.isLoadingMore else { return }
+        state.isLoadingMore = true
+        do {
+            var page: CloudDirectoryPage
+            repeat {
+                page = try await cloud.listDirectoryPage(
+                    state.directoryID,
+                    limit: 50,
+                    cursorName: cursorName,
+                    cursorEntryID: cursorEntryID
+                )
+                cursorName = page.nextCursorName
+                cursorEntryID = page.nextCursorEntryID
+            } while page.files.isEmpty && page.hasMore
+
+            var nextState = state
+            nextState.files.append(contentsOf: page.files)
+            nextState.canLoadMore = page.hasMore
+            nextState.isLoadingMore = false
+            state = nextState
+        } catch {
+            state.snackbar = domainErrorMessage(error)
+            state.isLoadingMore = false
+        }
     }
 
     func createFolder(name: String) async {

@@ -67,15 +67,49 @@ class CloudRepository(
 
     // MARK: Каталоги
 
-    /** Содержимое папки с полной информацией о файлах. `""` = корень. */
-    suspend fun listDirectory(directoryId: String): CloudListing {
-        val resp = grpc.cloudStub().listDirectoryDetailed(
-            ListDirectoryRequest.newBuilder().setDirectoryId(directoryId).build()
-        )
-        return CloudListing(
+    /** Одна страница содержимого папки. `""` = корень. */
+    suspend fun listDirectoryPage(
+        directoryId: String,
+        limit: Int = 50,
+        cursorName: String? = null,
+        cursorEntryId: String = "",
+    ): CloudDirectoryPage {
+        val req = ListDirectoryRequest.newBuilder()
+            .setDirectoryId(directoryId)
+            .setLimit(limit)
+            .setCursorEntryId(cursorEntryId)
+        if (!cursorName.isNullOrEmpty()) req.setCursorName(cursorName)
+
+        val resp = grpc.cloudStub().listDirectoryDetailed(req.build())
+        return CloudDirectoryPage(
             subdirs = resp.subdirsList.map { CloudDirectory.from(it) },
             files = resp.filesList.map { CloudFileEntry.from(it) },
+            nextCursorName = resp.nextCursorName.takeIf { it.isNotEmpty() },
+            nextCursorEntryId = resp.nextCursorEntryId,
         )
+    }
+
+    /** Содержимое папки целиком для системных потребителей, которым нужен полный обход. */
+    suspend fun listDirectory(directoryId: String): CloudListing {
+        var cursorName: String? = null
+        var cursorEntryId = ""
+        var subdirs = emptyList<CloudDirectory>()
+        val files = mutableListOf<CloudFileEntry>()
+
+        do {
+            val page = listDirectoryPage(
+                directoryId = directoryId,
+                limit = 200,
+                cursorName = cursorName,
+                cursorEntryId = cursorEntryId,
+            )
+            if (subdirs.isEmpty()) subdirs = page.subdirs
+            files += page.files
+            cursorName = page.nextCursorName
+            cursorEntryId = page.nextCursorEntryId
+        } while (page.hasMore)
+
+        return CloudListing(subdirs = subdirs, files = files)
     }
 
     /** Хлебные крошки до папки (от корня, не включая саму папку). */

@@ -17,6 +17,9 @@ namespace BarkCloud.Files.Features.Cloud.ListDirectoryDetailed;
 
 public class ListDirectoryDetailedCommandHandler : IRequestHandler<ListDirectoryDetailedCommand, DirectoryListingDetailed>
 {
+    private const int DefaultLimit = 50;
+    private const int MaxLimit = 200;
+
     private readonly ICloudHierarchyStorage _storage;
     private readonly IUploadedFilesStorage _uploadedFiles;
     private readonly UserContext _userContext;
@@ -60,10 +63,14 @@ public class ListDirectoryDetailedCommandHandler : IRequestHandler<ListDirectory
             fileDirectoryId = CloudHierarchyStorage.RootDirectoryId;
         }
 
+        var limit = request.Limit <= 0 ? DefaultLimit : Math.Min(request.Limit, MaxLimit);
+        var entries = await _storage.ListFilesInDirectoryPage(
+            ownerId, fileDirectoryId, request.CursorName, request.CursorEntryId, limit, cancellationToken);
+        var hasMore = entries.Count > limit;
+        var page = hasMore ? entries.Take(limit).ToList() : entries;
         var subdirs = await _storage.ListSubdirectories(ownerId, request.DirectoryId, cancellationToken);
-        var entries = await _storage.ListFilesInDirectory(ownerId, fileDirectoryId, cancellationToken);
 
-        var fileIds = entries.Select(e => e.FileId).Distinct().ToList();
+        var fileIds = page.Select(e => e.FileId).Distinct().ToList();
         var files = fileIds.Count == 0
             ? new List<Domain.UploadFile>()
             : await _uploadedFiles.GetFiles(fileIds);
@@ -85,7 +92,7 @@ public class ListDirectoryDetailedCommandHandler : IRequestHandler<ListDirectory
             });
         }
 
-        foreach (var e in entries)
+        foreach (var e in page)
         {
             if (!filesById.TryGetValue(e.FileId, out var file))
                 continue;
@@ -106,6 +113,13 @@ public class ListDirectoryDetailedCommandHandler : IRequestHandler<ListDirectory
                 Entry = entryInfo,
                 File = file.ToGrpc(baseUrl, previews)
             });
+        }
+
+        if (hasMore && page.Count > 0)
+        {
+            var last = page[^1];
+            response.NextCursorName = last.Name;
+            response.NextCursorEntryId = last.Id.ToString();
         }
 
         _logger.LogDebug(

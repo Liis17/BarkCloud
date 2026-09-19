@@ -46,8 +46,8 @@ Package: `barkcloud.files`
 | `RenameDirectory(RenameDirectoryRequest) → CloudEmpty` | Переименовать папку |
 | `MoveDirectory(MoveDirectoryRequest) → CloudEmpty` | Переместить папку |
 | `DeleteDirectory(DeleteDirectoryRequest) → CloudEmpty` | Удалить рекурсивно |
-| `ListDirectory(ListDirectoryRequest) → DirectoryListing` | Листинг (`subdirs`, ready `files`); `directory_id` пуст = корень владельца. Только метаданные |
-| `ListDirectoryDetailed(ListDirectoryRequest) → DirectoryListingDetailed` | Та же выборка, что у `ListDirectory`, но каждый ready-файл содержит полный `UploadFileInfo`; processing placeholders скрыты |
+| `ListDirectory(ListDirectoryRequest) → DirectoryListing` | Страница листинга (`subdirs`, ready `files`); `directory_id` пуст = корень владельца. Только метаданные |
+| `ListDirectoryDetailed(ListDirectoryRequest) → DirectoryListingDetailed` | Та же страница, что у `ListDirectory`, но каждый ready-файл содержит полный `UploadFileInfo`; processing placeholders скрыты |
 | `AttachFile(AttachFileRequest) → CloudEmpty` | Привязать только ready `UploadFile`; `upload_session_id/is_upload_retry` коррелируют V2 retry для логов/метрики, processing даёт `FileNotReadyException`, replay уже привязанного — `FileAlreadyAttachedException` |
 | `RenameFileEntry(RenameFileEntryRequest) → CloudEmpty` | Переименовать запись (не меняет `UploadFile.Filename`) |
 | `MoveFileEntry(MoveFileEntryRequest) → CloudEmpty` | Переместить запись (`new_directory_id` пуст = корень) |
@@ -96,9 +96,12 @@ Package: `barkcloud.files`
 - `CloudEmpty {}` — пустой ответ
 - `DirectoryInfo` — информация о папке
 - `FileEntryInfo` — содержит `directory_id` (папка-владелец записи)
-- `DirectoryListing { repeated DirectoryInfo subdirs; repeated FileEntryInfo files; }` — листинг для дешёвых UI-сценариев
+- `ListDirectoryRequest { optional directory_id; limit; optional cursor_name; cursor_entry_id; }` — `limit` по умолчанию 50, максимум 200; курсор exclusive по `(name, entry_id)`
+- `DirectoryListing { repeated DirectoryInfo subdirs; repeated FileEntryInfo files; next_cursor_name; next_cursor_entry_id; }` — страница для дешёвых UI-сценариев
 - `FileEntryDetailed { FileEntryInfo entry; UploadFileInfo file; }` — запись + полная info по блобу
-- `DirectoryListingDetailed { repeated DirectoryInfo subdirs; repeated FileEntryDetailed files; }`
+- `DirectoryListingDetailed { repeated DirectoryInfo subdirs; repeated FileEntryDetailed files; next_cursor_name; next_cursor_entry_id; }`
+
+Для обоих листингов пагинация применяется только к файлам: подпапки возвращаются целиком на каждой странице. Сервер выбирает `limit + 1` живых записей, сортирует по `name ASC, entry_id ASC` и возвращает `next_cursor_*`, если есть следующая страница; удалённые и неготовые файлы скрываются.
 - `ListUserImagesRequest { limit; cursor_created_at; cursor_file_id; }` — `limit` clamp 1..200, default 50; курсор exclusive
 - `ListUserMediaRequest { MediaKind kind; limit; cursor_created_at; cursor_file_id; }` — `kind` = PHOTO/VIDEO
 - `UserImageItem { UploadFileInfo file; entries_count; repeated entry_names; repeated entry_ids; duplicate_group_key; }` — карточка по `UploadFile`; `entries_count` — сколько **живых** записей у владельца, `entry_names` — до 5 имён, `entry_ids` — id живых записей (для rename/перехода к элементу галереи без листинга каталога; удаление галереи идёт через `DeleteUserMedia(file_id)`), `duplicate_group_key` — SHA-256 группы для системных папок дубликатов

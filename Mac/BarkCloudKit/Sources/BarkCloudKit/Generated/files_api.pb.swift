@@ -1673,11 +1673,28 @@ public struct Barkcloud_Files_ListDirectoryRequest: Sendable {
   /// Clears the value of `directoryID`. Subsequent reads from it will return its default value.
   public mutating func clearDirectoryID() {self._directoryID = nil}
 
+  /// 1..200, default 50
+  public var limit: Int32 = 0
+
+  /// exclusive; пусто = с первого имени
+  public var cursorName: String {
+    get {_cursorName ?? String()}
+    set {_cursorName = newValue}
+  }
+  /// Returns true if `cursorName` has been explicitly set.
+  public var hasCursorName: Bool {self._cursorName != nil}
+  /// Clears the value of `cursorName`. Subsequent reads from it will return its default value.
+  public mutating func clearCursorName() {self._cursorName = nil}
+
+  /// tie-breaker для стабильной cursor-пагинации
+  public var cursorEntryID: String = String()
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
   fileprivate var _directoryID: String? = nil
+  fileprivate var _cursorName: String? = nil
 }
 
 public struct Barkcloud_Files_DirectoryListing: Sendable {
@@ -1688,6 +1705,11 @@ public struct Barkcloud_Files_DirectoryListing: Sendable {
   public var subdirs: [Barkcloud_Files_DirectoryInfo] = []
 
   public var files: [Barkcloud_Files_FileEntryInfo] = []
+
+  /// пусто = больше страниц нет
+  public var nextCursorName: String = String()
+
+  public var nextCursorEntryID: String = String()
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -1706,7 +1728,7 @@ public struct Barkcloud_Files_AttachFileRequest: Sendable {
 
   public var name: String = String()
 
-  /// true → сервер кладёт файл в системную папку Фото/Видео/Другие документы по типу медиа
+  /// true → сервер кладёт файл в системную папку Фото/Видео/Музыка/Другие документы по типу медиа
   public var routeByMediaKind: Bool = false
 
   /// Корреляция Upload 2.0; пусто для legacy/обычного AttachFile
@@ -1841,6 +1863,11 @@ public struct Barkcloud_Files_DirectoryListingDetailed: Sendable {
   public var subdirs: [Barkcloud_Files_DirectoryInfo] = []
 
   public var files: [Barkcloud_Files_FileEntryDetailed] = []
+
+  /// пусто = больше страниц нет
+  public var nextCursorName: String = String()
+
+  public var nextCursorEntryID: String = String()
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -6977,7 +7004,7 @@ extension Barkcloud_Files_DeleteDirectoryRequest: SwiftProtobuf.Message, SwiftPr
 
 extension Barkcloud_Files_ListDirectoryRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ListDirectoryRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}directory_id\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}directory_id\0\u{1}limit\0\u{3}cursor_name\0\u{3}cursor_entry_id\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -6986,6 +7013,9 @@ extension Barkcloud_Files_ListDirectoryRequest: SwiftProtobuf.Message, SwiftProt
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self._directoryID) }()
+      case 2: try { try decoder.decodeSingularInt32Field(value: &self.limit) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self._cursorName) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self.cursorEntryID) }()
       default: break
       }
     }
@@ -6999,11 +7029,23 @@ extension Barkcloud_Files_ListDirectoryRequest: SwiftProtobuf.Message, SwiftProt
     try { if let v = self._directoryID {
       try visitor.visitSingularStringField(value: v, fieldNumber: 1)
     } }()
+    if self.limit != 0 {
+      try visitor.visitSingularInt32Field(value: self.limit, fieldNumber: 2)
+    }
+    try { if let v = self._cursorName {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 3)
+    } }()
+    if !self.cursorEntryID.isEmpty {
+      try visitor.visitSingularStringField(value: self.cursorEntryID, fieldNumber: 4)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: Barkcloud_Files_ListDirectoryRequest, rhs: Barkcloud_Files_ListDirectoryRequest) -> Bool {
     if lhs._directoryID != rhs._directoryID {return false}
+    if lhs.limit != rhs.limit {return false}
+    if lhs._cursorName != rhs._cursorName {return false}
+    if lhs.cursorEntryID != rhs.cursorEntryID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -7011,7 +7053,7 @@ extension Barkcloud_Files_ListDirectoryRequest: SwiftProtobuf.Message, SwiftProt
 
 extension Barkcloud_Files_DirectoryListing: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DirectoryListing"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}subdirs\0\u{1}files\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}subdirs\0\u{1}files\0\u{3}next_cursor_name\0\u{3}next_cursor_entry_id\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -7021,6 +7063,8 @@ extension Barkcloud_Files_DirectoryListing: SwiftProtobuf.Message, SwiftProtobuf
       switch fieldNumber {
       case 1: try { try decoder.decodeRepeatedMessageField(value: &self.subdirs) }()
       case 2: try { try decoder.decodeRepeatedMessageField(value: &self.files) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.nextCursorName) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self.nextCursorEntryID) }()
       default: break
       }
     }
@@ -7033,12 +7077,20 @@ extension Barkcloud_Files_DirectoryListing: SwiftProtobuf.Message, SwiftProtobuf
     if !self.files.isEmpty {
       try visitor.visitRepeatedMessageField(value: self.files, fieldNumber: 2)
     }
+    if !self.nextCursorName.isEmpty {
+      try visitor.visitSingularStringField(value: self.nextCursorName, fieldNumber: 3)
+    }
+    if !self.nextCursorEntryID.isEmpty {
+      try visitor.visitSingularStringField(value: self.nextCursorEntryID, fieldNumber: 4)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: Barkcloud_Files_DirectoryListing, rhs: Barkcloud_Files_DirectoryListing) -> Bool {
     if lhs.subdirs != rhs.subdirs {return false}
     if lhs.files != rhs.files {return false}
+    if lhs.nextCursorName != rhs.nextCursorName {return false}
+    if lhs.nextCursorEntryID != rhs.nextCursorEntryID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -7330,7 +7382,7 @@ extension Barkcloud_Files_FileEntryDetailed: SwiftProtobuf.Message, SwiftProtobu
 
 extension Barkcloud_Files_DirectoryListingDetailed: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DirectoryListingDetailed"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}subdirs\0\u{1}files\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}subdirs\0\u{1}files\0\u{3}next_cursor_name\0\u{3}next_cursor_entry_id\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -7340,6 +7392,8 @@ extension Barkcloud_Files_DirectoryListingDetailed: SwiftProtobuf.Message, Swift
       switch fieldNumber {
       case 1: try { try decoder.decodeRepeatedMessageField(value: &self.subdirs) }()
       case 2: try { try decoder.decodeRepeatedMessageField(value: &self.files) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.nextCursorName) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self.nextCursorEntryID) }()
       default: break
       }
     }
@@ -7352,12 +7406,20 @@ extension Barkcloud_Files_DirectoryListingDetailed: SwiftProtobuf.Message, Swift
     if !self.files.isEmpty {
       try visitor.visitRepeatedMessageField(value: self.files, fieldNumber: 2)
     }
+    if !self.nextCursorName.isEmpty {
+      try visitor.visitSingularStringField(value: self.nextCursorName, fieldNumber: 3)
+    }
+    if !self.nextCursorEntryID.isEmpty {
+      try visitor.visitSingularStringField(value: self.nextCursorEntryID, fieldNumber: 4)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: Barkcloud_Files_DirectoryListingDetailed, rhs: Barkcloud_Files_DirectoryListingDetailed) -> Bool {
     if lhs.subdirs != rhs.subdirs {return false}
     if lhs.files != rhs.files {return false}
+    if lhs.nextCursorName != rhs.nextCursorName {return false}
+    if lhs.nextCursorEntryID != rhs.nextCursorEntryID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
