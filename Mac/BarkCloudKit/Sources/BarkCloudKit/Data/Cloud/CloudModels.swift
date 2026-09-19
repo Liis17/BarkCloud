@@ -473,6 +473,16 @@ public struct CloudListing: Sendable {
     public let files: [CloudFileEntry]
 }
 
+/// Страница содержимого папки с cursor-пагинацией файлов.
+public struct CloudDirectoryPage: Sendable {
+    public let subdirs: [CloudDirectory]
+    public let files: [CloudFileEntry]
+    public let nextCursorName: String?
+    public let nextCursorEntryID: String
+
+    public var hasMore: Bool { nextCursorName != nil && !nextCursorEntryID.isEmpty }
+}
+
 /// Страница результатов поиска файлов по имени (зеркалит `SearchFilesResponse`).
 /// `nextCursorCreatedAt == nil` → больше страниц нет.
 public struct CloudSearchPage: Sendable {

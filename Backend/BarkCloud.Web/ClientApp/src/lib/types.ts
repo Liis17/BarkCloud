@@ -78,6 +78,8 @@ export interface Entry {
 export interface Listing {
   dirs: DirInfo[];
   files: Entry[];
+  nextCursorName?: string | null;
+  nextCursorId?: string | null;
 }
 
 /** Запись в корзине (CloudJson.Trash). */

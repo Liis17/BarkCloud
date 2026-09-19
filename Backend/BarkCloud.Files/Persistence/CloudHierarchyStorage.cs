@@ -225,6 +225,35 @@ public class CloudHierarchyStorage : ICloudHierarchyStorage
     }
 
     /// <summary>
+    /// Возвращает страницу живых записей каталога в стабильном порядке (Name, Id).
+    /// Возвращается limit+1 элементов, чтобы вызывающий код мог определить наличие
+    /// следующей страницы, не выполняя отдельный COUNT-запрос.
+    /// </summary>
+    public async Task<List<CloudFileEntry>> ListFilesInDirectoryPage(
+        long ownerId, Guid directoryId, string? cursorName, Guid? cursorEntryId, int limit,
+        CancellationToken cancellationToken = default)
+    {
+        var query = _context.CloudFileEntries
+            .AsNoTracking()
+            .Where(x => x.OwnerId == ownerId && x.DirectoryId == directoryId && !x.IsDeleted);
+
+        if (!string.IsNullOrEmpty(cursorName) && cursorEntryId.HasValue)
+        {
+            var cursorId = cursorEntryId.Value;
+            var cursorIdText = cursorId.ToString();
+            query = query.Where(x =>
+                x.Name.CompareTo(cursorName) > 0
+                || (x.Name == cursorName && x.Id.ToString().CompareTo(cursorIdText) > 0));
+        }
+
+        return await query
+            .OrderBy(x => x.Name)
+            .ThenBy(x => x.Id)
+            .Take(limit + 1)
+            .ToListAsync(cancellationToken);
+    }
+
+    /// <summary>
     /// Поиск живых записей файлов владельца по подстроке имени (регистронезависимо), по всему облаку.
     /// Сортировка (CreatedAt desc, Id desc), cursor-пагинация; возвращает limit+1 для определения след. страницы.
     /// <paramref name="kinds"/> — необязательный фильтр по типу медиа файла (пусто/null = все типы).

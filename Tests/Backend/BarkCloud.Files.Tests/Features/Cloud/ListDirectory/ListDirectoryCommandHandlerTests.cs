@@ -52,7 +52,8 @@ public class ListDirectoryCommandHandlerTests
         _storage.Setup(s => s.ListSubdirectories(OwnerId, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<CloudDirectory> { new() { Id = Guid.NewGuid(), OwnerId = OwnerId, Name = "Sub" } });
         var fileId = Guid.NewGuid();
-        _storage.Setup(s => s.ListFilesInDirectory(OwnerId, CloudHierarchyStorage.RootDirectoryId, It.IsAny<CancellationToken>()))
+        _storage.Setup(s => s.ListFilesInDirectoryPage(
+                OwnerId, CloudHierarchyStorage.RootDirectoryId, null, null, 50, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<CloudFileEntry> { new() { Id = Guid.NewGuid(), OwnerId = OwnerId, FileId = fileId, Name = "f.jpg" } });
         _files.Setup(s => s.GetFiles(It.Is<List<Guid>>(ids => ids.SequenceEqual(new[] { fileId }))))
             .ReturnsAsync([ReadyFile(fileId)]);
@@ -69,7 +70,8 @@ public class ListDirectoryCommandHandlerTests
         var fileId = Guid.NewGuid();
         _storage.Setup(s => s.ListSubdirectories(OwnerId, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
-        _storage.Setup(s => s.ListFilesInDirectory(OwnerId, CloudHierarchyStorage.RootDirectoryId, It.IsAny<CancellationToken>()))
+        _storage.Setup(s => s.ListFilesInDirectoryPage(
+                OwnerId, CloudHierarchyStorage.RootDirectoryId, null, null, 50, It.IsAny<CancellationToken>()))
             .ReturnsAsync([new CloudFileEntry { Id = Guid.NewGuid(), OwnerId = OwnerId, FileId = fileId, Name = "processing.bin" }]);
         _files.Setup(s => s.GetFiles(It.IsAny<List<Guid>>())).ReturnsAsync([]);
 

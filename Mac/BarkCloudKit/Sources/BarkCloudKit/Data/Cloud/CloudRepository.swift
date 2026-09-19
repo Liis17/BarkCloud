@@ -390,16 +390,52 @@ public final class CloudRepository: Sendable {
 
     // MARK: - Каталоги
 
-    /// Содержимое папки с полной информацией о файлах (превью/размеры). `""` = корень.
-    public func listDirectory(_ directoryID: String) async throws -> CloudListing {
+    /// Одна страница содержимого папки с полной информацией о файлах. `""` = корень.
+    public func listDirectoryPage(
+        _ directoryID: String,
+        limit: Int = 50,
+        cursorName: String? = nil,
+        cursorEntryID: String = ""
+    ) async throws -> CloudDirectoryPage {
         let stub = try await grpc.cloudStub()
         var req = Barkcloud_Files_ListDirectoryRequest()
         req.directoryID = directoryID
+        req.limit = Int32(max(1, min(200, limit)))
+        req.cursorEntryID = cursorEntryID
+        if let cursorName, !cursorName.isEmpty {
+            req.cursorName = cursorName
+        }
         let resp = try await stub.listDirectoryDetailed(req)
-        return CloudListing(
+        return CloudDirectoryPage(
             subdirs: resp.subdirs.map(CloudDirectory.init),
-            files: resp.files.map(CloudFileEntry.init)
+            files: resp.files.map(CloudFileEntry.init),
+            nextCursorName: resp.nextCursorName.isEmpty ? nil : resp.nextCursorName,
+            nextCursorEntryID: resp.nextCursorEntryID
         )
+    }
+
+    /// Полный обход содержимого папки для системных потребителей (например, FileProvider).
+    public func listDirectory(_ directoryID: String) async throws -> CloudListing {
+        var cursorName: String?
+        var cursorEntryID = ""
+        var subdirs: [CloudDirectory] = []
+        var files: [CloudFileEntry] = []
+
+        repeat {
+            let page = try await listDirectoryPage(
+                directoryID,
+                limit: 200,
+                cursorName: cursorName,
+                cursorEntryID: cursorEntryID
+            )
+            if subdirs.isEmpty { subdirs = page.subdirs }
+            files.append(contentsOf: page.files)
+            cursorName = page.nextCursorName
+            cursorEntryID = page.nextCursorEntryID
+            if !page.hasMore { break }
+        } while true
+
+        return CloudListing(subdirs: subdirs, files: files)
     }
 
     /// Хлебные крошки до папки (от корня, не включая саму папку).

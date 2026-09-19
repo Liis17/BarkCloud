@@ -465,11 +465,16 @@ message DeleteDirectoryRequest {
 
 message ListDirectoryRequest {
   optional string directory_id = 1; // Не указан или пустой = корень владельца
+  int32 limit = 2; // 1..200, default 50
+  optional string cursor_name = 3; // exclusive; пусто = с первого имени
+  string cursor_entry_id = 4; // tie-breaker для стабильной cursor-пагинации
 }
 
 message DirectoryListing {
   repeated DirectoryInfo subdirs = 1;
   repeated FileEntryInfo files = 2;
+  string next_cursor_name = 3; // пусто = больше страниц нет
+  string next_cursor_entry_id = 4;
 }
 
 message AttachFileRequest {
@@ -517,6 +522,8 @@ message FileEntryDetailed {
 message DirectoryListingDetailed {
   repeated DirectoryInfo subdirs = 1;
   repeated FileEntryDetailed files = 2;
+  string next_cursor_name = 3; // пусто = больше страниц нет
+  string next_cursor_entry_id = 4;
 }
 
 message ListUserImagesRequest {

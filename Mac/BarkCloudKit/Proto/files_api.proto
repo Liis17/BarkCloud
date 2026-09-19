@@ -465,18 +465,23 @@ message DeleteDirectoryRequest {
 
 message ListDirectoryRequest {
   optional string directory_id = 1; // Не указан или пустой = корень владельца
+  int32 limit = 2; // 1..200, default 50
+  optional string cursor_name = 3; // exclusive; пусто = с первого имени
+  string cursor_entry_id = 4; // tie-breaker для стабильной cursor-пагинации
 }
 
 message DirectoryListing {
   repeated DirectoryInfo subdirs = 1;
   repeated FileEntryInfo files = 2;
+  string next_cursor_name = 3; // пусто = больше страниц нет
+  string next_cursor_entry_id = 4;
 }
 
 message AttachFileRequest {
   string directory_id = 1; // Пустая строка означает корень владельца (игнорируется при route_by_media_kind)
   string file_id = 2;
   string name = 3;
-  bool route_by_media_kind = 4; // true → сервер кладёт файл в системную папку Фото/Видео/Другие документы по типу медиа
+  bool route_by_media_kind = 4; // true → сервер кладёт файл в системную папку Фото/Видео/Музыка/Другие документы по типу медиа
   string upload_session_id = 5; // Корреляция Upload 2.0; пусто для legacy/обычного AttachFile
   bool is_upload_retry = 6; // Retry после uploaded_not_attached
 }
@@ -517,6 +522,8 @@ message FileEntryDetailed {
 message DirectoryListingDetailed {
   repeated DirectoryInfo subdirs = 1;
   repeated FileEntryDetailed files = 2;
+  string next_cursor_name = 3; // пусто = больше страниц нет
+  string next_cursor_entry_id = 4;
 }
 
 message ListUserImagesRequest {

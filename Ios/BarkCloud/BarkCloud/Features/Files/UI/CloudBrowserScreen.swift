@@ -197,10 +197,12 @@ struct CloudBrowserScreen: View {
                         }
                         .contentShape(Rectangle())
                         .onTapGesture { vm.toggleFile(entry) }
+                        .onAppear { Task { await vm.loadMoreIfNeeded(current: entry) } }
                     } else {
-                    fileRow(entry)
+                        fileRow(entry)
                         .contentShape(Rectangle())
                         .onTapGesture { openFile = entry }
+                        .onAppear { Task { await vm.loadMoreIfNeeded(current: entry) } }
                         .swipeActions(edge: .trailing) {
                             deleteButton { vm.deleteFile(entry) }
                             moveButton { moveSubject = .file(entry) }
@@ -238,6 +240,14 @@ struct CloudBrowserScreen: View {
                             }
                         }
                     }
+                }
+                if vm.state.canLoadMore || vm.state.isLoadingMore {
+                    HStack {
+                        Spacer()
+                        ProgressView()
+                        Spacer()
+                    }
+                    .task(id: vm.state.files.count) { await vm.loadMore() }
                 }
             }
             .listStyle(.plain)
@@ -622,7 +632,7 @@ private struct CloudMovePicker: View {
 
     private func load() async {
         isLoading = true
-        if let listing = try? await cloud.listDirectory(currentID) {
+        if let listing = try? await cloud.listDirectoryPage(currentID, limit: 1) {
             subdirs = listing.subdirs
         }
         isLoading = false

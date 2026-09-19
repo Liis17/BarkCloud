@@ -6,12 +6,14 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -43,6 +45,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -79,6 +82,7 @@ fun CloudBrowserScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val openRemote = rememberRemoteOpener()
+    val listState = rememberLazyListState()
 
     var fabMenu by remember { mutableStateOf(false) }
     var showCreate by remember { mutableStateOf(false) }
@@ -98,6 +102,16 @@ fun CloudBrowserScreen(
         val msg = state.snackbar ?: return@LaunchedEffect
         snackbarHostState.showSnackbar(msg)
         viewModel.snackbarShown()
+    }
+    val shouldLoadMore by remember {
+        derivedStateOf {
+            val last = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+            val itemCount = state.subdirs.size + state.files.size + if (state.crumbs.isNotEmpty()) 1 else 0
+            (itemCount > 0 && last >= itemCount - 5) || (itemCount == 0 && state.canLoadMore)
+        }
+    }
+    LaunchedEffect(shouldLoadMore, state.files.size, state.subdirs.size, state.isLoadingMore) {
+        if (shouldLoadMore) viewModel.loadMore()
     }
 
     Scaffold(
@@ -141,7 +155,7 @@ fun CloudBrowserScreen(
         },
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
-            LazyColumn(Modifier.fillMaxSize()) {
+            LazyColumn(Modifier.fillMaxSize(), state = listState) {
                 if (state.crumbs.isNotEmpty()) {
                     item { Breadcrumbs(state.crumbs.map { it.id to it.name }, onOpenFolder) }
                 }
@@ -167,6 +181,16 @@ fun CloudBrowserScreen(
                         onMove = { moveTarget = CloudTarget.File(file.id, file.name) },
                         onDelete = { deleteTarget = CloudTarget.File(file.id, file.name) },
                     )
+                }
+                if (state.isLoadingMore) {
+                    item {
+                        Box(
+                            Modifier.fillMaxWidth().padding(16.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            CircularProgressIndicator(Modifier.size(24.dp))
+                        }
+                    }
                 }
             }
 

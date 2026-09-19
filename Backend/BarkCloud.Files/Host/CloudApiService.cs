@@ -119,9 +119,16 @@ public class CloudApiService : CloudApi.CloudApiBase
 
     public override Task<DirectoryListing> ListDirectory(ListDirectoryRequest request, ServerCallContext context)
     {
+        Guid? cursorEntryId = string.IsNullOrWhiteSpace(request.CursorEntryId)
+            ? null
+            : Guid.Parse(request.CursorEntryId);
+
         var command = new ListDirectoryCommand
         {
-            DirectoryId = request.HasDirectoryId ? ParseOptionalGuid(request.DirectoryId) : null
+            DirectoryId = request.HasDirectoryId ? ParseOptionalGuid(request.DirectoryId) : null,
+            Limit = request.Limit,
+            CursorName = request.HasCursorName ? request.CursorName : null,
+            CursorEntryId = cursorEntryId
         };
 
         return _mediator.Send(command);
@@ -129,9 +136,16 @@ public class CloudApiService : CloudApi.CloudApiBase
 
     public override Task<DirectoryListingDetailed> ListDirectoryDetailed(ListDirectoryRequest request, ServerCallContext context)
     {
+        Guid? cursorEntryId = string.IsNullOrWhiteSpace(request.CursorEntryId)
+            ? null
+            : Guid.Parse(request.CursorEntryId);
+
         var command = new ListDirectoryDetailedCommand
         {
-            DirectoryId = request.HasDirectoryId ? ParseOptionalGuid(request.DirectoryId) : null
+            DirectoryId = request.HasDirectoryId ? ParseOptionalGuid(request.DirectoryId) : null,
+            Limit = request.Limit,
+            CursorName = request.HasCursorName ? request.CursorName : null,
+            CursorEntryId = cursorEntryId
         };
 
         return _mediator.Send(command);

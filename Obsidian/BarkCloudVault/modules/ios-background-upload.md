@@ -192,7 +192,7 @@ AppEnvironment подписывает системный хук attachFile, Uplo
 `ShareExtension/ShareViewController.swift` — UIKit-based, показывает UI
 выбора целевой папки до загрузки:
 1. После `viewDidLoad` → `prepare()` копирует attachments в App Group container.
-2. Дёргает `grpc.cloudStub().listDirectoryDetailed("")` чтобы узнать папки
+2. Дёргает `grpc.cloudStub().listDirectoryDetailed("")` с `limit = 1`, чтобы узнать папки
    корня; ищет/создаёт «Недавно загруженные» как default.
 3. Показывает stack: иконка/заголовок, имя файла(ов), чип-кнопка «Папка: …»
    с `UIMenu` (через `showsMenuAsPrimaryAction = true`), кнопки «Загрузить»

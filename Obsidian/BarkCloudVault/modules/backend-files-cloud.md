@@ -60,8 +60,10 @@ NextCloud-подобная иерархия папок и файловых за�
 - `RenameDirectory` — переименовать
 - `MoveDirectory` — переместить в другую папку
 - `DeleteDirectory` — удалить рекурсивно
-- `ListDirectory` — листинг (subdirs + files), только метаданные
-- `ListDirectoryDetailed` — листинг с обогащёнными `FileEntryDetailed` (полная `UploadFileInfo` с URL/превью); записи без ready-блоба не возвращаются
+- `ListDirectory` — cursor-страница (subdirs + files), только метаданные
+- `ListDirectoryDetailed` — cursor-страница с обогащёнными `FileEntryDetailed` (полная `UploadFileInfo` с URL/превью); записи без ready-блоба не возвращаются
+
+Для обоих RPC размер страницы файлов по умолчанию — 50, максимум — 200. Курсор состоит из `(Name, entry_id)`, порядок — `Name ASC, entry_id ASC`; выборка делает `limit + 1`, чтобы определить `next_cursor_*`. Поддиректории не пагинируются. Удалённые и неготовые файлы не попадают в ответ.
 
 ### Записи о файлах
 - `AttachFile` — привязать существующий **ready** `UploadFile` к папке (создаёт `CloudFileEntry`); processing placeholder отклоняется `FileNotReadyException`; повтор уже привязанного файла даёт стабильный `FileAlreadyAttachedException`; коллизия имени разрешается суффиксом ` (1)`; при `route_by_media_kind=true` `directory_id` игнорируется и файл кладётся в системную папку по типу медиа
