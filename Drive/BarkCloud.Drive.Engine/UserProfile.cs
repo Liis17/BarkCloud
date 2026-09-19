@@ -15,7 +15,7 @@ internal sealed class UserProfile(UsersApi.UsersApiClient users)
         get { lock (_lock) return _username; }
     }
 
-    // URL аватара (превью или, если его нет, полный). Готовый /download-URL — нормализуется при скачивании.
+    // URL аватара (оригинал или, если его нет, превью). Готовый /download-URL — нормализуется при скачивании.
     public string? AvatarUrl
     {
         get { lock (_lock) return _avatarUrl; }
@@ -33,9 +33,9 @@ internal sealed class UserProfile(UsersApi.UsersApiClient users)
             lock (_lock)
             {
                 _username = user.Username;
-                _avatarUrl = !string.IsNullOrEmpty(user.ProfilePicturePreview)
-                    ? user.ProfilePicturePreview
-                    : user.ProfilePicture;
+                _avatarUrl = !string.IsNullOrEmpty(user.ProfilePicture)
+                    ? user.ProfilePicture
+                    : user.ProfilePicturePreview;
             }
         }
         catch (Exception ex)

@@ -101,7 +101,7 @@ extension RemoteImage where Placeholder == Color {
 
 /// Картинка, которая пробует загрузиться по нескольким URL по очереди и берёт
 /// первый успешный ответ (HTTP 2xx + валидное изображение). Нужна для аватара:
-/// сначала пробуем превью, при недоступности — полное изображение. В отличие от
+/// сначала пробуем оригинал, при недоступности — превью. В отличие от
 /// `RemoteImage`, проверяет HTTP-статус, чтобы не принять 404-страницу за картинку.
 struct FallbackRemoteImage<Placeholder: View>: View {
     let fileId: String?
@@ -143,9 +143,9 @@ struct FallbackRemoteImage<Placeholder: View>: View {
                 image = cached
                 return
             }
-            // Cache-aware путь: первый URL — превью аватара, второй — оригинал.
+            // Cache-aware путь: первый URL — оригинал аватара, второй — превью.
             if let fileId {
-                let variant: CacheVariant = index == 0 ? .avatarPreview : .avatar
+                let variant: CacheVariant = index == 0 ? .avatar : .avatarPreview
                 if let data = try? await env.fileCache.loadData(fileId: fileId, variant: variant, sourceURL: url),
                    let ui = UIImage(data: data) {
                     RemoteImageCache.shared.store(ui, for: url)

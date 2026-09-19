@@ -847,7 +847,7 @@ function AccountTab({ profile, flash }: { profile: SettingsState['profile']; fla
   const [baseUsername, setBaseUsername] = React.useState(profile.username || '');
   const [uStatus, setUStatus] = React.useState<'idle' | 'checking' | 'ok' | 'taken' | 'invalid'>('idle');
   const [savingUser, setSavingUser] = React.useState(false);
-  const [avatarUrl, setAvatarUrl] = React.useState(profile.avatarPreviewUrl || profile.avatarUrl || '');
+  const [avatarUrl, setAvatarUrl] = React.useState(profile.avatarUrl || profile.avatarPreviewUrl || '');
   const [avatarBusy, setAvatarBusy] = React.useState(false);
   const fileRef = React.useRef<HTMLInputElement>(null);
   const [delOpen, setDelOpen] = React.useState(false);
@@ -911,7 +911,7 @@ function AccountTab({ profile, flash }: { profile: SettingsState['profile']; fla
     }
     setAvatarBusy(false);
     if (r.ok && data) {
-      setAvatarUrl(data.avatarPreviewUrl || data.avatarUrl || '');
+      setAvatarUrl(data.avatarUrl || data.avatarPreviewUrl || '');
       flash('ok', 'Аватар обновлён');
     } else flash('err', (data && data.message) || 'Не удалось загрузить аватар');
   }
