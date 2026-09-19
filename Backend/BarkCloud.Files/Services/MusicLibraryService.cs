@@ -264,8 +264,15 @@ public class MusicLibraryService
 
         var requested = fileIds.Distinct().ToList();
         var files = await _filesStorage.GetFiles(requested);
-        if (files.Count != requested.Count || files.Any(f => f.MediaKind != DomainMediaKind.Audio || !f.Uploaders.Contains(_userContext.UserId)))
+        if (files.Count != requested.Count || files.Any(f => !f.Uploaders.Contains(_userContext.UserId)))
             throw new CloudAccessDeniedException();
+
+        requested = files
+            .Where(f => f.MediaKind == DomainMediaKind.Audio)
+            .Select(f => f.Id)
+            .ToList();
+        if (requested.Count == 0)
+            return new CloudEmpty();
 
         var existing = await _context.MusicPlaylistItems
             .AsNoTracking()

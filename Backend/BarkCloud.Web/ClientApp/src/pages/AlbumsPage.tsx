@@ -2,11 +2,14 @@ import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import { EmptyState, Loading } from '../components/ui/EmptyState';
+import { FileDropOverlay } from '../components/ui/FileDropOverlay';
 import { AlbumCard } from '../components/albums/AlbumCard';
 import { AlbumFormModal } from '../components/albums/AlbumFormModal';
 import { AlbumDetail } from '../components/albums/AlbumDetail';
 import { useToast } from '../hooks/useToast';
 import { usePageHeader } from '../hooks/usePageHeader';
+import { useFileDrop } from '../hooks/useFileDrop';
+import { useUploadActions } from '../hooks/useUploadManager';
 import { apiGet } from '../lib/api';
 import { plural } from '../lib/format';
 import type { Album, MediaItem } from '../lib/types';
@@ -22,6 +25,10 @@ export function AlbumsPage() {
   const [candidates, setCandidates] = React.useState<MediaItem[]>([]);
   const [toastNode, toast] = useToast();
   const resolvedOpenId = React.useRef('');
+  const { enqueue, attachVersion } = useUploadActions();
+  const { over, target: dropTarget, dropHandlers, getTargetHandlers } = useFileDrop((files, target) => {
+    enqueue(files, { routeByMediaKind: true, albumId: target?.id || openAlbum?.id });
+  });
 
   const loadAlbums = React.useCallback(() => {
     apiGet<{ albums: Album[] }>('/api/albums')
@@ -35,6 +42,10 @@ export function AlbumsPage() {
   React.useEffect(() => {
     loadAlbums();
   }, [loadAlbums]);
+
+  React.useEffect(() => {
+    if (attachVersion) loadAlbums();
+  }, [attachVersion, loadAlbums]);
 
   React.useEffect(() => {
     if (!openAlbumId || !albums || resolvedOpenId.current === openAlbumId) return;
@@ -90,40 +101,66 @@ export function AlbumsPage() {
     <>
       {toastNode}
 
-      {openAlbum ? (
-        <AlbumDetail album={openAlbum} candidates={candidates} albums={albums || []} toast={toast} onBack={() => setOpenAlbum(null)} onChanged={loadAlbums} />
-      ) : albums === null ? (
-        <Loading />
-      ) : albums.length === 0 ? (
-        <EmptyState
-          icon="photo"
-          title="Пока нет альбомов"
-          hint="Создайте альбом и добавьте в него фото и видео из галереи."
-          action={
-            <button className="btn primary" onClick={() => setCreating(true)}>
-              <Icon.plus size={16} /> Создать альбом
-            </button>
-          }
-        />
-      ) : (
-        <>
-          <div className="section-head">
-            <h2>Все альбомы</h2>
-            <div className="meta">
-              {albums.length} {plural(albums.length, 'альбом', 'альбома', 'альбомов')}
-            </div>
+      <div className={'dropzone' + (over ? ' drop-over' : '')} {...dropHandlers}>
+        {over && (
+          <FileDropOverlay
+            detail={dropTarget || openAlbum
+              ? `Фото и видео будут добавлены в альбом «${dropTarget?.label || openAlbum?.name}», остальные файлы загрузятся автоматически`
+              : 'Файлы будут распределены по стандартным папкам по формату'}
+          />
+        )}
+
+        {openAlbum ? (
+          <div {...getTargetHandlers({ id: openAlbum.id, label: openAlbum.name })}>
+            <AlbumDetail
+              album={openAlbum}
+              candidates={candidates}
+              albums={albums || []}
+              refreshKey={attachVersion}
+              toast={toast}
+              onBack={() => setOpenAlbum(null)}
+              onChanged={loadAlbums}
+            />
           </div>
-          <div className="album-grid">
-            {albums.map((a) => (
-              <AlbumCard key={a.id} album={a} onOpen={(al) => setOpenAlbum(al)} />
-            ))}
-            <div className="album-card new-album" onClick={() => setCreating(true)}>
-              <Icon.plus size={28} />
-              <span>Создать альбом</span>
+        ) : albums === null ? (
+          <Loading />
+        ) : albums.length === 0 ? (
+          <EmptyState
+            icon="photo"
+            title="Пока нет альбомов"
+            hint="Создайте альбом и добавьте в него фото и видео из галереи."
+            action={
+              <button className="btn primary" onClick={() => setCreating(true)}>
+                <Icon.plus size={16} /> Создать альбом
+              </button>
+            }
+          />
+        ) : (
+          <>
+            <div className="section-head">
+              <h2>Все альбомы</h2>
+              <div className="meta">
+                {albums.length} {plural(albums.length, 'альбом', 'альбома', 'альбомов')}
+              </div>
             </div>
-          </div>
-        </>
-      )}
+            <div className="album-grid">
+              {albums.map((a) => (
+                <AlbumCard
+                  key={a.id}
+                  album={a}
+                  active={dropTarget?.id === a.id}
+                  dropHandlers={getTargetHandlers({ id: a.id, label: a.name })}
+                  onOpen={(al) => setOpenAlbum(al)}
+                />
+              ))}
+              <div className="album-card new-album" onClick={() => setCreating(true)}>
+                <Icon.plus size={28} />
+                <span>Создать альбом</span>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
 
       {creating && (
         <AlbumFormModal

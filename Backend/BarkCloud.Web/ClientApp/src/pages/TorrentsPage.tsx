@@ -3,9 +3,12 @@ import { useLocation } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import { Modal } from '../components/ui/Modal';
 import { EmptyState } from '../components/ui/EmptyState';
+import { FileDropOverlay } from '../components/ui/FileDropOverlay';
 import { useToast } from '../hooks/useToast';
 import { usePageHeader } from '../hooks/usePageHeader';
 import { useTorrentStream, type Torrent, type TorrentFile } from '../hooks/useTorrentStream';
+import { useFileDrop } from '../hooks/useFileDrop';
+import { useUploadActions } from '../hooks/useUploadManager';
 import * as T from '../lib/torrents';
 
 function fmtBytes(n: number): string {
@@ -185,6 +188,27 @@ export function TorrentsPage() {
   const { torrents } = useTorrentStream();
   const [toastNode, push] = useToast();
   const [adding, setAdding] = React.useState(false);
+  const { enqueue } = useUploadActions();
+
+  async function handleDropped(files: File[]) {
+    const torrentFiles = files.filter((file) => file.name.toLowerCase().endsWith('.torrent')
+      || file.type === 'application/x-bittorrent');
+    const cloudFiles = files.filter((file) => !torrentFiles.includes(file));
+    if (cloudFiles.length) enqueue(cloudFiles, { routeByMediaKind: true });
+
+    let added = 0;
+    for (const file of torrentFiles) {
+      try {
+        await T.addTorrentFile(file);
+        added++;
+      } catch (e) {
+        push(`«${file.name}»: ${(e as Error).message}`, 'err');
+      }
+    }
+    if (added) push(`Торрентов добавлено: ${added}`);
+  }
+
+  const { over, dropHandlers } = useFileDrop((files) => { void handleDropped(files); });
 
   usePageHeader(() => ({
     title: 'Торренты',
@@ -196,7 +220,8 @@ export function TorrentsPage() {
   }), []);
 
   return (
-    <div style={{ padding: 16, maxWidth: 1100, margin: '0 auto' }}>
+    <div className={'dropzone' + (over ? ' drop-over' : '')} {...dropHandlers} style={{ padding: 16, maxWidth: 1100, margin: '0 auto' }}>
+      {over && <FileDropOverlay detail=".torrent-файлы будут добавлены напрямую, остальные загрузятся в облако" />}
       {torrents.length === 0
         ? <EmptyState icon="torrent" title="Нет торрентов" hint="Добавьте magnet-ссылку или .torrent-файл" />
         : torrents.map((t) => <TorrentRow key={t.id} t={t} onToast={push} forceOpen={t.id === openTorrentId} />)}

@@ -2,7 +2,7 @@ import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { UploadIndicator } from './UploadIndicator';
-import { UploadManagerProvider, useUploadActions } from '../../hooks/useUploadManager';
+import { UploadManagerProvider, useUploadActions, type AttachOptions } from '../../hooks/useUploadManager';
 import { ApiError, apiPost, checkDuplicateHash, pickFiles } from '../../lib/api';
 import { hashFile } from '../../lib/fileHasher';
 import {
@@ -47,17 +47,18 @@ const completeSessionMock = vi.mocked(completeUploadSession);
 const uploadPartsMock = vi.mocked(uploadMissingParts);
 const waitForReadyMock = vi.mocked(waitForUploadReady);
 const loadTasksMock = vi.mocked(loadUploadTasks);
+const EMPTY_ATTACH_OPTIONS: AttachOptions = {};
 
-function EnqueueFiles({ files }: { files: File[] }) {
+function EnqueueFiles({ files, attachOptions = EMPTY_ATTACH_OPTIONS }: { files: File[]; attachOptions?: AttachOptions }) {
   const { enqueue } = useUploadActions();
-  React.useEffect(() => enqueue(files, {}), [enqueue, files]);
+  React.useEffect(() => enqueue(files, attachOptions), [enqueue, files, attachOptions]);
   return null;
 }
 
-function renderUploads(files: File[]) {
+function renderUploads(files: File[], attachOptions: AttachOptions = {}) {
   return render(
     <UploadManagerProvider>
-      <EnqueueFiles files={files} />
+      <EnqueueFiles files={files} attachOptions={attachOptions} />
       <UploadIndicator />
     </UploadManagerProvider>,
   );
@@ -137,6 +138,43 @@ describe('UploadIndicator', () => {
       isUploadRetry: true,
       uploadSessionId: expect.stringMatching(/^session-/),
     }));
+  });
+
+  it('persists collection targets and retries post-attach actions after a partial failure', async () => {
+    apiPostMock
+      .mockResolvedValueOnce({})
+      .mockRejectedValueOnce(new Error('album failed'))
+      .mockRejectedValueOnce(new ApiError('already attached', {
+        code: 'F1A2B3C4-5D6E-47F8-9A0B-1C2D3E4F5A6B',
+        status: 400,
+      }))
+      .mockResolvedValueOnce({})
+      .mockResolvedValueOnce({});
+
+    renderUploads([new File(['file'], 'file.mp3', { type: 'audio/mpeg' })], {
+      albumId: 'album-1',
+      playlistId: 'playlist-1',
+    });
+
+    const indicator = await screen.findByTitle(/Загрузка/);
+    fireEvent.click(indicator);
+    await screen.findByText('Загружен, не прикреплён');
+    expect(apiPostMock).toHaveBeenNthCalledWith(2, '/api/albums/items/add', {
+      album: 'album-1',
+      fileIds: [expect.stringMatching(/^file-/)],
+    });
+
+    fireEvent.click(screen.getByTitle('Повторить'));
+    await screen.findByText('Загружен');
+    expect(apiPostMock).toHaveBeenNthCalledWith(3, '/api/cloud/attach', expect.objectContaining({ isUploadRetry: true }));
+    expect(apiPostMock).toHaveBeenNthCalledWith(4, '/api/albums/items/add', {
+      album: 'album-1',
+      fileIds: [expect.stringMatching(/^file-/)],
+    });
+    expect(apiPostMock).toHaveBeenNthCalledWith(5, '/api/music/playlists/tracks/add', {
+      playlistId: 'playlist-1',
+      fileIds: [expect.stringMatching(/^file-/)],
+    });
   });
 
   it('treats already-attached replay as success', async () => {

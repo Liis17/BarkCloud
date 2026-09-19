@@ -151,7 +151,7 @@ public class AttachFileCommandHandlerTests
     [InlineData(MediaKind.Photo, CloudDirectorySystemKind.Photos, "Фото")]
     [InlineData(MediaKind.Video, CloudDirectorySystemKind.Videos, "Видео")]
     [InlineData(MediaKind.Document, CloudDirectorySystemKind.OtherDocuments, "Другие документы")]
-    [InlineData(MediaKind.Audio, CloudDirectorySystemKind.OtherDocuments, "Другие документы")]
+    [InlineData(MediaKind.Audio, CloudDirectorySystemKind.Music, "Музыка")]
     [InlineData(MediaKind.Other, CloudDirectorySystemKind.OtherDocuments, "Другие документы")]
     public async Task Handle_RouteByMediaKind_RoutesToSystemFolderByType(
         MediaKind kind, CloudDirectorySystemKind expectedSystemKind, string expectedName)

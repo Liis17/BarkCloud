@@ -4,6 +4,7 @@ import { Icon } from '../components/Icon';
 import { MediaThumb } from '../components/media/MediaThumb';
 import { Lightbox } from '../components/media/Lightbox';
 import { EmptyState, Loading } from '../components/ui/EmptyState';
+import { FileDropOverlay } from '../components/ui/FileDropOverlay';
 import { MemoriesStrip } from '../components/memories/MemoriesStrip';
 import { MediaSearchResults } from '../components/search/MediaSearchResults';
 import { useToast } from '../hooks/useToast';
@@ -166,12 +167,7 @@ export function PhotosPage() {
       {bulk.overlay}
 
       <div className={'dropzone' + (over ? ' drop-over' : '')} {...dropHandlers}>
-        {over && (
-          <div className="drop-overlay">
-            <Icon.upload size={40} />
-            <span>Отпустите фото для загрузки</span>
-          </div>
-        )}
+        {over && <FileDropOverlay detail="Файлы будут распределены по стандартным папкам по формату" />}
 
       <div className="photos-toolbar">
         <div className="chip-row">

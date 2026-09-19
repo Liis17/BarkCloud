@@ -1,14 +1,17 @@
 import { plural } from '../../lib/format';
 import type { Album } from '../../lib/types';
+import type { FileDropHandlers } from '../../hooks/useFileDrop';
 
 interface AlbumCardProps {
   album: Album;
   onOpen: (album: Album) => void;
+  dropHandlers?: FileDropHandlers;
+  active?: boolean;
 }
 
-export function AlbumCard({ album, onOpen }: AlbumCardProps) {
+export function AlbumCard({ album, onOpen, dropHandlers, active }: AlbumCardProps) {
   return (
-    <div className="album-card" onClick={() => onOpen(album)}>
+    <div className={'album-card' + (active ? ' drop-target' : '')} {...dropHandlers} onClick={() => onOpen(album)}>
       {album.coverUrl ? (
         <img className="thumb" src={album.coverUrl} alt="" loading="lazy" style={{ objectFit: 'cover' }} />
       ) : (

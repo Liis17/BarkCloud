@@ -28,6 +28,8 @@ const FILE_ALREADY_ATTACHED_CODE = 'F1A2B3C4-5D6E-47F8-9A0B-1C2D3E4F5A6B';
 export interface AttachOptions {
   dir?: string;
   routeByMediaKind?: boolean;
+  albumId?: string;
+  playlistId?: string;
 }
 
 export type TaskStatus =
@@ -166,15 +168,30 @@ export function UploadManagerProvider({ children }: { children: React.ReactNode 
       if (task.attachOptions.routeByMediaKind) body.routeByMediaKind = true;
       body.uploadSessionId = task.sessionId;
       body.isUploadRetry = isUploadRetry;
-      await apiPost('/api/cloud/attach', body);
-    } catch (error) {
-      if (!(error instanceof ApiError)
-          || error.code?.toUpperCase() !== FILE_ALREADY_ATTACHED_CODE) {
-        task.status = 'uploaded_not_attached';
-        task.error = (error as Error).message || 'Не удалось привязать файл';
-        touchRef.current(task);
-        return;
+      try {
+        await apiPost('/api/cloud/attach', body);
+      } catch (error) {
+        if (!(error instanceof ApiError)
+            || error.code?.toUpperCase() !== FILE_ALREADY_ATTACHED_CODE) throw error;
       }
+
+      if (task.attachOptions.albumId) {
+        await apiPost('/api/albums/items/add', {
+          album: task.attachOptions.albumId,
+          fileIds: [task.fileId],
+        });
+      }
+      if (task.attachOptions.playlistId) {
+        await apiPost('/api/music/playlists/tracks/add', {
+          playlistId: task.attachOptions.playlistId,
+          fileIds: [task.fileId],
+        });
+      }
+    } catch (error) {
+      task.status = 'uploaded_not_attached';
+      task.error = (error as Error).message || 'Не удалось привязать файл';
+      touchRef.current(task);
+      return;
     }
 
     task.status = 'done';

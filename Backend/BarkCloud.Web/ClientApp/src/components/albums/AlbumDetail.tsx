@@ -24,13 +24,14 @@ interface AlbumDetailProps {
   /** Все альбомы пользователя — для панели действий Lightbox («Добавить в альбом»). */
   albums?: Album[];
   gridSizes?: string;
+  refreshKey?: number;
   onBack: () => void;
   onChanged: () => void;
   toast: ToastPush;
 }
 
 /** Просмотр альбома: сетка элементов, обложка, добавить/убрать, переименовать, удалить. */
-export function AlbumDetail({ album, candidates, albums, gridSizes = GRID_SIZES, onBack, onChanged, toast }: AlbumDetailProps) {
+export function AlbumDetail({ album, candidates, albums, gridSizes = GRID_SIZES, refreshKey = 0, onBack, onChanged, toast }: AlbumDetailProps) {
   const [items, setItems] = React.useState<CardFile[] | null>(null);
   const [lightbox, setLightbox] = React.useState<number | null>(null);
   const [editing, setEditing] = React.useState(false);
@@ -57,7 +58,7 @@ export function AlbumDetail({ album, candidates, albums, gridSizes = GRID_SIZES,
         setItems([]);
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [album.id]);
+  }, [album.id, refreshKey]);
   React.useEffect(load, [load]);
 
   // Панель действий Lightbox; после удаления в корзину альбом перезагружается (вьювер закрывается).
