@@ -16,11 +16,12 @@ interface UseBulkMediaArgs {
   albums: Album[];
   toast: ToastPush;
   onRemoved: (id: string) => void;
+  onRemovedBatch?: (ids: string[]) => void;
   onReloadAlbums?: () => void;
 }
 
 /** Множественный выбор и групповые действия для галерей (Фото/Видео): удалить, в альбом, копировать ссылки. */
-export function useBulkMedia({ items, albums, toast, onRemoved, onReloadAlbums }: UseBulkMediaArgs) {
+export function useBulkMedia({ items, albums, toast, onRemoved, onRemovedBatch, onReloadAlbums }: UseBulkMediaArgs) {
   const sel = useSelection();
   const [confirmDel, setConfirmDel] = React.useState(false);
   const [pickAlbum, setPickAlbum] = React.useState(false);
@@ -36,8 +37,10 @@ export function useBulkMedia({ items, albums, toast, onRemoved, onReloadAlbums }
     try {
       const result = await deleteMediaBatch(list.map((m) => m.id));
       const removed = new Set(result.succeededIds || (result.failed ? [] : list.map((m) => m.id)));
-      for (const m of list.filter((item) => removed.has(item.id)))
+      const removedItems = list.filter((item) => removed.has(item.id));
+      for (const m of removedItems)
         onRemoved(m.id);
+      if (removedItems.length) onRemovedBatch && onRemovedBatch(removedItems.map((m) => m.id));
       setConfirmDel(false);
       sel.clear();
       if (result.succeeded)

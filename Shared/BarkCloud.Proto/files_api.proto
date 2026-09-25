@@ -50,6 +50,7 @@ service CloudApi {
 
   rpc ListUserImages       (ListUserImagesRequest)       returns (ListUserImagesResponse);   // [DEPRECATED] Все изображения пользователя; используйте ListUserMedia(PHOTO)
   rpc ListUserMedia        (ListUserMediaRequest)        returns (ListUserMediaResponse);     // Медиа пользователя по типу (фото / видео) от новых к старым (cursor pagination)
+  rpc GetUserMediaStats    (GetUserMediaStatsRequest)    returns (GetUserMediaStatsResponse); // Полное количество и размер фото или видео в галерее
   rpc DeleteUserMedia      (DeleteUserMediaRequest)      returns (CloudEmpty);                // Удалить медиа из галереи по file_id: живые записи каталога → в корзину; если записей нет — создать запись корзины
 
   rpc GetPath              (GetPathRequest)              returns (PathResponse);             // Построить путь до объекта в иерархии
@@ -557,6 +558,15 @@ message ListUserMediaResponse {
   repeated UserImageItem items = 1;
   google.protobuf.Timestamp next_cursor_created_at = 2; // пусто = больше нет страниц
   string next_cursor_file_id = 3;
+}
+
+message GetUserMediaStatsRequest {
+  MediaKind kind = 1; // PHOTO или VIDEO
+}
+
+message GetUserMediaStatsResponse {
+  int64 total_count = 1;       // количество медиа, доступных в галерее
+  int64 total_size_bytes = 2;  // суммарный размер оригиналов в байтах
 }
 
 message SetVideoThumbnailRequest {

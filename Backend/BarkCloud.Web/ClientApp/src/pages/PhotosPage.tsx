@@ -9,6 +9,7 @@ import { MemoriesStrip } from '../components/memories/MemoriesStrip';
 import { MediaSearchResults } from '../components/search/MediaSearchResults';
 import { useToast } from '../hooks/useToast';
 import { useInfiniteMedia } from '../hooks/useInfiniteMedia';
+import { useMediaStats } from '../hooks/useMediaStats';
 import { useMediaActions } from '../hooks/useMediaActions';
 import { useFileDrop } from '../hooks/useFileDrop';
 import { useBulkMedia } from '../hooks/useBulkMedia';
@@ -60,7 +61,8 @@ export function PhotosPage() {
   const [toastNode, toast] = useToast();
   const { enqueue, attachVersion } = useUploadActions();
 
-  const { items: photos, loading, done, sentinelRef, removeItem, updateItem, prependItems } = useInfiniteMedia('photo', toast);
+  const { items: photos, loading, sentinelRef, removeItem, updateItem, prependItems } = useInfiniteMedia('photo', toast);
+  const { stats: mediaStats, refresh: refreshMediaStats } = useMediaStats('photo', attachVersion, toast);
 
   React.useEffect(() => {
     if (!openFileId || resolvedOpenId.current === openFileId) return;
@@ -96,6 +98,7 @@ export function PhotosPage() {
     onRemoved: (m) => {
       removeItem(m.id);
       setMemKey((k) => k + 1);
+      void refreshMediaStats();
     },
     onItemPatched: updateItem,
     reloadAlbums: loadAlbums,
@@ -116,6 +119,7 @@ export function PhotosPage() {
       removeItem(id);
       setMemKey((k) => k + 1);
     },
+    onRemovedBatch: () => { void refreshMediaStats(); },
     onReloadAlbums: loadAlbums,
   });
 
@@ -174,8 +178,7 @@ export function PhotosPage() {
           <span className="chip active">
             <Icon.check size={16} /> Все фото
             <span className="count">
-              {photos.length}
-              {done ? '' : '+'}
+              {mediaStats ? mediaStats.totalCount : '—'}
             </span>
           </span>
         </div>

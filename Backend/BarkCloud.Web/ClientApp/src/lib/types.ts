@@ -47,6 +47,12 @@ export interface MediaItem extends CardFile {
   duplicateGroupKey?: string;
 }
 
+/** Полная статистика галереи по одному виду медиа. */
+export interface MediaStats {
+  totalCount: number;
+  totalSizeBytes: number;
+}
+
 /** Группа «Воспоминаний» за один год (CloudJson.MemoryGroup). */
 export interface MemoryGroup {
   year: number;

@@ -17,6 +17,7 @@ public interface IUploadedFilesStorage
     Task<long> GetUserStorageUsed(long userId);
     Task<Dictionary<UploadFileType, long>> GetUserStorageByType(long userId);
     Task<bool> IsPreviewFile(Guid fileId, CancellationToken cancellationToken = default);
+    Task<UserMediaStats> GetUserMediaStats(long ownerId, MediaKind kind, CancellationToken cancellationToken = default);
     Task<List<UploadFile>> ListUserMediaPage(long ownerId, MediaKind kind, DateTime? cursorCreatedAt, Guid? cursorFileId, int limit, CancellationToken cancellationToken = default);
     Task<List<UploadFile>> ListUserImagesPage(long ownerId, DateTime? cursorCreatedAt, Guid? cursorFileId, int limit, CancellationToken cancellationToken = default);
     Task RemovePreviewsForOriginal(Guid originalFileId, long ownerId, CancellationToken cancellationToken = default);
@@ -33,6 +34,8 @@ public interface IUploadedFilesStorage
     /// </summary>
     Task<List<LocatedMediaItem>> ListMediaWithLocationPage(long ownerId, DateTime? cursorCreatedAt, Guid? cursorFileId, int limit, CancellationToken cancellationToken = default);
 }
+
+public sealed record UserMediaStats(long TotalCount, long TotalSizeBytes);
 
 /// <summary>Блоб + его дата съёмки (для группировки «Воспоминаний» по годам).</summary>
 public sealed record MemoryMediaItem(UploadFile File, DateTime TakenAt);

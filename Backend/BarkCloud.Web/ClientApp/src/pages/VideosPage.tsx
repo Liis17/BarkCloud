@@ -8,6 +8,7 @@ import { FileDropOverlay } from '../components/ui/FileDropOverlay';
 import { MediaSearchResults } from '../components/search/MediaSearchResults';
 import { useToast } from '../hooks/useToast';
 import { useInfiniteMedia } from '../hooks/useInfiniteMedia';
+import { useMediaStats } from '../hooks/useMediaStats';
 import { useMediaActions } from '../hooks/useMediaActions';
 import { useFileDrop } from '../hooks/useFileDrop';
 import { useBulkMedia } from '../hooks/useBulkMedia';
@@ -144,7 +145,8 @@ export function VideosPage() {
   const [toastNode, toast] = useToast();
   const { enqueue, attachVersion } = useUploadActions();
 
-  const { items: videos, loading, done, sentinelRef, removeItem, updateItem, prependItems } = useInfiniteMedia('video', toast);
+  const { items: videos, loading, sentinelRef, removeItem, updateItem, prependItems } = useInfiniteMedia('video', toast);
+  const { stats: mediaStats, refresh: refreshMediaStats } = useMediaStats('video', attachVersion, toast);
 
   React.useEffect(() => {
     if (!openFileId || resolvedOpenId.current === openFileId) return;
@@ -177,7 +179,10 @@ export function VideosPage() {
     albums: albums || [],
     toast,
     onRenamed: (m, name) => updateItem(m.id, { entryNames: [name, ...(m.entryNames || []).slice(1)] }),
-    onRemoved: (m) => removeItem(m.id),
+    onRemoved: (m) => {
+      removeItem(m.id);
+      void refreshMediaStats();
+    },
     onItemPatched: updateItem,
     reloadAlbums: loadAlbums,
   });
@@ -189,13 +194,19 @@ export function VideosPage() {
   }
 
   const { over, dropHandlers } = useFileDrop((f) => doUpload(f));
-  const bulk = useBulkMedia({ items: videos, albums: albums || [], toast, onRemoved: removeItem, onReloadAlbums: loadAlbums });
+  const bulk = useBulkMedia({
+    items: videos,
+    albums: albums || [],
+    toast,
+    onRemoved: removeItem,
+    onRemovedBatch: () => { void refreshMediaStats(); },
+    onReloadAlbums: loadAlbums,
+  });
 
   const prependRef = React.useRef(prependItems);
   prependRef.current = prependItems;
 
   const featured = videos.length ? videos[0] : null;
-  const totalSize = videos.reduce((s, v) => s + (v.size || 0), 0);
   const groups = React.useMemo(() => groupByDate(videos), [videos]);
 
   React.useEffect(() => {
@@ -204,8 +215,8 @@ export function VideosPage() {
       .catch(() => {});
   }, [attachVersion]);
   const stats = [
-    { k: 'Всего видео', v: videos.length ? videos.length + (done ? '' : '+') : '—' },
-    { k: 'Занято видео', v: fmtSize(totalSize) },
+    { k: 'Всего видео', v: mediaStats ? String(mediaStats.totalCount) : '—' },
+    { k: 'Занято видео', v: mediaStats ? fmtSize(mediaStats.totalSizeBytes) : '—' },
     { k: 'Альбомов', v: albums ? String(albums.length) : '—' },
   ];
 
@@ -261,10 +272,7 @@ export function VideosPage() {
         <div className="chip-row">
           <span className="chip active">
             <Icon.check size={16} /> Все видео
-            <span className="count">
-              {videos.length}
-              {done ? '' : '+'}
-            </span>
+            <span className="count">{mediaStats ? mediaStats.totalCount : '—'}</span>
           </span>
         </div>
       </div>

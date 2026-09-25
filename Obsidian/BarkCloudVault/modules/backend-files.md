@@ -42,7 +42,7 @@ Web использует server-owned `UploadSession` и состояния `upl
 ### Host
 - `FilesApiService.cs` — клиентский gRPC `FilesApi`
 - `FilesServerApiService.cs` — серверный gRPC `FilesServerApi`
-- `CloudApiService.cs` — gRPC `CloudApi` (иерархия + галерея `ListUserMedia` + `SetVideoThumbnail`) → [[modules/backend-files-cloud]]
+- `CloudApiService.cs` — gRPC `CloudApi` (иерархия + галерея `ListUserMedia`/`GetUserMediaStats` + `SetVideoThumbnail`) → [[modules/backend-files-cloud]]
 - `AlbumApiService.cs` — gRPC `AlbumApi` (альбомы)
 - `MusicApiService.cs` — gRPC `MusicApi`: список аудиотреков, temp-URL трека, CRUD плейлистов, ручной порядок, публичные ссылки и приватные гранты
 - `FilesController.cs` — HTTP-контроллер: V2 raw-part `PUT /file-upload/{sessionId}/parts/{partNumber}`, legacy upload и download
@@ -101,7 +101,7 @@ Web использует server-owned `UploadSession` и состояния `upl
 - `CloudHierarchyStorage.cs` — см. [[modules/backend-files-cloud]]; метод `FileEntryExistsForFile` для инварианта одной директории
 - `AlbumStorage.cs` — CRUD альбомов и их элементов, cursor-пагинация
 - `FavoriteFilesStorage.cs` — избранное: `Exists`/`Add`/`Remove`/`ListPage` (cursor-пагинация), по образцу item-методов `AlbumStorage`
-- `UploadedFilesStorage.cs` — добавлены `ListMemoriesForDay` (фото/видео с `FileMetadata.TakenAt` за месяц+день любых лет, для «Воспоминаний») и `ListMediaWithLocationPage` (медиа с `Latitude/Longitude`, cursor, для карты). Оба фильтруют как `ListUserMediaPage` (живые блобы владельца, не превью, не в корзине) + join к `FileMetadata`. DTO-записи `MemoryMediaItem`/`LocatedMediaItem` объявлены в `IUploadedFilesStorage.cs`. **Отдельных индексов нет**: запросы ведутся через GIN по `Uploaders` + PK `FileMetadata.FileId`
+- `UploadedFilesStorage.cs` — `ListMemoriesForDay` выбирает фото/видео с `FileMetadata.TakenAt` за месяц+день любых лет, а `ListMediaWithLocationPage` — медиа с `Latitude`/`Longitude` и cursor для карты; оба фильтруют как `ListUserMediaPage` и join’ятся к `FileMetadata`. `GetUserMediaStats` считает количество и размер всех видимых оригиналов фото/видео по тем же фильтрам `ListUserMediaPage`. DTO `UserMediaStats`/`MemoryMediaItem`/`LocatedMediaItem` объявлены в `IUploadedFilesStorage.cs`; отдельных индексов нет, запросы используют GIN по `Uploaders` и PK `FileMetadata.FileId`
 - `ShareStorage.cs` — публичные ссылки: `Add`/`GetByToken`/`Remove` (scoped по владельцу, идемпотентно)/`IncrementClicks`/`ListPage` (cursor-пагинация), по образцу `FavoriteFilesStorage`
 - `FileMetadataStorage.cs` — метаданные блоба: `Get`/`AddIfMissing` (идемпотентно, не перезаписывает)/`ListFilesMissingMetadata` (LEFT JOIN-выборка для бэкафилла)
 - `FileActivityStorage.cs` — append-only журнал действий: `Add`/`AddRange` и cursor-пагинация `ListPage(ownerId, fileId, cursorCreatedAt, cursorEventId, limit)` по `(CreatedAt desc, Id desc)`
