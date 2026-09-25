@@ -176,15 +176,7 @@ public class UploadedFilesStorage : IUploadedFilesStorage
     /// </summary>
     public async Task<List<UploadFile>> ListUserMediaPage(long ownerId, MediaKind kind, DateTime? cursorCreatedAt, Guid? cursorFileId, int limit, CancellationToken cancellationToken = default)
     {
-        var query = _context.UploadedFiles
-            .AsNoTracking()
-            .WhereReady()
-            .Where(f => f.Uploaders.Contains(ownerId)
-                        && f.Type == UploadFileType.CloudFile
-                        && f.MediaKind == kind
-                        && !_context.FilePreviews.Any(p => p.PreviewFileId == f.Id)
-                        && !(_context.CloudFileEntries.Any(e => e.OwnerId == ownerId && e.FileId == f.Id && e.IsDeleted)
-                             && !_context.CloudFileEntries.Any(e => e.OwnerId == ownerId && e.FileId == f.Id && !e.IsDeleted)));
+        var query = UserMediaQuery(ownerId, kind);
 
         if (cursorCreatedAt.HasValue && cursorFileId.HasValue)
         {
@@ -201,6 +193,34 @@ public class UploadedFilesStorage : IUploadedFilesStorage
             .Take(limit + 1)
             .ToListAsync(cancellationToken);
     }
+
+    /// <summary>
+    /// Считает все готовые оригиналы медиа, которые доступны владельцу в галерее.
+    /// Использует те же фильтры, что и страница <see cref="ListUserMediaPage"/>.
+    /// </summary>
+    public async Task<UserMediaStats> GetUserMediaStats(long ownerId, MediaKind kind, CancellationToken cancellationToken = default)
+    {
+        var aggregate = await UserMediaQuery(ownerId, kind)
+            .GroupBy(_ => 1)
+            .Select(group => new
+            {
+                TotalCount = group.LongCount(),
+                TotalSizeBytes = group.Sum(file => file.Size)
+            })
+            .SingleOrDefaultAsync(cancellationToken);
+
+        return new UserMediaStats(aggregate?.TotalCount ?? 0, aggregate?.TotalSizeBytes ?? 0);
+    }
+
+    private IQueryable<UploadFile> UserMediaQuery(long ownerId, MediaKind kind) => _context.UploadedFiles
+        .AsNoTracking()
+        .WhereReady()
+        .Where(f => f.Uploaders.Contains(ownerId)
+                    && f.Type == UploadFileType.CloudFile
+                    && f.MediaKind == kind
+                    && !_context.FilePreviews.Any(p => p.PreviewFileId == f.Id)
+                    && !(_context.CloudFileEntries.Any(e => e.OwnerId == ownerId && e.FileId == f.Id && e.IsDeleted)
+                         && !_context.CloudFileEntries.Any(e => e.OwnerId == ownerId && e.FileId == f.Id && !e.IsDeleted)));
 
     /// <summary>
     /// Страница «изображений» владельца с cursor-пагинацией (устаревший фильтр по расширению/ImageWidth,

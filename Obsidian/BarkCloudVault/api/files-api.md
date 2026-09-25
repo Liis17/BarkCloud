@@ -55,6 +55,7 @@ Package: `barkcloud.files`
 | `DeleteFileEntries(DeleteFileEntriesRequest) → DeleteFileEntriesResponse` | Массово переместить записи в корзину; чужие/несуществующие/уже удалённые id пропускаются, ответ содержит `deleted_count` |
 | `ListUserImages(ListUserImagesRequest) → ListUserImagesResponse` | **[DEPRECATED]** Все изображения пользователя; используйте `ListUserMedia(PHOTO)`. Исключает превью-блобы |
 | `ListUserMedia(ListUserMediaRequest) → ListUserMediaResponse` | Медиа пользователя по типу (`kind` = PHOTO/VIDEO) от новых к старым; cursor-пагинация (`cursor_created_at` + `cursor_file_id`); фильтр по `MediaKind`, исключает превью-блобы |
+| `GetUserMediaStats(GetUserMediaStatsRequest) → GetUserMediaStatsResponse` | Полное количество и суммарный размер фото или видео, доступных в галерее; исключает превью и файлы в корзине |
 | `DeleteUserMedia(DeleteUserMediaRequest) → CloudEmpty` | Удалить медиа из галереи по `file_id`: живые записи каталога перемещает в корзину; если записей нет — создаёт запись корзины в системной папке по типу медиа |
 | `SetVideoThumbnail(SetVideoThumbnailRequest) → CloudEmpty` | Заменить превью видео загруженной картинкой (`video_file_id`, `source_image_file_id`); пересоздаёт `FilePreview` из источника |
 | `GetMemories(GetMemoriesRequest) → GetMemoriesResponse` | «Воспоминания — В этот день»: фото/видео за указанный (или сегодняшний UTC) месяц+день прошлых лет по `FileMetadata.TakenAt`, группы-годы (`MemoryGroup { year; years_ago; total_count; items }`) от свежего к старому; ≤`per_year_limit` превью на год |
@@ -104,6 +105,7 @@ Package: `barkcloud.files`
 Для обоих листингов пагинация применяется только к файлам: подпапки возвращаются целиком на каждой странице. Сервер выбирает `limit + 1` живых записей, сортирует по `name ASC, entry_id ASC` и возвращает `next_cursor_*`, если есть следующая страница; удалённые и неготовые файлы скрываются.
 - `ListUserImagesRequest { limit; cursor_created_at; cursor_file_id; }` — `limit` clamp 1..200, default 50; курсор exclusive
 - `ListUserMediaRequest { MediaKind kind; limit; cursor_created_at; cursor_file_id; }` — `kind` = PHOTO/VIDEO
+- `GetUserMediaStatsRequest { MediaKind kind; }` → `GetUserMediaStatsResponse { total_count; total_size_bytes; }` — агрегаты полного набора галереи для выбранного вида медиа, без загрузки страниц
 - `UserImageItem { UploadFileInfo file; entries_count; repeated entry_names; repeated entry_ids; duplicate_group_key; }` — карточка по `UploadFile`; `entries_count` — сколько **живых** записей у владельца, `entry_names` — до 5 имён, `entry_ids` — id живых записей (для rename/перехода к элементу галереи без листинга каталога; удаление галереи идёт через `DeleteUserMedia(file_id)`), `duplicate_group_key` — SHA-256 группы для системных папок дубликатов
 - `ListUserImagesResponse` / `ListUserMediaResponse { items; next_cursor_created_at; next_cursor_file_id; }` — `next_cursor_*` пуст = страниц больше нет
 - `SetVideoThumbnailRequest { video_file_id; source_image_file_id; }`

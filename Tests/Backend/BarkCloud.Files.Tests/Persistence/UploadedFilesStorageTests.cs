@@ -71,5 +71,80 @@ public sealed class UploadedFilesStorageTests : IDisposable
         files.Should().ContainSingle().Which.Id.Should().Be(readyId);
     }
 
+    [Fact]
+    public async Task GetUserMediaStats_MatchesGalleryFiltersForKindReadyStatePreviewsAndTrash()
+    {
+        const long ownerId = 42;
+        var now = DateTime.UtcNow;
+        var visibleVideoOne = ReadyFile(ownerId, MediaKind.Video, 100);
+        var visibleVideoTwo = ReadyFile(ownerId, MediaKind.Video, 200);
+        var visiblePhoto = ReadyFile(ownerId, MediaKind.Photo, 300);
+        var previewVideo = ReadyFile(ownerId, MediaKind.Video, 400);
+        var trashedVideo = ReadyFile(ownerId, MediaKind.Video, 500);
+        var restoredVideo = ReadyFile(ownerId, MediaKind.Video, 600);
+        var pendingVideo = ReadyFile(ownerId, MediaKind.Video, 700);
+        pendingVideo.Etag = null;
+        pendingVideo.UploadedAt = null;
+        var anotherUsersVideo = ReadyFile(7, MediaKind.Video, 800);
+
+        _database.Context.UploadedFiles.AddRange(
+            visibleVideoOne, visibleVideoTwo, visiblePhoto, previewVideo,
+            trashedVideo, restoredVideo, pendingVideo, anotherUsersVideo);
+        _database.Context.FilePreviews.Add(new FilePreview
+        {
+            Id = Guid.NewGuid(),
+            OriginalFileId = visibleVideoOne.Id,
+            PreviewFileId = previewVideo.Id,
+            TargetWidth = 128,
+            CreatedAt = now
+        });
+        _database.Context.CloudFileEntries.AddRange(
+            new CloudFileEntry
+            {
+                Id = Guid.NewGuid(), OwnerId = ownerId, DirectoryId = Guid.NewGuid(),
+                FileId = trashedVideo.Id, Name = "deleted.mp4", IsDeleted = true, CreatedAt = now
+            },
+            new CloudFileEntry
+            {
+                Id = Guid.NewGuid(), OwnerId = ownerId, DirectoryId = Guid.NewGuid(),
+                FileId = restoredVideo.Id, Name = "old.mp4", IsDeleted = true, CreatedAt = now
+            },
+            new CloudFileEntry
+            {
+                Id = Guid.NewGuid(), OwnerId = ownerId, DirectoryId = Guid.NewGuid(),
+                FileId = restoredVideo.Id, Name = "restored.mp4", IsDeleted = false, CreatedAt = now
+            });
+        await _database.Context.SaveChangesAsync();
+
+        var storage = new UploadedFilesStorage(_database.Context);
+        var videoStats = await storage.GetUserMediaStats(ownerId, MediaKind.Video);
+        var photoStats = await storage.GetUserMediaStats(ownerId, MediaKind.Photo);
+
+        videoStats.Should().Be(new UserMediaStats(3, 900));
+        photoStats.Should().Be(new UserMediaStats(1, 300));
+    }
+
+    [Fact]
+    public async Task GetUserMediaStats_EmptyGalleryReturnsZeroValues()
+    {
+        var stats = await new UploadedFilesStorage(_database.Context)
+            .GetUserMediaStats(42, MediaKind.Video);
+
+        stats.Should().Be(new UserMediaStats(0, 0));
+    }
+
+    private static UploadFile ReadyFile(long ownerId, MediaKind kind, long size) => new()
+    {
+        Id = Guid.NewGuid(),
+        Uploaders = [ownerId],
+        CreatedAt = DateTime.UtcNow,
+        UploadedAt = DateTime.UtcNow,
+        Etag = "etag",
+        Type = UploadFileType.CloudFile,
+        StorageProfileId = "test-profile",
+        MediaKind = kind,
+        Size = size
+    };
+
     public void Dispose() => _database.Dispose();
 }

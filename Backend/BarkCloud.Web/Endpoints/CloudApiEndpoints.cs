@@ -376,6 +376,22 @@ public static class CloudApiEndpoints
                 }, Json);
             }));
 
+        api.MapGet("/cloud/media/stats", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud,
+            string? kind) =>
+            await Guarded(http, auth, async token =>
+            {
+                var req = new GetUserMediaStatsRequest
+                {
+                    Kind = kind == "video" ? MediaKind.Video : MediaKind.Photo
+                };
+                var resp = await cloud.GetUserMediaStatsAsync(req, token);
+                return Results.Json(new
+                {
+                    totalCount = resp.TotalCount,
+                    totalSizeBytes = resp.TotalSizeBytes
+                }, Json);
+            }));
+
         api.MapPost("/cloud/media/delete", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud, FileIdReq body) =>
             await Guarded(http, auth, async token =>
             {

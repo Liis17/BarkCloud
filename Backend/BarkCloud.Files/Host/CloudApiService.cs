@@ -46,6 +46,7 @@ using BarkCloud.Files.Features.Cloud.ListSharedWithMe;
 using BarkCloud.Files.Features.Cloud.GetSharedFileDownloadUrl;
 using BarkCloud.Files.Features.Cloud.SetVideoThumbnail;
 using BarkCloud.Files.Features.Cloud.GetMemories;
+using BarkCloud.Files.Features.Cloud.GetUserMediaStats;
 using BarkCloud.Files.Features.Cloud.ListMediaLocations;
 using BarkCloud.Proto.Files;
 using BarkCloud.Shared.Identity;
@@ -290,6 +291,16 @@ public class CloudApiService : CloudApi.CloudApiBase
             Limit = request.Limit,
             CursorCreatedAt = cursorCreatedAt,
             CursorFileId = cursorFileId
+        };
+
+        return _mediator.Send(command);
+    }
+
+    public override Task<GetUserMediaStatsResponse> GetUserMediaStats(GetUserMediaStatsRequest request, ServerCallContext context)
+    {
+        var command = new GetUserMediaStatsCommand
+        {
+            Kind = (BarkCloud.Files.Domain.MediaKind)(int)request.Kind
         };
 
         return _mediator.Send(command);
