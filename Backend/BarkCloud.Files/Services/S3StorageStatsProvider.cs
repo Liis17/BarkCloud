@@ -69,7 +69,7 @@ public sealed class S3StorageStatsProvider : IS3StorageStatsProvider
             .Select(group => new Bucket(
                 group.Key.BucketName,
                 group.Min(item => item.Profile.QuotaBytes),
-                group.First().Client))
+                group.Select(item => item.Client).Distinct().ToArray()))
             .ToArray();
 
         if (buckets.Length == 0)
@@ -90,13 +90,40 @@ public sealed class S3StorageStatsProvider : IS3StorageStatsProvider
 
     private static async Task<long> GetBucketSizeAsync(Bucket bucket, CancellationToken cancellationToken)
     {
+        List<Exception>? failures = null;
+        foreach (var client in bucket.Clients)
+        {
+            try
+            {
+                return await GetBucketSizeAsync(bucket.Name, client, cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                (failures ??= []).Add(exception);
+            }
+        }
+
+        throw new AggregateException(
+            $"Не удалось получить размер S3-бакета '{bucket.Name}' через доступные профили.",
+            failures!);
+    }
+
+    private static async Task<long> GetBucketSizeAsync(
+        string bucketName,
+        IAmazonS3 client,
+        CancellationToken cancellationToken)
+    {
         long usedBytes = 0;
         string? continuationToken = null;
         do
         {
-            var response = await bucket.Client.ListObjectsV2Async(new ListObjectsV2Request
+            var response = await client.ListObjectsV2Async(new ListObjectsV2Request
             {
-                BucketName = bucket.Name,
+                BucketName = bucketName,
                 ContinuationToken = continuationToken
             }, cancellationToken);
 
@@ -109,7 +136,7 @@ public sealed class S3StorageStatsProvider : IS3StorageStatsProvider
             if (!response.IsTruncated.GetValueOrDefault())
                 break;
             if (string.IsNullOrEmpty(response.NextContinuationToken))
-                throw new InvalidOperationException($"S3 не вернул continuation token для следующей страницы бакета '{bucket.Name}'.");
+                throw new InvalidOperationException($"S3 не вернул continuation token для следующей страницы бакета '{bucketName}'.");
             continuationToken = response.NextContinuationToken;
         } while (true);
 
@@ -124,5 +151,5 @@ public sealed class S3StorageStatsProvider : IS3StorageStatsProvider
 
     private readonly record struct PhysicalBucket(string Endpoint, string BucketName);
 
-    private sealed record Bucket(string Name, long QuotaBytes, IAmazonS3 Client);
+    private sealed record Bucket(string Name, long QuotaBytes, IReadOnlyList<IAmazonS3> Clients);
 }

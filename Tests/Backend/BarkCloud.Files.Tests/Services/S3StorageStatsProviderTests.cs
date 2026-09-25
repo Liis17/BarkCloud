@@ -82,6 +82,29 @@ public sealed class S3StorageStatsProviderTests
     }
 
     [Fact]
+    public async Task GetStatsAsync_TriesOtherCredentialsForTheSamePhysicalBucket()
+    {
+        var deniedClient = new Mock<IAmazonS3>();
+        deniedClient.Setup(s3 => s3.ListObjectsV2Async(It.IsAny<ListObjectsV2Request>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new AmazonS3Exception("access denied"));
+        var readableClient = new Mock<IAmazonS3>();
+        readableClient.Setup(s3 => s3.ListObjectsV2Async(It.IsAny<ListObjectsV2Request>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Page(23, "object"));
+        var profiles = new[]
+        {
+            (Profile("images-v1", "shared", active: true), deniedClient.Object),
+            (Profile("previews-v1", "shared", active: true), readableClient.Object)
+        };
+
+        var stats = await CreateProvider(profiles).GetStatsAsync();
+
+        stats.IsAvailable.Should().BeTrue();
+        stats.UsedBytes.Should().Be(23);
+        deniedClient.Verify(s3 => s3.ListObjectsV2Async(It.IsAny<ListObjectsV2Request>(), It.IsAny<CancellationToken>()), Times.Once);
+        readableClient.Verify(s3 => s3.ListObjectsV2Async(It.IsAny<ListObjectsV2Request>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
     public async Task GetStatsAsync_UsesLastSuccessfulSnapshotAfterRefreshFailure()
     {
         var client = new Mock<IAmazonS3>();
