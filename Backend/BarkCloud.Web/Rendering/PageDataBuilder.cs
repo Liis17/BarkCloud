@@ -73,6 +73,11 @@ public sealed class PageDataBuilder
             ["storage.percent"] = "0",
             ["storage.other_pct"] = "0",
             ["storage.s3_pct"] = "0",
+            ["storage.all_s3_used_label"] = "0 Б",
+            ["storage.all_s3_quota_label"] = "0 Б",
+            ["storage.all_s3_percent"] = "0",
+            ["storage.all_s3_has_finite_quota"] = "false",
+            ["storage.all_s3_stats_available"] = "false",
             // навигационные счётчики опускаем — пустые значения скрывают бейджи
             ["nav.photos_count"] = "",
             ["nav.videos_count"] = "",
@@ -117,6 +122,13 @@ public sealed class PageDataBuilder
             vars["storage.percent"] = Format.Percent(diskUsed, diskTotal).ToString();
             vars["storage.other_pct"] = PctOf(storage.DiskUsedStorage, diskTotal).ToString(CultureInfo.InvariantCulture);
             vars["storage.s3_pct"] = PctOf(storage.S3UsedStorage, diskTotal).ToString(CultureInfo.InvariantCulture);
+            vars["storage.all_s3_used_label"] = Format.Size(storage.AllS3UsedStorage);
+            vars["storage.all_s3_quota_label"] = Format.Size(storage.AllS3QuotaStorage);
+            vars["storage.all_s3_percent"] = storage.AllS3HasFiniteQuota
+                ? Format.Percent(storage.AllS3UsedStorage, storage.AllS3QuotaStorage).ToString(CultureInfo.InvariantCulture)
+                : "100";
+            vars["storage.all_s3_has_finite_quota"] = storage.AllS3HasFiniteQuota.ToString().ToLowerInvariant();
+            vars["storage.all_s3_stats_available"] = storage.AllS3StatsAvailable.ToString().ToLowerInvariant();
         }
         catch (RpcException ex)
         {
@@ -134,13 +146,19 @@ public sealed class PageDataBuilder
     {
         var token = BrowserContext.UserToken(user.AccessToken);
 
-        long diskTotal = 0, diskOther = 0, diskS3 = 0;
+        long diskTotal = 0, diskOther = 0, diskS3 = 0, allS3Used = 0, allS3Quota = 0;
+        var allS3Available = false;
+        var allS3HasFiniteQuota = false;
         try
         {
             var storage = await _files.GetUserStorageInfoAsync(new GetUserStorageInfoRequest(), token);
             diskTotal = storage.TotalAvailableStorage;
             diskOther = storage.DiskUsedStorage;
             diskS3 = storage.S3UsedStorage;
+            allS3Used = storage.AllS3UsedStorage;
+            allS3Quota = storage.AllS3QuotaStorage;
+            allS3Available = storage.AllS3StatsAvailable;
+            allS3HasFiniteQuota = storage.AllS3HasFiniteQuota;
         }
         catch (RpcException ex)
         {
@@ -155,7 +173,14 @@ public sealed class PageDataBuilder
             totalLabel = Format.Size(diskTotal),
             percent = Format.Percent(diskUsed, diskTotal),
             otherPct = PctOf(diskOther, diskTotal),
-            s3Pct = PctOf(diskS3, diskTotal)
+            s3Pct = PctOf(diskS3, diskTotal),
+            allS3UsedLabel = Format.Size(allS3Used),
+            allS3QuotaLabel = Format.Size(allS3Quota),
+            allS3Percent = !allS3Available ? 0 : allS3HasFiniteQuota
+                ? Format.Percent(allS3Used, allS3Quota)
+                : 100,
+            allS3HasFiniteQuota,
+            allS3StatsAvailable = allS3Available
         };
     }
 

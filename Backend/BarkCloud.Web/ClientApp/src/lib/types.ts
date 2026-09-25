@@ -264,7 +264,11 @@ export interface SharedMusicPlaylist {
 
 export interface Shell {
   user: { initials: string; displayName: string; role: string; avatarUrl: string };
-  storage: { usedLabel: string; totalLabel: string; percent: number; otherPct: number; s3Pct: number };
+  storage: {
+    usedLabel: string; totalLabel: string; percent: number; otherPct: number; s3Pct: number;
+    allS3UsedLabel: string; allS3QuotaLabel: string; allS3Percent: number;
+    allS3HasFiniteQuota: boolean; allS3StatsAvailable: boolean;
+  };
   app: { version: string; edition: string };
   server: { host: string };
   sync: { status: string; lastAt: string };

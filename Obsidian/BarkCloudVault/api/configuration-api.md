@@ -27,6 +27,8 @@ Package: `barkcloud.configuration`
 
 `StorageProfileItem` внутри доверенного service-to-service канала содержит credentials, нужные Files при старте. Web никогда не проксирует raw secret браузеру: [[modules/backend-web]] преобразует ответ в masked DTO.
 
+Профиль также содержит `quota_bytes` (квота физического бакета в байтах). `SaveStorageProfile` принимает целое `quota_value` и `quota_unit` (`gb`, `tb`, `pb`); единицы бинарные, `0` означает безлимит. Files получает квоту при стартовой загрузке профилей. Квота синхронизируется для профилей с одинаковыми endpoint и bucket, а её изменение требует перезапуска Files.
+
 ## Использование
 
 - Все сервисы вызывают `GetConfiguration` при старте через `LoadConfiguration` и `CONFIGURATION_SERVICE_URL`.

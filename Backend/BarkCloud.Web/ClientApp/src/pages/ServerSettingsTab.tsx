@@ -16,7 +16,8 @@ interface SettingRevision {
 interface StorageProfile {
   profileId: string; role: string; version: number; serviceUrl: string;
   hasAccessKey: boolean; hasSecretKey: boolean; bucketName: string; isR2: boolean;
-  isActive: boolean; isLegacy: boolean; editedAt: string | null; editedBy: string; editedFrom: string;
+  isActive: boolean; isLegacy: boolean; quotaBytes?: string;
+  editedAt: string | null; editedBy: string; editedFrom: string;
 }
 
 interface StorageRevision {
@@ -31,7 +32,11 @@ interface ServerSettings {
 
 interface MutationResult { success: boolean; message: string; restartTargets: string[] }
 interface StorageAccessCheckResult { success: boolean; message: string }
-interface StorageDraft { serviceUrl: string; accessKey: string; secretKey: string; bucketName: string; isR2: boolean }
+type QuotaUnit = 'gb' | 'tb' | 'pb';
+interface StorageDraft {
+  serviceUrl: string; accessKey: string; secretKey: string; bucketName: string; isR2: boolean;
+  quotaValue: string; quotaUnit: QuotaUnit;
+}
 
 const SERVICE_LABELS: Record<number, string> = {
   0: 'GlobalSettings', 1: 'IdentitySettings', 2: 'UsersSettings', 3: 'NotificationSettings',
@@ -39,6 +44,23 @@ const SERVICE_LABELS: Record<number, string> = {
 };
 const STORAGE_ROLES = ['universal', 'avatars', 'images', 'videos', 'audio', 'documents', 'other', 'previews'];
 const isTokenSetting = (setting: ServerSetting) => setting.key.toLowerCase() === 'token';
+const QUOTA_UNIT_BYTES: Record<QuotaUnit, bigint> = {
+  gb: 1024n ** 3n,
+  tb: 1024n ** 4n,
+  pb: 1024n ** 5n,
+};
+
+function quotaInputFromBytes(value = '0'): { value: string; unit: QuotaUnit } {
+  try {
+    const bytes = BigInt(value);
+    for (const unit of ['pb', 'tb', 'gb'] as const) {
+      const multiplier = QUOTA_UNIT_BYTES[unit];
+      if (bytes !== 0n && bytes % multiplier === 0n)
+        return { value: (bytes / multiplier).toString(), unit };
+    }
+  } catch { /* invalid data falls back to the default unlimited quota */ }
+  return { value: '0', unit: 'gb' };
+}
 
 async function request<T>(path: string, method = 'GET', body?: unknown): Promise<{ ok: boolean; data: T | null }> {
   const response = await fetch(path, {
@@ -148,22 +170,39 @@ function StorageCard({ role, profiles, revisions, onChanged }: {
   const [selectedProfileId, setSelectedProfileId] = React.useState<string | null>(null);
   const selected = ordered.find((profile) => profile.profileId === selectedProfileId) || current;
   const legacy = selected?.isLegacy || role.endsWith('-old');
-  const [draft, setDraft] = React.useState<StorageDraft>({ serviceUrl: '', accessKey: '', secretKey: '', bucketName: '', isR2: false });
+  const [draft, setDraft] = React.useState<StorageDraft>({
+    serviceUrl: '', accessKey: '', secretKey: '', bucketName: '', isR2: false,
+    quotaValue: '0', quotaUnit: 'gb',
+  });
   const [message, setMessage] = React.useState('');
   const [checking, setChecking] = React.useState(false);
-  React.useEffect(() => setDraft({ serviceUrl: selected?.serviceUrl || '', accessKey: '', secretKey: '', bucketName: selected?.bucketName || '', isR2: selected?.isR2 || false }), [selected?.profileId]);
+  React.useEffect(() => {
+    const quota = quotaInputFromBytes(selected?.quotaBytes);
+    setDraft({
+      serviceUrl: selected?.serviceUrl || '', accessKey: '', secretKey: '',
+      bucketName: selected?.bucketName || '', isR2: selected?.isR2 || false,
+      quotaValue: quota.value, quotaUnit: quota.unit,
+    });
+  }, [selected?.profileId, selected?.quotaBytes]);
 
   async function save() {
     const diff = selected ? [
       selected.serviceUrl !== draft.serviceUrl ? `Endpoint: ${selected.serviceUrl} → ${draft.serviceUrl || '(пусто)'}` : '',
       selected.bucketName !== draft.bucketName ? `Bucket: ${selected.bucketName} → ${draft.bucketName || '(пусто)'}` : '',
       selected.isR2 !== draft.isR2 ? `R2: ${selected.isR2 ? 'да' : 'нет'} → ${draft.isR2 ? 'да' : 'нет'}` : '',
+      (() => {
+        const quota = quotaInputFromBytes(selected.quotaBytes);
+        return quota.value !== draft.quotaValue || quota.unit !== draft.quotaUnit
+          ? `Квота: ${quota.value} ${quota.unit.toUpperCase()} → ${draft.quotaValue || '0'} ${draft.quotaUnit.toUpperCase()}`
+          : '';
+      })(),
       draft.accessKey ? 'Access key: заменить' : 'Access key: оставить текущий',
       draft.secretKey ? 'Secret key: заменить' : 'Secret key: оставить текущий',
     ].filter(Boolean) : [
       `Endpoint: ${draft.serviceUrl || '(пусто)'}`,
       `Bucket: ${draft.bucketName || '(пусто)'}`,
       `R2: ${draft.isR2 ? 'да' : 'нет'}`,
+      `Квота: ${draft.quotaValue || '0'} ${draft.quotaUnit.toUpperCase()}`,
       `Access key: ${draft.accessKey ? 'задан' : '(пусто)'}`,
       `Secret key: ${draft.secretKey ? 'задан' : '(пусто)'}`,
     ];
@@ -225,6 +264,14 @@ function StorageCard({ role, profiles, revisions, onChanged }: {
       <label><span>Bucket</span><input type="text" value={draft.bucketName} onChange={(event) => setDraft({ ...draft, bucketName: event.target.value })} /></label>
       <label><span>Access key</span><input type="text" value={draft.accessKey} placeholder={selected?.hasAccessKey ? 'Задан' : ''} onChange={(event) => setDraft({ ...draft, accessKey: event.target.value })} /></label>
       <label><span>Secret key</span><input type="password" value={draft.secretKey} placeholder={selected?.hasSecretKey ? 'Оставьте пустым, чтобы не менять' : ''} onChange={(event) => setDraft({ ...draft, secretKey: event.target.value })} /></label>
+      <label><span>Квота S3 бакета</span><div className="storage-quota-control">
+        <input aria-label="Квота S3 бакета" type="number" min="0" step="1" inputMode="numeric" value={draft.quotaValue}
+          onChange={(event) => setDraft({ ...draft, quotaValue: event.target.value })} />
+        <select aria-label="Единица квоты" value={draft.quotaUnit}
+          onChange={(event) => setDraft({ ...draft, quotaUnit: event.target.value as QuotaUnit })}>
+          <option value="gb">ГБ</option><option value="tb">ТБ</option><option value="pb">ПБ</option>
+        </select>
+      </div><small>0 = безлимит. Квота общая для профилей с тем же endpoint и bucket.</small></label>
     </div>
     <div className="storage-profile-footer">
       <label className="server-check"><input type="checkbox" checked={draft.isR2} onChange={(event) => setDraft({ ...draft, isR2: event.target.checked })} /><span>Cloudflare R2</span></label>

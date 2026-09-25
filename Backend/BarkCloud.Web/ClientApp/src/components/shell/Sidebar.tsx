@@ -76,21 +76,46 @@ export function Sidebar() {
       </nav>
 
       <div className="sb-storage">
-        <div className="sb-storage-head">
-          <span>Хранилище</span>
-          <span className="used">
-            {storage?.usedLabel} / {storage?.totalLabel}
-          </span>
-        </div>
-        <div className="bar">
-          <div style={{ display: 'flex', height: '100%', width: '100%' }}>
-            <div style={{ width: (storage?.otherPct ?? 0) + '%', background: 'var(--md-on-surface-variant)' }} />
-            <div style={{ width: (storage?.s3Pct ?? 0) + '%', background: '#9A4F1E' }} />
+        <div className="sb-storage-row">
+          <div className="sb-storage-head">
+            <span>Хранилище</span>
+            <span className="used">
+              {storage?.usedLabel} / {storage?.totalLabel}
+            </span>
+          </div>
+          <div className="bar">
+            <div style={{ display: 'flex', height: '100%', width: '100%' }}>
+              <div style={{ width: (storage?.otherPct ?? 0) + '%', background: 'var(--md-on-surface-variant)' }} />
+              <div style={{ width: (storage?.s3Pct ?? 0) + '%', background: '#9A4F1E' }} />
+            </div>
+          </div>
+          <div className="sb-storage-foot">
+            <span>{storage?.percent ?? 0}% использовано</span>
           </div>
         </div>
-        <div className="sb-storage-foot">
-          <span>{storage?.percent ?? 0}% использовано</span>
-          <Link to="/settings">Расширить</Link>
+        <div className="sb-storage-row">
+          <div className="sb-storage-head">
+            <span>S3-бакеты</span>
+            <span className="used">
+              {!storage?.allS3StatsAvailable ? 'недоступно' : storage.allS3HasFiniteQuota
+                ? `${storage.allS3UsedLabel} / ${storage.allS3QuotaLabel}`
+                : `${storage.allS3UsedLabel} · безлимит`}
+            </span>
+          </div>
+          <div className="bar" role="progressbar" aria-label="Использование S3-хранилища"
+            aria-valuemin={0} aria-valuemax={100}
+            aria-valuenow={!storage?.allS3StatsAvailable ? 0 : storage.allS3HasFiniteQuota
+              ? storage.allS3Percent : 100}>
+            <div className="bar-fill" style={{
+              width: (!storage?.allS3StatsAvailable ? 0 : storage.allS3HasFiniteQuota
+                ? storage.allS3Percent : 100) + '%',
+              background: '#9A4F1E',
+            }} />
+          </div>
+          <div className="sb-storage-foot">
+            <span>{!storage?.allS3StatsAvailable ? 'недоступно' : storage.allS3HasFiniteQuota
+              ? `${storage.allS3Percent}% использовано` : 'безлимит'}</span>
+          </div>
         </div>
       </div>
 

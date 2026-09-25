@@ -1,8 +1,8 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import ServerSettingsTab from './ServerSettingsTab';
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
 describe('ServerSettingsTab', () => {
   it('не выводит секреты и не раскрывает access key', async () => {
@@ -60,6 +60,9 @@ describe('ServerSettingsTab', () => {
 
     render(<ServerSettingsTab />);
 
+    const profileCard = (await screen.findByText('universal-v1')).closest('.storage-profile-card') as HTMLElement;
+    expect((within(profileCard).getByLabelText('Квота S3 бакета') as HTMLInputElement).value).toBe('0');
+    expect((within(profileCard).getByLabelText('Единица квоты') as HTMLSelectElement).value).toBe('gb');
     expect(await screen.findByText('universal-v1')).toBeTruthy();
     expect(screen.getByPlaceholderText('Задан')).toHaveProperty('value', '');
     expect(screen.getByPlaceholderText('Оставьте пустым, чтобы не менять')).toHaveProperty('value', '');
@@ -136,5 +139,39 @@ describe('ServerSettingsTab', () => {
       profileId: 'universal-v1',
     });
     expect(fetchMock.mock.calls.some(([path]) => path.endsWith('/storage/profile'))).toBe(false);
+  });
+
+  it('показывает сохранённую квоту и отправляет целое значение с выбранной единицей', async () => {
+    const fetchMock = vi.fn((path: string, _init?: RequestInit) => Promise.resolve({
+      ok: true,
+      json: async () => path.endsWith('/storage/profile')
+        ? { success: true, message: 'Сохранено', restartTargets: ['files'] }
+        : {
+          settings: [], reservedNames: [], storageRevisions: [],
+          storageProfiles: [{
+            profileId: 'universal-v1', role: 'universal', version: 1,
+            serviceUrl: 'http://minio:9000', hasAccessKey: true, hasSecretKey: true,
+            bucketName: 'cloud-universal', isR2: false, isActive: true, isLegacy: false,
+            quotaBytes: '2199023255552', editedAt: null, editedBy: 'seed', editedFrom: 'seed',
+          }],
+        },
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    render(<ServerSettingsTab />);
+
+    const card = (await screen.findByText('universal-v1')).closest('.storage-profile-card') as HTMLElement;
+    const cardQueries = within(card);
+    const quota = cardQueries.getByLabelText('Квота S3 бакета') as HTMLInputElement;
+    expect(quota.value).toBe('2');
+    expect((cardQueries.getByLabelText('Единица квоты') as HTMLSelectElement).value).toBe('tb');
+    fireEvent.change(quota, { target: { value: '3' } });
+    fireEvent.change(cardQueries.getByLabelText('Единица квоты'), { target: { value: 'pb' } });
+    fireEvent.click(card.querySelector('button.primary')!);
+
+    await waitFor(() => expect(fetchMock.mock.calls.some(([path]) => path.endsWith('/storage/profile'))).toBe(true));
+    const saveCall = fetchMock.mock.calls.find(([path]) => path.endsWith('/storage/profile'));
+    expect(JSON.parse(saveCall?.[1]?.body as string)).toMatchObject({ quotaValue: '3', quotaUnit: 'pb' });
   });
 });

@@ -183,6 +183,7 @@ message StorageProfileItem {
   string edited_by = 15;
   string edited_from = 16;
   bool has_secret_key = 17;
+  int64 quota_bytes = 18;
 }
 
 message StorageProfileRevisionItem {
@@ -213,6 +214,8 @@ message SaveStorageProfileRequest {
   bool confirm_legacy_mutation = 9;
   string edited_by = 10;
   string edited_from = 11;
+  string quota_value = 12; // Целое число из Web-формы; "0" означает безлимит
+  string quota_unit = 13; // gb | tb | pb, двоичные единицы
 }
 
 message SaveStorageProfileResponse {

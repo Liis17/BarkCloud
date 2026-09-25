@@ -10,6 +10,8 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.Configuration;
 
+using System.Globalization;
+
 namespace BarkCloud.GrpcServer;
 
 public static class WebApplicationBuilderExtensions
@@ -120,6 +122,7 @@ public static class WebApplicationBuilderExtensions
                 configurationDictionary[$"{prefix}:AccessKey"] = profile.AccessKey;
                 configurationDictionary[$"{prefix}:SecretKey"] = profile.SecretKey;
                 configurationDictionary[$"{prefix}:BucketName"] = profile.BucketName;
+                configurationDictionary[$"{prefix}:QuotaBytes"] = profile.QuotaBytes.ToString(CultureInfo.InvariantCulture);
                 configurationDictionary[$"{prefix}:IsR2"] = profile.IsR2.ToString();
                 configurationDictionary[$"{prefix}:IsActive"] = profile.IsActive.ToString();
                 configurationDictionary[$"{prefix}:IsLegacy"] = profile.IsLegacy.ToString();

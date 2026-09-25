@@ -70,6 +70,7 @@ public class ConfigurationContext : DbContext
             entity.Property(profile => profile.AccessKey).HasColumnType("text").IsRequired();
             entity.Property(profile => profile.SecretKey).HasColumnType("text").IsRequired();
             entity.Property(profile => profile.BucketName).HasColumnType("text").IsRequired();
+            entity.Property(profile => profile.QuotaBytes).HasColumnType("bigint");
             entity.Property(profile => profile.CreatedAt).HasColumnType("timestamp with time zone");
             entity.Property(profile => profile.CreatedBy).HasColumnType("text").IsRequired();
             entity.Property(profile => profile.CreatedFrom).HasColumnType("text").IsRequired();

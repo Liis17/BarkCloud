@@ -690,6 +690,10 @@ message GetUserStorageInfoResponse {
   int64 disk_used_storage = 5; // Занято на диске без учета S3-данных в байтах
   int64 s3_used_storage = 6; // Занято S3-данными в байтах
   int64 reserved_storage = 7; // Зарезервировано активными upload-сессиями
+  int64 all_s3_used_storage = 8; // Фактический объём объектов всех активных уникальных S3-бакетов
+  int64 all_s3_quota_storage = 9; // Сумма настроенных квот уникальных бакетов
+  bool all_s3_has_finite_quota = 10; // Все активные уникальные бакеты имеют положительную квоту
+  bool all_s3_stats_available = 11; // Удалось получить полную статистику S3 либо есть успешный stale-снимок
 }
 
 // ============ AlbumApi messages ============

@@ -11,6 +11,7 @@ public class FormatTests
     [InlineData(1024, "1 КБ")]
     [InlineData(1048576, "1 МБ")]
     [InlineData(5368709120, "5 ГБ")]
+    [InlineData(5629499534213120, "5 ПБ")]
     public void Size_FormatsWholeUnits(long bytes, string expected)
         => Format.Size(bytes).Should().Be(expected);
 

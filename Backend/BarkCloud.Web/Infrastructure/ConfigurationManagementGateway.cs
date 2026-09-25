@@ -2,6 +2,8 @@ using BarkCloud.Proto.Configuration;
 
 using Grpc.Core;
 
+using System.Globalization;
+
 namespace BarkCloud.Web.Infrastructure;
 
 public sealed record ServerSettingDto(
@@ -44,7 +46,8 @@ public sealed record ServerStorageProfileDto(
     bool IsLegacy,
     DateTimeOffset? EditedAt,
     string EditedBy,
-    string EditedFrom);
+    string EditedFrom,
+    string QuotaBytes);
 
 public sealed record ServerStorageRevisionDto(
     long Id,
@@ -75,7 +78,9 @@ public sealed record StorageProfileEdit(
     bool IsR2,
     bool IsLegacy,
     string? ProfileId,
-    bool ConfirmLegacyMutation);
+    bool ConfirmLegacyMutation,
+    string QuotaValue = "0",
+    string QuotaUnit = "gb");
 
 public sealed class ConfigurationManagementGateway(
     ConfigurationApi.ConfigurationApiClient configuration,
@@ -214,7 +219,9 @@ public sealed class ConfigurationManagementGateway(
             ProfileId = edit.ProfileId ?? string.Empty,
             ConfirmLegacyMutation = edit.ConfirmLegacyMutation,
             EditedBy = actor,
-            EditedFrom = "web-settings"
+            EditedFrom = "web-settings",
+            QuotaValue = edit.QuotaValue,
+            QuotaUnit = edit.QuotaUnit
         }, _headers, cancellationToken: cancellationToken);
         return new ConfigurationMutationResult(response.Success, response.Message, ["files"]);
     }
@@ -323,7 +330,8 @@ public sealed class ConfigurationManagementGateway(
         profile.IsLegacy,
         profile.EditedAt?.ToDateTimeOffset(),
         profile.EditedBy,
-        profile.EditedFrom);
+        profile.EditedFrom,
+        profile.QuotaBytes.ToString(CultureInfo.InvariantCulture));
 
     private static StorageProfileItem? FindStorageProfile(
         IEnumerable<StorageProfileItem> profiles,

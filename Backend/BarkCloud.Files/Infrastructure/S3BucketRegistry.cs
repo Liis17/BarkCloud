@@ -200,6 +200,8 @@ public class S3BucketRegistry : IDisposable
         if (new[] { profile.ProfileId, profile.Role, profile.ServiceUrl, profile.AccessKey, profile.SecretKey, profile.BucketName }
             .Any(string.IsNullOrWhiteSpace))
             throw new InvalidOperationException($"S3 profile '{profile.ProfileId}' is incomplete.");
+        if (profile.QuotaBytes < 0)
+            throw new InvalidOperationException($"S3 profile '{profile.ProfileId}' has a negative quota.");
         if (!Uri.TryCreate(profile.ServiceUrl, UriKind.Absolute, out var endpoint)
             || endpoint.Scheme is not ("http" or "https"))
             throw new InvalidOperationException($"S3 profile '{profile.ProfileId}' has an invalid endpoint.");
