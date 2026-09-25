@@ -59,6 +59,7 @@ Typed validation ограничивает TCP-порты диапазоном `1
 - Отключение специализированной роли прекращает новые записи; версии остаются доступными для чтения.
 - Legacy-профиль никогда не активируется для новых объектов; любое исправление требует явного подтверждения.
 - Пустой secret при редактировании сохраняет текущий; частичный профиль отклоняется.
+- `QuotaBytes` хранит квоту физического бакета в байтах; ввод целого `quota_value` с `quota_unit` (`gb`/`tb`/`pb`) пересчитывается в бинарные единицы, `0` означает безлимит. При сохранении квота синхронизируется между профилями одной физической локации (`endpoint + bucket`); изменения существующих профилей записываются отдельными ревизиями `QuotaChange` и требуют перезапуска Files.
 
 ## Основные файлы
 
@@ -66,6 +67,7 @@ Typed validation ограничивает TCP-порты диапазоном `1
 - `Catalog/SettingsCatalog.cs`, `SettingsValueValidator.cs` — whitelist и typed validation.
 - `Infrastructure/ConfigurationStorage.cs` — overlay, history/rollback, reserved names и compatibility-проекции.
 - `Infrastructure/StorageProfileStorage.cs` — версии, активация, disable и credential rotation.
+- `Domain/StorageProfileQuota.cs` — валидация целого значения и безопасное преобразование ГБ/ТБ/ПБ в байты.
 - `Infrastructure/ConfigurationDefaultsPopulator.cs` — идемпотентный seed.
 - `Infrastructure/ConfigurationAccessPolicy.cs` — production bootstrap-гейт.
 - `Infrastructure/LegacyConfigurationReporter.cs` — предупреждения о неизвестных legacy-ключах.

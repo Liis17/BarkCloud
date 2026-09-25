@@ -22,7 +22,7 @@ Package: `barkcloud.files`
 | `GetUploadUrl(GetUploadUrlRequest) → GetUploadUrlResponse` | Legacy: получить presigned URL для загрузки |
 | `GetTempDownloadUrl(GetTempDownloadUrlRequest) → GetTempDownloadUrlResponse` | Ссылки на скачивание + превью (`file_id`, `url`, `preview_url`) |
 | `CheckFileHash(CheckFileHashRequest) → CheckFileHashResponse` | Проверка наличия по хешу (без побочных эффектов): `exists` + `existing_locations` (имя+папка) для модалки «файл уже есть» |
-| `GetUserStorageInfo(GetUserStorageInfoRequest) → GetUserStorageInfoResponse` | Инфо о квоте/использовании, `reserved_storage` активных сессий + физический snapshot диска |
+| `GetUserStorageInfo(GetUserStorageInfoRequest) → GetUserStorageInfoResponse` | Инфо о пользовательской квоте/использовании, `reserved_storage` активных сессий, физический snapshot диска и суммарная статистика S3-бакетов |
 | `GetFileMetadata(GetFileMetadataRequest) → GetFileMetadataResponse` | Метаданные ready-файла (EXIF/ffprobe/PDF/Office). Только собственные файлы; processing отклоняется `FileNotReadyException` |
 
 ### UploadSession messages
@@ -240,5 +240,7 @@ Messages: `ResolveShareRequest { token; }` → `ResolveShareResponse { found; fi
 `total_available_storage` (общий размер диска), `disk_used_storage` (занято на диске без S3-данных),
 `s3_used_storage` (размер данных S3 на диске). Snapshot считает `PhysicalStorageStatsProvider`,
 кеширует результат на 5 минут и обновляет его только при запросе storage-info endpoint'ов.
+
+Отдельные поля `all_s3_used_storage`, `all_s3_quota_storage`, `all_s3_has_finite_quota` и `all_s3_stats_available` описывают сумму фактических объектов в активных уникальных S3-бакетах и их квот. Их считает `S3StorageStatsProvider` через полный пагинированный `ListObjectsV2`; учитываются originals, превью и остальные объекты, одинаковые endpoint+bucket не дублируются. При сбое после успешного чтения возвращается stale snapshot; если ни одного успешного чтения ещё не было, `all_s3_stats_available=false`, а не ложный ноль. Эти поля не меняют смысл физического snapshot выше.
 
 Сжатие изображений — `Services/ImageCompressor.cs`. Превью видео — кадр на 5 с (для коротких роликов берётся середина) через `Services/VideoThumbnailExtractor.cs`, затем `ImageCompressor.GenerateVideoPreviewsAsync` собирает горизонтальные JPEG-холсты 16:9: размытый затемнённый фон заполняет весь холст, исходный кадр вписывается целиком поверх него. FFMpegCore использует бинарь ffmpeg/ffprobe из образа `mwader/static-ffmpeg` (путь через `Ffmpeg:BinaryFolder`, по умолчанию `/usr/local/bin`). Сохранение превью (дедуп+S3+`FilePreview`) — `Services/PreviewPersistenceService.cs`. Очистка временных — `Services/TempFileCleanupService.cs` (background).

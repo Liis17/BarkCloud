@@ -294,6 +294,7 @@ public class ConfigurationApiService : BarkCloud.Proto.Configuration.Configurati
     {
         try
         {
+            var quotaBytes = await ResolveQuotaBytesAsync(request, context.CancellationToken);
             var profile = await _storageProfiles.SaveAsync(new StorageProfileInput(
                 request.Role,
                 request.ServiceUrl,
@@ -303,7 +304,9 @@ public class ConfigurationApiService : BarkCloud.Proto.Configuration.Configurati
                 request.IsR2,
                 request.IsLegacy,
                 string.IsNullOrWhiteSpace(request.ProfileId) ? null : request.ProfileId,
-                request.ConfirmLegacyMutation), request.EditedBy, request.EditedFrom, context.CancellationToken);
+                request.ConfirmLegacyMutation,
+                quotaBytes),
+                request.EditedBy, request.EditedFrom, context.CancellationToken);
             return new SaveStorageProfileResponse
             {
                 Success = true,
@@ -315,6 +318,24 @@ public class ConfigurationApiService : BarkCloud.Proto.Configuration.Configurati
         {
             return new SaveStorageProfileResponse { Success = false, Message = exception.Message };
         }
+    }
+
+    private async Task<long> ResolveQuotaBytesAsync(
+        SaveStorageProfileRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!string.IsNullOrEmpty(request.QuotaValue) || !string.IsNullOrEmpty(request.QuotaUnit))
+            return StorageProfileQuota.ParseBytes(request.QuotaValue, request.QuotaUnit);
+
+        // Old clients omit both fields. Keep an existing bucket's quota when they update credentials.
+        var profiles = await _storageProfiles.GetAllAsync(cancellationToken);
+        var existing = !string.IsNullOrWhiteSpace(request.ProfileId)
+            ? profiles.SingleOrDefault(profile => profile.ProfileId == request.ProfileId)
+            : profiles.Where(profile => profile.Role == request.Role)
+                .OrderByDescending(profile => profile.IsActive)
+                .ThenByDescending(profile => profile.Version)
+                .FirstOrDefault();
+        return existing?.QuotaBytes ?? 0;
     }
 
     public override async Task<UpdateConfigurationResponse> ActivateStorageProfile(
@@ -380,6 +401,7 @@ public class ConfigurationApiService : BarkCloud.Proto.Configuration.Configurati
         AccessKey = profile.AccessKey,
         SecretKey = profile.SecretKey,
         BucketName = profile.BucketName,
+        QuotaBytes = profile.QuotaBytes,
         IsR2 = profile.IsR2,
         IsActive = profile.IsActive,
         IsLegacy = profile.IsLegacy,

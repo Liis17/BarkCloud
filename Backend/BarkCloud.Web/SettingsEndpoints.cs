@@ -45,7 +45,9 @@ public static class SettingsEndpoints
         bool IsR2,
         bool IsLegacy,
         string? ProfileId,
-        bool ConfirmLegacyMutation);
+        bool ConfirmLegacyMutation,
+        string? QuotaValue,
+        string? QuotaUnit);
     public sealed record ServerStorageActivateBody(string? ProfileId);
     public sealed record ServerStorageDisableBody(string? Role);
     public sealed record ReservedNameBody(string? Name);
@@ -481,7 +483,9 @@ public static class SettingsEndpoints
         body.IsR2,
         body.IsLegacy,
         body.ProfileId,
-        body.ConfirmLegacyMutation);
+        body.ConfirmLegacyMutation,
+        body.QuotaValue ?? "0",
+        body.QuotaUnit ?? "gb");
 
     private static IResult MapRpc(RpcException ex)
     {

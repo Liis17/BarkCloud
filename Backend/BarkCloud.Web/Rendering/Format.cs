@@ -25,6 +25,7 @@ public static class Format
     private const double Mb = Kb * 1024d;
     private const double Gb = Mb * 1024d;
     private const double Tb = Gb * 1024d;
+    private const double Pb = Tb * 1024d;
 
     /// <summary>"312,4 ГБ", "1,1 МБ" и т.п.</summary>
     public static string Size(long bytes)
@@ -33,6 +34,7 @@ public static class Format
 
         return bytes switch
         {
+            >= (long)Pb => $"{(bytes / Pb).ToString("0.#", Ru)} ПБ",
             >= (long)Tb => $"{(bytes / Tb).ToString("0.#", Ru)} ТБ",
             >= (long)Gb => $"{(bytes / Gb).ToString("0.#", Ru)} ГБ",
             >= (long)Mb => $"{(bytes / Mb).ToString("0.#", Ru)} МБ",

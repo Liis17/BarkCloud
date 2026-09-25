@@ -16,7 +16,8 @@ public sealed record StorageProfileInput(
     bool IsR2,
     bool IsLegacy,
     string? ProfileId,
-    bool ConfirmLegacyMutation);
+    bool ConfirmLegacyMutation,
+    long QuotaBytes = 0);
 
 public static class StorageProfileRoles
 {
@@ -68,6 +69,8 @@ public sealed class StorageProfileStorage
         ValidateRole(input.Role);
         if (input.IsLegacy != StorageProfileRoles.IsCompatibility(input.Role))
             throw new InvalidOperationException("Legacy flag is allowed only for compatibility storage roles.");
+        if (input.QuotaBytes < 0)
+            throw new InvalidOperationException("Storage profile quota cannot be negative.");
         var actor = NormalizeActor(editedBy);
         var source = editedFrom ?? string.Empty;
 
@@ -148,6 +151,8 @@ public sealed class StorageProfileStorage
                 AddRevision(profile.ProfileId, before, profile, "CredentialsRotation", actor, source);
             }
         }
+
+        SynchronizeQuota(profiles, saved, input.QuotaBytes, actor, source);
 
         await _context.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
@@ -262,6 +267,7 @@ public sealed class StorageProfileStorage
             AccessKey = input.AccessKey.Trim(),
             SecretKey = secret,
             BucketName = input.BucketName.Trim(),
+            QuotaBytes = input.QuotaBytes,
             IsR2 = input.IsR2,
             IsLegacy = legacy,
             IsActive = !legacy,
@@ -311,6 +317,29 @@ public sealed class StorageProfileStorage
         });
     }
 
+    private void SynchronizeQuota(
+        IEnumerable<StorageProfile> profiles,
+        StorageProfile saved,
+        long quotaBytes,
+        string actor,
+        string source)
+    {
+        foreach (var profile in profiles.Append(saved)
+                     .DistinctBy(profile => profile.ProfileId)
+                     .Where(profile => SamePhysicalBucket(profile, saved)))
+        {
+            if (profile.QuotaBytes == quotaBytes)
+                continue;
+
+            var before = Snapshot(profile);
+            profile.QuotaBytes = quotaBytes;
+            profile.EditedAt = DateTime.UtcNow;
+            profile.EditedBy = actor;
+            profile.EditedFrom = source;
+            AddRevision(profile.ProfileId, before, profile, "QuotaChange", actor, source);
+        }
+    }
+
     private static string Snapshot(StorageProfile profile) => JsonSerializer.Serialize(new
     {
         profile.ProfileId,
@@ -320,6 +349,7 @@ public sealed class StorageProfileStorage
         profile.AccessKey,
         profile.SecretKey,
         profile.BucketName,
+        profile.QuotaBytes,
         profile.IsR2,
         profile.IsActive,
         profile.IsLegacy
@@ -337,6 +367,14 @@ public sealed class StorageProfileStorage
         string.Equals(left.ServiceUrl, right.ServiceUrl, StringComparison.OrdinalIgnoreCase)
         && string.Equals(left.BucketName, right.BucketName, StringComparison.Ordinal)
         && left.IsR2 == right.IsR2;
+
+    private static bool SamePhysicalBucket(StorageProfile left, StorageProfile right) =>
+        string.Equals(NormalizeEndpoint(left.ServiceUrl), NormalizeEndpoint(right.ServiceUrl), StringComparison.OrdinalIgnoreCase)
+        && string.Equals(left.BucketName, right.BucketName, StringComparison.Ordinal);
+
+    private static string NormalizeEndpoint(string value) => Uri.TryCreate(value, UriKind.Absolute, out var uri)
+        ? uri.GetLeftPart(UriPartial.Path).TrimEnd('/')
+        : NormalizeUrl(value);
 
     private static string NormalizeUrl(string value) => value.Trim().TrimEnd('/');
 

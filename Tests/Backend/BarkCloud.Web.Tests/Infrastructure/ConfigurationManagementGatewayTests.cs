@@ -34,12 +34,42 @@ public class ConfigurationManagementGatewayTests
             ProfileId = "universal-v1",
             AccessKey = "visible-access",
             SecretKey = "raw-secret",
-            HasSecretKey = true
+            HasSecretKey = true,
+            QuotaBytes = 12_345
         });
 
         dto.HasSecretKey.Should().BeTrue();
         dto.GetType().GetProperty("AccessKey").Should().BeNull();
         dto.GetType().GetProperty("SecretKey").Should().BeNull();
+        dto.QuotaBytes.Should().Be("12345");
+    }
+
+    [Fact]
+    public async Task SaveStorageProfile_PassesIntegerQuotaValueAndUnitToConfigurationService()
+    {
+        var configuration = new Mock<ConfigurationApi.ConfigurationApiClient>();
+        configuration
+            .Setup(client => client.GetStorageProfilesAsync(It.IsAny<GetStorageProfilesRequest>(), null, null, default))
+            .Returns(GrpcCallHelpers.AsyncUnary(new GetStorageProfilesResponse()));
+        configuration
+            .Setup(client => client.SaveStorageProfileAsync(
+                It.Is<SaveStorageProfileRequest>(request => request.QuotaValue == "2" && request.QuotaUnit == "tb"),
+                null, null, default))
+            .Returns(GrpcCallHelpers.AsyncUnary(new SaveStorageProfileResponse { Success = true }));
+        var gateway = new ConfigurationManagementGateway(
+            configuration.Object,
+            new ConfigurationBuilder().Build(),
+            new S3AccessChecker());
+
+        var result = await gateway.SaveStorageProfileAsync(new StorageProfileEdit(
+            "images", "https://s3.example", "access", "secret", "images", false, false, null, false, "2", "tb"),
+            "user:1");
+
+        result.Success.Should().BeTrue();
+        result.RestartTargets.Should().Contain("files");
+        configuration.Verify(client => client.SaveStorageProfileAsync(
+            It.Is<SaveStorageProfileRequest>(request => request.QuotaValue == "2" && request.QuotaUnit == "tb"),
+            null, null, default), Times.Once);
     }
 
     [Fact]

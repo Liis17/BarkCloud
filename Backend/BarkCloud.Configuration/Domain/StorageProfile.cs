@@ -16,6 +16,8 @@ public sealed class StorageProfile
 
     public string BucketName { get; set; } = string.Empty;
 
+    public long QuotaBytes { get; set; }
+
     public bool IsR2 { get; set; }
 
     public bool IsActive { get; set; }

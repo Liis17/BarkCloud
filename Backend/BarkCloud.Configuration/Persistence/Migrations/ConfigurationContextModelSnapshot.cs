@@ -128,6 +128,9 @@ namespace BarkCloud.Configuration.Persistence.Migrations
                     b.Property<bool>("IsR2")
                         .HasColumnType("boolean");
 
+                    b.Property<long>("QuotaBytes")
+                        .HasColumnType("bigint");
+
                     b.Property<string>("Role")
                         .IsRequired()
                         .HasColumnType("text");

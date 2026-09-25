@@ -998,6 +998,10 @@ tr.selected .row-actions { opacity: 1; }
 .storage-profile-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 12px; margin-top: 24px; }
 .storage-profile-grid label { display: flex; min-width: 0; flex-direction: column; gap: 7px; color: var(--md-on-surface-variant); font-size: 12px; line-height: 16px; }
 .storage-profile-grid input { min-width: 0; margin-top: 0; }
+.storage-quota-control { display: flex; min-width: 0; gap: 8px; }
+.storage-quota-control input { flex: 1 1 auto; }
+.storage-quota-control select { flex: 0 0 92px; min-width: 0; }
+.storage-profile-grid label small { color: var(--md-on-surface-variant); font-size: 11px; line-height: 15px; }
 .storage-profile-footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--md-outline-variant); }
 .storage-profile-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 0; }
 .storage-profile-actions .btn { height: 36px; padding: 0 16px; font-size: 13px; }

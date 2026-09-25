@@ -84,9 +84,10 @@ Web использует server-owned `UploadSession` и состояния `upl
 - `S3Uploader.cs` — обёртка над S3/MinIO по `ProfileId`: `UploadAsync`, `DownloadAsync`, range и `DeleteAsync`. Начиная со 100 MiB использует multipart (часть минимум 64 MiB, увеличивается до `ceil(size/10000)`), при ошибке abort’ит upload. Для R2 PutObject и UploadPart отключают streaming payload signing/checksum validation и явно используют non-chunked body
 - `IMultipartUploadStore.cs` / `S3MultipartUploadStore.cs` — Files-owned V2 multipart seam: initiate/upload/list/complete/abort/head; R2-части используют unsigned non-chunked payload. Files закрепляет актуальные `AWSSDK.S3/Core`, поддерживающие forward-only Kestrel stream в `UploadPart` без `PartialWrapperStream`/буферизации. Metadata имени файла отправляется только для печатного ASCII, Unicode-имя остаётся в `UploadSession`; пустой/null `Parts` от S3 нормализуется в пустой список
 - `PhysicalStorageStatsProvider.cs` — ленивый snapshot диска MinIO: общий размер, занято не-S3, занято S3; кеш 5 минут, обновляется только при запросах storage-info
+- `S3StorageStatsProvider.cs` — фактическая суммарная статистика S3 по активным non-legacy профилям: перечисляет все страницы `ListObjectsV2` (включая originals, превью и прочие объекты), считает одинаковые `endpoint + bucket` один раз; кеш 5 минут, при ошибке использует последний успешный snapshot, а до первого успеха сообщает unavailable. Если все уникальные бакеты имеют положительные квоты — отдаёт их сумму; иначе общий S3-индикатор безлимитный
 
 ### Configurations
-- `StorageProfileOptions.cs` — одна версия S3-профиля (`ProfileId`, роль, endpoint, credentials, bucket, R2/active/legacy-флаги)
+- `StorageProfileOptions.cs` — одна версия S3-профиля (`ProfileId`, роль, endpoint, credentials, bucket, `QuotaBytes`, R2/active/legacy-флаги); квота задаётся в Configuration и передаётся Files при старте
 
 Маршрутизация новых originals: avatar → `avatars`, photo → `images`, video → `videos`, audio → `audio`, document → `documents`, archive/other → `other`; отсутствующая специализированная роль использует `universal`. Любой JpegView, thumbnail, artwork, preview и avatar 64px идёт через `previews` → `universal`. Чтение, range, delete, backfill и архивирование всегда берут `StorageProfileId` конкретной строки; ZIP скачивает каждый source из его собственного профиля.
 
