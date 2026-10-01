@@ -13,7 +13,7 @@ DTO-контракты сообщений, которые сервисы пуб�
 ## События
 
 ### Identity
-- `SessionRevokedEvent.cs` — отзыв сессии пользователя. Публикуется `Identity` при logout/removeSession; подписаны `Users`, `Files`, `Identity` (см. `SessionRevokedConsumer.cs` в каждом сервисе)
+- `SessionRevokedEvent.cs` — отзыв сессии пользователя. Публикуется `Identity` при logout/removeSession; подписаны `Users`, `Files`, `Identity`, `Torrent`, `Web` (см. `SessionRevokedConsumer.cs` в каждом сервисе; очереди `session-revoked-<сервис>`)
 
 ### Users
 События об изменении профиля, публикуются `Users`:
@@ -36,7 +36,7 @@ DTO-контракты сообщений, которые сервисы пуб�
 ## Поток событий
 
 ```
-Identity ──► SessionRevokedEvent ──► Users, Files (Consumers/SessionRevokedConsumer)
+Identity ──► SessionRevokedEvent ──► Users, Files, Identity, Torrent, Web (Consumers/SessionRevokedConsumer)
 Identity ──► EmailNotification    ──► (внешний сервис нотификаций, не в этом репо)
 Users    ──► UserChanged*         ──► (потребители вне видимости текущего репо)
 Users    ──► UserDeleted          ──► Identity, Files (Consumers/UserDeletedConsumer)

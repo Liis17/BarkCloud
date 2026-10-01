@@ -21,6 +21,7 @@ Parent: [[index]] · See also: [[api/identity-api]] · [[api/users-api]] · [[ap
 - Cookie: `bark_at` (access), `bark_rt` (refresh), `bark_did` (стабильный device-id). HttpOnly, SameSite=Lax.
 - Токен валидируется **локально** по `JwtSettings:SecretKey/Issuer/Audience`. Эти значения web получает из **Configuration-сервиса** через `LoadConfiguration(ServiceId.Web)` — `JwtSettings` засеяны как общие (`ServiceId.Unknown`) и раздаются любому сервису, поэтому секрет автоматически совпадает с Identity.
 - Истёк access → автоматический refresh через `IdentityApi.CreateToken`.
+- **Отзыв сессии:** Web подписан на `SessionRevokedEvent` (`Auth/SessionRevokedConsumer`, очередь `session-revoked-web`, RabbitMQ-настройки приходят из Configuration как общие) и держит собственный singleton `TokenRevocationCache`. `AuthGateway.AuthenticateAsync` отвергает access-токен, если `iat` ≤ момента отзыва (по `WebUser.IssuedAt`), и идёт по ветке refresh: после logout/удаления сессии refresh в Identity уже удалён → `null` (редирект/401). Токен после refresh повторно не проверяется. `AddXAuth` в Web не подключён (схемы аутентификации нет) — регистрируются только кэш и `TokenRevocationCleanupService`. Кэш в памяти — после рестарта Web записи теряются (F10).
 - Логин → `IdentityApi.Auth` (с device-заголовками `x-device-name`/`x-os-name`/`x-app-name`/`x-app-version`, base64). Поддержан 2FA-шаг.
 
 ## Вход по ключу безопасности (WebAuthn / FIDO2)
@@ -69,7 +70,7 @@ Web — тонкий релей к [[modules/backend-identity]] (валидац�
 - `SettingsEndpoints.cs` — группа `/api/settings/*` для действий страницы настроек (см. раздел «Настройки») + **`GET /api/settings/full`**. Admin-only `/api/settings/server*` требует одновременно обычную авторизацию и действующую сессию `AdminGate`; `POST /api/settings/server/storage/check` проверяет S3-профиль без сохранения
 
 ### Auth
-- `AuthGateway.cs` — cookie, локальная валидация JWT, refresh, логин/логаут, `IssueSession` (общая выдача cookie сессии), `ClearSession` (удаление cookie без обращения в Identity — после удаления аккаунта).
+- `AuthGateway.cs` — cookie, локальная валидация JWT + проверка отзыва сессии по `TokenRevocationCache`, refresh, логин/логаут, `IssueSession` (общая выдача cookie сессии), `ClearSession` (удаление cookie без обращения в Identity — после удаления аккаунта).
 - `AdminGate.cs` — гейт админ-действий по паролю `App:AdminPassword` (cookie `bark_admin`, HMAC на `JwtSettings:SecretKey`). См. [[modules/web-system-updates]].
 - `RegistrationGateway.cs` — регистрация с кодом по почте через клиентский `IdentityApi` (`BeginAsync`/`ConfirmAsync`, см. раздел «Регистрация»).
 - `PasswordResetGateway.cs` — восстановление пароля «Забыли пароль?» через клиентский `IdentityApi` (`BeginAsync`/`ConfirmAsync`, см. раздел «Восстановление пароля»).

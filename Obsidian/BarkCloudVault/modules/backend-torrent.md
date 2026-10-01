@@ -22,9 +22,10 @@
 - `Infrastructure/TorrentPersistenceService` — тик 5 c: трафик накопительно в БД (переживает рестарт), прогресс/статус/пиры.
 - `Infrastructure/TorrentStartupService` — восстановление торрентов из БД при старте (re-add + приоритеты файлов).
 - `Infrastructure/TorrentImportService` — импорт файла в облако: `FilesApi.GetUploadUrl` → POST на `cloud-files:{FILES_HTTP1PORT}/upload/{id}` → `CloudApi.AttachFile` (проброс JWT пользователя).
-- `Host/TorrentApiService` — gRPC (Add/List/Get/Files/Pause/Resume/Remove/SetFilePriority/ImportToCloud/**StreamProgress** server-streaming).
+- `Host/TorrentApiService` — gRPC (Add/List/Get/Files/Pause/Resume/Remove/SetFilePriority/ImportToCloud/**StreamProgress** server-streaming). `StreamProgress` на каждой итерации проверяет `TokenRevocationCache` (по `UserContext.DeviceId`/`IssuedAt`) и при отзыве сессии завершается `Unauthenticated` — иначе стрим пережил бы logout.
 - `Host/TorrentController` — http1 download (Range, проверка владельца).
 - `Consumers/UserDeletedConsumer` — чистит торренты и папку пользователя при удалении аккаунта.
+- `Consumers/SessionRevokedConsumer` — `SessionRevokedEvent` (очередь `session-revoked-torrent`) → `TokenRevocationCache.Revoke`; по этому кэшу `XAuth` отвергает токены отозванных сессий (HTTP и gRPC).
 
 Приоритет файла в `TorrentMapper` преобразуется явно между enum API (`Skip/Low/Normal/High`) и
 enum MonoTorrent (`DoNotDownload/Low/Normal/High`): их числовые значения не совпадают.
