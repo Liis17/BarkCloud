@@ -60,7 +60,8 @@ Tests/
 | Проект | Тестов | Покрытые компоненты |
 |--------|-------:|---------------------|
 | `BarkCloud.Identity.Tests` | 119 | 20/20 хендлеров (client + 6 `*Server` admin-вариантов), `Services/` (`JwtService`, `PasswordHasher`, `CodeGenerator`, `RefreshTokenGenerator`), консьюмеры |
-| `BarkCloud.Users.Tests` | 71 юнит + 8 PostgreSQL | Все хендлеры (Devices×7, Privacy×2, Search/ListByIds/Contacts, ProfilePicture×2, ProfileServer, StorageLimit и пр.) + `SessionRevokedConsumer`; ID пользователей, миграции sequence и конкурентное создание |
+| `BarkCloud.Users.Tests` | 81 юнит + 8 PostgreSQL | Все хендлеры (Devices×7, Privacy×2, Search/ListByIds/Contacts, ProfilePicture×2, ProfileServer, StorageLimit и пр.) + `SessionRevokedConsumer`; ID пользователей, миграции sequence и конкурентное создание |
+| `BarkCloud.Users.IntegrationTests` | 20 PostgreSQL | Уникальность логинов, конфликты записи, гонки переименования/вставки/подтверждения черновика и появления черновика между проверками, миграция F04 и откат |
 | `BarkCloud.Web.Tests` | 49 | Rendering (`Format`, `FileKind`, `CloudJson`), `AuthGateway` (маппинг x-error-code → `LoginOutcome`) |
 | `BarkCloud.Files.Tests` | 167 | 43/44 хендлеров (Album×7, Cloud×26 — директории/корзина/шеринг/избранное/медиа, `GetFileData`/`GetFilesData`, `UploadFile` и др.), сервисы `ImageCompressor`/`AlbumViewBuilder`/`PhysicalStorageStatsProvider`, `SessionRevokedConsumer`. Пропущены: `UploadAvatarServer` (линейный S3/image-IO, `ImageCompressor` не `virtual`), `UserDeletedConsumer` (прямые `ExecuteDeleteAsync` по `FilesContext`), `VideoThumbnailExtractor`/`PreviewPersistenceService`/`*CleanupService` (IO/таймеры) |
 | `BarkCloud.Shared.SecurityUtilities.Tests` | 23 | `SecurityUtilities.EvaluatePasswordStrength`, `GetPasswordStrengthMessage` |
@@ -103,6 +104,21 @@ dotnet test Tests/Backend/BarkCloud.Users.Tests/BarkCloud.Users.Tests.csproj -c 
 ```
 
 Сервис `postgres:18` с healthcheck `pg_isready` и переменная подключения включены для Users в `tests.yml` (`test-users`), `tests-backend-manual.yml` (элемент matrix `users`) и `backend-service-ci.yml` (тестовый job сборки Users). Для остальных сервисов PostgreSQL не запускается.
+
+## Интеграционные тесты уникальности логинов (F04)
+
+Отдельный проект `Tests/Backend/BarkCloud.Users.IntegrationTests/BarkCloud.Users.IntegrationTests.csproj` проверяет реальные `UsersStorage`, обработчик повторной регистрации и миграции. Он запускается отдельно от `BarkCloud.slnx`, поэтому обычный запуск юнит-тестов не требует БД из-за F04.
+
+- Нужен `BARKCLOUD_TEST_POSTGRES` с доступом к отдельному тестовому PostgreSQL и правом `CREATE DATABASE`. Без строки подключения тесты завершаются ошибкой, а не пропускаются.
+- Каждый сценарий создаёт и удаляет только свою БД `barkcloud_users_f04_<guid>`. Docker/Testcontainers не требуются: локально можно использовать отдельный сервер PostgreSQL.
+- Проверяются регистронезависимые ограничения БД, доменные ошибки, повторная запись после конфликта, собственное имя, атомарный откат обновления профиля/контакта, конкурентное подтверждение черновика, отказ миграции на дублях с диагностикой ID, `Up → Down → Up` и непустой фильтр email.
+- Гонки переименования и вставки синхронизируются перехватчиком SQL с барьерами до записи или после проверки занятости. Отдельно проверяется появление черновика между поиском email и username: повтор по тому же email получает `UserIsDraftException`. В конкурентных вставках заданы разные ID, чтобы проверка F04 не зависела от генератора F05.
+- CI: отдельный `test-users-integration` в `.github/workflows/tests.yml`, PostgreSQL 18, .NET 10 и публикация TRX. Изменения интеграционного проекта включены в фильтр Users.
+
+```bash
+export BARKCLOUD_TEST_POSTGRES='Host=127.0.0.1;Port=5432;Database=postgres;Username=postgres;Password=postgres'
+dotnet test Tests/Backend/BarkCloud.Users.IntegrationTests/BarkCloud.Users.IntegrationTests.csproj -c Release
+```
 
 ## CI
 

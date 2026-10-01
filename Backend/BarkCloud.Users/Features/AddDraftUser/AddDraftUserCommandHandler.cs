@@ -44,6 +44,15 @@ public class AddDraftUserCommandHandler : IRequestHandler<AddDraftUserCommand, A
         var firstName = request.FirstName?.Trim();
         var lastName = request.LastName?.Trim();
 
+        _logger.LogDebug("Проверка на зарезервированное имя: {Username}", username);
+
+        if (_reservedUsernamesService.IsReserved(username))
+        {
+            _metrics.Increment("users_reserved_username_blocked");
+            _logger.LogWarning("Username {Username} является зарезервированным именем", username);
+            throw new UsernameReservedException();
+        }
+
         _logger.LogDebug("Проверка существования email: {Email}", email);
 
         var userByEmail = await _usersStorage.GetUserByEmail(email);
@@ -65,15 +74,6 @@ public class AddDraftUserCommandHandler : IRequestHandler<AddDraftUserCommand, A
             throw new EmailExistException();
         }
 
-        _logger.LogDebug("Проверка на зарезервированное имя: {Username}", username);
-
-        if (_reservedUsernamesService.IsReserved(username))
-        {
-            _metrics.Increment("users_reserved_username_blocked");
-            _logger.LogWarning("Username {Username} является зарезервированным именем", username);
-            throw new UsernameReservedException();
-        }
-
         _logger.LogDebug("Проверка существования username: {Username}", username);
 
         var userByUsername = await _usersStorage.GetUserByUsername(username);
@@ -83,12 +83,9 @@ public class AddDraftUserCommandHandler : IRequestHandler<AddDraftUserCommand, A
             _metrics.Increment("users_username_conflicts");
             if (userByUsername.IsDraft)
             {
-                _logger.LogWarning(
-                    "Username {Username} уже занят черновиком пользователя {UserId}",
-                    request.Username,
-                    userByUsername.Id
-                );
-                throw new UserIsDraftException();
+                var owner = await _usersStorage.GetUserByEmail(email);
+                if (owner?.IsDraft == true && owner.Id == userByUsername.Id)
+                    throw new UserIsDraftException();
             }
 
             _logger.LogWarning(
@@ -99,7 +96,19 @@ public class AddDraftUserCommandHandler : IRequestHandler<AddDraftUserCommand, A
             throw new UsernameExistException();
         }
 
-        var user = await _usersStorage.CreateUser(username, firstName, lastName, email);
+        Domain.User user;
+        try
+        {
+            user = await _usersStorage.CreateUser(username, firstName, lastName, email);
+        }
+        catch (Exception ex) when (ex is UsernameExistException or EmailExistException)
+        {
+            var owner = await _usersStorage.GetUserByEmail(email);
+            if (owner?.IsDraft == true)
+                throw new UserIsDraftException();
+
+            throw;
+        }
 
         _logger.LogInformation(
             "Черновик пользователя создан. UserId: {UserId}, Username: {Username}, Email: {Email}",

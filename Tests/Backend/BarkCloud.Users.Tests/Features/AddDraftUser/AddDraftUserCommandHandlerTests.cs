@@ -12,6 +12,51 @@ namespace BarkCloud.Users.Tests.Features.AddDraftUser;
 
 public class AddDraftUserCommandHandlerTests
 {
+    [Fact]
+    public async Task Handle_DraftCreatedBetweenEmailAndUsernameChecks_ThrowsUserIsDraft()
+    {
+        _usersStorage.SetupSequence(s => s.GetUserByEmail("a@b"))
+            .ReturnsAsync((User?)null)
+            .ReturnsAsync(new User { Id = 5, IsDraft = true });
+        _usersStorage.Setup(s => s.GetUserByUsername("john"))
+            .ReturnsAsync(new User { Id = 5, IsDraft = true });
+
+        var act = () => CreateSut().Handle(Command(), default);
+
+        await act.Should().ThrowAsync<UserIsDraftException>();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Handle_CreateConflictWithDraftAtSameEmail_ThrowsUserIsDraft(bool emailConflict)
+    {
+        _usersStorage.SetupSequence(s => s.GetUserByEmail("a@b"))
+            .ReturnsAsync((User?)null)
+            .ReturnsAsync(new User { Id = 5, IsDraft = true });
+        _usersStorage.Setup(s => s.CreateUser("john", "John", "Doe", "a@b"))
+            .ThrowsAsync(emailConflict ? new EmailExistException() : new UsernameExistException());
+
+        var act = () => CreateSut().Handle(Command(), default);
+
+        await act.Should().ThrowAsync<UserIsDraftException>();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Handle_CreateConflictWithoutMatchingDraft_PreservesConflict(bool emailConflict)
+    {
+        Exception conflict = emailConflict ? new EmailExistException() : new UsernameExistException();
+        _usersStorage.Setup(s => s.CreateUser("john", "John", "Doe", "a@b"))
+            .ThrowsAsync(conflict);
+
+        var act = () => CreateSut().Handle(Command(), default);
+
+        var result = await act.Should().ThrowAsync<Exception>();
+        result.Which.Should().BeSameAs(conflict);
+    }
+
     private readonly Mock<IUsersStorage> _usersStorage = new();
     private readonly MetricsCollector _metrics = new();
 
@@ -64,7 +109,18 @@ public class AddDraftUserCommandHandlerTests
     }
 
     [Fact]
-    public async Task Handle_UsernameUsedByDraft_ThrowsUserIsDraft()
+    public async Task Handle_ReservedUsernameWithExistingDraft_ThrowsUsernameReserved()
+    {
+        _usersStorage.Setup(s => s.GetUserByEmail("a@b"))
+            .ReturnsAsync(new User { Id = 1, IsDraft = true });
+
+        var act = () => CreateSut("john").Handle(Command(), default);
+
+        await act.Should().ThrowAsync<UsernameReservedException>();
+    }
+
+    [Fact]
+    public async Task Handle_UsernameUsedByDraftWithDifferentEmail_ThrowsUsernameExist()
     {
         _usersStorage.Setup(s => s.GetUserByEmail(It.IsAny<string>())).ReturnsAsync((User?)null);
         _usersStorage.Setup(s => s.GetUserByUsername("john"))
@@ -72,7 +128,7 @@ public class AddDraftUserCommandHandlerTests
 
         var act = () => CreateSut().Handle(Command(), default);
 
-        await act.Should().ThrowAsync<UserIsDraftException>();
+        await act.Should().ThrowAsync<UsernameExistException>();
         _metrics.SnapshotAndReset()["users_username_conflicts"].Should().Be(1);
     }
 

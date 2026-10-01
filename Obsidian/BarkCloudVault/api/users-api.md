@@ -61,8 +61,11 @@ Package: `barkcloud.users`
 - `ProfilePictureHasNotValidType` — `SetProfilePicture` с файлом не типа `USER_AVATAR`
 - `BioTooLongException` — `ChangeBio` с bio > 200 символов
 - `UsernameReservedException` (Identity) — `ChangeUsername` с зарезервированным именем
+- `UsernameExistException` / `EmailExistException` (Identity) — конфликт логина при записи, включая параллельные запросы; username и непустой email уникальны без учёта регистра для активных аккаунтов и черновиков
 - `UserNotFoundException` (Identity) — пользователь не найден
 - `ChatFolderInvalidNameException`, `ChatFolderNotFoundException` (для ChatFolders, которых пока нет)
+
+`ChangeUsername` разрешает собственное имя и смену только регистра; чужое имя возвращает `UsernameExistException`. Повтор регистрации через `OverrideDraftUser` обновляет только черновик с тем же email; подтверждённый аккаунт получает `EmailExistException`. Предварительные `CheckExist*` сохраняют прежнюю семантику (черновик → `false`) и не гарантируют успешной записи. Proto, `x-error-code` и статус `FailedPrecondition` для доменных ошибок не изменены. Детали — [[modules/backend-users]].
 
 ## События
 

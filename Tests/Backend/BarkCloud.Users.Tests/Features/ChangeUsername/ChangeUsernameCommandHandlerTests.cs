@@ -51,4 +51,16 @@ public class ChangeUsernameCommandHandlerTests
         _usersStorage.Verify(s => s.ChangeUsername(42, "john"), Times.Once);
         _queueSender.Verify(s => s.UsernameChangedEvent(42, "john"), Times.Once);
     }
+
+    [Fact]
+    public async Task Handle_UsernameConflict_DoesNotPublishChange()
+    {
+        _usersStorage.Setup(s => s.ChangeUsername(42, "john"))
+            .ThrowsAsync(new UsernameExistException());
+
+        var act = () => CreateSut().Handle(new ChangeUsernameCommand { Username = "john" }, default);
+
+        await act.Should().ThrowAsync<UsernameExistException>();
+        _queueSender.Verify(s => s.UsernameChangedEvent(It.IsAny<long>(), It.IsAny<string>()), Times.Never);
+    }
 }

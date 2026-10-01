@@ -11,7 +11,7 @@ public interface IUsersStorage
     Task<User> CreateUser(string username, string firstName, string lastName, string email);
     Task ChangeDraftStatus(long userId, bool isDraft);
     Task UpdateProfilePicture(long userId, string profilePictureUrl, string profilePicturePreviewUrl);
-    Task UpdateTrackedUser(User user);
+    Task OverrideDraftUser(long userId, string username, string firstName, string lastName, string email);
     Task ChangeName(long userId, string firstName, string lastName);
     Task ChangeUsername(long userId, string username);
     Task ChangeBio(long userId, string? bio);
