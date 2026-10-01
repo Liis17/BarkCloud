@@ -51,7 +51,8 @@ public class SetProfilePictureCommandHandler : IRequestHandler<SetProfilePicture
             // Получаем информацию о файле по его ID
             var fileDataRequest = new GetFileDataRequest
             {
-                FileId = request.FileId.ToString()
+                FileId = request.FileId.ToString(),
+                UserId = _userContext.UserId
             };
 
             GetFileDataResponse fileDataResponse;
