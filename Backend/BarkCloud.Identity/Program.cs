@@ -89,6 +89,7 @@ public class Program
         builder.Services.AddTransient<IRefreshTokensStorage, RefreshTokensStorage>();
         builder.Services.AddSingleton<IRegistrationPolicy, RegistrationPolicy>();
         builder.Services.AddScoped<SessionIssuer>();
+        builder.Services.AddScoped<PasswordChangedNotifier>();
         builder.Services.AddTransient<JwtService>();
         builder.Services.AddTransient<IConfirmationCodesStorage, ConfirmationCodesStorage>();
         builder.Services.AddScoped<NotificationQueueSender>();

@@ -838,6 +838,11 @@ function ForgotConfirmCard({ error }) {
             </button>
           </div>
         </div>
+        <label className="remember">
+          <input type="checkbox" name="revoke_sessions" defaultChecked/>
+          <span className="check-mark"/>
+          Выйти на всех других устройствах
+        </label>
         <button type="submit" className="btn-primary">Сменить пароль <ArrowIcon/></button>
       </form>
     </div>

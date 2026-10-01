@@ -57,7 +57,7 @@ Web — тонкий релей к [[modules/backend-identity]] (валидац�
 
 **Шаг 1 — `BeginAsync` (POST `/forgot`):** `IdentityApi.ResetPassword(email|username, OtpTypeId.Email)` с device-метаданными → письмо `ResetPassword` с кодом, `reset_id`. Identity анти-энумерационно отдаёт dummy `reset_id` даже для несуществующего пользователя → всегда показываем экран ввода кода (`flash.kind=forgot_confirm`).
 
-**Шаг 2 — `ConfirmAsync` (POST `/forgot/confirm`):** `IdentityApi.ConfirmResetPassword(reset_id, code)` → access+refresh (Identity очищает старый хеш пароля) → `IdentityApi.SetPassword(newPassword, old="")` (старый пароль не нужен — хеш очищен) → `AuthGateway.IssueSession` → `/photos`. Новый пароль вводится на шаге 2; `reset_id` несётся в скрытом поле.
+**Шаг 2 — `ConfirmAsync` (POST `/forgot/confirm`):** один вызов `IdentityApi.ConfirmResetPassword(reset_id, code, new_password, revoke_other_sessions)` — Identity проверяет код, атомарно ставит пароль и при включённой галочке завершает остальные сессии → access+refresh → `AuthGateway.IssueSession` → `/photos`. Новый пароль вводится на шаге 2; `reset_id` несётся в скрытом поле. Галочка «Выйти на всех других устройствах» (`revoke_sessions`, по умолчанию включена; снятая галочка в форме не отправляется — в endpoint это `form.ContainsKey("revoke_sessions")`). Ошибка «новый пароль совпадает с текущим» остаётся на форме с тем же `reset_id` (код не сгорает). Отдельного `SetPassword` после сброса больше нет.
 
 ## Файлы
 

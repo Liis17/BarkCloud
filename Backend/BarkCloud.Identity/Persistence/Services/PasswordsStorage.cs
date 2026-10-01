@@ -49,25 +49,6 @@ public class PasswordsStorage : IPasswordsStorage
     }
 
     /// <summary>
-    /// Очищает хеш пароля пользователя, позволяя установить новый пароль без ввода старого.
-    /// Используется при сбросе пароля после успешной проверки OTP кода.
-    /// </summary>
-    /// <param name="userId">Идентификатор пользователя</param>
-    public async Task ClearUserPasswordHash(long userId)
-    {
-        var userPassword = await _context.UserPasswords.FirstOrDefaultAsync(x => x.UserId == userId);
-
-        if (userPassword is not null)
-        {
-            userPassword.PasswordHash = null;
-            userPassword.ChangedAt = DateTime.UtcNow;
-
-            _context.UserPasswords.Update(userPassword);
-            await _context.SaveChangesAsync();
-        }
-    }
-
-    /// <summary>
     /// Удаляет пароль пользователя (при удалении аккаунта).
     /// </summary>
     public async Task DeleteByUserId(long userId)

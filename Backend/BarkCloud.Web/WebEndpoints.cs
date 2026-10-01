@@ -285,8 +285,10 @@ public static class WebEndpoints
             var code = form["otp"].ToString();
             var password = form["password"].ToString();
             var login = form["login"].ToString();
+            // Снятая галочка в форме не отправляется вовсе.
+            var revokeOtherSessions = form.ContainsKey("revoke_sessions");
 
-            var result = await reset.ConfirmAsync(http, resetId, code, password);
+            var result = await reset.ConfirmAsync(http, resetId, code, password, revokeOtherSessions);
             var registrationEnabled = await features.RegistrationEnabledAsync(http.RequestAborted);
 
             if (result.Outcome == PasswordResetOutcome.Success)
