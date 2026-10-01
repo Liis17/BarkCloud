@@ -97,9 +97,10 @@ public class UnifiedSearchService
         };
 
         var data = await LoadData(null, cancellationToken);
+        // Id хита своего файла — id записи в облаке, а галереи (фото/видео/музыка) открывают результат по id файла.
         var hit = BuildHits(section, data, string.Empty)
             .Select(x => x.Hit)
-            .FirstOrDefault(x => x.Kind == request.Kind && x.Id == request.Id);
+            .FirstOrDefault(x => x.Kind == request.Kind && (x.Id == request.Id || x.FileId == request.Id));
         return hit ?? throw new RpcException(new Status(StatusCode.NotFound, "Результат больше недоступен"));
     }
 
