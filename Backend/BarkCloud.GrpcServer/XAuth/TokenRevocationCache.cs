@@ -6,9 +6,6 @@ public class TokenRevocationCache
 {
     private readonly ConcurrentDictionary<string, RevocationEntry> _revokedSessions = new();
 
-    public void Revoke(long userId, string deviceId, DateTime accessTokenExpiresAt)
-        => Revoke(userId, deviceId, DateTime.UtcNow, accessTokenExpiresAt);
-
     public void Revoke(long userId, string deviceId, DateTime revokedAt, DateTime expiresAt)
     {
         var key = BuildKey(userId, deviceId);

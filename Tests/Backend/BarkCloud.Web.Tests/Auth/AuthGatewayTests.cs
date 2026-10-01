@@ -161,7 +161,7 @@ public class AuthGatewayTests
     public async Task AuthenticateAsync_RevokedToken_NoRefreshCookie_ReturnsNull()
     {
         var http = HttpWithCookies(Jwt());
-        _revocations.Revoke(42, "d1", DateTime.UtcNow.AddHours(1));
+        _revocations.Revoke(42, "d1", DateTime.UtcNow, DateTime.UtcNow.AddHours(1));
 
         var user = await CreateSut().AuthenticateAsync(http);
 
@@ -173,7 +173,7 @@ public class AuthGatewayTests
     public async Task AuthenticateAsync_RevokedToken_RefreshRejected_ReturnsNull()
     {
         var http = HttpWithCookies(Jwt(), refresh: "rt");
-        _revocations.Revoke(42, "d1", DateTime.UtcNow.AddHours(1));
+        _revocations.Revoke(42, "d1", DateTime.UtcNow, DateTime.UtcNow.AddHours(1));
         _identity.Setup(c => c.CreateTokenAsync(It.IsAny<CreateTokenRequest>(), It.IsAny<Metadata>(), null, default))
             .Throws(RpcWithErrorCode(null));
 
@@ -186,7 +186,7 @@ public class AuthGatewayTests
     public async Task AuthenticateAsync_RevokedToken_RefreshWorks_ReturnsRefreshedUserAndSetsCookie()
     {
         var http = HttpWithCookies(Jwt(), refresh: "rt");
-        _revocations.Revoke(42, "d1", DateTime.UtcNow.AddHours(1));
+        _revocations.Revoke(42, "d1", DateTime.UtcNow, DateTime.UtcNow.AddHours(1));
 
         // Свежий токен выдан уже после отзыва (новый iat)
         var fresh = Jwt(issuedAt: DateTime.UtcNow.AddMinutes(1));
@@ -206,7 +206,7 @@ public class AuthGatewayTests
     [Fact]
     public async Task AuthenticateAsync_TokenIssuedAfterRevocation_ReturnsUser()
     {
-        _revocations.Revoke(42, "d1", DateTime.UtcNow.AddHours(1));
+        _revocations.Revoke(42, "d1", DateTime.UtcNow, DateTime.UtcNow.AddHours(1));
         var http = HttpWithCookies(Jwt(issuedAt: DateTime.UtcNow.AddMinutes(1)));
 
         var user = await CreateSut().AuthenticateAsync(http);
@@ -218,7 +218,7 @@ public class AuthGatewayTests
     [Fact]
     public async Task AuthenticateAsync_OtherDeviceRevoked_ReturnsUser()
     {
-        _revocations.Revoke(42, "d2", DateTime.UtcNow.AddHours(1));
+        _revocations.Revoke(42, "d2", DateTime.UtcNow, DateTime.UtcNow.AddHours(1));
         var http = HttpWithCookies(Jwt(deviceId: "d1"));
 
         var user = await CreateSut().AuthenticateAsync(http);

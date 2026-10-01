@@ -140,7 +140,6 @@ public class Program
                 o.UseBusOutbox();
             });
 
-            x.AddConsumer<SessionRevokedConsumer>();
             x.AddConsumer<UserDeletedConsumer>();
             x.AddConsumer<ProcessUploadedFileConsumer>();
 
@@ -150,11 +149,6 @@ public class Program
                 {
                     h.Username(builder.Configuration["RabbitMQ:Username"]);
                     h.Password(builder.Configuration["RabbitMQ:Password"]);
-                });
-
-                cfg.ReceiveEndpoint("session-revoked-files", e =>
-                {
-                    e.ConfigureConsumer<SessionRevokedConsumer>(context);
                 });
 
                 cfg.ReceiveEndpoint("user-deleted-files", e =>
