@@ -25,7 +25,7 @@
 - `Host/TorrentApiService` — gRPC (Add/List/Get/Files/Pause/Resume/Remove/SetFilePriority/ImportToCloud/**StreamProgress** server-streaming). `StreamProgress` на каждой итерации проверяет `TokenRevocationCache` (по `UserContext.DeviceId`/`IssuedAt`) и при отзыве сессии завершается `Unauthenticated` — иначе стрим пережил бы logout.
 - `Host/TorrentController` — http1 download (Range, проверка владельца).
 - `Consumers/UserDeletedConsumer` — чистит торренты и папку пользователя при удалении аккаунта.
-- `Consumers/SessionRevokedConsumer` — `SessionRevokedEvent` (очередь `session-revoked-torrent`) → `TokenRevocationCache.Revoke`; по этому кэшу `XAuth` отвергает токены отозванных сессий (HTTP и gRPC).
+- Отзыв сессий — `GrpcRevocationFeed` из Identity, снимок до Kestrel и poll 5 с; HTTP/gRPC и `StreamProgress` продолжают проверять `TokenRevocationCache`. Прежний consumer удалён ([[modules/session-revocation]]).
 
 Приоритет файла в `TorrentMapper` преобразуется явно между enum API (`Skip/Low/Normal/High`) и
 enum MonoTorrent (`DoNotDownload/Low/Normal/High`): их числовые значения не совпадают.

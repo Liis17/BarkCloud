@@ -78,3 +78,7 @@ Typed validation ограничивает TCP-порты диапазоном `1
 Собственная БД и bootstrap-параметры не хранятся в settings-таблицах: `CONFIGURATION_HOST`, `CONFIGURATION_DBPORT`, `CONFIGURATION_DATABASE`, `CONFIGURATION_USERNAME`, `CONFIGURATION_PASSWORD`, `CONFIGURATION_PORT`, `CONFIGURATION_ACCESS_KEY`, `ASPNETCORE_ENVIRONMENT`.
 
 Автозаполнение использует `POSTGRES_*`, `RABBITMQ_DEFAULT_*`, `MINIO_HOST/MINIO_PORT/MINIO_ROOT_USER/MINIO_ROOT_PASSWORD`, optional `EMAIL_*`, обязательные production `EXTERNAL_*_HOST` и service ports из compose.
+
+## Настройки feed отзывов (F10)
+
+Каталог содержит `IdentityService:Host` и чувствительный `IdentityService:Token` для Users, Files и Torrent. `EnsureSeedAsync`/`PopulateDefaultsAsync` при каждом старте досоздают недостающие строки в существующих БД и вычисляют docker-host/service-JWT; уже заполненные значения сохраняются. Проверено SQLite-тестами трёх сервисов. Web использует прежний Host и генерирует сервисный токен локально. См. [[modules/session-revocation]].

@@ -190,3 +190,7 @@ cd Backend
 # собрать образы микросервисов из Dockerfile (или Dockerfile.slim)
 docker compose -f docker-compose-dev.yml up -d
 ```
+
+## Долговечный отзыв сессий (F10)
+
+Сначала обновить Configuration (новые Host/Token) и Identity (миграция и gRPC feed), затем Users/Files/Torrent/Web. Users/Files/Torrent зависят от `cloud-identity` в production compose и генераторе Builder; Identity при старте читает свою БД и не ждёт Users. `restart: always` повторяет запуск после исчерпания ретраев снимка. Очереди `session-revoked-*` после обновления всех сервисов можно удалить. См. [[modules/session-revocation]].

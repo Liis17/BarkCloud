@@ -36,8 +36,11 @@ Parent: [[index]]
 ### XAuth (авторизация)
 - `XAuthExtensions.cs` — DI/middleware для авторизации
 - `UserContext.cs` — текущий пользователь (claims + device + `IssuedAt` из клейма `iat`, `MinValue` если нет); `IssuedAt` нужен долгим стримам для повторной проверки отзыва (`TorrentApiService.StreamProgress`)
-- `TokenRevocationCache.cs` — in-memory кэш отозванных сессий по ключу `{userId}:{deviceId}`. **Учитывает время**: `Revoke` запоминает момент отзыва, `IsRevoked(userId, deviceId, tokenIssuedAt)` считает токен отозванным только если его `iat` ≤ момента отзыва. Поэтому повторный логин с тем же устройством (новый токен с iat > отзыва) валиден сразу, а не ждёт 60 мин. `OnTokenValidated` (`XAuthExtensions.cs`) берёт `iat` из `JsonWebToken`/`JwtSecurityToken` (fail-safe `MinValue` → «отозван»).
-- `TokenRevocationCleanupService.cs` — фоновая очистка записей по `ExpiresAt` (когда старые токены устройства уже истекли)
+- `TokenRevocationCache.cs` — локальный hot-path кэш: `Revoke(userId, deviceId, revokedAt, expiresAt)` принимает исходное время Identity и сохраняет максимальные время/expiry. `IsRevoked` по-прежнему проверяет `iat <= RevokedAt`; `OnTokenValidated` читает `iat` из JWT (fallback `MinValue`). См. [[modules/session-revocation]].
+- `RevocationSyncService.cs` — полный снимок с ретраями в `StartAsync` до открытия Kestrel, затем poll 5 с с перекрытием 1 мин и очисткой кэша; заменяет удалённый `TokenRevocationCleanupService`.
+
+- `IRevocationFeed.cs` — `RevocationBatch`/`SessionRevocation` и общий интерфейс источника.
+- `GrpcRevocationFeed.cs` — service-only клиент Identity, deadline 10 с; серверный контракт генерируется здесь единожды ([[api/session-revocation-api]]). Identity использует DB-feed.
 
 ## Что подключает каждый сервис
 

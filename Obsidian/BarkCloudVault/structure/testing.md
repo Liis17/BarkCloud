@@ -150,3 +150,7 @@ Drive (`Drive/*`, WPF/Windows, тестов нет) в CI не собирает�
 - `shared.proto` владельца не имеет (общие типы, `GrpcServices="None"`) → триггерит всех потребителей: Files, Identity, Users, Web.
 - Notification proto не использует — для него возвращать нечего.
 - Клиентские зависимости (`GrpcServices="Client"`) сборку НЕ триггерят: например правка `files_api.proto` не пересоберёт Users/Web, хотя они его клиенты. Компромисс: их сгенерированные стабы останутся со старым контрактом до их же следующей пересборки. `tests.yml` это не затрагивает — там `Shared/**` по-прежнему гоняет все backend-тесты.
+
+## F10: отзыв сессий
+
+`TokenRevocationCacheTests`, `RevocationSyncServiceTests` и `GrpcRevocationFeedTests` проверяют исходное время, max-upsert, снимок/дельту, ретраи, отмену, сохранение кэша при сбое, рестарт и две реплики. Тест с настоящим Kestrel проверяет блокировку порта до снимка. Identity SQLite: `RefreshTokensStorageRevocationTests` проверяет atomic rollback, safe logout, bulk/exclusion, TTL/cleanup и идемпотентность; `SessionRevocationApiServiceTests` — фильтры feed. Configuration SQLite проверяет появление ключей Identity в существующих развёртываниях. Подробности результатов и ещё не выполненных Docker-сценариев — [[modules/session-revocation]].

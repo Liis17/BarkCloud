@@ -123,7 +123,7 @@ Web использует server-owned `UploadSession` и состояния `upl
 - `FileNotUploadedException.cs`
 
 ### Consumers
-- `SessionRevokedConsumer.cs` — слушает `SessionRevokedEvent` из [[modules/shared-queue]]
+- Отзыв сессий — `GrpcRevocationFeed` из Identity, загрузка до Kestrel и poll 5 с; прежний consumer удалён ([[modules/session-revocation]])
 - `UserDeletedConsumer.cs` — по `UserDeleted` (из [[modules/backend-users]]) снимает пользователя из `Uploaders` всех его блобов (освобождает квоту) и удаляет его `CloudDirectories`/`CloudFileEntries`/`Albums`/`AlbumItems`/`FavoriteFiles`/`ShareLinks`/`FileGrants` (как владельца и как получателя). Физическое удаление осиротевших S3-блобов делает фоновый `OrphanBlobCleanupService`
 - `ProcessUploadedFileConsumer.cs` — принимает `ProcessUploadedFile { SessionId }`, concurrency 2, вызывает идемпотентный V2 processor; retry 10s/1m/5m/15m
 
