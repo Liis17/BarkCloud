@@ -141,6 +141,22 @@ jobs:
       - check_dotnet
     if: ${{ needs.changes.outputs.should_test == 'true' && needs.check_dotnet.result == 'success' }}
     runs-on: ubuntu-latest
+    env:
+      BARKCLOUD_TEST_POSTGRES: ${{ inputs.service-key == 'users' && 'Host=127.0.0.1;Port=5432;Database=postgres;Username=postgres;Password=postgres' || '' }}
+    services:
+      postgres:
+        image: ${{ inputs.service-key == 'users' && 'postgres:18' || '' }}
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
 

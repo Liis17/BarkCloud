@@ -1,10 +1,10 @@
-# Юнит-тесты
+# Тестирование
 
 Parent: [[index]]
 
 ## Назначение
 
-Юнит-тесты для всех модулей проекта BarkCloud. Цель — покрыть Features/Services/Consumers/Interceptors/Repositories/ViewModels во всех платформах (Backend .NET, Shared .NET, Android Kotlin, iOS Swift). Подход — **моки везде**, без EF Core InMemory и без Testcontainers.
+Юнит-тесты для всех модулей проекта BarkCloud. Цель — покрыть Features/Services/Consumers/Interceptors/Repositories/ViewModels во всех платформах (Backend .NET, Shared .NET, Android Kotlin, iOS Swift). Основной подход — моки на границах хендлеров; генерация ID и миграции Users дополнительно проверяются на реальном PostgreSQL. Без EF Core InMemory и без Testcontainers.
 
 ## Расположение
 
@@ -60,7 +60,7 @@ Tests/
 | Проект | Тестов | Покрытые компоненты |
 |--------|-------:|---------------------|
 | `BarkCloud.Identity.Tests` | 119 | 20/20 хендлеров (client + 6 `*Server` admin-вариантов), `Services/` (`JwtService`, `PasswordHasher`, `CodeGenerator`, `RefreshTokenGenerator`), консьюмеры |
-| `BarkCloud.Users.Tests` | 70 | Все хендлеры (Devices×7, Privacy×2, Search/ListByIds/Contacts, ProfilePicture×2, ProfileServer, StorageLimit и пр.) + `SessionRevokedConsumer` |
+| `BarkCloud.Users.Tests` | 71 юнит + 8 PostgreSQL | Все хендлеры (Devices×7, Privacy×2, Search/ListByIds/Contacts, ProfilePicture×2, ProfileServer, StorageLimit и пр.) + `SessionRevokedConsumer`; ID пользователей, миграции sequence и конкурентное создание |
 | `BarkCloud.Web.Tests` | 49 | Rendering (`Format`, `FileKind`, `CloudJson`), `AuthGateway` (маппинг x-error-code → `LoginOutcome`) |
 | `BarkCloud.Files.Tests` | 167 | 43/44 хендлеров (Album×7, Cloud×26 — директории/корзина/шеринг/избранное/медиа, `GetFileData`/`GetFilesData`, `UploadFile` и др.), сервисы `ImageCompressor`/`AlbumViewBuilder`/`PhysicalStorageStatsProvider`, `SessionRevokedConsumer`. Пропущены: `UploadAvatarServer` (линейный S3/image-IO, `ImageCompressor` не `virtual`), `UserDeletedConsumer` (прямые `ExecuteDeleteAsync` по `FilesContext`), `VideoThumbnailExtractor`/`PreviewPersistenceService`/`*CleanupService` (IO/таймеры) |
 | `BarkCloud.Shared.SecurityUtilities.Tests` | 23 | `SecurityUtilities.EvaluatePasswordStrength`, `GetPasswordStrengthMessage` |
@@ -84,6 +84,25 @@ dotnet test BarkCloud.slnx -c Release --collect:"XPlat Code Coverage"
 # Отдельный проект
 dotnet test Tests/Backend/BarkCloud.Identity.Tests/BarkCloud.Identity.Tests.csproj
 ```
+
+## PostgreSQL-тесты Users (F05)
+
+`Tests/Backend/BarkCloud.Users.Tests/Persistence/UsersStoragePostgresTests.cs` использует реальные `UsersContext`, миграции и `UsersStorage`; категория — `PostgreSQL`. В `_Helpers/` находятся `PostgresUsersDatabase`, `PostgresFactAttribute` и `PostgresTheoryAttribute`.
+
+- `BARKCLOUD_TEST_POSTGRES` — строка подключения к отдельному тестовому серверу PostgreSQL. Роли нужны права создания БД и применения миграций (в CI используется `postgres`).
+- Каждый сценарий создаёт БД `barkcloud_users_f05_<guid>`, применяет нужные миграции и удаляет только эту БД после завершения. Пул соединений ограничен 20.
+- Без строки подключения локальные тесты явно пропускаются. При `CI=true` отсутствие строки или недоступность PostgreSQL приводит к ошибке.
+- Проверяются первый ID `1`, сохранение старого ID `4_000_000_000` и его связей, оба состояния `is_called` у опережающей sequence, пустая таблица после удаления пользователей, откат транзакции миграции, 200 конкурентных созданий с отдельными контекстами (до 20 одновременно) и повторный запуск миграций.
+
+```bash
+export BARKCLOUD_TEST_POSTGRES='Host=127.0.0.1;Port=5432;Database=postgres;Username=postgres;Password=postgres'
+# Все тесты Users, включая PostgreSQL
+dotnet test Tests/Backend/BarkCloud.Users.Tests/BarkCloud.Users.Tests.csproj -c Release
+# Только PostgreSQL
+dotnet test Tests/Backend/BarkCloud.Users.Tests/BarkCloud.Users.Tests.csproj -c Release --filter 'Category=PostgreSQL'
+```
+
+Сервис `postgres:18` с healthcheck `pg_isready` и переменная подключения включены для Users в `tests.yml` (`test-users`), `tests-backend-manual.yml` (элемент matrix `users`) и `backend-service-ci.yml` (тестовый job сборки Users). Для остальных сервисов PostgreSQL не запускается.
 
 ## CI
 
