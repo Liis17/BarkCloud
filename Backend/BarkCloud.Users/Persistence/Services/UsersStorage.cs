@@ -52,11 +52,8 @@ public class UsersStorage : IUsersStorage
     {
         var contactUser = new UserContact { Email = email };
 
-        var unixTimestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-
         var user = new User
         {
-            Id = unixTimestamp,
             Username = username,
             FirstName = firstName,
             LastName = lastName,
