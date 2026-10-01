@@ -13,7 +13,8 @@ Parent: [[index]] · See also: [[api/identity-api]] · [[modules/shared-identity
 ## Файлы
 
 ### Domain
-- `AuthUserProperty.cs` (+ `WebAuthnUserHandle` — непубличный user handle WebAuthn)
+- `AuthUserProperty.cs` (+ `WebAuthnUserHandle` — непубличный user handle WebAuthn; + поля email-challenge: `LastEmailAuthCode`, `EmailAuthCodePurpose`, `EmailAuthCodeIssuedAt`, `EmailAuthCodeExpiresAt`, `EmailAuthCodeAttempts` — см. «Email-код 2FA (F07)»)
+- `EmailAuthCodePurpose.cs` — назначение email-кода: `Login`, `EnableEmailOtp`
 - `ConfirmationCode.cs`, `ConfirmationCodeType.cs`
 - `OtpType.cs`
 - `RefreshToken.cs`
@@ -58,7 +59,7 @@ Parent: [[index]] · See also: [[api/identity-api]] · [[modules/shared-identity
 - `Services/WebAuthnStorage.cs` — ключи + challenge'и + user handle
 - `Exceptions/OtpNotCreatedException.cs` (локальный)
 - `Exceptions/RefreshTokenNotFoundException.cs` (локальный)
-- `Migrations/` — 8 миграций:
+- `Migrations/` — 10 миграций:
   - `20250408213248_IdentityInitial`
   - `20250503180927_AddConfirmationCodes`
   - `20250508184250_AddOtp`
@@ -68,6 +69,7 @@ Parent: [[index]] · See also: [[api/identity-api]] · [[modules/shared-identity
   - `20260207120000_RenameDeviceNameToDeviceId`
   - `20260507005955_SecurityHardening`
   - `20260613125810_AddWebAuthn` — таблицы `WebAuthnCredentials`/`WebAuthnChallenges` + `WebAuthnUserHandle`
+  - `20261001190754_EmailAuthCodeChallenge` — аддитивно: `EmailAuthCodePurpose`/`IssuedAt`/`ExpiresAt`/`Attempts` в `AuthUserProperties` (F07; `LastEmailAuthCode` не тронут)
 
 ## Features (реализованные)
 
@@ -114,6 +116,19 @@ Parent: [[index]] · See also: [[api/identity-api]] · [[modules/shared-identity
 5. `UpdateUserPasswordHash`; 6. выдача refresh+access текущему устройству; 7. письмо через `PasswordChangedNotifier` (best-effort).
 
 Хеш пароля при сбросе **не очищается** (`ClearUserPasswordHash` удалён) — окна «пароль пуст, любая сессия ставит свой» нет. Известный остаток: для того же `deviceId` access-токен проживёт до `JwtSettings.ExpiryMinutes`; legacy-аккаунты с ранее очищенным хешем сохраняют «первичную установку» без старого пароля до первой установки пароля.
+
+## Email-код 2FA (F07)
+
+**Порядок `Auth`:** валидация заголовков → поиск пользователя → **проверка пароля** (неверный → `FailedLogin`-письмо + `InvalidLoginOrPasswordException`) → настройки 2FA → TOTP / email-код → выдача токенов. Пароль проверяется первым: без него нельзя ни получить код, ни узнать, что у аккаунта включена 2FA. Протокол без состояния — на втором шаге (с `otp_code`) пароль проверяется повторно.
+
+**Challenge** хранится в `AuthUserProperty` (один активный на пользователя; новая выдача заменяет прежний). Логика — в `AuthPropertiesStorage`, константы приватные: TTL **5 мин**, **5 попыток**, cooldown повторной выдачи **60 с**.
+- `TryIssueEmailAuthCode(userId, purpose, code)` — условный `ExecuteUpdate`; `false`, если код **того же** `purpose` выдан < 60 с назад (письмо не шлётся, прежний код остаётся). Если строки `AuthUserProperty` нет — создаёт. Cooldown привязан к пользователю, не к IP.
+- `TryConsumeEmailAuthCode(userId, purpose, code)` — по образцу `ResetPasswordsStorage.TryApprove`: (1) атомарно списывает попытку (`UPDATE … WHERE Purpose, код не NULL, ExpiresAt > now, Attempts < 5`), (2) сравнивает `CryptographicOperations.FixedTimeEquals`, (3) атомарно обнуляет challenge (`WHERE LastEmailAuthCode = код`) — из параллельных запросов успех получает один. Просроченный/использованный/исчерпавший попытки/чужого назначения код → `false` → хендлеры бросают прежний `NotValidOtpCodeException` (новых исключений нет, клиенты не менялись).
+- Назначения: `Login` (`AuthCommandHandler`) и `EnableEmailOtp` (`EnableOtpVerificationCommandHandler` выдаёт, `ConfirmOtpVerificationCommandHandler` расходует) — код входа не подходит для привязки и наоборот.
+- Если `TryIssue` вернул `false`, хендлер входа всё равно бросает `OtpCodeNeedException` (клиент остаётся на вводе кода), но письмо не отправляется; кнопка «отправить ещё раз» заработает через минуту.
+- Старые коды после миграции имеют `ExpiresAt = NULL` и считаются просроченными. Код хранится открытым текстом (как `ResetPassword.OtpCode`).
+
+Остаётся вне F07: общие лимиты попыток входа/OTP по IP и аккаунту и троттлинг `FailedLogin`-писем (F14); у email-кода сброса пароля (`ConfirmResetPassword`) нет лимита попыток.
 
 ## Запрет регистрации (Features:RegistrationEnabled)
 

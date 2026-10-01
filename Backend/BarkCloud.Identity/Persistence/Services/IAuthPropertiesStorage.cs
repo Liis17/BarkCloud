@@ -12,7 +12,8 @@ public interface IAuthPropertiesStorage
     Task<AuthUserProperty?> GetUserAuthProperties(long userId);
     Task DisableOtp(long userId);
     Task DisableEmailOtp(long userId);
-    Task UpdateLastEmailAuthCode(long userId, string code);
+    Task<bool> TryIssueEmailAuthCode(long userId, EmailAuthCodePurpose purpose, string code);
+    Task<bool> TryConsumeEmailAuthCode(long userId, EmailAuthCodePurpose purpose, string? code);
     Task UpdateOptType(OtpType type, long userId);
     Task DeleteByUserId(long userId);
 }

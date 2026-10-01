@@ -101,8 +101,8 @@ public class ConfirmOtpVerificationCommandHandler : IRequestHandler<ConfirmOtpVe
             {
                 _logger.LogDebug("Проверка Email OTP кода для пользователя {UserId}", _userContext.UserId);
 
-                if (!string.Equals(otpConfigs.LastEmailAuthCode, request.OtpCode,
-                        StringComparison.InvariantCultureIgnoreCase))
+                if (!await _authPropertiesStorage.TryConsumeEmailAuthCode(
+                        _userContext.UserId, Domain.EmailAuthCodePurpose.EnableEmailOtp, request.OtpCode))
                 {
                     _metrics.Increment("otp_email_failed");
                     _metrics.Increment("otp_confirmation_failed");

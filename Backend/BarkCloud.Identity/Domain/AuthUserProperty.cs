@@ -19,6 +19,14 @@ public class AuthUserProperty
 
     public string? LastEmailAuthCode { get; set; }
 
+    public EmailAuthCodePurpose? EmailAuthCodePurpose { get; set; }
+
+    public DateTime? EmailAuthCodeIssuedAt { get; set; }
+
+    public DateTime? EmailAuthCodeExpiresAt { get; set; }
+
+    public int EmailAuthCodeAttempts { get; set; }
+
     // Случайный непубличный user handle WebAuthn (один на пользователя, общий для всех его ключей).
     // Генерится при первой привязке ключа.
     public byte[]? WebAuthnUserHandle { get; set; }

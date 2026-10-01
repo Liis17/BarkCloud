@@ -1,5 +1,6 @@
 using BarkCloud.GrpcServer.Metrics;
 using BarkCloud.GrpcServer.Tracker;
+using BarkCloud.Identity.Domain;
 using BarkCloud.Identity.Features.CreateToken;
 using BarkCloud.Identity.Infrastructure;
 using BarkCloud.Identity.Persistence.Services;
@@ -96,105 +97,7 @@ public class AuthCommandHandler(UsersServerApi.UsersServerApiClient usersClient,
             throw new InvalidLoginOrPasswordException();
         }
 
-        var optOptions = await authPropertiesStorage.GetUserAuthProperties(user.User.Id);
-
-        if (optOptions != null && (optOptions.EmailOtpEnabled || optOptions.OtpEnabled) && string.IsNullOrEmpty(request.OtpCode))
-        {
-            logger.LogInformation(
-                "Требуется OTP код для пользователя {UserId}. Email OTP: {EmailOtp}, App OTP: {AppOtp}",
-                user.User.Id,
-                optOptions.EmailOtpEnabled,
-                optOptions.OtpEnabled
-            );
-
-            if (optOptions is { OtpEnabled: false, EmailOtpEnabled: true })
-            {
-                logger.LogDebug("Генерация и отправка Email OTP кода для пользователя {UserId}", user.User.Id);
-
-                var userContactInfo = await usersClient.GetUserContactsAsync(new GetUserContactsRequest { UserId = user.User.Id });
-                var code = CodeGenerator.GenerateDigitalCode(6);
-
-                await authPropertiesStorage.UpdateLastEmailAuthCode(userContactInfo.User.Id, code);
-
-                // Получаем данные о местоположении IP-адреса
-                var locationInfo = await locationClient.GetLocationString(requestContext.IpAddress);
-
-                var emailNotification = new EmailNotification
-                {
-                    OwnerId = userContactInfo.User.Id,
-                    Address = userContactInfo.Contact.Email,
-                    CreatedAt = DateTime.UtcNow,
-                    Payload = new Dictionary<string, string>
-                    {
-                        {"username", userContactInfo.User.Username},
-                        {"confirmation_code", code},
-                        {"ip", requestContext.IpAddress ?? string.Empty},
-                        {"devicename", requestContext.DeviceName},
-                        {"os", requestContext.OperationSystem},
-                        {"location", locationInfo},
-                        {"appname", $"{requestContext.AppName} v.{requestContext.AppVersion}"},
-                        {"datetime", DateTime.UtcNow.ToString("dd.MM.yyyy HH:mm:ss")}
-                    },
-                    ServiceId = ServiceId.Identity,
-                    Title = "Код подтверждения для входа",
-                    Type = NotificationType.ConfirmationAuth
-                };
-
-                await notificationQueueSender.SendNotification(emailNotification);
-                metrics.Increment("otp_email_codes_sent");
-            }
-
-            metrics.Increment("auth_otp_required");
-            throw new OtpCodeNeedException();
-        }
-
-        if (optOptions is { OtpEnabled: true })
-        {
-            logger.LogDebug("Проверка TOTP кода для пользователя {UserId}", user.User.Id);
-
-            var otpSecret = optOptions.OtpSecret;
-
-            var totp = new Totp(Base32Encoding.ToBytes(otpSecret));
-
-            var isValid = totp.VerifyTotp(request.OtpCode, out long timeStepMatched, VerificationWindow.RfcSpecifiedNetworkDelay);
-
-            if (!isValid)
-            {
-                metrics.Increment("auth_login_failed");
-                metrics.Increment("otp_authenticator_failed");
-                logger.LogWarning(
-                    "Неверный TOTP код для пользователя {UserId}, IP: {IpAddress}",
-                    user.User.Id,
-                    requestContext.IpAddress
-                );
-                throw new NotValidOtpCodeException();
-            }
-
-            metrics.Increment("otp_authenticator_verified");
-            logger.LogDebug("TOTP код успешно проверен для пользователя {UserId}", user.User.Id);
-        }
-
-        if (optOptions is { OtpEnabled: false, EmailOtpEnabled: true })
-        {
-            logger.LogDebug("Проверка Email OTP кода для пользователя {UserId}", user.User.Id);
-
-            if (!string.Equals(optOptions.LastEmailAuthCode, request.OtpCode,
-                    StringComparison.InvariantCultureIgnoreCase))
-            {
-                metrics.Increment("auth_login_failed");
-                metrics.Increment("otp_email_failed");
-                logger.LogWarning(
-                    "Неверный Email OTP код для пользователя {UserId}, IP: {IpAddress}",
-                    user.User.Id,
-                    requestContext.IpAddress
-                );
-                throw new NotValidOtpCodeException();
-            }
-
-            metrics.Increment("otp_email_verified");
-            logger.LogDebug("Email OTP код успешно проверен для пользователя {UserId}", user.User.Id);
-        }
-
+        // Пароль проверяется первым: без него нельзя ни получить код 2FA, ни узнать, что 2FA включена.
         logger.LogDebug("Проверка пароля для пользователя {UserId}", user.User.Id);
 
         var currentPasswordHash = await passwordsStorage.GetUserPasswordHash(user.User.Id);
@@ -238,6 +141,113 @@ public class AuthCommandHandler(UsersServerApi.UsersServerApiClient usersClient,
             await notificationQueueSender.SendNotification(failedLoginNotification);
 
             throw new InvalidLoginOrPasswordException();
+        }
+
+        var optOptions = await authPropertiesStorage.GetUserAuthProperties(user.User.Id);
+
+        if (optOptions != null && (optOptions.EmailOtpEnabled || optOptions.OtpEnabled) && string.IsNullOrEmpty(request.OtpCode))
+        {
+            logger.LogInformation(
+                "Требуется OTP код для пользователя {UserId}. Email OTP: {EmailOtp}, App OTP: {AppOtp}",
+                user.User.Id,
+                optOptions.EmailOtpEnabled,
+                optOptions.OtpEnabled
+            );
+
+            if (optOptions is { OtpEnabled: false, EmailOtpEnabled: true })
+            {
+                logger.LogDebug("Генерация и отправка Email OTP кода для пользователя {UserId}", user.User.Id);
+
+                var userContactInfo = await usersClient.GetUserContactsAsync(new GetUserContactsRequest { UserId = user.User.Id });
+                var code = CodeGenerator.GenerateDigitalCode(6);
+
+                // false — прежний код выдан совсем недавно и остаётся в силе: письмо не отправляем.
+                if (await authPropertiesStorage.TryIssueEmailAuthCode(userContactInfo.User.Id, EmailAuthCodePurpose.Login, code))
+                {
+                    // Получаем данные о местоположении IP-адреса
+                    var locationInfo = await locationClient.GetLocationString(requestContext.IpAddress);
+
+                    var emailNotification = new EmailNotification
+                    {
+                        OwnerId = userContactInfo.User.Id,
+                        Address = userContactInfo.Contact.Email,
+                        CreatedAt = DateTime.UtcNow,
+                        Payload = new Dictionary<string, string>
+                        {
+                            {"username", userContactInfo.User.Username},
+                            {"confirmation_code", code},
+                            {"ip", requestContext.IpAddress ?? string.Empty},
+                            {"devicename", requestContext.DeviceName},
+                            {"os", requestContext.OperationSystem},
+                            {"location", locationInfo},
+                            {"appname", $"{requestContext.AppName} v.{requestContext.AppVersion}"},
+                            {"datetime", DateTime.UtcNow.ToString("dd.MM.yyyy HH:mm:ss")}
+                        },
+                        ServiceId = ServiceId.Identity,
+                        Title = "Код подтверждения для входа",
+                        Type = NotificationType.ConfirmationAuth
+                    };
+
+                    await notificationQueueSender.SendNotification(emailNotification);
+                    metrics.Increment("otp_email_codes_sent");
+                }
+                else
+                {
+                    logger.LogInformation(
+                        "Повторная отправка Email OTP кода для пользователя {UserId} пропущена: действует ранее выданный код",
+                        user.User.Id
+                    );
+                }
+            }
+
+            metrics.Increment("auth_otp_required");
+            throw new OtpCodeNeedException();
+        }
+
+        if (optOptions is { OtpEnabled: true })
+        {
+            logger.LogDebug("Проверка TOTP кода для пользователя {UserId}", user.User.Id);
+
+            var otpSecret = optOptions.OtpSecret;
+
+            var totp = new Totp(Base32Encoding.ToBytes(otpSecret));
+
+            var isValid = totp.VerifyTotp(request.OtpCode, out long timeStepMatched, VerificationWindow.RfcSpecifiedNetworkDelay);
+
+            if (!isValid)
+            {
+                metrics.Increment("auth_login_failed");
+                metrics.Increment("otp_authenticator_failed");
+                logger.LogWarning(
+                    "Неверный TOTP код для пользователя {UserId}, IP: {IpAddress}",
+                    user.User.Id,
+                    requestContext.IpAddress
+                );
+                throw new NotValidOtpCodeException();
+            }
+
+            metrics.Increment("otp_authenticator_verified");
+            logger.LogDebug("TOTP код успешно проверен для пользователя {UserId}", user.User.Id);
+        }
+
+        if (optOptions is { OtpEnabled: false, EmailOtpEnabled: true })
+        {
+            logger.LogDebug("Проверка Email OTP кода для пользователя {UserId}", user.User.Id);
+
+            if (!await authPropertiesStorage.TryConsumeEmailAuthCode(user.User.Id, EmailAuthCodePurpose.Login, request.OtpCode))
+            {
+                metrics.Increment("auth_login_failed");
+                metrics.Increment("otp_email_failed");
+                logger.LogWarning(
+                    "Неверный Email OTP код для пользователя {UserId}, IP: {IpAddress}",
+                    user.User.Id,
+                    requestContext.IpAddress
+                );
+                throw new NotValidOtpCodeException();
+            }
+
+            metrics.Increment("otp_email_verified");
+            logger.LogDebug("Email OTP код успешно проверен для пользователя {UserId}", user.User.Id);
         }
 
         logger.LogInformation(

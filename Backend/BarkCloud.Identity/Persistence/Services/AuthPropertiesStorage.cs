@@ -1,3 +1,6 @@
+using System.Security.Cryptography;
+using System.Text;
+
 using BarkCloud.Identity.Domain;
 using BarkCloud.Identity.Persistence.Contexts;
 using BarkCloud.Identity.Persistence.Exceptions;
@@ -8,6 +11,10 @@ namespace BarkCloud.Identity.Persistence.Services;
 
 public class AuthPropertiesStorage : IAuthPropertiesStorage
 {
+    private const int EmailAuthCodeMaxAttempts = 5;
+    private static readonly TimeSpan EmailAuthCodeLifetime = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan EmailAuthCodeResendCooldown = TimeSpan.FromSeconds(60);
+
     private readonly IdentityContext _context;
 
     public AuthPropertiesStorage(IdentityContext context)
@@ -119,27 +126,102 @@ public class AuthPropertiesStorage : IAuthPropertiesStorage
         await _context.SaveChangesAsync();
     }
 
-    public async Task UpdateLastEmailAuthCode(long userId, string code)
+    /// <summary>
+    /// Выдаёт одноразовый email-код: заменяет прежний, задаёт срок и обнуляет счётчик попыток.
+    /// Возвращает false, если код того же назначения уже выдан менее <see cref="EmailAuthCodeResendCooldown"/> назад —
+    /// тогда прежний код остаётся в силе, а новое письмо отправлять не нужно.
+    /// </summary>
+    public async Task<bool> TryIssueEmailAuthCode(long userId, EmailAuthCodePurpose purpose, string code)
     {
-        var props = await _context.AuthUserProperties.FirstOrDefaultAsync(x => x.UserId == userId);
+        var now = DateTime.UtcNow;
+        var cooldownBorder = now - EmailAuthCodeResendCooldown;
+        var expiresAt = now + EmailAuthCodeLifetime;
 
-        if (props is null)
+        var updated = await _context.AuthUserProperties
+            .Where(x => x.UserId == userId
+                        && (x.EmailAuthCodePurpose != purpose
+                            || x.EmailAuthCodeIssuedAt == null
+                            || x.EmailAuthCodeIssuedAt <= cooldownBorder))
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(x => x.LastEmailAuthCode, code)
+                .SetProperty(x => x.EmailAuthCodePurpose, (EmailAuthCodePurpose?)purpose)
+                .SetProperty(x => x.EmailAuthCodeIssuedAt, (DateTime?)now)
+                .SetProperty(x => x.EmailAuthCodeExpiresAt, (DateTime?)expiresAt)
+                .SetProperty(x => x.EmailAuthCodeAttempts, 0));
+
+        if (updated == 1)
         {
-            props = new AuthUserProperty()
-            {
-                UserId = userId,
-                LastEmailAuthCode = code
-            };
-
-            await _context.AuthUserProperties.AddAsync(props);
-            await _context.SaveChangesAsync();
-
-            return;
+            return true;
         }
 
-        props.LastEmailAuthCode = code;
+        // Строка есть, но сработал cooldown.
+        if (await _context.AuthUserProperties.AnyAsync(x => x.UserId == userId))
+        {
+            return false;
+        }
 
+        await _context.AuthUserProperties.AddAsync(new AuthUserProperty
+        {
+            UserId = userId,
+            LastEmailAuthCode = code,
+            EmailAuthCodePurpose = purpose,
+            EmailAuthCodeIssuedAt = now,
+            EmailAuthCodeExpiresAt = expiresAt
+        });
         await _context.SaveChangesAsync();
+
+        return true;
+    }
+
+    /// <summary>
+    /// Проверяет и атомарно расходует email-код. Возвращает false, если кода нет, он просрочен,
+    /// выдан для другого назначения, исчерпал попытки, не совпал или его уже использовал параллельный запрос.
+    /// </summary>
+    public async Task<bool> TryConsumeEmailAuthCode(long userId, EmailAuthCodePurpose purpose, string? code)
+    {
+        if (string.IsNullOrEmpty(code))
+        {
+            return false;
+        }
+
+        var now = DateTime.UtcNow;
+
+        // Попытка списывается до сравнения: параллельный перебор не превысит лимит.
+        var reserved = await _context.AuthUserProperties
+            .Where(x => x.UserId == userId
+                        && x.EmailAuthCodePurpose == purpose
+                        && x.LastEmailAuthCode != null
+                        && x.EmailAuthCodeExpiresAt > now
+                        && x.EmailAuthCodeAttempts < EmailAuthCodeMaxAttempts)
+            .ExecuteUpdateAsync(s => s.SetProperty(x => x.EmailAuthCodeAttempts, x => x.EmailAuthCodeAttempts + 1));
+
+        if (reserved != 1)
+        {
+            return false;
+        }
+
+        var stored = await _context.AuthUserProperties
+            .Where(x => x.UserId == userId)
+            .Select(x => x.LastEmailAuthCode)
+            .FirstOrDefaultAsync();
+
+        if (stored is null
+            || !CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(stored), Encoding.UTF8.GetBytes(code)))
+        {
+            return false;
+        }
+
+        // Атомарный захват: при параллельных запросах с верным кодом успех получает только один.
+        var consumed = await _context.AuthUserProperties
+            .Where(x => x.UserId == userId && x.EmailAuthCodePurpose == purpose && x.LastEmailAuthCode == stored)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(x => x.LastEmailAuthCode, (string?)null)
+                .SetProperty(x => x.EmailAuthCodePurpose, (EmailAuthCodePurpose?)null)
+                .SetProperty(x => x.EmailAuthCodeIssuedAt, (DateTime?)null)
+                .SetProperty(x => x.EmailAuthCodeExpiresAt, (DateTime?)null)
+                .SetProperty(x => x.EmailAuthCodeAttempts, 0));
+
+        return consumed == 1;
     }
 
     public async Task UpdateOptType(OtpType type, long userId)
