@@ -32,6 +32,7 @@ Parent: [[index]] · See also: [[api/identity-api]] · [[modules/shared-identity
 - `RefreshTokenGenerator.cs` — генерация refresh-токенов
 - `CodeGenerator.cs` — генерация кодов подтверждения
 - `SessionIssuer.cs` — общий выпуск сессии (refresh+access, регистрация устройства, уведомление); используется входом по ключу (хвост `AuthCommandHandler`)
+- `PasswordChangedNotifier.cs` — письмо «Пароль успешно изменен» (`NotificationType.PasswordChanged`); общий хвост `SetPassword` (при смене, не при первичной установке) и `ConfirmResetPassword`
 - `Fido2` (пакет `Fido2` 4.0.1) регистрируется в `Program.cs` из `WebAuthn:RpId/ServerName/Origins`
 
 ### Infrastructure
@@ -100,6 +101,19 @@ Parent: [[index]] · See also: [[api/identity-api]] · [[modules/shared-identity
 ## Окружение
 
 `ASPNETCORE_ENVIRONMENT`, `CONFIGURATION_SERVICE_URL`. БД/JWT-настройки берутся из [[modules/backend-configuration]] при старте.
+
+## Смена и сброс пароля (F02)
+
+**`SetPassword`** (под токеном): при уже заданном пароле обязателен верный `old_password`, иначе `InvalidOldPasswordException`; новый пароль равный старому → `NewPasswordSameAsOldException`. Пустой хеш (аккаунт без строки в `UserPasswords`) = первичная установка при регистрации — старый не нужен, письмо не шлётся.
+
+**`ConfirmResetPassword`** (публичный) — атомарная установка пароля одним вызовом: `reset_id`, `otp_code`, **`new_password`**, `optional revoke_other_sessions` (не передано = `true`). Порядок шагов (безопасный отказ при сбое):
+1. проверка заголовков, reset (не найден/использован/истёк), OTP;
+2. пустой `new_password` → `NewPasswordRequiredException`; совпадение с текущим хешем → `NewPasswordSameAsOldException` (**до** захвата reset — код можно использовать повторно);
+3. `ResetPasswordsStorage.TryApprove` — атомарный `UPDATE … WHERE IsApproved=false`; `false` → `ResetIdHasIsApprovedException` (параллельные подтверждения: успех один);
+4. при `revoke_other_sessions`: `RefreshTokensStorage.DeleteAllByUserId` + `SessionRevokedEvent` по каждому устройству, **кроме текущего** (событие асинхронное и отозвало бы только что выданный токен: `TokenRevocationCache.IsRevoked` сравнивает `iat <= RevokedAt`);
+5. `UpdateUserPasswordHash`; 6. выдача refresh+access текущему устройству; 7. письмо через `PasswordChangedNotifier` (best-effort).
+
+Хеш пароля при сбросе **не очищается** (`ClearUserPasswordHash` удалён) — окна «пароль пуст, любая сессия ставит свой» нет. Известный остаток: для того же `deviceId` access-токен проживёт до `JwtSettings.ExpiryMinutes`; legacy-аккаунты с ранее очищенным хешем сохраняют «первичную установку» без старого пароля до первой установки пароля.
 
 ## Запрет регистрации (Features:RegistrationEnabled)
 

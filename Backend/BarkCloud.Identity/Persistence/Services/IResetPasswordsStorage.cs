@@ -6,6 +6,6 @@ public interface IResetPasswordsStorage
 {
     Task<ResetPassword?> GetResetPassword(Guid resetId);
     Task<ResetPassword> AddResetPassword(ResetPassword resetPassword);
-    Task SetApproved(Guid resetId);
+    Task<bool> TryApprove(Guid resetId);
     Task DeleteByUserId(long userId);
 }

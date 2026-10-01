@@ -183,7 +183,9 @@ public class IdentityApiService : BarkCloud.Proto.Identity.IdentityApi.IdentityA
         var command = new ConfirmResetPasswordCommand
         {
             OtpCode = request.OtpCode,
-            ResetId = Guid.Parse(request.ResetId)
+            ResetId = Guid.Parse(request.ResetId),
+            NewPassword = request.NewPassword,
+            RevokeOtherSessions = !request.HasRevokeOtherSessions || request.RevokeOtherSessions
         };
 
         var result = await _mediator.Send(command);

@@ -22,18 +22,17 @@ public class ResetPasswordsStorage(IdentityContext context) : IResetPasswordsSto
     }
 
     /// <summary>
-    /// Помечает запрос на сброс пароля как использованный после успешной проверки OTP кода.
+    /// Атомарно помечает запрос на сброс пароля как использованный. Возвращает false, если запрос
+    /// уже был использован (в т.ч. параллельным подтверждением) — успех получает только один вызов.
     /// </summary>
     /// <param name="resetId">Идентификатор запроса сброса</param>
-    public async Task SetApproved(Guid resetId)
+    public async Task<bool> TryApprove(Guid resetId)
     {
-        var resetPassword = await context.ResetPasswords.FirstOrDefaultAsync(x => x.Id == resetId);
+        var updated = await context.ResetPasswords
+            .Where(x => x.Id == resetId && !x.IsApproved)
+            .ExecuteUpdateAsync(s => s.SetProperty(x => x.IsApproved, true));
 
-        if (resetPassword is not null)
-        {
-            resetPassword.IsApproved = true;
-            await context.SaveChangesAsync();
-        }
+        return updated == 1;
     }
 
     /// <summary>

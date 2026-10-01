@@ -16,7 +16,7 @@ Parent: [[index]] · Proto: [[modules/shared-proto]] · Backend: [[modules/backe
 - **Пустые ответы**: многие методы возвращают пустое сообщение (`*Response { }`) — успех = отсутствие ошибки.
 
 ### ⚠️ Что НЕ в этом сервисе
-- **Смена пароля, сброс пароля, 2FA, логин, сессии, logout** — это сервис **Identity** (`IdentityApi`): `SetPassword(password, old_password)`, `ResetPassword`/`ConfirmResetPassword`, `Auth`, `GetActiveSessions`/`RemoveActiveSession`, `Logout`. См. [[api/identity-api]].
+- **Смена пароля, сброс пароля, 2FA, логин, сессии, logout** — это сервис **Identity** (`IdentityApi`): `SetPassword(password, old_password)` (новый пароль не должен совпадать со старым), `ResetPassword`/`ConfirmResetPassword(reset_id, otp_code, new_password, optional revoke_other_sessions)` (новый пароль передаётся сразу в подтверждении; по умолчанию остальные сессии завершаются), `Auth`, `GetActiveSessions`/`RemoveActiveSession`, `Logout`. См. [[api/identity-api]].
 - **Загрузка байтов аватара** — это сервис **Files** (см. §2 и [[api/files-client-guide]]).
 
 ---

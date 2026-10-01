@@ -7,8 +7,8 @@ namespace BarkCloud.Web.Auth;
 
 /// <summary>
 /// Восстановление пароля веб-пользователя по коду на почту — через клиентский Identity API:
-/// ResetPassword (код на почту) → ConfirmResetPassword (очищает старый пароль, выдаёт сессию)
-/// → SetPassword (новый пароль) → сессия.
+/// ResetPassword (код на почту) → ConfirmResetPassword (проверяет код, атомарно ставит новый пароль,
+/// при необходимости завершает остальные сессии и выдаёт новую).
 /// Двухшаговый процесс: <see cref="BeginAsync"/> отправляет код, <see cref="ConfirmAsync"/> подтверждает.
 /// </summary>
 public sealed class PasswordResetGateway
@@ -20,6 +20,7 @@ public sealed class PasswordResetGateway
     private const string ErrResetExpired = "9F3D1B82-8E55-4C71-BD2A-3D7FAC2E6AE1";
     private const string ErrResetNotFound = "5B9A8269-617E-4D4C-9696-A554C59E3A86";
     private const string ErrResetApproved = "BE708516-BF40-44F9-A6D1-A7F30AB02BED";
+    private const string ErrNewPasswordSameAsOld = "730737E2-64C9-492B-BE0C-459191C13F76";
 
     private readonly IdentityApi.IdentityApiClient _identity;
     private readonly AuthGateway _auth;
@@ -68,8 +69,12 @@ public sealed class PasswordResetGateway
         }
     }
 
-    /// <summary>Шаг 2: проверяет код и устанавливает новый пароль, открывая сессию.</summary>
-    public async Task<PasswordResetResult> ConfirmAsync(HttpContext http, string resetId, string code, string newPassword)
+    /// <summary>
+    /// Шаг 2: проверяет код и устанавливает новый пароль, открывая сессию.
+    /// <paramref name="revokeOtherSessions"/> — завершить остальные активные сессии пользователя.
+    /// </summary>
+    public async Task<PasswordResetResult> ConfirmAsync(
+        HttpContext http, string resetId, string code, string newPassword, bool revokeOtherSessions)
     {
         if (string.IsNullOrWhiteSpace(code))
             return new PasswordResetResult(PasswordResetOutcome.CodeInvalid, "Введите код из письма.", ResetId: resetId);
@@ -85,12 +90,10 @@ public sealed class PasswordResetGateway
             var confirmed = await _identity.ConfirmResetPasswordAsync(new ConfirmResetPasswordRequest
             {
                 ResetId = resetId,
-                OtpCode = code.Trim()
+                OtpCode = code.Trim(),
+                NewPassword = newPassword,
+                RevokeOtherSessions = revokeOtherSessions
             }, device.ToMetadata());
-
-            // ConfirmResetPassword очистил старый хеш — старый пароль не требуется.
-            await _identity.SetPasswordAsync(new SetPasswordRequest { Password = newPassword, OldPassword = "" },
-                BrowserContext.UserToken(confirmed.AccessToken.Value));
 
             _auth.IssueSession(http, confirmed.AccessToken, confirmed.RefreshToken, persistent: true);
 
@@ -102,6 +105,7 @@ public sealed class PasswordResetGateway
             var outcome = ex.Trailers.GetValue("x-error-code") switch
             {
                 ErrOtpInvalid => PasswordResetOutcome.CodeInvalid,
+                ErrNewPasswordSameAsOld => PasswordResetOutcome.ValidationError,
                 ErrResetExpired or ErrResetNotFound or ErrResetApproved => PasswordResetOutcome.CodeExpired,
                 _ => PasswordResetOutcome.Error
             };

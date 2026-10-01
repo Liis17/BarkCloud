@@ -1,6 +1,10 @@
 using BarkCloud.GrpcServer.Metrics;
 using BarkCloud.Identity.Persistence.Services;
+using BarkCloud.Identity.Settings;
 using BarkCloud.Shared.Exceptions.Identity;
+using BarkCloud.Shared.Queue.Identity;
+
+using MassTransit;
 
 using MediatR;
 
@@ -27,6 +31,9 @@ namespace BarkCloud.Identity.Features.ConfirmResetPassword
         private readonly IPasswordsStorage _passwordsStorage;
         private readonly IRefreshTokensStorage refreshTokensStorage;
         private readonly IMediator _mediator;
+        private readonly IPublishEndpoint _publishEndpoint;
+        private readonly JwtSettings _jwtSettings;
+        private readonly PasswordChangedNotifier _passwordChangedNotifier;
         private readonly RequestContext requestContext;
         private readonly MetricsCollector _metrics;
         private readonly ILogger<ConfirmResetPasswordCommandHandler> _logger;
@@ -35,14 +42,18 @@ namespace BarkCloud.Identity.Features.ConfirmResetPassword
 
 
         public ConfirmResetPasswordCommandHandler(IResetPasswordsStorage resetPasswordsStorage, IAuthPropertiesStorage authPropertiesStorage,
-            IPasswordsStorage passwordsStorage, IRefreshTokensStorage refreshTokensStorage, IMediator mediator, RequestContext requestContext,
-            MetricsCollector metrics, ILogger<ConfirmResetPasswordCommandHandler> logger)
+            IPasswordsStorage passwordsStorage, IRefreshTokensStorage refreshTokensStorage, IMediator mediator,
+            IPublishEndpoint publishEndpoint, JwtSettings jwtSettings, PasswordChangedNotifier passwordChangedNotifier,
+            RequestContext requestContext, MetricsCollector metrics, ILogger<ConfirmResetPasswordCommandHandler> logger)
         {
             _resetPasswordsStorage = resetPasswordsStorage;
             _authPropertiesStorage = authPropertiesStorage;
             _passwordsStorage = passwordsStorage;
             this.refreshTokensStorage = refreshTokensStorage;
             _mediator = mediator;
+            _publishEndpoint = publishEndpoint;
+            _jwtSettings = jwtSettings;
+            _passwordChangedNotifier = passwordChangedNotifier;
             this.requestContext = requestContext;
             _metrics = metrics;
             _logger = logger;
@@ -149,24 +160,79 @@ namespace BarkCloud.Identity.Features.ConfirmResetPassword
                 _logger.LogDebug("Email OTP код успешно проверен для пользователя {UserId}", resetPasswordInfo.UserId);
             }
 
-            _logger.LogDebug("Генерация refresh token для пользователя {UserId}", resetPasswordInfo.UserId);
+            if (string.IsNullOrEmpty(request.NewPassword))
+            {
+                throw new NewPasswordRequiredException();
+            }
+
+            // Новый пароль не должен совпадать с текущим. Проверяем ДО захвата reset —
+            // иначе пользователь не сможет повторить с тем же кодом и другим паролем.
+            var currentHash = await _passwordsStorage.GetUserPasswordHash(resetPasswordInfo.UserId);
+            if (PasswordHasher.VerifyPassword(request.NewPassword, currentHash))
+            {
+                _metrics.Increment("password_reset_confirmation_failed");
+                _metrics.Increment("password_reset_confirmation_failed_same_as_old");
+                throw new NewPasswordSameAsOldException();
+            }
+
+            // Атомарный захват reset: при параллельных подтверждениях успех получает только один.
+            if (!await _resetPasswordsStorage.TryApprove(request.ResetId))
+            {
+                _metrics.Increment("password_reset_confirmation_failed");
+                _metrics.Increment("password_reset_confirmation_failed_already_used");
+                _logger.LogWarning(
+                    "Reset ID {ResetId} уже был использован для пользователя {UserId}",
+                    request.ResetId,
+                    resetPasswordInfo.UserId
+                );
+                throw new ResetIdHasIsApprovedException();
+            }
 
             var deviceId = string.IsNullOrEmpty(requestContext.DeviceId)
                 ? Guid.NewGuid().ToString()
                 : requestContext.DeviceId;
+
+            // Отзыв прежних сессий — до записи нового хеша: при сбое между шагами пароль остаётся прежним.
+            if (request.RevokeOtherSessions)
+            {
+                _logger.LogDebug("Отзыв прежних сессий пользователя {UserId}", resetPasswordInfo.UserId);
+
+                var revokedDeviceIds = await refreshTokensStorage.DeleteAllByUserId(resetPasswordInfo.UserId);
+
+                // Для текущего устройства событие не публикуем: оно придёт асинхронно и отозвало бы
+                // только что выданный токен (iat <= RevokedAt), как при повторном входе в SessionIssuer.
+                foreach (var revokedDeviceId in revokedDeviceIds.Where(x => x != deviceId))
+                {
+                    await _publishEndpoint.Publish(new SessionRevokedEvent
+                    {
+                        UserId = resetPasswordInfo.UserId,
+                        DeviceId = revokedDeviceId,
+                        AccessTokenExpiresAt = DateTime.UtcNow.AddMinutes(_jwtSettings.ExpiryMinutes)
+                    }, cancellationToken);
+                }
+
+                _metrics.Increment("sessions_revoked");
+            }
+
+            _logger.LogDebug("Установка нового хеша пароля для пользователя {UserId}", resetPasswordInfo.UserId);
+            await _passwordsStorage.UpdateUserPasswordHash(resetPasswordInfo.UserId, PasswordHasher.HashPassword(request.NewPassword));
+
+            _logger.LogDebug("Генерация refresh token для пользователя {UserId}", resetPasswordInfo.UserId);
 
             var refreshTokenString = RefreshTokenGenerator.GenerateRefreshToken();
             await refreshTokensStorage.CreateNewRefreshToken(refreshTokenString, resetPasswordInfo.UserId, deviceId, ExpDaysRefreshToken);
 
             var accessTokenResponse = await _mediator.Send(new CreateTokenCommand { RefreshToken = refreshTokenString }, cancellationToken);
 
-            // Отметить запрос сброса как использованный
-            _logger.LogDebug("Отметка запроса сброса {ResetId} как использованного", request.ResetId);
-            await _resetPasswordsStorage.SetApproved(request.ResetId);
-
-            // Очистить хеш пароля для возможности установки нового без старого
-            _logger.LogDebug("Очистка хеша пароля для пользователя {UserId}", resetPasswordInfo.UserId);
-            await _passwordsStorage.ClearUserPasswordHash(resetPasswordInfo.UserId);
+            try
+            {
+                await _passwordChangedNotifier.NotifyAsync(resetPasswordInfo.UserId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex,
+                    "Не удалось отправить уведомление о смене пароля пользователю {UserId}", resetPasswordInfo.UserId);
+            }
 
             _metrics.Increment("password_resets_confirmed");
             _metrics.Increment("sessions_created");

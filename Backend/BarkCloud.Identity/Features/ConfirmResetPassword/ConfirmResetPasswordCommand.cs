@@ -9,5 +9,9 @@ namespace BarkCloud.Identity.Features.ConfirmResetPassword
         public Guid ResetId { get; set; }
 
         public string OtpCode { get; set; }
+
+        public string NewPassword { get; set; }
+
+        public bool RevokeOtherSessions { get; set; } = true;
     }
 }

@@ -2,15 +2,9 @@
 namespace BarkCloud.Identity.Features.SetPassword;
 
 using BarkCloud.GrpcServer.Metrics;
-using BarkCloud.GrpcServer.Tracker;
-using BarkCloud.Proto.Users;
 using BarkCloud.Shared.Exceptions.Identity;
-using BarkCloud.Shared.Identity;
-using BarkCloud.Shared.Queue.Notifications;
 
 using GrpcServer.XAuth;
-
-using Infrastructure;
 
 using MediatR;
 
@@ -25,25 +19,18 @@ public class SetPasswordCommandHandler : IRequestHandler<SetPasswordCommand>
     private readonly UserContext _userContext;
     private readonly IPasswordsStorage _passwordsStorage;
     private readonly IRefreshTokensStorage refreshTokensStorage;
-    private readonly NotificationQueueSender _notificationQueueSender;
-    private readonly LocationClient _locationClient;
-    private readonly UsersServerApi.UsersServerApiClient _usersClient;
-    private readonly RequestContext _requestContext;
+    private readonly PasswordChangedNotifier _passwordChangedNotifier;
     private readonly MetricsCollector _metrics;
     private readonly ILogger<SetPasswordCommandHandler> _logger;
 
     public SetPasswordCommandHandler(UserContext userContext, IPasswordsStorage passwordsStorage,
-        IRefreshTokensStorage refreshTokensStorage, NotificationQueueSender notificationQueueSender,
-        LocationClient locationClient, UsersServerApi.UsersServerApiClient usersClient, RequestContext requestContext,
+        IRefreshTokensStorage refreshTokensStorage, PasswordChangedNotifier passwordChangedNotifier,
         MetricsCollector metrics, ILogger<SetPasswordCommandHandler> logger)
     {
         _userContext = userContext;
         _passwordsStorage = passwordsStorage;
         this.refreshTokensStorage = refreshTokensStorage;
-        _notificationQueueSender = notificationQueueSender;
-        _locationClient = locationClient;
-        _usersClient = usersClient;
-        _requestContext = requestContext;
+        _passwordChangedNotifier = passwordChangedNotifier;
         _metrics = metrics;
         _logger = logger;
     }
@@ -69,6 +56,13 @@ public class SetPasswordCommandHandler : IRequestHandler<SetPasswordCommand>
                 _metrics.Increment("password_change_failed_invalid_old");
                 throw new InvalidOldPasswordException();
             }
+
+            // Старый пароль уже проверен, поэтому достаточно сравнить строки — второй bcrypt не нужен.
+            if (string.Equals(request.NewPassword, request.OldPassword, StringComparison.Ordinal))
+            {
+                _metrics.Increment("password_change_failed_same_as_old");
+                throw new NewPasswordSameAsOldException();
+            }
         }
 
         var passwordHash = PasswordHasher.HashPassword(request.NewPassword);
@@ -83,41 +77,9 @@ public class SetPasswordCommandHandler : IRequestHandler<SetPasswordCommand>
             _metrics.Increment("password_changes_initial");
         }
 
-        // Отправка уведомления об изменении пароля
-        var userInfo = await _usersClient.GetByIdAsync(new GetByIdRequest { UserId = _userContext.UserId });
-        var userContacts = await _usersClient.GetUserContactsAsync(new GetUserContactsRequest { UserId = _userContext.UserId });
-
-        var locationInfo = await _locationClient.GetLocationString(_requestContext.IpAddress);
-
         if (!isNewUser)
         {
-            var passwordChangedNotification = new EmailNotification
-            {
-                OwnerId = _userContext.UserId,
-                Address = userContacts.Contact.Email,
-                CreatedAt = DateTime.UtcNow,
-                Payload = new Dictionary<string, string>
-                {
-                    {"username", userInfo.User.Username},
-                    {"ip", _requestContext.IpAddress ?? string.Empty},
-                    {"devicename", _requestContext.DeviceName ?? string.Empty},
-                    {"os", _requestContext.OperationSystem ?? string.Empty},
-                    {"location", locationInfo},
-                    {"appname", $"{_requestContext.AppName} v.{_requestContext.AppVersion}"},
-                    {"datetime", DateTime.UtcNow.ToString("dd.MM.yyyy HH:mm:ss")}
-
-                },
-                ServiceId = ServiceId.Identity,
-                Title = "Пароль успешно изменен",
-                Type = NotificationType.PasswordChanged
-            };
-
-            _logger.LogDebug(
-                "Отправка уведомления об изменении пароля на адрес {Email}",
-                userContacts.Contact.Email
-            );
-
-            await _notificationQueueSender.SendNotification(passwordChangedNotification);
+            await _passwordChangedNotifier.NotifyAsync(_userContext.UserId);
         }
 
         _logger.LogInformation(
