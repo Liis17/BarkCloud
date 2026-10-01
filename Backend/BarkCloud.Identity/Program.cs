@@ -90,6 +90,7 @@ public class Program
         builder.Services.AddSingleton<IRegistrationPolicy, RegistrationPolicy>();
         builder.Services.AddScoped<SessionIssuer>();
         builder.Services.AddScoped<PasswordChangedNotifier>();
+        builder.Services.AddScoped<ReauthPasswordVerifier>();
         builder.Services.AddTransient<JwtService>();
         builder.Services.AddTransient<IConfirmationCodesStorage, ConfirmationCodesStorage>();
         builder.Services.AddScoped<NotificationQueueSender>();

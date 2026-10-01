@@ -45,6 +45,7 @@ public class EnableOtpVerificationCommandHandlerTests
         _location = new Mock<LocationClient>(new HttpClient(), new MetricsCollector(), NullLogger<LocationClient>.Instance);
         _location.Setup(c => c.GetLocation(It.IsAny<string>())).ReturnsAsync((IpLocation?)null);
         _passwords.Setup(p => p.GetUserPasswordHash(42)).ReturnsAsync(PasswordHash);
+        _authProps.Setup(s => s.TryReserveReauthPasswordAttempt(42)).ReturnsAsync(true);
     }
 
     private static IConfiguration EmailConfig(bool enabled) => new ConfigurationBuilder()
@@ -54,7 +55,7 @@ public class EnableOtpVerificationCommandHandlerTests
     private EnableOtpVerificationCommandHandler CreateSut(RequestContext? ctx = null, UserContext? user = null, bool emailEnabled = true)
         => new(user ?? UserContextFactory.Create(42),
             _authProps.Object,
-            _passwords.Object,
+            new ReauthPasswordVerifier(_authProps.Object, _passwords.Object),
             _usersClient.Object,
             _notifications.Object,
             ctx ?? FullContext(),
@@ -162,6 +163,34 @@ public class EnableOtpVerificationCommandHandlerTests
         _authProps.Verify(s => s.SetPendingOtpSecret(It.IsAny<long>(), It.IsAny<string>(), It.IsAny<DateTime>()), Times.Never);
         _authProps.Verify(s => s.UpdateOptType(It.IsAny<OtpType>(), It.IsAny<long>()), Times.Never);
         _metrics.SnapshotAndReset().Should().ContainKey("otp_setup_failed_invalid_password");
+    }
+
+    [Fact]
+    public async Task Handle_AuthenticatorType_AttemptLimitExceeded_ThrowsWithoutWritesEvenWithCorrectPassword()
+    {
+        ArrangeUser();
+        _authProps.Setup(s => s.GetUserAuthProperties(42)).ReturnsAsync((AuthUserProperty?)null);
+        _authProps.Setup(s => s.TryReserveReauthPasswordAttempt(42)).ReturnsAsync(false);
+
+        var act = () => CreateSut().Handle(
+            new EnableOtpVerificationCommand { OptType = OtpTypeId.Authenticator, Password = Password }, default);
+
+        await act.Should().ThrowAsync<PasswordAttemptsExceededException>();
+        _authProps.Verify(s => s.SetPendingOtpSecret(It.IsAny<long>(), It.IsAny<string>(), It.IsAny<DateTime>()), Times.Never);
+        _authProps.Verify(s => s.UpdateOptType(It.IsAny<OtpType>(), It.IsAny<long>()), Times.Never);
+        _metrics.SnapshotAndReset().Should().ContainKey("otp_setup_failed_invalid_password");
+    }
+
+    [Fact]
+    public async Task Handle_AuthenticatorType_CorrectPassword_ResetsAttemptCounter()
+    {
+        ArrangeUser();
+        _authProps.Setup(s => s.GetUserAuthProperties(42)).ReturnsAsync((AuthUserProperty?)null);
+
+        await CreateSut().Handle(
+            new EnableOtpVerificationCommand { OptType = OtpTypeId.Authenticator, Password = Password }, default);
+
+        _authProps.Verify(s => s.ResetReauthPasswordAttempts(42), Times.Once);
     }
 
     [Fact]

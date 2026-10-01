@@ -21,6 +21,12 @@ public class AuthUserProperty
 
     public DateTime? PendingOtpSecretExpiresAt { get; set; }
 
+    // Лимит попыток ввода пароля при повторной аутентификации (изменение 2FA): число попыток в текущем окне
+    // и момент его окончания. После окончания окна счётчик начинается заново.
+    public int ReauthPasswordAttempts { get; set; }
+
+    public DateTime? ReauthPasswordWindowEndsAt { get; set; }
+
     public OtpType SelectedOtpType { get; set; }
 
     public string? LastEmailAuthCode { get; set; }

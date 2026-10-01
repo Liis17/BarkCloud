@@ -23,7 +23,7 @@ public class DisableOtpVerificationCommandHandler : IRequestHandler<DisableOtpVe
 {
     private readonly UserContext _userContext;
     private readonly IAuthPropertiesStorage _authPropertiesStorage;
-    private readonly IPasswordsStorage _passwordsStorage;
+    private readonly ReauthPasswordVerifier _reauthPassword;
     private readonly NotificationQueueSender _notificationQueueSender;
     private readonly LocationClient _locationClient;
     private readonly UsersServerApi.UsersServerApiClient _usersClient;
@@ -32,13 +32,13 @@ public class DisableOtpVerificationCommandHandler : IRequestHandler<DisableOtpVe
     private readonly ILogger<DisableOtpVerificationCommandHandler> _logger;
 
     public DisableOtpVerificationCommandHandler(UserContext userContext, IAuthPropertiesStorage authPropertiesStorage,
-        IPasswordsStorage passwordsStorage, NotificationQueueSender notificationQueueSender,
+        ReauthPasswordVerifier reauthPassword, NotificationQueueSender notificationQueueSender,
         LocationClient locationClient, UsersServerApi.UsersServerApiClient usersClient, RequestContext requestContext,
         MetricsCollector metrics, ILogger<DisableOtpVerificationCommandHandler> logger)
     {
         _userContext = userContext;
         _authPropertiesStorage = authPropertiesStorage;
-        _passwordsStorage = passwordsStorage;
+        _reauthPassword = reauthPassword;
         _notificationQueueSender = notificationQueueSender;
         _locationClient = locationClient;
         _usersClient = usersClient;
@@ -106,15 +106,19 @@ public class DisableOtpVerificationCommandHandler : IRequestHandler<DisableOtpVe
         if (request.OptType == OtpTypeId.Email)
         {
             // Повторная аутентификация владельца: сессии недостаточно, чтобы снять email-2FA.
-            if (string.IsNullOrEmpty(request.Password) ||
-                !PasswordHasher.VerifyPassword(request.Password, await _passwordsStorage.GetUserPasswordHash(_userContext.UserId)))
+            try
+            {
+                await _reauthPassword.VerifyAsync(_userContext.UserId, request.Password);
+            }
+            catch (Exception ex) when (ex is InvalidPasswordException or PasswordAttemptsExceededException)
             {
                 _metrics.Increment("otp_disable_failed");
                 _logger.LogWarning(
-                    "Неверный пароль при попытке отключения Email 2FA для пользователя {UserId}",
+                    "Повторная аутентификация паролем отклонена ({Reason}) при отключении Email 2FA для пользователя {UserId}",
+                    ex.GetType().Name,
                     _userContext.UserId
                 );
-                throw new InvalidPasswordException();
+                throw;
             }
 
             _logger.LogDebug("Отключение Email 2FA для пользователя {UserId}", _userContext.UserId);
