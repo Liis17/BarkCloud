@@ -143,11 +143,11 @@ Web использует server-owned `UploadSession` и состояния `upl
 | `Create/Get/Resume/Complete/CancelUploadSession` | Control plane возобновляемой Web-загрузки; см. [[modules/upload-2]] |
 | `GetUploadUrl` | Legacy: выдать presigned URL для загрузки |
 | `UploadFile` | Общий enrichment handler и legacy-серверная загрузка; V2 вызывает его с уже сохранённым оригиналом и disk buffer |
-| `GetTempDownloadUrl` | Временные ссылки на скачивание + превью |
+| `GetTempDownloadUrl` | Временные ссылки на скачивание + превью. Только владельцу (`Uploaders.Contains(userId)`); чужой файл в запросе → `CloudAccessDeniedException` на весь запрос (F01) |
 | `DownloadFile` | Скачивание (через контроллер); для `TempFile`-ссылок отдаёт оригинальный `UploadFile.Filename` в `Content-Disposition`, а не `{fileId}.{ext}` |
 | `CheckFileHash` | Проверка наличия по хешу (без побочных эффектов); возвращает `exists` + локации копий пользователя (имя+папка) для модалки «файл уже есть» |
 | `CheckFileHashes` | Пакетная проверка наличия по списку SHA256-хешей (без побочных эффектов; для пассивной индикации «в облаке») |
-| `GetFileData` / `GetFilesData` | Метаданные файла(ов) |
+| `GetFileData` / `GetFilesData` | Метаданные файла(ов) (серверный API). Запрос несёт `user_id`: аватары отдаются всем, остальное — только владельцу (`Uploaders`), иначе `CloudAccessDeniedException` (F01) |
 | `GetFileMetadata` | EXIF/ffprobe/PDF/Office метаданные блоба (для диалога «Свойства»). Только собственные файлы (по `Uploaders`). Возвращает `HasMetadata=false`, если ничего не извлекалось |
 | `GetUserStorageInfo` / `GetUserStorageInfoServer` | Информация о квоте + физический snapshot диска MinIO |
 | `UploadAvatarServer` | Загрузка аватара пользователя (служебный) |

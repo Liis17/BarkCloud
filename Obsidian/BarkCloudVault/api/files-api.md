@@ -20,7 +20,7 @@ Package: `barkcloud.files`
 | `CompleteUploadSession(UploadSessionIdRequest) → UploadSessionResponse` | Проверить полноту multipart, завершить объект и атомарно поставить processing-задачу через outbox |
 | `CancelUploadSession(UploadSessionIdRequest) → UploadSessionResponse` | Abort активного multipart, release quota, terminal `cancelled` |
 | `GetUploadUrl(GetUploadUrlRequest) → GetUploadUrlResponse` | Legacy: получить presigned URL для загрузки |
-| `GetTempDownloadUrl(GetTempDownloadUrlRequest) → GetTempDownloadUrlResponse` | Ссылки на скачивание + превью (`file_id`, `url`, `preview_url`) |
+| `GetTempDownloadUrl(GetTempDownloadUrlRequest) → GetTempDownloadUrlResponse` | Ссылки на скачивание + превью (`file_id`, `url`, `preview_url`). Только собственные файлы (`Uploaders`): чужой готовый файл в запросе → `CloudAccessDeniedException` на весь запрос, `TempFile` не создаётся; несуществующие/неготовые ID пропускаются. Чужие файлы (шаринг) — через `CloudApi.GetSharedFileDownloadUrl` |
 | `CheckFileHash(CheckFileHashRequest) → CheckFileHashResponse` | Проверка наличия по хешу (без побочных эффектов): `exists` + `existing_locations` (имя+папка) для модалки «файл уже есть» |
 | `GetUserStorageInfo(GetUserStorageInfoRequest) → GetUserStorageInfoResponse` | Инфо о пользовательской квоте/использовании, `reserved_storage` активных сессий, физический snapshot диска и суммарная статистика S3-бакетов |
 | `GetFileMetadata(GetFileMetadataRequest) → GetFileMetadataResponse` | Метаданные ready-файла (EXIF/ffprobe/PDF/Office). Только собственные файлы; processing отклоняется `FileNotReadyException` |
@@ -150,8 +150,8 @@ Package: `barkcloud.files`
 
 | RPC | Назначение |
 |-----|-----------|
-| `GetFileData(GetFileDataRequest) → GetFileDataResponse` | Информация о загруженном файле |
-| `GetFilesData(GetFilesDataRequest) → GetFilesDataResponse` | Информация о нескольких файлах |
+| `GetFileData(GetFileDataRequest) → GetFileDataResponse` | Информация о загруженном файле. В запросе `user_id`: аватары (`UserAvatar`) отдаются всем, прочие файлы — только если `user_id ∈ Uploaders`, иначе `CloudAccessDeniedException` (`user_id = 0` — только аватары). Вызывающий сервис обязан передать id пользователя, от имени которого идёт запрос |
+| `GetFilesData(GetFilesDataRequest) → GetFilesDataResponse` | Информация о нескольких файлах; те же правила доступа, любой недоступный файл → отказ на весь запрос |
 | `GetUserStorageInfoServer(GetUserStorageInfoServerRequest) → GetUserStorageInfoResponse` | Storage info (админка) + физический snapshot диска |
 | `UploadAvatarServer(UploadAvatarServerRequest) → UploadAvatarServerResponse` | Загрузка аватарки пользователя (служебно) |
 | `ResolveShare(ResolveShareRequest) → ResolveShareResponse` | Резолв публичного токена (без `UserContext`): `found` + `file_id`/`name`/`download_url`. Внутри создаёт `TempFile` для оригинала (прямой `/download/{fileId}` для `CloudFile` запрещён в `DownloadFileCommandHandler`) и инкрементит `click_count`. Зовётся из Web-роута `/s/{token}` сервисным токеном |
