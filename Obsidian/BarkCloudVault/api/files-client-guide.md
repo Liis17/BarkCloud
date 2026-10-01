@@ -105,7 +105,7 @@ CLOUD_FILE = 2;   // обычный файл пользовательского 
 - **Оригинал `CLOUD_FILE`** (полное фото/видео/документ): прямой `file_url` **не сработает**. Нужно запросить временную ссылку:
 
 `FilesApi.GetTempDownloadUrl`
-- Передать: `GetTempDownloadUrlRequest { file_ids: [ ... ] }` (можно пачкой)
+- Передать: `GetTempDownloadUrlRequest { file_ids: [ ... ] }` (можно пачкой). Только **собственные** файлы: если среди ID есть чужой, весь запрос отклоняется (`CloudAccessDenied`, `FAILED_PRECONDITION` + `x-error-code`). Файлы, которыми с вами поделились, скачиваются через `CloudApi.GetSharedFileDownloadUrl`.
 - Вернётся: `GetTempDownloadUrlResponse { file_urls: [ { file_id, url, preview_url } ] }`
   - `url` — временная ссылка на скачивание оригинала (TTL ограничен).
   - `preview_url` — ссылка на превью.
