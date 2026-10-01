@@ -127,6 +127,8 @@ public class IdentityApiService : BarkCloud.Proto.Identity.IdentityApi.IdentityA
         var command = new EnableOtpVerificationCommand()
         {
             OptType = request.OtpType,
+            Password = request.Password,
+            CurrentOtpCode = request.CurrentOtpCode
         };
 
         return _mediator.Send(command);
@@ -149,7 +151,8 @@ public class IdentityApiService : BarkCloud.Proto.Identity.IdentityApi.IdentityA
         var command = new DisableOtpVerificationCommand
         {
             OtpCode = request.OtpCode,
-            OptType = request.OtpType
+            OptType = request.OtpType,
+            Password = request.Password
         };
 
         return _mediator.Send(command);

@@ -5,9 +5,9 @@ namespace BarkCloud.Identity.Persistence.Services;
 public interface IAuthPropertiesStorage
 {
     Task<bool> CheckOtpEnabled(long userId);
-    Task AddUserOtpSecretKey(long userId, string secretKey);
+    Task SetPendingOtpSecret(long userId, string secretKey, DateTime expiresAt);
+    Task<bool> ActivatePendingOtpSecret(long userId, string verifiedSecret);
     Task<string?> GetOtpSecretKey(long userId);
-    Task EnableOtp(long userId);
     Task EnableEmailOtp(long userId);
     Task<AuthUserProperty?> GetUserAuthProperties(long userId);
     Task DisableOtp(long userId);

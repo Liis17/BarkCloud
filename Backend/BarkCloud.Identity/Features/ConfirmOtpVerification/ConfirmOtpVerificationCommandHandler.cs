@@ -67,9 +67,19 @@ public class ConfirmOtpVerificationCommandHandler : IRequestHandler<ConfirmOtpVe
             {
                 _logger.LogDebug("Проверка Authenticator OTP кода для пользователя {UserId}", _userContext.UserId);
 
-                var otpSecret = await _authPropertiesStorage.GetOtpSecretKey(_userContext.UserId);
+                // Подтверждаем только ожидающий секрет: действующий OtpSecret до успешной проверки не меняется.
+                var pendingSecret = otpConfigs.PendingOtpSecret;
 
-                var totp = new Totp(Base32Encoding.ToBytes(otpSecret));
+                if (string.IsNullOrEmpty(pendingSecret) || otpConfigs.PendingOtpSecretExpiresAt <= DateTime.UtcNow)
+                {
+                    _logger.LogWarning(
+                        "Нет ожидающего подтверждения секрета Authenticator (не создан или истёк) для пользователя {UserId}",
+                        _userContext.UserId
+                    );
+                    throw new BarkCloud.Shared.Exceptions.Identity.OtpNotCreatedException();
+                }
+
+                var totp = new Totp(Base32Encoding.ToBytes(pendingSecret));
 
                 var isValid = totp.VerifyTotp(request.OtpCode, out long timeStepMatched, VerificationWindow.RfcSpecifiedNetworkDelay);
 
@@ -86,7 +96,18 @@ public class ConfirmOtpVerificationCommandHandler : IRequestHandler<ConfirmOtpVe
 
                 _logger.LogDebug("Активация Authenticator OTP для пользователя {UserId}", _userContext.UserId);
 
-                await _authPropertiesStorage.EnableOtp(_userContext.UserId);
+                // Атомарно: если секрет успели заменить новым Enable, активировать нечего.
+                if (!await _authPropertiesStorage.ActivatePendingOtpSecret(_userContext.UserId, pendingSecret))
+                {
+                    _metrics.Increment("otp_authenticator_failed");
+                    _metrics.Increment("otp_confirmation_failed");
+                    _logger.LogWarning(
+                        "Ожидающий секрет Authenticator был заменён до подтверждения для пользователя {UserId}",
+                        _userContext.UserId
+                    );
+                    throw new NotValidOtpCodeException();
+                }
+
                 confirmedMethod = "Authenticator приложение";
 
                 _metrics.Increment("otp_authenticator_verified");

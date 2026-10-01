@@ -69,13 +69,51 @@ public class ConfirmOtpVerificationCommandHandlerTests
         _authProps.Setup(s => s.GetUserAuthProperties(42)).ReturnsAsync(new AuthUserProperty
         {
             UserId = 42,
+            SelectedOtpType = OtpType.Email
+        });
+        _authProps
+            .Setup(s => s.TryConsumeEmailAuthCode(42, EmailAuthCodePurpose.EnableEmailOtp, "654321"))
+            .ReturnsAsync(true);
+        _authProps.Setup(s => s.EnableEmailOtp(42)).ThrowsAsync(new PersistenceOtpNotCreatedException());
+
+        var act = () => CreateSut().Handle(new ConfirmOtpVerificationCommand { OtpCode = "654321" }, default);
+
+        await act.Should().ThrowAsync<BarkCloud.Shared.Exceptions.Identity.OtpNotCreatedException>();
+    }
+
+    [Fact]
+    public async Task Handle_AuthenticatorNoPendingSecret_ThrowsOtpNotCreated()
+    {
+        _authProps.Setup(s => s.GetUserAuthProperties(42)).ReturnsAsync(new AuthUserProperty
+        {
+            UserId = 42,
             SelectedOtpType = OtpType.Authenticator
         });
-        _authProps.Setup(s => s.GetOtpSecretKey(42)).ThrowsAsync(new PersistenceOtpNotCreatedException());
 
         var act = () => CreateSut().Handle(new ConfirmOtpVerificationCommand { OtpCode = "000000" }, default);
 
         await act.Should().ThrowAsync<BarkCloud.Shared.Exceptions.Identity.OtpNotCreatedException>();
+        _authProps.Verify(s => s.ActivatePendingOtpSecret(It.IsAny<long>(), It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_AuthenticatorExpiredPendingSecret_ThrowsOtpNotCreated()
+    {
+        var key = KeyGeneration.GenerateRandomKey(20);
+        _authProps.Setup(s => s.GetUserAuthProperties(42)).ReturnsAsync(new AuthUserProperty
+        {
+            UserId = 42,
+            SelectedOtpType = OtpType.Authenticator,
+            PendingOtpSecret = Base32Encoding.ToString(key),
+            PendingOtpSecretExpiresAt = DateTime.UtcNow.AddMinutes(-1)
+        });
+
+        // Код сам по себе верный — отказ только из-за истёкшего срока ожидающего секрета.
+        var act = () => CreateSut().Handle(
+            new ConfirmOtpVerificationCommand { OtpCode = new Totp(key).ComputeTotp() }, default);
+
+        await act.Should().ThrowAsync<BarkCloud.Shared.Exceptions.Identity.OtpNotCreatedException>();
+        _authProps.Verify(s => s.ActivatePendingOtpSecret(It.IsAny<long>(), It.IsAny<string>()), Times.Never);
     }
 
     [Fact]
@@ -86,17 +124,42 @@ public class ConfirmOtpVerificationCommandHandlerTests
         _authProps.Setup(s => s.GetUserAuthProperties(42)).ReturnsAsync(new AuthUserProperty
         {
             UserId = 42,
-            SelectedOtpType = OtpType.Authenticator
+            SelectedOtpType = OtpType.Authenticator,
+            PendingOtpSecret = secret,
+            PendingOtpSecretExpiresAt = DateTime.UtcNow.AddMinutes(5)
         });
-        _authProps.Setup(s => s.GetOtpSecretKey(42)).ReturnsAsync(secret);
 
         var act = () => CreateSut().Handle(new ConfirmOtpVerificationCommand { OtpCode = "000000" }, default);
 
         await act.Should().ThrowAsync<NotValidOtpCodeException>();
+        _authProps.Verify(s => s.ActivatePendingOtpSecret(It.IsAny<long>(), It.IsAny<string>()), Times.Never);
     }
 
     [Fact]
-    public async Task Handle_AuthenticatorValidCode_EnablesOtp()
+    public async Task Handle_AuthenticatorCodeOfActiveSecret_RejectedWhileNewSecretPending()
+    {
+        var activeKey = KeyGeneration.GenerateRandomKey(20);
+        var pendingKey = KeyGeneration.GenerateRandomKey(20);
+        _authProps.Setup(s => s.GetUserAuthProperties(42)).ReturnsAsync(new AuthUserProperty
+        {
+            UserId = 42,
+            OtpEnabled = true,
+            OtpSecret = Base32Encoding.ToString(activeKey),
+            SelectedOtpType = OtpType.Authenticator,
+            PendingOtpSecret = Base32Encoding.ToString(pendingKey),
+            PendingOtpSecretExpiresAt = DateTime.UtcNow.AddMinutes(5)
+        });
+
+        // Код старого приложения не подтверждает новый секрет.
+        var act = () => CreateSut().Handle(
+            new ConfirmOtpVerificationCommand { OtpCode = new Totp(activeKey).ComputeTotp() }, default);
+
+        await act.Should().ThrowAsync<NotValidOtpCodeException>();
+        _authProps.Verify(s => s.ActivatePendingOtpSecret(It.IsAny<long>(), It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_AuthenticatorValidCode_ActivatesPendingSecret()
     {
         var key = KeyGeneration.GenerateRandomKey(20);
         var secret = Base32Encoding.ToString(key);
@@ -105,15 +168,39 @@ public class ConfirmOtpVerificationCommandHandlerTests
         _authProps.Setup(s => s.GetUserAuthProperties(42)).ReturnsAsync(new AuthUserProperty
         {
             UserId = 42,
-            SelectedOtpType = OtpType.Authenticator
+            SelectedOtpType = OtpType.Authenticator,
+            PendingOtpSecret = secret,
+            PendingOtpSecretExpiresAt = DateTime.UtcNow.AddMinutes(5)
         });
-        _authProps.Setup(s => s.GetOtpSecretKey(42)).ReturnsAsync(secret);
+        _authProps.Setup(s => s.ActivatePendingOtpSecret(42, secret)).ReturnsAsync(true);
 
         var response = await CreateSut().Handle(new ConfirmOtpVerificationCommand { OtpCode = validCode }, default);
 
         response.Should().NotBeNull();
-        _authProps.Verify(s => s.EnableOtp(42), Times.Once);
+        _authProps.Verify(s => s.ActivatePendingOtpSecret(42, secret), Times.Once);
         _metrics.SnapshotAndReset().Should().ContainKey("otp_enabled_authenticator");
+    }
+
+    [Fact]
+    public async Task Handle_AuthenticatorPendingSecretReplacedMeanwhile_ThrowsNotValidOtp()
+    {
+        var key = KeyGeneration.GenerateRandomKey(20);
+        var secret = Base32Encoding.ToString(key);
+
+        _authProps.Setup(s => s.GetUserAuthProperties(42)).ReturnsAsync(new AuthUserProperty
+        {
+            UserId = 42,
+            SelectedOtpType = OtpType.Authenticator,
+            PendingOtpSecret = secret,
+            PendingOtpSecretExpiresAt = DateTime.UtcNow.AddMinutes(5)
+        });
+        // Между проверкой кода и активацией ожидающий секрет заменили (параллельный Enable).
+        _authProps.Setup(s => s.ActivatePendingOtpSecret(42, secret)).ReturnsAsync(false);
+
+        var act = () => CreateSut().Handle(
+            new ConfirmOtpVerificationCommand { OtpCode = new Totp(key).ComputeTotp() }, default);
+
+        await act.Should().ThrowAsync<NotValidOtpCodeException>();
     }
 
     [Fact]
@@ -163,7 +250,7 @@ public class ConfirmOtpVerificationCommandHandlerTests
 
         await CreateSut().Handle(new ConfirmOtpVerificationCommand { OtpCode = "0" }, default);
 
-        _authProps.Verify(s => s.EnableOtp(It.IsAny<long>()), Times.Never);
+        _authProps.Verify(s => s.ActivatePendingOtpSecret(It.IsAny<long>(), It.IsAny<string>()), Times.Never);
         _authProps.Verify(s => s.EnableEmailOtp(It.IsAny<long>()), Times.Never);
     }
 }

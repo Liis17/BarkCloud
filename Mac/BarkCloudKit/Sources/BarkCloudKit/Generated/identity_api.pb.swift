@@ -207,9 +207,24 @@ public struct Barkcloud_Identity_ConfirmResetPasswordRequest: Sendable {
   /// код подтверждения
   public var otpCode: String = String()
 
+  /// новый пароль — устанавливается атомарно при подтверждении
+  public var newPassword: String = String()
+
+  /// завершить остальные сессии (если не передано — true)
+  public var revokeOtherSessions: Bool {
+    get {_revokeOtherSessions ?? false}
+    set {_revokeOtherSessions = newValue}
+  }
+  /// Returns true if `revokeOtherSessions` has been explicitly set.
+  public var hasRevokeOtherSessions: Bool {self._revokeOtherSessions != nil}
+  /// Clears the value of `revokeOtherSessions`. Subsequent reads from it will return its default value.
+  public mutating func clearRevokeOtherSessions() {self._revokeOtherSessions = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
+
+  fileprivate var _revokeOtherSessions: Bool? = nil
 }
 
 public struct Barkcloud_Identity_ConfirmResetPasswordResponse: Sendable {
@@ -366,8 +381,11 @@ public struct Barkcloud_Identity_DisableOtpVerificationRequest: Sendable {
   /// Тип 2ФА авторизации
   public var otpType: Barkcloud_Identity_OtpTypeId = .unknown
 
-  /// Код для отключения (при отключении email не передавать)
+  /// Текущий код из приложения-аутентификатора (для отключения Authenticator; для email не передавать)
   public var otpCode: String = String()
+
+  /// Текущий пароль — обязателен при отключении email-2FA
+  public var password: String = String()
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -414,6 +432,12 @@ public struct Barkcloud_Identity_EnableOtpVerificationRequest: Sendable {
 
   /// Тип 2ФА авторизации
   public var otpType: Barkcloud_Identity_OtpTypeId = .unknown
+
+  /// Текущий пароль — обязателен при настройке Authenticator
+  public var password: String = String()
+
+  /// Текущий код действующего Authenticator — обязателен при его замене
+  public var currentOtpCode: String = String()
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -1301,7 +1325,7 @@ extension Barkcloud_Identity_ForceSetPasswordServerResponse: SwiftProtobuf.Messa
 
 extension Barkcloud_Identity_ConfirmResetPasswordRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ConfirmResetPasswordRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}reset_id\0\u{3}otp_code\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}reset_id\0\u{3}otp_code\0\u{3}new_password\0\u{3}revoke_other_sessions\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1311,24 +1335,38 @@ extension Barkcloud_Identity_ConfirmResetPasswordRequest: SwiftProtobuf.Message,
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.resetID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.otpCode) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.newPassword) }()
+      case 4: try { try decoder.decodeSingularBoolField(value: &self._revokeOtherSessions) }()
       default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
     if !self.resetID.isEmpty {
       try visitor.visitSingularStringField(value: self.resetID, fieldNumber: 1)
     }
     if !self.otpCode.isEmpty {
       try visitor.visitSingularStringField(value: self.otpCode, fieldNumber: 2)
     }
+    if !self.newPassword.isEmpty {
+      try visitor.visitSingularStringField(value: self.newPassword, fieldNumber: 3)
+    }
+    try { if let v = self._revokeOtherSessions {
+      try visitor.visitSingularBoolField(value: v, fieldNumber: 4)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: Barkcloud_Identity_ConfirmResetPasswordRequest, rhs: Barkcloud_Identity_ConfirmResetPasswordRequest) -> Bool {
     if lhs.resetID != rhs.resetID {return false}
     if lhs.otpCode != rhs.otpCode {return false}
+    if lhs.newPassword != rhs.newPassword {return false}
+    if lhs._revokeOtherSessions != rhs._revokeOtherSessions {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -1589,7 +1627,7 @@ extension Barkcloud_Identity_ListOtpVerificationResponse: SwiftProtobuf.Message,
 
 extension Barkcloud_Identity_DisableOtpVerificationRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DisableOtpVerificationRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}otp_type\0\u{3}otp_code\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}otp_type\0\u{3}otp_code\0\u{1}password\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1599,6 +1637,7 @@ extension Barkcloud_Identity_DisableOtpVerificationRequest: SwiftProtobuf.Messag
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularEnumField(value: &self.otpType) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.otpCode) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.password) }()
       default: break
       }
     }
@@ -1611,12 +1650,16 @@ extension Barkcloud_Identity_DisableOtpVerificationRequest: SwiftProtobuf.Messag
     if !self.otpCode.isEmpty {
       try visitor.visitSingularStringField(value: self.otpCode, fieldNumber: 2)
     }
+    if !self.password.isEmpty {
+      try visitor.visitSingularStringField(value: self.password, fieldNumber: 3)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: Barkcloud_Identity_DisableOtpVerificationRequest, rhs: Barkcloud_Identity_DisableOtpVerificationRequest) -> Bool {
     if lhs.otpType != rhs.otpType {return false}
     if lhs.otpCode != rhs.otpCode {return false}
+    if lhs.password != rhs.password {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -1692,7 +1735,7 @@ extension Barkcloud_Identity_ConfirmOtpVerificationResponse: SwiftProtobuf.Messa
 
 extension Barkcloud_Identity_EnableOtpVerificationRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".EnableOtpVerificationRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}otp_type\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}otp_type\0\u{1}password\0\u{3}current_otp_code\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1701,6 +1744,8 @@ extension Barkcloud_Identity_EnableOtpVerificationRequest: SwiftProtobuf.Message
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularEnumField(value: &self.otpType) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.password) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.currentOtpCode) }()
       default: break
       }
     }
@@ -1710,11 +1755,19 @@ extension Barkcloud_Identity_EnableOtpVerificationRequest: SwiftProtobuf.Message
     if self.otpType != .unknown {
       try visitor.visitSingularEnumField(value: self.otpType, fieldNumber: 1)
     }
+    if !self.password.isEmpty {
+      try visitor.visitSingularStringField(value: self.password, fieldNumber: 2)
+    }
+    if !self.currentOtpCode.isEmpty {
+      try visitor.visitSingularStringField(value: self.currentOtpCode, fieldNumber: 3)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: Barkcloud_Identity_EnableOtpVerificationRequest, rhs: Barkcloud_Identity_EnableOtpVerificationRequest) -> Bool {
     if lhs.otpType != rhs.otpType {return false}
+    if lhs.password != rhs.password {return false}
+    if lhs.currentOtpCode != rhs.currentOtpCode {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
