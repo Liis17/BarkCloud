@@ -24,8 +24,11 @@ namespace BarkCloud.Identity.Features.EnableOtpVerification;
 
 public class EnableOtpVerificationCommandHandler : IRequestHandler<EnableOtpVerificationCommand, EnableOtpVerificationResponse>
 {
+    private static readonly TimeSpan PendingSecretLifetime = TimeSpan.FromMinutes(10);
+
     private readonly UserContext _userContext;
     private readonly IAuthPropertiesStorage _authPropertiesStorage;
+    private readonly IPasswordsStorage _passwordsStorage;
     private readonly BarkCloud.Proto.Users.UsersServerApi.UsersServerApiClient _usersClient;
     private readonly NotificationQueueSender _notificationQueueSender;
     private readonly RequestContext _requestContext;
@@ -35,12 +38,13 @@ public class EnableOtpVerificationCommandHandler : IRequestHandler<EnableOtpVeri
     private readonly ILogger<EnableOtpVerificationCommandHandler> _logger;
 
     public EnableOtpVerificationCommandHandler(UserContext userContext, IAuthPropertiesStorage authPropertiesStorage,
-        UsersServerApi.UsersServerApiClient usersClient, NotificationQueueSender notificationQueueSender,
-        RequestContext requestContext, LocationClient locationClient, MetricsCollector metrics,
-        IConfiguration configuration, ILogger<EnableOtpVerificationCommandHandler> logger)
+        IPasswordsStorage passwordsStorage, UsersServerApi.UsersServerApiClient usersClient,
+        NotificationQueueSender notificationQueueSender, RequestContext requestContext, LocationClient locationClient,
+        MetricsCollector metrics, IConfiguration configuration, ILogger<EnableOtpVerificationCommandHandler> logger)
     {
         _userContext = userContext;
         _authPropertiesStorage = authPropertiesStorage;
+        _passwordsStorage = passwordsStorage;
         _usersClient = usersClient;
         _notificationQueueSender = notificationQueueSender;
         _requestContext = requestContext;
@@ -89,6 +93,36 @@ public class EnableOtpVerificationCommandHandler : IRequestHandler<EnableOtpVeri
 
             _logger.LogDebug("Предыдущий метод 2FA: {OldMethod}", oldMethod);
 
+            // Повторная аутентификация владельца: пароль всегда, а при замене действующего Authenticator — ещё и его текущий код.
+            // Проверки идут до любых записей: отказ не меняет ни активный, ни ожидающий секрет.
+            if (string.IsNullOrEmpty(request.Password) ||
+                !PasswordHasher.VerifyPassword(request.Password, await _passwordsStorage.GetUserPasswordHash(_userContext.UserId)))
+            {
+                _metrics.Increment("otp_setup_failed_invalid_password");
+                _logger.LogWarning(
+                    "Неверный пароль при настройке Authenticator 2FA для пользователя {UserId}",
+                    _userContext.UserId
+                );
+                throw new InvalidPasswordException();
+            }
+
+            if (oldOptOptions is { OtpEnabled: true })
+            {
+                var activeTotp = new Totp(Base32Encoding.ToBytes(oldOptOptions.OtpSecret));
+
+                if (string.IsNullOrEmpty(request.CurrentOtpCode) ||
+                    !activeTotp.VerifyTotp(request.CurrentOtpCode, out _, VerificationWindow.RfcSpecifiedNetworkDelay))
+                {
+                    _metrics.Increment("otp_authenticator_failed");
+                    _metrics.Increment("otp_setup_failed_invalid_otp");
+                    _logger.LogWarning(
+                        "Неверный текущий OTP код при замене Authenticator 2FA для пользователя {UserId}",
+                        _userContext.UserId
+                    );
+                    throw new NotValidOtpCodeException();
+                }
+            }
+
             var key = KeyGeneration.GenerateRandomKey(20);
             var base32Secret = Base32Encoding.ToString(key);
 
@@ -98,7 +132,9 @@ public class EnableOtpVerificationCommandHandler : IRequestHandler<EnableOtpVeri
 
             _logger.LogDebug("Генерация QR кода для Authenticator 2FA");
 
-            await _authPropertiesStorage.AddUserOtpSecretKey(_userContext.UserId, base32Secret);
+            // Новый секрет ждёт подтверждения кодом (Confirm) и не заменяет действующий OtpSecret.
+            await _authPropertiesStorage.SetPendingOtpSecret(
+                _userContext.UserId, base32Secret, DateTime.UtcNow + PendingSecretLifetime);
             await _authPropertiesStorage.UpdateOptType(Domain.OtpType.Authenticator, userInfo.User.Id);
 
             var qrGenerator = new QRCodeGenerator();

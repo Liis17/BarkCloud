@@ -138,6 +138,8 @@ message ForceSetPasswordServerResponse { }
 message ConfirmResetPasswordRequest {
   string reset_id = 1; // идентификатор сброса пароля
   string otp_code = 2; // код подтверждения
+  string new_password = 3; // новый пароль — устанавливается атомарно при подтверждении
+  optional bool revoke_other_sessions = 4; // завершить остальные сессии (если не передано — true)
 }
 
 message ConfirmResetPasswordResponse {
@@ -190,7 +192,9 @@ message DisableOtpVerificationRequest {
   
   OtpTypeId otp_type = 1; // Тип 2ФА авторизации
   
-  string otp_code = 2; // Код для отключения (при отключении email не передавать)
+  string otp_code = 2; // Текущий код из приложения-аутентификатора (для отключения Authenticator; для email не передавать)
+
+  string password = 3; // Текущий пароль — обязателен при отключении email-2FA
 }
 
 message DisableOtpVerificationResponse {
@@ -207,6 +211,8 @@ message ConfirmOtpVerificationResponse {
 
 message EnableOtpVerificationRequest {
     OtpTypeId otp_type = 1; // Тип 2ФА авторизации
+    string password = 2; // Текущий пароль — обязателен при настройке Authenticator
+    string current_otp_code = 3; // Текущий код действующего Authenticator — обязателен при его замене
 }
 
 message EnableOtpVerificationResponse {

@@ -54,6 +54,12 @@ namespace BarkCloud.Identity.Persistence.Migrations
                     b.Property<string>("OtpSecret")
                         .HasColumnType("text");
 
+                    b.Property<string>("PendingOtpSecret")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("PendingOtpSecretExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<int>("SelectedOtpType")
                         .HasColumnType("integer");
 

@@ -5,6 +5,7 @@ using BarkCloud.Identity.Domain;
 using BarkCloud.Identity.Features.DisableOtpVerification;
 using BarkCloud.Identity.Infrastructure;
 using BarkCloud.Identity.Persistence.Services;
+using BarkCloud.Identity.Services;
 using BarkCloud.Identity.Tests._Helpers;
 using BarkCloud.Proto.Identity;
 using BarkCloud.Proto.Users;
@@ -26,7 +27,11 @@ namespace BarkCloud.Identity.Tests.Features.DisableOtpVerification;
 
 public class DisableOtpVerificationCommandHandlerTests
 {
+    private const string Password = "correct-password";
+    private static readonly string PasswordHash = PasswordHasher.HashPassword(Password);
+
     private readonly Mock<IAuthPropertiesStorage> _authProps = new();
+    private readonly Mock<IPasswordsStorage> _passwords = new();
     private readonly Mock<UsersServerApi.UsersServerApiClient> _usersClient = new();
     private readonly Mock<NotificationQueueSender> _notifications;
     private readonly Mock<LocationClient> _location;
@@ -40,6 +45,7 @@ public class DisableOtpVerificationCommandHandlerTests
         _notifications.Setup(n => n.SendNotification(It.IsAny<Notification>())).Returns(Task.CompletedTask);
         _location = new Mock<LocationClient>(new HttpClient(), new MetricsCollector(), NullLogger<LocationClient>.Instance);
         _location.Setup(c => c.GetLocation(It.IsAny<string>())).ReturnsAsync((IpLocation?)null);
+        _passwords.Setup(p => p.GetUserPasswordHash(42)).ReturnsAsync(PasswordHash);
 
         _usersClient
             .Setup(c => c.GetByIdAsync(It.IsAny<GetByIdRequest>(), null, null, default))
@@ -56,6 +62,7 @@ public class DisableOtpVerificationCommandHandlerTests
     private DisableOtpVerificationCommandHandler CreateSut() => new(
         UserContextFactory.Create(42),
         _authProps.Object,
+        _passwords.Object,
         _notifications.Object,
         _location.Object,
         _usersClient.Object,
@@ -68,7 +75,8 @@ public class DisableOtpVerificationCommandHandlerTests
     {
         _authProps.Setup(s => s.GetUserAuthProperties(42)).ReturnsAsync((AuthUserProperty?)null);
 
-        var act = () => CreateSut().Handle(new DisableOtpVerificationCommand { OptType = OtpTypeId.Email }, default);
+        var act = () => CreateSut().Handle(
+            new DisableOtpVerificationCommand { OptType = OtpTypeId.Email, Password = Password }, default);
 
         await act.Should().ThrowAsync<OtpNotCreatedException>();
     }
@@ -143,11 +151,51 @@ public class DisableOtpVerificationCommandHandlerTests
         });
 
         await CreateSut().Handle(
-            new DisableOtpVerificationCommand { OptType = OtpTypeId.Email },
+            new DisableOtpVerificationCommand { OptType = OtpTypeId.Email, Password = Password },
             default);
 
         _authProps.Verify(s => s.DisableEmailOtp(42), Times.Once);
         _notifications.Verify(n => n.SendNotification(It.IsAny<EmailNotification>()), Times.Once);
         _metrics.SnapshotAndReset().Should().ContainKey("otp_disabled_email");
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("wrong-password")]
+    public async Task Handle_EmailType_MissingOrWrongPassword_ThrowsAndKeepsEmailOtp(string? password)
+    {
+        _authProps.Setup(s => s.GetUserAuthProperties(42)).ReturnsAsync(new AuthUserProperty
+        {
+            UserId = 42,
+            EmailOtpEnabled = true
+        });
+
+        var act = () => CreateSut().Handle(
+            new DisableOtpVerificationCommand { OptType = OtpTypeId.Email, Password = password },
+            default);
+
+        await act.Should().ThrowAsync<InvalidPasswordException>();
+        _authProps.Verify(s => s.DisableEmailOtp(It.IsAny<long>()), Times.Never);
+        _notifications.Verify(n => n.SendNotification(It.IsAny<Notification>()), Times.Never);
+        _metrics.SnapshotAndReset().Should().ContainKey("otp_disable_failed");
+    }
+
+    [Fact]
+    public async Task Handle_EmailType_NoPasswordHash_ThrowsAndKeepsEmailOtp()
+    {
+        _authProps.Setup(s => s.GetUserAuthProperties(42)).ReturnsAsync(new AuthUserProperty
+        {
+            UserId = 42,
+            EmailOtpEnabled = true
+        });
+        _passwords.Setup(p => p.GetUserPasswordHash(42)).ReturnsAsync((string?)null);
+
+        var act = () => CreateSut().Handle(
+            new DisableOtpVerificationCommand { OptType = OtpTypeId.Email, Password = Password },
+            default);
+
+        await act.Should().ThrowAsync<InvalidPasswordException>();
+        _authProps.Verify(s => s.DisableEmailOtp(It.IsAny<long>()), Times.Never);
     }
 }

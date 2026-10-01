@@ -15,6 +15,12 @@ public class AuthUserProperty
 
     public string? OtpSecret { get; set; }
 
+    // Секрет Authenticator, ожидающий подтверждения кодом. Заменяет OtpSecret только после успешного Confirm,
+    // поэтому незавершённая (пере)настройка не ломает действующий Authenticator.
+    public string? PendingOtpSecret { get; set; }
+
+    public DateTime? PendingOtpSecretExpiresAt { get; set; }
+
     public OtpType SelectedOtpType { get; set; }
 
     public string? LastEmailAuthCode { get; set; }

@@ -29,7 +29,10 @@ public class AuthPropertiesStorage : IAuthPropertiesStorage
         return props is not null && props.OtpEnabled;
     }
 
-    public async Task AddUserOtpSecretKey(long userId, string secretKey)
+    /// <summary>
+    /// Сохраняет секрет Authenticator как ожидающий подтверждения. Действующие <c>OtpSecret</c>/<c>OtpEnabled</c> не меняются.
+    /// </summary>
+    public async Task SetPendingOtpSecret(long userId, string secretKey, DateTime expiresAt)
     {
         var props = await _context.AuthUserProperties.FirstOrDefaultAsync(x => x.UserId == userId);
 
@@ -39,7 +42,8 @@ public class AuthPropertiesStorage : IAuthPropertiesStorage
             {
                 OtpEnabled = false,
                 UserId = userId,
-                OtpSecret = secretKey
+                PendingOtpSecret = secretKey,
+                PendingOtpSecretExpiresAt = expiresAt
             };
 
             await _context.AuthUserProperties.AddAsync(props);
@@ -48,9 +52,27 @@ public class AuthPropertiesStorage : IAuthPropertiesStorage
             return;
         }
 
-        props.OtpSecret = secretKey;
+        props.PendingOtpSecret = secretKey;
+        props.PendingOtpSecretExpiresAt = expiresAt;
 
         await _context.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Атомарно делает подтверждённый ожидающий секрет действующим и включает Authenticator.
+    /// Возвращает false, если ожидающий секрет успели заменить или сбросить после проверки кода.
+    /// </summary>
+    public async Task<bool> ActivatePendingOtpSecret(long userId, string verifiedSecret)
+    {
+        var updated = await _context.AuthUserProperties
+            .Where(x => x.UserId == userId && x.PendingOtpSecret == verifiedSecret)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(x => x.OtpSecret, x => x.PendingOtpSecret)
+                .SetProperty(x => x.OtpEnabled, true)
+                .SetProperty(x => x.PendingOtpSecret, (string?)null)
+                .SetProperty(x => x.PendingOtpSecretExpiresAt, (DateTime?)null));
+
+        return updated == 1;
     }
 
     public async Task<string?> GetOtpSecretKey(long userId)
@@ -63,20 +85,6 @@ public class AuthPropertiesStorage : IAuthPropertiesStorage
         }
 
         return props.OtpSecret;
-    }
-
-    public async Task EnableOtp(long userId)
-    {
-        var props = await _context.AuthUserProperties.FirstOrDefaultAsync(x => x.UserId == userId);
-
-        if (props is null)
-        {
-            throw new OtpNotCreatedException();
-        }
-
-        props.OtpEnabled = true;
-
-        await _context.SaveChangesAsync();
     }
 
     public async Task EnableEmailOtp(long userId)
@@ -108,6 +116,8 @@ public class AuthPropertiesStorage : IAuthPropertiesStorage
         }
 
         props.OtpEnabled = false;
+        props.PendingOtpSecret = null;
+        props.PendingOtpSecretExpiresAt = null;
 
         await _context.SaveChangesAsync();
     }

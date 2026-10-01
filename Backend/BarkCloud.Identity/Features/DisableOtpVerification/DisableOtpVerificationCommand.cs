@@ -9,4 +9,6 @@ public class DisableOtpVerificationCommand : IRequest<DisableOtpVerificationResp
     public OtpTypeId OptType { get; set; }
 
     public string? OtpCode { get; set; }
+
+    public string? Password { get; set; }
 }
