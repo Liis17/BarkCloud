@@ -1,8 +1,6 @@
 using BarkCloud.GrpcServer.Metrics;
 using BarkCloud.Identity.Consumers;
 using BarkCloud.Identity.Persistence.Services;
-using BarkCloud.Identity.Settings;
-using BarkCloud.Shared.Queue.Identity;
 using BarkCloud.Shared.Queue.Users;
 
 using MassTransit;
@@ -18,26 +16,24 @@ public class UserDeletedConsumerTests
     private readonly Mock<IAuthPropertiesStorage> _authProps = new();
     private readonly Mock<IResetPasswordsStorage> _resets = new();
     private readonly Mock<IConfirmationCodesStorage> _codes = new();
-    private readonly Mock<IPublishEndpoint> _publish = new();
-    private readonly JwtSettings _jwt = new() { SecretKey = "k", Issuer = "i", Audience = "a", ExpiryMinutes = 15 };
     private readonly MetricsCollector _metrics = new();
 
     private UserDeletedConsumer CreateSut() => new(
         _refreshTokens.Object, _passwords.Object, _authProps.Object,
-        _resets.Object, _codes.Object, _publish.Object, _jwt, _metrics,
+        _resets.Object, _codes.Object, _metrics,
         NullLogger<UserDeletedConsumer>.Instance);
 
     [Fact]
     public async Task Consume_NoDevices_StillCleansUserData()
     {
-        _refreshTokens.Setup(s => s.DeleteAllByUserId(42)).ReturnsAsync(new List<string>());
+        _refreshTokens.Setup(s => s.RevokeAllSessions(42, null, default)).ReturnsAsync(0);
         var msg = new UserDeleted { UserId = 42 };
         var ctx = new Mock<ConsumeContext<UserDeleted>>();
         ctx.SetupGet(c => c.Message).Returns(msg);
 
         await CreateSut().Consume(ctx.Object);
 
-        _publish.Verify(p => p.Publish(It.IsAny<SessionRevokedEvent>(), It.IsAny<CancellationToken>()), Times.Never);
+        _refreshTokens.Verify(s => s.RevokeAllSessions(42, null, default), Times.Once);
         _passwords.Verify(s => s.DeleteByUserId(42), Times.Once);
         _authProps.Verify(s => s.DeleteByUserId(42), Times.Once);
         _resets.Verify(s => s.DeleteByUserId(42), Times.Once);
@@ -45,19 +41,33 @@ public class UserDeletedConsumerTests
     }
 
     [Fact]
-    public async Task Consume_WithDevices_PublishesSessionRevokedForEach()
+    public async Task Consume_WithDevices_RevokesAllSessions()
     {
-        _refreshTokens.Setup(s => s.DeleteAllByUserId(42))
-            .ReturnsAsync(new List<string> { "d1", "d2", "d3" });
+        _refreshTokens.Setup(s => s.RevokeAllSessions(42, null, default))
+            .ReturnsAsync(3);
         var msg = new UserDeleted { UserId = 42 };
         var ctx = new Mock<ConsumeContext<UserDeleted>>();
         ctx.SetupGet(c => c.Message).Returns(msg);
 
         await CreateSut().Consume(ctx.Object);
 
-        _publish.Verify(p => p.Publish(
-            It.Is<SessionRevokedEvent>(e => e.UserId == 42),
-            It.IsAny<CancellationToken>()), Times.Exactly(3));
+        _refreshTokens.Verify(s => s.RevokeAllSessions(42, null, default), Times.Once);
         _metrics.SnapshotAndReset().Should().ContainKey("accounts_cleaned_identity");
+    }
+
+    [Fact]
+    public async Task Consume_Redelivery_RepeatsCleanupSafelyWhenRefreshTokensAreAlreadyGone()
+    {
+        _refreshTokens.SetupSequence(s => s.RevokeAllSessions(42, null, default))
+            .ReturnsAsync(2).ReturnsAsync(0);
+        var context = new Mock<ConsumeContext<UserDeleted>>();
+        context.SetupGet(c => c.Message).Returns(new UserDeleted { UserId = 42 });
+        var sut = CreateSut();
+
+        await sut.Consume(context.Object);
+        await sut.Consume(context.Object);
+
+        _refreshTokens.Verify(s => s.RevokeAllSessions(42, null, default), Times.Exactly(2));
+        _passwords.Verify(s => s.DeleteByUserId(42), Times.Exactly(2));
     }
 }

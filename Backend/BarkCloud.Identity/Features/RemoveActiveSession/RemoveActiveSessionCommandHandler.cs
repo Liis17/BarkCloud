@@ -2,13 +2,9 @@ using BarkCloud.GrpcServer.Metrics;
 using BarkCloud.GrpcServer.XAuth;
 using BarkCloud.Identity.Persistence.Exceptions;
 using BarkCloud.Identity.Persistence.Services;
-using BarkCloud.Identity.Settings;
 using BarkCloud.Proto.Identity;
 using BarkCloud.Proto.Users;
 using BarkCloud.Shared.Exceptions.Identity;
-using BarkCloud.Shared.Queue.Identity;
-
-using MassTransit;
 
 using MediatR;
 
@@ -19,21 +15,16 @@ public class RemoveActiveSessionCommandHandler : IRequestHandler<RemoveActiveSes
     private readonly IRefreshTokensStorage _refreshTokensStorage;
     private readonly UserContext _userContext;
     private readonly UsersServerApi.UsersServerApiClient _usersClient;
-    private readonly IPublishEndpoint _publishEndpoint;
-    private readonly JwtSettings _jwtSettings;
     private readonly MetricsCollector _metrics;
     private readonly ILogger<RemoveActiveSessionCommandHandler> _logger;
 
     public RemoveActiveSessionCommandHandler(IRefreshTokensStorage refreshTokensStorage, UserContext userContext,
-        UsersServerApi.UsersServerApiClient usersClient, IPublishEndpoint publishEndpoint,
-        JwtSettings jwtSettings, MetricsCollector metrics,
+        UsersServerApi.UsersServerApiClient usersClient, MetricsCollector metrics,
         ILogger<RemoveActiveSessionCommandHandler> logger)
     {
         _refreshTokensStorage = refreshTokensStorage;
         _userContext = userContext;
         _usersClient = usersClient;
-        _publishEndpoint = publishEndpoint;
-        _jwtSettings = jwtSettings;
         _metrics = metrics;
         _logger = logger;
     }
@@ -48,7 +39,7 @@ public class RemoveActiveSessionCommandHandler : IRequestHandler<RemoveActiveSes
 
         try
         {
-            await _refreshTokensStorage.DeleteRefreshTokensByDeviceId(request.DeviceId, _userContext.UserId);
+            await _refreshTokensStorage.RevokeSession(request.DeviceId, _userContext.UserId, cancellationToken);
 
             _metrics.Increment("sessions_removed");
             _metrics.Increment("sessions_revoked");
@@ -70,14 +61,6 @@ public class RemoveActiveSessionCommandHandler : IRequestHandler<RemoveActiveSes
             );
             throw new SessionNotFoundException();
         }
-
-        // Публикуем событие отзыва сессии для инвалидации access токенов
-        await _publishEndpoint.Publish(new SessionRevokedEvent
-        {
-            UserId = _userContext.UserId,
-            DeviceId = request.DeviceId,
-            AccessTokenExpiresAt = DateTime.UtcNow.AddMinutes(_jwtSettings.ExpiryMinutes)
-        });
 
         // Удаляем устройство из Users сервиса
         try
