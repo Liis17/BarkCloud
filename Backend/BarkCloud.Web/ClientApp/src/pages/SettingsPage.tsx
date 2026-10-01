@@ -1087,6 +1087,10 @@ function SecurityTab({ security, flash }: { security: SettingsState['security'];
   const [disableDlg, setDisableDlg] = React.useState<{ otpType: number } | null>(null);
   const [disableCode, setDisableCode] = React.useState('');
   const [disableBusy, setDisableBusy] = React.useState(false);
+  // Повторное подтверждение паролем: настройка Authenticator и отключение email-2FA.
+  const [reauthDlg, setReauthDlg] = React.useState<'enableAuth' | 'disableEmail' | null>(null);
+  const [reauthPwd, setReauthPwd] = React.useState('');
+  const [reauthBusy, setReauthBusy] = React.useState(false);
 
   async function refresh2fa() {
     const res = await sGet<{ authenticator: boolean; email: boolean }>('/api/settings/security/2fa');
@@ -1115,7 +1119,32 @@ function SecurityTab({ security, flash }: { security: SettingsState['security'];
       flash('ok', 'Пароль изменён');
     } else flash('err', errMsg(res));
   }
+  async function submitReauth() {
+    if (!reauthDlg) return;
+    setReauthBusy(true);
+    if (reauthDlg === 'enableAuth') {
+      const res = await sPost<{ qr: string; code: string }>('/api/settings/security/2fa/enable', { otpType: 1, password: reauthPwd });
+      if (res.ok && res.data) {
+        setReauthDlg(null);
+        setEnableCode('');
+        setEnableDlg({ otpType: 1, qr: res.data.qr, code: res.data.code });
+      } else flash('err', errMsg(res));
+    } else {
+      const res = await sPost('/api/settings/security/2fa/disable', { otpType: 2, otpCode: '', password: reauthPwd });
+      if (res.ok) {
+        setReauthDlg(null);
+        flash('ok', 'Email-2FA отключена');
+        refresh2fa();
+      } else flash('err', errMsg(res));
+    }
+    setReauthBusy(false);
+  }
   async function startEnable(otpType: number) {
+    if (otpType === 1) {
+      setReauthPwd('');
+      setReauthDlg('enableAuth');
+      return;
+    }
     setEnableBusy(true);
     const res = await sPost<{ qr: string; code: string }>('/api/settings/security/2fa/enable', { otpType });
     setEnableBusy(false);
@@ -1136,11 +1165,8 @@ function SecurityTab({ security, flash }: { security: SettingsState['security'];
   }
   async function startDisable(otpType: number) {
     if (otpType === 2) {
-      const res = await sPost('/api/settings/security/2fa/disable', { otpType, otpCode: '' });
-      if (res.ok) {
-        flash('ok', 'Email-2FA отключена');
-        refresh2fa();
-      } else flash('err', errMsg(res));
+      setReauthPwd('');
+      setReauthDlg('disableEmail');
       return;
     }
     setDisableCode('');
@@ -1290,6 +1316,24 @@ function SecurityTab({ security, flash }: { security: SettingsState['security'];
           </Field>
         </div>
       </div>
+
+      {reauthDlg && (
+        <div className="sys-scrim" onClick={() => !reauthBusy && setReauthDlg(null)}>
+          <div className="sys-dialog" onClick={(e) => e.stopPropagation()}>
+            <h3>{reauthDlg === 'enableAuth' ? 'Настройка аутентификатора' : 'Отключить email-2FA'}</h3>
+            <div className="sub">Введите текущий пароль, чтобы подтвердить изменение двухфакторной защиты.</div>
+            <input className="dlg-input" type="password" value={reauthPwd} onChange={(e) => setReauthPwd(e.target.value)} placeholder="Пароль" autoFocus onKeyDown={(e) => { if (e.key === 'Enter' && reauthPwd) submitReauth(); }} />
+            <div className="dlg-actions two">
+              <button className="btn text" onClick={() => setReauthDlg(null)} disabled={reauthBusy}>
+                Отмена
+              </button>
+              <button className="btn primary" onClick={submitReauth} disabled={reauthBusy || !reauthPwd}>
+                {reauthBusy ? <span className="spin" /> : null} Продолжить
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {enableDlg && (
         <div className="sys-scrim" onClick={() => !enableBusy && setEnableDlg(null)}>

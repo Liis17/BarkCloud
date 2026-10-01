@@ -26,9 +26,9 @@ public static class SettingsEndpoints
     public sealed record UsernameBody(string? Username);
     public sealed record PrivacyBody(int ProfileVisibility, int EmailVisibility, int LastSeenVisibility, bool SearchableByUsername);
     public sealed record PasswordBody(string? OldPassword, string? NewPassword);
-    public sealed record OtpEnableBody(int OtpType);
+    public sealed record OtpEnableBody(int OtpType, string? Password, string? CurrentOtpCode);
     public sealed record OtpConfirmBody(string? OtpCode);
-    public sealed record OtpDisableBody(int OtpType, string? OtpCode);
+    public sealed record OtpDisableBody(int OtpType, string? OtpCode, string? Password);
     public sealed record RenameBody(string? DeviceId, string? CustomName);
     public sealed record RevokeBody(string? DeviceId);
     public sealed record WebAuthnRegisterCompleteBody(string? ChallengeId, JsonElement Attestation, string? Name);
@@ -244,7 +244,9 @@ public static class SettingsEndpoints
             {
                 var resp = await identity.EnableOtpVerificationAsync(new EnableOtpVerificationRequest
                 {
-                    OtpType = (OtpTypeId)body.OtpType
+                    OtpType = (OtpTypeId)body.OtpType,
+                    Password = body.Password ?? "",
+                    CurrentOtpCode = body.CurrentOtpCode ?? ""
                 }, token);
                 return Results.Ok(new { qr = resp.OtpQr, code = resp.OtpCode });
             }));
@@ -262,7 +264,8 @@ public static class SettingsEndpoints
                 await identity.DisableOtpVerificationAsync(new DisableOtpVerificationRequest
                 {
                     OtpType = (OtpTypeId)body.OtpType,
-                    OtpCode = body.OtpCode ?? ""
+                    OtpCode = body.OtpCode ?? "",
+                    Password = body.Password ?? ""
                 }, token);
                 return Results.Ok(new { ok = true });
             }));
