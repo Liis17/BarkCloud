@@ -2,6 +2,7 @@ using BarkCloud.Files.Helpers;
 using BarkCloud.Files.Domain;
 using BarkCloud.Files.Persistence;
 using BarkCloud.GrpcServer.Settings;
+using BarkCloud.GrpcServer.XAuth;
 using BarkCloud.Proto.Files;
 
 using MediatR;
@@ -12,15 +13,18 @@ public class GetTempDownloadUrlCommandHandler : IRequestHandler<GetTempDownloadU
 {
     private readonly IUploadedFilesStorage _uploadedFilesStorage;
     private readonly ITempFilesStorage _tempFilesStorage;
+    private readonly UserContext _userContext;
     private readonly RunSettings _runSettings;
     private readonly IConfiguration _configuration;
     private readonly ILogger<GetTempDownloadUrlCommandHandler> _logger;
 
     public GetTempDownloadUrlCommandHandler(IUploadedFilesStorage uploadedFilesStorage, ITempFilesStorage tempFilesStorage,
-        RunSettings runSettings, IConfiguration configuration, ILogger<GetTempDownloadUrlCommandHandler> logger)
+        UserContext userContext, RunSettings runSettings, IConfiguration configuration,
+        ILogger<GetTempDownloadUrlCommandHandler> logger)
     {
         _uploadedFilesStorage = uploadedFilesStorage;
         _tempFilesStorage = tempFilesStorage;
+        _userContext = userContext;
         _runSettings = runSettings;
         _configuration = configuration;
         _logger = logger;
@@ -39,7 +43,22 @@ public class GetTempDownloadUrlCommandHandler : IRequestHandler<GetTempDownloadU
             throw new FileNotFoundException();
         }
         var files = storedFiles.Where(x => x.IsReady()).ToList();
-        
+
+        // Ссылку на оригинал получает только владелец. Чужой файл в запросе — отказ на весь запрос,
+        // ни одного TempFile не создаётся. Получатели шаринга качают через GetSharedFileDownloadUrl.
+        var userId = _userContext.UserId;
+        var foreignCount = files.Count(f => !f.Uploaders.Contains(userId));
+        if (foreignCount > 0)
+        {
+            _logger.LogWarning(
+                "Пользователь {UserId} запросил ссылки на {ForeignCount} чужих файлов из {RequestedCount}",
+                userId,
+                foreignCount,
+                request.FileIds.Count
+            );
+            throw new BarkCloud.Shared.Exceptions.Files.CloudAccessDeniedException();
+        }
+
         if (files.Count != request.FileIds.Count)
         {
             _logger.LogWarning(
