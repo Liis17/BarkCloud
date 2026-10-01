@@ -130,6 +130,17 @@ Parent: [[index]] · See also: [[api/identity-api]] · [[modules/shared-identity
 
 Остаётся вне F07: общие лимиты попыток входа/OTP по IP и аккаунту и троттлинг `FailedLogin`-писем (F14); у email-кода сброса пароля (`ConfirmResetPassword`) нет лимита попыток.
 
+## Управление 2FA: ожидающий секрет и повторная аутентификация (F08)
+
+**Жизненный цикл Authenticator.** `EnableOtpVerification(Authenticator)` не трогает действующие `OtpSecret`/`OtpEnabled`: новый секрет пишется в `AuthUserProperty.PendingOtpSecret` (+ `PendingOtpSecretExpiresAt`, TTL **10 мин**, константа `PendingSecretLifetime` в хендлере) через `SetPendingOtpSecret`, `SelectedOtpType = Authenticator`. `ConfirmOtpVerification` проверяет код **по ожидающему секрету** (нет секрета/истёк → shared `OtpNotCreatedException` — начать настройку заново; код действующего приложения новый секрет не подтверждает) и вызывает `ActivatePendingOtpSecret(userId, проверенный секрет)` — условный `ExecuteUpdate … WHERE PendingOtpSecret = @секрет`, который одним UPDATE копирует pending в `OtpSecret`, ставит `OtpEnabled = true` и очищает pending; `false` (секрет успели заменить параллельным Enable) → `NotValidOtpCodeException`. Закрытый QR-экран или повторное открытие настройки вход прежним приложением не ломают. `DisableOtp` дополнительно очищает pending. `GetOtpSecretKey` остаётся — его использует `ConfirmResetPassword`.
+
+**Повторная аутентификация** (проверки идут до любых записей):
+- `EnableOtpVerification(Authenticator)` — текущий пароль `password` (иначе `InvalidPasswordException`, метрика `otp_setup_failed_invalid_password`); если Authenticator уже активен — ещё и `current_otp_code` против действующего секрета (`NotValidOtpCodeException`, `otp_setup_failed_invalid_otp`). Пароль проверяется первым, поэтому без него нельзя перебирать TOTP. Аккаунт без хеша пароля отклоняется (`PasswordHasher.VerifyPassword(…, null)` = `false`) — сначала `SetPassword`.
+- `DisableOtpVerification(Email)` — `password`; метрика `otp_disable_failed`. `Disable(Authenticator)` — по-прежнему только TOTP (`otp_code`).
+- `EnableOtpVerification(Email)` — без изменений (код уходит владельцу на почту; его challenge — см. F07).
+
+Новая ошибка `InvalidPasswordException` («Неверный пароль») — в отличие от `InvalidOldPasswordException` (смена пароля) не говорит про «старый». Миграция `AddPendingOtpSecret` — две nullable-колонки в `AuthUserProperties`. Не охвачено: лимит попыток подбора пароля/OTP (F14), отзыв остальных сессий при смене 2FA.
+
 ## Запрет регистрации (Features:RegistrationEnabled)
 
 `CreateAccountCommandHandler` и `ConfirmAccountCommandHandler` вызывают `RegistrationPolicy.EnsureRegistrationEnabledAsync` до создания/подтверждения пользователя. При `false` бросается `RegistrationDisabledException`: новые аккаунты не создаются и ранее начатая регистрация не подтверждается.
