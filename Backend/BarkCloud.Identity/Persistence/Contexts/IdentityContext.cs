@@ -10,6 +10,8 @@ public class IdentityContext : DbContext
 
     public DbSet<RefreshToken> RefreshTokens { get; set; }
 
+    public DbSet<RevokedSession> RevokedSessions { get; set; }
+
     public DbSet<ConfirmationCode> ConfirmationCodes { get; set; }
 
     public DbSet<AuthUserProperty> AuthUserProperties { get; set; }
@@ -29,6 +31,12 @@ public class IdentityContext : DbContext
         modelBuilder.Entity<RefreshToken>()
             .HasIndex(x => x.Value)
             .IsUnique();
+
+        modelBuilder.Entity<RevokedSession>()
+            .HasIndex(x => x.ExpiresAt);
+
+        modelBuilder.Entity<RevokedSession>()
+            .HasIndex(x => x.RevokedAt);
 
         modelBuilder.Entity<WebAuthnCredential>()
             .HasIndex(x => x.CredentialId)
