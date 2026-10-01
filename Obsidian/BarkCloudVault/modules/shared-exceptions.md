@@ -21,8 +21,8 @@ Parent: [[index]]
 - `FileNotFoundException`
 - `NotValidFileIdException`
 
-### Identity (23)
-`ConfirmationCodeExpiredException`, `ConfirmationCodeIncorrectException`, `ConfirmationCodeNotFoundException`, `EmailExistException`, `InvalidLoginOrPasswordException`, `InvalidOldPasswordException`, `InvalidPasswordException`, `InvalidRefreshTokenException`, `NotSetUsernameOrEmailException`, `NotValidOtpCodeException`, `OtpCodeNeedException`, `OtpNotCreatedException`, `ResetIdExpiredException`, `ResetIdHasIsApprovedException`, `ResetIdNotFoundException`, `SessionNotFoundException`, `UserNotFoundException`, `UsernameExistException`, `UsernameOrEmailIsEmptyException`, `UsernameReservedException`, `XAppInfoIsRequiedException`, `XDeviceNameIsRequiredException`, `XOsNameIsRequiredException`.
+### Identity (24)
+`ConfirmationCodeExpiredException`, `ConfirmationCodeIncorrectException`, `ConfirmationCodeNotFoundException`, `EmailExistException`, `InvalidLoginOrPasswordException`, `InvalidOldPasswordException`, `InvalidPasswordException`, `InvalidRefreshTokenException`, `NotSetUsernameOrEmailException`, `NotValidOtpCodeException`, `OtpCodeNeedException`, `OtpNotCreatedException`, `PasswordAttemptsExceededException`, `ResetIdExpiredException`, `ResetIdHasIsApprovedException`, `ResetIdNotFoundException`, `SessionNotFoundException`, `UserNotFoundException`, `UsernameExistException`, `UsernameOrEmailIsEmptyException`, `UsernameReservedException`, `XAppInfoIsRequiedException`, `XDeviceNameIsRequiredException`, `XOsNameIsRequiredException`.
 
 ### Users (5)
 - `BioTooLongException`
