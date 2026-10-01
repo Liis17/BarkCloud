@@ -51,7 +51,7 @@ public class TrashPurgeServiceTests : IDisposable
         UploadedAt = DateTime.UtcNow,
     };
 
-    private CloudFileEntry SeedEntry(Guid fileId, bool deleted)
+    private CloudFileEntry SeedEntry(Guid fileId, bool deleted, DateTime? purgeAt = null)
     {
         var entry = new CloudFileEntry
         {
@@ -62,10 +62,61 @@ public class TrashPurgeServiceTests : IDisposable
             IsDeleted = deleted,
             CreatedAt = DateTime.UtcNow,
             DeletedAt = deleted ? DateTime.UtcNow : null,
+            PurgeAt = deleted ? purgeAt : null,
         };
         _db.Context.CloudFileEntries.Add(entry);
         return entry;
     }
+
+    /// <summary>Привязки файла владельца (избранное, альбом, публичная ссылка), которые чистит purge.</summary>
+    private void SeedDependencies(Guid fileId)
+    {
+        _db.Context.FavoriteFiles.Add(new FavoriteFile
+        {
+            Id = Guid.NewGuid(), OwnerId = OwnerId, FileId = fileId, CreatedAt = DateTime.UtcNow
+        });
+        _db.Context.AlbumItems.Add(new AlbumItem
+        {
+            Id = Guid.NewGuid(), AlbumId = Guid.NewGuid(), OwnerId = OwnerId, FileId = fileId, AddedAt = DateTime.UtcNow
+        });
+        _db.Context.ShareLinks.Add(new ShareLink
+        {
+            Id = Guid.NewGuid(), OwnerId = OwnerId, FileId = fileId, Token = Guid.NewGuid().ToString("N"),
+            Name = "a.jpg", CreatedAt = DateTime.UtcNow
+        });
+    }
+
+    private async Task<int> DependencyCountAsync(Guid fileId) =>
+        await _db.Context.FavoriteFiles.CountAsync(f => f.FileId == fileId)
+        + await _db.Context.AlbumItems.CountAsync(a => a.FileId == fileId)
+        + await _db.Context.ShareLinks.CountAsync(s => s.FileId == fileId);
+
+    /// <summary>
+    /// Параллельное действие пользователя из другого контекста («другое устройство»): меняет запись
+    /// в БД, пока у воркера на руках уже устаревший снимок.
+    /// </summary>
+    private async Task RestoreConcurrentlyAsync(Guid entryId)
+    {
+        using var other = _db.CreateAdditionalContext();
+        await other.CloudFileEntries
+            .Where(e => e.Id == entryId)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(e => e.IsDeleted, false)
+                .SetProperty(e => e.DeletedAt, (DateTime?)null)
+                .SetProperty(e => e.PurgeAt, (DateTime?)null));
+    }
+
+    private async Task ReTrashConcurrentlyAsync(Guid entryId, DateTime newPurgeAt)
+    {
+        using var other = _db.CreateAdditionalContext();
+        await other.CloudFileEntries
+            .Where(e => e.Id == entryId)
+            .ExecuteUpdateAsync(s => s.SetProperty(e => e.PurgeAt, (DateTime?)newPurgeAt));
+    }
+
+    /// <summary>Выборка воркера: tracked-снимок просроченных записей.</summary>
+    private Task<List<CloudFileEntry>> SelectExpiredAsync(DateTime now) =>
+        _db.Context.CloudFileEntries.Where(e => e.IsDeleted && e.PurgeAt != null && e.PurgeAt <= now).ToListAsync();
 
     [Fact]
     public async Task PurgeEntries_SharedPreview_KeepsPreviewOfRemainingFile()
@@ -131,6 +182,151 @@ public class TrashPurgeServiceTests : IDisposable
         (await _db.Context.UploadedFiles.FindAsync(preview)).Should().BeNull("приватное превью осиротевает вместе с оригиналом");
         _deletedKeys.Should().Contain(preview.ToString());
         (await _db.Context.FilePreviews.AnyAsync(p => p.PreviewFileId == preview)).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task PurgeExpiredEntries_ExpiredEntry_IsPurgedWithDependenciesAndBlob()
+    {
+        var now = DateTime.UtcNow;
+        var fileId = Guid.NewGuid();
+        _db.Context.UploadedFiles.Add(Blob(fileId, OwnerId));
+        SeedEntry(fileId, deleted: true, purgeAt: now.AddHours(-1));
+        SeedDependencies(fileId);
+        await _db.Context.SaveChangesAsync();
+
+        var batch = await SelectExpiredAsync(now);
+        var result = await CreateSut().PurgeExpiredEntriesAsync(batch, now, default);
+
+        _db.Context.ChangeTracker.Clear();
+        result.Entries.Should().Be(1);
+        result.Blobs.Should().Be(1);
+        (await _db.Context.CloudFileEntries.AnyAsync()).Should().BeFalse();
+        (await DependencyCountAsync(fileId)).Should().Be(0);
+        (await _db.Context.UploadedFiles.FindAsync(fileId)).Should().BeNull();
+        _deletedKeys.Should().Contain(fileId.ToString());
+    }
+
+    [Fact]
+    public async Task PurgeExpiredEntries_RestoredAfterSelection_KeepsEntryDependenciesAndBlob()
+    {
+        // F06: воркер выбрал просроченную запись, пользователь восстановил её, затем воркер удаляет.
+        var now = DateTime.UtcNow;
+        var fileId = Guid.NewGuid();
+        _db.Context.UploadedFiles.Add(Blob(fileId, OwnerId));
+        var entry = SeedEntry(fileId, deleted: true, purgeAt: now.AddHours(-1));
+        SeedDependencies(fileId);
+        await _db.Context.SaveChangesAsync();
+
+        var batch = await SelectExpiredAsync(now);
+        await RestoreConcurrentlyAsync(entry.Id);
+
+        var result = await CreateSut().PurgeExpiredEntriesAsync(batch, now, default);
+
+        _db.Context.ChangeTracker.Clear();
+        result.Should().Be(new TrashPurgeResult(0, 0));
+        var restored = await _db.Context.CloudFileEntries.SingleAsync();
+        restored.IsDeleted.Should().BeFalse("восстановленный файл не должен удаляться воркером");
+        (await DependencyCountAsync(fileId)).Should().Be(3, "избранное, альбом и ссылка восстановленного файла сохраняются");
+        var blob = await _db.Context.UploadedFiles.FindAsync(fileId);
+        blob.Should().NotBeNull();
+        blob!.Uploaders.Should().Contain(OwnerId);
+        _deletedKeys.Should().BeEmpty("оригинал в S3 не удаляется");
+    }
+
+    [Fact]
+    public async Task PurgeExpiredEntries_ReTrashedWithLaterPurgeAt_IsNotPurged()
+    {
+        // Запись восстановили и снова удалили: PurgeAt уже в будущем, срок хранения начался заново.
+        var now = DateTime.UtcNow;
+        var fileId = Guid.NewGuid();
+        _db.Context.UploadedFiles.Add(Blob(fileId, OwnerId));
+        var entry = SeedEntry(fileId, deleted: true, purgeAt: now.AddHours(-1));
+        await _db.Context.SaveChangesAsync();
+
+        var batch = await SelectExpiredAsync(now);
+        await ReTrashConcurrentlyAsync(entry.Id, now.AddDays(14));
+
+        var result = await CreateSut().PurgeExpiredEntriesAsync(batch, now, default);
+
+        _db.Context.ChangeTracker.Clear();
+        result.Entries.Should().Be(0);
+        (await _db.Context.CloudFileEntries.SingleAsync()).IsDeleted.Should().BeTrue();
+        (await _db.Context.UploadedFiles.FindAsync(fileId)).Should().NotBeNull();
+        _deletedKeys.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task PurgeExpiredEntries_MixedBatch_PurgesOnlyStillExpired()
+    {
+        var now = DateTime.UtcNow;
+        var restoredFile = Guid.NewGuid();
+        var expiredFile = Guid.NewGuid();
+        _db.Context.UploadedFiles.AddRange(Blob(restoredFile, OwnerId), Blob(expiredFile, OwnerId));
+        var restoredEntry = SeedEntry(restoredFile, deleted: true, purgeAt: now.AddHours(-2));
+        SeedEntry(expiredFile, deleted: true, purgeAt: now.AddHours(-1));
+        SeedDependencies(restoredFile);
+        SeedDependencies(expiredFile);
+        await _db.Context.SaveChangesAsync();
+
+        var batch = await SelectExpiredAsync(now);
+        await RestoreConcurrentlyAsync(restoredEntry.Id);
+
+        var result = await CreateSut().PurgeExpiredEntriesAsync(batch, now, default);
+
+        _db.Context.ChangeTracker.Clear();
+        result.Entries.Should().Be(1);
+        (await _db.Context.CloudFileEntries.SingleAsync()).FileId.Should().Be(restoredFile);
+        (await DependencyCountAsync(restoredFile)).Should().Be(3);
+        (await DependencyCountAsync(expiredFile)).Should().Be(0);
+        (await _db.Context.UploadedFiles.FindAsync(restoredFile)).Should().NotBeNull();
+        (await _db.Context.UploadedFiles.FindAsync(expiredFile)).Should().BeNull();
+        _deletedKeys.Should().ContainSingle().Which.Should().Be(expiredFile.ToString());
+    }
+
+    [Fact]
+    public async Task PurgeEntries_AlreadyRestored_DoesNothing()
+    {
+        // Ручное «Удалить навсегда»: запись успели восстановить с другого устройства.
+        var fileId = Guid.NewGuid();
+        _db.Context.UploadedFiles.Add(Blob(fileId, OwnerId));
+        var entry = SeedEntry(fileId, deleted: true, purgeAt: DateTime.UtcNow.AddDays(10));
+        SeedDependencies(fileId);
+        await _db.Context.SaveChangesAsync();
+
+        await RestoreConcurrentlyAsync(entry.Id);
+        var result = await CreateSut().PurgeEntriesAsync(new[] { entry }, default);
+
+        _db.Context.ChangeTracker.Clear();
+        result.Entries.Should().Be(0);
+        (await _db.Context.CloudFileEntries.SingleAsync()).IsDeleted.Should().BeFalse();
+        (await DependencyCountAsync(fileId)).Should().Be(3);
+        (await _db.Context.UploadedFiles.FindAsync(fileId)).Should().NotBeNull();
+        _deletedKeys.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task PurgeEntries_FileHasLiveEntry_KeepsDependenciesAndOwnership()
+    {
+        // Файл удалили, загрузили повторно (живая запись на тот же блоб) — purge старой записи в
+        // корзине не должен стирать избранное/альбомы/ссылки живой записи и снимать владельца.
+        var fileId = Guid.NewGuid();
+        _db.Context.UploadedFiles.Add(Blob(fileId, OwnerId));
+        var trashed = SeedEntry(fileId, deleted: true);
+        SeedEntry(fileId, deleted: false);
+        SeedDependencies(fileId);
+        await _db.Context.SaveChangesAsync();
+
+        var result = await CreateSut().PurgeEntriesAsync(new[] { trashed }, default);
+
+        _db.Context.ChangeTracker.Clear();
+        result.Entries.Should().Be(1);
+        result.Blobs.Should().Be(0);
+        var remaining = await _db.Context.CloudFileEntries.SingleAsync();
+        remaining.IsDeleted.Should().BeFalse();
+        (await DependencyCountAsync(fileId)).Should().Be(3);
+        var blob = await _db.Context.UploadedFiles.FindAsync(fileId);
+        blob!.Uploaders.Should().Contain(OwnerId);
+        _deletedKeys.Should().BeEmpty();
     }
 
     public void Dispose() => _db.Dispose();

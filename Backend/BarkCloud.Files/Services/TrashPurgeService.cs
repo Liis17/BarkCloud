@@ -38,121 +38,156 @@ public class TrashPurgeService : ITrashPurgeService
     }
 
     /// <summary>
-    /// Окончательно удаляет переданные записи корзины. Возвращает число физически удалённых
-    /// из S3 блобов (оригиналов + превью).
+    /// Окончательно удаляет переданные записи корзины (ручное «Удалить навсегда» / «Очистить
+    /// корзину»). Записи, которые к моменту удаления уже не в корзине, не трогаются.
     /// </summary>
-    public async Task<int> PurgeEntriesAsync(IReadOnlyCollection<CloudFileEntry> entries, CancellationToken cancellationToken)
+    public Task<TrashPurgeResult> PurgeEntriesAsync(IReadOnlyCollection<CloudFileEntry> entries, CancellationToken cancellationToken)
+        => PurgeCoreAsync(entries, expiredAt: null, cancellationToken);
+
+    /// <summary>
+    /// Окончательно удаляет переданные записи корзины, у которых срок хранения истёк к
+    /// <paramref name="now"/> (фоновый воркер). Запись, восстановленная или повторно удалённая с
+    /// более поздним PurgeAt после выборки, не трогается.
+    /// </summary>
+    public Task<TrashPurgeResult> PurgeExpiredEntriesAsync(IReadOnlyCollection<CloudFileEntry> entries, DateTime now, CancellationToken cancellationToken)
+        => PurgeCoreAsync(entries, now, cancellationToken);
+
+    /// <summary>
+    /// Ядро зачистки. Точка невозврата — условное удаление строк записей в короткой транзакции БД:
+    /// переданные <paramref name="entries"/> — лишь устаревший снимок, к моменту удаления запись
+    /// могла быть восстановлена (или повторно удалена с новым PurgeAt). Дальше обрабатываются только
+    /// реально удалённые строки; S3 трогается после коммита.
+    /// </summary>
+    private async Task<TrashPurgeResult> PurgeCoreAsync(
+        IReadOnlyCollection<CloudFileEntry> entries, DateTime? expiredAt, CancellationToken cancellationToken)
     {
         if (entries.Count == 0)
-            return 0;
+            return default;
 
-        var pairs = entries
-            .Select(e => new { e.OwnerId, e.FileId })
-            .Distinct()
-            .ToList();
         var entryIds = entries.Select(e => e.Id).ToList();
+        List<CloudFileEntry> purged;
+        List<(long OwnerId, Guid FileId)> pairs;
 
-        // 1. Убираем файлы из альбомов, избранного, публичных ссылок и грантов доступа владельца,
-        //    удаляем сами записи иерархии.
-        foreach (var pair in pairs)
+        await using (var transaction = await _context.Database.BeginTransactionAsync(cancellationToken))
         {
-            await _context.AlbumItems
-                .Where(a => a.OwnerId == pair.OwnerId && a.FileId == pair.FileId)
-                .ExecuteDeleteAsync(cancellationToken);
+            // 1. Gate: удаляем только то, что всё ещё в корзине (и, для воркера, всё ещё просрочено).
+            //    Конкурирующее восстановление либо выполнилось раньше (условие не совпадёт), либо
+            //    дождётся коммита и получит «записи нет».
+            var gate = _context.CloudFileEntries.Where(e => entryIds.Contains(e.Id) && e.IsDeleted);
+            if (expiredAt is { } cutoff)
+                gate = gate.Where(e => e.PurgeAt != null && e.PurgeAt <= cutoff);
+            await gate.ExecuteDeleteAsync(cancellationToken);
 
-            await _context.FavoriteFiles
-                .Where(f => f.OwnerId == pair.OwnerId && f.FileId == pair.FileId)
-                .ExecuteDeleteAsync(cancellationToken);
-
-            await _context.FileSearchAliases
-                .Where(a => a.OwnerId == pair.OwnerId && a.FileId == pair.FileId)
-                .ExecuteDeleteAsync(cancellationToken);
-
-            await _context.FileTags
-                .Where(t => t.OwnerId == pair.OwnerId && t.FileId == pair.FileId)
-                .ExecuteDeleteAsync(cancellationToken);
-
-            await _context.ShareLinks
-                .Where(s => s.OwnerId == pair.OwnerId && s.FileId == pair.FileId)
-                .ExecuteDeleteAsync(cancellationToken);
-
-            await _context.FileGrants
-                .Where(g => g.OwnerId == pair.OwnerId && g.FileId == pair.FileId)
-                .ExecuteDeleteAsync(cancellationToken);
-
-            await _context.MusicPlaylistItems
-                .Where(i => i.OwnerId == pair.OwnerId && i.FileId == pair.FileId)
-                .ExecuteDeleteAsync(cancellationToken);
-        }
-
-        await _context.CloudFileEntries
-            .Where(e => entryIds.Contains(e.Id))
-            .ExecuteDeleteAsync(cancellationToken);
-
-        // 2. Снимаем владельца с блоба, если у него не осталось ни одной записи (любого
-        //    состояния) на этот файл. Сначала фиксируем, какие (владелец, файл) реально
-        //    освобождаются, — превью обрабатываем отдельным проходом ниже.
-        var released = new List<(long OwnerId, Guid FileId)>();
-        foreach (var pair in pairs)
-        {
-            var stillReferenced = await _context.CloudFileEntries
-                .AnyAsync(e => e.OwnerId == pair.OwnerId && e.FileId == pair.FileId, cancellationToken);
-            if (stillReferenced)
-                continue;
-
-            var uploadFile = await _context.UploadedFiles
-                .FirstOrDefaultAsync(f => f.Id == pair.FileId, cancellationToken);
-            uploadFile?.Uploaders.Remove(pair.OwnerId);
-            released.Add((pair.OwnerId, pair.FileId));
-        }
-
-        // Снимаем владельца с превью-блобов. Превью дедуплицируются по SHA256, поэтому один
-        // блоб-превью может быть привязан сразу к нескольким оригиналам. Убираем владельца с
-        // превью ТОЛЬКО если у него не осталось другого (не удаляемого сейчас) оригинала,
-        // ссылающегося на тот же превью-блоб, — иначе оставшийся файл лишился бы превью.
-        foreach (var ownerGroup in released.GroupBy(r => r.OwnerId))
-        {
-            var ownerId = ownerGroup.Key;
-            var releasedFileIds = ownerGroup.Select(r => r.FileId).ToList();
-
-            var previewFileIds = await _context.FilePreviews
-                .AsNoTracking()
-                .Where(p => releasedFileIds.Contains(p.OriginalFileId))
-                .Select(p => p.PreviewFileId)
-                .Distinct()
-                .ToListAsync(cancellationToken);
-            if (previewFileIds.Count == 0)
-                continue;
-
-            var previewFiles = await _context.UploadedFiles
-                .Where(f => previewFileIds.Contains(f.Id))
-                .ToListAsync(cancellationToken);
-
-            foreach (var pf in previewFiles)
-            {
-                var stillNeeded = await _context.FilePreviews
+            // Реально удалены те записи, которых после gate больше нет в БД; оставшиеся
+            // восстановлены/повторно удалены — их не трогаем.
+            var survivors = (await _context.CloudFileEntries
                     .AsNoTracking()
-                    .AnyAsync(p => p.PreviewFileId == pf.Id
-                        && !releasedFileIds.Contains(p.OriginalFileId)
-                        && _context.UploadedFiles.Any(o => o.Id == p.OriginalFileId && o.Uploaders.Contains(ownerId)),
-                        cancellationToken);
+                    .Where(e => entryIds.Contains(e.Id))
+                    .Select(e => e.Id)
+                    .ToListAsync(cancellationToken))
+                .ToHashSet();
+            purged = entries.Where(e => !survivors.Contains(e.Id)).ToList();
+            if (purged.Count == 0)
+                return default;
 
-                if (!stillNeeded)
-                    pf.Uploaders.Remove(ownerId);
+            pairs = purged.Select(e => (e.OwnerId, e.FileId)).Distinct().ToList();
+
+            // 2. Снимаем владельца с блоба и чистим привязки (альбомы, избранное, публичные ссылки,
+            //    гранты доступа) только у пар, у которых не осталось ни одной записи (любого
+            //    состояния). Если у файла есть другая запись (например, живая после повторной
+            //    загрузки), её метаданные не трогаем. Сначала фиксируем освобождённые пары — превью
+            //    обрабатываем отдельным проходом ниже.
+            var released = new List<(long OwnerId, Guid FileId)>();
+            foreach (var pair in pairs)
+            {
+                var stillReferenced = await _context.CloudFileEntries
+                    .AnyAsync(e => e.OwnerId == pair.OwnerId && e.FileId == pair.FileId, cancellationToken);
+                if (stillReferenced)
+                    continue;
+
+                await _context.AlbumItems
+                    .Where(a => a.OwnerId == pair.OwnerId && a.FileId == pair.FileId)
+                    .ExecuteDeleteAsync(cancellationToken);
+
+                await _context.FavoriteFiles
+                    .Where(f => f.OwnerId == pair.OwnerId && f.FileId == pair.FileId)
+                    .ExecuteDeleteAsync(cancellationToken);
+
+                await _context.FileSearchAliases
+                    .Where(a => a.OwnerId == pair.OwnerId && a.FileId == pair.FileId)
+                    .ExecuteDeleteAsync(cancellationToken);
+
+                await _context.FileTags
+                    .Where(t => t.OwnerId == pair.OwnerId && t.FileId == pair.FileId)
+                    .ExecuteDeleteAsync(cancellationToken);
+
+                await _context.ShareLinks
+                    .Where(s => s.OwnerId == pair.OwnerId && s.FileId == pair.FileId)
+                    .ExecuteDeleteAsync(cancellationToken);
+
+                await _context.FileGrants
+                    .Where(g => g.OwnerId == pair.OwnerId && g.FileId == pair.FileId)
+                    .ExecuteDeleteAsync(cancellationToken);
+
+                await _context.MusicPlaylistItems
+                    .Where(i => i.OwnerId == pair.OwnerId && i.FileId == pair.FileId)
+                    .ExecuteDeleteAsync(cancellationToken);
+
+                var uploadFile = await _context.UploadedFiles
+                    .FirstOrDefaultAsync(f => f.Id == pair.FileId, cancellationToken);
+                uploadFile?.Uploaders.Remove(pair.OwnerId);
+                released.Add(pair);
             }
+
+            // Снимаем владельца с превью-блобов. Превью дедуплицируются по SHA256, поэтому один
+            // блоб-превью может быть привязан сразу к нескольким оригиналам. Убираем владельца с
+            // превью ТОЛЬКО если у него не осталось другого (не удаляемого сейчас) оригинала,
+            // ссылающегося на тот же превью-блоб, — иначе оставшийся файл лишился бы превью.
+            foreach (var ownerGroup in released.GroupBy(r => r.OwnerId))
+            {
+                var ownerId = ownerGroup.Key;
+                var releasedFileIds = ownerGroup.Select(r => r.FileId).ToList();
+
+                var previewFileIds = await _context.FilePreviews
+                    .AsNoTracking()
+                    .Where(p => releasedFileIds.Contains(p.OriginalFileId))
+                    .Select(p => p.PreviewFileId)
+                    .Distinct()
+                    .ToListAsync(cancellationToken);
+                if (previewFileIds.Count == 0)
+                    continue;
+
+                var previewFiles = await _context.UploadedFiles
+                    .Where(f => previewFileIds.Contains(f.Id))
+                    .ToListAsync(cancellationToken);
+
+                foreach (var pf in previewFiles)
+                {
+                    var stillNeeded = await _context.FilePreviews
+                        .AsNoTracking()
+                        .AnyAsync(p => p.PreviewFileId == pf.Id
+                            && !releasedFileIds.Contains(p.OriginalFileId)
+                            && _context.UploadedFiles.Any(o => o.Id == p.OriginalFileId && o.Uploaders.Contains(ownerId)),
+                            cancellationToken);
+
+                    if (!stillNeeded)
+                        pf.Uploaders.Remove(ownerId);
+                }
+            }
+
+            await _context.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
         }
 
-        await _context.SaveChangesAsync(cancellationToken);
-
-        // 3. Физически удаляем осиротевшие блобы (оригиналы и их превью) из S3 и БД.
+        // 3. Вне транзакции физически удаляем осиротевшие блобы (оригиналы и их превью) из S3 и БД.
         var originalFileIds = pairs.Select(p => p.FileId).Distinct().ToList();
-        var purged = await PurgeOrphanBlobsAsync(originalFileIds, cancellationToken);
+        var blobs = await PurgeOrphanBlobsAsync(originalFileIds, cancellationToken);
 
         _logger.LogInformation(
             "Окончательно удалено: записей {Entries}, осиротевших блобов из S3 {Orphans}",
-            entryIds.Count, purged);
+            purged.Count, blobs);
 
-        return purged;
+        return new TrashPurgeResult(purged.Count, blobs);
     }
 
     /// <summary>

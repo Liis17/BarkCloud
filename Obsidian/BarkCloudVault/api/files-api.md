@@ -64,9 +64,9 @@ Package: `barkcloud.files`
 | `ListFileActivity(ListFileActivityRequest) → ListFileActivityResponse` | История действий по файлу для «Свойства»: последние события по `file_id`, cursor-пагинация (`cursor_created_at` + `cursor_event_id`), доступ только владельцу blob |
 | `ListTrash(ListTrashRequest) → ListTrashResponse` | Список файлов в корзине (от свежеудалённых); cursor `(cursor_deleted_at + cursor_entry_id)`; `TrashEntry` содержит `entry`, `file`, `deleted_at`, `purge_at` |
 | `GetTrashSummary(GetTrashSummaryRequest) → GetTrashSummaryResponse` | Лёгкая сводка: `total_count` + `oldest_purge_at` (серверный `COUNT` + `MIN(PurgeAt)`). Для бейджей/виджета корзины — «самый истекающий» файл без выгрузки страниц |
-| `RestoreFromTrash(RestoreFromTrashRequest) → CloudEmpty` | Восстановить файл из корзины (в исходную папку либо в корень, если она удалена) |
-| `DeleteFromTrash(DeleteFromTrashRequest) → CloudEmpty` | Удалить файл из корзины навсегда (немедленно: БД + альбомы + осиротевший блоб из S3) |
-| `EmptyTrash(EmptyTrashRequest) → CloudEmpty` | Очистить корзину владельца целиком |
+| `RestoreFromTrash(RestoreFromTrashRequest) → CloudEmpty` | Восстановить файл из корзины (в исходную папку либо в корень, если она удалена). Если запись уже удалена навсегда (воркером или «Удалить навсегда») — `FileEntryNotFound` |
+| `DeleteFromTrash(DeleteFromTrashRequest) → CloudEmpty` | Удалить файл из корзины навсегда (немедленно: БД + альбомы + осиротевший блоб из S3). Если запись параллельно восстановлена — `FileEntryNotFound`, ничего не удаляется |
+| `EmptyTrash(EmptyTrashRequest) → CloudEmpty` | Очистить корзину владельца целиком (записи, параллельно восстановленные, пропускаются) |
 | `AddFavorite(AddFavoriteRequest) → CloudEmpty` | Добавить файл в избранное (по `file_id`; идемпотентно; только файл владельца) |
 | `RemoveFavorite(RemoveFavoriteRequest) → CloudEmpty` | Убрать файл из избранного (идемпотентно) |
 | `ListFavorites(ListFavoritesRequest) → ListFavoritesResponse` | Все избранные файлы владельца от новых к старым; cursor `(cursor_favorited_at + cursor_file_id)`; исключает корзину и осиротевшие ссылки |
