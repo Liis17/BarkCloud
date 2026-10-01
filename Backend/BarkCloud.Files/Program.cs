@@ -7,6 +7,9 @@ using BarkCloud.Files.Services;
 using BarkCloud.GrpcServer;
 using BarkCloud.GrpcServer.Tracker;
 using BarkCloud.GrpcServer.XAuth;
+using BarkCloud.Proto.SessionRevocation;
+using BarkCloud.Shared.Auth;
+using BarkCloud.Shared.Exceptions.Interceptors;
 using BarkCloud.Shared.Identity;
 
 using MassTransit;
@@ -51,6 +54,12 @@ public class Program
         builder.Services.AddGrpcReflection();
 
         builder.Services.AddXAuth(builder.Configuration);
+        builder.Services.AddSingleton<IRevocationFeed, GrpcRevocationFeed>();
+        builder.Services.AddGrpcClient<SessionRevocationApi.SessionRevocationApiClient>(o =>
+            {
+                o.Address = new Uri(builder.Configuration["IdentityService:Host"]!);
+            }).AddInterceptor(() => new JwtClientInterceptor(builder.Configuration["IdentityService:Token"]!))
+            .AddInterceptor(() => new ExceptionClientInterceptor());
         builder.Services.AddRequestContext();
 
         // Регистрируем gRPC клиент для UsersServerApi

@@ -3,9 +3,11 @@ using BarkCloud.GrpcServer.XAuth;
 using BarkCloud.Proto.Configuration;
 using BarkCloud.Proto.Files;
 using BarkCloud.Proto.Identity;
+using BarkCloud.Proto.SessionRevocation;
 using BarkCloud.Proto.Torrent;
 using BarkCloud.Proto.Users;
 using BarkCloud.Shared.Auth;
+using BarkCloud.Shared.Exceptions.Interceptors;
 using BarkCloud.Shared.Identity;
 using BarkCloud.Web;
 using BarkCloud.Web.Auth;
@@ -107,6 +109,11 @@ builder.Services.Configure<FormOptions>(o => o.MultipartBodyLengthLimit = long.M
 // при регистрации (Users) и загрузка аватара (Files).
 var serviceToken = ServiceToken.Generate(builder.Configuration);
 
+builder.Services.AddGrpcClient<SessionRevocationApi.SessionRevocationApiClient>(o => o.Address = new Uri(identityAddress))
+    .AddInterceptor(() => new JwtClientInterceptor(serviceToken))
+    .AddInterceptor(() => new ExceptionClientInterceptor());
+builder.Services.AddSingleton<IRevocationFeed, GrpcRevocationFeed>();
+
 builder.Services.AddGrpcClient<UsersServerApi.UsersServerApiClient>(o => o.Address = new Uri(usersAddress))
     .AddInterceptor(() => new JwtClientInterceptor(serviceToken));
 builder.Services.AddGrpcClient<FilesServerApi.FilesServerApiClient>(o => o.Address = new Uri(filesAddress))
@@ -133,7 +140,7 @@ builder.Services.AddScoped<PageDataBuilder>();
 // Отзыв сессий (logout, удаление устройства/аккаунта): Identity публикует SessionRevokedEvent,
 // кэш отзыва проверяет AuthGateway. AddXAuth не вызываем — схемы аутентификации в Web нет.
 builder.Services.AddSingleton<TokenRevocationCache>();
-builder.Services.AddHostedService<TokenRevocationCleanupService>();
+builder.Services.AddHostedService<RevocationSyncService>();
 builder.Services.AddMassTransit(x =>
 {
     x.AddConsumer<SessionRevokedConsumer>();

@@ -68,6 +68,7 @@ services:
       - barkcloud-network
     depends_on:
       - cloud-configuration
+      - cloud-identity
 
   cloud-files:
     image: docker.barkfluff.com/barkcloud-files:latest
@@ -86,6 +87,7 @@ services:
       - barkcloud-network
     depends_on:
       - cloud-configuration
+      - cloud-identity
 
   # Сервис уведомлений. Внешнего API нет — в nginx не маршрутизируется. Опционален
   cloud-notification:
@@ -116,6 +118,7 @@ services:
       - barkcloud-network
     depends_on:
       - cloud-configuration
+      - cloud-identity
 
   # Веб-клиент
   cloud-web:

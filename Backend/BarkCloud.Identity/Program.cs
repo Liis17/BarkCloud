@@ -64,7 +64,6 @@ public class Program
 
         builder.Services.AddXAuth(builder.Configuration);
         builder.Services.AddSingleton<IRevocationFeed, DbRevocationFeed>();
-        builder.Services.AddHostedService<RevocationSyncService>();
 
         builder.Services.AddCors(o => o.AddPolicy("IdentityCors", p =>
         {

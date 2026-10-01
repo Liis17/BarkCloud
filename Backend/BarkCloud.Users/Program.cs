@@ -1,6 +1,7 @@
 using BarkCloud.GrpcServer;
 using BarkCloud.GrpcServer.Metrics;
 using BarkCloud.GrpcServer.XAuth;
+using BarkCloud.Proto.SessionRevocation;
 using BarkCloud.Proto.Files;
 using BarkCloud.Shared.Auth;
 using BarkCloud.Shared.Exceptions.Interceptors;
@@ -48,6 +49,12 @@ public class Program
 
         // Регистрируем аутентификацию и авторизацию
         builder.Services.AddXAuth(builder.Configuration);
+        builder.Services.AddSingleton<IRevocationFeed, GrpcRevocationFeed>();
+        builder.Services.AddGrpcClient<SessionRevocationApi.SessionRevocationApiClient>(o =>
+            {
+                o.Address = new Uri(builder.Configuration["IdentityService:Host"]!);
+            }).AddInterceptor(() => new JwtClientInterceptor(builder.Configuration["IdentityService:Token"]!))
+            .AddInterceptor(() => new ExceptionClientInterceptor());
 
         builder.Services.AddGrpcClient<FilesServerApi.FilesServerApiClient>(o =>
             {
