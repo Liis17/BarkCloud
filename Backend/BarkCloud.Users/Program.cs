@@ -6,7 +6,6 @@ using BarkCloud.Proto.Files;
 using BarkCloud.Shared.Auth;
 using BarkCloud.Shared.Exceptions.Interceptors;
 using BarkCloud.Shared.Identity;
-using BarkCloud.Users.Consumers;
 using BarkCloud.Users.Host;
 using BarkCloud.Users.Infrastructure;
 using BarkCloud.Users.Persistence.Contexts;
@@ -64,19 +63,12 @@ public class Program
 
         builder.Services.AddMassTransit(x =>
         {
-            x.AddConsumer<SessionRevokedConsumer>();
-
             x.UsingRabbitMq((context, cfg) =>
             {
                 cfg.Host(builder.Configuration["RabbitMQ:Host"], "/", h =>
                 {
                     h.Username(builder.Configuration["RabbitMQ:Username"]);
                     h.Password(builder.Configuration["RabbitMQ:Password"]);
-                });
-
-                cfg.ReceiveEndpoint("session-revoked-users", e =>
-                {
-                    e.ConfigureConsumer<SessionRevokedConsumer>(context);
                 });
             });
         });
