@@ -1,10 +1,6 @@
 using BarkCloud.GrpcServer.Metrics;
 using BarkCloud.Identity.Persistence.Services;
-using BarkCloud.Identity.Settings;
 using BarkCloud.Shared.Exceptions.Identity;
-using BarkCloud.Shared.Queue.Identity;
-
-using MassTransit;
 
 using MediatR;
 
@@ -31,8 +27,6 @@ namespace BarkCloud.Identity.Features.ConfirmResetPassword
         private readonly IPasswordsStorage _passwordsStorage;
         private readonly IRefreshTokensStorage refreshTokensStorage;
         private readonly IMediator _mediator;
-        private readonly IPublishEndpoint _publishEndpoint;
-        private readonly JwtSettings _jwtSettings;
         private readonly PasswordChangedNotifier _passwordChangedNotifier;
         private readonly RequestContext requestContext;
         private readonly MetricsCollector _metrics;
@@ -43,7 +37,7 @@ namespace BarkCloud.Identity.Features.ConfirmResetPassword
 
         public ConfirmResetPasswordCommandHandler(IResetPasswordsStorage resetPasswordsStorage, IAuthPropertiesStorage authPropertiesStorage,
             IPasswordsStorage passwordsStorage, IRefreshTokensStorage refreshTokensStorage, IMediator mediator,
-            IPublishEndpoint publishEndpoint, JwtSettings jwtSettings, PasswordChangedNotifier passwordChangedNotifier,
+            PasswordChangedNotifier passwordChangedNotifier,
             RequestContext requestContext, MetricsCollector metrics, ILogger<ConfirmResetPasswordCommandHandler> logger)
         {
             _resetPasswordsStorage = resetPasswordsStorage;
@@ -51,8 +45,6 @@ namespace BarkCloud.Identity.Features.ConfirmResetPassword
             _passwordsStorage = passwordsStorage;
             this.refreshTokensStorage = refreshTokensStorage;
             _mediator = mediator;
-            _publishEndpoint = publishEndpoint;
-            _jwtSettings = jwtSettings;
             _passwordChangedNotifier = passwordChangedNotifier;
             this.requestContext = requestContext;
             _metrics = metrics;
@@ -197,19 +189,7 @@ namespace BarkCloud.Identity.Features.ConfirmResetPassword
             {
                 _logger.LogDebug("Отзыв прежних сессий пользователя {UserId}", resetPasswordInfo.UserId);
 
-                var revokedDeviceIds = await refreshTokensStorage.DeleteAllByUserId(resetPasswordInfo.UserId);
-
-                // Для текущего устройства событие не публикуем: оно придёт асинхронно и отозвало бы
-                // только что выданный токен (iat <= RevokedAt), как при повторном входе в SessionIssuer.
-                foreach (var revokedDeviceId in revokedDeviceIds.Where(x => x != deviceId))
-                {
-                    await _publishEndpoint.Publish(new SessionRevokedEvent
-                    {
-                        UserId = resetPasswordInfo.UserId,
-                        DeviceId = revokedDeviceId,
-                        AccessTokenExpiresAt = DateTime.UtcNow.AddMinutes(_jwtSettings.ExpiryMinutes)
-                    }, cancellationToken);
-                }
+                await refreshTokensStorage.RevokeAllSessions(resetPasswordInfo.UserId, deviceId, cancellationToken);
 
                 _metrics.Increment("sessions_revoked");
             }

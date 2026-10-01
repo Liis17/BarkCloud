@@ -1,12 +1,8 @@
 using BarkCloud.GrpcServer.Metrics;
 using BarkCloud.GrpcServer.XAuth;
 using BarkCloud.Identity.Persistence.Services;
-using BarkCloud.Identity.Settings;
 using BarkCloud.Proto.Identity;
 using BarkCloud.Proto.Users;
-using BarkCloud.Shared.Queue.Identity;
-
-using MassTransit;
 
 using MediatR;
 
@@ -16,8 +12,6 @@ public class LogoutCommandHandler(
     IRefreshTokensStorage refreshTokensStorage,
     UserContext userContext,
     UsersServerApi.UsersServerApiClient usersClient,
-    IPublishEndpoint publishEndpoint,
-    JwtSettings jwtSettings,
     MetricsCollector metrics,
     ILogger<LogoutCommandHandler> logger) : IRequestHandler<LogoutCommand, LogoutResponse>
 {
@@ -30,14 +24,7 @@ public class LogoutCommandHandler(
             "Разлогин пользователя {UserId} с устройства {DeviceId}",
             userId, deviceId);
 
-        await refreshTokensStorage.DeleteRefreshTokensByDeviceIdSafe(deviceId!, userId);
-
-        await publishEndpoint.Publish(new SessionRevokedEvent
-        {
-            UserId = userId,
-            DeviceId = deviceId!,
-            AccessTokenExpiresAt = DateTime.UtcNow.AddMinutes(jwtSettings.ExpiryMinutes)
-        }, cancellationToken);
+        await refreshTokensStorage.RevokeSessionSafe(deviceId!, userId, cancellationToken);
 
         try
         {

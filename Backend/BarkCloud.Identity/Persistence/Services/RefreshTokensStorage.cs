@@ -41,22 +41,6 @@ public class RefreshTokensStorage(IdentityContext context, JwtSettings jwtSettin
         return await context.RefreshTokens.Where(x => x.UserId == userId).ToListAsync();
     }
 
-    public async Task DeleteRefreshTokensByDeviceId(string deviceId, long userId)
-    {
-        var refreshTokens = await context.RefreshTokens
-            .Where(x => x.DeviceId == deviceId && x.UserId == userId)
-            .ToListAsync();
-
-        if (refreshTokens.Count == 0)
-        {
-            throw new RefreshTokenNotFoundException();
-        }
-
-        context.RefreshTokens.RemoveRange(refreshTokens);
-
-        await context.SaveChangesAsync();
-    }
-
     /// <summary>
     /// Удаляет все refresh токены для устройства. Не выбрасывает исключение если токенов нет.
     /// Используется при логине для очистки старых токенов перед созданием нового.
@@ -72,27 +56,6 @@ public class RefreshTokensStorage(IdentityContext context, JwtSettings jwtSettin
             context.RefreshTokens.RemoveRange(refreshTokens);
             await context.SaveChangesAsync();
         }
-    }
-
-    /// <summary>
-    /// Удаляет все refresh-токены пользователя (при удалении аккаунта).
-    /// Возвращает список уникальных DeviceId для последующего отзыва access-токенов.
-    /// </summary>
-    public async Task<List<string>> DeleteAllByUserId(long userId)
-    {
-        var refreshTokens = await context.RefreshTokens
-            .Where(x => x.UserId == userId)
-            .ToListAsync();
-
-        var deviceIds = refreshTokens.Select(x => x.DeviceId).Distinct().ToList();
-
-        if (refreshTokens.Count > 0)
-        {
-            context.RefreshTokens.RemoveRange(refreshTokens);
-            await context.SaveChangesAsync();
-        }
-
-        return deviceIds;
     }
 
     public Task RevokeSession(string deviceId, long userId, CancellationToken cancellationToken = default)

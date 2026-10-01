@@ -1,7 +1,5 @@
 using BarkCloud.GrpcServer.Metrics;
 using BarkCloud.Identity.Persistence.Services;
-using BarkCloud.Identity.Settings;
-using BarkCloud.Shared.Queue.Identity;
 using BarkCloud.Shared.Queue.Users;
 
 using MassTransit;
@@ -18,8 +16,6 @@ public class UserDeletedConsumer(
     IAuthPropertiesStorage authPropertiesStorage,
     IResetPasswordsStorage resetPasswordsStorage,
     IConfirmationCodesStorage confirmationCodesStorage,
-    IPublishEndpoint publishEndpoint,
-    JwtSettings jwtSettings,
     MetricsCollector metrics,
     ILogger<UserDeletedConsumer> logger)
     : IConsumer<UserDeleted>
@@ -34,17 +30,7 @@ public class UserDeletedConsumer(
         logger.LogInformation("Получено событие удаления аккаунта: UserId={UserId}", userId);
 
         // Удаляем refresh-токены и отзываем access-токены по каждому устройству.
-        var deviceIds = await refreshTokensStorage.DeleteAllByUserId(userId);
-
-        foreach (var deviceId in deviceIds)
-        {
-            await publishEndpoint.Publish(new SessionRevokedEvent
-            {
-                UserId = userId,
-                DeviceId = deviceId,
-                AccessTokenExpiresAt = DateTime.UtcNow.AddMinutes(jwtSettings.ExpiryMinutes)
-            });
-        }
+        var sessionsCount = await refreshTokensStorage.RevokeAllSessions(userId, cancellationToken: context.CancellationToken);
 
         // Удаляем остальные данные пользователя.
         await passwordsStorage.DeleteByUserId(userId);
@@ -56,6 +42,6 @@ public class UserDeletedConsumer(
 
         logger.LogInformation(
             "Данные Identity для пользователя {UserId} удалены, отозвано сессий: {SessionsCount}",
-            userId, deviceIds.Count);
+            userId, sessionsCount);
     }
 }

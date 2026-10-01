@@ -5,11 +5,9 @@ using BarkCloud.Identity.Features.CreateToken;
 using BarkCloud.Identity.Infrastructure;
 using BarkCloud.Identity.Persistence.Services;
 using BarkCloud.Identity.Services;
-using BarkCloud.Identity.Settings;
 using BarkCloud.Proto.Identity;
 using BarkCloud.Proto.Users;
 using BarkCloud.Shared.Exceptions.Identity;
-using BarkCloud.Shared.Queue.Identity;
 using BarkCloud.Shared.Queue.Notifications;
 
 using MassTransit;
@@ -33,9 +31,7 @@ public class ConfirmResetPasswordCommandHandlerTests
     private readonly Mock<IPasswordsStorage> _passwords = new();
     private readonly Mock<IRefreshTokensStorage> _refreshTokens = new();
     private readonly Mock<IMediator> _mediator = new();
-    private readonly Mock<IPublishEndpoint> _publish = new();
     private readonly Mock<PasswordChangedNotifier> _notifier;
-    private readonly JwtSettings _jwt = new() { SecretKey = "k", Issuer = "i", Audience = "a", ExpiryMinutes = 15 };
     private readonly MetricsCollector _metrics = new();
     private readonly ILogger<ConfirmResetPasswordCommandHandler> _logger = NullLogger<ConfirmResetPasswordCommandHandler>.Instance;
 
@@ -50,7 +46,7 @@ public class ConfirmResetPasswordCommandHandlerTests
             NullLogger<PasswordChangedNotifier>.Instance);
         _notifier.Setup(n => n.NotifyAsync(It.IsAny<long>())).Returns(Task.CompletedTask);
 
-        _refreshTokens.Setup(s => s.DeleteAllByUserId(42)).ReturnsAsync(new List<string>());
+        _refreshTokens.Setup(s => s.RevokeAllSessions(42, "device-1", default)).ReturnsAsync(0);
         _resets.Setup(s => s.TryApprove(It.IsAny<Guid>())).ReturnsAsync(true);
         _mediator
             .Setup(m => m.Send(It.IsAny<CreateTokenCommand>(), It.IsAny<CancellationToken>()))
@@ -59,7 +55,7 @@ public class ConfirmResetPasswordCommandHandlerTests
 
     private ConfirmResetPasswordCommandHandler CreateSut(RequestContext? ctx = null) => new(
         _resets.Object, _authProps.Object, _passwords.Object, _refreshTokens.Object,
-        _mediator.Object, _publish.Object, _jwt, _notifier.Object, ctx ?? FullContext(), _metrics, _logger);
+        _mediator.Object, _notifier.Object, ctx ?? FullContext(), _metrics, _logger);
 
     private static DomainResetPassword ValidEmailReset(Guid id) => new()
     {
@@ -218,7 +214,7 @@ public class ConfirmResetPasswordCommandHandlerTests
         await act.Should().ThrowAsync<NewPasswordSameAsOldException>();
         _resets.Verify(s => s.TryApprove(It.IsAny<Guid>()), Times.Never);
         _passwords.Verify(s => s.UpdateUserPasswordHash(It.IsAny<long>(), It.IsAny<string>()), Times.Never);
-        _refreshTokens.Verify(s => s.DeleteAllByUserId(It.IsAny<long>()), Times.Never);
+        _refreshTokens.Verify(s => s.RevokeAllSessions(It.IsAny<long>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -233,7 +229,7 @@ public class ConfirmResetPasswordCommandHandlerTests
 
         await act.Should().ThrowAsync<ResetIdHasIsApprovedException>();
         _passwords.Verify(s => s.UpdateUserPasswordHash(It.IsAny<long>(), It.IsAny<string>()), Times.Never);
-        _refreshTokens.Verify(s => s.DeleteAllByUserId(It.IsAny<long>()), Times.Never);
+        _refreshTokens.Verify(s => s.RevokeAllSessions(It.IsAny<long>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
         _refreshTokens.Verify(s => s.CreateNewRefreshToken(It.IsAny<string>(), It.IsAny<long>(), It.IsAny<string>(), It.IsAny<int>()), Times.Never);
     }
 
@@ -243,9 +239,9 @@ public class ConfirmResetPasswordCommandHandlerTests
         var id = Guid.NewGuid();
         var calls = new List<string>();
         _resets.Setup(s => s.GetResetPassword(id)).ReturnsAsync(ValidEmailReset(id));
-        _refreshTokens.Setup(s => s.DeleteAllByUserId(42))
+        _refreshTokens.Setup(s => s.RevokeAllSessions(42, "device-1", default))
             .Callback(() => calls.Add("revoke"))
-            .ReturnsAsync(new List<string> { "device-1", "device-2", "device-3" });
+            .ReturnsAsync(2);
         _passwords.Setup(s => s.UpdateUserPasswordHash(42, It.IsAny<string>()))
             .Callback(() => calls.Add("set-hash"))
             .ReturnsAsync(false);
@@ -254,15 +250,7 @@ public class ConfirmResetPasswordCommandHandlerTests
             new ConfirmResetPasswordCommand { ResetId = id, OtpCode = "123456", NewPassword = "newp" }, default);
 
         calls.Should().Equal("revoke", "set-hash");
-        _publish.Verify(p => p.Publish(
-            It.Is<SessionRevokedEvent>(e => e.UserId == 42 && e.DeviceId == "device-2"),
-            It.IsAny<CancellationToken>()), Times.Once);
-        _publish.Verify(p => p.Publish(
-            It.Is<SessionRevokedEvent>(e => e.UserId == 42 && e.DeviceId == "device-3"),
-            It.IsAny<CancellationToken>()), Times.Once);
-        _publish.Verify(p => p.Publish(
-            It.Is<SessionRevokedEvent>(e => e.DeviceId == "device-1"),
-            It.IsAny<CancellationToken>()), Times.Never);
+        _refreshTokens.Verify(s => s.RevokeAllSessions(42, "device-1", default), Times.Once);
     }
 
     [Fact]
@@ -277,8 +265,7 @@ public class ConfirmResetPasswordCommandHandlerTests
                 ResetId = id, OtpCode = "123456", NewPassword = "newp", RevokeOtherSessions = false
             }, default);
 
-        _refreshTokens.Verify(s => s.DeleteAllByUserId(It.IsAny<long>()), Times.Never);
-        _publish.Verify(p => p.Publish(It.IsAny<SessionRevokedEvent>(), It.IsAny<CancellationToken>()), Times.Never);
+        _refreshTokens.Verify(s => s.RevokeAllSessions(It.IsAny<long>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
         _passwords.Verify(s => s.UpdateUserPasswordHash(42, It.IsAny<string>()), Times.Once);
     }
 
