@@ -35,7 +35,7 @@ Parent: [[index]]
 
 ### XAuth (авторизация)
 - `XAuthExtensions.cs` — DI/middleware для авторизации
-- `UserContext.cs` — текущий пользователь (claims + device)
+- `UserContext.cs` — текущий пользователь (claims + device + `IssuedAt` из клейма `iat`, `MinValue` если нет); `IssuedAt` нужен долгим стримам для повторной проверки отзыва (`TorrentApiService.StreamProgress`)
 - `TokenRevocationCache.cs` — in-memory кэш отозванных сессий по ключу `{userId}:{deviceId}`. **Учитывает время**: `Revoke` запоминает момент отзыва, `IsRevoked(userId, deviceId, tokenIssuedAt)` считает токен отозванным только если его `iat` ≤ момента отзыва. Поэтому повторный логин с тем же устройством (новый токен с iat > отзыва) валиден сразу, а не ждёт 60 мин. `OnTokenValidated` (`XAuthExtensions.cs`) берёт `iat` из `JsonWebToken`/`JwtSecurityToken` (fail-safe `MinValue` → «отозван»).
 - `TokenRevocationCleanupService.cs` — фоновая очистка записей по `ExpiresAt` (когда старые токены устройства уже истекли)
 
