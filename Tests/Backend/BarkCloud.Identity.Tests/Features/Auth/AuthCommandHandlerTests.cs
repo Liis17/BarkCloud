@@ -22,6 +22,8 @@ namespace BarkCloud.Identity.Tests.Features.Auth;
 
 public class AuthCommandHandlerTests
 {
+    private static readonly string PasswordHash = BCrypt.Net.BCrypt.HashPassword("p");
+
     private readonly Mock<UsersServerApi.UsersServerApiClient> _usersClient = new();
     private readonly Mock<IMediator> _mediator = new();
     private readonly Mock<IAuthPropertiesStorage> _authProps = new();
@@ -143,10 +145,129 @@ public class AuthCommandHandlerTests
         _authProps
             .Setup(s => s.GetUserAuthProperties(1))
             .ReturnsAsync(new AuthUserProperty { UserId = 1, OtpEnabled = true });
+        _passwords.Setup(s => s.GetUserPasswordHash(1)).ReturnsAsync(PasswordHash);
 
         var act = () => CreateSut().Handle(new AuthCommand { Username = "u", Password = "p" }, default);
 
         await act.Should().ThrowAsync<OtpCodeNeedException>();
+    }
+
+    [Fact]
+    public async Task Handle_TotpEnabledNoCodeWrongPassword_ThrowsInvalidLoginNotOtpCodeNeed()
+    {
+        SetupUser(1, new AuthUserProperty { UserId = 1, OtpEnabled = true });
+
+        var act = () => CreateSut().Handle(new AuthCommand { Username = "u", Password = "wrong" }, default);
+
+        await act.Should().ThrowAsync<InvalidLoginOrPasswordException>();
+        _authProps.Verify(s => s.GetUserAuthProperties(It.IsAny<long>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_EmailOtpNoCodeWrongPassword_DoesNotIssueOrSendCode()
+    {
+        SetupUser(1, new AuthUserProperty { UserId = 1, EmailOtpEnabled = true });
+
+        var act = () => CreateSut().Handle(new AuthCommand { Username = "u", Password = "wrong" }, default);
+
+        await act.Should().ThrowAsync<InvalidLoginOrPasswordException>();
+        _authProps.Verify(
+            s => s.TryIssueEmailAuthCode(It.IsAny<long>(), It.IsAny<EmailAuthCodePurpose>(), It.IsAny<string>()),
+            Times.Never);
+        _notifications.Verify(
+            n => n.SendNotification(It.Is<EmailNotification>(e => e.Type == NotificationType.ConfirmationAuth)),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_EmailOtpNoCode_IssuesLoginCodeSendsEmailAndThrowsOtpCodeNeed()
+    {
+        SetupUser(1, new AuthUserProperty { UserId = 1, EmailOtpEnabled = true });
+        _authProps
+            .Setup(s => s.TryIssueEmailAuthCode(1, EmailAuthCodePurpose.Login, It.IsAny<string>()))
+            .ReturnsAsync(true);
+
+        var act = () => CreateSut().Handle(new AuthCommand { Username = "u", Password = "p" }, default);
+
+        await act.Should().ThrowAsync<OtpCodeNeedException>();
+        _authProps.Verify(s => s.TryIssueEmailAuthCode(1, EmailAuthCodePurpose.Login, It.IsAny<string>()), Times.Once);
+        _notifications.Verify(
+            n => n.SendNotification(It.Is<EmailNotification>(e => e.Type == NotificationType.ConfirmationAuth)),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_EmailOtpNoCodeResendCooldown_DoesNotSendEmailButThrowsOtpCodeNeed()
+    {
+        SetupUser(1, new AuthUserProperty { UserId = 1, EmailOtpEnabled = true });
+        _authProps
+            .Setup(s => s.TryIssueEmailAuthCode(1, EmailAuthCodePurpose.Login, It.IsAny<string>()))
+            .ReturnsAsync(false);
+
+        var act = () => CreateSut().Handle(new AuthCommand { Username = "u", Password = "p" }, default);
+
+        await act.Should().ThrowAsync<OtpCodeNeedException>();
+        _notifications.Verify(n => n.SendNotification(It.IsAny<Notification>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_EmailOtpInvalidCode_ThrowsNotValidOtpAndDoesNotIssueTokens()
+    {
+        SetupUser(1, new AuthUserProperty { UserId = 1, EmailOtpEnabled = true });
+        _authProps
+            .Setup(s => s.TryConsumeEmailAuthCode(1, EmailAuthCodePurpose.Login, "123456"))
+            .ReturnsAsync(false);
+
+        var act = () => CreateSut().Handle(
+            new AuthCommand { Username = "u", Password = "p", OtpCode = "123456" }, default);
+
+        await act.Should().ThrowAsync<NotValidOtpCodeException>();
+        _refreshTokens.Verify(
+            s => s.CreateNewRefreshToken(It.IsAny<string>(), It.IsAny<long>(), It.IsAny<string>(), It.IsAny<int>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_EmailOtpValidCode_ConsumesCodeAndIssuesTokens()
+    {
+        SetupUser(1, new AuthUserProperty { UserId = 1, EmailOtpEnabled = true });
+        _authProps
+            .Setup(s => s.TryConsumeEmailAuthCode(1, EmailAuthCodePurpose.Login, "123456"))
+            .ReturnsAsync(true);
+
+        var response = await CreateSut().Handle(
+            new AuthCommand { Username = "u", Password = "p", OtpCode = "123456" }, default);
+
+        response.AccessToken.Value.Should().Be("access");
+        _authProps.Verify(s => s.TryConsumeEmailAuthCode(1, EmailAuthCodePurpose.Login, "123456"), Times.Once);
+        _refreshTokens.Verify(
+            s => s.CreateNewRefreshToken(It.IsAny<string>(), 1, "device-1", It.IsAny<int>()),
+            Times.Once);
+    }
+
+    /// <summary>Пользователь с паролем "p" и всем необходимым для успешного входа.</summary>
+    private void SetupUser(long id, AuthUserProperty? props)
+    {
+        _usersClient
+            .Setup(c => c.FindByLoginAsync(It.IsAny<FindByLoginRequest>(), null, null, default))
+            .Returns(GrpcCallHelpers.AsyncUnary(new FindByLoginResponse { User = new User { Id = id, Username = "u" } }));
+        _usersClient
+            .Setup(c => c.GetUserContactsAsync(It.IsAny<GetUserContactsRequest>(), null, null, default))
+            .Returns(GrpcCallHelpers.AsyncUnary(new GetUserContactsResponse
+            {
+                User = new User { Id = id, Username = "u" },
+                Contact = new UserContact { Email = "u@e" }
+            }));
+        _usersClient
+            .Setup(c => c.RegisterDeviceAsync(It.IsAny<RegisterDeviceRequest>(), null, null, default))
+            .Returns(GrpcCallHelpers.AsyncUnary(new RegisterDeviceResponse()));
+
+        _authProps.Setup(s => s.GetUserAuthProperties(id)).ReturnsAsync(props);
+        _passwords.Setup(s => s.GetUserPasswordHash(id)).ReturnsAsync(PasswordHash);
+
+        _mediator
+            .Setup(m => m.Send(It.IsAny<CreateTokenCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CreateTokenResponse { AccessToken = new Token { Value = "access" } });
     }
 
     [Fact]

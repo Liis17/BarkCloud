@@ -148,42 +148,48 @@ public class EnableOtpVerificationCommandHandler : IRequestHandler<EnableOtpVeri
 
             _logger.LogDebug("Генерация кода подтверждения для Email 2FA");
 
-            await _authPropertiesStorage.UpdateLastEmailAuthCode(userContactInfo.User.Id, code);
+            var issued = await _authPropertiesStorage.TryIssueEmailAuthCode(
+                userContactInfo.User.Id, Domain.EmailAuthCodePurpose.EnableEmailOtp, code);
 
             await _authPropertiesStorage.UpdateOptType(Domain.OtpType.Email, userContactInfo.User.Id);
 
-            var locationInfo = await _locationClient.GetLocationString(_requestContext.IpAddress);
-
-            var emailNotification = new EmailNotification()
+            // issued == false — прежний код выдан совсем недавно и остаётся в силе: письмо не отправляем.
+            if (issued)
             {
-                OwnerId = userInfo.User.Id,
-                Address = userContactInfo.Contact.Email,
-                CreatedAt = DateTime.UtcNow,
-                Payload = new Dictionary<string, string>()
+                var locationInfo = await _locationClient.GetLocationString(_requestContext.IpAddress);
+
+                var emailNotification = new EmailNotification()
                 {
-                    {"username", userInfo.User.Username},
-                    {"confirmation_code", code},
-                    {"ip", _requestContext.IpAddress ?? string.Empty},
-                    {"devicename", _requestContext.DeviceName},
-                    {"os", _requestContext.OperationSystem},
-                    {"location", locationInfo},
-                    {"appname", $"{_requestContext.AppName} v.{_requestContext.AppVersion}"},
-                    {"datetime", DateTime.UtcNow.ToString("dd.MM.yyyy HH:mm:ss")}
-                },
-                ServiceId = ServiceId.Identity,
-                Title = "Код подтверждения для привязки",
-                Type = NotificationType.ConfirmationOtpEmail
-            };
+                    OwnerId = userInfo.User.Id,
+                    Address = userContactInfo.Contact.Email,
+                    CreatedAt = DateTime.UtcNow,
+                    Payload = new Dictionary<string, string>()
+                    {
+                        {"username", userInfo.User.Username},
+                        {"confirmation_code", code},
+                        {"ip", _requestContext.IpAddress ?? string.Empty},
+                        {"devicename", _requestContext.DeviceName},
+                        {"os", _requestContext.OperationSystem},
+                        {"location", locationInfo},
+                        {"appname", $"{_requestContext.AppName} v.{_requestContext.AppVersion}"},
+                        {"datetime", DateTime.UtcNow.ToString("dd.MM.yyyy HH:mm:ss")}
+                    },
+                    ServiceId = ServiceId.Identity,
+                    Title = "Код подтверждения для привязки",
+                    Type = NotificationType.ConfirmationOtpEmail
+                };
 
-            _logger.LogDebug(
-                "Отправка кода подтверждения на адрес {Email}",
-                userContactInfo.Contact.Email
-            );
+                _logger.LogDebug(
+                    "Отправка кода подтверждения на адрес {Email}",
+                    userContactInfo.Contact.Email
+                );
 
-            await _notificationQueueSender.SendNotification(emailNotification);
+                await _notificationQueueSender.SendNotification(emailNotification);
+
+                _metrics.Increment("otp_email_codes_sent");
+            }
 
             _metrics.Increment("otp_setup_email");
-            _metrics.Increment("otp_email_codes_sent");
 
             _logger.LogInformation(
                 "Email 2FA успешно настроен для пользователя {UserId}. Старый метод: {OldMethod}",

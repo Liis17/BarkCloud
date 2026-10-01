@@ -30,6 +30,18 @@ namespace BarkCloud.Identity.Persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
+                    b.Property<int>("EmailAuthCodeAttempts")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("EmailAuthCodeExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("EmailAuthCodeIssuedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("EmailAuthCodePurpose")
+                        .HasColumnType("integer");
+
                     b.Property<bool>("EmailOtpEnabled")
                         .HasColumnType("boolean");
 

@@ -10,7 +10,7 @@ Package: `barkcloud.identity`
 
 | RPC | Реализовано? | Назначение |
 |-----|--------------|-----------|
-| `Auth(AuthRequest) → AuthResponse` | ✅ | Авторизация login + password |
+| `Auth(AuthRequest) → AuthResponse` | ✅ | Авторизация login + password. Пароль проверяется **первым**; при включённой 2FA без `otp_code` → `OtpCodeNeedException` (email-2FA: письмо с кодом уходит только после верного пароля). Email-код: 5 мин, 5 попыток, одноразовый; повторная отправка не чаще раза в 60 с (внутри окна письмо не шлётся, ответ тот же `OtpCodeNeed`). Просроченный/использованный код → `NotValidOtpCodeException`; чтобы получить новый — повторить `Auth` без `otp_code`. См. [[modules/backend-identity]] |
 | `FastAuth(FastAuthRequest) → AuthResponse` | ❌ | Объявлен в proto, **нет handler-а** в `Features/` |
 | `CreateToken(CreateTokenRequest) → CreateTokenResponse` | ✅ | Обновить access по refresh |
 | `CreateAccount(CreateAccountRequest) → CreateAccountResponse` | ✅ | Регистрация |

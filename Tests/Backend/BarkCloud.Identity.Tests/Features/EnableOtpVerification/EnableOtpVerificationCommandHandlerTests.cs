@@ -123,15 +123,43 @@ public class EnableOtpVerificationCommandHandlerTests
                 Contact = new UserContact { Email = "u@e" }
             }));
         _authProps.Setup(s => s.GetUserAuthProperties(42)).ReturnsAsync((AuthUserProperty?)null);
+        _authProps
+            .Setup(s => s.TryIssueEmailAuthCode(42, EmailAuthCodePurpose.EnableEmailOtp, It.IsAny<string>()))
+            .ReturnsAsync(true);
 
         var response = await CreateSut().Handle(
             new EnableOtpVerificationCommand { OptType = OtpTypeId.Email }, default);
 
         response.OtpQr.Should().BeEmpty();
-        _authProps.Verify(s => s.UpdateLastEmailAuthCode(42, It.IsAny<string>()), Times.Once);
+        _authProps.Verify(s => s.TryIssueEmailAuthCode(42, EmailAuthCodePurpose.EnableEmailOtp, It.IsAny<string>()), Times.Once);
         _authProps.Verify(s => s.UpdateOptType(OtpType.Email, 42), Times.Once);
         _notifications.Verify(n => n.SendNotification(It.Is<EmailNotification>(
             e => e.Type == NotificationType.ConfirmationOtpEmail)), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_EmailType_ResendCooldown_DoesNotSendNotification()
+    {
+        _usersClient
+            .Setup(c => c.GetByIdAsync(It.IsAny<GetByIdRequest>(), null, null, default))
+            .Returns(GrpcCallHelpers.AsyncUnary(new GetByIdResponse { User = new User { Id = 42, Username = "u" } }));
+        _usersClient
+            .Setup(c => c.GetUserContactsAsync(It.IsAny<GetUserContactsRequest>(), null, null, default))
+            .Returns(GrpcCallHelpers.AsyncUnary(new GetUserContactsResponse
+            {
+                User = new User { Id = 42, Username = "u" },
+                Contact = new UserContact { Email = "u@e" }
+            }));
+        _authProps.Setup(s => s.GetUserAuthProperties(42)).ReturnsAsync((AuthUserProperty?)null);
+        _authProps
+            .Setup(s => s.TryIssueEmailAuthCode(42, EmailAuthCodePurpose.EnableEmailOtp, It.IsAny<string>()))
+            .ReturnsAsync(false);
+
+        var response = await CreateSut().Handle(
+            new EnableOtpVerificationCommand { OptType = OtpTypeId.Email }, default);
+
+        response.OtpQr.Should().BeEmpty();
+        _notifications.Verify(n => n.SendNotification(It.IsAny<Notification>()), Times.Never);
     }
 
     [Fact]
@@ -161,6 +189,8 @@ public class EnableOtpVerificationCommandHandlerTests
 
         response.OtpQr.Should().BeEmpty();
         _authProps.Verify(s => s.AddUserOtpSecretKey(It.IsAny<long>(), It.IsAny<string>()), Times.Never);
-        _authProps.Verify(s => s.UpdateLastEmailAuthCode(It.IsAny<long>(), It.IsAny<string>()), Times.Never);
+        _authProps.Verify(
+            s => s.TryIssueEmailAuthCode(It.IsAny<long>(), It.IsAny<EmailAuthCodePurpose>(), It.IsAny<string>()),
+            Times.Never);
     }
 }

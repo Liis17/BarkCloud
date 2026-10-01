@@ -122,13 +122,16 @@ public class ConfirmOtpVerificationCommandHandlerTests
         _authProps.Setup(s => s.GetUserAuthProperties(42)).ReturnsAsync(new AuthUserProperty
         {
             UserId = 42,
-            SelectedOtpType = OtpType.Email,
-            LastEmailAuthCode = "111111"
+            SelectedOtpType = OtpType.Email
         });
+        _authProps
+            .Setup(s => s.TryConsumeEmailAuthCode(42, EmailAuthCodePurpose.EnableEmailOtp, "999999"))
+            .ReturnsAsync(false);
 
         var act = () => CreateSut().Handle(new ConfirmOtpVerificationCommand { OtpCode = "999999" }, default);
 
         await act.Should().ThrowAsync<NotValidOtpCodeException>();
+        _authProps.Verify(s => s.EnableEmailOtp(It.IsAny<long>()), Times.Never);
     }
 
     [Fact]
@@ -137,9 +140,11 @@ public class ConfirmOtpVerificationCommandHandlerTests
         _authProps.Setup(s => s.GetUserAuthProperties(42)).ReturnsAsync(new AuthUserProperty
         {
             UserId = 42,
-            SelectedOtpType = OtpType.Email,
-            LastEmailAuthCode = "654321"
+            SelectedOtpType = OtpType.Email
         });
+        _authProps
+            .Setup(s => s.TryConsumeEmailAuthCode(42, EmailAuthCodePurpose.EnableEmailOtp, "654321"))
+            .ReturnsAsync(true);
 
         await CreateSut().Handle(new ConfirmOtpVerificationCommand { OtpCode = "654321" }, default);
 
