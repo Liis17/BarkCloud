@@ -62,7 +62,7 @@ Parent: [[index]] · Proto: [[modules/shared-proto]] · Backend: [[modules/backe
 `UsersApi.ChangeUsername`
 - Передать: `ChangeUsernameRequest { string username }`
 - Вернётся: `ChangeUsernameResponse { }`
-- Ошибки: `UsernameReserved` (имя зарезервировано). Для проверки занятости — `CheckExistUsername` заранее.
+- Ошибки: `UsernameReserved` (имя зарезервировано), `UsernameExist` (имя занято другим пользователем или черновиком, включая другой регистр и конкурентную запись). Собственное имя и смена только регистра разрешены. `CheckExistUsername` — предварительная подсказка.
 - Когда: смена юзернейма. Публикует `UserChangedUsername`.
 
 ### ChangeBio — сменить описание
@@ -79,6 +79,7 @@ Parent: [[index]] · Proto: [[modules/shared-proto]] · Backend: [[modules/backe
 - Передать: `{ string username }` / `{ string email }`
 - Вернётся: `CheckExistResponse { bool exist }`
 - Когда: валидация на формах регистрации/смены юзернейма до отправки.
+- Черновик по-прежнему возвращает `exist = false`; окончательное решение принимает запись. Повтор регистрации допускается только по тому же email, а не по совпадению одного username.
 
 ---
 

@@ -1,3 +1,4 @@
+using BarkCloud.Shared.Exceptions.Identity;
 using BarkCloud.Users.Domain;
 using BarkCloud.Users.Features.UpdateProfileServer;
 using BarkCloud.Users.Infrastructure;
@@ -67,6 +68,18 @@ public class UpdateProfileServerCommandHandlerTests
         _users.Verify(s => s.ChangeUsername(7, "newname"), Times.Once);
         _queue.Verify(s => s.UsernameChangedEvent(7, "newname"), Times.Once);
         _users.Verify(s => s.ChangeName(It.IsAny<long>(), It.IsAny<string>(), It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_UsernameConflict_DoesNotPublishUsernameChange()
+    {
+        SetupCurrent();
+        _users.Setup(s => s.ChangeUsername(7, "taken")).ThrowsAsync(new UsernameExistException());
+
+        var act = () => CreateSut().Handle(new UpdateProfileServerCommand { UserId = 7, Username = "taken" }, default);
+
+        await act.Should().ThrowAsync<UsernameExistException>();
+        _queue.Verify(s => s.UsernameChangedEvent(It.IsAny<long>(), It.IsAny<string>()), Times.Never);
     }
 
     [Fact]

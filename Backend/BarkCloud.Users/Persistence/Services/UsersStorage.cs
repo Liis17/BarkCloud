@@ -1,8 +1,11 @@
+using BarkCloud.Shared.Exceptions;
 using BarkCloud.Shared.Exceptions.Identity;
 using BarkCloud.Users.Domain;
 using BarkCloud.Users.Persistence.Contexts;
 
 using Microsoft.EntityFrameworkCore;
+
+using Npgsql;
 
 namespace BarkCloud.Users.Persistence.Services;
 
@@ -64,7 +67,16 @@ public class UsersStorage : IUsersStorage
 
         await _usersContext.Users.AddAsync(user);
 
-        await _usersContext.SaveChangesAsync();
+        try
+        {
+            await _usersContext.SaveChangesAsync();
+        }
+        catch (DbUpdateException ex) when (GetLoginConflict(ex) is { } conflict)
+        {
+            _usersContext.Entry(contactUser).State = EntityState.Detached;
+            _usersContext.Entry(user).State = EntityState.Detached;
+            throw conflict;
+        }
 
         return user;
     }
@@ -98,11 +110,37 @@ public class UsersStorage : IUsersStorage
     }
 
 
-    public async Task UpdateTrackedUser(User user)
+    public async Task OverrideDraftUser(long userId, string username, string firstName, string lastName, string email)
     {
-        _usersContext.Users.Update(user);
+        await using var transaction = await _usersContext.Database.BeginTransactionAsync();
+        try
+        {
+            var updated = await _usersContext.Users
+                .Where(u => u.Id == userId && u.IsDraft && u.Contact.Email.ToLower() == email.ToLower())
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(u => u.Username, username)
+                    .SetProperty(u => u.FirstName, firstName)
+                    .SetProperty(u => u.LastName, lastName)
+                    .SetProperty(u => u.ProfilePicture, (string?)null)
+                    .SetProperty(u => u.RegistrationDate, DateTime.UtcNow));
 
-        await _usersContext.SaveChangesAsync();
+            if (updated == 0)
+                throw new EmailExistException();
+
+            await _usersContext.UserContacts.Where(c => c.UserId == userId)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(c => c.Email, email));
+
+            await transaction.CommitAsync();
+        }
+        catch (Exception ex) when (GetLoginConflict(ex) is { } conflict)
+        {
+            throw conflict;
+        }
+
+        foreach (var entry in _usersContext.ChangeTracker.Entries<UserContact>().Where(e => e.Entity.UserId == userId).ToList())
+            entry.State = EntityState.Detached;
+        foreach (var entry in _usersContext.ChangeTracker.Entries<User>().Where(e => e.Entity.Id == userId).ToList())
+            entry.State = EntityState.Detached;
     }
 
     public async Task ChangeName(long userId, string firstName, string lastName)
@@ -128,9 +166,24 @@ public class UsersStorage : IUsersStorage
             throw new UserNotFoundException();
         }
 
+        var owner = await GetUserByUsername(username);
+        if (owner is not null && owner.Id != userId)
+        {
+            throw new UsernameExistException();
+        }
+
+        var previousUsername = user.Username;
         user.Username = username;
 
-        await _usersContext.SaveChangesAsync();
+        try
+        {
+            await _usersContext.SaveChangesAsync();
+        }
+        catch (DbUpdateException ex) when (GetLoginConflict(ex) is { } conflict)
+        {
+            user.Username = previousUsername;
+            throw conflict;
+        }
     }
 
     public async Task ChangeBio(long userId, string? bio)
@@ -225,5 +278,25 @@ public class UsersStorage : IUsersStorage
         user.StorageLimitGb = limitGb;
 
         await _usersContext.SaveChangesAsync();
+    }
+
+    private static BaseGrpcException? GetLoginConflict(Exception exception)
+    {
+        var postgresException = exception switch
+        {
+            PostgresException postgres => postgres,
+            DbUpdateException { InnerException: PostgresException postgres } => postgres,
+            _ => null,
+        };
+
+        if (postgresException?.SqlState != PostgresErrorCodes.UniqueViolation)
+            return null;
+
+        return postgresException.ConstraintName switch
+        {
+            "UX_Users_Username_Lower" => new UsernameExistException(),
+            "UX_UserContacts_Email_Lower" => new EmailExistException(),
+            _ => null,
+        };
     }
 }

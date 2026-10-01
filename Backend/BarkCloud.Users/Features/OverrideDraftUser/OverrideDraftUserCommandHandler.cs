@@ -30,33 +30,30 @@ public class OverrideDraftUserCommandHandler : IRequestHandler<OverrideDraftUser
             email
         );
 
-        var user = await _usersStorage.GetUserByEmail(email)
-                   ?? await _usersStorage.GetUserByUsername(username);
+        var user = await _usersStorage.GetUserByEmail(email);
 
         if (user == null)
         {
             _logger.LogWarning(
-                "Пользователь не найден по Email {Email} или Username {Username}",
-                email,
-                username
+                "Черновик пользователя не найден по Email {Email}",
+                email
             );
             throw new UserNotFoundException();
         }
+
+        if (!user.IsDraft)
+            throw new EmailExistException();
+
+        var owner = await _usersStorage.GetUserByUsername(username);
+        if (owner is not null && owner.Id != user.Id)
+            throw new UsernameExistException();
 
         _logger.LogDebug(
             "Обновление данных черновика пользователя {UserId}",
             user.Id
         );
 
-        user.FirstName = firstName;
-        user.LastName = lastName;
-        user.Contact.Email = email;
-        user.Username = username;
-        user.ProfilePicture = null;
-        user.RegistrationDate = DateTime.UtcNow;
-        user.IsDraft = true;
-
-        await _usersStorage.UpdateTrackedUser(user);
+        await _usersStorage.OverrideDraftUser(user.Id, username, firstName, lastName, email);
 
         _logger.LogInformation(
             "Черновик пользователя {UserId} ({Username}) успешно перезаписан",
