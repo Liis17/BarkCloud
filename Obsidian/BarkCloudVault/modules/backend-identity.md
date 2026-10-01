@@ -139,7 +139,9 @@ Parent: [[index]] · See also: [[api/identity-api]] · [[modules/shared-identity
 - `DisableOtpVerification(Email)` — `password`; метрика `otp_disable_failed`. `Disable(Authenticator)` — по-прежнему только TOTP (`otp_code`).
 - `EnableOtpVerification(Email)` — без изменений (код уходит владельцу на почту; его challenge — см. F07).
 
-Новая ошибка `InvalidPasswordException` («Неверный пароль») — в отличие от `InvalidOldPasswordException` (смена пароля) не говорит про «старый». Миграция `AddPendingOtpSecret` — две nullable-колонки в `AuthUserProperties`. Не охвачено: лимит попыток подбора пароля/OTP (F14), отзыв остальных сессий при смене 2FA.
+Новая ошибка `InvalidPasswordException` («Неверный пароль») — в отличие от `InvalidOldPasswordException` (смена пароля) не говорит про «старый».
+
+**Лимит попыток пароля.** Проверка пароля — в `ReauthPasswordVerifier` (`Services/`, scoped; используют `Enable` и `Disable`): пустой пароль → `InvalidPasswordException` без расхода попытки; затем `IAuthPropertiesStorage.TryReserveReauthPasswordAttempt` **до** проверки хеша — один условный `ExecuteUpdate` (окно **15 мин**, **5 попыток**; окно открывается первой попыткой, `ReauthPasswordAttempts` / `ReauthPasswordWindowEndsAt` в `AuthUserProperty`), поэтому параллельный перебор не превысит лимит; нет строки `AuthUserProperty` — создаётся сразу с первой попыткой. Лимит исчерпан → `PasswordAttemptsExceededException` («Слишком много неверных попыток ввода пароля. Повторите позже») даже при верном пароле; верный пароль → `ResetReauthPasswordAttempts`. Метрика остаётся прежней (`otp_setup_failed_invalid_password` / `otp_disable_failed`). Побочный эффект: владелец сессии может на 15 мин заблокировать себе только эти операции (вход не затрагивается). Миграции: `AddPendingOtpSecret` (2 nullable-колонки), `AddReauthPasswordAttempts` (`int` + nullable `timestamptz`). Не охвачено: лимит попыток входа/старого пароля в `SetPassword`/`Auth` и перебор OTP (F14) — подбор пароля через них остаётся возможным; отзыв остальных сессий при смене 2FA.
 
 ## Запрет регистрации (Features:RegistrationEnabled)
 

@@ -16,7 +16,7 @@ Package: `barkcloud.identity`
 | `CreateAccount(CreateAccountRequest) → CreateAccountResponse` | ✅ | Регистрация |
 | `ConfirmAccount(ConfirmAccountRequest) → ConfirmAccountResponse` | ✅ | Подтвердить аккаунт |
 | `GetActiveSessions` / `RemoveActiveSession` | ✅ | Сессии |
-| `EnableOtpVerification` / `ConfirmOtpVerification` / `DisableOtpVerification` / `ListOtpVerification` | ✅ | Управление 2FA. `Enable(Authenticator)` требует `password` (+ `current_otp_code`, если Authenticator уже включён) и сохраняет секрет как **ожидающий** (10 мин) — действующий не меняется до `Confirm` с кодом нового секрета. `Disable(Email)` требует `password`; `Disable(Authenticator)` — `otp_code`. Неверный пароль → `InvalidPasswordException`. См. [[modules/backend-identity]] |
+| `EnableOtpVerification` / `ConfirmOtpVerification` / `DisableOtpVerification` / `ListOtpVerification` | ✅ | Управление 2FA. `Enable(Authenticator)` требует `password` (+ `current_otp_code`, если Authenticator уже включён) и сохраняет секрет как **ожидающий** (10 мин) — действующий не меняется до `Confirm` с кодом нового секрета. `Disable(Email)` требует `password`; `Disable(Authenticator)` — `otp_code`. Неверный пароль → `InvalidPasswordException`; не более 5 попыток пароля за 15 мин, дальше `PasswordAttemptsExceededException` (даже при верном пароле). См. [[modules/backend-identity]] |
 | `ResetPassword` / `ConfirmResetPassword` / `SetPassword` | ✅ | Пароль. `ConfirmResetPassword(reset_id, otp_code, new_password, optional revoke_other_sessions)` — **одним вызовом** проверяет код, ставит новый пароль и (по умолчанию) завершает остальные сессии, возвращает токены; отдельный `SetPassword` после сброса не нужен. Новый пароль не может совпадать с текущим (и в `SetPassword`, и в сбросе). См. [[modules/backend-identity]] |
 | `Logout(LogoutRequest) → LogoutResponse` | ✅ | Завершить сессию (триггерит `SessionRevokedEvent`) |
 | `BeginWebAuthnRegistration` / `CompleteWebAuthnRegistration` | ✅ | Привязка ключа безопасности (под токеном) |
@@ -34,7 +34,7 @@ Package: `barkcloud.identity`
 
 ## Типизированные ошибки
 
-См. `Shared/BarkCloud.Shared.Exceptions/Identity/` ([[modules/shared-exceptions]]) — 26 исключений, в т.ч. `InvalidLoginOrPasswordException`, `InvalidOldPasswordException`, `InvalidPasswordException`, `NewPasswordSameAsOldException`, `NewPasswordRequiredException`, `InvalidRefreshTokenException`, `OtpCodeNeedException`, `EmailExistException`, `UsernameReservedException`, `XAppInfoIsRequiedException`, `XDeviceNameIsRequiredException`, `XOsNameIsRequiredException`, а также WebAuthn: `NoWebAuthnCredentialsException`, `WebAuthnChallengeExpiredException`, `WebAuthnVerificationFailedException`.
+См. `Shared/BarkCloud.Shared.Exceptions/Identity/` ([[modules/shared-exceptions]]) — 27 исключений, в т.ч. `InvalidLoginOrPasswordException`, `InvalidOldPasswordException`, `InvalidPasswordException`, `PasswordAttemptsExceededException`, `NewPasswordSameAsOldException`, `NewPasswordRequiredException`, `InvalidRefreshTokenException`, `OtpCodeNeedException`, `EmailExistException`, `UsernameReservedException`, `XAppInfoIsRequiedException`, `XDeviceNameIsRequiredException`, `XOsNameIsRequiredException`, а также WebAuthn: `NoWebAuthnCredentialsException`, `WebAuthnChallengeExpiredException`, `WebAuthnVerificationFailedException`.
 
 ## Связанные потоки
 
