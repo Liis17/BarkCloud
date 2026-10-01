@@ -18,6 +18,7 @@ Parent: [[index]] · See also: [[api/identity-api]] · [[modules/shared-identity
 - `ConfirmationCode.cs`, `ConfirmationCodeType.cs`
 - `OtpType.cs`
 - `RefreshToken.cs`
+- `RevokedSession.cs` — долговечный отзыв по времени и срок жизни записи ([[modules/session-revocation]])
 - `ResetPassword.cs`
 - `UserPassword.cs`
 - `WebAuthnCredential.cs` — привязанный ключ FIDO2 (CredentialId, PublicKey, SignatureCounter, AaGuid)
@@ -26,9 +27,11 @@ Parent: [[index]] · See also: [[api/identity-api]] · [[modules/shared-identity
 ### Host (gRPC)
 - `IdentityApiService.cs` — клиентский `IdentityApi`
 - `IdentityServerApiService.cs` — серверный `IdentityServerApi`
+- `SessionRevocationApiService.cs` — feed отзывов для сервисных JWT ([[api/session-revocation-api]])
 
 ### Services
 - `JwtService.cs` — выпуск/валидация JWT
+- `DbRevocationFeed.cs` — читает активные отзывы в отдельном scope; полный снимок и дельта
 - `PasswordHasher.cs` — хеширование паролей
 - `RefreshTokenGenerator.cs` — генерация refresh-токенов
 - `CodeGenerator.cs` — генерация кодов подтверждения
@@ -46,20 +49,19 @@ Parent: [[index]] · See also: [[api/identity-api]] · [[modules/shared-identity
 - `JwtSettings.cs` — issuer, audience, ключ, lifetime
 
 ### Consumers
-- `SessionRevokedConsumer.cs` — наполняет `TokenRevocationCache` по `SessionRevokedEvent`
-- `UserDeletedConsumer.cs` — по `UserDeleted` (из [[modules/backend-users]]) отзывает все сессии (удаляет refresh-токены + публикует `SessionRevokedEvent` по каждому устройству) и удаляет пароль/2FA-свойства/запросы сброса/коды подтверждения
+- `UserDeletedConsumer.cs` — по `UserDeleted` (из [[modules/backend-users]]) отзывает все сессии (удаляет refresh-токены и сохраняет `RevokedSession` в одной транзакции) и удаляет пароль/2FA-свойства/запросы сброса/коды подтверждения
 
 ### Persistence
 - `Contexts/IdentityContext.cs`, `IdentityContextFactory.cs`
 - `Services/AuthPropertiesStorage.cs`
 - `Services/ConfirmationCodesStorage.cs`
 - `Services/PasswordsStorage.cs`
-- `Services/RefreshTokensStorage.cs`
+- `Services/RefreshTokensStorage.cs` — `RevokeSession`, `RevokeSessionSafe`, `RevokeAllSessions`: атомарные refresh-delete + отзыв; очистка истёкших записей ([[modules/session-revocation]])
 - `Services/ResetPasswordsStorage.cs`
 - `Services/WebAuthnStorage.cs` — ключи + challenge'и + user handle
 - `Exceptions/OtpNotCreatedException.cs` (локальный)
 - `Exceptions/RefreshTokenNotFoundException.cs` (локальный)
-- `Migrations/` — 10 миграций:
+- `Migrations/`:
   - `20250408213248_IdentityInitial`
   - `20250503180927_AddConfirmationCodes`
   - `20250508184250_AddOtp`
@@ -70,6 +72,8 @@ Parent: [[index]] · See also: [[api/identity-api]] · [[modules/shared-identity
   - `20260507005955_SecurityHardening`
   - `20260613125810_AddWebAuthn` — таблицы `WebAuthnCredentials`/`WebAuthnChallenges` + `WebAuthnUserHandle`
   - `20261001190754_EmailAuthCodeChallenge` — аддитивно: `EmailAuthCodePurpose`/`IssuedAt`/`ExpiresAt`/`Attempts` в `AuthUserProperties` (F07; `LastEmailAuthCode` не тронут)
+
+  - `20261001194141_AddRevokedSessions` — таблица отзывов и индексы по `RevokedAt`/`ExpiresAt` (F10)
 
 ## Features (реализованные)
 
@@ -112,7 +116,7 @@ Parent: [[index]] · See also: [[api/identity-api]] · [[modules/shared-identity
 1. проверка заголовков, reset (не найден/использован/истёк), OTP;
 2. пустой `new_password` → `NewPasswordRequiredException`; совпадение с текущим хешем → `NewPasswordSameAsOldException` (**до** захвата reset — код можно использовать повторно);
 3. `ResetPasswordsStorage.TryApprove` — атомарный `UPDATE … WHERE IsApproved=false`; `false` → `ResetIdHasIsApprovedException` (параллельные подтверждения: успех один);
-4. при `revoke_other_sessions`: `RefreshTokensStorage.DeleteAllByUserId` + `SessionRevokedEvent` по каждому устройству, **кроме текущего** (событие асинхронное и отозвало бы только что выданный токен: `TokenRevocationCache.IsRevoked` сравнивает `iat <= RevokedAt`);
+4. при `revoke_other_sessions`: `RefreshTokensStorage.RevokeAllSessions(userId, currentDeviceId, ct)` атомарно удаляет все прежние refresh и записывает access-отзывы по устройствам, **кроме текущего** (`iat <= RevokedAt`; новый токен текущего устройства не должен попасть под отзыв);
 5. `UpdateUserPasswordHash`; 6. выдача refresh+access текущему устройству; 7. письмо через `PasswordChangedNotifier` (best-effort).
 
 Хеш пароля при сбросе **не очищается** (`ClearUserPasswordHash` удалён) — окна «пароль пуст, любая сессия ставит свой» нет. Известный остаток: для того же `deviceId` access-токен проживёт до `JwtSettings.ExpiryMinutes`; legacy-аккаунты с ранее очищенным хешем сохраняют «первичную установку» без старого пароля до первой установки пароля.
@@ -166,3 +170,7 @@ Parent: [[index]] · See also: [[api/identity-api]] · [[modules/shared-identity
 - **RP ID** = домен сервера, выводится [[modules/backend-configuration]] из `ExternalEndpoint:Host` Identity (`EXTERNAL_IDENTITY_HOST`); `Origins = https://<домен>`. Конфиг `WebAuthn:RpId/ServerName/Origins`. Требует доменный хост + TLS (не голый IP).
 - Begin/Complete-assertion — **публичные** (без токена, как `Auth`); registration/list/remove — под токеном пользователя.
 - Клиенты: [[modules/backend-web]] (релей + `navigator.credentials`), [[modules/windows-drive]] (`webauthn.dll` через DSInternals, только вход).
+
+## Долговечный отзыв сессий (F10)
+
+Identity — источник истины для отзывов; все реплики загружают снимок до старта Kestrel и обновляют кэш примерно каждые 5 с. `Logout`, удаление сессии, сброс пароля и `UserDeletedConsumer` используют storage без событий отзыва. При сбросе все прежние refresh удаляются, текущее устройство исключается только из access-отзыва. Подробности, ограничения секундного `iat`, изменения lifetime и порядок обновления — [[modules/session-revocation]].

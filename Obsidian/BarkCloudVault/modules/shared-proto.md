@@ -16,6 +16,7 @@ Parent: [[index]]
 |------|-----------|-------------------|
 | `configuration_api.proto` | `ConfigurationApi` (служебный, между сервисами) | [[api/configuration-api]] |
 | `identity_api.proto` | `IdentityApi`, `IdentityServerApi` | [[api/identity-api]] |
+| `session_revocation_api.proto` | `SessionRevocationApi` (служебный feed Identity), генерация Both только в GrpcServer | [[api/session-revocation-api]] |
 | `users_api.proto` | `UsersApi`, `UsersServerApi` | [[api/users-api]] |
 | `files_api.proto` | `FilesApi`, `CloudApi`, `FilesServerApi` | [[api/files-api]] |
 | `shared.proto` | Общие messages, типы и enum'ы, используемые в нескольких сервисах | — |

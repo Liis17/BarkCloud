@@ -85,3 +85,7 @@
 | `MainWindow.xaml(.cs)` | FluentWindow: секции-экспандеры, выбор сертификатов, запись nginx/+certs/ |
 
 См. также [[structure/infrastructure]] (исходный docker-compose и инфраструктура).
+
+## Порядок старта отзывов сессий (F10)
+
+`BackendComposeGenerator.BuildCompose` добавляет `depends_on: cloud-identity` для Users, Files и Torrent, как production compose. Identity не ждёт Users при старте; клиенты блокируют открытие порта до снимка отзывов. См. [[modules/session-revocation]].

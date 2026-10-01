@@ -39,9 +39,6 @@ Parent: [[index]] · See also: [[api/users-api]] · [[modules/shared-queue]]
 ### Infrastructure
 - `UserInfoQueueSender.cs` — публикует события `UserChanged*` в RabbitMQ ([[modules/shared-queue]])
 
-### Consumers
-- `SessionRevokedConsumer.cs`
-
 ### Persistence
 - `Contexts/UsersContext.cs`, `UsersContextFactory.cs`
 - `Services/UsersStorage.cs` (+ `ChangeBio`, `SearchUsers`, `DeleteUser`, `GetOrCreatePrivacy`, `UpdatePrivacy`)
@@ -110,7 +107,7 @@ Parent: [[index]] · See also: [[api/users-api]] · [[modules/shared-queue]]
 
 > `UserDeleted` обрабатывают консьюмеры в [[modules/backend-identity]] (отзыв сессий + удаление пароля/2FA/сбросов/кодов) и [[modules/backend-files]] (открепление блобов из Uploaders + удаление каталогов/записей/альбомов). Физическая очистка осиротевших S3-блобов — отдельная фоновая задача (как и при ручном удалении).
 
-Слушает: `SessionRevokedEvent`.
+Отзыв сессий читает через `GrpcRevocationFeed` из Identity: снимок до старта, poll 5 с. MassTransit остаётся для публикаций Users. См. [[modules/session-revocation]].
 
 ## Зависимости
 
