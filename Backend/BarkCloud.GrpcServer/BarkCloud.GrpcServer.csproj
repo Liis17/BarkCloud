@@ -33,6 +33,7 @@
 
     <ItemGroup>
         <Protobuf Include="..\..\Shared\BarkCloud.Proto\configuration_api.proto" GrpcServices="Client" />
+        <Protobuf Include="..\..\Shared\BarkCloud.Proto\session_revocation_api.proto" GrpcServices="Both" />
     </ItemGroup>
 
 </Project>

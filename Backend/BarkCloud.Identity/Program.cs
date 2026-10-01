@@ -63,6 +63,8 @@ public class Program
         builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssemblyContaining<Program>());
 
         builder.Services.AddXAuth(builder.Configuration);
+        builder.Services.AddSingleton<IRevocationFeed, DbRevocationFeed>();
+        builder.Services.AddHostedService<RevocationSyncService>();
 
         builder.Services.AddCors(o => o.AddPolicy("IdentityCors", p =>
         {
@@ -146,6 +148,7 @@ public class Program
 
         app.MapGrpcService<IdentityApiService>().EnableGrpcWeb();
         app.MapGrpcService<IdentityServerApiService>();
+        app.MapGrpcService<SessionRevocationApiService>();
 
         app.Lifetime.ApplicationStopped.Register(Log.CloseAndFlush);
         app.Run();
