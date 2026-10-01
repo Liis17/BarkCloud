@@ -110,6 +110,8 @@ public static class SettingsCatalog
             restartTargets: ["notification", "identity", "web"]);
 
         AddService(entries, ServiceId.Users,
+            ("IdentityService", "Host", SettingValueKind.Url, false, false),
+            ("IdentityService", "Token", SettingValueKind.Password, true, false),
             ("RunSettings", "Port", SettingValueKind.Integer, false, true),
             ("UsersDb", "", SettingValueKind.Password, true, true),
             ("FilesService", "Host", SettingValueKind.Url, false, false),
@@ -117,6 +119,8 @@ public static class SettingsCatalog
             ("ExternalEndpoint", "Host", SettingValueKind.Url, false, false));
 
         AddService(entries, ServiceId.Files,
+            ("IdentityService", "Host", SettingValueKind.Url, false, false),
+            ("IdentityService", "Token", SettingValueKind.Password, true, false),
             ("RunSettings", "Port", SettingValueKind.Integer, false, true),
             ("RunSettings", "Http1Port", SettingValueKind.Integer, false, true),
             ("FilesDb", "", SettingValueKind.Password, true, true),
@@ -127,6 +131,8 @@ public static class SettingsCatalog
             ("Uploads", "TempDirectory", SettingValueKind.String, false, false));
 
         AddService(entries, ServiceId.Torrent,
+            ("IdentityService", "Host", SettingValueKind.Url, false, false),
+            ("IdentityService", "Token", SettingValueKind.Password, true, false),
             ("RunSettings", "Port", SettingValueKind.Integer, false, true),
             ("RunSettings", "Http1Port", SettingValueKind.Integer, false, true),
             ("TorrentDb", "", SettingValueKind.Password, true, true),

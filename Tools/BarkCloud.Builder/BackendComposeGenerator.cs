@@ -108,6 +108,7 @@ services:
       - barkcloud-network
     depends_on:
       - cloud-configuration
+      - cloud-identity
 
   cloud-files:
     image: {{Img("files")}}
@@ -126,6 +127,7 @@ services:
       - barkcloud-network
     depends_on:
       - cloud-configuration
+      - cloud-identity
 """,
         };
 
@@ -166,6 +168,7 @@ services:
       - barkcloud-network
     depends_on:
       - cloud-configuration
+      - cloud-identity
 """);
         }
 

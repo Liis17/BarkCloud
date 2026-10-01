@@ -1,3 +1,4 @@
+using BarkCloud.Configuration.Domain;
 using BarkCloud.Configuration.Infrastructure;
 using BarkCloud.GrpcServer.Metrics;
 using BarkCloud.Shared.Identity;
@@ -5,6 +6,8 @@ using BarkCloud.Shared.Identity;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
+
+using System.IdentityModel.Tokens.Jwt;
 
 namespace BarkCloud.Configuration.Tests.Infrastructure;
 
@@ -67,6 +70,39 @@ public sealed class ConfigurationDefaultsPopulatorTests : IDisposable
         await populator.PopulateDefaultsAsync();
 
         (await _context.StorageProfiles.CountAsync()).Should().Be(0);
+    }
+
+    [Theory]
+    [InlineData(ServiceId.Users)]
+    [InlineData(ServiceId.Files)]
+    [InlineData(ServiceId.Torrent)]
+    public async Task Startup_ExistingDeployment_GetsIdentityFeedHostAndServiceToken(ServiceId serviceId)
+    {
+        var populator = CreatePopulator(minioAccessKey: "", minioSecretKey: "");
+        await populator.EnsureSeedAsync();
+        await populator.PopulateDefaultsAsync();
+        var scope = SettingsScopes.Get(serviceId);
+        await _context.Settings(scope)
+            .Where(x => x.Key == "IdentityService:Host" || x.Key == "IdentityService:Token").ExecuteDeleteAsync();
+        _context.ChangeTracker.Clear();
+
+        await populator.EnsureSeedAsync();
+        await populator.PopulateDefaultsAsync();
+
+        var storage = new ConfigurationStorage(_context, new MetricsCollector());
+        var settings = await storage.GetAllAsync();
+        var host = settings.Single(x => x.ServiceId == serviceId && x.Section == "IdentityService" && x.Key == "Host").Value;
+        new Uri(host).Host.Should().Be("cloud-identity");
+        var token = settings.Single(x => x.ServiceId == serviceId && x.Section == "IdentityService" && x.Key == "Token").Value;
+        new JwtSecurityTokenHandler().ReadJwtToken(token).Claims
+            .Should().Contain(x => x.Type == IdentityClaims.TokenType && x.Value == nameof(TokenType.Service));
+        var original = token;
+
+        await populator.EnsureSeedAsync();
+        await populator.PopulateDefaultsAsync();
+
+        (await storage.GetAllAsync()).Single(x => x.ServiceId == serviceId && x.Section == "IdentityService" && x.Key == "Token")
+            .Value.Should().Be(original);
     }
 
     private ConfigurationDefaultsPopulator CreatePopulator(string minioAccessKey, string minioSecretKey) => new(

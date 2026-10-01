@@ -17,7 +17,7 @@ public static class XAuthExtensions
     public static IServiceCollection AddXAuth(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddSingleton<TokenRevocationCache>();
-        services.AddHostedService<TokenRevocationCleanupService>();
+        services.AddHostedService<RevocationSyncService>();
 
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddJwtBearer(cfg =>
