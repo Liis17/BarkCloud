@@ -35,11 +35,11 @@ public class EmptyTrashCommandHandler : IRequestHandler<EmptyTrashCommand, Cloud
         var ownerId = _userContext.UserId;
 
         var entries = await _storage.GetAllTrashedEntries(ownerId, cancellationToken);
-        var blobs = await _purge.PurgeEntriesAsync(entries, cancellationToken);
+        var result = await _purge.PurgeEntriesAsync(entries, cancellationToken);
 
         _logger.LogInformation(
             "Корзина владельца {OwnerId} очищена: записей {Entries}, блобов из S3 {Blobs}",
-            ownerId, entries.Count, blobs);
+            ownerId, result.Entries, result.Blobs);
 
         return new CloudEmpty();
     }

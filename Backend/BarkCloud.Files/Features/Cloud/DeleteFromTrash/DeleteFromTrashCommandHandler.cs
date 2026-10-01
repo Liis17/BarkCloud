@@ -45,7 +45,10 @@ public class DeleteFromTrashCommandHandler : IRequestHandler<DeleteFromTrashComm
         if (entry.OwnerId != ownerId)
             throw new CloudAccessDeniedException();
 
-        await _purge.PurgeEntriesAsync(new[] { entry }, cancellationToken);
+        // Запись могли восстановить после выборки — тогда purge её не тронет.
+        var result = await _purge.PurgeEntriesAsync(new[] { entry }, cancellationToken);
+        if (result.Entries == 0)
+            throw new FileEntryNotFoundException();
 
         _logger.LogInformation("Запись {EntryId} (Owner: {OwnerId}) удалена из корзины навсегда", entry.Id, ownerId);
 

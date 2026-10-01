@@ -64,10 +64,13 @@ public class TrashCleanupService : BackgroundService
             if (batch.Count == 0)
                 break;
 
-            totalBlobs += await purge.PurgeEntriesAsync(batch, stoppingToken);
-            totalEntries += batch.Count;
+            var result = await purge.PurgeExpiredEntriesAsync(batch, now, stoppingToken);
+            totalBlobs += result.Blobs;
+            totalEntries += result.Entries;
 
-            if (batch.Count < BatchSize)
+            // Ничего не удалено (всю пачку параллельно восстановили) — не крутимся на том же
+            // наборе, следующий тик подберёт остальное.
+            if (batch.Count < BatchSize || result.Entries == 0)
                 break;
         }
 

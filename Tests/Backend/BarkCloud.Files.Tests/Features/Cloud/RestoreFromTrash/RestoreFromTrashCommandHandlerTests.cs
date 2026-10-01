@@ -4,6 +4,7 @@ using BarkCloud.Files.Persistence;
 using BarkCloud.Files.Tests._Helpers;
 using BarkCloud.Shared.Exceptions.Files;
 
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 
 using DomainFileEntry = BarkCloud.Files.Domain.CloudFileEntry;
@@ -81,6 +82,27 @@ public class RestoreFromTrashCommandHandlerTests
         entry.DirectoryId.Should().Be(CloudHierarchyStorage.RootDirectoryId);
         entry.Name.Should().Be("photo.jpg");
         _storage.Verify(s => s.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_EntryPurgedConcurrently_ThrowsNotFound()
+    {
+        // Окончательное удаление успело раньше: UPDATE затронул 0 строк.
+        var id = Guid.NewGuid();
+        var fileId = Guid.NewGuid();
+        var entry = new DomainFileEntry
+        {
+            Id = id, OwnerId = OwnerId, FileId = fileId,
+            DirectoryId = CloudHierarchyStorage.RootDirectoryId, Name = "photo.jpg", IsDeleted = true
+        };
+        _storage.Setup(s => s.GetTrashedEntry(id, It.IsAny<CancellationToken>())).ReturnsAsync(entry);
+        _storage.Setup(s => s.FileEntryExistsForFile(OwnerId, fileId, It.IsAny<CancellationToken>())).ReturnsAsync(false);
+        _storage.Setup(s => s.FileEntryNameExists(OwnerId, CloudHierarchyStorage.RootDirectoryId, "photo.jpg", It.IsAny<CancellationToken>())).ReturnsAsync(false);
+        _storage.Setup(s => s.SaveChangesAsync(It.IsAny<CancellationToken>())).ThrowsAsync(new DbUpdateConcurrencyException());
+
+        var act = () => CreateSut().Handle(new RestoreFromTrashCommand { EntryId = id }, default);
+
+        await act.Should().ThrowAsync<FileEntryNotFoundException>();
     }
 
     [Fact]

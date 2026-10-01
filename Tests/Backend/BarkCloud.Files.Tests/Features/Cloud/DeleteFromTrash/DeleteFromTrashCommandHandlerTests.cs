@@ -1,3 +1,4 @@
+using BarkCloud.Files.Domain;
 using BarkCloud.Files.Features.Cloud.DeleteFromTrash;
 using BarkCloud.Files.Persistence;
 using BarkCloud.Files.Services;
@@ -51,11 +52,36 @@ public class DeleteFromTrashCommandHandlerTests
         var id = Guid.NewGuid();
         var entry = new DomainFileEntry { Id = id, OwnerId = OwnerId };
         _storage.Setup(s => s.GetTrashedEntry(id, It.IsAny<CancellationToken>())).ReturnsAsync(entry);
+        _purge.Setup(p => p.PurgeEntriesAsync(It.IsAny<IReadOnlyCollection<DomainFileEntry>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new TrashPurgeResult(1, 1));
 
         await CreateSut().Handle(new DeleteFromTrashCommand { EntryId = id }, default);
 
         _purge.Verify(p => p.PurgeEntriesAsync(
             It.Is<IReadOnlyCollection<DomainFileEntry>>(c => c.Single() == entry),
             It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_EntryRestoredConcurrently_ThrowsNotFoundAndWritesNoActivity()
+    {
+        // Между выбором записи и purge её восстановили: purge ничего не удалил.
+        var id = Guid.NewGuid();
+        var entry = new DomainFileEntry { Id = id, OwnerId = OwnerId };
+        _storage.Setup(s => s.GetTrashedEntry(id, It.IsAny<CancellationToken>())).ReturnsAsync(entry);
+        _purge.Setup(p => p.PurgeEntriesAsync(It.IsAny<IReadOnlyCollection<DomainFileEntry>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new TrashPurgeResult(0, 0));
+        var activityStorage = new Mock<IFileActivityStorage>();
+        var sut = new DeleteFromTrashCommandHandler(
+            _storage.Object, _purge.Object,
+            UserContextFactory.Create(OwnerId),
+            NullLogger<DeleteFromTrashCommandHandler>.Instance,
+            new FileActivityWriter(activityStorage.Object, NullLogger<FileActivityWriter>.Instance));
+
+        var act = () => sut.Handle(new DeleteFromTrashCommand { EntryId = id }, default);
+
+        await act.Should().ThrowAsync<FileEntryNotFoundException>();
+        activityStorage.Verify(
+            s => s.AddRange(It.IsAny<IEnumerable<FileActivityEvent>>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 }

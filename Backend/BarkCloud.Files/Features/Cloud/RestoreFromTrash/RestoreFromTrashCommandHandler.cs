@@ -8,6 +8,8 @@ using BarkCloud.Shared.Exceptions.Files;
 
 using MediatR;
 
+using Microsoft.EntityFrameworkCore;
+
 namespace BarkCloud.Files.Features.Cloud.RestoreFromTrash;
 
 /// <summary>
@@ -70,7 +72,15 @@ public class RestoreFromTrashCommandHandler : IRequestHandler<RestoreFromTrashCo
         entry.DirectoryId = targetDirectoryId;
         entry.Name = name;
 
-        await _storage.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _storage.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // Окончательное удаление (воркер или «Удалить навсегда») успело раньше — записи уже нет.
+            throw new FileEntryNotFoundException();
+        }
 
         _logger.LogInformation(
             "Запись {EntryId} (FileId: {FileId}, Owner: {OwnerId}) восстановлена из корзины в директорию {DirectoryId} как {Name}",
