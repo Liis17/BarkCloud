@@ -2,7 +2,7 @@ syntax = "proto3";
 
 option csharp_namespace = "BarkCloud.Proto.SessionRevocation";
 
-package session_revocation;
+package barkcloud.session_revocation;
 
 import "google/protobuf/timestamp.proto";
 
