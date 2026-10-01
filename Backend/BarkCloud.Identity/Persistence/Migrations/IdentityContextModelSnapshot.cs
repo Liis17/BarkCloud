@@ -166,6 +166,36 @@ namespace BarkCloud.Identity.Persistence.Migrations
                     b.ToTable("ResetPasswords");
                 });
 
+            modelBuilder.Entity("BarkCloud.Identity.Domain.RevokedSession", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("DeviceId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("RevokedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExpiresAt");
+
+                    b.HasIndex("RevokedAt");
+
+                    b.ToTable("RevokedSessions");
+                });
+
             modelBuilder.Entity("BarkCloud.Identity.Domain.UserPassword", b =>
                 {
                     b.Property<long>("Id")
