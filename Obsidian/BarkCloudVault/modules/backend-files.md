@@ -181,7 +181,7 @@ Web использует server-owned `UploadSession` и состояния `upl
 
 ## Единый поиск
 
-`SearchApiService` вызывает `UnifiedSearchService` для всех личных разделов поиска. Сервис нормализует Unicode NFKC, пробелы и регистр, классифицирует один файл ровно в одну основную группу (`Фото`/`Видео`/`Музыка`/`Файлы`), ранжирует exact → prefix → substring → trigram-like typo и выдаёт opaque keyset-курсор. `ResolveHit` повторно авторизует deeplink.
+`SearchApiService` вызывает `UnifiedSearchService` для всех личных разделов поиска. Сервис нормализует Unicode NFKC, пробелы и регистр, классифицирует один файл ровно в одну основную группу (`Фото`/`Видео`/`Музыка`/`Файлы`), ранжирует exact → prefix → substring → trigram-like typo и выдаёт opaque keyset-курсор. `ResolveHit` повторно авторизует deeplink и находит хит как по `id`, так и по `file_id` (веб открывает фото/видео/трек по id файла, а `id` хита — id записи облака).
 
 Личные метаданные поиска лежат в `FileSearchAliases` и `FileTags`: ключ включает `OwnerId`, поэтому алиасы и теги не уходят получателю shared-доступа. `ReplaceFileSearchMetadata` атомарно заменяет один алиас (≤120) и до 20 тегов (≤50); `TrashPurgeService` и `UserDeletedConsumer` явно чистят строки. Миграция `20260906150936_AddFileSearchMetadata` включает `pg_trgm` и GIN-индексы для новых таблиц и создаёт trigram-индексы крупных именных таблиц concurrently.
 - Тесно связан с MinIO (см. [[structure/infrastructure]])
