@@ -1,5 +1,7 @@
+using BarkCloud.GrpcServer.XAuth;
 using BarkCloud.Proto.Identity;
 using BarkCloud.Shared.Exceptions.Identity;
+using BarkCloud.Shared.Identity;
 using BarkCloud.TestKit;
 using BarkCloud.Web.Auth;
 
@@ -10,26 +12,73 @@ using Grpc.Core;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.IdentityModel.Tokens;
+
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
 
 namespace BarkCloud.Web.Tests.Auth;
 
 public class AuthGatewayTests
 {
+    private const string Secret = "test-secret-key-at-least-32-bytes-long!!";
+
     private readonly Mock<IdentityApi.IdentityApiClient> _identity = new();
+    private readonly TokenRevocationCache _revocations = new();
 
     private AuthGateway CreateSut()
     {
         var config = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["JwtSettings:SecretKey"] = "test-secret-key-at-least-32-bytes-long!!",
+                ["JwtSettings:SecretKey"] = Secret,
                 ["JwtSettings:Issuer"] = "bark",
                 ["JwtSettings:Audience"] = "bark"
             })
             .Build();
 
-        return new AuthGateway(_identity.Object, config, NullLogger<AuthGateway>.Instance);
+        return new AuthGateway(_identity.Object, _revocations, config, NullLogger<AuthGateway>.Instance);
     }
+
+    // User-JWT как у Identity (HS256, те же клеймы), но с управляемым iat.
+    private static string Jwt(long userId = 42, string deviceId = "d1", DateTime? issuedAt = null)
+    {
+        var now = DateTime.UtcNow;
+        var descriptor = new SecurityTokenDescriptor
+        {
+            Subject = new ClaimsIdentity(new List<Claim>
+            {
+                new(IdentityClaims.UserId, userId.ToString()),
+                new(IdentityClaims.TokenType, TokenType.User.ToString()),
+                new(IdentityClaims.DeviceId, deviceId)
+            }),
+            IssuedAt = issuedAt ?? now.AddMinutes(-10),
+            NotBefore = now.AddMinutes(-10),
+            Expires = now.AddMinutes(50),
+            Issuer = "bark",
+            Audience = "bark",
+            SigningCredentials = new SigningCredentials(
+                new SymmetricSecurityKey(Encoding.ASCII.GetBytes(Secret)), SecurityAlgorithms.HmacSha256)
+        };
+
+        var handler = new JwtSecurityTokenHandler();
+        return handler.WriteToken(handler.CreateToken(descriptor));
+    }
+
+    private static HttpContext HttpWithCookies(string access, string? refresh = null)
+    {
+        var http = new DefaultHttpContext();
+        http.Request.Headers.Cookie = refresh is null
+            ? $"{AuthGateway.AccessCookie}={access}"
+            : $"{AuthGateway.AccessCookie}={access}; {AuthGateway.RefreshCookie}={refresh}";
+        return http;
+    }
+
+    private void VerifyRefreshNotCalled()
+        => _identity.Verify(
+            c => c.CreateTokenAsync(It.IsAny<CreateTokenRequest>(), It.IsAny<Metadata>(), null, default),
+            Times.Never);
 
     private static AuthResponse SuccessResponse() => new()
     {
@@ -93,5 +142,87 @@ public class AuthGatewayTests
         var result = await CreateSut().LoginAsync(http, "user", "pass", otp: null, remember: false);
 
         result.Outcome.Should().Be(LoginOutcome.Error);
+    }
+
+    [Fact]
+    public async Task AuthenticateAsync_ValidToken_ReturnsUser()
+    {
+        var http = HttpWithCookies(Jwt());
+
+        var user = await CreateSut().AuthenticateAsync(http);
+
+        user.Should().NotBeNull();
+        user!.UserId.Should().Be(42);
+        user.DeviceId.Should().Be("d1");
+        VerifyRefreshNotCalled();
+    }
+
+    [Fact]
+    public async Task AuthenticateAsync_RevokedToken_NoRefreshCookie_ReturnsNull()
+    {
+        var http = HttpWithCookies(Jwt());
+        _revocations.Revoke(42, "d1", DateTime.UtcNow.AddHours(1));
+
+        var user = await CreateSut().AuthenticateAsync(http);
+
+        user.Should().BeNull();
+        VerifyRefreshNotCalled();
+    }
+
+    [Fact]
+    public async Task AuthenticateAsync_RevokedToken_RefreshRejected_ReturnsNull()
+    {
+        var http = HttpWithCookies(Jwt(), refresh: "rt");
+        _revocations.Revoke(42, "d1", DateTime.UtcNow.AddHours(1));
+        _identity.Setup(c => c.CreateTokenAsync(It.IsAny<CreateTokenRequest>(), It.IsAny<Metadata>(), null, default))
+            .Throws(RpcWithErrorCode(null));
+
+        var user = await CreateSut().AuthenticateAsync(http);
+
+        user.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task AuthenticateAsync_RevokedToken_RefreshWorks_ReturnsRefreshedUserAndSetsCookie()
+    {
+        var http = HttpWithCookies(Jwt(), refresh: "rt");
+        _revocations.Revoke(42, "d1", DateTime.UtcNow.AddHours(1));
+
+        // Свежий токен выдан уже после отзыва (новый iat)
+        var fresh = Jwt(issuedAt: DateTime.UtcNow.AddMinutes(1));
+        _identity.Setup(c => c.CreateTokenAsync(It.IsAny<CreateTokenRequest>(), It.IsAny<Metadata>(), null, default))
+            .Returns(GrpcCallHelpers.AsyncUnary(new CreateTokenResponse
+            {
+                AccessToken = new Token { Value = fresh, ExpirationDate = Timestamp.FromDateTime(DateTime.UtcNow.AddHours(1)) }
+            }));
+
+        var user = await CreateSut().AuthenticateAsync(http);
+
+        user.Should().NotBeNull();
+        user!.AccessToken.Should().Be(fresh);
+        http.Response.Headers.SetCookie.ToString().Should().Contain(AuthGateway.AccessCookie);
+    }
+
+    [Fact]
+    public async Task AuthenticateAsync_TokenIssuedAfterRevocation_ReturnsUser()
+    {
+        _revocations.Revoke(42, "d1", DateTime.UtcNow.AddHours(1));
+        var http = HttpWithCookies(Jwt(issuedAt: DateTime.UtcNow.AddMinutes(1)));
+
+        var user = await CreateSut().AuthenticateAsync(http);
+
+        user.Should().NotBeNull();
+        VerifyRefreshNotCalled();
+    }
+
+    [Fact]
+    public async Task AuthenticateAsync_OtherDeviceRevoked_ReturnsUser()
+    {
+        _revocations.Revoke(42, "d2", DateTime.UtcNow.AddHours(1));
+        var http = HttpWithCookies(Jwt(deviceId: "d1"));
+
+        var user = await CreateSut().AuthenticateAsync(http);
+
+        user.Should().NotBeNull();
     }
 }

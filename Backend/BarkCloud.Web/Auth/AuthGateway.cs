@@ -2,6 +2,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 
+using BarkCloud.GrpcServer.XAuth;
 using BarkCloud.Proto.Identity;
 using BarkCloud.Shared.Identity;
 using BarkCloud.Web.Infrastructure;
@@ -30,15 +31,21 @@ public sealed class AuthGateway
     private const string ErrInvalidLogin = "21BFB9B5-C377-45D1-9B15-6B7F3432B397";
 
     private readonly IdentityApi.IdentityApiClient _identity;
+    private readonly TokenRevocationCache _revocations;
     private readonly ILogger<AuthGateway> _logger;
     private readonly TokenValidationParameters? _validation;
     private readonly bool _cookieSecure;
     private readonly string _appName;
     private readonly string _appVersion;
 
-    public AuthGateway(IdentityApi.IdentityApiClient identity, IConfiguration configuration, ILogger<AuthGateway> logger)
+    public AuthGateway(
+        IdentityApi.IdentityApiClient identity,
+        TokenRevocationCache revocations,
+        IConfiguration configuration,
+        ILogger<AuthGateway> logger)
     {
         _identity = identity;
+        _revocations = revocations;
         _logger = logger;
         _cookieSecure = configuration.Flag("App:CookieSecure");
         _appName = configuration.Value("App:AppName", "BarkCloud Web");
@@ -66,7 +73,8 @@ public sealed class AuthGateway
         }
     }
 
-    /// <summary>Определяет текущего пользователя по cookie. При истёкшем access-токене пытается обновить его.</summary>
+    /// <summary>Определяет текущего пользователя по cookie. При истёкшем или отозванном access-токене
+    /// пытается обновить его по refresh: refresh хранится в Identity и после logout/удаления сессии удалён.</summary>
     public async Task<WebUser?> AuthenticateAsync(HttpContext http)
     {
         if (_validation is null)
@@ -76,7 +84,8 @@ public sealed class AuthGateway
 
         if (!string.IsNullOrEmpty(access)
             && TryReadUser(access, out var user, out var expired)
-            && !expired)
+            && !expired
+            && !IsRevoked(user!))
         {
             return user;
         }
@@ -215,6 +224,11 @@ public sealed class AuthGateway
         Delete(http, RefreshCookie);
     }
 
+    /// <summary>Сессия токена отозвана после его выдачи. Без DeviceId проверка пропускается — как в XAuth.</summary>
+    private bool IsRevoked(WebUser user)
+        => !string.IsNullOrEmpty(user.DeviceId)
+           && _revocations.IsRevoked(user.UserId, user.DeviceId, user.IssuedAt);
+
     private bool TryReadUser(string token, out WebUser? user, out bool expired)
     {
         user = null;
@@ -224,7 +238,7 @@ public sealed class AuthGateway
 
         try
         {
-            var principal = handler.ValidateToken(token, _validation, out _);
+            var principal = handler.ValidateToken(token, _validation, out var validated);
 
             if (principal.FindFirst(IdentityClaims.TokenType)?.Value != TokenType.User.ToString())
                 return false;
@@ -237,7 +251,9 @@ public sealed class AuthGateway
             {
                 UserId = userId,
                 DeviceId = principal.FindFirst(IdentityClaims.DeviceId)?.Value,
-                AccessToken = token
+                AccessToken = token,
+                // Нет iat — MinValue (fail-safe: при отзыве такой токен считается отозванным)
+                IssuedAt = (validated as JwtSecurityToken)?.IssuedAt ?? DateTime.MinValue
             };
             return true;
         }

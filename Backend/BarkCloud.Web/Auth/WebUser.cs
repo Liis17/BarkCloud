@@ -8,6 +8,9 @@ public sealed class WebUser
     public string? DeviceId { get; init; }
 
     public required string AccessToken { get; init; }
+
+    /// <summary>Момент выдачи access-токена (<c>iat</c>); по нему сверяется момент отзыва сессии.</summary>
+    public DateTime IssuedAt { get; init; }
 }
 
 public enum LoginOutcome

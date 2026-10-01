@@ -1,6 +1,7 @@
 using BarkCloud.Shared.Identity;
 
 using Microsoft.AspNetCore.Http;
+using Microsoft.IdentityModel.JsonWebTokens;
 
 namespace BarkCloud.GrpcServer.XAuth;
 
@@ -11,6 +12,10 @@ public class UserContext
     public TokenType TokenType { get; }
 
     public string? DeviceId { get; }
+
+    /// <summary>Момент выдачи токена (клейм <c>iat</c>). Нет клейма — <see cref="DateTime.MinValue"/>
+    /// (fail-safe: при отзыве сессии такой токен считается отозванным).</summary>
+    public DateTime IssuedAt { get; } = DateTime.MinValue;
 
     public bool IsAuthenticated => UserId != 0 && TokenType != TokenType.Unknown;
 
@@ -28,6 +33,11 @@ public class UserContext
             TokenType = type;
 
             DeviceId = principal.FindFirst(IdentityClaims.DeviceId)?.Value;
+
+            if (long.TryParse(principal.FindFirst(JwtRegisteredClaimNames.Iat)?.Value, out var iat))
+            {
+                IssuedAt = DateTimeOffset.FromUnixTimeSeconds(iat).UtcDateTime;
+            }
         }
     }
 }
