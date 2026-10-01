@@ -46,6 +46,7 @@ public class DisableOtpVerificationCommandHandlerTests
         _location = new Mock<LocationClient>(new HttpClient(), new MetricsCollector(), NullLogger<LocationClient>.Instance);
         _location.Setup(c => c.GetLocation(It.IsAny<string>())).ReturnsAsync((IpLocation?)null);
         _passwords.Setup(p => p.GetUserPasswordHash(42)).ReturnsAsync(PasswordHash);
+        _authProps.Setup(s => s.TryReserveReauthPasswordAttempt(42)).ReturnsAsync(true);
 
         _usersClient
             .Setup(c => c.GetByIdAsync(It.IsAny<GetByIdRequest>(), null, null, default))
@@ -62,7 +63,7 @@ public class DisableOtpVerificationCommandHandlerTests
     private DisableOtpVerificationCommandHandler CreateSut() => new(
         UserContextFactory.Create(42),
         _authProps.Object,
-        _passwords.Object,
+        new ReauthPasswordVerifier(_authProps.Object, _passwords.Object),
         _notifications.Object,
         _location.Object,
         _usersClient.Object,
@@ -176,6 +177,26 @@ public class DisableOtpVerificationCommandHandlerTests
             default);
 
         await act.Should().ThrowAsync<InvalidPasswordException>();
+        _authProps.Verify(s => s.DisableEmailOtp(It.IsAny<long>()), Times.Never);
+        _notifications.Verify(n => n.SendNotification(It.IsAny<Notification>()), Times.Never);
+        _metrics.SnapshotAndReset().Should().ContainKey("otp_disable_failed");
+    }
+
+    [Fact]
+    public async Task Handle_EmailType_AttemptLimitExceeded_ThrowsAndKeepsEmailOtpEvenWithCorrectPassword()
+    {
+        _authProps.Setup(s => s.GetUserAuthProperties(42)).ReturnsAsync(new AuthUserProperty
+        {
+            UserId = 42,
+            EmailOtpEnabled = true
+        });
+        _authProps.Setup(s => s.TryReserveReauthPasswordAttempt(42)).ReturnsAsync(false);
+
+        var act = () => CreateSut().Handle(
+            new DisableOtpVerificationCommand { OptType = OtpTypeId.Email, Password = Password },
+            default);
+
+        await act.Should().ThrowAsync<PasswordAttemptsExceededException>();
         _authProps.Verify(s => s.DisableEmailOtp(It.IsAny<long>()), Times.Never);
         _notifications.Verify(n => n.SendNotification(It.IsAny<Notification>()), Times.Never);
         _metrics.SnapshotAndReset().Should().ContainKey("otp_disable_failed");

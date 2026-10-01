@@ -14,6 +14,8 @@ public class AuthPropertiesStorage : IAuthPropertiesStorage
     private const int EmailAuthCodeMaxAttempts = 5;
     private static readonly TimeSpan EmailAuthCodeLifetime = TimeSpan.FromMinutes(5);
     private static readonly TimeSpan EmailAuthCodeResendCooldown = TimeSpan.FromSeconds(60);
+    private const int ReauthPasswordMaxAttempts = 5;
+    private static readonly TimeSpan ReauthPasswordWindow = TimeSpan.FromMinutes(15);
 
     private readonly IdentityContext _context;
 
@@ -73,6 +75,64 @@ public class AuthPropertiesStorage : IAuthPropertiesStorage
                 .SetProperty(x => x.PendingOtpSecretExpiresAt, (DateTime?)null));
 
         return updated == 1;
+    }
+
+    /// <summary>
+    /// Атомарно занимает одну попытку ввода пароля при повторной аутентификации (до самой проверки пароля —
+    /// параллельный перебор не превысит лимит). Не более <see cref="ReauthPasswordMaxAttempts"/> попыток за окно
+    /// <see cref="ReauthPasswordWindow"/>, которое открывается первой попыткой. Возвращает false, если лимит окна исчерпан.
+    /// </summary>
+    public async Task<bool> TryReserveReauthPasswordAttempt(long userId)
+    {
+        var now = DateTime.UtcNow;
+        DateTime? newWindowEndsAt = now + ReauthPasswordWindow;
+
+        var reserved = await _context.AuthUserProperties
+            .Where(x => x.UserId == userId
+                        && (x.ReauthPasswordWindowEndsAt == null
+                            || x.ReauthPasswordWindowEndsAt <= now
+                            || x.ReauthPasswordAttempts < ReauthPasswordMaxAttempts))
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(x => x.ReauthPasswordAttempts,
+                    x => x.ReauthPasswordWindowEndsAt == null || x.ReauthPasswordWindowEndsAt <= now
+                        ? 1
+                        : x.ReauthPasswordAttempts + 1)
+                .SetProperty(x => x.ReauthPasswordWindowEndsAt,
+                    x => x.ReauthPasswordWindowEndsAt == null || x.ReauthPasswordWindowEndsAt <= now
+                        ? newWindowEndsAt
+                        : x.ReauthPasswordWindowEndsAt));
+
+        if (reserved == 1)
+        {
+            return true;
+        }
+
+        // Строка есть, но лимит окна исчерпан.
+        if (await _context.AuthUserProperties.AnyAsync(x => x.UserId == userId))
+        {
+            return false;
+        }
+
+        // У пользователя ещё нет настроек 2FA: создаём строку сразу с первой занятой попыткой.
+        await _context.AuthUserProperties.AddAsync(new AuthUserProperty
+        {
+            UserId = userId,
+            ReauthPasswordAttempts = 1,
+            ReauthPasswordWindowEndsAt = newWindowEndsAt
+        });
+        await _context.SaveChangesAsync();
+
+        return true;
+    }
+
+    /// <summary>Сбрасывает счётчик попыток после успешной проверки пароля.</summary>
+    public async Task ResetReauthPasswordAttempts(long userId)
+    {
+        await _context.AuthUserProperties
+            .Where(x => x.UserId == userId)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(x => x.ReauthPasswordAttempts, 0)
+                .SetProperty(x => x.ReauthPasswordWindowEndsAt, (DateTime?)null));
     }
 
     public async Task<string?> GetOtpSecretKey(long userId)

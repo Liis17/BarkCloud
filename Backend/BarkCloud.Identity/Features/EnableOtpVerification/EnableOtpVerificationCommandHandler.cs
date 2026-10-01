@@ -28,7 +28,7 @@ public class EnableOtpVerificationCommandHandler : IRequestHandler<EnableOtpVeri
 
     private readonly UserContext _userContext;
     private readonly IAuthPropertiesStorage _authPropertiesStorage;
-    private readonly IPasswordsStorage _passwordsStorage;
+    private readonly ReauthPasswordVerifier _reauthPassword;
     private readonly BarkCloud.Proto.Users.UsersServerApi.UsersServerApiClient _usersClient;
     private readonly NotificationQueueSender _notificationQueueSender;
     private readonly RequestContext _requestContext;
@@ -38,13 +38,13 @@ public class EnableOtpVerificationCommandHandler : IRequestHandler<EnableOtpVeri
     private readonly ILogger<EnableOtpVerificationCommandHandler> _logger;
 
     public EnableOtpVerificationCommandHandler(UserContext userContext, IAuthPropertiesStorage authPropertiesStorage,
-        IPasswordsStorage passwordsStorage, UsersServerApi.UsersServerApiClient usersClient,
+        ReauthPasswordVerifier reauthPassword, UsersServerApi.UsersServerApiClient usersClient,
         NotificationQueueSender notificationQueueSender, RequestContext requestContext, LocationClient locationClient,
         MetricsCollector metrics, IConfiguration configuration, ILogger<EnableOtpVerificationCommandHandler> logger)
     {
         _userContext = userContext;
         _authPropertiesStorage = authPropertiesStorage;
-        _passwordsStorage = passwordsStorage;
+        _reauthPassword = reauthPassword;
         _usersClient = usersClient;
         _notificationQueueSender = notificationQueueSender;
         _requestContext = requestContext;
@@ -95,15 +95,19 @@ public class EnableOtpVerificationCommandHandler : IRequestHandler<EnableOtpVeri
 
             // Повторная аутентификация владельца: пароль всегда, а при замене действующего Authenticator — ещё и его текущий код.
             // Проверки идут до любых записей: отказ не меняет ни активный, ни ожидающий секрет.
-            if (string.IsNullOrEmpty(request.Password) ||
-                !PasswordHasher.VerifyPassword(request.Password, await _passwordsStorage.GetUserPasswordHash(_userContext.UserId)))
+            try
+            {
+                await _reauthPassword.VerifyAsync(_userContext.UserId, request.Password);
+            }
+            catch (Exception ex) when (ex is InvalidPasswordException or PasswordAttemptsExceededException)
             {
                 _metrics.Increment("otp_setup_failed_invalid_password");
                 _logger.LogWarning(
-                    "Неверный пароль при настройке Authenticator 2FA для пользователя {UserId}",
+                    "Повторная аутентификация паролем отклонена ({Reason}) при настройке Authenticator 2FA для пользователя {UserId}",
+                    ex.GetType().Name,
                     _userContext.UserId
                 );
-                throw new InvalidPasswordException();
+                throw;
             }
 
             if (oldOptOptions is { OtpEnabled: true })

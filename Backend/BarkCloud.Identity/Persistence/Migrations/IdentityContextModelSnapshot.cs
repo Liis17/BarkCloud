@@ -60,6 +60,12 @@ namespace BarkCloud.Identity.Persistence.Migrations
                     b.Property<DateTime?>("PendingOtpSecretExpiresAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<int>("ReauthPasswordAttempts")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("ReauthPasswordWindowEndsAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<int>("SelectedOtpType")
                         .HasColumnType("integer");
 
