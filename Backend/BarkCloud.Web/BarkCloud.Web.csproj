@@ -16,6 +16,7 @@
     </PackageReference>
     <PackageReference Include="AWSSDK.Core" Version="4.0.7.4" />
     <PackageReference Include="AWSSDK.S3" Version="4.0.23.5" />
+    <PackageReference Include="MassTransit.RabbitMQ" Version="8.5.2" />
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.18.0" />
   </ItemGroup>
 
@@ -24,6 +25,7 @@
     <ProjectReference Include="..\BarkCloud.GrpcServer\BarkCloud.GrpcServer.csproj" />
     <ProjectReference Include="..\..\Shared\BarkCloud.Shared.Auth\BarkCloud.Shared.Auth.csproj" />
     <ProjectReference Include="..\..\Shared\BarkCloud.Shared.Identity\BarkCloud.Shared.Identity.csproj" />
+    <ProjectReference Include="..\..\Shared\BarkCloud.Shared.Queue\BarkCloud.Shared.Queue.csproj" />
   </ItemGroup>
 
   <ItemGroup>

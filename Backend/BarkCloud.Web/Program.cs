@@ -1,4 +1,5 @@
 using BarkCloud.GrpcServer;
+using BarkCloud.GrpcServer.XAuth;
 using BarkCloud.Proto.Configuration;
 using BarkCloud.Proto.Files;
 using BarkCloud.Proto.Identity;
@@ -11,6 +12,8 @@ using BarkCloud.Web.Auth;
 using BarkCloud.Web.Endpoints;
 using BarkCloud.Web.Infrastructure;
 using BarkCloud.Web.Rendering;
+
+using MassTransit;
 
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Http.Features;
@@ -126,6 +129,29 @@ builder.Services.AddScoped<AuthGateway>();
 builder.Services.AddScoped<RegistrationGateway>();
 builder.Services.AddScoped<PasswordResetGateway>();
 builder.Services.AddScoped<PageDataBuilder>();
+
+// Отзыв сессий (logout, удаление устройства/аккаунта): Identity публикует SessionRevokedEvent,
+// кэш отзыва проверяет AuthGateway. AddXAuth не вызываем — схемы аутентификации в Web нет.
+builder.Services.AddSingleton<TokenRevocationCache>();
+builder.Services.AddHostedService<TokenRevocationCleanupService>();
+builder.Services.AddMassTransit(x =>
+{
+    x.AddConsumer<SessionRevokedConsumer>();
+
+    x.UsingRabbitMq((context, cfg) =>
+    {
+        cfg.Host(builder.Configuration["RabbitMQ:Host"], "/", h =>
+        {
+            h.Username(builder.Configuration["RabbitMQ:Username"]!);
+            h.Password(builder.Configuration["RabbitMQ:Password"]!);
+        });
+
+        cfg.ReceiveEndpoint("session-revoked-web", e =>
+        {
+            e.ConfigureConsumer<SessionRevokedConsumer>(context);
+        });
+    });
+});
 
 var app = builder.Build();
 app.Lifetime.ApplicationStopped.Register(Log.CloseAndFlush);

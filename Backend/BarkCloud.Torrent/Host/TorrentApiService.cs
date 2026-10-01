@@ -20,6 +20,7 @@ namespace BarkCloud.Torrent.Host;
 public class TorrentApiService : TorrentApi.TorrentApiBase
 {
     private readonly UserContext _userContext;
+    private readonly TokenRevocationCache _revocations;
     private readonly ITorrentStore _store;
     private readonly TorrentEngineService _engine;
     private readonly TorrentImportService _import;
@@ -29,6 +30,7 @@ public class TorrentApiService : TorrentApi.TorrentApiBase
 
     public TorrentApiService(
         UserContext userContext,
+        TokenRevocationCache revocations,
         ITorrentStore store,
         TorrentEngineService engine,
         TorrentImportService import,
@@ -37,6 +39,7 @@ public class TorrentApiService : TorrentApi.TorrentApiBase
         MetricsCollector metrics)
     {
         _userContext = userContext;
+        _revocations = revocations;
         _store = store;
         _engine = engine;
         _import = import;
@@ -378,6 +381,14 @@ public class TorrentApiService : TorrentApi.TorrentApiBase
         var userId = UserId;
         while (!context.CancellationToken.IsCancellationRequested)
         {
+            // Аутентификация проверяется только при открытии вызова, поэтому отзыв сессии
+            // (logout, удаление устройства) во время долгого стрима проверяем на каждой итерации.
+            if (_userContext.DeviceId is { Length: > 0 } deviceId
+                && _revocations.IsRevoked(userId, deviceId, _userContext.IssuedAt))
+            {
+                throw new RpcException(new Status(StatusCode.Unauthenticated, "Сессия отозвана"));
+            }
+
             using (var scope = _scopeFactory.CreateScope())
             {
                 var store = scope.ServiceProvider.GetRequiredService<ITorrentStore>();
