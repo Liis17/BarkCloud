@@ -33,7 +33,8 @@ public class FilesServerApiService : FilesServerApi.FilesServerApiBase
     {
         var command = new GetFileDataCommand()
         {
-            FileId = Guid.Parse(request.FileId)
+            FileId = Guid.Parse(request.FileId),
+            UserId = request.UserId
         };
 
         return _mediator.Send(command);
@@ -43,7 +44,8 @@ public class FilesServerApiService : FilesServerApi.FilesServerApiBase
     {
         var command = new GetFilesDataCommand()
         {
-            FileIds = request.FileIds.Select(Guid.Parse).ToList()
+            FileIds = request.FileIds.Select(Guid.Parse).ToList(),
+            UserId = request.UserId
         };
 
         return _mediator.Send(command);

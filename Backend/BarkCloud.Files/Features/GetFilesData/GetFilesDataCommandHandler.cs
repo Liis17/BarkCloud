@@ -7,6 +7,8 @@ using BarkCloud.Proto.Files;
 
 using MediatR;
 
+using UploadFileType = BarkCloud.Files.Domain.UploadFileType;
+
 namespace BarkCloud.Files.Features.GetFilesData;
 
 public class GetFilesDataCommandHandler : IRequestHandler<GetFilesDataCommand, GetFilesDataResponse>
@@ -35,6 +37,19 @@ public class GetFilesDataCommandHandler : IRequestHandler<GetFilesDataCommand, G
         var files = (await _uploadedFilesStorage.GetFiles(request.FileIds))
             .Where(x => x.IsReady())
             .ToList();
+
+        // Аватары публичны; остальное — только владельцу. Любой недоступный файл — отказ на весь запрос.
+        var foreignCount = files.Count(f => f.Type != UploadFileType.UserAvatar && !f.Uploaders.Contains(request.UserId));
+        if (foreignCount > 0)
+        {
+            _logger.LogWarning(
+                "Пользователь {UserId} запросил данные {ForeignCount} недоступных файлов из {RequestedCount}",
+                request.UserId,
+                foreignCount,
+                request.FileIds.Count()
+            );
+            throw new BarkCloud.Shared.Exceptions.Files.CloudAccessDeniedException();
+        }
 
         _logger.LogInformation(
             "Получены данные для {FoundCount} файлов из {RequestedCount} запрошенных",

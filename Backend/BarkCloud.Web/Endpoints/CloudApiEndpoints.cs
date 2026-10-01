@@ -24,6 +24,9 @@ public static class CloudApiEndpoints
     // дефолтный энкодер экранирует < > & — безопасно; имена свойств уже в нужном регистре
     private static readonly JsonSerializerOptions Json = new();
 
+    // x-error-code из трейлеров gRPC (см. CloudAccessDeniedException в Shared.Exceptions)
+    private const string ErrCloudAccessDenied = "D4F1E2A8-9C5B-4A77-83BB-5E6F7A8B9C01";
+
     public static void MapCloudApiEndpoints(this WebApplication app)
     {
         var api = app.MapGroup("/api");
@@ -1427,7 +1430,7 @@ public static class CloudApiEndpoints
 
             try
             {
-                var resp = await filesServer.GetFileDataAsync(new GetFileDataRequest { FileId = id });
+                var resp = await filesServer.GetFileDataAsync(new GetFileDataRequest { FileId = id, UserId = user.UserId });
                 var f = resp.FileInfo;
                 if (f is null || string.IsNullOrEmpty(f.Id))
                     return Results.Json(new { error = "Файл не найден" }, Json, statusCode: 404);
@@ -1493,6 +1496,11 @@ public static class CloudApiEndpoints
             catch (RpcException ex) when (ex.StatusCode == StatusCode.NotFound)
             {
                 return Results.Json(new { error = "Файл не найден" }, Json, statusCode: 404);
+            }
+            catch (RpcException ex) when (ex.StatusCode == StatusCode.FailedPrecondition
+                                          && ex.Trailers.GetValue("x-error-code") == ErrCloudAccessDenied)
+            {
+                return Results.Json(new { error = "Нет доступа" }, Json, statusCode: 403);
             }
             catch (RpcException ex)
             {
