@@ -438,3 +438,4 @@ FodyWeavers.xsd
 /Mac/BarkCloudKit/.build
 /Mac/BarkCloudDrive/build
 .claude/scheduled_tasks.lock
+*.profraw
