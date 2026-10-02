@@ -19,6 +19,6 @@ Identity регистрирует `Host/SessionRevocationApiService.cs`. Дос�
 
 `RevokedSession` содержит `int64 user_id`, `string device_id`, `Timestamp revoked_at`, `Timestamp expires_at`. Повторные записи устройства допустимы: потребитель сохраняет максимальные время отзыва и срок жизни, используя [[modules/session-revocation]].
 
-Сервер использует `DbRevocationFeed` с отдельным scope/IdentityContext. `GrpcRevocationFeed` передаёт cancellation token и deadline 10 с, переводит protobuf в `RevocationBatch`. Poll — 5 с, курсор последнего успеха минус 1 мин. После сбоя курсор не двигается.
+Сервер использует `DbRevocationFeed` с отдельным scope/IdentityContext. `GrpcRevocationFeed` передаёт cancellation token и deadline 10 с, переводит protobuf в `RevocationBatch`. Poll — 5 с, курсор последнего успеха минус 1 мин. После сбоя курсор не двигается. Раз в минуту вместо incremental-запроса клиент запрашивает полный снимок (без `changed_since`): он подбирает отзывы, закоммиченные позже overlap. Неудачная полная сверка повторяется на следующем опросе.
 
 Пагинации нет. Клиент хранит снимок в памяти, а перед открытием сетевого порта обязательно загружает его заново из Identity.
