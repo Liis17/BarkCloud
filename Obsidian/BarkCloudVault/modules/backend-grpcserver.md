@@ -43,6 +43,10 @@ Parent: [[index]]
 - `IRevocationFeed.cs` — `RevocationBatch`/`SessionRevocation` и общий интерфейс источника.
 - `GrpcRevocationFeed.cs` — service-only клиент Identity, deadline 10 с; серверный контракт генерируется здесь единожды ([[api/session-revocation-api]]). Identity использует DB-feed.
 
+## Генерация protobuf
+
+Единственное место генерации контрактов `configuration_api.proto` и `session_revocation_api.proto` — этот проект, оба с `GrpcServices="Both"`. Сервисы, которые ссылаются на GrpcServer, свои копии не генерируют: Configuration реализует `ConfigurationApi.ConfigurationApiBase` из GrpcServer (как Identity — `SessionRevocationApiBase`), поэтому одноимённые CLR-типы не дублируются в связанных сборках и `CS0436` не возникает (аудит Q01). Новый контракт, который нужен нескольким связанным сборкам, генерировать здесь же, а не повторно в потребителе.
+
 ## Что подключает каждый сервис
 
 Типовой `Program.cs` микросервиса:
