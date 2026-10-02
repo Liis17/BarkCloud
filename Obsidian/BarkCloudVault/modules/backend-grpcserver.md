@@ -32,6 +32,7 @@ Parent: [[index]]
 ### Tracker (request context)
 - `IRequestContextAccessor.cs`, `RequestContext.cs` — контекст текущего запроса (аналог HttpContextAccessor)
 - `RequestContextInterceptor.cs` — gRPC-интерсептор, наполняющий `RequestContext` из метаданных запроса
+- `SourceIpResolver.cs` — доверенный адрес источника для лимитов попыток (`RequestContext.SourceIp`, F14): валидный `X-Real-IP`, иначе адрес соединения; IPv4-mapped → IPv4, IPv6 → /64. Клиентские `x-ip-address` и `X-Forwarded-For` не используются (они остаются в `IpAddress` для писем и логов)
 
 ### XAuth (авторизация)
 - `XAuthExtensions.cs` — DI/middleware для авторизации

@@ -42,6 +42,21 @@ Production compose не публикует порты сервисов на host
 
 Legacy-загрузка `/web/upload/` на порту Files (7025) вынесена в отдельный `location` с лимитами (F12): `limit_conn upload_conn 16` на IP клиента (зона `limit_conn_zone` в верхнем уровне конфига, ответ 429), `client_max_body_size 11g` (потолок `Uploads:Legacy:MaxFileBytes` = 10 GiB + запас; менять вместе с настройкой Files) и `client_body_timeout 60s` — это пауза между двумя чтениями тела, а не общий лимит. Тот же блок есть в шаблоне `Tools/BarkCloud.Builder/BackendComposeGenerator.cs`. Остальные `/web/` (download) сохраняют таймаут 7200 с.
 
+### Адрес клиента и лимиты попыток (F14)
+
+Лимиты попыток Identity и Web считаются по доверенному адресу источника — заголовку `X-Real-IP`, который nginx **перезаписывает** значением `$remote_addr` (`grpc_set_header`/`proxy_set_header` с одним именем заменяют присланный клиентом). `X-Forwarded-For` не используется: `$proxy_add_x_forwarded_for` дописывает адрес к значению клиента, а первый элемент он контролирует; метаданные `x-ip-address` клиент тоже ставит сам. Условия модели доверия:
+
+- Identity (и Web) недоступны снаружи в обход nginx — в compose они не публикуют портов; публиковать их нельзя, иначе `X-Real-IP` подделывается.
+- Web вызывает Identity напрямую по docker-сети и сам передаёт адрес браузера метаданными `x-real-ip`.
+- **Если перед nginx стоит ещё один прокси/CDN (Cloudflare и т.п.)**, `$remote_addr` будет адресом этого прокси, и IP-лимиты станут общими для всех его клиентов. Тогда в `http`-контексте nginx нужно восстановить настоящий адрес — только для диапазонов вашего прокси:
+
+```nginx
+set_real_ip_from 173.245.48.0/20;   # диапазоны CDN (пример для Cloudflare — взять актуальный список у провайдера)
+real_ip_header   CF-Connecting-IP;  # для Cloudflare; для другого прокси — его заголовок или X-Forwarded-For + real_ip_recursive on
+```
+
+Конфиг репозитория (`cloud.barkfluff.conf`, шаблон `BackendComposeGenerator`) этого не содержит: выбор зависит от развёртывания. Лимиты Identity/Web работают и без nginx-слоя (`limit_req` не добавлялся); лимиты аккаунта, `reset_id` и кода от адреса не зависят.
+
 Web-vhost на 443 отдельно направляет `/file-upload/` прямо в HTTP/1 Files upstream `cloud-files:7026` с `proxy_request_buffering off` и `proxy_buffering off`. Это data plane [[modules/upload-2]]: raw parts не проходят через `cloud-web` и не буферизуются nginx. Остальные browser routes остаются на `cloud-web:8080`. Vite dev-server зеркалирует маршрут на `localhost:7026`.
 
 ## Инфраструктурные контейнеры
