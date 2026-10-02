@@ -10,5 +10,5 @@ public interface IRefreshTokensStorage
     Task DeleteRefreshTokensByDeviceIdSafe(string deviceId, long userId);
     Task RevokeSession(string deviceId, long userId, CancellationToken cancellationToken = default);
     Task RevokeSessionSafe(string deviceId, long userId, CancellationToken cancellationToken = default);
-    Task<int> RevokeAllSessions(long userId, string? exceptDeviceId = null, CancellationToken cancellationToken = default);
+    Task<int> RevokeAllSessions(long userId, string? currentDeviceId = null, CancellationToken cancellationToken = default);
 }

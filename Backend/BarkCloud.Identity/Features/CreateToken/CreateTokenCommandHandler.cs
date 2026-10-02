@@ -33,7 +33,7 @@ public class CreateTokenCommandHandler(IRefreshTokensStorage refreshTokensStorag
 
         logger.LogDebug("Генерация access token для пользователя {UserId}", accessToken.UserId);
 
-        var token = jwtService.GenerateUserToken(accessToken.UserId, accessToken.DeviceId);
+        var token = jwtService.GenerateUserToken(accessToken.UserId, accessToken.DeviceId, accessToken.Id);
 
         metrics.Increment("tokens_refreshed");
 

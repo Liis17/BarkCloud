@@ -185,7 +185,9 @@ public class NotificationOutboxTests
         await new PasswordsStorage(context).UpdateUserPasswordHash(42, PasswordHasher.HashPassword("old-password"));
         context.PendingNotifications.Add(Row(new Dictionary<string, string>()));
         await context.SaveChangesAsync();
-        var previous = context.Database.GetMigrations().Reverse().Skip(1).First();
+        // Откат миграции outbox: берём предшествующую ей, а не предпоследнюю — после неё добавляются другие миграции.
+        var migrations = context.Database.GetMigrations().ToList();
+        var previous = migrations[migrations.FindIndex(x => x.EndsWith("_AddPendingNotifications")) - 1];
 
         await context.GetService<IMigrator>().MigrateAsync(previous);
         await context.Database.MigrateAsync();

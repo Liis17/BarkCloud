@@ -32,11 +32,12 @@ public class JwtServiceTests
     {
         var sut = new JwtService(BuildSettings());
 
-        var result = sut.GenerateUserToken(userId: 42, deviceId: "device-abc");
+        var result = sut.GenerateUserToken(userId: 42, deviceId: "device-abc", sessionId: 9);
 
         var jwt = Read(result.Value);
         jwt.Claims.Should().Contain(c => c.Type == IdentityClaims.UserId && c.Value == "42");
         jwt.Claims.Should().Contain(c => c.Type == IdentityClaims.DeviceId && c.Value == "device-abc");
+        jwt.Claims.Should().Contain(c => c.Type == IdentityClaims.SessionId && c.Value == "9");
         jwt.Claims.Should().Contain(c => c.Type == IdentityClaims.TokenType && c.Value == TokenType.User.ToString());
     }
 
@@ -45,7 +46,7 @@ public class JwtServiceTests
     {
         var sut = new JwtService(BuildSettings());
 
-        var token = sut.GenerateUserToken(1, "d");
+        var token = sut.GenerateUserToken(1, "d", 7);
 
         var jwt = Read(token.Value);
         jwt.Issuer.Should().Be("bark-issuer");
@@ -58,7 +59,7 @@ public class JwtServiceTests
         var sut = new JwtService(BuildSettings(expiryMinutes: 30));
         var before = DateTime.UtcNow;
 
-        var token = sut.GenerateUserToken(1, "d");
+        var token = sut.GenerateUserToken(1, "d", 7);
 
         var expected = before.AddMinutes(30);
         token.ExpirationDate.ToDateTime().Should().BeCloseTo(expected, TimeSpan.FromSeconds(5));
@@ -69,7 +70,7 @@ public class JwtServiceTests
     {
         var sut = new JwtService(BuildSettings());
 
-        var token = sut.GenerateUserToken(1, "d");
+        var token = sut.GenerateUserToken(1, "d", 7);
 
         var jwt = Read(token.Value);
         jwt.SignatureAlgorithm.Should().Be(SecurityAlgorithms.HmacSha256);
@@ -81,7 +82,7 @@ public class JwtServiceTests
         var settings = BuildSettings();
         var sut = new JwtService(settings);
 
-        var token = sut.GenerateUserToken(42, "device-abc");
+        var token = sut.GenerateUserToken(42, "device-abc", 7);
 
         var handler = new JwtSecurityTokenHandler();
         handler.ValidateToken(token.Value, new TokenValidationParameters
@@ -155,7 +156,7 @@ public class JwtServiceTests
             .Get(JwtBearerDefaults.AuthenticationScheme).TokenValidationParameters;
         var handler = new JwtSecurityTokenHandler();
 
-        var userToken = () => handler.ValidateToken(sut.GenerateUserToken(42, "device-abc").Value, parameters, out _);
+        var userToken = () => handler.ValidateToken(sut.GenerateUserToken(42, "device-abc", 7).Value, parameters, out _);
         var serverToken = () => handler.ValidateToken(sut.GenerateServerToken(ServiceId.Files), parameters, out _);
 
         userToken.Should().NotThrow();
@@ -166,7 +167,7 @@ public class JwtServiceTests
     public void GenerateUserToken_ValidationWithWrongKey_IsRejected()
     {
         var sut = new JwtService(BuildSettings());
-        var token = sut.GenerateUserToken(1, "d");
+        var token = sut.GenerateUserToken(1, "d", 7);
 
         var handler = new JwtSecurityTokenHandler();
         var act = () => handler.ValidateToken(token.Value, new TokenValidationParameters

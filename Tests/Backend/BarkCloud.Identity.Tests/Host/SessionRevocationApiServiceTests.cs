@@ -72,4 +72,21 @@ public class SessionRevocationApiServiceTests : IDisposable
 
         response.Sessions.Select(x => x.DeviceId).Should().BeEquivalentTo("boundary", "recent");
     }
+
+    [Fact]
+    public async Task GetRevokedSessions_PassesMaxSessionIdOnlyForSessionRevocations()
+    {
+        _db.Context.RevokedSessions.AddRange(
+            new RevokedSession { UserId = 1, DeviceId = "by-time", RevokedAt = _now, ExpiresAt = _now.AddHours(1) },
+            new RevokedSession { UserId = 1, DeviceId = "by-session", RevokedAt = _now, ExpiresAt = _now.AddHours(1), MaxSessionId = 17 });
+        await _db.Context.SaveChangesAsync();
+
+        var response = await _sut.GetRevokedSessions(new GetRevokedSessionsRequest(), new TestServerCallContext());
+
+        var byTime = response.Sessions.Single(x => x.DeviceId == "by-time");
+        byTime.HasMaxSessionId.Should().BeFalse();
+        var bySession = response.Sessions.Single(x => x.DeviceId == "by-session");
+        bySession.HasMaxSessionId.Should().BeTrue();
+        bySession.MaxSessionId.Should().Be(17);
+    }
 }

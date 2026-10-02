@@ -78,24 +78,28 @@ public class RefreshTokensStorage(IdentityContext context, JwtSettings jwtSettin
         await SaveRevocations(userId, refreshTokens, [deviceId], cancellationToken);
     }
 
-    public async Task<int> RevokeAllSessions(long userId, string? exceptDeviceId = null, CancellationToken cancellationToken = default)
+    public async Task<int> RevokeAllSessions(long userId, string? currentDeviceId = null, CancellationToken cancellationToken = default)
     {
         var refreshTokens = await context.RefreshTokens
             .Where(x => x.UserId == userId)
             .ToListAsync(cancellationToken);
         var deviceIds = refreshTokens.Select(x => x.DeviceId)
-            .Where(x => x != exceptDeviceId).Distinct().ToList();
+            .Where(x => x != currentDeviceId).Distinct().ToList();
 
-        // Исключение касается access-токена текущего устройства. Все прежние refresh
-        // удаляются, включая текущий: сброс пароля затем выдаёт новую пару токенов.
-        await SaveRevocations(userId, refreshTokens, deviceIds, cancellationToken);
+        // Все прежние refresh удаляются, включая текущий: сброс пароля затем выдаёт текущему устройству новую пару.
+        // Отзыв по времени здесь не годится — iat в секундах, новый access попал бы под отзыв. Старые access
+        // текущего устройства отзываются по порогу sid (Id refresh): у новой сессии Id строго больше.
+        var currentMaxSessionId = refreshTokens.Where(x => x.DeviceId == currentDeviceId).Max(x => (long?)x.Id);
+        await SaveRevocations(userId, refreshTokens, deviceIds, cancellationToken,
+            currentMaxSessionId.HasValue ? (currentDeviceId!, currentMaxSessionId.Value) : null);
         return deviceIds.Count;
     }
 
     private async Task SaveRevocations(long userId, List<RefreshToken> refreshTokens, IEnumerable<string> deviceIds,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, (string DeviceId, long MaxSessionId)? replacedSession = null)
     {
         var revokedAt = DateTime.UtcNow;
+        var expiresAt = revokedAt.AddMinutes(jwtSettings.ExpiryMinutes + 1);
         await context.RevokedSessions.Where(x => x.ExpiresAt <= revokedAt).ExecuteDeleteAsync(cancellationToken);
 
         context.RefreshTokens.RemoveRange(refreshTokens);
@@ -104,8 +108,19 @@ public class RefreshTokensStorage(IdentityContext context, JwtSettings jwtSettin
             UserId = userId,
             DeviceId = deviceId,
             RevokedAt = revokedAt,
-            ExpiresAt = revokedAt.AddMinutes(jwtSettings.ExpiryMinutes + 1)
+            ExpiresAt = expiresAt
         }));
+        if (replacedSession.HasValue)
+        {
+            context.RevokedSessions.Add(new RevokedSession
+            {
+                UserId = userId,
+                DeviceId = replacedSession.Value.DeviceId,
+                RevokedAt = revokedAt,
+                ExpiresAt = expiresAt,
+                MaxSessionId = replacedSession.Value.MaxSessionId
+            });
+        }
 
         // EF сохраняет удаление refresh и вставку отзывов в одной транзакции.
         await context.SaveChangesAsync(cancellationToken);
