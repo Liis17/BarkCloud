@@ -30,11 +30,15 @@ public class GrantStorage : IGrantStorage
             .AnyAsync(x => x.OwnerId == ownerId && x.FileId == fileId && x.RecipientId == recipientId, cancellationToken);
     }
 
-    /// <summary>Есть ли у получателя доступ к файлу (любой владелец) — для проверки скачивания.</summary>
+    /// <summary>
+    /// Есть ли у получателя доступ к файлу (любой владелец) — для проверки скачивания.
+    /// Грант не действует, пока файл в корзине у выдавшего его владельца.
+    /// </summary>
     public async Task<bool> RecipientHasAccess(long recipientId, Guid fileId, CancellationToken cancellationToken = default)
     {
         return await _context.FileGrants
             .AsNoTracking()
+            .WhereOwnerFileNotTrashed(_context)
             .AnyAsync(x => x.RecipientId == recipientId && x.FileId == fileId, cancellationToken);
     }
 
