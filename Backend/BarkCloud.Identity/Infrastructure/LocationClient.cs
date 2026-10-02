@@ -7,6 +7,10 @@ namespace BarkCloud.Identity.Infrastructure;
 public class LocationClient
 {
     private const string BaseUrl = "http://ip-api.com/json/";
+
+    // Геолокация необязательна (только текст письма и название места устройства): ждём недолго, дальше — «-».
+    public static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(2);
+
     private readonly HttpClient _httpClient;
     private readonly MetricsCollector _metrics;
     private readonly ILogger<LocationClient> _logger;
@@ -25,8 +29,10 @@ public class LocationClient
 
         try
         {
+            using var timeout = new CancellationTokenSource(RequestTimeout);
+
             var url = $"{BaseUrl}{ip}?lang=ru";
-            var response = await _httpClient.GetAsync(url);
+            var response = await _httpClient.GetAsync(url, timeout.Token);
 
             if (!response.IsSuccessStatusCode)
             {
@@ -39,7 +45,7 @@ public class LocationClient
                 return null;
             }
 
-            var content = await response.Content.ReadAsStringAsync();
+            var content = await response.Content.ReadAsStringAsync(timeout.Token);
             var location = JsonSerializer.Deserialize<IpLocation>(content);
 
             if (location != null)
@@ -55,6 +61,18 @@ public class LocationClient
             }
 
             return location;
+        }
+        catch (OperationCanceledException)
+        {
+            // Внешнего токена нет: отмена — это только наш таймаут.
+            _metrics.Increment("geolocation_errors");
+            _metrics.Increment("geolocation_timeouts");
+            _logger.LogWarning(
+                "Геолокация для IP {IpAddress} не получена за {Timeout} с",
+                ip,
+                RequestTimeout.TotalSeconds
+            );
+            return null;
         }
         catch (HttpRequestException ex)
         {
