@@ -8,7 +8,6 @@ using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 
 using System.IdentityModel.Tokens.Jwt;
-using System.Text;
 
 namespace BarkCloud.GrpcServer.XAuth;
 
@@ -16,6 +15,10 @@ public static class XAuthExtensions
 {
     public static IServiceCollection AddXAuth(this IServiceCollection services, IConfiguration configuration)
     {
+        // Ключ строим сразу, а не в лямбде AddJwtBearer: та выполняется лениво (на первом запросе),
+        // а непригодный секрет должен останавливать сервис на старте с понятным сообщением.
+        var signingKey = new SymmetricSecurityKey(JwtSecret.GetKeyBytes(configuration[JwtSecret.ConfigKey]));
+
         services.AddSingleton<TokenRevocationCache>();
         services.AddHostedService<RevocationSyncService>();
 
@@ -25,7 +28,7 @@ public static class XAuthExtensions
                 cfg.TokenValidationParameters = new TokenValidationParameters
                 {
                     ValidateIssuerSigningKey = true,
-                    IssuerSigningKey = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(configuration["JwtSettings:SecretKey"]!)),
+                    IssuerSigningKey = signingKey,
                     ValidateIssuer = true,
                     ValidIssuer = configuration["JwtSettings:Issuer"],
                     ValidateAudience = true,

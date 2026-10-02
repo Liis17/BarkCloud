@@ -1,3 +1,5 @@
+using BarkCloud.Shared.Identity;
+
 using System.Globalization;
 
 namespace BarkCloud.Configuration.Catalog;
@@ -9,6 +11,9 @@ public static class SettingsValueValidator
         var normalized = value?.Trim() ?? string.Empty;
         if (normalized.Length == 0)
             return string.Empty;
+
+        if (entry.StorageKey == JwtSecret.ConfigKey)
+            JwtSecret.GetKeyBytes(normalized, JwtSecret.RecommendedMinBytes);
 
         return entry.ValueKind switch
         {

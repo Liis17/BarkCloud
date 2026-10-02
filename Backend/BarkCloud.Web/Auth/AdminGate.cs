@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 
+using BarkCloud.Shared.Identity;
 using BarkCloud.Web.Infrastructure;
 
 namespace BarkCloud.Web.Auth;
@@ -24,7 +25,7 @@ public sealed class AdminGate
     public AdminGate(IConfiguration configuration)
     {
         var secret = configuration["JwtSettings:SecretKey"];
-        _key = string.IsNullOrEmpty(secret) ? null : Encoding.ASCII.GetBytes(secret);
+        _key = string.IsNullOrEmpty(secret) ? null : JwtSecret.GetKeyBytes(secret);
         _password = configuration["App:AdminPassword"];
         _cookieSecure = configuration.Flag("App:CookieSecure");
     }

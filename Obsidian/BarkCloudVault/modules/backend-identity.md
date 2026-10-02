@@ -31,7 +31,7 @@ Parent: [[index]] · See also: [[api/identity-api]] · [[modules/shared-identity
 - `SessionRevocationApiService.cs` — feed отзывов для сервисных JWT ([[api/session-revocation-api]])
 
 ### Services
-- `JwtService.cs` — выпуск/валидация JWT
+- `JwtService.cs` — выпуск/валидация JWT; байты ключа подписи берёт из `JwtSecret.GetKeyBytes` (UTF-8, общий с проверкой в `AddXAuth`, F23 — [[modules/shared-identity]])
 - `DbRevocationFeed.cs` — читает активные отзывы в отдельном scope; полный снимок и дельта
 - `PasswordHasher.cs` — хеширование паролей
 - `RefreshTokenGenerator.cs` — генерация refresh-токенов

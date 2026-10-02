@@ -64,7 +64,7 @@ Typed validation ограничивает TCP-порты диапазоном `1
 ## Основные файлы
 
 - `Infrastructure/ConfigurationContext.cs` — EF-модель всех новых таблиц.
-- `Catalog/SettingsCatalog.cs`, `SettingsValueValidator.cs` — whitelist и typed validation.
+- `Catalog/SettingsCatalog.cs`, `SettingsValueValidator.cs` — whitelist и typed validation. `JwtSettings:SecretKey` дополнительно проверяется через `JwtSecret.GetKeyBytes(..., RecommendedMinBytes)`: короче 32 байт UTF-8 отклоняется (`InvalidOperationException`, как остальные ошибки валидатора), пустое значение по-прежнему означает «не задано» (F23, [[modules/shared-identity]]). `ConfigurationDefaultsPopulator.GenerateServiceToken` подписывает стартовые `*Service:Token` тем же UTF-8 ключом.
 - `Infrastructure/ConfigurationStorage.cs` — overlay, history/rollback, reserved names и compatibility-проекции.
 - `Infrastructure/StorageProfileStorage.cs` — версии, активация, disable и credential rotation.
 - `Domain/StorageProfileQuota.cs` — валидация целого значения и безопасное преобразование ГБ/ТБ/ПБ в байты.

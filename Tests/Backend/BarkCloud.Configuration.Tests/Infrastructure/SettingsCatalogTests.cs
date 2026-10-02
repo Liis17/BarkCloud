@@ -103,6 +103,44 @@ public class SettingsCatalogTests
         act.Should().Throw<InvalidOperationException>();
     }
 
+    [Theory]
+    [InlineData("short-secret")]
+    [InlineData("жжжжжжжжжжжжжжж")] // 15 символов = 30 байт UTF-8
+    public void ValidateAndNormalize_JwtSecret_RejectsKeyShorterThanRecommendedBytes(string input)
+    {
+        var entry = SettingsCatalog.Resolve(ServiceId.Unknown, "JwtSettings", "SecretKey");
+
+        var act = () => SettingsValueValidator.ValidateAndNormalize(entry, input);
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*JwtSettings:SecretKey*");
+    }
+
+    [Theory]
+    [InlineData("supersecretkey_at_least_32_chars_long!!")]
+    [InlineData("жжжжжжжжжжжжжжжж")] // 16 символов = 32 байта UTF-8
+    public void ValidateAndNormalize_JwtSecret_AcceptsKeyOfRecommendedBytesIncludingUnicode(string input)
+    {
+        var entry = SettingsCatalog.Resolve(ServiceId.Unknown, "JwtSettings", "SecretKey");
+
+        SettingsValueValidator.ValidateAndNormalize(entry, $" {input} ").Should().Be(input);
+    }
+
+    [Fact]
+    public void ValidateAndNormalize_JwtSecret_EmptyMeansNotSet()
+    {
+        var entry = SettingsCatalog.Resolve(ServiceId.Unknown, "JwtSettings", "SecretKey");
+
+        SettingsValueValidator.ValidateAndNormalize(entry, "  ").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void ValidateAndNormalize_OtherPassword_StillAcceptsShortValue()
+    {
+        var entry = SettingsCatalog.Resolve(ServiceId.Unknown, "RabbitMQ", "Password");
+
+        SettingsValueValidator.ValidateAndNormalize(entry, "pw").Should().Be("pw");
+    }
+
     [Fact]
     public void EmailSettings_ReportEveryStartupConsumerThatNeedsRestart()
     {

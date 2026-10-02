@@ -1,6 +1,5 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using System.Text;
 
 using BarkCloud.Shared.Identity;
 
@@ -22,7 +21,7 @@ public static class ServiceToken
         if (string.IsNullOrEmpty(secret))
             return string.Empty;
 
-        var key = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(secret));
+        var key = new SymmetricSecurityKey(JwtSecret.GetKeyBytes(secret));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
         var claims = new[]

@@ -97,4 +97,27 @@ public class AdminGateTests
     [Fact]
     public void IsUnlocked_NoCookie_ReturnsFalse()
         => new AdminGate(Config()).IsUnlocked(new DefaultHttpContext()).Should().BeFalse();
+
+    // F23: не-ASCII секрет раньше превращался в ключ из «?»; теперь UTF-8, и разные секреты дают разные подписи.
+    [Fact]
+    public void IsUnlocked_UnicodeSecret_ValidOnlyForSameSecret()
+    {
+        var unlockCtx = new DefaultHttpContext();
+        new AdminGate(Config(secret: "СекретныйКлючДляПодписиАдминКуки1")).Unlock(unlockCtx, Password);
+        var sameSecret = new DefaultHttpContext();
+        var otherSecret = new DefaultHttpContext();
+        TransferCookie(unlockCtx, sameSecret);
+        TransferCookie(unlockCtx, otherSecret);
+
+        new AdminGate(Config(secret: "СекретныйКлючДляПодписиАдминКуки1")).IsUnlocked(sameSecret).Should().BeTrue();
+        new AdminGate(Config(secret: "СекретныйКлючДляПодписиАдминКуки2")).IsUnlocked(otherSecret).Should().BeFalse();
+    }
+
+    [Fact]
+    public void Ctor_UnusableSecret_ThrowsConfigurationError()
+    {
+        var act = () => new AdminGate(Config(secret: "short"));
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*JwtSettings:SecretKey*");
+    }
 }
