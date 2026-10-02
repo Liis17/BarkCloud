@@ -64,52 +64,41 @@ public class PreviewPersistenceService
                 previewHash = Convert.ToHexString(hashBytes).ToLowerInvariant();
             }
 
+            // Уже есть UploadFile с такими байтами — переиспользуем (владельцы + связка атомарно). Если блоб
+            // к этому моменту удалён очисткой осиротевших, заливаем новый.
             var existingPreviewFileId = await _hashesStorage.GetFileIdByHash(previewHash, storageProfileId);
-            Guid previewFileId;
+            if (existingPreviewFileId.HasValue
+                && await TryLinkExistingBlobAsync(
+                    original,
+                    NewLink(original.Id, existingPreviewFileId.Value, item.TargetWidth, item.ActualWidth, item.ActualHeight),
+                    cancellationToken))
+                continue;
 
-            if (existingPreviewFileId.HasValue)
+            var previewFileId = Guid.NewGuid();
+            using var ms = new MemoryStream(item.Bytes);
+            var previewEtag = await _s3Uploader.UploadAsync(storageProfileId, $"{previewFileId}", ms, "image/jpeg");
+
+            var previewFile = new UploadFile
             {
-                // Уже есть UploadFile с такими байтами — переиспользуем, добавляем владельцев.
-                previewFileId = existingPreviewFileId.Value;
-                foreach (var uploaderId in original.Uploaders)
-                    await _filesStorage.AddUploaderToFile(previewFileId, uploaderId);
-            }
-            else
-            {
-                previewFileId = Guid.NewGuid();
-                using var ms = new MemoryStream(item.Bytes);
-                var previewEtag = await _s3Uploader.UploadAsync(storageProfileId, $"{previewFileId}", ms, "image/jpeg");
+                Id = previewFileId,
+                Uploaders = original.Uploaders.ToList(),
+                CreatedAt = DateTime.UtcNow,
+                UploadedAt = DateTime.UtcNow,
+                Etag = previewEtag,
+                Type = UploadFileType.CloudFile,
+                StorageProfileId = storageProfileId,
+                MediaKind = MediaKind.Photo,
+                Filename = $"preview_{item.TargetWidth}.jpg",
+                Size = item.Bytes.Length,
+                ImageWidth = item.ActualWidth,
+                ImageHeight = item.ActualHeight
+            };
 
-                var previewFile = new UploadFile
-                {
-                    Id = previewFileId,
-                    Uploaders = original.Uploaders.ToList(),
-                    CreatedAt = DateTime.UtcNow,
-                    UploadedAt = DateTime.UtcNow,
-                    Etag = previewEtag,
-                    Type = UploadFileType.CloudFile,
-                    StorageProfileId = storageProfileId,
-                    MediaKind = MediaKind.Photo,
-                    Filename = $"preview_{item.TargetWidth}.jpg",
-                    Size = item.Bytes.Length,
-                    ImageWidth = item.ActualWidth,
-                    ImageHeight = item.ActualHeight
-                };
+            await _filesStorage.AddToStorage(previewFile);
+            await _hashesStorage.AddHash(new FileHash { FileId = previewFileId, Hash = previewHash });
 
-                await _filesStorage.AddToStorage(previewFile);
-                await _hashesStorage.AddHash(new FileHash { FileId = previewFileId, Hash = previewHash });
-            }
-
-            _context.FilePreviews.Add(new FilePreview
-            {
-                Id = Guid.NewGuid(),
-                OriginalFileId = original.Id,
-                PreviewFileId = previewFileId,
-                TargetWidth = item.TargetWidth,
-                ActualWidth = item.ActualWidth,
-                ActualHeight = item.ActualHeight,
-                CreatedAt = DateTime.UtcNow
-            });
+            _context.FilePreviews.Add(
+                NewLink(original.Id, previewFileId, item.TargetWidth, item.ActualWidth, item.ActualHeight));
         }
 
         await _context.SaveChangesAsync(cancellationToken);
@@ -142,52 +131,71 @@ public class PreviewPersistenceService
         }
 
         var existingByHash = await _hashesStorage.GetFileIdByHash(viewHash, storageProfileId);
-        Guid viewFileId;
+        if (existingByHash.HasValue
+            && await TryLinkExistingBlobAsync(
+                original, NewLink(original.Id, existingByHash.Value, 0, width, height), cancellationToken))
+            return existingByHash.Value;
 
-        if (existingByHash.HasValue)
+        var viewFileId = Guid.NewGuid();
+        using var ms = new MemoryStream(jpegBytes);
+        var etag = await _s3Uploader.UploadAsync(storageProfileId, $"{viewFileId}", ms, "image/jpeg");
+
+        var viewFile = new UploadFile
         {
-            viewFileId = existingByHash.Value;
-            foreach (var uploaderId in original.Uploaders)
-                await _filesStorage.AddUploaderToFile(viewFileId, uploaderId);
-        }
-        else
-        {
-            viewFileId = Guid.NewGuid();
-            using var ms = new MemoryStream(jpegBytes);
-            var etag = await _s3Uploader.UploadAsync(storageProfileId, $"{viewFileId}", ms, "image/jpeg");
+            Id = viewFileId,
+            Uploaders = original.Uploaders.ToList(),
+            CreatedAt = DateTime.UtcNow,
+            UploadedAt = DateTime.UtcNow,
+            Etag = etag,
+            Type = UploadFileType.CloudFile,
+            StorageProfileId = storageProfileId,
+            MediaKind = MediaKind.Photo,
+            Filename = "view.jpg",
+            Size = jpegBytes.Length,
+            ImageWidth = width > 0 ? width : null,
+            ImageHeight = height > 0 ? height : null
+        };
 
-            var viewFile = new UploadFile
-            {
-                Id = viewFileId,
-                Uploaders = original.Uploaders.ToList(),
-                CreatedAt = DateTime.UtcNow,
-                UploadedAt = DateTime.UtcNow,
-                Etag = etag,
-                Type = UploadFileType.CloudFile,
-                StorageProfileId = storageProfileId,
-                MediaKind = MediaKind.Photo,
-                Filename = "view.jpg",
-                Size = jpegBytes.Length,
-                ImageWidth = width > 0 ? width : null,
-                ImageHeight = height > 0 ? height : null
-            };
+        await _filesStorage.AddToStorage(viewFile);
+        await _hashesStorage.AddHash(new FileHash { FileId = viewFileId, Hash = viewHash });
 
-            await _filesStorage.AddToStorage(viewFile);
-            await _hashesStorage.AddHash(new FileHash { FileId = viewFileId, Hash = viewHash });
-        }
-
-        _context.FilePreviews.Add(new FilePreview
-        {
-            Id = Guid.NewGuid(),
-            OriginalFileId = original.Id,
-            PreviewFileId = viewFileId,
-            TargetWidth = 0,
-            ActualWidth = width,
-            ActualHeight = height,
-            CreatedAt = DateTime.UtcNow
-        });
+        _context.FilePreviews.Add(NewLink(original.Id, viewFileId, 0, width, height));
 
         await _context.SaveChangesAsync(cancellationToken);
         return viewFileId;
+    }
+
+    private static FilePreview NewLink(Guid originalId, Guid previewFileId, int targetWidth, int actualWidth, int actualHeight) => new()
+    {
+        Id = Guid.NewGuid(),
+        OriginalFileId = originalId,
+        PreviewFileId = previewFileId,
+        TargetWidth = targetWidth,
+        ActualWidth = actualWidth,
+        ActualHeight = actualHeight,
+        CreatedAt = DateTime.UtcNow
+    };
+
+    /// <summary>
+    /// Привязывает оригинал к уже существующему превью-блобу: владельцы оригинала добавляются блобу и
+    /// сохраняется связка — в одной транзакции под блокировкой строки блоба. Параллельное освобождение
+    /// владельца или удаление осиротевшего блоба ждёт и не успевает вклиниться между проверкой и связкой.
+    /// Возвращает false, если блоба уже нет или на него никто не ссылается (его удаляет очистка) —
+    /// тогда ссылаться на него нельзя.
+    /// </summary>
+    private async Task<bool> TryLinkExistingBlobAsync(UploadFile original, FilePreview link, CancellationToken cancellationToken)
+    {
+        await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+
+        if ((await _context.LockLiveFilesAsync([link.PreviewFileId], cancellationToken)).Count == 0)
+            return false;
+
+        foreach (var uploaderId in original.Uploaders)
+            await _filesStorage.AddUploaderToFile(link.PreviewFileId, uploaderId);
+
+        _context.FilePreviews.Add(link);
+        await _context.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return true;
     }
 }
