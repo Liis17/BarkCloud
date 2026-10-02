@@ -4,7 +4,7 @@ Parent: [[modules/backend-identity]] · [[modules/backend-grpcserver]]
 
 ## Источник истины
 
-Identity хранит `RevokedSession { Id, UserId, DeviceId, RevokedAt, ExpiresAt }` в таблице `RevokedSessions`. Миграция `20261001194141_AddRevokedSessions` создаёт bigint identity PK и индексы по `RevokedAt` и `ExpiresAt`. Формат JWT и клиентский `identity_api.proto` не менялись.
+Identity хранит `RevokedSession { Id, UserId, DeviceId, RevokedAt, ExpiresAt, MaxSessionId? }` в таблице `RevokedSessions`. Миграция `20261001194141_AddRevokedSessions` создаёт bigint identity PK и индексы по `RevokedAt` и `ExpiresAt`; `AddRevokedSessionMaxSessionId` (F02) добавляет nullable bigint `MaxSessionId`. Клиентский `identity_api.proto` не менялся; в access-JWT добавлен клейм `x-session-id` (клиенты JWT не разбирают).
 
 `RefreshTokensStorage` получает общий scoped `IdentityContext` и `JwtSettings`. `RevokedAt = DateTime.UtcNow` фиксируется один раз на операцию; `ExpiresAt = RevokedAt + ExpiryMinutes + 1 мин`. Удаление refresh-токенов и добавление отзывов выполняются одним `SaveChangesAsync`, в одной транзакции EF. Перед сохранением `ExecuteDeleteAsync` удаляет уже просроченные отзывы; эта очистка независима от транзакции удаления refresh и безопасна при её откате.
 
@@ -12,10 +12,20 @@ Identity хранит `RevokedSession { Id, UserId, DeviceId, RevokedAt, Expires
 |---|---|---|
 | `RevokeSession(deviceId, userId, ct)` | Удаляет refresh устройства и записывает отзыв; отсутствие refresh → `RefreshTokenNotFoundException` | `RemoveActiveSession`, `RemoveActiveSessionServer` |
 | `RevokeSessionSafe(deviceId, userId, ct)` | Записывает отзыв даже без refresh | `Logout` |
-| `RevokeAllSessions(userId, exceptDeviceId, ct)` | Удаляет все refresh пользователя, записывает по одному отзыву на уникальное устройство, кроме исключённого; возвращает число устройств | `ConfirmResetPassword` (исключает текущее), `UserDeletedConsumer` (без исключения) |
+| `RevokeAllSessions(userId, currentDeviceId, ct)` | Удаляет все refresh пользователя. Прочие устройства — отзыв по времени (по записи на устройство). Текущее устройство, если у него были refresh-строки, — одна запись **по сессии**: `MaxSessionId = max(Id)` удаляемых строк. Возвращает число прочих устройств | `ConfirmResetPassword` (с текущим устройством), `UserDeletedConsumer` (без него — все по времени) |
 | `DeleteRefreshTokensByDeviceIdSafe` | Удаляет старые refresh без отзыва access | `SessionIssuer` при повторном входе |
 
-Исключение в сбросе пароля касается только access-отзыва: все прежние refresh, включая текущее устройство, удаляются до выдачи новой пары. Повторная доставка `UserDeleted` не меняет уже сохранённое время отзыва: refresh уже удалены, отзывы остаются. F11 сохраняет сам `UserDeleted` в outbox Users вместе с удалением профиля; очистка Identity и весь сброс пароля дополнительно объединены внешними транзакциями. См. [[modules/transactional-outbox]].
+При сбросе пароля все прежние refresh, включая текущее устройство, удаляются до выдачи новой пары; старые access текущего устройства отзываются по порогу сессии (см. ниже). Повторная доставка `UserDeleted` не меняет уже сохранённое время отзыва: refresh уже удалены, отзывы остаются. F11 сохраняет сам `UserDeleted` в outbox Users вместе с удалением профиля; очистка Identity и весь сброс пароля дополнительно объединены внешними транзакциями. См. [[modules/transactional-outbox]].
+
+## Отзыв по сессии (F02)
+
+Новый access текущего устройства выдаётся сразу после сброса пароля и может иметь тот же `iat` (секунды), что и старый, поэтому отзыв по времени разделить их не может. Access-токен несёт клейм `x-session-id` (`IdentityClaims.SessionId`) — `RefreshToken.Id` сессии, по которой он выдан (`CreateTokenCommandHandler` → `JwtService.GenerateUserToken(userId, deviceId, sessionId)`). Id — монотонный bigint identity, поэтому у новой сессии он строго больше, чем у любых старых строк.
+
+Запись с `MaxSessionId` отзывает токены с `sid <= MaxSessionId` **и токены без sid** (выданы до появления клейма, т.е. раньше сброса; fail-safe, как для отсутствующего `iat`). Время такой записи порогом не служит — `RevokedAt` нужен только дельте фида. Записи без `MaxSessionId` работают как прежде (`iat <= RevokedAt`). Отзыв по сессии закрывает и гонку «refresh старой сессии между снимком и commit»: такой access получит старый `sid`.
+
+Контракт: `session_revocation_api.proto` → `optional int64 max_session_id = 5`, `SessionRevocation.MaxSessionId`. `sid` читают `XAuthExtensions` (`OnTokenValidated`), `UserContext.SessionId` (Torrent `StreamProgress`) и Web `AuthGateway` (`WebUser.SessionId`; Web `v1.6.7`).
+
+**Порядок выкладки:** сначала Users/Files/Torrent/Web (читают `sid`, без него работают как раньше), затем **все** реплики Identity. Если сброс пароля выполнится при смешанных версиях Identity, access новой сессии, обновлённый старой репликой (без `sid`), будет отозван до следующего refresh — ограниченное окно.
 
 ## Синхронизация
 
@@ -27,7 +37,7 @@ Identity хранит `RevokedSession { Id, UserId, DeviceId, RevokedAt, Expires
 
 Раз в минуту (`FullResyncInterval`, равен overlap) вместо incremental-запроса выполняется **полный снимок**; время последней успешной полной загрузки хранится в сервисе, стартовая загрузка тоже считается. Это закрывает остаток F10: `RevokedAt` ставится до commit (для сброса пароля и `UserDeleted` commit внешней транзакции идёт ещё позже), и отзыв, закоммиченный позже минутного overlap, фильтр `RevokedAt >= changedSince` не вернул бы никогда — до рестарта реплика принимала бы старый access-токен. Теперь такая запись попадает в кэш каждой реплики не позже чем через ~1 мин после commit, пока она не истекла; если commit позже `ExpiryMinutes` после `RevokedAt`, все отзываемые JWT уже недействительны. Неудачная полная сверка повторяется на следующем 5-секундном тике, а не через минуту. Протокол и `DbRevocationFeed` не менялись; `Revoke` идемпотентен, повторные снимки безвредны.
 
-`TokenRevocationCache.Revoke(userId, deviceId, revokedAt, expiresAt)` сохраняет максимальные `RevokedAt` и `ExpiresAt` для ключа `{userId}:{deviceId}`. Повторы и порядок записей не влияют на результат. `IsRevoked(userId, deviceId, issuedAt)` сохраняет правило `issuedAt <= RevokedAt`. Очистка удаляет именно прочитанную просроченную запись, сохраняя конкурентное обновление.
+`TokenRevocationCache.Revoke(userId, deviceId, revokedAt, expiresAt, maxSessionId?)` сохраняет для ключа `{userId}:{deviceId}` независимые максимумы порога времени (`RevokedAt`, записи без `MaxSessionId`), порога сессии (`MaxSessionId`) и `ExpiresAt`. Повторы и порядок записей не влияют на результат. `IsRevoked(userId, deviceId, issuedAt, sessionId?)` = `issuedAt <= RevokedAt` **или** (порог сессии задан и (`sessionId` отсутствует или `sessionId <= MaxSessionId`)). Очистка удаляет именно прочитанную просроченную запись, сохраняя конкурентное обновление.
 
 Users/Files/Torrent получают `IdentityService:Host` и `IdentityService:Token` из каталога Configuration. `EnsureSeedAsync` и `PopulateDefaultsAsync` добавляют их и в существующие развёртывания, сохраняют уже заполненные значения. Web берёт существующий `IdentityService:Host` и генерирует сервисный JWT через `ServiceToken.Generate`. `docker-compose.yml` и генератор Builder добавляют Users/Files/Torrent зависимость от Identity; Identity не ждёт Users при старте.
 
@@ -39,7 +49,7 @@ Users/Files/Torrent получают `IdentityService:Host` и `IdentityService:
 
 ## Ограничения
 
-- `iat` имеет секундную точность. Logout и новый вход на том же устройстве в одну секунду могут отклонить новый JWT до истечения отзыва. Риск принят вместо добавления `sid`; зафиксирован тестом `Revoke_SameSecondLogin_RemainsRevokedBecauseJwtIatHasSecondPrecision`.
+- `iat` имеет секундную точность. Logout и новый вход на том же устройстве в одну секунду могут отклонить новый JWT до истечения отзыва: отзыв по времени (logout, удаление сессии/аккаунта) `sid` не использует; зафиксировано тестом `Revoke_SameSecondLogin_RemainsRevokedBecauseJwtIatHasSecondPrecision`. Сброс пароля этим ограничением не затронут — он отзывает текущее устройство по сессии.
 - Уменьшение `JwtSettings:ExpiryMinutes` может сделать срок отзыва короче жизни ранее выданных JWT; запас 1 мин этого не гарантирует. До истечения прежних JWT сохранять прежний lifetime.
 - Снимок не разбит на страницы; объём равен числу ещё действующих отзывов, и каждая реплика загружает его раз в минуту. При росте нагрузки потребуется пагинация.
 - Гарантия «не позже ~1 мин после commit», а не «сразу»: запись, закоммиченная позже overlap, доходит с полной сверкой. Если понадобится мгновенная гарантия — курсор по порядку видимости commit (`xid8` + `pg_snapshot_xmin`) с изменением proto и миграцией; отклонено как избыточное для редкого случая.

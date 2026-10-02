@@ -36,8 +36,8 @@ Parent: [[index]]
 
 ### XAuth (авторизация)
 - `XAuthExtensions.cs` — DI/middleware для авторизации. Ключ проверки JWT строится сразу при `AddXAuth` из `JwtSecret.GetKeyBytes` (UTF-8, [[modules/shared-identity]]), а не лениво в `AddJwtBearer`: пустой секрет или короче 16 байт останавливает Identity/Users/Files/Torrent на старте с понятным сообщением (F23)
-- `UserContext.cs` — текущий пользователь (claims + device + `IssuedAt` из клейма `iat`, `MinValue` если нет); `IssuedAt` нужен долгим стримам для повторной проверки отзыва (`TorrentApiService.StreamProgress`)
-- `TokenRevocationCache.cs` — локальный hot-path кэш: `Revoke(userId, deviceId, revokedAt, expiresAt)` принимает исходное время Identity и сохраняет максимальные время/expiry. `IsRevoked` по-прежнему проверяет `iat <= RevokedAt`; `OnTokenValidated` читает `iat` из JWT (fallback `MinValue`). См. [[modules/session-revocation]].
+- `UserContext.cs` — текущий пользователь (claims + device + `IssuedAt` из клейма `iat`, `MinValue` если нет); `SessionId` — клейм `x-session-id` (`null`, если нет; F02); `IssuedAt` и `SessionId` нужны долгим стримам для повторной проверки отзыва (`TorrentApiService.StreamProgress`)
+- `TokenRevocationCache.cs` — локальный hot-path кэш: `Revoke(userId, deviceId, revokedAt, expiresAt, maxSessionId?)` принимает исходное время Identity и сохраняет независимые максимумы порога времени, порога сессии и expiry. `IsRevoked(…, issuedAt, sessionId?)` проверяет `iat <= RevokedAt` либо `sid <= MaxSessionId` (токен без sid при записи по сессии отозван); `OnTokenValidated` читает `iat` (fallback `MinValue`) и `x-session-id` из JWT. См. [[modules/session-revocation]].
 - `RevocationSyncService.cs` — полный снимок с ретраями в `StartAsync` до открытия Kestrel, затем poll 5 с с перекрытием 1 мин и очисткой кэша; заменяет удалённый `TokenRevocationCleanupService`.
 
 - `IRevocationFeed.cs` — `RevocationBatch`/`SessionRevocation` и общий интерфейс источника.
