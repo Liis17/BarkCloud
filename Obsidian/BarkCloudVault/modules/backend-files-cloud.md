@@ -50,12 +50,26 @@ NextCloud-подобная иерархия папок и файловых за�
 Дерево — это `CloudDirectory.ParentId` без внешнего ключа, поэтому циклы и «сирот» предотвращает только код.
 
 - **Замок структуры.** `ICloudHierarchyStorage.LockTree(ownerId)` открывает транзакцию EF и на Npgsql берёт `pg_advisory_xact_lock(hashtextextended('cloud-tree:{ownerId}', 0))`. Ключ не совпадает с замком квоты (`StorageQuotaService`: `pg_advisory_xact_lock(ownerId)`), чтобы замки не мешали друг другу. На SQLite (юнит-тесты) берётся только транзакция. Возвращает `ICloudTreeLock` (`CommitAsync` + `DisposeAsync`; без коммита — откат и снятие замка).
-- **Где используется:** `MoveDirectory` и `DeleteDirectory`. Порядок строгий: замок → чтение папок (отслеживаемые сущности EF иначе останутся устаревшими) → проверки → запись → `CommitAsync`. Параллельные «A в B» и «B в A» выполняются по очереди: второй видит `A.ParentId == B` и получает `CircularMove`. Move внутрь удаляемого поддерева либо выполняется до удаления (папка уходит вместе с поддеревом), либо получает `DirectoryNotFound`.
-- **Вне замка:** `CreateDirectory`, `RenameDirectory`, `EnsureSystemDirectory` — они не могут создать цикл; уникальность имён и системных типов закреплена индексами F16 (см. ниже).
+- **Где используется:** `MoveDirectory` и `DeleteDirectory` (циклы и перемещение в удаляемое поддерево) и все писатели, которые **ссылаются** на папку: `CreateDirectory` (`ParentId`), `AttachFile` (`DirectoryId`, в том числе системная папка из `EnsureSystemDirectory` при `route_by_media_kind`), `MoveFileEntry`, `RestoreFromTrash` (возврат в исходную папку), `CreateFolderShare` (публичная ссылка), `ShareFolderWithUser` (грант). Порядок строгий: замок → чтение папок (отслеживаемые сущности EF иначе останутся устаревшими) → проверки → запись → `CommitAsync`; запись активности и лог — после commit. Параллельные «A в B» и «B в A» выполняются по очереди: второй видит `A.ParentId == B` и получает `CircularMove`. Писатель, опередивший `DeleteDirectory`, сохраняет ссылку, и удаление забирает её вместе с поддеревом (запись уходит в корзину, ссылка и грант снимаются); опоздавший писатель получает `DirectoryNotFound`. Без замка писатель успевал проверить папку, пропускал удаление и сохранял живую запись/папку/ссылку/грант на несуществующую папку.
+- **Цена замка:** структурные операции одного владельца идут по очереди на время нескольких SQL-запросов (в замке нет обращений к S3); замки разных владельцев независимы.
+- **Вне замка:** `RenameDirectory` и `EnsureSystemDirectory` — они не создают ссылок на чужую папку (сирот и цикл не порождают); уникальность имён и системных типов закреплена индексами F16 (см. ниже). `RenameDirectory` против `DeleteDirectory` может закончиться `DbUpdateConcurrencyException` вместо `DirectoryNotFound`. `DeleteUserMedia` и `CreateArchive` создают записи сразу в корзине — ссылка на удалённую папку для них штатна (restore вернёт файл в корень).
 - **Защита обходов от повреждённых данных:** `GetSubtree` пропускает уже посещённые папки (конечен и отдаёт каждую папку один раз, в том числе при самопетле); на нём держатся `DeleteDirectory`, `CreateArchive`, `ResolveFolderShare`, `RevokeFolderShare`, `FolderGrantAccessService`. Подъём по предкам в `MoveDirectory` при повторной папке отвечает `CircularMoveException`; в `GetPath` — `DirectoryTreeCorruptedException` ([[modules/shared-exceptions]]). `CreateArchive.RelativeDirPath` уже был ограничен счётчиком.
-- **Не сделано:** уже существующие циклы в БД не чинятся автоматически. Их можно посчитать запросом с рекурсивным CTE по `CloudDirectories`; цикл недостижим из корня, но виден по ID (поиск, гранты, публичные ссылки).
+- **Не сделано:** уже существующие циклы и сироты в БД не чинятся автоматически. FK на `ParentId`/`DirectoryId` нет: у записей корневой `Guid.Empty` синтетический, а записи корзины намеренно указывают на удалённые папки; FK потребовал бы отдельной миграции с проверкой существующих сирот (по образцу F16).
+- **Диагностика (только чтение).** Циклы — запросом с рекурсивным CTE по `CloudDirectories`; цикл недостижим из корня, но виден по ID (поиск, гранты, публичные ссылки). Сироты, оставшиеся от гонок до F13:
+  ```sql
+  -- папки с несуществующим родителем
+  SELECT d."Id", d."OwnerId", d."ParentId" FROM "CloudDirectories" d
+  WHERE d."ParentId" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM "CloudDirectories" p WHERE p."Id" = d."ParentId");
+  -- живые записи в несуществующей папке (корень — Guid.Empty)
+  SELECT e."Id", e."OwnerId", e."DirectoryId" FROM "CloudFileEntries" e
+  WHERE NOT e."IsDeleted" AND e."DirectoryId" <> '00000000-0000-0000-0000-000000000000'
+    AND NOT EXISTS (SELECT 1 FROM "CloudDirectories" d WHERE d."Id" = e."DirectoryId");
+  -- публичные ссылки и гранты на несуществующую папку
+  SELECT s."Id", s."DirectoryId" FROM "FolderShareLinks" s WHERE NOT EXISTS (SELECT 1 FROM "CloudDirectories" d WHERE d."Id" = s."DirectoryId");
+  SELECT g."Id", g."DirectoryId" FROM "DirectoryGrants" g WHERE NOT EXISTS (SELECT 1 FROM "CloudDirectories" d WHERE d."Id" = g."DirectoryId");
+  ```
 
-Тесты: юнит — `CloudHierarchyStorageTests` (`GetSubtree` на цикле/самопетле), `GetPathCommandHandlerTests`, `MoveDirectoryCommandHandlerTests` (порядок замок → чтение → запись → коммит, цикл выше нового родителя), `DeleteDirectoryCommandHandlerTests`. Интеграционные на PostgreSQL — `Persistence/CloudTreeConcurrencyPostgresTests` (хелпер `_Helpers/PostgresFilesDatabase`, переменная `BARKCLOUD_TEST_POSTGRES`, без неё пропускаются): оба хендлера останавливаются на барьере после проверки и до записи; без `LockTree` оба теста падают. Для CI сервис PostgreSQL включён у Files в `tests.yml`, `backend-service-ci.yml`, `tests-backend-manual.yml`.
+Тесты: юнит — `CloudHierarchyStorageTests` (`GetSubtree` на цикле/самопетле), `GetPathCommandHandlerTests`, `MoveDirectoryCommandHandlerTests` (порядок замок → чтение → запись → коммит, цикл выше нового родителя), `DeleteDirectoryCommandHandlerTests`; для остальных писателей — `{CreateDirectory,AttachFile,MoveFileEntry,RestoreFromTrash,CreateFolderShare,ShareFolderWithUser}CommandHandlerTests` (порядок «замок → проверка → запись → commit», без commit при отказе). Интеграционные на PostgreSQL (хелпер `_Helpers/PostgresFilesDatabase`, переменная `BARKCLOUD_TEST_POSTGRES`, без неё пропускаются): `Persistence/CloudTreeConcurrencyPostgresTests` — Move/Move и Move/Delete, оба хендлера останавливаются на барьере после проверки и до записи; `Persistence/CloudTreeWriterRacePostgresTests` — по одному сценарию «писатель ‖ `DeleteDirectory`» для всех шести писателей (перехватчик `SaveChanges` останавливает писателя после проверки папки и до записи, затем стартует удаление; инвариант — нет подпапок, живых записей, ссылок и грантов на несуществующую папку). Без `LockTree` все эти тесты падают. В `CloudDirectoryUniquenessPostgresTests` хелпер `Create` пишет через `AddDirectory` мимо хендлера: хендлер теперь сериализует создания одного владельца, а там проверяются сами уникальные индексы. Для CI сервис PostgreSQL включён у Files в `tests.yml`, `backend-service-ci.yml`, `tests-backend-manual.yml`.
 
 ## Уникальность папок (F16)
 
@@ -88,7 +102,7 @@ NextCloud-подобная иерархия папок и файловых за�
 `Backend/BarkCloud.Files/Features/Cloud/` — каждая пара `XxxCommand.cs` + `XxxCommandHandler.cs`:
 
 ### Директории
-- `CreateDirectory` — создать папку (возвращает `DirectoryInfo`)
+- `CreateDirectory` — создать папку (возвращает `DirectoryInfo`; под `LockTree`)
 - `RenameDirectory` — переименовать
 - `MoveDirectory` — переместить в другую папку (под `LockTree`, см. «Целостность дерева»)
 - `DeleteDirectory` — удалить рекурсивно (под `LockTree`)
@@ -98,9 +112,9 @@ NextCloud-подобная иерархия папок и файловых за�
 Для обоих RPC размер страницы файлов по умолчанию — 50, максимум — 200. Курсор состоит из `(Name, entry_id)`, порядок — `Name ASC, entry_id ASC`; выборка делает `limit + 1`, чтобы определить `next_cursor_*`. Поддиректории не пагинируются. Удалённые и неготовые файлы не попадают в ответ.
 
 ### Записи о файлах
-- `AttachFile` — привязать существующий **ready** `UploadFile` к папке (создаёт `CloudFileEntry`); processing placeholder отклоняется `FileNotReadyException`; повтор уже привязанного файла даёт стабильный `FileAlreadyAttachedException`; коллизия имени разрешается суффиксом ` (1)`; при `route_by_media_kind=true` `directory_id` игнорируется и файл кладётся в системную папку по типу медиа
+- `AttachFile` — привязать существующий **ready** `UploadFile` к папке (создаёт `CloudFileEntry`; под `LockTree`, включая выбор системной папки); processing placeholder отклоняется `FileNotReadyException`; повтор уже привязанного файла даёт стабильный `FileAlreadyAttachedException`; коллизия имени разрешается суффиксом ` (1)`; при `route_by_media_kind=true` `directory_id` игнорируется и файл кладётся в системную папку по типу медиа
 - `RenameFileEntry` — изменить отображаемое имя записи
-- `MoveFileEntry` — перенести в другую папку
+- `MoveFileEntry` — перенести в другую папку (под `LockTree`)
 - `DeleteFileEntry` — **перемещает запись в корзину** (soft-delete: `IsDeleted/DeletedAt/PurgeAt`). `Uploaders`/квота сохраняются, блоб не трогается
 - `DeleteFileEntries` — массовый вариант soft-delete для записей каталога: принимает набор `entry_id`, дедуплицирует, чужие/несуществующие/уже удалённые записи молча пропускает и возвращает `deleted_count`. Web использует его через `/api/cloud/entries/delete`.
 - `DeleteDirectory` — рекурсивно: файлы поддерева → в корзину, сами папки удаляются сразу (restore вернёт файлы в корень). Дополнительно немедленно снимает публичность (`FolderShareLink`) и приватные гранты (`DirectoryGrant`) со всех папок поддерева — публичная страница `/f` и доступ получателей прекращаются сразу
@@ -111,7 +125,7 @@ NextCloud-подобная иерархия папок и файловых за�
 
 ### Корзина
 - `ListTrash` — список записей в корзине (от свежеудалённых к старым); cursor-пагинация `(DeletedAt + entry_id)`; `TrashEntry` = `FileEntryInfo` + `UploadFileInfo` + `deleted_at`/`purge_at`
-- `RestoreFromTrash` — восстановить запись (в исходную папку или, если она удалена, в корень; конфликт имени разрешается суффиксом; отказ при нарушении инварианта одной директории)
+- `RestoreFromTrash` — восстановить запись (под `LockTree`; в исходную папку или, если она удалена, в корень; конфликт имени разрешается суффиксом; отказ при нарушении инварианта одной директории)
 - `DeleteFromTrash` — удалить запись из корзины навсегда (немедленно) → `TrashPurgeService`
 - `EmptyTrash` — очистить корзину владельца целиком → `TrashPurgeService`
 
