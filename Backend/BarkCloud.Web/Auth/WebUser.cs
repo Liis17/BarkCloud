@@ -19,6 +19,7 @@ public enum LoginOutcome
     NeedsOtp,
     WrongOtp,
     InvalidCredentials,
+    TooManyAttempts,
     Error
 }
 

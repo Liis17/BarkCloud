@@ -67,13 +67,34 @@ public static class SystemEndpoints
 
         // ───────── Разблокировка по паролю ─────────
 
-        api.MapPost("/unlock", async (HttpContext http, AuthGateway auth, AdminGate admin, UnlockRequest body) =>
+        api.MapPost("/unlock", async (
+            HttpContext http, AuthGateway auth, AdminGate admin, AdminUnlockLimiter limiter,
+            ILogger<AdminGate> log, UnlockRequest body) =>
         {
-            if (await auth.AuthenticateAsync(http) is null) return Results.Unauthorized();
+            var user = await auth.AuthenticateAsync(http);
+            if (user is null) return Results.Unauthorized();
             if (!admin.Enabled) return Results.BadRequest(new { message = "Админ-доступ не настроен" });
-            return admin.Unlock(http, body.Password)
-                ? Results.Ok(new { unlocked = true })
-                : Results.BadRequest(new { message = "Неверный пароль" });
+
+            // Лимит по адресу источника и общий; ключ не зависит от сессии, поэтому новый вход его не обходит.
+            var sourceIp = BrowserContext.ResolveIp(http);
+            var (allowed, retryAfter) = limiter.TryAcquire(sourceIp);
+            if (!allowed)
+            {
+                log.LogWarning("Разблокировка обслуживания отклонена лимитом попыток: IP {SourceIp}, пользователь {UserId}", sourceIp, user.UserId);
+                http.Response.Headers.RetryAfter = Math.Max(1, (int)Math.Ceiling(retryAfter.TotalSeconds)).ToString(CultureInfo.InvariantCulture);
+                return Results.Json(
+                    new { message = $"Слишком много попыток. Повторите через {Math.Max(1, (int)Math.Ceiling(retryAfter.TotalMinutes))} мин" },
+                    statusCode: StatusCodes.Status429TooManyRequests);
+            }
+
+            if (admin.Unlock(http, body.Password))
+            {
+                log.LogInformation("Раздел обслуживания разблокирован: IP {SourceIp}, пользователь {UserId}", sourceIp, user.UserId);
+                return Results.Ok(new { unlocked = true });
+            }
+
+            log.LogWarning("Неверный админ-пароль обслуживания: IP {SourceIp}, пользователь {UserId}", sourceIp, user.UserId);
+            return Results.BadRequest(new { message = "Неверный пароль" });
         });
 
         api.MapPost("/lock", async (HttpContext http, AuthGateway auth, AdminGate admin) =>

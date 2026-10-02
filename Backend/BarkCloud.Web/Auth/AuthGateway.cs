@@ -29,6 +29,8 @@ public sealed class AuthGateway
     private const string ErrOtpNeeded = "C1576884-12D8-4722-A7EE-9F9789AD1265";
     private const string ErrOtpInvalid = "803B632C-4457-4B05-9435-9C3DD0F41E00";
     private const string ErrInvalidLogin = "21BFB9B5-C377-45D1-9B15-6B7F3432B397";
+    private const string ErrPasswordAttemptsExceeded = "3C8E5A17-6D42-4B90-A1F3-7E2B9D0C4A58";
+    private const string ErrTooManyRequests = "8F2B6D41-5A93-4C7E-B0D8-1E4A7C9F3B26";
 
     private readonly IdentityApi.IdentityApiClient _identity;
     private readonly TokenRevocationCache _revocations;
@@ -146,6 +148,7 @@ public sealed class AuthGateway
                 ErrOtpNeeded => new LoginResult(LoginOutcome.NeedsOtp),
                 ErrOtpInvalid => new LoginResult(LoginOutcome.WrongOtp, ex.Status.Detail),
                 ErrInvalidLogin => new LoginResult(LoginOutcome.InvalidCredentials, ex.Status.Detail),
+                ErrPasswordAttemptsExceeded or ErrTooManyRequests => new LoginResult(LoginOutcome.TooManyAttempts, ex.Status.Detail),
                 _ => new LoginResult(LoginOutcome.Error, ex.Status.Detail)
             };
         }
