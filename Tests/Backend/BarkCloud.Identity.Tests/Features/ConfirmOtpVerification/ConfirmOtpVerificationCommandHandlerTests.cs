@@ -5,6 +5,7 @@ using BarkCloud.Identity.Domain;
 using BarkCloud.Identity.Features.ConfirmOtpVerification;
 using BarkCloud.Identity.Infrastructure;
 using BarkCloud.Identity.Persistence.Services;
+using BarkCloud.Identity.Services;
 using BarkCloud.Identity.Tests._Helpers;
 using BarkCloud.Proto.Identity;
 using BarkCloud.Proto.Users;
@@ -30,6 +31,7 @@ public class ConfirmOtpVerificationCommandHandlerTests
     private readonly Mock<UsersServerApi.UsersServerApiClient> _usersClient = new();
     private readonly Mock<NotificationQueueSender> _notifications;
     private readonly Mock<LocationClient> _location;
+    private readonly Mock<IAuthRateLimiter> _rateLimiter = new();
     private readonly MetricsCollector _metrics = new();
     private readonly ILogger<ConfirmOtpVerificationCommandHandler> _logger =
         NullLogger<ConfirmOtpVerificationCommandHandler>.Instance;
@@ -61,6 +63,7 @@ public class ConfirmOtpVerificationCommandHandlerTests
         new RequestContext { DeviceName = "Pixel", OperationSystem = "Android", IpAddress = "1.1.1.1" },
         _location.Object,
         _metrics,
+        _rateLimiter.Object,
         _logger);
 
     [Fact]
@@ -252,5 +255,25 @@ public class ConfirmOtpVerificationCommandHandlerTests
 
         _authProps.Verify(s => s.ActivatePendingOtpSecret(It.IsAny<long>(), It.IsAny<string>()), Times.Never);
         _authProps.Verify(s => s.EnableEmailOtp(It.IsAny<long>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_AuthenticatorTotpLimitExceeded_RejectsValidCodeWithoutActivation()
+    {
+        var key = KeyGeneration.GenerateRandomKey(20);
+        _authProps.Setup(s => s.GetUserAuthProperties(42)).ReturnsAsync(new AuthUserProperty
+        {
+            UserId = 42,
+            SelectedOtpType = OtpType.Authenticator,
+            PendingOtpSecret = Base32Encoding.ToString(key),
+            PendingOtpSecretExpiresAt = DateTime.UtcNow.AddMinutes(5)
+        });
+        _rateLimiter.Setup(l => l.EnsureTotpAttemptAsync(42)).ThrowsAsync(new TooManyRequestsException());
+
+        var act = () => CreateSut().Handle(
+            new ConfirmOtpVerificationCommand { OtpCode = new Totp(key).ComputeTotp() }, default);
+
+        await act.Should().ThrowAsync<TooManyRequestsException>();
+        _authProps.Verify(s => s.ActivatePendingOtpSecret(It.IsAny<long>(), It.IsAny<string>()), Times.Never);
     }
 }

@@ -5,6 +5,7 @@ using BarkCloud.Identity.Features.Auth;
 using BarkCloud.Identity.Features.CreateToken;
 using BarkCloud.Identity.Infrastructure;
 using BarkCloud.Identity.Persistence.Services;
+using BarkCloud.Identity.Services;
 using BarkCloud.Proto.Identity;
 using BarkCloud.Proto.Users;
 using BarkCloud.Shared.Exceptions.Identity;
@@ -31,6 +32,7 @@ public class AuthCommandHandlerTests
     private readonly Mock<IRefreshTokensStorage> _refreshTokens = new();
     private readonly Mock<IPasswordsStorage> _passwords = new();
     private readonly Mock<LocationClient> _location;
+    private readonly Mock<IAuthRateLimiter> _rateLimiter = new();
     private readonly MetricsCollector _metrics = new();
     private readonly ILogger<AuthCommandHandler> _logger = NullLogger<AuthCommandHandler>.Instance;
 
@@ -44,14 +46,18 @@ public class AuthCommandHandlerTests
             new MetricsCollector(),
             NullLogger<LocationClient>.Instance);
         _location.Setup(c => c.GetLocation(It.IsAny<string>())).ReturnsAsync((IpLocation?)null);
+
+        // По умолчанию лимиты не сработали; отдельные тесты переопределяют нужную политику.
+        _rateLimiter.Setup(l => l.TryReserveAsync(It.IsAny<AuthLimits.Policy>(), It.IsAny<string>())).ReturnsAsync(true);
     }
 
     private AuthCommandHandler CreateSut(RequestContext? ctx = null) => new(
         _usersClient.Object, _mediator.Object, _authProps.Object, _notifications.Object,
-        _refreshTokens.Object, ctx ?? FullContext(), _passwords.Object, _location.Object, _metrics, _logger);
+        _refreshTokens.Object, ctx ?? FullContext(), _passwords.Object, _location.Object, _metrics, _rateLimiter.Object, _logger);
 
-    private static RequestContext FullContext() => new()
+    private static RequestContext FullContext(string? sourceIp = null) => new()
     {
+        SourceIp = sourceIp ?? "203.0.113.7",
         DeviceName = "Pixel",
         OperationSystem = "Android 14",
         AppName = "BarkCloud",
@@ -335,5 +341,119 @@ public class AuthCommandHandlerTests
             s => s.CreateNewRefreshToken(It.IsAny<string>(), 42, "device-1", It.IsAny<int>()),
             Times.Once);
         _notifications.Verify(n => n.SendNotification(It.IsAny<EmailNotification>()), Times.AtLeastOnce);
+    }
+
+    // ───────── F14: лимиты попыток ─────────
+
+    [Fact]
+    public async Task Handle_SourceLimitExceeded_ThrowsTooManyRequestsBeforeUserLookup()
+    {
+        _rateLimiter.Setup(l => l.EnsureSourceAsync(AuthLimits.AuthByIp)).ThrowsAsync(new TooManyRequestsException());
+
+        var act = () => CreateSut().Handle(new AuthCommand { Username = "u", Password = "p" }, default);
+
+        await act.Should().ThrowAsync<TooManyRequestsException>();
+        _usersClient.Verify(
+            c => c.FindByLoginAsync(It.IsAny<FindByLoginRequest>(), null, null, default), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_InvalidRequest_DoesNotSpendSourceLimit()
+    {
+        var act = () => CreateSut().Handle(new AuthCommand { Username = "u" }, default);
+
+        await act.Should().ThrowAsync<InvalidLoginOrPasswordException>();
+        _rateLimiter.Verify(l => l.EnsureSourceAsync(It.IsAny<AuthLimits.Policy>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_AccountLimitExhausted_RejectsBeforePasswordCheckAndCodeIssue()
+    {
+        SetupUser(1, new AuthUserProperty { UserId = 1, EmailOtpEnabled = true });
+        _rateLimiter.Setup(l => l.TryReserveAsync(AuthLimits.LoginByAccount, "1")).ReturnsAsync(false);
+
+        // Пароль верный, но лимит исчерпан: ни пароль, ни код 2FA не проверяются, письмо не уходит.
+        var act = () => CreateSut().Handle(new AuthCommand { Username = "u", Password = "p" }, default);
+
+        await act.Should().ThrowAsync<PasswordAttemptsExceededException>();
+        _passwords.Verify(s => s.GetUserPasswordHash(It.IsAny<long>()), Times.Never);
+        _authProps.Verify(
+            s => s.TryIssueEmailAuthCode(It.IsAny<long>(), It.IsAny<EmailAuthCodePurpose>(), It.IsAny<string>()),
+            Times.Never);
+        _notifications.Verify(n => n.SendNotification(It.IsAny<Notification>()), Times.Never);
+        _metrics.SnapshotAndReset()["auth_login_failed_locked"].Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Handle_AccountLimit_DependsOnAccountNotOnSourceIp()
+    {
+        SetupUser(1, null);
+
+        foreach (var ip in new[] { "203.0.113.7", "198.51.100.9" })
+        {
+            var ctx = FullContext(sourceIp: ip);
+            await CreateSut(ctx).Handle(new AuthCommand { Username = "u", Password = "p" }, default);
+        }
+
+        _rateLimiter.Verify(l => l.TryReserveAsync(AuthLimits.LoginByAccount, "1"), Times.Exactly(2));
+    }
+
+    [Fact]
+    public async Task Handle_Success_ResetsAccountCounter()
+    {
+        SetupUser(1, null);
+
+        await CreateSut().Handle(new AuthCommand { Username = "u", Password = "p" }, default);
+
+        _rateLimiter.Verify(l => l.ResetAsync(AuthLimits.LoginByAccount, "1"), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_WrongPassword_DoesNotResetAccountCounter()
+    {
+        SetupUser(1, null);
+
+        var act = () => CreateSut().Handle(new AuthCommand { Username = "u", Password = "wrong" }, default);
+
+        await act.Should().ThrowAsync<InvalidLoginOrPasswordException>();
+        _rateLimiter.Verify(l => l.ResetAsync(It.IsAny<AuthLimits.Policy>(), It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_OtpStepWithoutFullSuccess_DoesNotResetAccountCounter()
+    {
+        SetupUser(1, new AuthUserProperty { UserId = 1, OtpEnabled = true });
+
+        var act = () => CreateSut().Handle(new AuthCommand { Username = "u", Password = "p" }, default);
+
+        await act.Should().ThrowAsync<OtpCodeNeedException>();
+        _rateLimiter.Verify(l => l.ResetAsync(It.IsAny<AuthLimits.Policy>(), It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_WrongPassword_SendsFailedLoginMailWhenNotLimited()
+    {
+        SetupUser(1, null);
+
+        var act = () => CreateSut().Handle(new AuthCommand { Username = "u", Password = "wrong" }, default);
+
+        await act.Should().ThrowAsync<InvalidLoginOrPasswordException>();
+        _notifications.Verify(
+            n => n.SendNotification(It.Is<EmailNotification>(e => e.Type == NotificationType.FailedLogin)), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_WrongPasswordMailLimited_SkipsMailAndExternalLookups()
+    {
+        SetupUser(1, null);
+        _rateLimiter.Setup(l => l.TryReserveAsync(AuthLimits.FailedLoginMail, "1")).ReturnsAsync(false);
+
+        var act = () => CreateSut().Handle(new AuthCommand { Username = "u", Password = "wrong" }, default);
+
+        await act.Should().ThrowAsync<InvalidLoginOrPasswordException>();
+        _notifications.Verify(n => n.SendNotification(It.IsAny<Notification>()), Times.Never);
+        _usersClient.Verify(
+            c => c.GetUserContactsAsync(It.IsAny<GetUserContactsRequest>(), null, null, default), Times.Never);
+        _location.Verify(c => c.GetLocation(It.IsAny<string>()), Times.Never);
     }
 }

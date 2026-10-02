@@ -35,6 +35,7 @@ public class EnableOtpVerificationCommandHandlerTests
     private readonly Mock<UsersServerApi.UsersServerApiClient> _usersClient = new();
     private readonly Mock<NotificationQueueSender> _notifications;
     private readonly Mock<LocationClient> _location;
+    private readonly Mock<IAuthRateLimiter> _rateLimiter = new();
     private readonly MetricsCollector _metrics = new();
     private readonly ILogger<EnableOtpVerificationCommandHandler> _logger = NullLogger<EnableOtpVerificationCommandHandler>.Instance;
 
@@ -61,6 +62,7 @@ public class EnableOtpVerificationCommandHandlerTests
             ctx ?? FullContext(),
             _location.Object,
             _metrics,
+            _rateLimiter.Object,
             EmailConfig(emailEnabled),
             _logger);
 
@@ -345,5 +347,29 @@ public class EnableOtpVerificationCommandHandlerTests
         _authProps.Verify(
             s => s.TryIssueEmailAuthCode(It.IsAny<long>(), It.IsAny<EmailAuthCodePurpose>(), It.IsAny<string>()),
             Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_AuthenticatorType_CurrentCodeLimitExceeded_RejectsValidCodeWithoutWrites()
+    {
+        var activeKey = KeyGeneration.GenerateRandomKey(20);
+        ArrangeUser();
+        _authProps.Setup(s => s.GetUserAuthProperties(42)).ReturnsAsync(new AuthUserProperty
+        {
+            UserId = 42,
+            OtpEnabled = true,
+            OtpSecret = Base32Encoding.ToString(activeKey)
+        });
+        _rateLimiter.Setup(l => l.EnsureTotpAttemptAsync(42)).ThrowsAsync(new TooManyRequestsException());
+
+        var act = () => CreateSut().Handle(new EnableOtpVerificationCommand
+        {
+            OptType = OtpTypeId.Authenticator,
+            Password = Password,
+            CurrentOtpCode = new Totp(activeKey).ComputeTotp()
+        }, default);
+
+        await act.Should().ThrowAsync<TooManyRequestsException>();
+        _authProps.Verify(s => s.SetPendingOtpSecret(It.IsAny<long>(), It.IsAny<string>(), It.IsAny<DateTime>()), Times.Never);
     }
 }

@@ -34,13 +34,15 @@ public class EnableOtpVerificationCommandHandler : IRequestHandler<EnableOtpVeri
     private readonly RequestContext _requestContext;
     private readonly LocationClient _locationClient;
     private readonly MetricsCollector _metrics;
+    private readonly IAuthRateLimiter _rateLimiter;
     private readonly IConfiguration _configuration;
     private readonly ILogger<EnableOtpVerificationCommandHandler> _logger;
 
     public EnableOtpVerificationCommandHandler(UserContext userContext, IAuthPropertiesStorage authPropertiesStorage,
         ReauthPasswordVerifier reauthPassword, UsersServerApi.UsersServerApiClient usersClient,
         NotificationQueueSender notificationQueueSender, RequestContext requestContext, LocationClient locationClient,
-        MetricsCollector metrics, IConfiguration configuration, ILogger<EnableOtpVerificationCommandHandler> logger)
+        MetricsCollector metrics, IAuthRateLimiter rateLimiter, IConfiguration configuration,
+        ILogger<EnableOtpVerificationCommandHandler> logger)
     {
         _userContext = userContext;
         _authPropertiesStorage = authPropertiesStorage;
@@ -50,6 +52,7 @@ public class EnableOtpVerificationCommandHandler : IRequestHandler<EnableOtpVeri
         _requestContext = requestContext;
         _locationClient = locationClient;
         _metrics = metrics;
+        _rateLimiter = rateLimiter;
         _configuration = configuration;
         _logger = logger;
     }
@@ -112,6 +115,9 @@ public class EnableOtpVerificationCommandHandler : IRequestHandler<EnableOtpVeri
 
             if (oldOptOptions is { OtpEnabled: true })
             {
+                // Шестизначный код под токеном: перебор ограничен по аккаунту.
+                await _rateLimiter.EnsureTotpAttemptAsync(_userContext.UserId);
+
                 var activeTotp = new Totp(Base32Encoding.ToBytes(oldOptOptions.OtpSecret));
 
                 if (string.IsNullOrEmpty(request.CurrentOtpCode) ||
