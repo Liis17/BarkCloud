@@ -40,6 +40,9 @@ public class RequestContextInterceptor : Interceptor
             AppVersion = GetMetadataValue(metadata, MetadataKeys.AppVersion),
             DeviceId = GetMetadataValue(metadata, MetadataKeys.DeviceId),
             IpAddress = ResolveIpAddress(metadata, httpContext),
+            SourceIp = SourceIpResolver.Resolve(
+                httpContext.Request.Headers["X-Real-IP"].FirstOrDefault(),
+                httpContext.Connection.RemoteIpAddress),
         };
 
         accessor.Set(requestContext);

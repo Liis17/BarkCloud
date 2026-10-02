@@ -22,6 +22,23 @@ namespace BarkCloud.Identity.Persistence.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("BarkCloud.Identity.Domain.AuthAttemptCounter", b =>
+                {
+                    b.Property<string>("Key")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int>("Count")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("WindowEndsAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Key");
+
+                    b.ToTable("AuthAttemptCounters");
+                });
+
             modelBuilder.Entity("BarkCloud.Identity.Domain.AuthUserProperty", b =>
                 {
                     b.Property<long>("Id")

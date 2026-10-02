@@ -14,5 +14,8 @@ public class MetadataKeys
 
     public const string IpAddress = "x-ip-address";
 
+    /// <summary>Доверенный адрес источника для лимитов попыток (nginx перезаписывает его; Web выставляет сам).</summary>
+    public const string RealIp = "x-real-ip";
+
     public const string DeviceId = "x-device-id";
 }
