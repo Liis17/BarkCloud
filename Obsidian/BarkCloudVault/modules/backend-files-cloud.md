@@ -41,8 +41,21 @@ NextCloud-подобная иерархия папок и файловых за�
 - Методы доступа к `CloudDirectories` и `CloudFileEntries` (`Get*`, `*AsNoTracking`, и др.). «Живые» выборки (`ListFilesInDirectory`, `GetFileEntriesInDirectories`, `FileEntryNameExists`, `FileEntryExistsForFile`) фильтруют `!IsDeleted`
 - Методы корзины: `GetTrashedEntry`, `ListTrashedPage`, `GetAllTrashedEntries`, `GetExpiredTrashedEntries` (для воркера), `GetEffectivelyTrashedFileIds` (для скрытия из галереи/альбомов)
 - Подключён к `FilesContext` (`CloudDirectories`, `CloudFileEntries` DbSet'ы)
+- `LockTree(ownerId)` → `ICloudTreeLock` — замок структуры дерева владельца (F13), см. ниже
 
 Миграции: `Persistence/Migrations/20260518174041_AddCloudDirectories.cs`; `20260525213058_AddTrashToCloudFileEntries.cs` (поля корзины + частичные уникальные индексы `WHERE IsDeleted = false` + индекс по `PurgeAt WHERE IsDeleted = true`).
+
+## Целостность дерева (F13)
+
+Дерево — это `CloudDirectory.ParentId` без внешнего ключа, поэтому циклы и «сирот» предотвращает только код.
+
+- **Замок структуры.** `ICloudHierarchyStorage.LockTree(ownerId)` открывает транзакцию EF и на Npgsql берёт `pg_advisory_xact_lock(hashtextextended('cloud-tree:{ownerId}', 0))`. Ключ не совпадает с замком квоты (`StorageQuotaService`: `pg_advisory_xact_lock(ownerId)`), чтобы замки не мешали друг другу. На SQLite (юнит-тесты) берётся только транзакция. Возвращает `ICloudTreeLock` (`CommitAsync` + `DisposeAsync`; без коммита — откат и снятие замка).
+- **Где используется:** `MoveDirectory` и `DeleteDirectory`. Порядок строгий: замок → чтение папок (отслеживаемые сущности EF иначе останутся устаревшими) → проверки → запись → `CommitAsync`. Параллельные «A в B» и «B в A» выполняются по очереди: второй видит `A.ParentId == B` и получает `CircularMove`. Move внутрь удаляемого поддерева либо выполняется до удаления (папка уходит вместе с поддеревом), либо получает `DirectoryNotFound`.
+- **Вне замка:** `CreateDirectory`, `RenameDirectory`, `EnsureSystemDirectory` — они не могут создать цикл; уникальность имён корневых папок — отдельная находка F16.
+- **Защита обходов от повреждённых данных:** `GetSubtree` пропускает уже посещённые папки (конечен и отдаёт каждую папку один раз, в том числе при самопетле); на нём держатся `DeleteDirectory`, `CreateArchive`, `ResolveFolderShare`, `RevokeFolderShare`, `FolderGrantAccessService`. Подъём по предкам в `MoveDirectory` при повторной папке отвечает `CircularMoveException`; в `GetPath` — `DirectoryTreeCorruptedException` ([[modules/shared-exceptions]]). `CreateArchive.RelativeDirPath` уже был ограничен счётчиком.
+- **Не сделано:** уже существующие циклы в БД не чинятся автоматически. Их можно посчитать запросом с рекурсивным CTE по `CloudDirectories`; цикл недостижим из корня, но виден по ID (поиск, гранты, публичные ссылки).
+
+Тесты: юнит — `CloudHierarchyStorageTests` (`GetSubtree` на цикле/самопетле), `GetPathCommandHandlerTests`, `MoveDirectoryCommandHandlerTests` (порядок замок → чтение → запись → коммит, цикл выше нового родителя), `DeleteDirectoryCommandHandlerTests`. Интеграционные на PostgreSQL — `Persistence/CloudTreeConcurrencyPostgresTests` (хелпер `_Helpers/PostgresFilesDatabase`, переменная `BARKCLOUD_TEST_POSTGRES`, без неё пропускаются): оба хендлера останавливаются на барьере после проверки и до записи; без `LockTree` оба теста падают. Для CI сервис PostgreSQL включён у Files в `tests.yml`, `backend-service-ci.yml`, `tests-backend-manual.yml`.
 
 ## Host (gRPC)
 
@@ -58,8 +71,8 @@ NextCloud-подобная иерархия папок и файловых за�
 ### Директории
 - `CreateDirectory` — создать папку (возвращает `DirectoryInfo`)
 - `RenameDirectory` — переименовать
-- `MoveDirectory` — переместить в другую папку
-- `DeleteDirectory` — удалить рекурсивно
+- `MoveDirectory` — переместить в другую папку (под `LockTree`, см. «Целостность дерева»)
+- `DeleteDirectory` — удалить рекурсивно (под `LockTree`)
 - `ListDirectory` — cursor-страница (subdirs + files), только метаданные
 - `ListDirectoryDetailed` — cursor-страница с обогащёнными `FileEntryDetailed` (полная `UploadFileInfo` с URL/превью); записи без ready-блоба не возвращаются
 
