@@ -182,10 +182,12 @@ public partial class UnifiedSearchService
     private IQueryable<Ranked<Guid>> BestFileMatches(
         long ownerId, SearchTerms terms, IQueryable<UploadFile> files, IQueryable<CloudFileEntry> titles, SearchSection section)
     {
-        var hits = titles.RankedBy(terms, e => e.FileId, true, e => e.Name)
-            .Concat(_context.FileSearchAliases.AsNoTracking().Where(a => a.OwnerId == ownerId)
+        // Источники ограничены файлами секции: ранг не считается для чужих разделов (в пустой секции работы почти нет).
+        var hits = titles.Where(e => files.Any(f => f.Id == e.FileId))
+                .RankedBy(terms, e => e.FileId, true, e => e.Name)
+            .Concat(_context.FileSearchAliases.AsNoTracking().Where(a => a.OwnerId == ownerId && files.Any(f => f.Id == a.FileId))
                 .RankedBy(terms, a => a.FileId, true, a => a.NormalizedValue))
-            .Concat(_context.FileTags.AsNoTracking().Where(t => t.OwnerId == ownerId)
+            .Concat(_context.FileTags.AsNoTracking().Where(t => t.OwnerId == ownerId && files.Any(f => f.Id == t.FileId))
                 .RankedBy(terms, t => t.FileId, true, t => t.NormalizedValue));
         if (section != SearchSection.Trash)
             hits = hits.Concat(files.Where(f => !_context.CloudFileEntries.Any(e => e.OwnerId == ownerId && e.FileId == f.Id))
