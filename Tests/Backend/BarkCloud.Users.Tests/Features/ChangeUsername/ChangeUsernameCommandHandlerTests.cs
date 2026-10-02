@@ -18,7 +18,7 @@ public class ChangeUsernameCommandHandlerTests
 
     public ChangeUsernameCommandHandlerTests()
     {
-        _queueSender = new Mock<UserInfoQueueSender>(Mock.Of<IPublishEndpoint>(), new MetricsCollector());
+        _queueSender = new Mock<UserInfoQueueSender>(Mock.Of<IPublishEndpoint>(), new MetricsCollector(), UsersContextFactory.Create());
         _queueSender
             .Setup(s => s.UsernameChangedEvent(It.IsAny<long>(), It.IsAny<string>()))
             .Returns(Task.CompletedTask);

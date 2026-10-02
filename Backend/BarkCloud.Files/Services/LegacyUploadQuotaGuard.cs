@@ -9,11 +9,77 @@ namespace BarkCloud.Files.Services;
 
 public readonly record struct LegacyUploadReservation(Guid SessionId, bool RequiresProcessing);
 
+/// <summary>Результат допуска до чтения тела: потолок размера файла для этого запроса.</summary>
+public readonly record struct LegacyUploadAdmission(long OwnerId, UploadFileType FileType, long MaxBytes);
+
 public sealed class LegacyUploadQuotaGuard(
     FilesContext context,
     IStorageQuotaService quota,
-    TimeProvider time) : ILegacyUploadCompletionMarker
+    TimeProvider time,
+    LegacyUploadOptions? options = null) : ILegacyUploadCompletionMarker
 {
+    private readonly LegacyUploadOptions _options = options ?? new LegacyUploadOptions();
+
+    /// <summary>
+    /// Проверка разрешения до чтения тела запроса: только чтение, ничего не резервирует.
+    /// Точное и атомарное резервирование остаётся за <see cref="ReserveAsync"/>.
+    /// </summary>
+    public async Task<LegacyUploadAdmission> AdmitAsync(
+        Guid fileId,
+        long? contentLength,
+        CancellationToken cancellationToken)
+    {
+        var file = await context.UploadedFiles
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == fileId, cancellationToken)
+            ?? throw new BarkCloud.Shared.Exceptions.Files.FileNotFoundException();
+        var existing = await context.UploadSessions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.FileId == fileId, cancellationToken);
+        if (existing is not null)
+        {
+            // Replay: размер уже зафиксирован сессией, тело не может быть больше.
+            if ((existing.Status == UploadSessionStatus.Ready && file.IsReady())
+                || (existing.Status == UploadSessionStatus.Processing
+                    && existing.LegacyProcessingCompletedAt.HasValue))
+            {
+                return new LegacyUploadAdmission(existing.OwnerId, file.Type, existing.DeclaredSize);
+            }
+
+            throw new FileAlreadyUploadedException(existing.Status == UploadSessionStatus.Processing
+                ? "Upload для этого файла уже выполняется"
+                : "Upload для этого файла уже завершён");
+        }
+
+        if (file.IsReady())
+            throw new FileAlreadyUploadedException("Файл уже был загружен");
+
+        var ownerId = file.Uploaders.FirstOrDefault();
+        var maxBytes = file.Type == UploadFileType.UserAvatar
+            ? _options.MaxAvatarBytes
+            : Math.Min(_options.MaxFileBytes, _options.MaxBufferedBytes);
+
+        var snapshot = await quota.GetSnapshotAsync(ownerId, acquireTransactionLock: false, cancellationToken);
+        if (snapshot.LimitBytes is { } limit)
+        {
+            var remaining = Math.Max(0, limit - snapshot.UsedBytes - snapshot.ReservedBytes);
+            if (remaining < maxBytes)
+            {
+                // Файл не может быть больше Content-Length за вычетом multipart-обвязки.
+                var requested = contentLength is { } length
+                    ? Math.Max(1, length - _options.MultipartOverheadBytes)
+                    : 1;
+                if (remaining == 0 || requested > remaining)
+                    throw new BarkCloud.Shared.Exceptions.Files.UploadQuotaExceededException(
+                        limit, snapshot.UsedBytes, snapshot.ReservedBytes, requested);
+
+                maxBytes = remaining;
+            }
+        }
+
+        return new LegacyUploadAdmission(ownerId, file.Type, maxBytes);
+    }
+
     public async Task<LegacyUploadReservation> ReserveAsync(
         Guid fileId,
         string fileName,

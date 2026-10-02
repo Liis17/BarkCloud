@@ -67,6 +67,11 @@ public sealed class PostgresUsersDatabase : IAsyncDisposable
     public UsersContext CreateContext(params IInterceptor[] interceptors) => new(
         new DbContextOptionsBuilder<UsersContext>().UseNpgsql(_dataSource).AddInterceptors(interceptors).Options);
 
+    public string ConnectionString => new NpgsqlConnectionStringBuilder(_dataSource.ConnectionString)
+    {
+        Pooling = false
+    }.ConnectionString;
+
     public async ValueTask DisposeAsync()
     {
         await _dataSource.DisposeAsync();

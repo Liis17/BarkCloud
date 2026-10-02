@@ -1,4 +1,5 @@
 using BarkCloud.GrpcServer.Metrics;
+using BarkCloud.Identity.Persistence.Contexts;
 using BarkCloud.Identity.Persistence.Services;
 using BarkCloud.Shared.Exceptions.Identity;
 
@@ -31,6 +32,7 @@ namespace BarkCloud.Identity.Features.ConfirmResetPassword
         private readonly RequestContext requestContext;
         private readonly MetricsCollector _metrics;
         private readonly ILogger<ConfirmResetPasswordCommandHandler> _logger;
+        private readonly IdentityContext _context;
 
         private const int ExpDaysRefreshToken = 9999;
 
@@ -38,7 +40,8 @@ namespace BarkCloud.Identity.Features.ConfirmResetPassword
         public ConfirmResetPasswordCommandHandler(IResetPasswordsStorage resetPasswordsStorage, IAuthPropertiesStorage authPropertiesStorage,
             IPasswordsStorage passwordsStorage, IRefreshTokensStorage refreshTokensStorage, IMediator mediator,
             PasswordChangedNotifier passwordChangedNotifier,
-            RequestContext requestContext, MetricsCollector metrics, ILogger<ConfirmResetPasswordCommandHandler> logger)
+            RequestContext requestContext, MetricsCollector metrics, ILogger<ConfirmResetPasswordCommandHandler> logger,
+            IdentityContext context)
         {
             _resetPasswordsStorage = resetPasswordsStorage;
             _authPropertiesStorage = authPropertiesStorage;
@@ -49,6 +52,7 @@ namespace BarkCloud.Identity.Features.ConfirmResetPassword
             this.requestContext = requestContext;
             _metrics = metrics;
             _logger = logger;
+            _context = context;
         }
 
         public async Task<ConfirmResetPasswordResponse> Handle(ConfirmResetPasswordCommand request, CancellationToken cancellationToken)
@@ -167,42 +171,47 @@ namespace BarkCloud.Identity.Features.ConfirmResetPassword
                 throw new NewPasswordSameAsOldException();
             }
 
-            // Атомарный захват reset: при параллельных подтверждениях успех получает только один.
-            if (!await _resetPasswordsStorage.TryApprove(request.ResetId))
-            {
-                _metrics.Increment("password_reset_confirmation_failed");
-                _metrics.Increment("password_reset_confirmation_failed_already_used");
-                _logger.LogWarning(
-                    "Reset ID {ResetId} уже был использован для пользователя {UserId}",
-                    request.ResetId,
-                    resetPasswordInfo.UserId
-                );
-                throw new ResetIdHasIsApprovedException();
-            }
-
+            var newPasswordHash = PasswordHasher.HashPassword(request.NewPassword);
             var deviceId = string.IsNullOrEmpty(requestContext.DeviceId)
                 ? Guid.NewGuid().ToString()
                 : requestContext.DeviceId;
+            var refreshTokenString = RefreshTokenGenerator.GenerateRefreshToken();
+            CreateTokenResponse accessTokenResponse;
 
-            // Отзыв прежних сессий — до записи нового хеша: при сбое между шагами пароль остаётся прежним.
-            if (request.RevokeOtherSessions)
+            await using (var transaction = await _context.Database.BeginTransactionAsync(cancellationToken))
             {
-                _logger.LogDebug("Отзыв прежних сессий пользователя {UserId}", resetPasswordInfo.UserId);
+                // Захват reset и все изменения сессий/пароля фиксируются одним коммитом.
+                if (!await _resetPasswordsStorage.TryApprove(request.ResetId))
+                {
+                    _metrics.Increment("password_reset_confirmation_failed");
+                    _metrics.Increment("password_reset_confirmation_failed_already_used");
+                    _logger.LogWarning(
+                        "Reset ID {ResetId} уже был использован для пользователя {UserId}",
+                        request.ResetId,
+                        resetPasswordInfo.UserId
+                    );
+                    throw new ResetIdHasIsApprovedException();
+                }
 
-                await refreshTokensStorage.RevokeAllSessions(resetPasswordInfo.UserId, deviceId, cancellationToken);
+                if (request.RevokeOtherSessions)
+                {
+                    _logger.LogDebug("Отзыв прежних сессий пользователя {UserId}", resetPasswordInfo.UserId);
+                    await refreshTokensStorage.RevokeAllSessions(resetPasswordInfo.UserId, deviceId, cancellationToken);
+                }
 
-                _metrics.Increment("sessions_revoked");
+                _logger.LogDebug("Установка нового хеша пароля для пользователя {UserId}", resetPasswordInfo.UserId);
+                await _passwordsStorage.UpdateUserPasswordHash(resetPasswordInfo.UserId, newPasswordHash);
+
+                _logger.LogDebug("Генерация refresh token для пользователя {UserId}", resetPasswordInfo.UserId);
+                await refreshTokensStorage.CreateNewRefreshToken(refreshTokenString, resetPasswordInfo.UserId, deviceId, ExpDaysRefreshToken);
+                accessTokenResponse = await _mediator.Send(new CreateTokenCommand { RefreshToken = refreshTokenString }, cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
             }
 
-            _logger.LogDebug("Установка нового хеша пароля для пользователя {UserId}", resetPasswordInfo.UserId);
-            await _passwordsStorage.UpdateUserPasswordHash(resetPasswordInfo.UserId, PasswordHasher.HashPassword(request.NewPassword));
-
-            _logger.LogDebug("Генерация refresh token для пользователя {UserId}", resetPasswordInfo.UserId);
-
-            var refreshTokenString = RefreshTokenGenerator.GenerateRefreshToken();
-            await refreshTokensStorage.CreateNewRefreshToken(refreshTokenString, resetPasswordInfo.UserId, deviceId, ExpDaysRefreshToken);
-
-            var accessTokenResponse = await _mediator.Send(new CreateTokenCommand { RefreshToken = refreshTokenString }, cancellationToken);
+            if (request.RevokeOtherSessions)
+            {
+                _metrics.Increment("sessions_revoked");
+            }
 
             try
             {

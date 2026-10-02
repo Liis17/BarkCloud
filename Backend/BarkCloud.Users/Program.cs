@@ -63,6 +63,12 @@ public class Program
 
         builder.Services.AddMassTransit(x =>
         {
+            x.AddEntityFrameworkOutbox<UsersContext>(o =>
+            {
+                o.UsePostgres();
+                o.UseBusOutbox();
+            });
+
             x.UsingRabbitMq((context, cfg) =>
             {
                 cfg.Host(builder.Configuration["RabbitMQ:Host"], "/", h =>

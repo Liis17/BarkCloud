@@ -1,5 +1,7 @@
 using BarkCloud.Users.Domain;
 
+using MassTransit;
+
 using Microsoft.EntityFrameworkCore;
 
 namespace BarkCloud.Users.Persistence.Contexts;
@@ -18,6 +20,10 @@ public class UsersContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.AddInboxStateEntity();
+        modelBuilder.AddOutboxStateEntity();
+        modelBuilder.AddOutboxMessageEntity();
+
         modelBuilder.Entity<User>()
             .HasOne(u => u.Contact)
             .WithOne(p => p.User)

@@ -1,6 +1,7 @@
 using BarkCloud.GrpcServer.Metrics;
 using BarkCloud.Identity.Consumers;
 using BarkCloud.Identity.Persistence.Services;
+using BarkCloud.Identity.Tests._Helpers;
 using BarkCloud.Shared.Queue.Users;
 
 using MassTransit;
@@ -9,7 +10,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace BarkCloud.Identity.Tests.Consumers;
 
-public class UserDeletedConsumerTests
+public class UserDeletedConsumerTests : IDisposable
 {
     private readonly Mock<IRefreshTokensStorage> _refreshTokens = new();
     private readonly Mock<IPasswordsStorage> _passwords = new();
@@ -17,11 +18,14 @@ public class UserDeletedConsumerTests
     private readonly Mock<IResetPasswordsStorage> _resets = new();
     private readonly Mock<IConfirmationCodesStorage> _codes = new();
     private readonly MetricsCollector _metrics = new();
+    private readonly SqliteIdentityContext _db = new();
+
+    public void Dispose() => _db.Dispose();
 
     private UserDeletedConsumer CreateSut() => new(
         _refreshTokens.Object, _passwords.Object, _authProps.Object,
         _resets.Object, _codes.Object, _metrics,
-        NullLogger<UserDeletedConsumer>.Instance);
+        NullLogger<UserDeletedConsumer>.Instance, _db.Context);
 
     [Fact]
     public async Task Consume_NoDevices_StillCleansUserData()

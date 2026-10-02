@@ -216,9 +216,9 @@ public class UsersStorage : IUsersStorage
             .ToListAsync();
     }
 
-    public async Task DeleteUser(long userId)
+    public async Task DeleteUser(long userId, CancellationToken cancellationToken = default)
     {
-        var user = await _usersContext.Users.FirstOrDefaultAsync(x => x.Id == userId);
+        var user = await _usersContext.Users.FirstOrDefaultAsync(x => x.Id == userId, cancellationToken);
 
         if (user is null)
         {
@@ -228,7 +228,7 @@ public class UsersStorage : IUsersStorage
         // Связанные UserContact / UserDevice / UserPrivacy удалятся каскадно (см. UsersContext).
         _usersContext.Users.Remove(user);
 
-        await _usersContext.SaveChangesAsync();
+        await _usersContext.SaveChangesAsync(cancellationToken);
     }
 
     public async Task<UserPrivacy> GetOrCreatePrivacy(long userId)

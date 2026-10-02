@@ -55,6 +55,7 @@ jobs:
             identity:
               - 'Backend/BarkCloud.Identity/**'
               - 'Tests/Backend/BarkCloud.Identity.Tests/**'
+              - 'Tests/Backend/BarkCloud.Identity.IntegrationTests/**'
             notification:
               - 'Backend/BarkCloud.Notification/**'
               - 'Tests/Backend/BarkCloud.Notification.Tests/**'
@@ -151,6 +152,41 @@ jobs:
           name: test-results-identity
           path: TestResults/**
 
+  test-identity-integration:
+    name: "Identity — PostgreSQL integration"
+    needs: changes
+    if: ${{ needs.changes.outputs.identity == 'true' || needs.changes.outputs.shared == 'true' }}
+    runs-on: ubuntu-latest
+    env:
+      BARKCLOUD_TEST_POSTGRES: Host=127.0.0.1;Port=5432;Database=postgres;Username=postgres;Password=postgres
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: "Test"
+        run: dotnet test Tests/Backend/BarkCloud.Identity.IntegrationTests/BarkCloud.Identity.IntegrationTests.csproj -c Release --logger "trx;LogFileName=identity-integration.trx" --results-directory TestResults
+      - name: "Upload test results"
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-identity-integration
+          path: TestResults/**
+
   test-notification:
     name: "Notification"
     needs: changes
@@ -200,12 +236,13 @@ jobs:
           path: TestResults/**
 
   test-users-integration:
-    name: "Users — PostgreSQL integration"
+    name: "Users — PostgreSQL/RabbitMQ integration"
     needs: changes
     if: ${{ needs.changes.outputs.users == 'true' || needs.changes.outputs.shared == 'true' }}
     runs-on: ubuntu-latest
     env:
       BARKCLOUD_TEST_POSTGRES: Host=127.0.0.1;Port=5432;Database=postgres;Username=postgres;Password=postgres
+      BARKCLOUD_TEST_RABBITMQ: rabbitmq://integration:integration@127.0.0.1:5672/
     services:
       postgres:
         image: postgres:18
@@ -217,6 +254,18 @@ jobs:
           - 5432:5432
         options: >-
           --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      rabbitmq:
+        image: rabbitmq:4.1
+        env:
+          RABBITMQ_DEFAULT_USER: integration
+          RABBITMQ_DEFAULT_PASS: integration
+        ports:
+          - 5672:5672
+        options: >-
+          --health-cmd "rabbitmq-diagnostics -q ping"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10

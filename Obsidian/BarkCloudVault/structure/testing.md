@@ -113,11 +113,22 @@ dotnet test Tests/Backend/BarkCloud.Users.Tests/BarkCloud.Users.Tests.csproj -c 
 - Каждый сценарий создаёт и удаляет только свою БД `barkcloud_users_f04_<guid>`. Docker/Testcontainers не требуются: локально можно использовать отдельный сервер PostgreSQL.
 - Проверяются регистронезависимые ограничения БД, доменные ошибки, повторная запись после конфликта, собственное имя, атомарный откат обновления профиля/контакта, конкурентное подтверждение черновика, отказ миграции на дублях с диагностикой ID, `Up → Down → Up` и непустой фильтр email.
 - Гонки переименования и вставки синхронизируются перехватчиком SQL с барьерами до записи или после проверки занятости. Отдельно проверяется появление черновика между поиском email и username: повтор по тому же email получает `UserIsDraftException`. В конкурентных вставках заданы разные ID, чтобы проверка F04 не зависела от генератора F05.
-- CI: отдельный `test-users-integration` в `.github/workflows/tests.yml`, PostgreSQL 18, .NET 10 и публикация TRX. Изменения интеграционного проекта включены в фильтр Users.
+- CI: отдельный `test-users-integration` в `.github/workflows/tests.yml`, PostgreSQL 18, RabbitMQ 4.1, .NET 10 и публикация TRX. Изменения интеграционного проекта включены в фильтр Users.
 
 ```bash
 export BARKCLOUD_TEST_POSTGRES='Host=127.0.0.1;Port=5432;Database=postgres;Username=postgres;Password=postgres'
+export BARKCLOUD_TEST_RABBITMQ='rabbitmq://integration:integration@127.0.0.1:5672/'
 dotnet test Tests/Backend/BarkCloud.Users.IntegrationTests/BarkCloud.Users.IntegrationTests.csproj -c Release
+```
+
+## Транзакции и outbox F11
+
+Users integration дополнительно требует `BARKCLOUD_TEST_RABBITMQ` — URI отдельного тестового RabbitMQ с доступом к vhost. Наблюдатели создают временные очереди; сетевой сбой моделируется локальным TCP proxy одного отправителя, общий брокер не останавливается. Проверяются сохранение/откат `UserDeleted`, отмена commit, доставка после восстановления сети и пересоздания host/DI, все профильные события в одном scope и up/down/up миграции outbox.
+
+`Tests/Backend/BarkCloud.Identity.IntegrationTests` использует `BARKCLOUD_TEST_POSTGRES`; создаёт и удаляет только свои БД `barkcloud_identity_f11_<guid>`. Проверяет атомарную очистку аккаунта, повторную обработку, rollback и конкурентное подтверждение сброса пароля, оба значения `RevokeOtherSessions`, commit до уведомления, а также rollback/успех logout и двух обработчиков удаления сессии. Отдельный `test-identity-integration` в CI запускается при изменениях Identity или Shared. Оба интеграционных проекта включены в `BarkCloud.slnx` и не пропускают проверки при отсутствии необходимого подключения. См. [[modules/transactional-outbox]].
+
+```bash
+dotnet test Tests/Backend/BarkCloud.Identity.IntegrationTests/BarkCloud.Identity.IntegrationTests.csproj -c Release
 ```
 
 ## CI

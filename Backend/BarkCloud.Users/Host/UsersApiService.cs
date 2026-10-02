@@ -129,7 +129,7 @@ public class UsersApiService : BarkCloud.Proto.Users.UsersApi.UsersApiBase
     public override async Task<DeleteAccountResponse> DeleteAccount(DeleteAccountRequest request, ServerCallContext context)
     {
         _metrics.Increment("account_deletions");
-        await _mediator.Send(new DeleteAccountCommand());
+        await _mediator.Send(new DeleteAccountCommand(), context.CancellationToken);
 
         return new DeleteAccountResponse();
     }

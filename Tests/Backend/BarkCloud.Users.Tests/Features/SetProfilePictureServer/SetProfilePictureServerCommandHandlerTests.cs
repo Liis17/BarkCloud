@@ -15,7 +15,7 @@ public class SetProfilePictureServerCommandHandlerTests
 
     public SetProfilePictureServerCommandHandlerTests()
     {
-        _queue = new Mock<UserInfoQueueSender>(Mock.Of<IPublishEndpoint>(), new BarkCloud.GrpcServer.Metrics.MetricsCollector());
+        _queue = new Mock<UserInfoQueueSender>(Mock.Of<IPublishEndpoint>(), new BarkCloud.GrpcServer.Metrics.MetricsCollector(), BarkCloud.Users.Tests._Helpers.UsersContextFactory.Create());
         _queue.Setup(s => s.UserChangedAvatarEvent(It.IsAny<long>(), It.IsAny<string>(), It.IsAny<string>()))
             .Returns(Task.CompletedTask);
     }

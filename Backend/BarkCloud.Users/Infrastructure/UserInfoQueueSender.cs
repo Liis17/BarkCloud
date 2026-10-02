@@ -1,5 +1,6 @@
 using BarkCloud.GrpcServer.Metrics;
 using BarkCloud.Shared.Queue.Users;
+using BarkCloud.Users.Persistence.Contexts;
 
 using MassTransit;
 
@@ -9,11 +10,13 @@ public class UserInfoQueueSender
 {
     private readonly IPublishEndpoint _publishEndpoint;
     private readonly MetricsCollector _metrics;
+    private readonly UsersContext _context;
 
-    public UserInfoQueueSender(IPublishEndpoint publishEndpoint, MetricsCollector metrics)
+    public UserInfoQueueSender(IPublishEndpoint publishEndpoint, MetricsCollector metrics, UsersContext context)
     {
         _publishEndpoint = publishEndpoint;
         _metrics = metrics;
+        _context = context;
     }
 
 
@@ -27,6 +30,7 @@ public class UserInfoQueueSender
         };
 
         await _publishEndpoint.Publish(userChangeNameEvent);
+        await _context.SaveChangesAsync();
         _metrics.Increment("user_events_published");
         _metrics.Increment("user_name_changed_published");
     }
@@ -40,6 +44,7 @@ public class UserInfoQueueSender
         };
 
         await _publishEndpoint.Publish(usernameChangedEvent);
+        await _context.SaveChangesAsync();
         _metrics.Increment("user_events_published");
         _metrics.Increment("user_username_changed_published");
     }
@@ -54,6 +59,7 @@ public class UserInfoQueueSender
         };
 
         await _publishEndpoint.Publish(userChangedAvatarEvent);
+        await _context.SaveChangesAsync();
         _metrics.Increment("user_events_published");
         _metrics.Increment("user_avatar_changed_published");
     }
@@ -67,19 +73,19 @@ public class UserInfoQueueSender
         };
 
         await _publishEndpoint.Publish(bioChangedEvent);
+        await _context.SaveChangesAsync();
         _metrics.Increment("user_events_published");
         _metrics.Increment("user_bio_changed_published");
     }
 
-    public virtual async Task UserDeletedEvent(long userId)
+    public virtual async Task UserDeletedEvent(long userId, CancellationToken cancellationToken = default)
     {
         var userDeletedEvent = new UserDeleted()
         {
             UserId = userId
         };
 
-        await _publishEndpoint.Publish(userDeletedEvent);
-        _metrics.Increment("user_events_published");
-        _metrics.Increment("user_deleted_published");
+        await _publishEndpoint.Publish(userDeletedEvent, cancellationToken);
+        await _context.SaveChangesAsync(cancellationToken);
     }
 }

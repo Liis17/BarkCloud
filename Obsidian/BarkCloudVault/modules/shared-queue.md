@@ -44,4 +44,4 @@ Files    ──► ProcessUploadedFile  ──► Files (Consumers/ProcessUpload
 
 ## Зависимости
 
-- Используется: всеми Backend-микросервисами через MassTransit/RabbitMQ.Client (см. их `Consumers/` и `Infrastructure/`-классы вроде `NotificationQueueSender`, `UserInfoQueueSender`). Files дополнительно использует `MassTransit.EntityFrameworkCore` 8.5.2 и PostgreSQL inbox/outbox tables для атомарной доставки Upload 2.0
+- Используется: всеми Backend-микросервисами через MassTransit/RabbitMQ.Client (см. их `Consumers/` и `Infrastructure/`-классы вроде `NotificationQueueSender`, `UserInfoQueueSender`). Files и Users используют `MassTransit.EntityFrameworkCore` 8.5.2 и PostgreSQL inbox/outbox: Upload 2.0 и атомарное удаление аккаунта с `UserDeleted`. Профильные события Users также сохраняются в outbox. См. [[modules/transactional-outbox]].

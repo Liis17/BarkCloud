@@ -5,6 +5,7 @@ using BarkCloud.Identity.Features.CreateToken;
 using BarkCloud.Identity.Infrastructure;
 using BarkCloud.Identity.Persistence.Services;
 using BarkCloud.Identity.Services;
+using BarkCloud.Identity.Tests._Helpers;
 using BarkCloud.Proto.Identity;
 using BarkCloud.Proto.Users;
 using BarkCloud.Shared.Exceptions.Identity;
@@ -24,7 +25,7 @@ using OtpType = BarkCloud.Identity.Domain.OtpType;
 
 namespace BarkCloud.Identity.Tests.Features.ConfirmResetPassword;
 
-public class ConfirmResetPasswordCommandHandlerTests
+public class ConfirmResetPasswordCommandHandlerTests : IDisposable
 {
     private readonly Mock<IResetPasswordsStorage> _resets = new();
     private readonly Mock<IAuthPropertiesStorage> _authProps = new();
@@ -33,6 +34,9 @@ public class ConfirmResetPasswordCommandHandlerTests
     private readonly Mock<IMediator> _mediator = new();
     private readonly Mock<PasswordChangedNotifier> _notifier;
     private readonly MetricsCollector _metrics = new();
+    private readonly SqliteIdentityContext _db = new();
+
+    public void Dispose() => _db.Dispose();
     private readonly ILogger<ConfirmResetPasswordCommandHandler> _logger = NullLogger<ConfirmResetPasswordCommandHandler>.Instance;
 
     public ConfirmResetPasswordCommandHandlerTests()
@@ -55,7 +59,7 @@ public class ConfirmResetPasswordCommandHandlerTests
 
     private ConfirmResetPasswordCommandHandler CreateSut(RequestContext? ctx = null) => new(
         _resets.Object, _authProps.Object, _passwords.Object, _refreshTokens.Object,
-        _mediator.Object, _notifier.Object, ctx ?? FullContext(), _metrics, _logger);
+        _mediator.Object, _notifier.Object, ctx ?? FullContext(), _metrics, _logger, _db.Context);
 
     private static DomainResetPassword ValidEmailReset(Guid id) => new()
     {
