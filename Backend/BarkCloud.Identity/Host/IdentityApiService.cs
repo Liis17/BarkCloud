@@ -191,7 +191,7 @@ public class IdentityApiService : BarkCloud.Proto.Identity.IdentityApi.IdentityA
             RevokeOtherSessions = !request.HasRevokeOtherSessions || request.RevokeOtherSessions
         };
 
-        var result = await _mediator.Send(command);
+        var result = await _mediator.Send(command, context.CancellationToken);
 
         return result;
     }

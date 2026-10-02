@@ -1,4 +1,5 @@
 using BarkCloud.GrpcServer.Metrics;
+using BarkCloud.Identity.Persistence.Contexts;
 using BarkCloud.Identity.Persistence.Services;
 using BarkCloud.Shared.Queue.Users;
 
@@ -17,7 +18,8 @@ public class UserDeletedConsumer(
     IResetPasswordsStorage resetPasswordsStorage,
     IConfirmationCodesStorage confirmationCodesStorage,
     MetricsCollector metrics,
-    ILogger<UserDeletedConsumer> logger)
+    ILogger<UserDeletedConsumer> logger,
+    IdentityContext identityContext)
     : IConsumer<UserDeleted>
 {
     public async Task Consume(ConsumeContext<UserDeleted> context)
@@ -29,6 +31,8 @@ public class UserDeletedConsumer(
 
         logger.LogInformation("Получено событие удаления аккаунта: UserId={UserId}", userId);
 
+        await using var transaction = await identityContext.Database.BeginTransactionAsync(context.CancellationToken);
+
         // Удаляем refresh-токены и отзываем access-токены по каждому устройству.
         var sessionsCount = await refreshTokensStorage.RevokeAllSessions(userId, cancellationToken: context.CancellationToken);
 
@@ -37,6 +41,7 @@ public class UserDeletedConsumer(
         await authPropertiesStorage.DeleteByUserId(userId);
         await resetPasswordsStorage.DeleteByUserId(userId);
         await confirmationCodesStorage.DeleteByOwnerId(userId);
+        await transaction.CommitAsync(context.CancellationToken);
 
         metrics.Increment("accounts_cleaned_identity");
 

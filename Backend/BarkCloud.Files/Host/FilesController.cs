@@ -82,8 +82,9 @@ public class FilesController : Controller
         }
     }
 
-    [HttpPost("upload/{uploadId}")]
-    [DisableRequestSizeLimit]
+    [HttpPost("upload/{uploadId:guid}")]
+    [ServiceFilter(typeof(LegacyUploadAdmissionFilter))]
+    // Реальный предел размера задаёт фильтр через Kestrel-фичу MaxRequestBodySize на запрос.
     [RequestFormLimits(MultipartBodyLengthLimit = long.MaxValue)]
     public async Task<IActionResult> UploadFile([FromRoute] Guid uploadId, [FromForm] IFormFile? file)
     {

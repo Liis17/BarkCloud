@@ -1,6 +1,7 @@
 using BarkCloud.GrpcServer.Metrics;
 using BarkCloud.GrpcServer.XAuth;
 using BarkCloud.Users.Infrastructure;
+using BarkCloud.Users.Persistence.Contexts;
 using BarkCloud.Users.Persistence.Services;
 
 using MediatR;
@@ -14,31 +15,38 @@ public class DeleteAccountCommandHandler : IRequestHandler<DeleteAccountCommand>
     private readonly UserInfoQueueSender _userInfoQueueSender;
     private readonly MetricsCollector _metrics;
     private readonly ILogger<DeleteAccountCommandHandler> _logger;
+    private readonly UsersContext _context;
 
     public DeleteAccountCommandHandler(IUsersStorage usersStorage, UserContext userContext,
         UserInfoQueueSender userInfoQueueSender, MetricsCollector metrics,
-        ILogger<DeleteAccountCommandHandler> logger)
+        ILogger<DeleteAccountCommandHandler> logger, UsersContext context)
     {
         _usersStorage = usersStorage;
         _userContext = userContext;
         _userInfoQueueSender = userInfoQueueSender;
         _metrics = metrics;
         _logger = logger;
+        _context = context;
     }
 
     public async Task Handle(DeleteAccountCommand request, CancellationToken cancellationToken)
     {
         _logger.LogInformation("Начало удаления аккаунта пользователя {UserId}", _userContext.UserId);
 
+        await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+
         // Удаляем профиль, контакт, устройства и настройки приватности (каскадно в Users).
-        await _usersStorage.DeleteUser(_userContext.UserId);
+        await _usersStorage.DeleteUser(_userContext.UserId, cancellationToken);
 
         // Публикуем событие, чтобы остальные сервисы (Identity — пароли/сессии, Files — хранилище)
         // могли очистить свои данные пользователя.
-        await _userInfoQueueSender.UserDeletedEvent(_userContext.UserId);
+        await _userInfoQueueSender.UserDeletedEvent(_userContext.UserId, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
 
         _metrics.Increment("accounts_deleted");
+        _metrics.Increment("user_events_published");
+        _metrics.Increment("user_deleted_published");
 
-        _logger.LogInformation("Аккаунт пользователя {UserId} удалён, событие UserDeleted опубликовано", _userContext.UserId);
+        _logger.LogInformation("Аккаунт пользователя {UserId} удалён, событие UserDeleted сохранено в outbox", _userContext.UserId);
     }
 }

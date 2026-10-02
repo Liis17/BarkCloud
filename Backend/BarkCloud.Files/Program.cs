@@ -30,13 +30,21 @@ public class Program
         builder.AddBarkCloudSerilog("BarkCloud.Files");
         builder.SetRunningAddress(builder.Configuration);
 
-        // Загрузка/скачивание файлов без лимита размера тела и без ограничения минимальной
-        // скорости (HTTP1-эндпоинт 7026: иначе большой файл на медленном канале оборвётся).
+        // Тело запроса ограничено 32 МиБ (> 20 МиБ gRPC MaxReceiveMessageSize). Загрузки больше
+        // задают свой лимит сами: part-PUT — [DisableRequestSizeLimit], legacy upload —
+        // LegacyUploadAdmissionFilter. Минимальная скорость снята глобально (part-PUT на медленном
+        // канале иначе оборвётся); для legacy upload её выставляет фильтр на запрос.
         builder.WebHost.ConfigureKestrel(o =>
         {
-            o.Limits.MaxRequestBodySize = null;
+            o.Limits.MaxRequestBodySize = 32 * 1024 * 1024;
             o.Limits.MinRequestBodyDataRate = null;
         });
+
+        var legacyUploadOptions = builder.Configuration.GetSection("Uploads:Legacy").Get<LegacyUploadOptions>()
+                                  ?? new LegacyUploadOptions();
+        builder.Services.AddSingleton(legacyUploadOptions);
+        builder.Services.AddSingleton<LegacyUploadBudget>();
+        builder.Services.AddScoped<LegacyUploadAdmissionFilter>();
 
         // Регистрируем gRPC сервисы с интерцепторами
         builder.Services.AddGrpc(options =>

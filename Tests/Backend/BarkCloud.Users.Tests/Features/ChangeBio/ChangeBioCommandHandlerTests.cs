@@ -18,7 +18,7 @@ public class ChangeBioCommandHandlerTests
 
     public ChangeBioCommandHandlerTests()
     {
-        _queueSender = new Mock<UserInfoQueueSender>(Mock.Of<IPublishEndpoint>(), new MetricsCollector());
+        _queueSender = new Mock<UserInfoQueueSender>(Mock.Of<IPublishEndpoint>(), new MetricsCollector(), UsersContextFactory.Create());
         _queueSender
             .Setup(s => s.BioChangedEvent(It.IsAny<long>(), It.IsAny<string>()))
             .Returns(Task.CompletedTask);

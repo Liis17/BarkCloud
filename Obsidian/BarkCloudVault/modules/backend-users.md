@@ -37,10 +37,11 @@ Parent: [[index]] · See also: [[api/users-api]] · [[modules/shared-queue]]
 - `UserMapping.cs` — маппинг Domain ↔ Proto
 
 ### Infrastructure
-- `UserInfoQueueSender.cs` — публикует события `UserChanged*` в RabbitMQ ([[modules/shared-queue]])
+- `UserInfoQueueSender.cs` — сохраняет `UserChanged*` / `UserDeleted` через MassTransit Bus Outbox; доставка в RabbitMQ выполняется фоном ([[modules/shared-queue]], [[modules/transactional-outbox]])
 
 ### Persistence
 - `Contexts/UsersContext.cs`, `UsersContextFactory.cs`
+- `Migrations/20261002001157_AddUsersOutbox.cs` — таблицы MassTransit inbox/outbox; `DeleteAccount` объединяет каскадное удаление и событие одной транзакцией. `DeleteUser` принимает `CancellationToken`; успех/метрики после commit. См. [[modules/transactional-outbox]].
 - `Services/UsersStorage.cs` (+ `ChangeBio`, `SearchUsers`, `DeleteUser`, `GetOrCreatePrivacy`, `UpdatePrivacy`)
 - `Services/DevicesStorage.cs` (+ `SetFirebaseToken`)
 - `Migrations/20260518171439_InitialCreate.cs`, `20260524215052_AddBioPrivacyFirebaseToken.cs`, `20260602120000_AddUserLookupIndexes.cs` (raw-SQL индексы производительности: функциональные `lower("Username")`/`lower("Email")` под точный логин + триграммные GIN `pg_trgm` на `lower(Username/FirstName/LastName)` под подстрочный `SearchUsers` — ранее seq-scan)

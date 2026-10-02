@@ -22,7 +22,7 @@ public class SetProfilePictureCommandHandlerTests
 
     public SetProfilePictureCommandHandlerTests()
     {
-        _queue = new Mock<UserInfoQueueSender>(Mock.Of<IPublishEndpoint>(), new MetricsCollector());
+        _queue = new Mock<UserInfoQueueSender>(Mock.Of<IPublishEndpoint>(), new MetricsCollector(), UsersContextFactory.Create());
         _queue.Setup(s => s.UserChangedAvatarEvent(It.IsAny<long>(), It.IsAny<string>(), It.IsAny<string>()))
             .Returns(Task.CompletedTask);
     }

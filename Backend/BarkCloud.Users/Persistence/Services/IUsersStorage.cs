@@ -16,7 +16,7 @@ public interface IUsersStorage
     Task ChangeUsername(long userId, string username);
     Task ChangeBio(long userId, string? bio);
     Task<List<User>> SearchUsers(string query, long excludeUserId, int limit);
-    Task DeleteUser(long userId);
+    Task DeleteUser(long userId, CancellationToken cancellationToken = default);
     Task<UserPrivacy> GetOrCreatePrivacy(long userId);
     Task<UserPrivacy> UpdatePrivacy(long userId, PrivacyVisibility profileVisibility,
         PrivacyVisibility emailVisibility, PrivacyVisibility lastSeenVisibility, bool searchableByUsername);

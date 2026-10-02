@@ -21,6 +21,7 @@
 - [[modules/backend-identity]] — Сервис идентификации (авторизация, токены, 2FA, сессии)
 - [[modules/backend-notification]] — Сервис уведомлений (consumer RabbitMQ → SMTP: коды подтверждения, уведомления о входе)
 - [[modules/backend-users]] — Сервис пользователей (профили, устройства, контакты, draft-flow)
+  - [[modules/transactional-outbox]] — Надёжная доставка удаления аккаунта и транзакции Identity (F11)
 - [[modules/backend-files]] — Сервис файлов (MinIO, аватары, превью видео через FFmpeg, галерея фото/видео, альбомы) + [[modules/upload-2]] возобновляемая Web-загрузка + [[modules/backend-files-cloud]] облачная иерархия папок + [[modules/backend-files-dynamic-folders]] умные (динамические) папки
 - [[modules/backend-torrent]] — Сервис торрентов (MonoTorrent, качает на хост-диск, стриминг по Range, импорт в облако, SSE-прогресс)
 - [[modules/backend-grpcserver]] — Общий хост для gRPC-серверов (расширения, метрики, перехватчики)
@@ -55,6 +56,7 @@
 - [[modules/upload-progress-bar-prototype]] — standalone-прототип дизайна индикатора отправки файлов (не production-код)
 
 ### 🛡 Аудит
+- [[modules/backend-audit]] — Аудит backend от 2026-10-01: [report.md](../../report.md), 27 находок с приоритетами и критериями исправления; 798 существующих тестов прошли.
 - `Docs/audit/SECURITY_PERFORMANCE_AUDIT.md` — Пошаговый план аудита безопасности и производительности (Backend + Web + инфраструктура): сквозные этапы E1–E10, проверки по каждому микросервису, нагрузочное тестирование, шаблон отчёта и приложение с известными горячими точками (file:line).
 - `Docs/audit/SECURITY_AUDIT_FINDINGS.md` — Отчёт по выполненному аудиту: находки с верификацией по коду (2 Critical, 6 High, 7 Medium, 6 Low), поправки к предварительным находкам, производительность, матрица покрытия и приоритеты ремедиации.
 - `Docs/audit/WINDOWS_DRIVE_AUDIT.md` — План аудита Windows-клиента `BarkCloud.Drive` (Engine + App): безопасность (TLS/MITM, IPC named pipe, секреты, данные в `%TEMP%`), производительность (sync-over-async в колбэках Dokany, кэш, резолв путей) и качество кода. Сквозные этапы W1–W8, проверки по компонентам, нагрузочные сценарии, шаблон находок и приложение с горячими точками (file:line). Контекст — [[modules/windows-drive]].

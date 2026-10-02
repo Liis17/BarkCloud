@@ -46,6 +46,7 @@ Web использует server-owned `UploadSession` и состояния `upl
 - `AlbumApiService.cs` — gRPC `AlbumApi` (альбомы)
 - `MusicApiService.cs` — gRPC `MusicApi`: список аудиотреков, temp-URL трека, CRUD плейлистов, ручной порядок, публичные ссылки и приватные гранты
 - `FilesController.cs` — HTTP-контроллер: V2 raw-part `PUT /file-upload/{sessionId}/parts/{partNumber}`, legacy upload и download
+- `LegacyUploadAdmissionFilter.cs` — resource-фильтр legacy `POST /upload/{uploadId:guid}`: допуск, потолок размера, бюджет и Kestrel-лимиты на запрос **до** чтения тела (F12); см. [[modules/upload-2]]
 
 ### Services
 - `ImageCompressor.cs` — сжатие изображений и генерация превью (на **SixLabors.ImageSharp**; HEIC/HEIF **не декодирует** — для них см. `HeicImageConverter`). `GenerateVideoPreviewsAsync` делает горизонтальный холст 16:9 для каждого размера (1024/512/128): размытый затемнённый cover-фон + исходный кадр, вписанный целиком поверх него; обычные фото- и квадратные аудио-превью используют отдельные методы
@@ -63,6 +64,7 @@ Web использует server-owned `UploadSession` и состояния `upl
 - `MusicLibraryService.cs` — бизнес-логика аудиотеки: `ListTracks` по `MediaKind.Audio`, `GetTrackDownloadUrl`, плейлисты, `ResolvePublicPlaylist`, публичные `MusicPlaylistShareLink` и приватные `MusicPlaylistGrant`
 - `UploadSessionCoordinator.cs` — create/get/resume/complete/cancel, token/range/part validation и S3 recovery через `ListParts`/`HeadObject`; подтверждённые ответы `UploadPart` сохраняются в `UploadSessionParts`, чтобы восстановить ETag при неполном ответе S3-compatible `ListParts`
 - `StorageQuotaService.cs` / `LegacyUploadQuotaGuard.cs` — PostgreSQL advisory lock, ready bytes + active reservations, атомарный reserve/release/convert
+- `LegacyUploadBudget.cs` / `LegacyUploadOptions.cs` — слоты (по умолчанию 8) и байтовый бюджет буфера (20 GiB) legacy-загрузок, настройки секции `Uploads:Legacy` с дефолтами в коде; `LegacyUploadQuotaGuard.AdmitAsync` — read-only допуск до чтения тела
 - `UploadSessionProcessor.cs` / `ExistingUploadEnrichmentPipeline.cs` — disk-backed SHA/size validation и переиспользование текущего metadata/preview pipeline
 - `UploadArtifactCleaner.cs` / `UploadSessionMaintenance.cs` / `UploadSessionCleanupService.cs` — expire, abort, cleanup retry и 7-дневная terminal retention. Владелец снимается с оригинала и (если не нужен другим оригиналам) с общих превью в одной транзакции через `FileOwnership.ReleasePreviewOwnerAsync` (F15)
 - `TempFileCleanupService.cs` — фоновая очистка временных файлов (BackgroundService)

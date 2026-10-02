@@ -119,6 +119,8 @@ Parent: [[index]] · See also: [[api/identity-api]] · [[modules/shared-identity
 4. при `revoke_other_sessions`: `RefreshTokensStorage.RevokeAllSessions(userId, currentDeviceId, ct)` атомарно удаляет все прежние refresh и записывает access-отзывы по устройствам, **кроме текущего** (`iat <= RevokedAt`; новый токен текущего устройства не должен попасть под отзыв);
 5. `UpdateUserPasswordHash`; 6. выдача refresh+access текущему устройству; 7. письмо через `PasswordChangedNotifier` (best-effort).
 
+После F11 шаги 3–6 выполняются в одной явной транзакции общего scoped `IdentityContext`: хеш вычисляется заранее, письмо отправляется после commit. Ошибка создания токенов или отмена откатывает пароль, отзывы, refresh и расходование reset. `UserDeletedConsumer` также объединяет отзыв сессий и всю существующую очистку в одну транзакцию. Подробности — [[modules/transactional-outbox]].
+
 Хеш пароля при сбросе **не очищается** (`ClearUserPasswordHash` удалён) — окна «пароль пуст, любая сессия ставит свой» нет. Известный остаток: для того же `deviceId` access-токен проживёт до `JwtSettings.ExpiryMinutes`; legacy-аккаунты с ранее очищенным хешем сохраняют «первичную установку» без старого пароля до первой установки пароля.
 
 ## Email-код 2FA (F07)

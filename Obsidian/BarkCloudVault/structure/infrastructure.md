@@ -40,6 +40,8 @@ Production compose не публикует порты сервисов на host
 
 > Backend-порты соответствуют `RunSettings:Port` сервисов в конфиг-БД; при их смене — править конфиг.
 
+Legacy-загрузка `/web/upload/` на порту Files (7025) вынесена в отдельный `location` с лимитами (F12): `limit_conn upload_conn 16` на IP клиента (зона `limit_conn_zone` в верхнем уровне конфига, ответ 429), `client_max_body_size 11g` (потолок `Uploads:Legacy:MaxFileBytes` = 10 GiB + запас; менять вместе с настройкой Files) и `client_body_timeout 60s` — это пауза между двумя чтениями тела, а не общий лимит. Тот же блок есть в шаблоне `Tools/BarkCloud.Builder/BackendComposeGenerator.cs`. Остальные `/web/` (download) сохраняют таймаут 7200 с.
+
 Web-vhost на 443 отдельно направляет `/file-upload/` прямо в HTTP/1 Files upstream `cloud-files:7026` с `proxy_request_buffering off` и `proxy_buffering off`. Это data plane [[modules/upload-2]]: raw parts не проходят через `cloud-web` и не буферизуются nginx. Остальные browser routes остаются на `cloud-web:8080`. Vite dev-server зеркалирует маршрут на `localhost:7026`.
 
 ## Инфраструктурные контейнеры
