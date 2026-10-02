@@ -1,5 +1,6 @@
 using BarkCloud.GrpcServer.Metrics;
 using BarkCloud.GrpcServer.Tracker;
+using BarkCloud.GrpcServer.XAuth;
 using BarkCloud.Identity.Features.ConfirmResetPassword;
 using BarkCloud.Identity.Features.CreateToken;
 using BarkCloud.Identity.Infrastructure;
@@ -10,6 +11,7 @@ using BarkCloud.Identity.Settings;
 using BarkCloud.Proto.Identity;
 using BarkCloud.Proto.Users;
 using BarkCloud.Shared.Exceptions.Identity;
+using BarkCloud.Shared.Identity;
 
 using MassTransit;
 
@@ -18,12 +20,14 @@ using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 
 using DomainResetPassword = BarkCloud.Identity.Domain.ResetPassword;
 using OtpType = BarkCloud.Identity.Domain.OtpType;
 
 using System.Data.Common;
+using System.IdentityModel.Tokens.Jwt;
 
 namespace BarkCloud.Identity.IntegrationTests;
 
@@ -108,9 +112,60 @@ public class ResetPasswordTests
         tokens.Count.Should().Be(revoke ? 1 : 3);
         var revoked = await reader.RevokedSessions.ToListAsync();
         if (revoke)
-            revoked.Should().ContainSingle().Which.DeviceId.Should().Be("other");
+        {
+            revoked.Select(x => x.DeviceId).Should().BeEquivalentTo("other", "current");
+            revoked.Single(x => x.DeviceId == "other").MaxSessionId.Should().BeNull();
+            // Текущее устройство отзывается по порогу сессии: новый Id строго больше порога.
+            var oldCurrentId = (await reader.RevokedSessions.SingleAsync(x => x.DeviceId == "current")).MaxSessionId;
+            tokens.Single().Id.Should().BeGreaterThan(oldCurrentId!.Value);
+        }
         else
+        {
             revoked.Should().BeEmpty();
+        }
+    }
+
+    [Fact]
+    public async Task ResetPassword_OldAccessOfCurrentDeviceIsRevoked_WhileNewPairWorks()
+    {
+        await using var database = await PostgresIdentityDatabase.CreateAsync();
+        await using var context = database.CreateContext();
+        var reset = await Seed(context);
+        var settings = new JwtSettings
+        {
+            SecretKey = "supersecretkey_at_least_32_chars_long_for_hs256!!", Issuer = "bark", Audience = "bark", ExpiryMinutes = 60
+        };
+        var jwt = new JwtService(settings);
+        var storage = new RefreshTokensStorage(context, settings);
+        var oldCurrent = (await storage.FindRefreshToken("old-current"))!;
+        var oldOther = (await storage.FindRefreshToken("old-other"))!;
+        // Копии access-токенов, выданные до сброса пароля.
+        var oldCurrentAccess = jwt.GenerateUserToken(42, "current", oldCurrent.Id).Value;
+        var oldOtherAccess = jwt.GenerateUserToken(42, "other", oldOther.Id).Value;
+        context.ChangeTracker.Clear();
+
+        var response = await CreateHandler(context, jwt: jwt).Handle(Command(reset.Id), default);
+
+        // Кэш наполняется так же, как в сервисах: из фида Identity.
+        await using var services = new ServiceCollection().AddScoped(_ => database.CreateContext()).BuildServiceProvider();
+        var batch = await new DbRevocationFeed(services.GetRequiredService<IServiceScopeFactory>()).FetchAsync(null, default);
+        var cache = new TokenRevocationCache();
+        foreach (var session in batch.Sessions)
+            cache.Revoke(session.UserId, session.DeviceId, session.RevokedAt, session.ExpiresAt, session.MaxSessionId);
+        bool IsRevoked(string token, string deviceId)
+        {
+            var jwtToken = new JwtSecurityTokenHandler().ReadJwtToken(token);
+            long? sid = long.TryParse(jwtToken.Claims.Single(x => x.Type == IdentityClaims.SessionId).Value, out var v) ? v : null;
+            return cache.IsRevoked(42, deviceId, jwtToken.IssuedAt, sid);
+        }
+
+        IsRevoked(oldCurrentAccess, "current").Should().BeTrue("старый access текущего устройства отозван");
+        IsRevoked(oldOtherAccess, "other").Should().BeTrue();
+        IsRevoked(response.AccessToken.Value, "current").Should().BeFalse("новая пара работает, даже если выдана в ту же секунду");
+        await using var reader = database.CreateContext();
+        var refreshStorage = new RefreshTokensStorage(reader, settings);
+        (await refreshStorage.FindRefreshToken("old-current")).Should().BeNull("старый refresh удалён");
+        (await refreshStorage.FindRefreshToken(response.RefreshToken.Value))!.Id.Should().BeGreaterThan(oldCurrent.Id);
     }
 
     [Fact]
@@ -134,7 +189,7 @@ public class ResetPasswordTests
         errors.Single(x => x is not null).Should().BeOfType<ResetIdHasIsApprovedException>();
         await using var reader = database.CreateContext();
         (await new RefreshTokensStorage(reader, new JwtSettings()).GetRefreshTokens(42)).Should().ContainSingle();
-        (await reader.RevokedSessions.SingleAsync()).DeviceId.Should().Be("other");
+        (await reader.RevokedSessions.Select(x => x.DeviceId).ToListAsync()).Should().BeEquivalentTo("other", "current");
     }
 
     [Fact]
@@ -188,20 +243,32 @@ public class ResetPasswordTests
         ResetId = resetId, OtpCode = "123456", NewPassword = "new-password", RevokeOtherSessions = revoke
     };
 
-    internal static ConfirmResetPasswordCommandHandler CreateHandler(IdentityContext context, Func<Task>? notify = null)
+    internal static ConfirmResetPasswordCommandHandler CreateHandler(IdentityContext context, Func<Task>? notify = null,
+        JwtService? jwt = null)
     {
         var metrics = new MetricsCollector();
+        var refreshTokens = new RefreshTokensStorage(context, new JwtSettings { ExpiryMinutes = 60 });
         var request = new RequestContext
         {
             DeviceId = "current", DeviceName = "Phone", OperationSystem = "Android", AppName = "BarkCloud", AppVersion = "1.0"
         };
         var mediator = new Mock<IMediator>();
-        mediator.Setup(m => m.Send(It.IsAny<CreateTokenCommand>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new CreateTokenResponse { AccessToken = new Token { Value = "access" } });
+        if (jwt is null)
+        {
+            mediator.Setup(m => m.Send(It.IsAny<CreateTokenCommand>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new CreateTokenResponse { AccessToken = new Token { Value = "access" } });
+        }
+        else
+        {
+            // Настоящий выпуск access: sid берётся из Id только что созданной refresh-строки.
+            var createToken = new CreateTokenCommandHandler(refreshTokens, jwt, metrics, NullLogger<CreateTokenCommandHandler>.Instance);
+            mediator.Setup(m => m.Send(It.IsAny<CreateTokenCommand>(), It.IsAny<CancellationToken>()))
+                .Returns((CreateTokenCommand command, CancellationToken token) => createToken.Handle(command, token));
+        }
         var notifier = new Mock<PasswordChangedNotifier>(Mock.Of<INotificationOutbox>(), request);
         notifier.Setup(n => n.NotifyAsync(It.IsAny<long>())).Returns(() => notify?.Invoke() ?? Task.CompletedTask);
         return new ConfirmResetPasswordCommandHandler(new ResetPasswordsStorage(context), new AuthPropertiesStorage(context),
-            new PasswordsStorage(context), new RefreshTokensStorage(context, new JwtSettings { ExpiryMinutes = 60 }),
+            new PasswordsStorage(context), refreshTokens,
             mediator.Object, notifier.Object, request, metrics,
             new AuthRateLimiter(new AttemptCountersStorage(context), request, NullLogger<AuthRateLimiter>.Instance),
             NullLogger<ConfirmResetPasswordCommandHandler>.Instance, context);

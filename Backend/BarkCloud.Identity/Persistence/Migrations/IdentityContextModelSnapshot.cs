@@ -246,6 +246,9 @@ namespace BarkCloud.Identity.Persistence.Migrations
                     b.Property<DateTime>("ExpiresAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<long?>("MaxSessionId")
+                        .HasColumnType("bigint");
+
                     b.Property<DateTime>("RevokedAt")
                         .HasColumnType("timestamp with time zone");
 

@@ -18,12 +18,21 @@ public class SessionRevocationApiService(IRevocationFeed feed) : SessionRevocati
     {
         var batch = await feed.FetchAsync(request.ChangedSince?.ToDateTime(), context.CancellationToken);
         var response = new GetRevokedSessionsResponse { ServerTime = Timestamp.FromDateTime(batch.ServerTime) };
-        response.Sessions.AddRange(batch.Sessions.Select(x => new RevokedSession
+        response.Sessions.AddRange(batch.Sessions.Select(x =>
         {
-            UserId = x.UserId,
-            DeviceId = x.DeviceId,
-            RevokedAt = Timestamp.FromDateTime(DateTime.SpecifyKind(x.RevokedAt, DateTimeKind.Utc)),
-            ExpiresAt = Timestamp.FromDateTime(DateTime.SpecifyKind(x.ExpiresAt, DateTimeKind.Utc))
+            var session = new RevokedSession
+            {
+                UserId = x.UserId,
+                DeviceId = x.DeviceId,
+                RevokedAt = Timestamp.FromDateTime(DateTime.SpecifyKind(x.RevokedAt, DateTimeKind.Utc)),
+                ExpiresAt = Timestamp.FromDateTime(DateTime.SpecifyKind(x.ExpiresAt, DateTimeKind.Utc))
+            };
+            if (x.MaxSessionId.HasValue)
+            {
+                session.MaxSessionId = x.MaxSessionId.Value;
+            }
+
+            return session;
         }));
         return response;
     }

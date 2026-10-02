@@ -5,9 +5,12 @@ using BarkCloud.Identity.Persistence.Services;
 using BarkCloud.Identity.Services;
 using BarkCloud.Identity.Settings;
 using BarkCloud.Shared.Exceptions.Identity;
+using BarkCloud.Shared.Identity;
 
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+
+using System.IdentityModel.Tokens.Jwt;
 
 namespace BarkCloud.Identity.Tests.Features.CreateToken;
 
@@ -74,6 +77,7 @@ public class CreateTokenCommandHandlerTests
     {
         _refreshTokens.Setup(s => s.FindRefreshToken("t")).ReturnsAsync(new RefreshToken
         {
+            Id = 17,
             UserId = 42,
             DeviceId = "device-1",
             Value = "t",
@@ -83,6 +87,9 @@ public class CreateTokenCommandHandlerTests
         var response = await CreateSut().Handle(new CreateTokenCommand { RefreshToken = "t" }, default);
 
         response.AccessToken.Value.Should().NotBeNullOrWhiteSpace();
+        // sid access-токена — Id refresh-строки: по нему отзывается старая сессия устройства при сбросе пароля.
+        new JwtSecurityTokenHandler().ReadJwtToken(response.AccessToken.Value).Claims
+            .Should().Contain(c => c.Type == IdentityClaims.SessionId && c.Value == "17");
         _metrics.SnapshotAndReset().Should().ContainKey("tokens_refreshed");
     }
 }

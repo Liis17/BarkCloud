@@ -13,13 +13,14 @@ namespace BarkCloud.Identity.Services;
 
 public class JwtService(JwtSettings jwtSettings)
 {
-    public Token GenerateUserToken(long userId, string deviceId)
+    public Token GenerateUserToken(long userId, string deviceId, long sessionId)
     {
         var claims = new List<Claim>
         {
             new(IdentityClaims.UserId, userId.ToString()),
             new(IdentityClaims.TokenType, TokenType.User.ToString()),
             new(IdentityClaims.DeviceId, deviceId),
+            new(IdentityClaims.SessionId, sessionId.ToString()),
         };
 
         var dateEnd = DateTime.UtcNow.AddMinutes(jwtSettings.ExpiryMinutes);

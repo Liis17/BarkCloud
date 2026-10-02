@@ -19,7 +19,8 @@ public class DbRevocationFeed(IServiceScopeFactory scopeFactory) : IRevocationFe
             query = query.Where(x => x.RevokedAt >= changedSince.Value);
         }
 
-        var sessions = await query.Select(x => new SessionRevocation(x.UserId, x.DeviceId, x.RevokedAt, x.ExpiresAt))
+        var sessions = await query
+            .Select(x => new SessionRevocation(x.UserId, x.DeviceId, x.RevokedAt, x.ExpiresAt, x.MaxSessionId))
             .ToListAsync(cancellationToken);
         return new RevocationBatch(sessions, serverTime);
     }

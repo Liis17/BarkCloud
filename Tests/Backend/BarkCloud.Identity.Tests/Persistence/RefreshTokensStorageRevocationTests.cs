@@ -64,18 +64,35 @@ public class RefreshTokensStorageRevocationTests : IDisposable
     }
 
     [Fact]
-    public async Task RevokeAll_ExcludesCurrentDeviceFromAccessRevocationButDeletesAllOldRefreshTokens()
+    public async Task RevokeAll_CurrentDevice_IsRevokedBySessionThresholdAndOthersByTime()
     {
-        await Seed((42, "current"), (42, "other"), (42, "other"), (42, "third"), (43, "other"));
+        await Seed((42, "current"), (42, "current"), (42, "other"), (42, "third"), (43, "other"));
+        var currentMaxId = (await _db.Context.RefreshTokens.Where(x => x.DeviceId == "current").MaxAsync(x => x.Id));
+        _db.Context.ChangeTracker.Clear();
 
         var count = await CreateSut().RevokeAllSessions(42, "current");
 
+        // Число прочих устройств; текущее считается отдельно — его сессия заменяется новой.
         count.Should().Be(2);
         using var persisted = _db.CreateAdditionalContext();
         (await persisted.RefreshTokens.SingleAsync()).UserId.Should().Be(43);
         var revoked = await persisted.RevokedSessions.ToListAsync();
-        revoked.Select(x => x.DeviceId).Should().BeEquivalentTo("other", "third");
+        revoked.Select(x => x.DeviceId).Should().BeEquivalentTo("other", "third", "current");
+        revoked.Single(x => x.DeviceId == "current").MaxSessionId.Should().Be(currentMaxId);
+        revoked.Where(x => x.DeviceId != "current").Select(x => x.MaxSessionId).Should().AllSatisfy(x => x.Should().BeNull());
         revoked.Select(x => x.RevokedAt).Distinct().Should().ContainSingle();
+        revoked.Select(x => x.ExpiresAt).Distinct().Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task RevokeAll_CurrentDeviceWithoutRefreshTokens_CreatesNoRecordForIt()
+    {
+        await Seed((42, "other"));
+
+        await CreateSut().RevokeAllSessions(42, "current");
+
+        using var persisted = _db.CreateAdditionalContext();
+        (await persisted.RevokedSessions.SingleAsync()).DeviceId.Should().Be("other");
     }
 
     [Fact]
