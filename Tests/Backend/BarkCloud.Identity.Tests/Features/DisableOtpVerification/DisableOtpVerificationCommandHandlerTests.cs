@@ -3,17 +3,12 @@ using BarkCloud.GrpcServer.Tracker;
 using BarkCloud.GrpcServer.XAuth;
 using BarkCloud.Identity.Domain;
 using BarkCloud.Identity.Features.DisableOtpVerification;
-using BarkCloud.Identity.Infrastructure;
 using BarkCloud.Identity.Persistence.Services;
 using BarkCloud.Identity.Services;
 using BarkCloud.Identity.Tests._Helpers;
 using BarkCloud.Proto.Identity;
-using BarkCloud.Proto.Users;
 using BarkCloud.Shared.Exceptions.Identity;
 using BarkCloud.Shared.Queue.Notifications;
-using BarkCloud.TestKit;
-
-using MassTransit;
 
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -32,9 +27,7 @@ public class DisableOtpVerificationCommandHandlerTests
 
     private readonly Mock<IAuthPropertiesStorage> _authProps = new();
     private readonly Mock<IPasswordsStorage> _passwords = new();
-    private readonly Mock<UsersServerApi.UsersServerApiClient> _usersClient = new();
-    private readonly Mock<NotificationQueueSender> _notifications;
-    private readonly Mock<LocationClient> _location;
+    private readonly Mock<INotificationOutbox> _outbox = new();
     private readonly Mock<IAuthRateLimiter> _rateLimiter = new();
     private readonly MetricsCollector _metrics = new();
     private readonly ILogger<DisableOtpVerificationCommandHandler> _logger =
@@ -42,32 +35,18 @@ public class DisableOtpVerificationCommandHandlerTests
 
     public DisableOtpVerificationCommandHandlerTests()
     {
-        _notifications = new Mock<NotificationQueueSender>(Mock.Of<IPublishEndpoint>(), new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build());
-        _notifications.Setup(n => n.SendNotification(It.IsAny<Notification>())).Returns(Task.CompletedTask);
-        _location = new Mock<LocationClient>(new HttpClient(), new MetricsCollector(), NullLogger<LocationClient>.Instance);
-        _location.Setup(c => c.GetLocation(It.IsAny<string>())).ReturnsAsync((IpLocation?)null);
         _passwords.Setup(p => p.GetUserPasswordHash(42)).ReturnsAsync(PasswordHash);
         _authProps.Setup(s => s.TryReserveReauthPasswordAttempt(42)).ReturnsAsync(true);
-
-        _usersClient
-            .Setup(c => c.GetByIdAsync(It.IsAny<GetByIdRequest>(), null, null, default))
-            .Returns(GrpcCallHelpers.AsyncUnary(new GetByIdResponse { User = new User { Id = 42, Username = "u" } }));
-        _usersClient
-            .Setup(c => c.GetUserContactsAsync(It.IsAny<GetUserContactsRequest>(), null, null, default))
-            .Returns(GrpcCallHelpers.AsyncUnary(new GetUserContactsResponse
-            {
-                User = new User { Id = 42, Username = "u" },
-                Contact = new UserContact { Email = "u@e" }
-            }));
     }
+
+    private void VerifyNothingQueued() => _outbox.Verify(o => o.EnqueueAsync(
+        It.IsAny<long>(), It.IsAny<NotificationType>(), It.IsAny<string>(), It.IsAny<Dictionary<string, string>>()), Times.Never);
 
     private DisableOtpVerificationCommandHandler CreateSut() => new(
         UserContextFactory.Create(42),
         _authProps.Object,
         new ReauthPasswordVerifier(_authProps.Object, _passwords.Object),
-        _notifications.Object,
-        _location.Object,
-        _usersClient.Object,
+        _outbox.Object,
         new RequestContext { DeviceName = "Pixel", OperationSystem = "Android", IpAddress = "1.1.1.1" },
         _metrics,
         _rateLimiter.Object,
@@ -139,8 +118,10 @@ public class DisableOtpVerificationCommandHandlerTests
             default);
 
         _authProps.Verify(s => s.DisableOtp(42), Times.Once);
-        _notifications.Verify(n => n.SendNotification(It.Is<EmailNotification>(
-            e => e.Type == NotificationType.TwoFactorMethodChanged)), Times.Once);
+        _outbox.Verify(o => o.EnqueueAsync(
+            42, NotificationType.TwoFactorMethodChanged, It.IsAny<string>(),
+            It.Is<Dictionary<string, string>>(p => p["old_method"] == "Authenticator приложение"
+                                                   && p["new_method"] == "Отключена" && p["devicename"] == "Pixel")), Times.Once);
         _metrics.SnapshotAndReset().Should().ContainKey("otp_disabled_authenticator");
     }
 
@@ -158,7 +139,9 @@ public class DisableOtpVerificationCommandHandlerTests
             default);
 
         _authProps.Verify(s => s.DisableEmailOtp(42), Times.Once);
-        _notifications.Verify(n => n.SendNotification(It.IsAny<EmailNotification>()), Times.Once);
+        _outbox.Verify(o => o.EnqueueAsync(
+            42, NotificationType.TwoFactorMethodChanged, It.IsAny<string>(),
+            It.Is<Dictionary<string, string>>(p => p["old_method"] == "Email" && p["new_method"] == "Отключена")), Times.Once);
         _metrics.SnapshotAndReset().Should().ContainKey("otp_disabled_email");
     }
 
@@ -180,7 +163,7 @@ public class DisableOtpVerificationCommandHandlerTests
 
         await act.Should().ThrowAsync<InvalidPasswordException>();
         _authProps.Verify(s => s.DisableEmailOtp(It.IsAny<long>()), Times.Never);
-        _notifications.Verify(n => n.SendNotification(It.IsAny<Notification>()), Times.Never);
+        VerifyNothingQueued();
         _metrics.SnapshotAndReset().Should().ContainKey("otp_disable_failed");
     }
 
@@ -200,7 +183,7 @@ public class DisableOtpVerificationCommandHandlerTests
 
         await act.Should().ThrowAsync<PasswordAttemptsExceededException>();
         _authProps.Verify(s => s.DisableEmailOtp(It.IsAny<long>()), Times.Never);
-        _notifications.Verify(n => n.SendNotification(It.IsAny<Notification>()), Times.Never);
+        VerifyNothingQueued();
         _metrics.SnapshotAndReset().Should().ContainKey("otp_disable_failed");
     }
 

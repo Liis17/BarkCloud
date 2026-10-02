@@ -7,7 +7,6 @@ using BarkCloud.Identity.Services;
 using BarkCloud.Proto.Identity;
 using BarkCloud.Proto.Users;
 using BarkCloud.Shared.Exceptions.Identity;
-using BarkCloud.Shared.Identity;
 using BarkCloud.Shared.Queue.Notifications;
 
 using Google.Protobuf.WellKnownTypes;
@@ -20,7 +19,7 @@ namespace BarkCloud.Identity.Features.ConfirmAccount;
 
 public class ConfirmAccountCommandHandler(IConfirmationCodesStorage confirmationCodesStorage,
     UsersServerApi.UsersServerApiClient usersClient, IRefreshTokensStorage refreshTokensStorage, RequestContext requestContext,
-    NotificationQueueSender notificationQueueSender, LocationClient locationClient, MetricsCollector metrics,
+    INotificationOutbox notificationOutbox, MetricsCollector metrics,
     IRegistrationPolicy registrationPolicy, IAuthRateLimiter rateLimiter,
     ILogger<ConfirmAccountCommandHandler> logger)
     : IRequestHandler<ConfirmAccountCommand, ConfirmAccountResponse>
@@ -115,52 +114,25 @@ public class ConfirmAccountCommandHandler(IConfirmationCodesStorage confirmation
         // Удаляем использованный код, чтобы предотвратить повторное использование.
         await confirmationCodesStorage.DeleteCode(codeId);
 
-        // Отправка уведомления об успешной регистрации
-        var userInfo = await usersClient.GetByIdAsync(new GetByIdRequest { UserId = code.OwnerId!.Value });
-        var userContacts = await usersClient.GetUserContactsAsync(new GetUserContactsRequest { UserId = code.OwnerId!.Value });
-
-        var locationInfo = await locationClient.GetLocationString(requestContext.IpAddress);
-
-        var successfulRegistrationNotification = new EmailNotification
-        {
-            OwnerId = code.OwnerId!.Value,
-            Address = userContacts.Contact.Email,
-            CreatedAt = DateTime.UtcNow,
-            Payload = new Dictionary<string, string>
-            {
-                {"username", userInfo.User.Username},
-                {"ip", requestContext.IpAddress ?? string.Empty},
-                {"devicename", requestContext.DeviceName},
-                {"os", requestContext.OperationSystem ?? string.Empty},
-                {"location", locationInfo},
-                {"appname", $"{requestContext.AppName} v.{requestContext.AppVersion}"},
-                {"datetime", DateTime.UtcNow.ToString("dd.MM.yyyy HH:mm:ss")}
-            },
-            ServiceId = ServiceId.Identity,
-            Title = "Успешная регистрация",
-            Type = NotificationType.SuccessfulRegistration
-        };
-
-        logger.LogDebug(
-            "Отправка уведомления об успешной регистрации на адрес {Email}",
-            userContacts.Contact.Email
-        );
-
-        await notificationQueueSender.SendNotification(successfulRegistrationNotification);
-
         logger.LogDebug("Генерация refresh token для пользователя {UserId}", code.OwnerId!.Value);
 
         var refreshTokenString = RefreshTokenGenerator.GenerateRefreshToken();
 
         await refreshTokensStorage.CreateNewRefreshToken(refreshTokenString, code.OwnerId!.Value, requestContext.DeviceId ?? requestContext.DeviceName, ExpDaysRefreshToken);
 
+        // Аккаунт уже подтверждён, код погашен и сессия создана: письмо — через outbox, его сбой не должен ломать ответ.
+        await notificationOutbox.EnqueueAsync(
+            code.OwnerId!.Value,
+            NotificationType.SuccessfulRegistration,
+            "Успешная регистрация",
+            NotificationPayload.Device(requestContext));
+
         metrics.Increment("accounts_confirmed");
         metrics.Increment("sessions_created");
 
         logger.LogInformation(
-            "Аккаунт успешно подтвержден. UserId: {UserId}, Username: {Username}, Устройство: {DeviceName}",
+            "Аккаунт успешно подтвержден. UserId: {UserId}, Устройство: {DeviceName}",
             code.OwnerId!.Value,
-            userInfo.User.Username,
             requestContext.DeviceName
         );
 

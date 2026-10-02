@@ -1,13 +1,10 @@
 using BarkCloud.GrpcServer.Metrics;
 using BarkCloud.GrpcServer.Tracker;
 using BarkCloud.GrpcServer.XAuth;
-using BarkCloud.Identity.Infrastructure;
 using BarkCloud.Identity.Persistence.Services;
 using BarkCloud.Identity.Services;
 using BarkCloud.Proto.Identity;
-using BarkCloud.Proto.Users;
 using BarkCloud.Shared.Exceptions.Identity;
-using BarkCloud.Shared.Identity;
 using BarkCloud.Shared.Queue.Notifications;
 
 using MediatR;
@@ -24,25 +21,20 @@ public class DisableOtpVerificationCommandHandler : IRequestHandler<DisableOtpVe
     private readonly UserContext _userContext;
     private readonly IAuthPropertiesStorage _authPropertiesStorage;
     private readonly ReauthPasswordVerifier _reauthPassword;
-    private readonly NotificationQueueSender _notificationQueueSender;
-    private readonly LocationClient _locationClient;
-    private readonly UsersServerApi.UsersServerApiClient _usersClient;
+    private readonly INotificationOutbox _notificationOutbox;
     private readonly RequestContext _requestContext;
     private readonly MetricsCollector _metrics;
     private readonly IAuthRateLimiter _rateLimiter;
     private readonly ILogger<DisableOtpVerificationCommandHandler> _logger;
 
     public DisableOtpVerificationCommandHandler(UserContext userContext, IAuthPropertiesStorage authPropertiesStorage,
-        ReauthPasswordVerifier reauthPassword, NotificationQueueSender notificationQueueSender,
-        LocationClient locationClient, UsersServerApi.UsersServerApiClient usersClient, RequestContext requestContext,
+        ReauthPasswordVerifier reauthPassword, INotificationOutbox notificationOutbox, RequestContext requestContext,
         MetricsCollector metrics, IAuthRateLimiter rateLimiter, ILogger<DisableOtpVerificationCommandHandler> logger)
     {
         _userContext = userContext;
         _authPropertiesStorage = authPropertiesStorage;
         _reauthPassword = reauthPassword;
-        _notificationQueueSender = notificationQueueSender;
-        _locationClient = locationClient;
-        _usersClient = usersClient;
+        _notificationOutbox = notificationOutbox;
         _requestContext = requestContext;
         _metrics = metrics;
         _rateLimiter = rateLimiter;
@@ -133,41 +125,16 @@ public class DisableOtpVerificationCommandHandler : IRequestHandler<DisableOtpVe
             _metrics.Increment("otp_disabled_email");
         }
 
-        // Отправка уведомления об изменении метода 2FA (отключении)
-        var userInfo = await _usersClient.GetByIdAsync(new GetByIdRequest { UserId = _userContext.UserId });
-        var userContacts = await _usersClient.GetUserContactsAsync(new GetUserContactsRequest { UserId = _userContext.UserId });
+        // Уведомление об отключении 2FA — через outbox: 2FA уже отключена, сбой Users/почты не должен превращаться в ошибку.
+        var payload = NotificationPayload.Device(_requestContext);
+        payload["old_method"] = oldMethod;
+        payload["new_method"] = "Отключена";
 
-        var locationInfo = await _locationClient.GetLocationString(_requestContext.IpAddress);
-
-        var twoFactorChangedNotification = new EmailNotification
-        {
-            OwnerId = _userContext.UserId,
-            Address = userContacts.Contact.Email,
-            CreatedAt = DateTime.UtcNow,
-            Payload = new Dictionary<string, string>
-            {
-                {"username", userInfo.User.Username},
-                {"old_method", oldMethod},
-                {"new_method", "Отключена"},
-                {"ip", _requestContext.IpAddress ?? string.Empty},
-                {"devicename", _requestContext.DeviceName ?? string.Empty},
-                {"os", _requestContext.OperationSystem ?? string.Empty},
-                {"location", locationInfo},
-                {"appname", $"{_requestContext.AppName} v.{_requestContext.AppVersion}"},
-                {"datetime", DateTime.UtcNow.ToString("dd.MM.yyyy HH:mm:ss")}
-
-            },
-            ServiceId = ServiceId.Identity,
-            Title = "Изменен метод двухфакторной аутентификации",
-            Type = NotificationType.TwoFactorMethodChanged
-        };
-
-        _logger.LogDebug(
-            "Отправка уведомления об отключении 2FA на адрес {Email}",
-            userContacts.Contact.Email
-        );
-
-        await _notificationQueueSender.SendNotification(twoFactorChangedNotification);
+        await _notificationOutbox.EnqueueAsync(
+            _userContext.UserId,
+            NotificationType.TwoFactorMethodChanged,
+            "Изменен метод двухфакторной аутентификации",
+            payload);
 
         _logger.LogInformation(
             "2FA успешно отключена для пользователя {UserId}. Метод: {OldMethod}",

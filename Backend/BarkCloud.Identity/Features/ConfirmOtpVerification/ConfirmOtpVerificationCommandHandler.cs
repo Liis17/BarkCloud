@@ -1,13 +1,10 @@
 using BarkCloud.GrpcServer.Metrics;
 using BarkCloud.GrpcServer.Tracker;
 using BarkCloud.GrpcServer.XAuth;
-using BarkCloud.Identity.Infrastructure;
 using BarkCloud.Identity.Persistence.Services;
 using BarkCloud.Identity.Services;
 using BarkCloud.Proto.Identity;
-using BarkCloud.Proto.Users;
 using BarkCloud.Shared.Exceptions.Identity;
-using BarkCloud.Shared.Identity;
 using BarkCloud.Shared.Queue.Notifications;
 
 using MediatR;
@@ -24,25 +21,20 @@ public class ConfirmOtpVerificationCommandHandler : IRequestHandler<ConfirmOtpVe
 {
     private readonly UserContext _userContext;
     private readonly IAuthPropertiesStorage _authPropertiesStorage;
-    private readonly UsersServerApi.UsersServerApiClient _usersClient;
-    private readonly NotificationQueueSender _notificationQueueSender;
+    private readonly INotificationOutbox _notificationOutbox;
     private readonly RequestContext _requestContext;
-    private readonly LocationClient _locationClient;
     private readonly MetricsCollector _metrics;
     private readonly IAuthRateLimiter _rateLimiter;
     private readonly ILogger<ConfirmOtpVerificationCommandHandler> _logger;
 
     public ConfirmOtpVerificationCommandHandler(UserContext userContext, IAuthPropertiesStorage authPropertiesStorage,
-        UsersServerApi.UsersServerApiClient usersClient, NotificationQueueSender notificationQueueSender,
-        RequestContext requestContext, LocationClient locationClient, MetricsCollector metrics,
+        INotificationOutbox notificationOutbox, RequestContext requestContext, MetricsCollector metrics,
         IAuthRateLimiter rateLimiter, ILogger<ConfirmOtpVerificationCommandHandler> logger)
     {
         _userContext = userContext;
         _authPropertiesStorage = authPropertiesStorage;
-        _usersClient = usersClient;
-        _notificationQueueSender = notificationQueueSender;
+        _notificationOutbox = notificationOutbox;
         _requestContext = requestContext;
-        _locationClient = locationClient;
         _metrics = metrics;
         _rateLimiter = rateLimiter;
         _logger = logger;
@@ -174,51 +166,23 @@ public class ConfirmOtpVerificationCommandHandler : IRequestHandler<ConfirmOtpVe
         return new ConfirmOtpVerificationResponse();
     }
 
+    // Метод 2FA уже изменён: письмо ставится в outbox и не может сорвать ответ.
     private async Task SendTwoFactorChangedNotification(string newMethod, string oldMethod)
     {
-        try
-        {
-            var userInfo = await _usersClient.GetByIdAsync(new GetByIdRequest { UserId = _userContext.UserId });
-            var userContactInfo = await _usersClient.GetUserContactsAsync(new GetUserContactsRequest { UserId = _userContext.UserId });
+        var payload = NotificationPayload.Device(_requestContext);
+        payload["old_method"] = oldMethod;
+        payload["new_method"] = newMethod;
 
-            var locationInfo = await _locationClient.GetLocationString(_requestContext.IpAddress);
+        await _notificationOutbox.EnqueueAsync(
+            _userContext.UserId,
+            NotificationType.TwoFactorMethodChanged,
+            "Изменен метод двухфакторной аутентификации",
+            payload);
 
-            var notification = new EmailNotification
-            {
-                OwnerId = userInfo.User.Id,
-                Address = userContactInfo.Contact.Email,
-                CreatedAt = DateTime.UtcNow,
-                Payload = new Dictionary<string, string>
-                {
-                    {"username", userInfo.User.Username},
-                    {"old_method", oldMethod},
-                    {"new_method", newMethod},
-                    {"ip", _requestContext.IpAddress ?? string.Empty},
-                    {"devicename", _requestContext.DeviceName ?? string.Empty},
-                    {"os", _requestContext.OperationSystem ?? string.Empty},
-                    {"location", locationInfo},
-                    {"datetime", DateTime.UtcNow.ToString("dd.MM.yyyy HH:mm:ss")}
-                },
-                ServiceId = ServiceId.Identity,
-                Title = "Изменен метод двухфакторной аутентификации",
-                Type = NotificationType.TwoFactorMethodChanged
-            };
-
-            await _notificationQueueSender.SendNotification(notification);
-
-            _logger.LogInformation(
-                "Отправлено уведомление об изменении 2FA для пользователя {UserId}, новый метод: {NewMethod}",
-                _userContext.UserId,
-                newMethod
-            );
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(
-                ex,
-                "Ошибка при отправке уведомления об изменении 2FA для пользователя {UserId}",
-                _userContext.UserId
-            );
-        }
+        _logger.LogInformation(
+            "Уведомление об изменении 2FA поставлено в очередь для пользователя {UserId}, новый метод: {NewMethod}",
+            _userContext.UserId,
+            newMethod
+        );
     }
 }
