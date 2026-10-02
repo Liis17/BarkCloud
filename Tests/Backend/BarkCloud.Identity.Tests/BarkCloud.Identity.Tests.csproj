@@ -10,6 +10,9 @@
     <!-- Реляционный провайдер для тестов хранилищ с реальным IdentityContext (нужен ExecuteUpdate;
          InMemory его не поддерживает). -->
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.8" />
+    <!-- EF Core Sqlite 10.0.x тянет SQLitePCLRaw 2.1.11 с SQLite 3.49.1 (CVE-2025-6965).
+         Явно поднимаем бандл до 2.1.12 (SQLite 3.53.3); убрать, когда EF Core сам перейдёт на >= 2.1.12. -->
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.12" />
   </ItemGroup>
 
   <ItemGroup>
