@@ -64,9 +64,13 @@ public class GetPathCommandHandler : IRequestHandler<GetPathCommand, PathRespons
 
         // Поднимаемся вверх, собирая сегменты предков
         var ancestors = new List<(Guid Id, string Name)>();
+        var visited = new HashSet<Guid>();
         var cursorId = startDirectoryId;
         while (cursorId.HasValue)
         {
+            if (!visited.Add(cursorId.Value))
+                throw new DirectoryTreeCorruptedException();
+
             var cur = await _storage.GetDirectoryAsNoTracking(cursorId.Value, cancellationToken);
             if (cur is null)
                 break;
