@@ -10,18 +10,20 @@ Identity хранит `RevokedSession { Id, UserId, DeviceId, RevokedAt, Expires
 
 | Метод | Поведение | Вызывается |
 |---|---|---|
-| `RevokeSession(deviceId, userId, ct)` | Удаляет refresh устройства и записывает отзыв; отсутствие refresh → `RefreshTokenNotFoundException` | `RemoveActiveSession`, `RemoveActiveSessionServer` |
-| `RevokeSessionSafe(deviceId, userId, ct)` | Записывает отзыв даже без refresh | `Logout` |
-| `RevokeAllSessions(userId, currentDeviceId, ct)` | Удаляет все refresh пользователя. Прочие устройства — отзыв по времени (по записи на устройство). Текущее устройство, если у него были refresh-строки, — одна запись **по сессии**: `MaxSessionId = max(Id)` удаляемых строк. Возвращает число прочих устройств | `ConfirmResetPassword` (с текущим устройством), `UserDeletedConsumer` (без него — все по времени) |
+| `RevokeSession(deviceId, userId, ct)` | Удаляет refresh устройства и записывает отзыв **по сессии** (`MaxSessionId = max(Id)` удаляемых строк); отсутствие refresh → `RefreshTokenNotFoundException` | `RemoveActiveSession`, `RemoveActiveSessionServer` |
+| `RevokeSessionSafe(deviceId, userId, ct)` | То же; если refresh уже нет — запись **по времени** (`MaxSessionId = null`) | `Logout` |
+| `RevokeAllSessions(userId, currentDeviceId, ct)` | Удаляет все refresh пользователя. Каждое устройство с refresh-строками — одна запись **по сессии**: `MaxSessionId = max(Id)` его удаляемых строк (текущее — тоже). Возвращает число **прочих** устройств | `ConfirmResetPassword` (с текущим устройством), `UserDeletedConsumer` (без него) |
 | `DeleteRefreshTokensByDeviceIdSafe` | Удаляет старые refresh без отзыва access | `SessionIssuer` при повторном входе |
 
-При сбросе пароля все прежние refresh, включая текущее устройство, удаляются до выдачи новой пары; старые access текущего устройства отзываются по порогу сессии (см. ниже). Повторная доставка `UserDeleted` не меняет уже сохранённое время отзыва: refresh уже удалены, отзывы остаются. F11 сохраняет сам `UserDeleted` в outbox Users вместе с удалением профиля; очистка Identity и весь сброс пароля дополнительно объединены внешними транзакциями. См. [[modules/transactional-outbox]].
+При сбросе пароля все прежние refresh, включая текущее устройство, удаляются до выдачи новой пары; старые access всех устройств отзываются по порогу сессии (см. ниже). Повторная доставка `UserDeleted` не меняет уже сохранённое время отзыва: refresh уже удалены, отзывы остаются. F11 сохраняет сам `UserDeleted` в outbox Users вместе с удалением профиля; очистка Identity и весь сброс пароля дополнительно объединены внешними транзакциями. См. [[modules/transactional-outbox]].
 
 ## Отзыв по сессии (F02)
 
-Новый access текущего устройства выдаётся сразу после сброса пароля и может иметь тот же `iat` (секунды), что и старый, поэтому отзыв по времени разделить их не может. Access-токен несёт клейм `x-session-id` (`IdentityClaims.SessionId`) — `RefreshToken.Id` сессии, по которой он выдан (`CreateTokenCommandHandler` → `JwtService.GenerateUserToken(userId, deviceId, sessionId)`). Id — монотонный bigint identity, поэтому у новой сессии он строго больше, чем у любых старых строк.
+Отзыв по времени (`iat <= RevokedAt`) не отделяет старый access от нового: новый access текущего устройства выдаётся сразу после сброса пароля и может иметь тот же `iat` (секунды), а `RevokedAt` берётся в приложении **до** commit, поэтому access, подписанный уже после commit по старому refresh, получил бы `iat > RevokedAt` и прошёл бы. Access-токен несёт клейм `x-session-id` (`IdentityClaims.SessionId`) — `RefreshToken.Id` сессии, по которой он выдан (`CreateTokenCommandHandler` → `JwtService.GenerateUserToken(userId, deviceId, sessionId)`). Id — монотонный bigint identity, поэтому у новой сессии он строго больше, чем у любых старых строк устройства.
 
-Запись с `MaxSessionId` отзывает токены с `sid <= MaxSessionId` **и токены без sid** (выданы до появления клейма, т.е. раньше сброса; fail-safe, как для отсутствующего `iat`). Время такой записи порогом не служит — `RevokedAt` нужен только дельте фида. Записи без `MaxSessionId` работают как прежде (`iat <= RevokedAt`). Отзыв по сессии закрывает и гонку «refresh старой сессии между снимком и commit»: такой access получит старый `sid`.
+`SaveRevocations` пишет `MaxSessionId = max(Id)` удаляемых refresh **для каждого** отзываемого устройства (не только для текущего при сбросе пароля) — для logout, удаления сессии, сброса пароля и удаления аккаунта. Запись с `MaxSessionId` отзывает токены с `sid <= MaxSessionId` **и токены без sid** (выданы до появления клейма, т.е. раньше отзыва; fail-safe, как для отсутствующего `iat`). Время такой записи порогом не служит — `RevokedAt` нужен только дельте фида. По времени (`iat <= RevokedAt`) отзывается лишь устройство без refresh-строк (повторный `Logout`).
+
+Это закрывает гонку «refresh прочитан до reset, access выпущен после»: `CreateToken` другого устройства прочитал строку (Id=2), reset удалил её и записал `MaxSessionId=2`, access подписан позже с `iat > RevokedAt`, но с `sid=2` — кэш его отклоняет независимо от часов. Проверено на PostgreSQL тестом `ResetPassword_StaleRefreshReadBeforeReset_IssuedAccessIsRevoked` (остановка `CreateToken` после чтения refresh, настоящий reset, фид → кэш). Блокировки между `CreateToken` и reset не нужны.
 
 Контракт: `session_revocation_api.proto` → `optional int64 max_session_id = 5`, `SessionRevocation.MaxSessionId`. `sid` читают `XAuthExtensions` (`OnTokenValidated`), `UserContext.SessionId` (Torrent `StreamProgress`) и Web `AuthGateway` (`WebUser.SessionId`; Web `v1.6.7`).
 
@@ -49,7 +51,8 @@ Users/Files/Torrent получают `IdentityService:Host` и `IdentityService:
 
 ## Ограничения
 
-- `iat` имеет секундную точность. Logout и новый вход на том же устройстве в одну секунду могут отклонить новый JWT до истечения отзыва: отзыв по времени (logout, удаление сессии/аккаунта) `sid` не использует; зафиксировано тестом `Revoke_SameSecondLogin_RemainsRevokedBecauseJwtIatHasSecondPrecision`. Сброс пароля этим ограничением не затронут — он отзывает текущее устройство по сессии.
+- `iat` имеет секундную точность. Отзыв по времени (только устройство без refresh-строк, например повторный logout) и новый вход на том же устройстве в одну секунду могут отклонить новый JWT до истечения отзыва; зафиксировано тестом `Revoke_SameSecondLogin_RemainsRevokedBecauseJwtIatHasSecondPrecision`. Logout с refresh, удаление сессии, сброс пароля и удаление аккаунта отзывают по сессии и этим ограничением не затронуты.
+- Запись отзыва живёт `ExpiryMinutes + 1` мин после `RevokedAt`. `CreateToken`, зависший дольше этого окна между чтением refresh и подписью, порогом не покрыт (для gRPC с deadline нереалистично).
 - Уменьшение `JwtSettings:ExpiryMinutes` может сделать срок отзыва короче жизни ранее выданных JWT; запас 1 мин этого не гарантирует. До истечения прежних JWT сохранять прежний lifetime.
 - Снимок не разбит на страницы; объём равен числу ещё действующих отзывов, и каждая реплика загружает его раз в минуту. При росте нагрузки потребуется пагинация.
 - Гарантия «не позже ~1 мин после commit», а не «сразу»: запись, закоммиченная позже overlap, доходит с полной сверкой. Если понадобится мгновенная гарантия — курсор по порядку видимости commit (`xid8` + `pg_snapshot_xmin`) с изменением proto и миграцией; отклонено как избыточное для редкого случая.
