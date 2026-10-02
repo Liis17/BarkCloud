@@ -44,6 +44,8 @@ Tests/
 
 Версии управляются централизованно через `Tests/Directory.Build.props`. В каждом тестовом проекте — только `ProjectReference` на тестируемый проект и (при необходимости) дополнительные `PackageReference` для gRPC/Logging.
 
+SQLite-тесты (`Configuration.Tests`, `Files.Tests`, `Identity.Tests`) закреплены на `SQLitePCLRaw.bundle_e_sqlite3 2.1.12`: `Microsoft.EntityFrameworkCore.Sqlite 10.0.x` тянет `2.1.11` с нативным SQLite 3.49.1 (CVE-2025-6965, `NU1903`), а в `2.1.12` — SQLite 3.53.3. Пин стоит прямой ссылкой в каждом из трёх проектов (не в `Tests/Directory.Build.props` — SQLite нужен не всем); убрать, когда EF Core сам перейдёт на `>= 2.1.12`. См. [[modules/backend-audit]] (Q02).
+
 ## Стратегия мокирования
 
 - **Storage классы Backend** (`*Storage.cs` в `Persistence/Services/`) — переведены на интерфейсы `I*Storage` (Files: `IAlbumStorage`/`IShareStorage`/`IFavoriteFilesStorage`/`ICloudHierarchyStorage`/`IUploadedFilesStorage`/`IFileHashesStorage`; `IConfigurationStorage`), хендлеры инжектят интерфейс и мокаются Moq.
