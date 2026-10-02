@@ -29,6 +29,10 @@ public class MoveDirectoryCommandHandler : IRequestHandler<MoveDirectoryCommand,
     {
         var ownerId = _userContext.UserId;
 
+        // Проверка предков и запись ParentId — одна граница: параллельное перемещение
+        // не должно пройти проверку по состоянию до нашей записи (иначе возможен цикл).
+        await using var treeLock = await _storage.LockTree(ownerId, cancellationToken);
+
         var directory = await _storage.GetDirectory(request.DirectoryId, cancellationToken);
         if (directory is null)
             throw new DirectoryNotFoundException();
@@ -73,6 +77,7 @@ public class MoveDirectoryCommandHandler : IRequestHandler<MoveDirectoryCommand,
         directory.ParentId = request.NewParentId;
         directory.UpdatedAt = DateTime.UtcNow;
         await _storage.UpdateDirectory(directory, cancellationToken);
+        await treeLock.CommitAsync(cancellationToken);
 
         _logger.LogInformation(
             "Перемещена папка {DirectoryId} в {NewParentId}",

@@ -1,6 +1,7 @@
 using BarkCloud.Files.Domain;
 
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace BarkCloud.Files.Persistence;
 
@@ -28,6 +29,41 @@ public class CloudHierarchyStorage : ICloudHierarchyStorage
     }
 
     // ===== Directories =====
+
+    /// <summary>
+    /// Сериализует структурные изменения дерева владельца (перемещение, удаление папок):
+    /// транзакция + pg_advisory_xact_lock. Ключ отдельный от блокировки квоты (там ownerId как есть).
+    /// Читать данные дерева нужно уже после захвата — иначе проверка пойдёт по устаревшему состоянию.
+    /// </summary>
+    public async Task<ICloudTreeLock> LockTree(long ownerId, CancellationToken cancellationToken = default)
+    {
+        var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            if (_context.Database.ProviderName?.Contains("Npgsql", StringComparison.Ordinal) == true)
+            {
+                var key = $"cloud-tree:{ownerId}";
+                await _context.Database.ExecuteSqlInterpolatedAsync(
+                    $"SELECT pg_advisory_xact_lock(hashtextextended({key}, 0))",
+                    cancellationToken);
+            }
+        }
+        catch
+        {
+            await transaction.DisposeAsync();
+            throw;
+        }
+
+        return new TreeLock(transaction);
+    }
+
+    private sealed class TreeLock(IDbContextTransaction transaction) : ICloudTreeLock
+    {
+        public Task CommitAsync(CancellationToken cancellationToken = default) =>
+            transaction.CommitAsync(cancellationToken);
+
+        public ValueTask DisposeAsync() => transaction.DisposeAsync();
+    }
 
     public async Task<CloudDirectory?> GetDirectory(Guid id, CancellationToken cancellationToken = default)
     {

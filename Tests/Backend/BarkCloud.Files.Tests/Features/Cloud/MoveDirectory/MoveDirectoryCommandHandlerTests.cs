@@ -14,6 +14,12 @@ public class MoveDirectoryCommandHandlerTests
 {
     private const long OwnerId = 42;
     private readonly Mock<ICloudHierarchyStorage> _storage = new();
+    private readonly Mock<ICloudTreeLock> _treeLock = new();
+
+    public MoveDirectoryCommandHandlerTests()
+    {
+        _storage.Setup(s => s.LockTree(OwnerId, It.IsAny<CancellationToken>())).ReturnsAsync(_treeLock.Object);
+    }
 
     private MoveDirectoryCommandHandler CreateSut() => new(
         _storage.Object,
@@ -124,5 +130,44 @@ public class MoveDirectoryCommandHandlerTests
         await CreateSut().Handle(new MoveDirectoryCommand { DirectoryId = id, NewParentId = newParent }, default);
 
         _storage.Verify(s => s.UpdateDirectory(It.Is<CloudDirectory>(d => d.ParentId == newParent), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_HappyPath_LocksTreeBeforeReadingAndCommitsAfterUpdate()
+    {
+        var id = Guid.NewGuid();
+        var newParent = Guid.NewGuid();
+        var calls = new List<string>();
+        _storage.Setup(s => s.LockTree(OwnerId, It.IsAny<CancellationToken>()))
+            .Callback(() => calls.Add("lock")).ReturnsAsync(_treeLock.Object);
+        _storage.Setup(s => s.GetDirectory(id, It.IsAny<CancellationToken>()))
+            .Callback(() => calls.Add("read"))
+            .ReturnsAsync(new CloudDirectory { Id = id, OwnerId = OwnerId, ParentId = null, Name = "Docs" });
+        _storage.Setup(s => s.GetDirectoryAsNoTracking(newParent, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CloudDirectory { Id = newParent, OwnerId = OwnerId, ParentId = null });
+        _storage.Setup(s => s.UpdateDirectory(It.IsAny<CloudDirectory>(), It.IsAny<CancellationToken>()))
+            .Callback(() => calls.Add("update"));
+        _treeLock.Setup(l => l.CommitAsync(It.IsAny<CancellationToken>()))
+            .Callback(() => calls.Add("commit")).Returns(Task.CompletedTask);
+
+        await CreateSut().Handle(new MoveDirectoryCommand { DirectoryId = id, NewParentId = newParent }, default);
+
+        calls.Should().Equal("lock", "read", "update", "commit");
+    }
+
+    [Fact]
+    public async Task Handle_Circular_DoesNotCommit()
+    {
+        var id = Guid.NewGuid();
+        var newParent = Guid.NewGuid();
+        SetupDir(id, new CloudDirectory { Id = id, OwnerId = OwnerId, ParentId = null });
+        _storage.Setup(s => s.GetDirectoryAsNoTracking(newParent, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CloudDirectory { Id = newParent, OwnerId = OwnerId, ParentId = id });
+
+        var act = () => CreateSut().Handle(new MoveDirectoryCommand { DirectoryId = id, NewParentId = newParent }, default);
+
+        await act.Should().ThrowAsync<CircularMoveException>();
+        _treeLock.Verify(l => l.CommitAsync(It.IsAny<CancellationToken>()), Times.Never);
+        _treeLock.Verify(l => l.DisposeAsync(), Times.Once);
     }
 }

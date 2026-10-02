@@ -16,6 +16,12 @@ public class DeleteDirectoryCommandHandlerTests
     private readonly Mock<ICloudHierarchyStorage> _storage = new();
     private readonly Mock<IFolderShareStorage> _folderShares = new();
     private readonly Mock<IDirectoryGrantStorage> _dirGrants = new();
+    private readonly Mock<ICloudTreeLock> _treeLock = new();
+
+    public DeleteDirectoryCommandHandlerTests()
+    {
+        _storage.Setup(s => s.LockTree(OwnerId, It.IsAny<CancellationToken>())).ReturnsAsync(_treeLock.Object);
+    }
 
     private DeleteDirectoryCommandHandler CreateSut() => new(
         _storage.Object,
@@ -69,5 +75,19 @@ public class DeleteDirectoryCommandHandlerTests
         entries[0].PurgeAt.Should().NotBeNull();
         _storage.Verify(s => s.RemoveDirectories(subtree), Times.Once);
         _storage.Verify(s => s.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+        _treeLock.Verify(l => l.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_NotOwner_DoesNotCommit()
+    {
+        var id = Guid.NewGuid();
+        _storage.Setup(s => s.GetDirectoryAsNoTracking(id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CloudDirectory { Id = id, OwnerId = 999 });
+
+        var act = () => CreateSut().Handle(new DeleteDirectoryCommand { DirectoryId = id }, default);
+
+        await act.Should().ThrowAsync<CloudAccessDeniedException>();
+        _treeLock.Verify(l => l.CommitAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 }

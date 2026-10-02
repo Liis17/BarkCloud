@@ -41,6 +41,10 @@ public class DeleteDirectoryCommandHandler : IRequestHandler<DeleteDirectoryComm
     {
         var ownerId = _userContext.UserId;
 
+        // Снимок поддерева и удаление — одна граница: параллельное перемещение внутрь
+        // удаляемого поддерева оставило бы папку с ParentId на уже удалённую.
+        await using var treeLock = await _storage.LockTree(ownerId, cancellationToken);
+
         var root = await _storage.GetDirectoryAsNoTracking(request.DirectoryId, cancellationToken);
         if (root is null)
             throw new DirectoryNotFoundException();
@@ -72,6 +76,7 @@ public class DeleteDirectoryCommandHandler : IRequestHandler<DeleteDirectoryComm
         // публичная страница /f и доступ получателей должны прекратиться немедленно.
         var removedFolderShares = await _folderShares.RemoveByDirectories(ownerId, subtreeIds, cancellationToken);
         var removedDirGrants = await _dirGrants.RemoveByDirectories(ownerId, subtreeIds, cancellationToken);
+        await treeLock.CommitAsync(cancellationToken);
 
         _logger.LogInformation(
             "Удалена папка {DirectoryId} рекурсивно (директорий: {DirCount}, файлов в корзину: {FileCount}, публичных папок снято: {FolderShares}, грантов папок снято: {DirGrants}, Owner: {OwnerId})",
