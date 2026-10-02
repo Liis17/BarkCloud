@@ -117,8 +117,9 @@ public sealed class LegacyUploadAdmissionFilter(
         if (bodySize is { IsReadOnly: false })
             bodySize.MaxRequestBodySize = admission.MaxBytes + options.MultipartOverheadBytes;
 
+        // На HTTP/2 и HTTP/3 Kestrel не поддерживает per-request MinDataRate: сеттер бросает NotSupportedException.
         var dataRate = http.Features.Get<IHttpMinRequestBodyDataRateFeature>();
-        if (dataRate is not null)
+        if (dataRate is not null && !HttpProtocol.IsHttp2(request.Protocol) && !HttpProtocol.IsHttp3(request.Protocol))
             dataRate.MinDataRate = new MinDataRate(options.MinBytesPerSecond, options.MinRateGrace);
 
         await next();

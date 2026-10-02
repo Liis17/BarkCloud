@@ -227,6 +227,28 @@ public class LegacyUploadAdmissionFilterTests : IDisposable
     }
 
     [Fact]
+    public async Task AdmittedRequestOverHttp2_SkipsMinDataRateAndStillAdmits()
+    {
+        var fileId = await AddPlaceholderAsync();
+        SetupQuota(limit: null);
+        var sut = CreateSut();
+        var harness = CreateHarness(fileId, contentLength: 800);
+        harness.Http.Request.Protocol = "HTTP/2";
+        harness.Http.Features.Set<IHttpMinRequestBodyDataRateFeature>(new Http2MinRateFeature());
+
+        await sut.OnResourceExecutionAsync(harness.Context, harness.Next);
+
+        harness.NextCalled.Should().BeTrue();
+        harness.Context.Result.Should().BeNull();
+        harness.BodySize.MaxRequestBodySize.Should().Be(1000 + 100);
+        _budget.BufferedBytes.Should().Be(800);
+
+        await harness.Response.FireOnCompletedAsync();
+
+        _budget.BufferedBytes.Should().Be(0);
+    }
+
+    [Fact]
     public async Task ChunkedRequest_ReservesWholeCapInBudget()
     {
         var fileId = await AddPlaceholderAsync();
@@ -287,5 +309,15 @@ public class LegacyUploadAdmissionFilterTests : IDisposable
     private sealed class FakeMinRateFeature : IHttpMinRequestBodyDataRateFeature
     {
         public MinDataRate? MinDataRate { get; set; }
+    }
+
+    /// <summary>Как Kestrel на HTTP/2: per-request минимальная скорость не поддерживается.</summary>
+    private sealed class Http2MinRateFeature : IHttpMinRequestBodyDataRateFeature
+    {
+        public MinDataRate? MinDataRate
+        {
+            get => throw new NotSupportedException();
+            set => throw new NotSupportedException();
+        }
     }
 }

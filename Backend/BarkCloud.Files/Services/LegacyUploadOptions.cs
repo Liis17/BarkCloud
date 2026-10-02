@@ -27,7 +27,10 @@ public sealed class LegacyUploadOptions
     /// <summary>Запас на multipart-обвязку (границы, заголовки части) сверх размера файла.</summary>
     public long MultipartOverheadBytes { get; set; } = 64 * 1024;
 
-    /// <summary>Минимальная скорость чтения тела; медленнее <see cref="MinRateGrace"/> — обрыв.</summary>
+    /// <summary>
+    /// Минимальная скорость чтения тела; медленнее <see cref="MinRateGrace"/> — обрыв.
+    /// Действует только на HTTP/1.x: на HTTP/2/3 Kestrel не даёт задать её на запрос.
+    /// </summary>
     public double MinBytesPerSecond { get; set; } = 1024;
 
     public TimeSpan MinRateGrace { get; set; } = TimeSpan.FromSeconds(30);
