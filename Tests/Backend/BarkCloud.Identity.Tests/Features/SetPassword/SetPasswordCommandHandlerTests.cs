@@ -12,6 +12,7 @@ using BarkCloud.TestKit;
 
 using MassTransit;
 
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -28,13 +29,7 @@ public class SetPasswordCommandHandlerTests
 
     public SetPasswordCommandHandlerTests()
     {
-        _notifier = new Mock<PasswordChangedNotifier>(
-            Mock.Of<UsersServerApi.UsersServerApiClient>(),
-            new Mock<NotificationQueueSender>(Mock.Of<IPublishEndpoint>(),
-                new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build()).Object,
-            new Mock<LocationClient>(new HttpClient(), new MetricsCollector(), NullLogger<LocationClient>.Instance).Object,
-            new RequestContext(),
-            NullLogger<PasswordChangedNotifier>.Instance);
+        _notifier = new Mock<PasswordChangedNotifier>(Mock.Of<INotificationOutbox>(), new RequestContext());
         _notifier.Setup(n => n.NotifyAsync(It.IsAny<long>())).Returns(Task.CompletedTask);
         _authProps.Setup(s => s.TryReserveReauthPasswordAttempt(42)).ReturnsAsync(true);
     }
@@ -98,6 +93,49 @@ public class SetPasswordCommandHandlerTests
         _passwords.Verify(s => s.UpdateUserPasswordHash(42, It.IsAny<string>()), Times.Once);
         _notifier.Verify(n => n.NotifyAsync(42), Times.Once);
         _metrics.SnapshotAndReset().Should().ContainKey("password_changes");
+    }
+
+    [Fact]
+    public async Task Handle_OutboxStorageBroken_PasswordStillChangedAndNoError()
+    {
+        // F19: письмо ставится в очередь после записи пароля; сбой очереди не должен превращаться в ошибку клиенту.
+        using var database = new SqliteIdentityContext();
+        await database.Context.Database.ExecuteSqlRawAsync("DROP TABLE PendingNotifications");
+        var outbox = new NotificationOutbox(
+            database.Context, new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build(), _metrics,
+            NullLogger<NotificationOutbox>.Instance);
+        var sut = new SetPasswordCommandHandler(
+            UserContextFactory.Create(42), _passwords.Object, _authProps.Object, _refreshTokens.Object,
+            new PasswordChangedNotifier(outbox, new RequestContext()), _metrics, _logger);
+        _passwords.Setup(s => s.GetUserPasswordHash(42)).ReturnsAsync(PasswordHasher.HashPassword("oldp"));
+        _passwords.Setup(s => s.UpdateUserPasswordHash(42, It.IsAny<string>())).ReturnsAsync(false);
+
+        var act = () => sut.Handle(new SetPasswordCommand { OldPassword = "oldp", NewPassword = "newp" }, default);
+
+        await act.Should().NotThrowAsync();
+        _passwords.Verify(s => s.UpdateUserPasswordHash(42, It.IsAny<string>()), Times.Once);
+        _metrics.SnapshotAndReset().Should().ContainKey("notification_outbox_enqueue_failed");
+    }
+
+    [Fact]
+    public async Task Handle_ValidChange_QueuesPasswordChangedMailForLaterDelivery()
+    {
+        using var database = new SqliteIdentityContext();
+        var outbox = new NotificationOutbox(
+            database.Context, new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build(), _metrics,
+            NullLogger<NotificationOutbox>.Instance);
+        var sut = new SetPasswordCommandHandler(
+            UserContextFactory.Create(42), _passwords.Object, _authProps.Object, _refreshTokens.Object,
+            new PasswordChangedNotifier(outbox, new RequestContext()), _metrics, _logger);
+        _passwords.Setup(s => s.GetUserPasswordHash(42)).ReturnsAsync(PasswordHasher.HashPassword("oldp"));
+        _passwords.Setup(s => s.UpdateUserPasswordHash(42, It.IsAny<string>())).ReturnsAsync(false);
+
+        await sut.Handle(new SetPasswordCommand { OldPassword = "oldp", NewPassword = "newp" }, default);
+
+        await using var reader = database.CreateAdditionalContext();
+        var queued = await reader.PendingNotifications.SingleAsync();
+        queued.UserId.Should().Be(42);
+        queued.Type.Should().Be(NotificationType.PasswordChanged);
     }
 
     [Fact]

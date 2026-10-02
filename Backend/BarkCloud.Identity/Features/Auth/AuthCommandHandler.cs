@@ -1,7 +1,6 @@
 using BarkCloud.GrpcServer.Metrics;
 using BarkCloud.GrpcServer.Tracker;
 using BarkCloud.Identity.Domain;
-using BarkCloud.Identity.Features.CreateToken;
 using BarkCloud.Identity.Infrastructure;
 using BarkCloud.Identity.Persistence.Services;
 using BarkCloud.Identity.Services;
@@ -11,8 +10,6 @@ using BarkCloud.Shared.Exceptions.Identity;
 using BarkCloud.Shared.Identity;
 using BarkCloud.Shared.Queue.Notifications;
 
-using Google.Protobuf.WellKnownTypes;
-
 using MediatR;
 
 using OtpNet;
@@ -21,14 +18,11 @@ using OtpNet;
 namespace BarkCloud.Identity.Features.Auth;
 
 public class AuthCommandHandler(UsersServerApi.UsersServerApiClient usersClient,
-    IMediator mediator, IAuthPropertiesStorage authPropertiesStorage, NotificationQueueSender notificationQueueSender,
-    IRefreshTokensStorage refreshTokensStorage, RequestContext requestContext, IPasswordsStorage passwordsStorage,
-    LocationClient locationClient, MetricsCollector metrics, IAuthRateLimiter rateLimiter,
-    ILogger<AuthCommandHandler> logger) : IRequestHandler<AuthCommand, AuthResponse>
+    IAuthPropertiesStorage authPropertiesStorage, NotificationQueueSender notificationQueueSender,
+    INotificationOutbox notificationOutbox, SessionIssuer sessionIssuer, RequestContext requestContext,
+    IPasswordsStorage passwordsStorage, LocationClient locationClient, MetricsCollector metrics,
+    IAuthRateLimiter rateLimiter, ILogger<AuthCommandHandler> logger) : IRequestHandler<AuthCommand, AuthResponse>
 {
-
-    private const int ExpDaysRefreshToken = 9999;
-
     public async Task<AuthResponse> Handle(AuthCommand request, CancellationToken cancellationToken)
     {
         var login = request.Username ?? request.Email;
@@ -65,11 +59,6 @@ public class AuthCommandHandler(UsersServerApi.UsersServerApiClient usersClient,
         {
             throw new XAppInfoIsRequiedException();
         }
-
-        // Если DeviceId не передан, генерируем временный для обратной совместимости
-        var deviceId = string.IsNullOrEmpty(requestContext.DeviceId)
-            ? Guid.NewGuid().ToString()
-            : requestContext.DeviceId;
 
         // Лимит по источнику — до обращения к Users: перебор логинов с одного адреса не доходит ни до поиска, ни до bcrypt.
         await rateLimiter.EnsureSourceAsync(AuthLimits.AuthByIp);
@@ -140,32 +129,12 @@ public class AuthCommandHandler(UsersServerApi.UsersServerApiClient usersClient,
                 throw new InvalidLoginOrPasswordException();
             }
 
-            // Отправка уведомления о неудачной попытке входа
-            var userContactInfo = await usersClient.GetUserContactsAsync(new GetUserContactsRequest { UserId = user.User.Id });
-
-            var locationInfo = await locationClient.GetLocationString(requestContext.IpAddress);
-
-            var failedLoginNotification = new EmailNotification
-            {
-                OwnerId = user.User.Id,
-                Address = userContactInfo.Contact.Email,
-                CreatedAt = DateTime.UtcNow,
-                Payload = new Dictionary<string, string>
-                {
-                    {"username", user.User.Username},
-                    {"ip", requestContext.IpAddress ?? string.Empty},
-                    {"devicename", requestContext.DeviceName},
-                    {"os", requestContext.OperationSystem},
-                    {"location", locationInfo},
-                    {"appname", $"{requestContext.AppName} v.{requestContext.AppVersion}"},
-                    {"datetime", DateTime.UtcNow.ToString("dd.MM.yyyy HH:mm:ss")}
-                },
-                ServiceId = ServiceId.Identity,
-                Title = "Неуспешная попытка входа в аккаунт",
-                Type = NotificationType.FailedLogin
-            };
-
-            await notificationQueueSender.SendNotification(failedLoginNotification);
+            // Письмо уходит через outbox: ни Users, ни геолокация не задерживают отказ и не меняют его результат.
+            await notificationOutbox.EnqueueAsync(
+                user.User.Id,
+                NotificationType.FailedLogin,
+                "Неуспешная попытка входа в аккаунт",
+                NotificationPayload.Device(requestContext));
 
             throw new InvalidLoginOrPasswordException();
         }
@@ -287,81 +256,6 @@ public class AuthCommandHandler(UsersServerApi.UsersServerApiClient usersClient,
             requestContext.IpAddress
         );
 
-        logger.LogDebug("Генерация refresh token для пользователя {UserId}", user.User.Id);
-
-        // Удаляем старые токены для этого устройства перед созданием нового
-        await refreshTokensStorage.DeleteRefreshTokensByDeviceIdSafe(deviceId, user.User.Id);
-
-        var refreshTokenString = RefreshTokenGenerator.GenerateRefreshToken();
-        await refreshTokensStorage.CreateNewRefreshToken(refreshTokenString, user.User.Id, deviceId, ExpDaysRefreshToken);
-
-        var accessTokenResponse = await mediator.Send(new CreateTokenCommand { RefreshToken = refreshTokenString }, cancellationToken);
-
-        // Регистрация устройства в Users сервисе
-        var successLocationInfo = await locationClient.GetLocationString(requestContext.IpAddress);
-
-        try
-        {
-            await usersClient.RegisterDeviceAsync(new RegisterDeviceRequest
-            {
-                DeviceId = deviceId,
-                UserId = user.User.Id,
-                OriginalName = requestContext.DeviceName ?? "Unknown",
-                AppName = $"{requestContext.AppName} v.{requestContext.AppVersion}",
-                OperationSystem = requestContext.OperationSystem ?? "",
-                Location = successLocationInfo
-            });
-        }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex, "Не удалось зарегистрировать устройство {DeviceId} для пользователя {UserId}",
-                deviceId, user.User.Id);
-        }
-
-        // Отправка уведомления об успешном входе
-        var successUserContactInfo = await usersClient.GetUserContactsAsync(new GetUserContactsRequest { UserId = user.User.Id });
-
-        var successfulLoginNotification = new EmailNotification
-        {
-            OwnerId = user.User.Id,
-            Address = successUserContactInfo.Contact.Email,
-            CreatedAt = DateTime.UtcNow,
-            Payload = new Dictionary<string, string>
-            {
-                {"username", user.User.Username},
-                {"ip", requestContext.IpAddress ?? string.Empty},
-                {"devicename", requestContext.DeviceName},
-                {"os", requestContext.OperationSystem},
-                {"location", successLocationInfo},
-                {"appname", $"{requestContext.AppName} v.{requestContext.AppVersion}"},
-                {"datetime", DateTime.UtcNow.ToString("dd.MM.yyyy HH:mm:ss")}
-            },
-            ServiceId = ServiceId.Identity,
-            Title = "Успешный вход в аккаунт",
-            Type = NotificationType.SuccessfulLogin
-        };
-
-        await notificationQueueSender.SendNotification(successfulLoginNotification);
-
-        metrics.Increment("auth_login_success");
-        metrics.Increment("sessions_created");
-
-        logger.LogInformation(
-            "Аутентификация завершена успешно для пользователя {UserId}. Токены сгенерированы, уведомление отправлено",
-            user.User.Id
-        );
-
-        var response = new AuthResponse
-        {
-            RefreshToken = new Token
-            {
-                Value = refreshTokenString,
-                ExpirationDate = Timestamp.FromDateTime(DateTime.UtcNow.AddDays(ExpDaysRefreshToken))
-
-            },
-            AccessToken = accessTokenResponse.AccessToken
-        };
-
-        return response;
+        return await sessionIssuer.IssueAsync(user.User.Id, cancellationToken);
     }
 }

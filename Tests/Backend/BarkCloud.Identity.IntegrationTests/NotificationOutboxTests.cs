@@ -1,13 +1,20 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
 
+using System.Security.Claims;
+
 using BarkCloud.GrpcServer.Metrics;
+using BarkCloud.GrpcServer.Tracker;
+using BarkCloud.GrpcServer.XAuth;
 using BarkCloud.Identity.Domain;
+using BarkCloud.Identity.Features.SetPassword;
 using BarkCloud.Identity.Infrastructure;
 using BarkCloud.Identity.Persistence.Contexts;
 using BarkCloud.Identity.Persistence.Services;
 using BarkCloud.Identity.Services;
+using BarkCloud.Identity.Settings;
 using BarkCloud.Proto.Users;
+using BarkCloud.Shared.Identity;
 using BarkCloud.Shared.Queue.Notifications;
 using BarkCloud.TestKit;
 
@@ -15,6 +22,7 @@ using Grpc.Core;
 
 using MassTransit;
 
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
@@ -119,6 +127,57 @@ public class NotificationOutboxTests
     }
 
     [Fact]
+    public async Task SetPassword_UsersDownAfterPasswordWrite_ClientSucceedsAndMailIsDeliveredLater()
+    {
+        await using var database = await PostgresIdentityDatabase.CreateAsync();
+        await using (var setup = database.CreateContext())
+        {
+            await new PasswordsStorage(setup).UpdateUserPasswordHash(42, PasswordHasher.HashPassword("old-password"));
+        }
+
+        var published = new ConcurrentBag<string>();
+        using var host = Host(database, published, usersAvailable: false);
+
+        // Users недоступен весь вызов: раньше смена пароля падала на запросе контактов уже после записи хеша.
+        await using (var context = database.CreateContext())
+        {
+            var metrics = new MetricsCollector();
+            var outbox = new NotificationOutbox(context, new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build(),
+                metrics, NullLogger<NotificationOutbox>.Instance);
+            var handler = new SetPasswordCommandHandler(
+                UserContextFor(42), new PasswordsStorage(context), new AuthPropertiesStorage(context),
+                new RefreshTokensStorage(context, new JwtSettings { ExpiryMinutes = 60 }),
+                new PasswordChangedNotifier(outbox, new RequestContext { DeviceName = "Phone", IpAddress = "1.1.1.1" }),
+                metrics, NullLogger<SetPasswordCommandHandler>.Instance);
+
+            await handler.Handle(new SetPasswordCommand { OldPassword = "old-password", NewPassword = "new-password" }, default);
+        }
+
+        await using (var reader = database.CreateContext())
+        {
+            PasswordHasher.VerifyPassword("new-password", await new PasswordsStorage(reader).GetUserPasswordHash(42))
+                .Should().BeTrue();
+            (await reader.PendingNotifications.SingleAsync()).Type.Should().Be(NotificationType.PasswordChanged);
+        }
+
+        await host.Worker.ProcessBatchAsync(default);
+        published.Should().BeEmpty();
+
+        await using (var context = database.CreateContext())
+        {
+            await context.PendingNotifications.ExecuteUpdateAsync(
+                s => s.SetProperty(x => x.NextAttemptAt, DateTime.UtcNow.AddSeconds(-1)));
+        }
+
+        host.UsersAvailable = true;
+        await host.Worker.ProcessBatchAsync(default);
+
+        published.Should().ContainSingle();
+        await using var after = database.CreateContext();
+        (await after.PendingNotifications.AnyAsync()).Should().BeFalse();
+    }
+
+    [Fact]
     public async Task Migration_DownAndUp_KeepsOtherIdentityData()
     {
         await using var database = await PostgresIdentityDatabase.CreateAsync();
@@ -136,6 +195,21 @@ public class NotificationOutboxTests
             .Should().BeTrue();
         (await reader.PendingNotifications.AnyAsync()).Should().BeFalse();
         reader.Database.HasPendingModelChanges().Should().BeFalse();
+    }
+
+    private static UserContext UserContextFor(long userId)
+    {
+        var identity = new ClaimsIdentity(
+        [
+            new Claim(IdentityClaims.UserId, userId.ToString()),
+            new Claim(IdentityClaims.TokenType, TokenType.User.ToString()),
+            new Claim(IdentityClaims.DeviceId, "device-1")
+        ], authenticationType: "test");
+
+        return new UserContext(new HttpContextAccessor
+        {
+            HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(identity) }
+        });
     }
 
     private static async Task Drain(NotificationOutboxWorker worker)

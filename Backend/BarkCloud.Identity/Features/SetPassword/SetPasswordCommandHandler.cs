@@ -94,7 +94,7 @@ public class SetPasswordCommandHandler : IRequestHandler<SetPasswordCommand>
         }
 
         _logger.LogInformation(
-            "Пароль успешно изменен для пользователя {UserId}. Уведомление отправлено",
+            "Пароль успешно изменен для пользователя {UserId}. Уведомление поставлено в очередь",
             _userContext.UserId
         );
     }

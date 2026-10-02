@@ -198,10 +198,7 @@ public class ResetPasswordTests
         var mediator = new Mock<IMediator>();
         mediator.Setup(m => m.Send(It.IsAny<CreateTokenCommand>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CreateTokenResponse { AccessToken = new Token { Value = "access" } });
-        var notifier = new Mock<PasswordChangedNotifier>(Mock.Of<UsersServerApi.UsersServerApiClient>(),
-            new NotificationQueueSender(Mock.Of<IPublishEndpoint>(), new ConfigurationBuilder().Build()),
-            new LocationClient(new HttpClient(), metrics, NullLogger<LocationClient>.Instance),
-            request, NullLogger<PasswordChangedNotifier>.Instance);
+        var notifier = new Mock<PasswordChangedNotifier>(Mock.Of<INotificationOutbox>(), request);
         notifier.Setup(n => n.NotifyAsync(It.IsAny<long>())).Returns(() => notify?.Invoke() ?? Task.CompletedTask);
         return new ConfirmResetPasswordCommandHandler(new ResetPasswordsStorage(context), new AuthPropertiesStorage(context),
             new PasswordsStorage(context), new RefreshTokensStorage(context, new JwtSettings { ExpiryMinutes = 60 }),
