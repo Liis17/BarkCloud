@@ -35,7 +35,14 @@ public sealed record DeviceInfo(
             AddBase64(metadata, MetadataKeys.DeviceId, DeviceId);
 
         if (!string.IsNullOrEmpty(Ip))
+        {
             AddBase64(metadata, MetadataKeys.IpAddress, Ip);
+
+            // Доверенный адрес для лимитов попыток в Identity (читается как X-Real-IP; значение не base64).
+            // Web вызывает Identity напрямую, минуя nginx, поэтому без него все веб-пользователи
+            // попали бы в одно «ведро» с адресом контейнера Web.
+            metadata.Add(MetadataKeys.RealIp, Ip);
+        }
 
         return metadata;
     }

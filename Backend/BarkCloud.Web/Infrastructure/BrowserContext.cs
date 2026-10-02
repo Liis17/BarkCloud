@@ -1,3 +1,5 @@
+using System.Net;
+
 using BarkCloud.Shared.Auth;
 
 using Grpc.Core;
@@ -34,21 +36,22 @@ public static class BrowserContext
             Ip: ResolveIp(http));
     }
 
-    private static string ResolveIp(HttpContext http)
+    /// <summary>
+    /// Адрес браузера: <c>X-Real-IP</c>, который nginx перезаписывает значением <c>$remote_addr</c>, иначе адрес
+    /// соединения. <c>X-Forwarded-For</c> не используется — nginx лишь дописывает к нему свой адрес, а первый
+    /// элемент задаёт клиент. Значение уходит в Identity как <c>x-real-ip</c> и служит ключом лимитов попыток.
+    /// </summary>
+    public static string ResolveIp(HttpContext http)
     {
-        var forwarded = http.Request.Headers["X-Forwarded-For"].FirstOrDefault();
-        if (!string.IsNullOrWhiteSpace(forwarded))
-            return forwarded.Split(',')[0].Trim();
+        var real = http.Request.Headers["X-Real-IP"].FirstOrDefault();
+        if (IPAddress.TryParse(real?.Trim(), out var forwarded))
+            return Plain(forwarded).ToString();
 
         var ip = http.Connection.RemoteIpAddress;
-        if (ip is null)
-            return string.Empty;
-
-        if (ip.IsIPv4MappedToIPv6)
-            ip = ip.MapToIPv4();
-
-        return ip.ToString();
+        return ip is null ? string.Empty : Plain(ip).ToString();
     }
+
+    private static IPAddress Plain(IPAddress ip) => ip.IsIPv4MappedToIPv6 ? ip.MapToIPv4() : ip;
 
     private static string DescribeBrowser(string ua)
     {

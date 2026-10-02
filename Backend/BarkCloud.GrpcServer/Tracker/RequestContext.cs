@@ -6,6 +6,9 @@ public class RequestContext
 
     public string? IpAddress { get; init; }
 
+    /// <summary>Доверенный адрес источника (см. <see cref="SourceIpResolver"/>) — только для лимитов попыток.</summary>
+    public string? SourceIp { get; init; }
+
     public string? DeviceName { get; init; }
 
     public string? AppName { get; init; }

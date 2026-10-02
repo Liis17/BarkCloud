@@ -24,6 +24,8 @@ public class IdentityContext : DbContext
 
     public DbSet<WebAuthnChallenge> WebAuthnChallenges { get; set; }
 
+    public DbSet<AuthAttemptCounter> AuthAttemptCounters { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -44,5 +46,11 @@ public class IdentityContext : DbContext
 
         modelBuilder.Entity<WebAuthnCredential>()
             .HasIndex(x => x.UserId);
+
+        modelBuilder.Entity<AuthAttemptCounter>(e =>
+        {
+            e.HasKey(x => x.Key);
+            e.Property(x => x.Key).HasMaxLength(200);
+        });
     }
 }
