@@ -8,7 +8,6 @@ using Microsoft.IdentityModel.Tokens;
 
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using System.Text;
 
 namespace BarkCloud.Identity.Services;
 
@@ -47,7 +46,7 @@ public class JwtService(JwtSettings jwtSettings)
 
     private string CreateToken(IEnumerable<Claim> claims, DateTime expiration)
     {
-        var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.SecretKey));
+        var securityKey = new SymmetricSecurityKey(JwtSecret.GetKeyBytes(jwtSettings.SecretKey));
         var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
 
         var tokenDescriptor = new SecurityTokenDescriptor

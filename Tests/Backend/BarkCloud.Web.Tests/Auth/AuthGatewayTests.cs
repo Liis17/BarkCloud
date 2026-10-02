@@ -27,12 +27,12 @@ public class AuthGatewayTests
     private readonly Mock<IdentityApi.IdentityApiClient> _identity = new();
     private readonly TokenRevocationCache _revocations = new();
 
-    private AuthGateway CreateSut()
+    private AuthGateway CreateSut(string secret = Secret)
     {
         var config = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["JwtSettings:SecretKey"] = Secret,
+                ["JwtSettings:SecretKey"] = secret,
                 ["JwtSettings:Issuer"] = "bark",
                 ["JwtSettings:Audience"] = "bark"
             })
@@ -42,7 +42,7 @@ public class AuthGatewayTests
     }
 
     // User-JWT как у Identity (HS256, те же клеймы), но с управляемым iat.
-    private static string Jwt(long userId = 42, string deviceId = "d1", DateTime? issuedAt = null)
+    private static string Jwt(long userId = 42, string deviceId = "d1", DateTime? issuedAt = null, string secret = Secret)
     {
         var now = DateTime.UtcNow;
         var descriptor = new SecurityTokenDescriptor
@@ -59,7 +59,7 @@ public class AuthGatewayTests
             Issuer = "bark",
             Audience = "bark",
             SigningCredentials = new SigningCredentials(
-                new SymmetricSecurityKey(Encoding.ASCII.GetBytes(Secret)), SecurityAlgorithms.HmacSha256)
+                new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret)), SecurityAlgorithms.HmacSha256)
         };
 
         var handler = new JwtSecurityTokenHandler();
@@ -156,6 +156,20 @@ public class AuthGatewayTests
         user.Should().NotBeNull();
         user!.UserId.Should().Be(42);
         user.DeviceId.Should().Be("d1");
+        VerifyRefreshNotCalled();
+    }
+
+    // F23: токен Identity подписан по UTF-8 байтам секрета; Web раньше проверял по ASCII.
+    [Fact]
+    public async Task AuthenticateAsync_UnicodeSecret_ReturnsUserForTokenSignedLikeIdentity()
+    {
+        const string unicodeSecret = "СекретныйКлючДляПодписиТокеновЮникод";
+        var http = HttpWithCookies(Jwt(secret: unicodeSecret));
+
+        var user = await CreateSut(unicodeSecret).AuthenticateAsync(http);
+
+        user.Should().NotBeNull();
+        user!.UserId.Should().Be(42);
         VerifyRefreshNotCalled();
     }
 

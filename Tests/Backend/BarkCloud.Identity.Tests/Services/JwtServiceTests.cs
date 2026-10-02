@@ -1,7 +1,12 @@
+using BarkCloud.GrpcServer.XAuth;
 using BarkCloud.Identity.Services;
 using BarkCloud.Identity.Settings;
 using BarkCloud.Shared.Identity;
 
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
 using System.IdentityModel.Tokens.Jwt;
@@ -125,6 +130,36 @@ public class JwtServiceTests
         var jwt = Read(token);
         jwt.Claims.Should().NotContain(c => c.Type == IdentityClaims.UserId);
         jwt.Claims.Should().NotContain(c => c.Type == IdentityClaims.DeviceId);
+    }
+
+    // F23: ключ проверки в остальных сервисах (AddXAuth) обязан совпадать с ключом подписи Identity,
+    // в том числе при не-ASCII секрете (раньше проверка шла по ASCII и ключи расходились).
+    [Theory]
+    [InlineData("supersecretkey_at_least_32_chars_long_for_hs256!!")]
+    [InlineData("СекретныйКлючДляПодписиТокеновЮникод")]
+    public void GeneratedTokens_AreAcceptedByXAuthValidation(string secret)
+    {
+        var settings = BuildSettings();
+        settings.SecretKey = secret;
+        var sut = new JwtService(settings);
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["JwtSettings:SecretKey"] = secret,
+            ["JwtSettings:Issuer"] = settings.Issuer,
+            ["JwtSettings:Audience"] = settings.Audience
+        }).Build();
+        var services = new ServiceCollection();
+        services.AddXAuth(configuration);
+        using var provider = services.BuildServiceProvider();
+        var parameters = provider.GetRequiredService<IOptionsMonitor<JwtBearerOptions>>()
+            .Get(JwtBearerDefaults.AuthenticationScheme).TokenValidationParameters;
+        var handler = new JwtSecurityTokenHandler();
+
+        var userToken = () => handler.ValidateToken(sut.GenerateUserToken(42, "device-abc").Value, parameters, out _);
+        var serverToken = () => handler.ValidateToken(sut.GenerateServerToken(ServiceId.Files), parameters, out _);
+
+        userToken.Should().NotThrow();
+        serverToken.Should().NotThrow();
     }
 
     [Fact]

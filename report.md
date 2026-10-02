@@ -46,7 +46,7 @@
 | F20 | P2 | Files | Поиск материализует большой каталог до применения лимита страницы |
 | F21 | P2 | Torrent | При ошибке сохранения теряется учёт трафика |
 | F22 | P2 | Torrent | Ошибка остановки оставляет торрент в движке без ссылки в реестре |
-| F23 | P2 | Identity/GrpcServer/Web | Секрет JWT кодируется по-разному при подписи и проверке |
+| F23 | P2 | Identity/GrpcServer/Web | Исправлено: единое UTF-8 преобразование секрета JWT (`JwtSecret`), проверка длины при записи и старте; Docker-прогон ожидается |
 | F24 | P2 | CI | Фильтры пропускают общие зависимости; тесты Torrent не подключены |
 | Q01 | P2 | Контракты | Повторная генерация protobuf создаёт конфликтующие CLR-типы |
 | Q02 | P2 | Зависимости | NuGet сообщает об известных уязвимостях пакетов |
@@ -333,6 +333,8 @@ Unique-индекс задан по `(OwnerId, ParentId, Name)`, но `ParentId`
 **Проверка:** имитация ошибки Stop/Remove и повтор операции: менеджер остаётся доступен для управления до успешного удаления; после успеха отсутствует в движке, реестре и БД.
 
 ### F23. Unicode в секрете JWT ломает проверку токенов
+
+**Статус F23 — исправлено (2026-10-02):** единственный способ получить байты ключа — `JwtSecret.GetKeyBytes` (`Shared.Identity`): UTF-8, для ASCII-секретов байты прежние. Подключён во всех шести местах: `JwtService`, `XAuthExtensions`, Web `AuthGateway`/`AdminGate`/`ServiceToken`, Configuration `GenerateServiceToken` (в отчёте названы четыре; остальные два тоже использовали ASCII, где не-ASCII символы заменяются на `?`, то есть ключ из кириллицы вырождался в строку «?»). Длина проверяется в байтах UTF-8: Configuration отклоняет при записи секрет короче 32 байт (RFC 7518), сервисы при старте — короче 16 (предел HS256 в IdentityModel). `AddXAuth` строит ключ сразу, а не лениво в `AddJwtBearer`, поэтому Identity/Users/Files/Torrent падают на старте; Web проверяет секрет сразу после `LoadConfiguration` (пустой секрет Web по-прежнему допускает, аутентификация отключена). Web — `v1.6.6`. **Миграция:** ASCII-секрет — без изменений. При не-ASCII секрете сохранённые `*Service:Token` (подписаны по ASCII-ключу) перестанут проходить проверку: очистить их в Configuration и перезапустить Configuration (`PopulateDefaultsAsync` выпустит новые), все сервисы обновлять одним релизом. Секрет короче 16 байт после обновления остановит сервисы с понятной ошибкой — значение исправить прямо в БД Configuration. Вне объёма: смена секрета через UI не перевыпускает сохранённые сервисные токены. Проверено: новые тесты `JwtSecret`, `AddXAuth`, кросс-тест Identity → `AddXAuth` (на ASCII-проверке с кириллическим секретом падает, после правки проходит), `AuthGateway`, `AdminGate`, `ServiceToken`, валидатор и populator Configuration; тесты Configuration, GrpcServer, Identity, Notification, Torrent, Users, Web проходят (Files.Tests и PostgreSQL-интеграционные в среде не запускались), Docker-прогон не выполнялся. Подробности — [память Shared · Identity](Obsidian/BarkCloudVault/modules/shared-identity.md).
 
 **Код:** [JwtService.cs:50](Backend/BarkCloud.Identity/Services/JwtService.cs#L50), [XAuthExtensions.cs:28](Backend/BarkCloud.GrpcServer/XAuth/XAuthExtensions.cs#L28), [AuthGateway.cs:58](Backend/BarkCloud.Web/Auth/AuthGateway.cs#L58), [SettingsValueValidator.cs:13](Backend/BarkCloud.Configuration/Catalog/SettingsValueValidator.cs#L13).
 

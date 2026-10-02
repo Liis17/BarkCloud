@@ -1,6 +1,5 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using System.Text;
 
 using BarkCloud.GrpcServer.XAuth;
 using BarkCloud.Proto.Identity;
@@ -64,7 +63,7 @@ public sealed class AuthGateway
             _validation = new TokenValidationParameters
             {
                 ValidateIssuerSigningKey = true,
-                IssuerSigningKey = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(secret)),
+                IssuerSigningKey = new SymmetricSecurityKey(JwtSecret.GetKeyBytes(secret)),
                 ValidateIssuer = true,
                 ValidIssuer = configuration["JwtSettings:Issuer"],
                 ValidateAudience = true,

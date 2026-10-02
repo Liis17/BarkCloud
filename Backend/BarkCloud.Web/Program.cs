@@ -42,6 +42,11 @@ for (var attempt = 1; ; attempt++)
     }
 }
 
+// Непригодный секрет JWT иначе проявился бы лениво и непонятно (AuthGateway/AdminGate/ServiceToken) —
+// падаем на старте с внятным сообщением. Пустой секрет Web допускает: аутентификация просто отключена.
+if (!string.IsNullOrEmpty(builder.Configuration[JwtSecret.ConfigKey]))
+    JwtSecret.GetKeyBytes(builder.Configuration[JwtSecret.ConfigKey]);
+
 // Web также пишет ошибки и события в stdout контейнера и Seq. Без этого провайдеров
 // Serilog на веб-хосте не было, поэтому detached self-update было трудно диагностировать.
 builder.AddBarkCloudSerilog("BarkCloud.Web");

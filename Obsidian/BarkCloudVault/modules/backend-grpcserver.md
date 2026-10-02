@@ -35,7 +35,7 @@ Parent: [[index]]
 - `SourceIpResolver.cs` — доверенный адрес источника для лимитов попыток (`RequestContext.SourceIp`, F14): валидный `X-Real-IP`, иначе адрес соединения; IPv4-mapped → IPv4, IPv6 → /64. Клиентские `x-ip-address` и `X-Forwarded-For` не используются (они остаются в `IpAddress` для писем и логов)
 
 ### XAuth (авторизация)
-- `XAuthExtensions.cs` — DI/middleware для авторизации
+- `XAuthExtensions.cs` — DI/middleware для авторизации. Ключ проверки JWT строится сразу при `AddXAuth` из `JwtSecret.GetKeyBytes` (UTF-8, [[modules/shared-identity]]), а не лениво в `AddJwtBearer`: пустой секрет или короче 16 байт останавливает Identity/Users/Files/Torrent на старте с понятным сообщением (F23)
 - `UserContext.cs` — текущий пользователь (claims + device + `IssuedAt` из клейма `iat`, `MinValue` если нет); `IssuedAt` нужен долгим стримам для повторной проверки отзыва (`TorrentApiService.StreamProgress`)
 - `TokenRevocationCache.cs` — локальный hot-path кэш: `Revoke(userId, deviceId, revokedAt, expiresAt)` принимает исходное время Identity и сохраняет максимальные время/expiry. `IsRevoked` по-прежнему проверяет `iat <= RevokedAt`; `OnTokenValidated` читает `iat` из JWT (fallback `MinValue`). См. [[modules/session-revocation]].
 - `RevocationSyncService.cs` — полный снимок с ретраями в `StartAsync` до открытия Kestrel, затем poll 5 с с перекрытием 1 мин и очисткой кэша; заменяет удалённый `TokenRevocationCleanupService`.

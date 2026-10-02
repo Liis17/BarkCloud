@@ -19,9 +19,9 @@ Parent: [[index]] · See also: [[api/identity-api]] · [[api/users-api]] · [[ap
 ## Аутентификация
 
 - Cookie: `bark_at` (access), `bark_rt` (refresh), `bark_did` (стабильный device-id). HttpOnly, SameSite=Lax.
-- Токен валидируется **локально** по `JwtSettings:SecretKey/Issuer/Audience`. Эти значения web получает из **Configuration-сервиса** через `LoadConfiguration(ServiceId.Web)` — `JwtSettings` засеяны как общие (`ServiceId.Unknown`) и раздаются любому сервису, поэтому секрет автоматически совпадает с Identity.
+- Токен валидируется **локально** по `JwtSettings:SecretKey/Issuer/Audience`. Эти значения web получает из **Configuration-сервиса** через `LoadConfiguration(ServiceId.Web)` — `JwtSettings` засеяны как общие (`ServiceId.Unknown`) и раздаются любому сервису, поэтому секрет автоматически совпадает с Identity. Байты ключа везде берутся из `JwtSecret.GetKeyBytes` (UTF-8, [[modules/shared-identity]]) — как у Identity, поэтому не-ASCII секрет не расходится (F23); сразу после `LoadConfiguration` `Program.cs` проверяет непустой секрет (короче 16 байт — падение на старте с понятным сообщением; пустой секрет по-прежнему допустим, аутентификация отключена).
 - Истёк access → автоматический refresh через `IdentityApi.CreateToken`.
-- **Отзыв сессии:** Web загружает полный снимок отзывов из Identity до открытия порта и обновляет его каждые 5 с (`GrpcRevocationFeed`, `RevocationSyncService`, singleton `TokenRevocationCache`). `AuthGateway.AuthenticateAsync` проверяет `iat <= RevokedAt` и при отзыве идёт по refresh: после logout/удаления сессии refresh уже удалён → `null` (редирект/401). `AddXAuth` не подключён; используется сервисный JWT `ServiceToken.Generate` и `IdentityService:Host`. MassTransit, consumer и прежняя фоновая очистка удалены; рестарт заново загружает снимок. Web `AppVersion.Current = v1.6.5`. См. [[modules/session-revocation]].
+- **Отзыв сессии:** Web загружает полный снимок отзывов из Identity до открытия порта и обновляет его каждые 5 с (`GrpcRevocationFeed`, `RevocationSyncService`, singleton `TokenRevocationCache`). `AuthGateway.AuthenticateAsync` проверяет `iat <= RevokedAt` и при отзыве идёт по refresh: после logout/удаления сессии refresh уже удалён → `null` (редирект/401). `AddXAuth` не подключён; используется сервисный JWT `ServiceToken.Generate` и `IdentityService:Host`. MassTransit, consumer и прежняя фоновая очистка удалены; рестарт заново загружает снимок. Web `AppVersion.Current = v1.6.6`. См. [[modules/session-revocation]].
 - Логин → `IdentityApi.Auth` (с device-заголовками `x-device-name`/`x-os-name`/`x-app-name`/`x-app-version`, base64). Поддержан 2FA-шаг.
 - **Адрес клиента и лимиты (F14).** `BrowserContext.ResolveIp` берёт `X-Real-IP` (nginx перезаписывает его `$remote_addr`), иначе адрес соединения; `X-Forwarded-For` игнорируется. `DeviceInfo.ToMetadata` передаёт адрес в Identity дважды: `x-ip-address` (base64, для писем/логов) и `x-real-ip` (plain, доверенный ключ лимитов Identity — [[modules/backend-identity]]). Блокировка от Identity (`PasswordAttemptsExceeded`/`TooManyRequests`) → `LoginOutcome.TooManyAttempts` → страница входа с `flash.kind = locked` и текстом сервера; регистрация и «забыли пароль» показывают `Status.Detail` как раньше. Разблокировка обслуживания — `AdminUnlockLimiter` ([[modules/web-system-updates]]).
 
@@ -72,7 +72,7 @@ Web — тонкий релей к [[modules/backend-identity]] (валидац�
 
 ### Auth
 - `AuthGateway.cs` — cookie, локальная валидация JWT + проверка отзыва сессии по `TokenRevocationCache`, refresh, логин/логаут, `IssueSession` (общая выдача cookie сессии), `ClearSession` (удаление cookie без обращения в Identity — после удаления аккаунта).
-- `AdminGate.cs` — гейт админ-действий по паролю `App:AdminPassword` (cookie `bark_admin`, HMAC на `JwtSettings:SecretKey`). См. [[modules/web-system-updates]].
+- `AdminGate.cs` — гейт админ-действий по паролю `App:AdminPassword` (cookie `bark_admin`, HMAC на UTF-8 байтах `JwtSettings:SecretKey` через `JwtSecret`). См. [[modules/web-system-updates]].
 - `RegistrationGateway.cs` — регистрация с кодом по почте через клиентский `IdentityApi` (`BeginAsync`/`ConfirmAsync`, см. раздел «Регистрация»).
 - `PasswordResetGateway.cs` — восстановление пароля «Забыли пароль?» через клиентский `IdentityApi` (`BeginAsync`/`ConfirmAsync`, см. раздел «Восстановление пароля»).
 - `WebUser.cs` — модель пользователя + `LoginOutcome`/`LoginResult` + `RegistrationOutcome`/`RegistrationResult` + `PasswordResetOutcome`/`PasswordResetResult`.
@@ -82,7 +82,7 @@ Web — тонкий релей к [[modules/backend-identity]] (валидац�
 - `ConfigurationManagementGateway.cs` — единый серверный gateway к Configuration: добавляет `x-config-access-key`, преобразует DTO, скрывает scalar secrets и полностью удаляет `SecretKey` S3 из browser JSON; пустой secret в edit означает «сохранить текущий». `S3AccessChecker.cs` выполняет безопасную проверку доступности бакета с таймаутом без записи объектов
 - `TemplateRenderer.cs` — рендер плейсхолдеров `{{ }}` / `{{{ }}}` / `| default("…")` с JS-экранированием. Используется только для серверной страницы логина.
 - `DeviceInfo.cs`, `BrowserContext.cs` — построение device-метаданных из запроса браузера.
-- `ServiceToken.cs` — генерация сервисного JWT (`TokenType=Service`) из общего `JwtSettings:SecretKey`.
+- `ServiceToken.cs` — генерация сервисного JWT (`TokenType=Service`) из общего `JwtSettings:SecretKey` (UTF-8 через `JwtSecret`).
 - `DockerService.cs` + `DeploymentJobService.cs` — управление контейнерами через `docker.sock`: server-side очередь pull/up/restart/start/stop с проверкой health и откатом старого образа, self-update веба через helper-контейнер. См. [[modules/web-system-updates]].
 
 ### Rendering

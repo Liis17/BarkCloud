@@ -357,7 +357,7 @@ public class ConfigurationDefaultsPopulator
         string serviceName)
     {
         var credentials = new SigningCredentials(
-            new SymmetricSecurityKey(Encoding.ASCII.GetBytes(secretKey)),
+            new SymmetricSecurityKey(JwtSecret.GetKeyBytes(secretKey)),
             SecurityAlgorithms.HmacSha256);
         var claims = new[]
         {
