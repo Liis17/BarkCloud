@@ -20,6 +20,7 @@ Parent: [[index]]
 ### Files (2)
 - `FileNotFoundException`
 - `NotValidFileIdException`
+- `DirectoryTreeCorruptedException` — цикл в цепочке родителей папки (F13); перечень неполный, актуальные исключения — в каталоге `Files/`
 
 ### Identity (24)
 `ConfirmationCodeExpiredException`, `ConfirmationCodeIncorrectException`, `ConfirmationCodeNotFoundException`, `EmailExistException`, `InvalidLoginOrPasswordException`, `InvalidOldPasswordException`, `InvalidPasswordException`, `InvalidRefreshTokenException`, `NotSetUsernameOrEmailException`, `NotValidOtpCodeException`, `OtpCodeNeedException`, `OtpNotCreatedException`, `PasswordAttemptsExceededException`, `ResetIdExpiredException`, `ResetIdHasIsApprovedException`, `ResetIdNotFoundException`, `SessionNotFoundException`, `UserNotFoundException`, `UsernameExistException`, `UsernameOrEmailIsEmptyException`, `UsernameReservedException`, `XAppInfoIsRequiedException`, `XDeviceNameIsRequiredException`, `XOsNameIsRequiredException`.

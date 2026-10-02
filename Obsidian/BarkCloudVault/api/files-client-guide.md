@@ -236,6 +236,7 @@ CLOUD_FILE = 2;   // обычный файл пользовательского 
 - `CloudAccessDenied` — объект не принадлежит пользователю.
 - `FileAlreadyAttached` — файл уже привязан к директории (нарушение «одна директория на файл»).
 - `DirectoryNotFound`, `DirectoryNameConflict`, `CircularMove` — операции с каталогами.
+- `DirectoryTreeCorrupted` (`7D3E5A91-4C28-4F6B-8E10-5B2A9C4D1F02`) — в цепочке родителей папки обнаружен цикл (повреждённые данные); возвращает `GetPath`. Клиент может показать общую ошибку.
 - `AlbumNotFound`, `AlbumNameConflict` — операции с альбомами.
 - `InvalidThumbnailSource` — неверные аргументы `SetVideoThumbnail`.
 
