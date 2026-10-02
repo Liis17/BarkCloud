@@ -19,7 +19,7 @@
     server.online       — boolean (JSON), влияет на индикатор
     form.email          — предзаполненный email (при ошибке / remember-me)
     form.attempts_left  — "3"
-    flash.kind          — "" | "error" | "2fa" | "register" | "register_confirm" | "forgot" | "forgot_confirm"  (определяет экран)
+    flash.kind          — "" | "error" | "locked" | "2fa" | "register" | "register_confirm" | "forgot" | "forgot_confirm"  (определяет экран)
     sso.enabled         — boolean (JSON)
     year                — "2026"
   -->
@@ -525,9 +525,9 @@ function bcBufToB64url(buf) {
 }
 const WEBAUTHN_SUPPORTED = typeof window !== 'undefined' && !!window.PublicKeyCredential;
 
-function LoginCard({ state, showSSO }) {
+function LoginCard({ state, showSSO, error }) {
   const [showPw, setShowPw] = React.useState(false);
-  const [email, setEmail] = React.useState(state === 'error' ? '{{ form.email }}' : '');
+  const [email, setEmail] = React.useState(state === 'error' || state === 'locked' ? '{{ form.email }}' : '');
   const [pw, setPw] = React.useState(state === 'error' ? '{{ form.password_masked }}' : '');
   const [shake] = React.useState(false);
   const [keyBusy, setKeyBusy] = React.useState(false);
@@ -604,6 +604,16 @@ function LoginCard({ state, showSSO }) {
           <div>
             <div style={{fontWeight:600, marginBottom:2}}>Неверный логин или пароль</div>
             <div style={{fontSize:13, opacity:.85}}>Осталось {"{{ form.attempts_left }}"} попытки до временной блокировки.</div>
+          </div>
+        </div>
+      )}
+
+      {state === 'locked' && (
+        <div className="err-banner">
+          <AlertIcon/>
+          <div>
+            <div style={{fontWeight:600, marginBottom:2}}>Слишком много попыток</div>
+            <div style={{fontSize:13, opacity:.85}}>{error}</div>
           </div>
         </div>
       )}
@@ -898,7 +908,7 @@ function App() {
                 case 'register_confirm': return REGISTRATION_ENABLED ? <RegisterConfirmCard error={'{{ form.error }}'}/> : <LoginCard state="default" showSSO={t.showSSO}/>;
                 case 'forgot':           return <ForgotCard error={'{{ form.error }}'}/>;
                 case 'forgot_confirm':   return <ForgotConfirmCard error={'{{ form.error }}'}/>;
-                default:                 return <LoginCard state={t.state} showSSO={t.showSSO}/>;
+                default:                 return <LoginCard state={t.state} error={'{{ form.error }}'} showSSO={t.showSSO}/>;
               }
             })()}
             {REGISTRATION_ENABLED && (t.state === 'register' || t.state === 'register_confirm')

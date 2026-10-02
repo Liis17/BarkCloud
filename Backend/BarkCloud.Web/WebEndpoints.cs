@@ -60,6 +60,11 @@ public static class WebEndpoints
                     var twoFa = await pages.RenderAsync(LoginPage, LoginVars(http, config, registrationEnabled, "2fa", login, login, password));
                     return Results.Content(twoFa, "text/html; charset=utf-8");
 
+                case LoginOutcome.TooManyAttempts:
+                    var locked = await pages.RenderAsync(LoginPage,
+                        LoginVars(http, config, registrationEnabled, "locked", login, login, password, result.Message));
+                    return Results.Content(locked, "text/html; charset=utf-8");
+
                 default:
                     var error = await pages.RenderAsync(LoginPage, LoginVars(http, config, registrationEnabled, "error", login, login, password));
                     return Results.Content(error, "text/html; charset=utf-8");
@@ -512,7 +517,8 @@ public static class WebEndpoints
     }
 
     private static Dictionary<string, string?> LoginVars(
-        HttpContext http, IConfiguration config, bool registrationEnabled, string flashKind, string? email, string? login, string? password)
+        HttpContext http, IConfiguration config, bool registrationEnabled, string flashKind, string? email, string? login, string? password,
+        string? error = null)
         => new()
         {
             ["app.version"] = config.Value("App:Version", AppVersion.Current),
@@ -524,6 +530,7 @@ public static class WebEndpoints
             ["form.email"] = email ?? "",
             ["form.password_masked"] = "",
             ["form.attempts_left"] = "—",
+            ["form.error"] = error ?? "",
             ["form.login"] = login ?? "",
             ["form.password"] = password ?? "",
             ["year"] = DateTime.UtcNow.Year.ToString()

@@ -116,6 +116,8 @@ public class AuthGatewayTests
         [new OtpCodeNeedException().ErrorCode, LoginOutcome.NeedsOtp],
         [new NotValidOtpCodeException().ErrorCode, LoginOutcome.WrongOtp],
         [new InvalidLoginOrPasswordException().ErrorCode, LoginOutcome.InvalidCredentials],
+        [new PasswordAttemptsExceededException().ErrorCode, LoginOutcome.TooManyAttempts],
+        [new TooManyRequestsException().ErrorCode, LoginOutcome.TooManyAttempts],
         ["00000000-0000-0000-0000-000000000000", LoginOutcome.Error]
     ];
 

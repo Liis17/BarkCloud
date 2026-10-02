@@ -120,6 +120,7 @@ builder.Services.AddGrpcClient<FilesServerApi.FilesServerApiClient>(o => o.Addre
 builder.Services.AddSingleton<TemplateRenderer>();
 builder.Services.AddSingleton<PageService>();
 builder.Services.AddSingleton<AdminGate>();
+builder.Services.AddSingleton<AdminUnlockLimiter>();
 builder.Services.AddSingleton<ComposeImageService>();
 builder.Services.AddSingleton<MaintenanceOperationStore>();
 builder.Services.AddSingleton<DockerService>();
