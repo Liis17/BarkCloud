@@ -4,6 +4,7 @@ using BarkCloud.Identity.Domain;
 using BarkCloud.Identity.Features.CreateAccount;
 using BarkCloud.Identity.Infrastructure;
 using BarkCloud.Identity.Persistence.Services;
+using BarkCloud.Identity.Services;
 using BarkCloud.Proto.Identity;
 using BarkCloud.Proto.Users;
 using BarkCloud.Shared.Exceptions.Identity;
@@ -26,6 +27,7 @@ public class CreateAccountCommandHandlerTests
     private readonly Mock<IRefreshTokensStorage> _refreshTokens = new();
     private readonly Mock<NotificationQueueSender> _notifications;
     private readonly Mock<LocationClient> _location;
+    private readonly Mock<IAuthRateLimiter> _rateLimiter = new();
     private readonly MetricsCollector _metrics = new();
     private readonly ILogger<CreateAccountCommandHandler> _logger = NullLogger<CreateAccountCommandHandler>.Instance;
 
@@ -36,6 +38,7 @@ public class CreateAccountCommandHandlerTests
 
         _location = new Mock<LocationClient>(new HttpClient(), new MetricsCollector(), NullLogger<LocationClient>.Instance);
         _location.Setup(c => c.GetLocation(It.IsAny<string>())).ReturnsAsync((IpLocation?)null);
+        _rateLimiter.Setup(l => l.TryReserveAsync(It.IsAny<AuthLimits.Policy>(), It.IsAny<string>())).ReturnsAsync(true);
     }
 
     private static IConfiguration FeatureConfig(bool emailEnabled) => new ConfigurationBuilder()
@@ -60,7 +63,7 @@ public class CreateAccountCommandHandlerTests
         RequestContext? ctx = null, bool emailEnabled = true, bool registrationEnabled = true) => new(
         _usersClient.Object, _codes.Object, _notifications.Object,
         ctx ?? FullContext(), _location.Object, _metrics, _refreshTokens.Object,
-        FeatureConfig(emailEnabled), RegistrationPolicy(registrationEnabled), _logger);
+        FeatureConfig(emailEnabled), RegistrationPolicy(registrationEnabled), _rateLimiter.Object, _logger);
 
     private static RequestContext FullContext() => new()
     {
@@ -195,5 +198,86 @@ public class CreateAccountCommandHandlerTests
         var snap = _metrics.SnapshotAndReset();
         snap.Should().ContainKey("accounts_confirmed");
         snap.Should().ContainKey("sessions_created");
+    }
+
+    private void ArrangeDraft()
+    {
+        _usersClient
+            .Setup(c => c.AddDraftUserAsync(It.IsAny<AddDraftUserRequest>(), null, null, default))
+            .Returns(GrpcCallHelpers.AsyncUnary(new AddDraftUserResponse { UserId = 7 }));
+        _codes
+            .Setup(s => s.AddCode(It.IsAny<ConfirmationCode>()))
+            .ReturnsAsync((ConfirmationCode c) => { c.Id = Guid.NewGuid(); return c; });
+    }
+
+    [Fact]
+    public async Task Handle_SourceLimitExceeded_ThrowsBeforeDraftCreation()
+    {
+        _rateLimiter.Setup(l => l.EnsureSourceAsync(AuthLimits.CreateAccountByIp)).ThrowsAsync(new TooManyRequestsException());
+
+        var act = () => CreateSut().Handle(ValidCommand(), default);
+
+        await act.Should().ThrowAsync<TooManyRequestsException>();
+        _usersClient.Verify(c => c.AddDraftUserAsync(It.IsAny<AddDraftUserRequest>(), null, null, default), Times.Never);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Handle_RecipientMailThrottled_ThrowsWithoutCodeOrMail(bool cooldownTripped)
+    {
+        ArrangeDraft();
+        var tripped = cooldownTripped ? AuthLimits.RegistrationMailCooldown : AuthLimits.RegistrationMailHourly;
+        _rateLimiter.Setup(l => l.TryReserveAsync(tripped, It.IsAny<string>())).ReturnsAsync(false);
+
+        var act = () => CreateSut().Handle(ValidCommand(), default);
+
+        await act.Should().ThrowAsync<TooManyRequestsException>();
+        _codes.Verify(s => s.AddCode(It.IsAny<ConfirmationCode>()), Times.Never);
+        _notifications.Verify(n => n.SendNotification(It.IsAny<Notification>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_RecipientKey_IsHashedAndCaseInsensitive()
+    {
+        ArrangeDraft();
+        var keys = new List<string>();
+        _rateLimiter.Setup(l => l.TryReserveAsync(AuthLimits.RegistrationMailCooldown, It.IsAny<string>()))
+            .Callback<AuthLimits.Policy, string>((_, key) => keys.Add(key))
+            .ReturnsAsync(true);
+
+        var upper = ValidCommand();
+        upper.Email = " U@E ";
+        await CreateSut().Handle(ValidCommand(), default);
+        await CreateSut().Handle(upper, default);
+
+        keys.Should().HaveCount(2);
+        keys[0].Should().Be(keys[1]).And.NotContain("@").And.HaveLength(64);
+    }
+
+    [Fact]
+    public async Task Handle_DraftFails_DoesNotSpendRecipientMailBudget()
+    {
+        _usersClient
+            .Setup(c => c.AddDraftUserAsync(It.IsAny<AddDraftUserRequest>(), null, null, default))
+            .Throws(new UsernameExistException());
+
+        var act = () => CreateSut().Handle(ValidCommand(), default);
+
+        await act.Should().ThrowAsync<UsernameExistException>();
+        _rateLimiter.Verify(l => l.TryReserveAsync(It.IsAny<AuthLimits.Policy>(), It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_EmailDisabled_DoesNotSpendRecipientMailBudget()
+    {
+        ArrangeDraft();
+        _usersClient
+            .Setup(c => c.ConfirmUserAsync(It.IsAny<ConfirmUserRequest>(), null, null, default))
+            .Returns(GrpcCallHelpers.AsyncUnary(new ConfirmUserResponse()));
+
+        await CreateSut(emailEnabled: false).Handle(ValidCommand(), default);
+
+        _rateLimiter.Verify(l => l.TryReserveAsync(It.IsAny<AuthLimits.Policy>(), It.IsAny<string>()), Times.Never);
     }
 }

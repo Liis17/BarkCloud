@@ -17,4 +17,7 @@ public class ResetPassword
     public string? OtpCode { get; set; }
 
     public bool IsApproved { get; set; }
+
+    /// <summary>Занятые попытки ввода кода (верных и неверных) — лимит на запрос сброса, не зависящий от адреса источника.</summary>
+    public int OtpAttempts { get; set; }
 }

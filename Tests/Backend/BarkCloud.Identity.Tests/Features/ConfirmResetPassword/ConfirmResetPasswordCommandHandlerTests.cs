@@ -33,6 +33,7 @@ public class ConfirmResetPasswordCommandHandlerTests : IDisposable
     private readonly Mock<IRefreshTokensStorage> _refreshTokens = new();
     private readonly Mock<IMediator> _mediator = new();
     private readonly Mock<PasswordChangedNotifier> _notifier;
+    private readonly Mock<IAuthRateLimiter> _rateLimiter = new();
     private readonly MetricsCollector _metrics = new();
     private readonly SqliteIdentityContext _db = new();
 
@@ -52,6 +53,7 @@ public class ConfirmResetPasswordCommandHandlerTests : IDisposable
 
         _refreshTokens.Setup(s => s.RevokeAllSessions(42, "device-1", default)).ReturnsAsync(0);
         _resets.Setup(s => s.TryApprove(It.IsAny<Guid>())).ReturnsAsync(true);
+        _resets.Setup(s => s.TryReserveOtpAttempt(It.IsAny<Guid>(), It.IsAny<int>())).ReturnsAsync(true);
         _mediator
             .Setup(m => m.Send(It.IsAny<CreateTokenCommand>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CreateTokenResponse { AccessToken = new Token { Value = "access" } });
@@ -59,7 +61,7 @@ public class ConfirmResetPasswordCommandHandlerTests : IDisposable
 
     private ConfirmResetPasswordCommandHandler CreateSut(RequestContext? ctx = null) => new(
         _resets.Object, _authProps.Object, _passwords.Object, _refreshTokens.Object,
-        _mediator.Object, _notifier.Object, ctx ?? FullContext(), _metrics, _logger, _db.Context);
+        _mediator.Object, _notifier.Object, ctx ?? FullContext(), _metrics, _rateLimiter.Object, _logger, _db.Context);
 
     private static DomainResetPassword ValidEmailReset(Guid id) => new()
     {
@@ -284,5 +286,96 @@ public class ConfirmResetPasswordCommandHandlerTests : IDisposable
             new ConfirmResetPasswordCommand { ResetId = id, OtpCode = "123456", NewPassword = "newp" }, default);
 
         response.AccessToken.Value.Should().Be("access");
+    }
+
+    [Fact]
+    public async Task Handle_SourceLimitExceeded_ThrowsBeforeResetLookup()
+    {
+        _rateLimiter.Setup(l => l.EnsureSourceAsync(AuthLimits.ConfirmResetPasswordByIp)).ThrowsAsync(new TooManyRequestsException());
+
+        var act = () => CreateSut().Handle(
+            new ConfirmResetPasswordCommand { ResetId = Guid.NewGuid(), OtpCode = "123456", NewPassword = "newp" }, default);
+
+        await act.Should().ThrowAsync<TooManyRequestsException>();
+        _resets.Verify(s => s.GetResetPassword(It.IsAny<Guid>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_EmailWrongCode_ReservesAttemptOnThatResetBeforeComparison()
+    {
+        var id = Guid.NewGuid();
+        _resets.Setup(s => s.GetResetPassword(id)).ReturnsAsync(ValidEmailReset(id));
+
+        var act = () => CreateSut().Handle(
+            new ConfirmResetPasswordCommand { ResetId = id, OtpCode = "000000", NewPassword = "newp" }, default);
+
+        await act.Should().ThrowAsync<NotValidOtpCodeException>();
+        _resets.Verify(s => s.TryReserveOtpAttempt(id, AuthLimits.ChallengeMaxAttempts), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_EmailAttemptsExhausted_RejectsEvenCorrectCodeWithoutChangingPassword()
+    {
+        var id = Guid.NewGuid();
+        _resets.Setup(s => s.GetResetPassword(id)).ReturnsAsync(ValidEmailReset(id));
+        _resets.Setup(s => s.TryReserveOtpAttempt(id, It.IsAny<int>())).ReturnsAsync(false);
+
+        var act = () => CreateSut().Handle(
+            new ConfirmResetPasswordCommand { ResetId = id, OtpCode = "123456", NewPassword = "newp" }, default);
+
+        await act.Should().ThrowAsync<NotValidOtpCodeException>();
+        _resets.Verify(s => s.TryApprove(It.IsAny<Guid>()), Times.Never);
+        _passwords.Verify(s => s.UpdateUserPasswordHash(It.IsAny<long>(), It.IsAny<string>()), Times.Never);
+        _metrics.SnapshotAndReset().Should().ContainKey("password_reset_confirmation_failed_attempts_exceeded");
+    }
+
+    [Fact]
+    public async Task Handle_AuthenticatorAttemptsExhausted_RejectsEvenCorrectTotp()
+    {
+        var id = Guid.NewGuid();
+        var key = KeyGeneration.GenerateRandomKey(20);
+        _resets.Setup(s => s.GetResetPassword(id)).ReturnsAsync(new DomainResetPassword
+        {
+            Id = id, UserId = 42, ExpiresAt = DateTime.UtcNow.AddMinutes(5), OtpType = OtpType.Authenticator
+        });
+        _authProps.Setup(s => s.GetOtpSecretKey(42)).ReturnsAsync(Base32Encoding.ToString(key));
+        _resets.Setup(s => s.TryReserveOtpAttempt(id, It.IsAny<int>())).ReturnsAsync(false);
+
+        var act = () => CreateSut().Handle(new ConfirmResetPasswordCommand
+        {
+            ResetId = id, OtpCode = new Totp(key).ComputeTotp(), NewPassword = "newp"
+        }, default);
+
+        await act.Should().ThrowAsync<NotValidOtpCodeException>();
+        _resets.Verify(s => s.TryApprove(It.IsAny<Guid>()), Times.Never);
+    }
+
+    [Theory]
+    [InlineData("12345")]
+    [InlineData("1234567")]
+    [InlineData("")]
+    public async Task Handle_EmailCodeOfDifferentLength_IsRejected(string code)
+    {
+        var id = Guid.NewGuid();
+        _resets.Setup(s => s.GetResetPassword(id)).ReturnsAsync(ValidEmailReset(id));
+
+        var act = () => CreateSut().Handle(
+            new ConfirmResetPasswordCommand { ResetId = id, OtpCode = code, NewPassword = "newp" }, default);
+
+        await act.Should().ThrowAsync<NotValidOtpCodeException>();
+    }
+
+    [Fact]
+    public async Task Handle_EmailResetWithoutStoredCode_RejectsEmptyCode()
+    {
+        var id = Guid.NewGuid();
+        var reset = ValidEmailReset(id);
+        reset.OtpCode = null;
+        _resets.Setup(s => s.GetResetPassword(id)).ReturnsAsync(reset);
+
+        var act = () => CreateSut().Handle(
+            new ConfirmResetPasswordCommand { ResetId = id, OtpCode = "", NewPassword = "newp" }, default);
+
+        await act.Should().ThrowAsync<NotValidOtpCodeException>();
     }
 }

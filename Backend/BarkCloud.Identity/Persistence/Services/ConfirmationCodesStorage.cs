@@ -28,6 +28,21 @@ public class ConfirmationCodesStorage : IConfirmationCodesStorage
         return await _context.ConfirmationCodes.FirstOrDefaultAsync(x => x.Id == id);
     }
 
+    /// <summary>
+    /// Атомарно занимает одну попытку ввода кода (до сравнения — параллельный перебор не превысит лимит).
+    /// Возвращает false, если код не найден, истёк или попытки исчерпаны.
+    /// </summary>
+    public async Task<bool> TryReserveAttempt(Guid id, int maxAttempts)
+    {
+        var now = DateTime.UtcNow;
+
+        var reserved = await _context.ConfirmationCodes
+            .Where(x => x.Id == id && x.Expires > now && x.Attempts < maxAttempts)
+            .ExecuteUpdateAsync(s => s.SetProperty(x => x.Attempts, x => x.Attempts + 1));
+
+        return reserved == 1;
+    }
+
     public async Task DeleteCode(Guid id)
     {
         var code = await _context.ConfirmationCodes.FirstOrDefaultAsync(x => x.Id == id);

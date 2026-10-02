@@ -18,12 +18,15 @@ public class CompleteWebAuthnAssertionCommandHandler(
     IWebAuthnStorage webAuthnStorage,
     IFido2 fido2,
     SessionIssuer sessionIssuer,
+    IAuthRateLimiter rateLimiter,
     MetricsCollector metrics,
     ILogger<CompleteWebAuthnAssertionCommandHandler> logger)
     : IRequestHandler<CompleteWebAuthnAssertionCommand, AuthResponse>
 {
     public async Task<AuthResponse> Handle(CompleteWebAuthnAssertionCommand request, CancellationToken cancellationToken)
     {
+        await rateLimiter.EnsureSourceAsync(AuthLimits.WebAuthnByIp);
+
         if (!Guid.TryParse(request.ChallengeId, out var challengeId))
         {
             throw new WebAuthnChallengeExpiredException();

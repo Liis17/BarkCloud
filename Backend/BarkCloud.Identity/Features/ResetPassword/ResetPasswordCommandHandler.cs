@@ -27,13 +27,15 @@ public class ResetPasswordCommandHandler : IRequestHandler<ResetPasswordCommand,
     private readonly NotificationQueueSender _notificationQueueSender;
     private readonly LocationClient _locationClient;
     private readonly MetricsCollector _metrics;
+    private readonly IAuthRateLimiter _rateLimiter;
     private readonly IConfiguration _configuration;
     private readonly ILogger<ResetPasswordCommandHandler> _logger;
 
     public ResetPasswordCommandHandler(IResetPasswordsStorage resetPasswordsStorage,
         IAuthPropertiesStorage authPropertiesStorage, UsersServerApi.UsersServerApiClient usersApiClient,
         RequestContext requestContext, NotificationQueueSender notificationQueueSender, LocationClient locationClient,
-        MetricsCollector metrics, IConfiguration configuration, ILogger<ResetPasswordCommandHandler> logger)
+        MetricsCollector metrics, IAuthRateLimiter rateLimiter, IConfiguration configuration,
+        ILogger<ResetPasswordCommandHandler> logger)
     {
         _resetPasswordsStorage = resetPasswordsStorage;
         _authPropertiesStorage = authPropertiesStorage;
@@ -42,6 +44,7 @@ public class ResetPasswordCommandHandler : IRequestHandler<ResetPasswordCommand,
         _notificationQueueSender = notificationQueueSender;
         _locationClient = locationClient;
         _metrics = metrics;
+        _rateLimiter = rateLimiter;
         _configuration = configuration;
         _logger = logger;
     }
@@ -84,6 +87,9 @@ public class ResetPasswordCommandHandler : IRequestHandler<ResetPasswordCommand,
             _logger.LogWarning("Сброс пароля по email отклонён — почта на сервере не настроена");
             throw new EmailServiceDisabledException();
         }
+
+        // Лимит по источнику не зависит от того, существует ли пользователь, — ответ не раскрывает аккаунт.
+        await _rateLimiter.EnsureSourceAsync(AuthLimits.ResetPasswordByIp);
 
         var usersRequest = new FindByLoginRequest();
 
@@ -159,6 +165,30 @@ public class ResetPasswordCommandHandler : IRequestHandler<ResetPasswordCommand,
             "Создание запроса на сброс пароля с Email OTP для пользователя {UserId}",
             user.User.Id
         );
+
+        // Не чаще одного письма в минуту и пяти в час на аккаунт. При отказе письмо не шлём и отвечаем ResetId
+        // действующего запроса — прежний код остаётся в силе (как в F07), а ответ выглядит так же, как обычный.
+        var accountKey = user.User.Id.ToString();
+
+        if (!await _rateLimiter.TryReserveAsync(AuthLimits.ResetMailCooldown, accountKey)
+            || !await _rateLimiter.TryReserveAsync(AuthLimits.ResetMailHourly, accountKey))
+        {
+            var active = await _resetPasswordsStorage.GetActiveEmailReset(user.User.Id);
+
+            if (active is null)
+            {
+                throw new TooManyRequestsException();
+            }
+
+            _metrics.Increment("password_reset_mail_throttled");
+            _logger.LogInformation(
+                "Повторная отправка кода сброса пропущена для пользователя {UserId}: действует ранее выданный запрос {ResetId}",
+                user.User.Id,
+                active.Id
+            );
+
+            return new ResetPasswordResponse { ResetId = active.Id.ToString() };
+        }
 
         var userContactInfo = await _usersClient.GetUserContactsAsync(new GetUserContactsRequest { UserId = user.User.Id });
 

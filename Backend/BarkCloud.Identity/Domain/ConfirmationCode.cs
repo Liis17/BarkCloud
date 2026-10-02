@@ -14,4 +14,7 @@ public class ConfirmationCode
     public long? OwnerId { get; set; }
 
     public ConfirmationCodeType Type { get; set; }
+
+    /// <summary>Занятые попытки ввода кода — лимит на код, не зависящий от адреса источника.</summary>
+    public int Attempts { get; set; }
 }
