@@ -93,6 +93,9 @@ public class ResetPasswordTests
         await using var database = await PostgresIdentityDatabase.CreateAsync();
         await using var context = database.CreateContext();
         var reset = await Seed(context);
+        await using var beforeReset = database.CreateContext();
+        var oldIds = (await new RefreshTokensStorage(beforeReset, new JwtSettings()).GetRefreshTokens(42))
+            .ToDictionary(x => x.Value, x => x.Id);
         var committedBeforeNotification = false;
         var handler = CreateHandler(context, async () =>
         {
@@ -114,9 +117,10 @@ public class ResetPasswordTests
         if (revoke)
         {
             revoked.Select(x => x.DeviceId).Should().BeEquivalentTo("other", "current");
-            revoked.Single(x => x.DeviceId == "other").MaxSessionId.Should().BeNull();
-            // Текущее устройство отзывается по порогу сессии: новый Id строго больше порога.
-            var oldCurrentId = (await reader.RevokedSessions.SingleAsync(x => x.DeviceId == "current")).MaxSessionId;
+            // Все устройства отзываются по порогу сессии (Id удалённого refresh); у новой сессии Id строго больше.
+            revoked.Single(x => x.DeviceId == "other").MaxSessionId.Should().Be(oldIds["old-other"]);
+            var oldCurrentId = revoked.Single(x => x.DeviceId == "current").MaxSessionId;
+            oldCurrentId.Should().Be(oldIds["old-current"]);
             tokens.Single().Id.Should().BeGreaterThan(oldCurrentId!.Value);
         }
         else
@@ -146,26 +150,46 @@ public class ResetPasswordTests
 
         var response = await CreateHandler(context, jwt: jwt).Handle(Command(reset.Id), default);
 
-        // Кэш наполняется так же, как в сервисах: из фида Identity.
-        await using var services = new ServiceCollection().AddScoped(_ => database.CreateContext()).BuildServiceProvider();
-        var batch = await new DbRevocationFeed(services.GetRequiredService<IServiceScopeFactory>()).FetchAsync(null, default);
-        var cache = new TokenRevocationCache();
-        foreach (var session in batch.Sessions)
-            cache.Revoke(session.UserId, session.DeviceId, session.RevokedAt, session.ExpiresAt, session.MaxSessionId);
-        bool IsRevoked(string token, string deviceId)
-        {
-            var jwtToken = new JwtSecurityTokenHandler().ReadJwtToken(token);
-            long? sid = long.TryParse(jwtToken.Claims.Single(x => x.Type == IdentityClaims.SessionId).Value, out var v) ? v : null;
-            return cache.IsRevoked(42, deviceId, jwtToken.IssuedAt, sid);
-        }
+        var cache = await LoadCache(database);
 
-        IsRevoked(oldCurrentAccess, "current").Should().BeTrue("старый access текущего устройства отозван");
-        IsRevoked(oldOtherAccess, "other").Should().BeTrue();
-        IsRevoked(response.AccessToken.Value, "current").Should().BeFalse("новая пара работает, даже если выдана в ту же секунду");
+        IsRevoked(cache, oldCurrentAccess, "current").Should().BeTrue("старый access текущего устройства отозван");
+        IsRevoked(cache, oldOtherAccess, "other").Should().BeTrue();
+        IsRevoked(cache, response.AccessToken.Value, "current").Should().BeFalse("новая пара работает, даже если выдана в ту же секунду");
         await using var reader = database.CreateContext();
         var refreshStorage = new RefreshTokensStorage(reader, settings);
         (await refreshStorage.FindRefreshToken("old-current")).Should().BeNull("старый refresh удалён");
         (await refreshStorage.FindRefreshToken(response.RefreshToken.Value))!.Id.Should().BeGreaterThan(oldCurrent.Id);
+    }
+
+    [Fact]
+    public async Task ResetPassword_StaleRefreshReadBeforeReset_IssuedAccessIsRevoked()
+    {
+        await using var database = await PostgresIdentityDatabase.CreateAsync();
+        await using var context = database.CreateContext();
+        var reset = await Seed(context);
+        var settings = new JwtSettings
+        {
+            SecretKey = "supersecretkey_at_least_32_chars_long_for_hs256!!", Issuer = "bark", Audience = "bark", ExpiryMinutes = 60
+        };
+        var jwt = new JwtService(settings);
+
+        // CreateToken другого устройства прочитал refresh и остановился до сброса пароля.
+        var pause = new RefreshReadPause();
+        await using var staleContext = database.CreateContext(pause);
+        var staleCreateToken = new CreateTokenCommandHandler(new RefreshTokensStorage(staleContext, settings), jwt,
+            new MetricsCollector(), NullLogger<CreateTokenCommandHandler>.Instance);
+        var stale = staleCreateToken.Handle(new CreateTokenCommand { RefreshToken = "old-other" }, default);
+        await pause.Reached;
+
+        var response = await CreateHandler(context, jwt: jwt).Handle(Command(reset.Id), default);
+        // iat имеет секундную точность: выпуск после reset должен попасть в секунду позже RevokedAt.
+        await Task.Delay(TimeSpan.FromMilliseconds(1100));
+        pause.Release();
+        var staleAccess = (await stale).AccessToken.Value;
+
+        var cache = await LoadCache(database);
+        IsRevoked(cache, staleAccess, "other").Should().BeTrue("JWT выпущен по refresh, удалённому сбросом пароля");
+        IsRevoked(cache, response.AccessToken.Value, "current").Should().BeFalse("новая сессия работает");
     }
 
     [Fact]
@@ -217,6 +241,24 @@ public class ResetPasswordTests
         (await new ResetPasswordsStorage(reader).GetResetPassword(reset.Id))!.IsApproved.Should().BeFalse();
         PasswordHasher.VerifyPassword("old-password", await new PasswordsStorage(reader).GetUserPasswordHash(42))
             .Should().BeTrue();
+    }
+
+    // Кэш наполняется так же, как в сервисах: из фида Identity.
+    private static async Task<TokenRevocationCache> LoadCache(PostgresIdentityDatabase database)
+    {
+        await using var services = new ServiceCollection().AddScoped(_ => database.CreateContext()).BuildServiceProvider();
+        var batch = await new DbRevocationFeed(services.GetRequiredService<IServiceScopeFactory>()).FetchAsync(null, default);
+        var cache = new TokenRevocationCache();
+        foreach (var session in batch.Sessions)
+            cache.Revoke(session.UserId, session.DeviceId, session.RevokedAt, session.ExpiresAt, session.MaxSessionId);
+        return cache;
+    }
+
+    private static bool IsRevoked(TokenRevocationCache cache, string token, string deviceId)
+    {
+        var jwtToken = new JwtSecurityTokenHandler().ReadJwtToken(token);
+        long? sid = long.TryParse(jwtToken.Claims.Single(x => x.Type == IdentityClaims.SessionId).Value, out var v) ? v : null;
+        return cache.IsRevoked(42, deviceId, jwtToken.IssuedAt, sid);
     }
 
     private static async Task<Exception?> Capture(Func<Task> action)

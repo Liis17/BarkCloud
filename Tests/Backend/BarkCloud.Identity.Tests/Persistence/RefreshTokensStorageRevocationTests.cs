@@ -30,6 +30,8 @@ public class RefreshTokensStorageRevocationTests : IDisposable
     public async Task RevokeDevice_DeletesOnlyItsRefreshTokensAndCreatesOneDurableRevocation()
     {
         await Seed((42, "d1"), (42, "d1"), (42, "d2"), (43, "d1"));
+        var maxId = await _db.Context.RefreshTokens.Where(x => x.UserId == 42 && x.DeviceId == "d1").MaxAsync(x => x.Id);
+        _db.Context.ChangeTracker.Clear();
         var before = DateTime.UtcNow;
 
         await CreateSut().RevokeSession("d1", 42);
@@ -41,6 +43,7 @@ public class RefreshTokensStorageRevocationTests : IDisposable
         var revocation = await persisted.RevokedSessions.SingleAsync();
         revocation.UserId.Should().Be(42);
         revocation.DeviceId.Should().Be("d1");
+        revocation.MaxSessionId.Should().Be(maxId);
         revocation.RevokedAt.Should().BeOnOrAfter(before);
         revocation.ExpiresAt.Should().Be(revocation.RevokedAt.AddMinutes(61));
     }
@@ -60,14 +63,17 @@ public class RefreshTokensStorageRevocationTests : IDisposable
         await CreateSut().RevokeSessionSafe("d1", 42);
 
         using var persisted = _db.CreateAdditionalContext();
-        (await persisted.RevokedSessions.SingleAsync()).DeviceId.Should().Be("d1");
+        var revocation = await persisted.RevokedSessions.SingleAsync();
+        revocation.DeviceId.Should().Be("d1");
+        revocation.MaxSessionId.Should().BeNull("у устройства нет refresh — порога сессии нет, отзыв по времени");
     }
 
     [Fact]
-    public async Task RevokeAll_CurrentDevice_IsRevokedBySessionThresholdAndOthersByTime()
+    public async Task RevokeAll_EveryDeviceIsRevokedBySessionThreshold()
     {
-        await Seed((42, "current"), (42, "current"), (42, "other"), (42, "third"), (43, "other"));
-        var currentMaxId = (await _db.Context.RefreshTokens.Where(x => x.DeviceId == "current").MaxAsync(x => x.Id));
+        await Seed((42, "current"), (42, "current"), (42, "other"), (42, "other"), (42, "third"), (43, "other"));
+        var maxIds = (await _db.Context.RefreshTokens.Where(x => x.UserId == 42).ToListAsync())
+            .GroupBy(x => x.DeviceId).ToDictionary(x => x.Key, x => x.Max(t => t.Id));
         _db.Context.ChangeTracker.Clear();
 
         var count = await CreateSut().RevokeAllSessions(42, "current");
@@ -78,8 +84,7 @@ public class RefreshTokensStorageRevocationTests : IDisposable
         (await persisted.RefreshTokens.SingleAsync()).UserId.Should().Be(43);
         var revoked = await persisted.RevokedSessions.ToListAsync();
         revoked.Select(x => x.DeviceId).Should().BeEquivalentTo("other", "third", "current");
-        revoked.Single(x => x.DeviceId == "current").MaxSessionId.Should().Be(currentMaxId);
-        revoked.Where(x => x.DeviceId != "current").Select(x => x.MaxSessionId).Should().AllSatisfy(x => x.Should().BeNull());
+        revoked.Should().AllSatisfy(x => x.MaxSessionId.Should().Be(maxIds[x.DeviceId]));
         revoked.Select(x => x.RevokedAt).Distinct().Should().ContainSingle();
         revoked.Select(x => x.ExpiresAt).Distinct().Should().ContainSingle();
     }

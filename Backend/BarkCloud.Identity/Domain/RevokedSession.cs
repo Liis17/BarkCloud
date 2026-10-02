@@ -12,7 +12,7 @@ public class RevokedSession
 
     public DateTime ExpiresAt { get; set; }
 
-    /// <summary>Задано — отзыв по сессии (сброс пароля на том же устройстве): отклоняются токены с sid не больше
-    /// значения. Не задано — отзыв по времени (<see cref="RevokedAt"/>).</summary>
+    /// <summary>Задано — отзыв по сессии (у устройства были refresh, и они удалены): отклоняются токены с sid не больше
+    /// значения. Не задано — устройство без refresh, отзыв по времени (<see cref="RevokedAt"/>).</summary>
     public long? MaxSessionId { get; set; }
 }

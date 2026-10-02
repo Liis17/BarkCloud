@@ -82,7 +82,7 @@ Parent: [[index]] · See also: [[api/identity-api]] · [[modules/shared-identity
   - `20261002112945_AddPendingNotifications` — таблица `PendingNotifications` (outbox уведомлений) и индекс по `NextAttemptAt` (F19)
   - `20261002101816_AddAuthAttemptCounters` — таблица счётчиков попыток (F14)
   - `20261002102704_AddOtpAttempts` — `ResetPasswords.OtpAttempts`, `ConfirmationCodes.Attempts` (F14)
-  - `20261002172853_AddRevokedSessionMaxSessionId` — nullable `RevokedSessions.MaxSessionId`: отзыв по сессии при сбросе пароля (F02)
+  - `20261002172853_AddRevokedSessionMaxSessionId` — nullable `RevokedSessions.MaxSessionId`: отзыв по сессии при удалении refresh устройства (F02)
 
 ## Features (реализованные)
 
@@ -125,12 +125,12 @@ Parent: [[index]] · See also: [[api/identity-api]] · [[modules/shared-identity
 1. проверка заголовков, reset (не найден/использован/истёк), OTP;
 2. пустой `new_password` → `NewPasswordRequiredException`; совпадение с текущим хешем → `NewPasswordSameAsOldException` (**до** захвата reset — код можно использовать повторно);
 3. `ResetPasswordsStorage.TryApprove` — атомарный `UPDATE … WHERE IsApproved=false`; `false` → `ResetIdHasIsApprovedException` (параллельные подтверждения: успех один);
-4. при `revoke_other_sessions`: `RefreshTokensStorage.RevokeAllSessions(userId, currentDeviceId, ct)` атомарно удаляет все прежние refresh и записывает access-отзывы: по времени для прочих устройств (`iat <= RevokedAt`) и **по сессии для текущего** — `MaxSessionId = max(Id)` его удалённых refresh; access-токены несут клейм `x-session-id` = `RefreshToken.Id`, поэтому новая пара (Id больше порога) не попадает под отзыв даже при совпадении секунды `iat` — см. [[modules/session-revocation]];
+4. при `revoke_other_sessions`: `RefreshTokensStorage.RevokeAllSessions(userId, currentDeviceId, ct)` атомарно удаляет все прежние refresh и записывает access-отзывы **по сессии для каждого устройства** — `MaxSessionId = max(Id)` его удалённых refresh; access-токены несут клейм `x-session-id` = `RefreshToken.Id`, поэтому новая пара (Id больше порога) не попадает под отзыв даже при совпадении секунды `iat`, а access, который `CreateToken` другого устройства подписал уже после reset по прочитанному до него refresh, несёт старый `sid` и отзывается — см. [[modules/session-revocation]];
 5. `UpdateUserPasswordHash`; 6. выдача refresh+access текущему устройству; 7. письмо через `PasswordChangedNotifier` — постановка в outbox после commit; ошибка не отменяет результат, доставка — воркером ([[modules/notification-outbox]]).
 
 После F11 шаги 3–6 выполняются в одной явной транзакции общего scoped `IdentityContext`: хеш вычисляется заранее, письмо отправляется после commit. Ошибка создания токенов или отмена откатывает пароль, отзывы, refresh и расходование reset. `UserDeletedConsumer` также объединяет отзыв сессий и всю существующую очистку в одну транзакцию. Подробности — [[modules/transactional-outbox]].
 
-Хеш пароля при сбросе **не очищается** (`ClearUserPasswordHash` удалён) — окна «пароль пуст, любая сессия ставит свой» нет. Старые access текущего устройства после сброса отклоняются (остаток F02 закрыт отзывом по сессии); legacy-аккаунты с ранее очищенным хешем сохраняют «первичную установку» без старого пароля до первой установки пароля.
+Хеш пароля при сбросе **не очищается** (`ClearUserPasswordHash` удалён) — окна «пароль пуст, любая сессия ставит свой» нет. Старые access всех устройств после сброса отклоняются (остаток F02 закрыт отзывом по сессии, в том числе для устройств, чей `CreateToken` выпустил access после reset); legacy-аккаунты с ранее очищенным хешем сохраняют «первичную установку» без старого пароля до первой установки пароля.
 
 ## Email-код 2FA (F07)
 
@@ -190,7 +190,7 @@ Parent: [[index]] · See also: [[api/identity-api]] · [[modules/shared-identity
 
 ## Долговечный отзыв сессий (F10)
 
-Identity — источник истины для отзывов; все реплики загружают снимок до старта Kestrel и обновляют кэш примерно каждые 5 с. `Logout`, удаление сессии, сброс пароля и `UserDeletedConsumer` используют storage без событий отзыва. При сбросе все прежние refresh удаляются; прочие устройства отзываются по времени, текущее — по порогу сессии (`x-session-id`, F02). Подробности, ограничения секундного `iat`, изменения lifetime и порядок обновления — [[modules/session-revocation]].
+Identity — источник истины для отзывов; все реплики загружают снимок до старта Kestrel и обновляют кэш примерно каждые 5 с. `Logout`, удаление сессии, сброс пароля и `UserDeletedConsumer` используют storage без событий отзыва. Любой отзыв удаляет refresh устройства и пишет порог сессии (`MaxSessionId = max(Id)` удалённых строк, `x-session-id`, F02); по времени отзывается только устройство без refresh. Подробности, ограничения секундного `iat`, изменения lifetime и порядок обновления — [[modules/session-revocation]].
 
 ## Лимиты попыток и рассылки (F14)
 

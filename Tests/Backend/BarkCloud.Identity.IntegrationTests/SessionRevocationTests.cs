@@ -51,7 +51,7 @@ public class SessionRevocationTests
         await using var database = await PostgresIdentityDatabase.CreateAsync();
         await using var context = database.CreateContext();
         var storage = new RefreshTokensStorage(context, new JwtSettings { ExpiryMinutes = 60 });
-        await storage.CreateNewRefreshToken("phone-refresh", 42, "phone", 1);
+        var phoneRefresh = await storage.CreateNewRefreshToken("phone-refresh", 42, "phone", 1);
         await storage.CreateNewRefreshToken("other-refresh", 42, "other", 1);
 
         await Run(operation, storage);
@@ -62,6 +62,7 @@ public class SessionRevocationTests
         var revoked = await reader.RevokedSessions.SingleAsync();
         revoked.UserId.Should().Be(42);
         revoked.DeviceId.Should().Be("phone");
+        revoked.MaxSessionId.Should().Be(phoneRefresh!.Id, "access, выпущенный по удалённому refresh, отзывается по sid");
     }
 
     [Fact]
