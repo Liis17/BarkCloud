@@ -19,6 +19,7 @@
 ### 📦 Модули — Backend
 - [[modules/backend-configuration]] — Сервис конфигурации (хранит настройки всех микросервисов и зарезервированные юзернеймы)
 - [[modules/backend-identity]] — Сервис идентификации (авторизация, токены, 2FA, сессии)
+  - [[modules/notification-outbox]] — Outbox уведомлений Identity (F19): письма вне критического пути, воркер доставки с повторами, таймаут геолокации
 - [[modules/backend-notification]] — Сервис уведомлений (consumer RabbitMQ → SMTP: коды подтверждения, уведомления о входе)
 - [[modules/backend-users]] — Сервис пользователей (профили, устройства, контакты, draft-flow)
   - [[modules/transactional-outbox]] — Надёжная доставка удаления аккаунта и транзакции Identity (F11)

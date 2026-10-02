@@ -22,6 +22,7 @@ Parent: [[index]] · See also: [[api/identity-api]] · [[modules/shared-identity
 - `RevokedSession.cs` — долговечный отзыв по времени и срок жизни записи ([[modules/session-revocation]])
 - `ResetPassword.cs` (+ `OtpAttempts` — попытки ввода кода, F14)
 - `UserPassword.cs`
+- `PendingNotification.cs` — письмо в очереди доставки (outbox, F19) — [[modules/notification-outbox]]
 - `WebAuthnCredential.cs` — привязанный ключ FIDO2 (CredentialId, PublicKey, SignatureCounter, AaGuid)
 - `WebAuthnChallenge.cs` — временный challenge между begin/complete (TTL 5 мин)
 
@@ -36,16 +37,17 @@ Parent: [[index]] · See also: [[api/identity-api]] · [[modules/shared-identity
 - `PasswordHasher.cs` — хеширование паролей
 - `RefreshTokenGenerator.cs` — генерация refresh-токенов
 - `CodeGenerator.cs` — генерация кодов подтверждения
-- `SessionIssuer.cs` — общий выпуск сессии (refresh+access, регистрация устройства, уведомление); используется входом по ключу (хвост `AuthCommandHandler`)
+- `SessionIssuer.cs` — единый выпуск сессии (refresh+access, регистрация устройства, уведомление о входе через outbox): `IssueAsync(userId, ct)` — вход пользователя (`AuthCommandHandler`, WebAuthn), `IssueAsync(userId, SessionDevice, ct)` — устройство задано явно (`CreateSessionForUserServer`). `auth_login_success` считает только первая перегрузка; `sessions_created` — обе
 - `AuthLimits.cs` — политика лимитов попыток и рассылки (F14); `AuthRateLimiter.cs` (`IAuthRateLimiter`, scoped) — применение политики по `RequestContext.SourceIp` / аккаунту / получателю
-- `PasswordChangedNotifier.cs` — письмо «Пароль успешно изменен» (`NotificationType.PasswordChanged`); общий хвост `SetPassword` (при смене, не при первичной установке) и `ConfirmResetPassword`
+- `PasswordChangedNotifier.cs` — ставит в outbox письмо «Пароль успешно изменен» (`NotificationType.PasswordChanged`) и не бросает; общий хвост `SetPassword` (при смене, не при первичной установке) и `ConfirmResetPassword`
+- `INotificationOutbox.cs`, `NotificationOutbox.cs`, `NotificationPayload.cs`, `NotificationOutboxWorker.cs` — outbox уведомлений и фоновая доставка (F19), см. [[modules/notification-outbox]]
 - `Fido2` (пакет `Fido2` 4.0.1) регистрируется в `Program.cs` из `WebAuthn:RpId/ServerName/Origins`
 
 ### Infrastructure
-- `LocationClient.cs`, `LocationClientExtensions.cs` — определение IP-локации
+- `LocationClient.cs`, `LocationClientExtensions.cs` — определение IP-локации; запрос ограничен `LocationClient.RequestTimeout` (2 с), по таймауту — «-» (F19)
 - `RegistrationPolicy.cs` — runtime-проверка `Features:RegistrationEnabled` через Configuration API с fallback на стартовую конфигурацию
 - `IpLocation.cs` — DTO результата
-- `NotificationQueueSender.cs` — отправка `EmailNotification` через RabbitMQ ([[modules/shared-queue]])
+- `NotificationQueueSender.cs` — публикация `EmailNotification` в RabbitMQ ([[modules/shared-queue]]); вызывается воркером outbox и синхронными письмами с кодами (`CreateAccount`, `ResetPassword`, email-код `Enable`/`Auth`)
 
 ### Settings
 - `JwtSettings.cs` — issuer, audience, ключ, lifetime
@@ -77,6 +79,7 @@ Parent: [[index]] · See also: [[api/identity-api]] · [[modules/shared-identity
   - `20261001190754_EmailAuthCodeChallenge` — аддитивно: `EmailAuthCodePurpose`/`IssuedAt`/`ExpiresAt`/`Attempts` в `AuthUserProperties` (F07; `LastEmailAuthCode` не тронут)
 
   - `20261001194141_AddRevokedSessions` — таблица отзывов и индексы по `RevokedAt`/`ExpiresAt` (F10)
+  - `20261002112945_AddPendingNotifications` — таблица `PendingNotifications` (outbox уведомлений) и индекс по `NextAttemptAt` (F19)
   - `20261002101816_AddAuthAttemptCounters` — таблица счётчиков попыток (F14)
   - `20261002102704_AddOtpAttempts` — `ResetPasswords.OtpAttempts`, `ConfirmationCodes.Attempts` (F14)
 
@@ -122,7 +125,7 @@ Parent: [[index]] · See also: [[api/identity-api]] · [[modules/shared-identity
 2. пустой `new_password` → `NewPasswordRequiredException`; совпадение с текущим хешем → `NewPasswordSameAsOldException` (**до** захвата reset — код можно использовать повторно);
 3. `ResetPasswordsStorage.TryApprove` — атомарный `UPDATE … WHERE IsApproved=false`; `false` → `ResetIdHasIsApprovedException` (параллельные подтверждения: успех один);
 4. при `revoke_other_sessions`: `RefreshTokensStorage.RevokeAllSessions(userId, currentDeviceId, ct)` атомарно удаляет все прежние refresh и записывает access-отзывы по устройствам, **кроме текущего** (`iat <= RevokedAt`; новый токен текущего устройства не должен попасть под отзыв);
-5. `UpdateUserPasswordHash`; 6. выдача refresh+access текущему устройству; 7. письмо через `PasswordChangedNotifier` (best-effort).
+5. `UpdateUserPasswordHash`; 6. выдача refresh+access текущему устройству; 7. письмо через `PasswordChangedNotifier` — постановка в outbox после commit; ошибка не отменяет результат, доставка — воркером ([[modules/notification-outbox]]).
 
 После F11 шаги 3–6 выполняются в одной явной транзакции общего scoped `IdentityContext`: хеш вычисляется заранее, письмо отправляется после commit. Ошибка создания токенов или отмена откатывает пароль, отзывы, refresh и расходование reset. `UserDeletedConsumer` также объединяет отзыв сессий и всю существующую очистку в одну транзакцию. Подробности — [[modules/transactional-outbox]].
 
@@ -177,6 +180,12 @@ Parent: [[index]] · See also: [[api/identity-api]] · [[modules/shared-identity
 - **RP ID** = домен сервера, выводится [[modules/backend-configuration]] из `ExternalEndpoint:Host` Identity (`EXTERNAL_IDENTITY_HOST`); `Origins = https://<домен>`. Конфиг `WebAuthn:RpId/ServerName/Origins`. Требует доменный хост + TLS (не голый IP).
 - Begin/Complete-assertion — **публичные** (без токена, как `Auth`); registration/list/remove — под токеном пользователя.
 - Клиенты: [[modules/backend-web]] (релей + `navigator.credentials`), [[modules/windows-drive]] (`webauthn.dll` через DSInternals, только вход).
+
+## Уведомления вне критического пути (F19)
+
+Основное изменение (пароль, сессия, подтверждение аккаунта, смена 2FA) больше не зависит от писем. После коммита хендлер вызывает `INotificationOutbox.EnqueueAsync`, который только вставляет строку в `PendingNotifications` и не бросает; адрес из Users, геолокацию и публикацию в RabbitMQ делает `NotificationOutboxWorker` с повторами и паузой до 24 ч. Через outbox идут письма `FailedLogin`, `SuccessfulLogin`, `SuccessfulRegistration`, `PasswordChanged`, `PasswordChangedByAdmin`, `TwoFactorMethodChanged`. Письма с кодами (регистрация, сброс пароля, email-код 2FA и входа) остались синхронными: там ошибка должна дойти до клиента.
+
+Вход паролем, по ключу и серверное создание сессии выпускают токены одним `SessionIssuer`: сбой Users/очереди одинаково не влияет на результат любого способа. Ожидание геолокации ограничено 2 с. Подробности, гарантии, метрики и диагностика — [[modules/notification-outbox]].
 
 ## Долговечный отзыв сессий (F10)
 
