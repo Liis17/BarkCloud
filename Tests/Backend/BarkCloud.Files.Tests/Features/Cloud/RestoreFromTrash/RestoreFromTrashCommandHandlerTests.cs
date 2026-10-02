@@ -15,6 +15,12 @@ public class RestoreFromTrashCommandHandlerTests
 {
     private const long OwnerId = 42;
     private readonly Mock<ICloudHierarchyStorage> _storage = new();
+    private readonly Mock<ICloudTreeLock> _treeLock = new();
+
+    public RestoreFromTrashCommandHandlerTests()
+    {
+        _storage.Setup(s => s.LockTree(OwnerId, It.IsAny<CancellationToken>())).ReturnsAsync(_treeLock.Object);
+    }
 
     private RestoreFromTrashCommandHandler CreateSut() => new(
         _storage.Object,
@@ -123,5 +129,52 @@ public class RestoreFromTrashCommandHandlerTests
         await CreateSut().Handle(new RestoreFromTrashCommand { EntryId = id }, default);
 
         entry.Name.Should().Be("photo (1).jpg");
+    }
+
+    [Fact]
+    public async Task Handle_HappyPath_LocksTreeBeforeReadingAndCommitsAfterSave()
+    {
+        var id = Guid.NewGuid();
+        var fileId = Guid.NewGuid();
+        var dirId = Guid.NewGuid();
+        var calls = new List<string>();
+        _storage.Setup(s => s.LockTree(OwnerId, It.IsAny<CancellationToken>()))
+            .Callback(() => calls.Add("lock")).ReturnsAsync(_treeLock.Object);
+        _storage.Setup(s => s.GetTrashedEntry(id, It.IsAny<CancellationToken>()))
+            .Callback(() => calls.Add("read"))
+            .ReturnsAsync(new DomainFileEntry
+            {
+                Id = id, OwnerId = OwnerId, FileId = fileId, DirectoryId = dirId, Name = "photo.jpg", IsDeleted = true
+            });
+        _storage.Setup(s => s.GetDirectoryAsNoTracking(dirId, It.IsAny<CancellationToken>()))
+            .Callback(() => calls.Add("check"))
+            .ReturnsAsync(new CloudDirectory { Id = dirId, OwnerId = OwnerId });
+        _storage.Setup(s => s.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .Callback(() => calls.Add("save")).Returns(Task.CompletedTask);
+        _treeLock.Setup(l => l.CommitAsync(It.IsAny<CancellationToken>()))
+            .Callback(() => calls.Add("commit")).Returns(Task.CompletedTask);
+
+        await CreateSut().Handle(new RestoreFromTrashCommand { EntryId = id }, default);
+
+        calls.Should().Equal("lock", "read", "check", "save", "commit");
+    }
+
+    [Fact]
+    public async Task Handle_EntryPurgedConcurrently_DoesNotCommit()
+    {
+        var id = Guid.NewGuid();
+        var fileId = Guid.NewGuid();
+        _storage.Setup(s => s.GetTrashedEntry(id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new DomainFileEntry
+            {
+                Id = id, OwnerId = OwnerId, FileId = fileId,
+                DirectoryId = CloudHierarchyStorage.RootDirectoryId, Name = "photo.jpg", IsDeleted = true
+            });
+        _storage.Setup(s => s.SaveChangesAsync(It.IsAny<CancellationToken>())).ThrowsAsync(new DbUpdateConcurrencyException());
+
+        var act = () => CreateSut().Handle(new RestoreFromTrashCommand { EntryId = id }, default);
+
+        await act.Should().ThrowAsync<FileEntryNotFoundException>();
+        _treeLock.Verify(l => l.CommitAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 }

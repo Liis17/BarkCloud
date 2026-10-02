@@ -14,6 +14,12 @@ public class CreateDirectoryCommandHandlerTests
 {
     private const long OwnerId = 42;
     private readonly Mock<ICloudHierarchyStorage> _storage = new();
+    private readonly Mock<ICloudTreeLock> _treeLock = new();
+
+    public CreateDirectoryCommandHandlerTests()
+    {
+        _storage.Setup(s => s.LockTree(OwnerId, It.IsAny<CancellationToken>())).ReturnsAsync(_treeLock.Object);
+    }
 
     private CreateDirectoryCommandHandler CreateSut() => new(
         _storage.Object,
@@ -73,5 +79,37 @@ public class CreateDirectoryCommandHandlerTests
         _storage.Verify(s => s.AddDirectory(
             It.Is<CloudDirectory>(d => d.OwnerId == OwnerId && d.Name == "Photos" && d.ParentId == null),
             It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_HappyPath_LocksTreeBeforeCheckingParentAndCommitsAfterAdd()
+    {
+        var parentId = Guid.NewGuid();
+        var calls = new List<string>();
+        _storage.Setup(s => s.LockTree(OwnerId, It.IsAny<CancellationToken>()))
+            .Callback(() => calls.Add("lock")).ReturnsAsync(_treeLock.Object);
+        _storage.Setup(s => s.GetDirectoryAsNoTracking(parentId, It.IsAny<CancellationToken>()))
+            .Callback(() => calls.Add("read"))
+            .ReturnsAsync(new CloudDirectory { Id = parentId, OwnerId = OwnerId });
+        _storage.Setup(s => s.AddDirectory(It.IsAny<CloudDirectory>(), It.IsAny<CancellationToken>()))
+            .Callback(() => calls.Add("add")).ReturnsAsync((CloudDirectory d, CancellationToken _) => d);
+        _treeLock.Setup(l => l.CommitAsync(It.IsAny<CancellationToken>()))
+            .Callback(() => calls.Add("commit")).Returns(Task.CompletedTask);
+
+        await CreateSut().Handle(new CreateDirectoryCommand { Name = "New", ParentId = parentId }, default);
+
+        calls.Should().Equal("lock", "read", "add", "commit");
+    }
+
+    [Fact]
+    public async Task Handle_ParentNotFound_DoesNotCommit()
+    {
+        var parentId = Guid.NewGuid();
+        _storage.Setup(s => s.GetDirectoryAsNoTracking(parentId, It.IsAny<CancellationToken>())).ReturnsAsync((CloudDirectory?)null);
+
+        var act = () => CreateSut().Handle(new CreateDirectoryCommand { Name = "New", ParentId = parentId }, default);
+
+        await act.Should().ThrowAsync<DirectoryNotFoundException>();
+        _treeLock.Verify(l => l.CommitAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 }

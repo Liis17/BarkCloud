@@ -41,6 +41,10 @@ public class RestoreFromTrashCommandHandler : IRequestHandler<RestoreFromTrashCo
     {
         var ownerId = _userContext.UserId;
 
+        // Проверка исходной папки и возврат записи в неё — одна граница: параллельное удаление папки
+        // оставило бы восстановленную живую запись в несуществующей папке.
+        await using var treeLock = await _storage.LockTree(ownerId, cancellationToken);
+
         var entry = await _storage.GetTrashedEntry(request.EntryId, cancellationToken);
         if (entry is null)
             throw new FileEntryNotFoundException();
@@ -81,6 +85,8 @@ public class RestoreFromTrashCommandHandler : IRequestHandler<RestoreFromTrashCo
             // Окончательное удаление (воркер или «Удалить навсегда») успело раньше — записи уже нет.
             throw new FileEntryNotFoundException();
         }
+
+        await treeLock.CommitAsync(cancellationToken);
 
         _logger.LogInformation(
             "Запись {EntryId} (FileId: {FileId}, Owner: {OwnerId}) восстановлена из корзины в директорию {DirectoryId} как {Name}",

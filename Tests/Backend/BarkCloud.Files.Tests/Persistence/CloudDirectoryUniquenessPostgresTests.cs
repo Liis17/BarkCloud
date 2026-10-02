@@ -1,7 +1,6 @@
 using System.Data.Common;
 
 using BarkCloud.Files.Domain;
-using BarkCloud.Files.Features.Cloud.CreateDirectory;
 using BarkCloud.Files.Features.Cloud.MoveDirectory;
 using BarkCloud.Files.Features.Cloud.RenameDirectory;
 using BarkCloud.Files.Persistence;
@@ -349,13 +348,12 @@ public sealed class CloudDirectoryUniquenessPostgresTests
         return id;
     }
 
+    // Мимо CreateDirectoryCommandHandler: он берёт замок дерева (F13) и не даёт двум созданиям одного владельца
+    // дойти до записи одновременно. Здесь проверяются сами уникальные индексы — последняя линия защиты.
     private static async Task Create(PostgresFilesDatabase database, DirectoryWriteBarrier barrier, string name)
     {
         await using var context = database.CreateContext(barrier);
-        var handler = new CreateDirectoryCommandHandler(
-            new CloudHierarchyStorage(context), UserContextFactory.Create(OwnerId),
-            NullLogger<CreateDirectoryCommandHandler>.Instance);
-        await handler.Handle(new CreateDirectoryCommand { Name = name }, CancellationToken.None);
+        await new CloudHierarchyStorage(context).AddDirectory(Directory(name));
     }
 
     private static async Task<Exception?> Capture(Func<Task> action)

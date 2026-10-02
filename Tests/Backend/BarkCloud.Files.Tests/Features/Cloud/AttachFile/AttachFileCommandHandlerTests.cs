@@ -17,8 +17,14 @@ public class AttachFileCommandHandlerTests
 {
     private const long OwnerId = 42;
     private readonly Mock<ICloudHierarchyStorage> _storage = new();
+    private readonly Mock<ICloudTreeLock> _treeLock = new();
     private readonly Mock<IUploadedFilesStorage> _files = new();
     private readonly MetricsCollector _metrics = new();
+
+    public AttachFileCommandHandlerTests()
+    {
+        _storage.Setup(s => s.LockTree(OwnerId, It.IsAny<CancellationToken>())).ReturnsAsync(_treeLock.Object);
+    }
 
     private AttachFileCommandHandler CreateSut() => new(
         _storage.Object, _files.Object,
@@ -171,6 +177,60 @@ public class AttachFileCommandHandlerTests
             It.IsAny<CancellationToken>()), Times.Once);
         // Явный directory_id не валидируется при авто-распределении.
         _storage.Verify(s => s.GetDirectoryAsNoTracking(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_ExplicitDirectory_LocksTreeBeforeCheckingDirectoryAndCommitsAfterAdd()
+    {
+        var fileId = Guid.NewGuid();
+        var dirId = Guid.NewGuid();
+        var calls = new List<string>();
+        _storage.Setup(s => s.LockTree(OwnerId, It.IsAny<CancellationToken>()))
+            .Callback(() => calls.Add("lock")).ReturnsAsync(_treeLock.Object);
+        _storage.Setup(s => s.GetDirectoryAsNoTracking(dirId, It.IsAny<CancellationToken>()))
+            .Callback(() => calls.Add("check"))
+            .ReturnsAsync(new CloudDirectory { Id = dirId, OwnerId = OwnerId });
+        _files.Setup(s => s.GetFile(fileId)).ReturnsAsync(ReadyFile(fileId));
+        _storage.Setup(s => s.AddFileEntry(It.IsAny<CloudFileEntry>(), It.IsAny<CancellationToken>()))
+            .Callback(() => calls.Add("add")).ReturnsAsync((CloudFileEntry e, CancellationToken _) => e);
+        _treeLock.Setup(l => l.CommitAsync(It.IsAny<CancellationToken>()))
+            .Callback(() => calls.Add("commit")).Returns(Task.CompletedTask);
+
+        await CreateSut().Handle(new AttachFileCommand { FileId = fileId, Name = "f", DirectoryId = dirId }, default);
+
+        calls.Should().Equal("lock", "check", "add", "commit");
+    }
+
+    [Fact]
+    public async Task Handle_RouteByMediaKind_EnsuresSystemDirectoryInsideTreeLock()
+    {
+        var fileId = Guid.NewGuid();
+        var calls = new List<string>();
+        _storage.Setup(s => s.LockTree(OwnerId, It.IsAny<CancellationToken>()))
+            .Callback(() => calls.Add("lock")).ReturnsAsync(_treeLock.Object);
+        _files.Setup(s => s.GetFile(fileId)).ReturnsAsync(ReadyFile(fileId, mediaKind: MediaKind.Photo));
+        _storage.Setup(s => s.EnsureSystemDirectory(OwnerId, CloudDirectorySystemKind.Photos, "Фото", It.IsAny<CancellationToken>()))
+            .Callback(() => calls.Add("ensure")).ReturnsAsync(Guid.NewGuid());
+        _storage.Setup(s => s.AddFileEntry(It.IsAny<CloudFileEntry>(), It.IsAny<CancellationToken>()))
+            .Callback(() => calls.Add("add")).ReturnsAsync((CloudFileEntry e, CancellationToken _) => e);
+        _treeLock.Setup(l => l.CommitAsync(It.IsAny<CancellationToken>()))
+            .Callback(() => calls.Add("commit")).Returns(Task.CompletedTask);
+
+        await CreateSut().Handle(new AttachFileCommand { FileId = fileId, Name = "f", RouteByMediaKind = true }, default);
+
+        calls.Should().Equal("lock", "ensure", "add", "commit");
+    }
+
+    [Fact]
+    public async Task Handle_DirectoryNotFound_DoesNotCommit()
+    {
+        var dirId = Guid.NewGuid();
+        _storage.Setup(s => s.GetDirectoryAsNoTracking(dirId, It.IsAny<CancellationToken>())).ReturnsAsync((CloudDirectory?)null);
+
+        var act = () => CreateSut().Handle(new AttachFileCommand { FileId = Guid.NewGuid(), Name = "f", DirectoryId = dirId }, default);
+
+        await act.Should().ThrowAsync<DirectoryNotFoundException>();
+        _treeLock.Verify(l => l.CommitAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 
     private static UploadFileEntity ReadyFile(

@@ -34,6 +34,10 @@ public class MoveFileEntryCommandHandler : IRequestHandler<MoveFileEntryCommand,
     {
         var ownerId = _userContext.UserId;
 
+        // Проверка целевой папки и запись записи в неё — одна граница: параллельное удаление папки
+        // оставило бы живую запись в несуществующей папке.
+        await using var treeLock = await _storage.LockTree(ownerId, cancellationToken);
+
         var entry = await _storage.GetFileEntry(request.EntryId, cancellationToken);
         if (entry is null)
             throw new FileEntryNotFoundException();
@@ -64,6 +68,7 @@ public class MoveFileEntryCommandHandler : IRequestHandler<MoveFileEntryCommand,
         var oldDirectoryId = entry.DirectoryId;
         entry.DirectoryId = newStorageDirectoryId;
         await _storage.UpdateFileEntry(entry, cancellationToken);
+        await treeLock.CommitAsync(cancellationToken);
 
         _logger.LogInformation(
             "Перемещена запись {EntryId} в директорию {DirectoryId}",

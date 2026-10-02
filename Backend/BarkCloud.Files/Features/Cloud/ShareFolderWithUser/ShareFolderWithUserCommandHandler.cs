@@ -33,6 +33,10 @@ public class ShareFolderWithUserCommandHandler : IRequestHandler<ShareFolderWith
     {
         var ownerId = _userContext.UserId;
 
+        // Проверка папки и сохранение гранта на неё — одна граница: параллельное удаление папки
+        // оставило бы грант на несуществующую папку.
+        await using var treeLock = await _hierarchy.LockTree(ownerId, cancellationToken);
+
         // Поделиться можно только своей папкой.
         var dir = await _hierarchy.GetDirectoryAsNoTracking(request.DirectoryId, cancellationToken);
         if (dir is null)
@@ -56,6 +60,7 @@ public class ShareFolderWithUserCommandHandler : IRequestHandler<ShareFolderWith
             DirectoryId = request.DirectoryId,
             CreatedAt = DateTime.UtcNow
         }, cancellationToken);
+        await treeLock.CommitAsync(cancellationToken);
 
         _logger.LogInformation(
             "Папка {DirectoryId} расшарена пользователю {RecipientId} (Owner: {OwnerId})",

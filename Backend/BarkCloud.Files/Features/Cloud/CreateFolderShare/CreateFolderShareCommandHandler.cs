@@ -37,6 +37,10 @@ public class CreateFolderShareCommandHandler : IRequestHandler<CreateFolderShare
     {
         var ownerId = _userContext.UserId;
 
+        // Проверка папки и сохранение ссылки на неё — одна граница: параллельное удаление папки
+        // оставило бы публичную ссылку на несуществующую папку.
+        await using var treeLock = await _hierarchy.LockTree(ownerId, cancellationToken);
+
         // Публиковать можно только свою папку.
         var dir = await _hierarchy.GetDirectoryAsNoTracking(request.DirectoryId, cancellationToken);
         if (dir is null)
@@ -61,6 +65,7 @@ public class CreateFolderShareCommandHandler : IRequestHandler<CreateFolderShare
         };
 
         await _storage.Add(share, cancellationToken);
+        await treeLock.CommitAsync(cancellationToken);
 
         _logger.LogInformation("Создана публичная папка {ShareId} на директорию {DirectoryId} (Owner: {OwnerId})",
             share.Id, request.DirectoryId, ownerId);
