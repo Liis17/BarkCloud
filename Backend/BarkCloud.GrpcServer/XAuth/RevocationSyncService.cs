@@ -9,8 +9,13 @@ public class RevocationSyncService(
     ILogger<RevocationSyncService> logger,
     TimeProvider? timeProvider = null) : BackgroundService
 {
+    // Равен overlap incremental-запроса: отзыв, закоммиченный позже overlap, incremental не вернёт,
+    // поэтому полный снимок повторяется, чтобы такая запись дошла до кэша.
+    private static readonly TimeSpan FullResyncInterval = TimeSpan.FromMinutes(1);
+
     private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
     private DateTime _serverTime;
+    private DateTimeOffset _lastFullSync;
 
     public override async Task StartAsync(CancellationToken cancellationToken)
     {
@@ -21,6 +26,7 @@ public class RevocationSyncService(
             try
             {
                 Apply(await feed.FetchAsync(null, cancellationToken));
+                _lastFullSync = _timeProvider.GetUtcNow();
                 break;
             }
             catch (Exception ex) when (!cancellationToken.IsCancellationRequested && attempt < 6)
@@ -40,7 +46,12 @@ public class RevocationSyncService(
             await Task.Delay(TimeSpan.FromSeconds(5), _timeProvider, stoppingToken);
             try
             {
-                Apply(await feed.FetchAsync(_serverTime.AddMinutes(-1), stoppingToken));
+                var fullResync = _timeProvider.GetUtcNow() - _lastFullSync >= FullResyncInterval;
+                Apply(await feed.FetchAsync(fullResync ? null : _serverTime.AddMinutes(-1), stoppingToken));
+                if (fullResync)
+                {
+                    _lastFullSync = _timeProvider.GetUtcNow();
+                }
             }
             catch (Exception ex) when (!stoppingToken.IsCancellationRequested)
             {
