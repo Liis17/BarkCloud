@@ -1,5 +1,5 @@
 import type { NavigateFunction } from 'react-router-dom';
-import type { CardFile, MediaKind } from './types';
+import type { CardFile, MediaItem, MediaKind } from './types';
 
 export type SearchSectionKey = 'photos' | 'videos' | 'files' | 'tracks' | 'albums' | 'playlists' | 'folders' | 'shared' | 'trash' | 'torrents';
 export type SearchHitKind = 'photo' | 'video' | 'file' | 'track' | 'album' | 'playlist' | 'folder' | 'dynamicFolder' | 'sharedFile' | 'sharedFolder' | 'sharedPlaylist' | 'trash' | 'torrent';
@@ -95,5 +95,15 @@ export function searchHitToCardFile(hit: SearchHit): CardFile {
     previews: hit.previewUrl ? [{ w: 512, target: 512, url: hit.previewUrl }] : [],
     createdAt: hit.createdAt,
     uploadedAt: hit.createdAt,
+  };
+}
+
+/** Хит файла как элемент галереи для `useMediaActions`: хит — одна запись каталога, `entryId` может быть пуст. */
+export function searchHitToMediaItem(hit: SearchHit): MediaItem {
+  return {
+    ...searchHitToCardFile(hit),
+    entryIds: hit.entryId ? [hit.entryId] : [],
+    entryNames: [hit.title],
+    entriesCount: 1,
   };
 }

@@ -115,6 +115,14 @@ export async function downloadArchive(payload: ArchivePayload): Promise<void> {
   window.open(d.url, '_blank');
 }
 
+/** Скачать оригинал своего файла по временной ссылке. */
+export async function downloadFile(fileId: string): Promise<void> {
+  const d = await apiGet<{ urls: Record<string, string | null> }>('/api/files/download?ids=' + encodeURIComponent(fileId));
+  const url = d.urls && d.urls[fileId];
+  if (!url) throw new Error('Ссылка недоступна');
+  window.open(url, '_blank');
+}
+
 /** Проверка наличия контента по SHA256 (без побочных эффектов): есть ли уже такой файл
  *  у пользователя и где он лежит. Хеш вычисляется потоковым Worker до этого вызова. */
 export async function checkDuplicateHash(hash: string): Promise<{ exists: boolean; locations: DuplicateLocation[] }> {

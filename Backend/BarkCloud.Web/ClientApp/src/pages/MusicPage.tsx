@@ -14,7 +14,7 @@ import { usePageHeader } from '../hooks/usePageHeader';
 import { useToast } from '../hooks/useToast';
 import { useFileDrop, type FileDropHandlers } from '../hooks/useFileDrop';
 import { useUploadActions } from '../hooks/useUploadManager';
-import { apiGet, apiPost, pickFiles } from '../lib/api';
+import { apiGet, apiPost, downloadFile, pickFiles } from '../lib/api';
 import { uploadFile } from '../lib/uploadSessions';
 import { formatDuration } from '../lib/format';
 import { createMusicPlaylistShare, createShare } from '../lib/share';
@@ -377,6 +377,14 @@ export function MusicPage() {
     }
   }
 
+  async function downloadTrack(track: MusicTrack) {
+    try {
+      await downloadFile(track.file.id);
+    } catch (e) {
+      toast((e as Error).message || 'Не удалось скачать', 'err');
+    }
+  }
+
   function trackMenu(track: MusicTrack, opts: { canManageFile?: boolean; canRemoveFromPlaylist?: boolean } = {}): ContextItem[] {
     const canManageFile = opts.canManageFile ?? true;
     const hasEntry = (track.file.entryIds || []).length > 0;
@@ -384,6 +392,7 @@ export function MusicPage() {
       ? playlists.map((playlist) => ({ label: playlist.name, onClick: () => addToPlaylist(playlist.id, track.file.id) }))
       : [{ label: 'Нет плейлистов', disabled: true }];
     const items: ContextItem[] = [
+      ...(canManageFile ? [{ label: 'Скачать', icon: 'download', onClick: () => downloadTrack(track) }] : []),
       { label: 'Добавить в плейлист', icon: 'plus', submenu: playlistItems },
       { label: 'Свойства', icon: 'info', onClick: () => setPropsTrack(track) },
       { label: 'Публичная ссылка', icon: 'link', onClick: () => createShare(track.file.id, trackDisplayName(track), toast) },
