@@ -133,9 +133,7 @@ public class TrashPurgeService : ITrashPurgeService
                     .Where(i => i.OwnerId == pair.OwnerId && i.FileId == pair.FileId)
                     .ExecuteDeleteAsync(cancellationToken);
 
-                var uploadFile = await _context.UploadedFiles
-                    .FirstOrDefaultAsync(f => f.Id == pair.FileId, cancellationToken);
-                uploadFile?.Uploaders.Remove(pair.OwnerId);
+                await _context.RemoveUploaderAsync(pair.FileId, pair.OwnerId, cancellationToken);
                 released.Add(pair);
             }
 
@@ -143,39 +141,28 @@ public class TrashPurgeService : ITrashPurgeService
             // блоб-превью может быть привязан сразу к нескольким оригиналам. Убираем владельца с
             // превью ТОЛЬКО если у него не осталось другого (не удаляемого сейчас) оригинала,
             // ссылающегося на тот же превью-блоб, — иначе оставшийся файл лишился бы превью.
+            // Строки превью блокируются до коммита (параллельная привязка нового оригинала или такой же
+            // purge ждёт и видит результат), сразу все и по порядку Id — чтобы два purge с пересекающимися
+            // превью разных владельцев не ждали друг друга.
+            var previewsByOwner = new List<(long OwnerId, List<Guid> ReleasedFileIds, List<Guid> PreviewFileIds)>();
             foreach (var ownerGroup in released.GroupBy(r => r.OwnerId))
             {
-                var ownerId = ownerGroup.Key;
                 var releasedFileIds = ownerGroup.Select(r => r.FileId).ToList();
-
                 var previewFileIds = await _context.FilePreviews
                     .AsNoTracking()
                     .Where(p => releasedFileIds.Contains(p.OriginalFileId))
                     .Select(p => p.PreviewFileId)
                     .Distinct()
                     .ToListAsync(cancellationToken);
-                if (previewFileIds.Count == 0)
-                    continue;
-
-                var previewFiles = await _context.UploadedFiles
-                    .Where(f => previewFileIds.Contains(f.Id))
-                    .ToListAsync(cancellationToken);
-
-                foreach (var pf in previewFiles)
-                {
-                    var stillNeeded = await _context.FilePreviews
-                        .AsNoTracking()
-                        .AnyAsync(p => p.PreviewFileId == pf.Id
-                            && !releasedFileIds.Contains(p.OriginalFileId)
-                            && _context.UploadedFiles.Any(o => o.Id == p.OriginalFileId && o.Uploaders.Contains(ownerId)),
-                            cancellationToken);
-
-                    if (!stillNeeded)
-                        pf.Uploaders.Remove(ownerId);
-                }
+                if (previewFileIds.Count > 0)
+                    previewsByOwner.Add((ownerGroup.Key, releasedFileIds, previewFileIds));
             }
 
-            await _context.SaveChangesAsync(cancellationToken);
+            await _context.LockLiveFilesAsync(
+                previewsByOwner.SelectMany(x => x.PreviewFileIds).Distinct().ToList(), cancellationToken);
+            foreach (var (ownerId, releasedFileIds, previewFileIds) in previewsByOwner)
+                await _context.ReleasePreviewOwnerAsync(previewFileIds, ownerId, releasedFileIds, cancellationToken);
+
             await transaction.CommitAsync(cancellationToken);
         }
 
@@ -195,6 +182,9 @@ public class TrashPurgeService : ITrashPurgeService
     /// кандидатов и связанных с ними превью: объект из S3, его хеш, связки FilePreview и строку
     /// UploadedFiles. Строка БД удаляется ТОЛЬКО при успешном удалении объекта из S3 — иначе блоб
     /// остаётся осиротевшим и будет повторно обработан фоновым <see cref="OrphanBlobCleanupService"/>.
+    /// Блоб занимается условным удалением строки в транзакции ДО удаления из S3: если на него успели
+    /// сослаться (владелец добавлен), он остаётся; если ссылаются позже, параллельная привязка превью
+    /// ждёт на этой строке и после коммита видит, что блоба нет, — удалённый объект не «воскресает».
     /// Возвращает число физически удалённых блобов.
     /// </summary>
     public async Task<int> PurgeOrphanBlobsAsync(IReadOnlyCollection<Guid> candidateFileIds, CancellationToken cancellationToken)
@@ -212,46 +202,54 @@ public class TrashPurgeService : ITrashPurgeService
         var allIds = candidateFileIds.Concat(previewFileIds).Distinct().ToList();
 
         var orphans = await _context.UploadedFiles
+            .AsNoTracking()
             .Where(f => allIds.Contains(f.Id) && f.Uploaders.Count == 0)
             .ToListAsync(cancellationToken);
-        if (orphans.Count == 0)
-            return 0;
 
-        // Удаляем из S3 по одному; строку БД сносим только при успехе. При ошибке блоб остаётся
-        // осиротевшим — фоновый воркер повторит попытку позже, и объект не «протечёт» в S3.
-        var deleted = new List<UploadFile>();
-        foreach (var f in orphans)
+        // Удаляем по одному; при ошибке S3 блоб остаётся осиротевшим — фоновый воркер повторит
+        // попытку позже, и объект не «протечёт» в S3.
+        var deleted = 0;
+        foreach (var orphan in orphans)
         {
-            var storageProfileId = _bucketRegistry.ResolveReadProfileId(f);
-            try
-            {
-                await _s3.DeleteAsync(storageProfileId, f.Id.ToString());
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex,
-                    "Не удалось удалить объект S3 (bucket={Bucket}, key={FileId}); блоб оставлен для повторной попытки",
-                    storageProfileId, f.Id);
-                continue;
-            }
-
-            await _hashesStorage.DeleteHashByFileId(f.Id, cancellationToken);
-            deleted.Add(f);
+            if (await TryDeleteOrphanAsync(orphan, cancellationToken))
+                deleted++;
         }
 
-        if (deleted.Count == 0)
-            return 0;
+        return deleted;
+    }
 
-        var deletedIds = deleted.Select(f => f.Id).ToHashSet();
+    private async Task<bool> TryDeleteOrphanAsync(UploadFile orphan, CancellationToken cancellationToken)
+    {
+        // Без CommitAsync (блоб оказался не сирота или S3 не удалил объект) Dispose откатывает занятие строки.
+        await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
 
-        // Снимаем связки превью, ссылающиеся на удалённые блобы (как на оригиналы, так и на превью).
+        var claimed = await _context.UploadedFiles
+            .Where(f => f.Id == orphan.Id && f.Uploaders.Count == 0)
+            .ExecuteDeleteAsync(cancellationToken);
+        if (claimed == 0)
+            return false;
+
+        var storageProfileId = _bucketRegistry.ResolveReadProfileId(orphan);
+        try
+        {
+            await _s3.DeleteAsync(storageProfileId, orphan.Id.ToString());
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex,
+                "Не удалось удалить объект S3 (bucket={Bucket}, key={FileId}); блоб оставлен для повторной попытки",
+                storageProfileId, orphan.Id);
+            return false;
+        }
+
+        await _hashesStorage.DeleteHashByFileId(orphan.Id, cancellationToken);
+
+        // Снимаем связки превью, ссылающиеся на удалённый блоб (как на оригинал, так и на превью).
         await _context.FilePreviews
-            .Where(p => deletedIds.Contains(p.OriginalFileId) || deletedIds.Contains(p.PreviewFileId))
+            .Where(p => p.OriginalFileId == orphan.Id || p.PreviewFileId == orphan.Id)
             .ExecuteDeleteAsync(cancellationToken);
 
-        _context.UploadedFiles.RemoveRange(deleted);
-        await _context.SaveChangesAsync(cancellationToken);
-
-        return deleted.Count;
+        await transaction.CommitAsync(cancellationToken);
+        return true;
     }
 }

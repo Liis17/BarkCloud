@@ -12,40 +12,22 @@ public sealed class UploadArtifactCleaner(
 {
     public async Task CleanupAsync(UploadSession session, CancellationToken cancellationToken)
     {
-        var file = await context.UploadedFiles
-            .FirstOrDefaultAsync(x => x.Id == session.FileId, cancellationToken);
-        if (file is not null)
+        // Владелец снимается с оригинала и (если он ему больше не нужен) с превью в одной транзакции:
+        // общее превью проверяется и освобождается под блокировкой строки (см. FileOwnership).
+        await using (var transaction = await context.Database.BeginTransactionAsync(cancellationToken))
         {
-            file.Uploaders.Clear();
-        }
+            await context.RemoveUploaderAsync(session.FileId, session.OwnerId, cancellationToken);
 
-        var previewFileIds = await context.FilePreviews
-            .AsNoTracking()
-            .Where(x => x.OriginalFileId == session.FileId)
-            .Select(x => x.PreviewFileId)
-            .Distinct()
-            .ToListAsync(cancellationToken);
-        if (previewFileIds.Count > 0)
-        {
-            var previewFiles = await context.UploadedFiles
-                .Where(x => previewFileIds.Contains(x.Id))
+            var previewFileIds = await context.FilePreviews
+                .AsNoTracking()
+                .Where(x => x.OriginalFileId == session.FileId)
+                .Select(x => x.PreviewFileId)
+                .Distinct()
                 .ToListAsync(cancellationToken);
-            foreach (var preview in previewFiles)
-            {
-                var stillNeeded = await context.FilePreviews
-                    .AsNoTracking()
-                    .AnyAsync(x => x.PreviewFileId == preview.Id
-                                   && x.OriginalFileId != session.FileId
-                                   && context.UploadedFiles.Any(original =>
-                                       original.Id == x.OriginalFileId
-                                       && original.Uploaders.Contains(session.OwnerId)),
-                        cancellationToken);
-                if (!stillNeeded)
-                    preview.Uploaders.Remove(session.OwnerId);
-            }
-        }
+            await context.ReleasePreviewOwnerAsync(previewFileIds, session.OwnerId, [session.FileId], cancellationToken);
 
-        await context.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+        }
 
         try
         {

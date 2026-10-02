@@ -34,20 +34,9 @@ public class UserDeletedConsumer(
 
         logger.LogInformation("Получено событие удаления аккаунта: UserId={UserId}", userId);
 
-        // Снимаем пользователя из Uploaders всех его блобов (оригиналы, превью, аватары).
-        var files = await context.UploadedFiles
-            .Where(f => f.Uploaders.Contains(userId))
-            .ToListAsync();
-
-        foreach (var file in files)
-        {
-            file.Uploaders.Remove(userId);
-        }
-
-        if (files.Count > 0)
-        {
-            await context.SaveChangesAsync();
-        }
+        // Снимаем пользователя из Uploaders всех его блобов (оригиналы, превью, аватары) одним
+        // атомарным оператором: целиком записанный список затёр бы параллельно добавленных владельцев.
+        var files = await context.RemoveUploaderFromAllAsync(userId);
 
         // Удаляем владельческие данные иерархии, альбомов и избранного.
         var entries = await context.CloudFileEntries.Where(x => x.OwnerId == userId).ExecuteDeleteAsync();
@@ -71,6 +60,6 @@ public class UserDeletedConsumer(
 
         logger.LogInformation(
             "Данные Files для пользователя {UserId} очищены: блобов откреплено {Files}, записей {Entries}, папок {Dirs}, альбомов {Albums} (элементов {AlbumItems}), избранного {Favorites}, алиасов {Aliases}, тегов {Tags}, ссылок {Shares}, публичных папок {FolderShares}, грантов файлов {Grants}, грантов папок {DirGrants}",
-            userId, files.Count, entries, dirs, albums + musicPlaylists, albumItems + musicItems, favorites, aliases, tags, shares + musicShares, folderShares, grants + musicGrants, dirGrants);
+            userId, files, entries, dirs, albums + musicPlaylists, albumItems + musicItems, favorites, aliases, tags, shares + musicShares, folderShares, grants + musicGrants, dirGrants);
     }
 }
