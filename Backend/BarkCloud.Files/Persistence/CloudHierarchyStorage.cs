@@ -150,12 +150,14 @@ public class CloudHierarchyStorage : ICloudHierarchyStorage
     /// <summary>
     /// Возвращает все папки в поддереве, включая саму root-папку.
     /// Реализовано итеративным обходом, без рекурсивных SQL CTE — это работает
-    /// одинаково на любом провайдере и не требует raw-SQL.
+    /// одинаково на любом провайдере и не требует raw-SQL. Уже посещённые папки пропускаются:
+    /// на повреждённых данных с циклом обход конечен и отдаёт каждую папку один раз.
     /// </summary>
     public async Task<List<CloudDirectory>> GetSubtree(long ownerId, Guid rootDirectoryId, CancellationToken cancellationToken = default)
     {
         var result = new List<CloudDirectory>();
         var frontier = new Queue<Guid>();
+        var visited = new HashSet<Guid>();
 
         var root = await _context.CloudDirectories
             .FirstOrDefaultAsync(x => x.Id == rootDirectoryId && x.OwnerId == ownerId, cancellationToken);
@@ -163,6 +165,7 @@ public class CloudHierarchyStorage : ICloudHierarchyStorage
             return result;
 
         result.Add(root);
+        visited.Add(root.Id);
         frontier.Enqueue(root.Id);
 
         while (frontier.Count > 0)
@@ -177,6 +180,9 @@ public class CloudHierarchyStorage : ICloudHierarchyStorage
 
             foreach (var child in children)
             {
+                if (!visited.Add(child.Id))
+                    continue;
+
                 result.Add(child);
                 frontier.Enqueue(child.Id);
             }

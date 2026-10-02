@@ -156,6 +156,33 @@ public class MoveDirectoryCommandHandlerTests
     }
 
     [Fact]
+    public async Task Handle_NewParentAncestorsAlreadyCyclic_ThrowsCircular()
+    {
+        var id = Guid.NewGuid();
+        var newParent = Guid.NewGuid();
+        var a = Guid.NewGuid();
+        var b = Guid.NewGuid();
+        SetupDir(id, new CloudDirectory { Id = id, OwnerId = OwnerId, ParentId = null });
+        // newParent висит на уже существующем цикле a ↔ b, в который перемещаемая папка не входит.
+        var dirs = new Dictionary<Guid, CloudDirectory>
+        {
+            [newParent] = new() { Id = newParent, OwnerId = OwnerId, ParentId = a },
+            [a] = new() { Id = a, OwnerId = OwnerId, ParentId = b },
+            [b] = new() { Id = b, OwnerId = OwnerId, ParentId = a },
+        };
+        var calls = 0;
+        // Моки синхронны, поэтому зависание ловим счётчиком, а не таймаутом.
+        _storage.Setup(s => s.GetDirectoryAsNoTracking(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Guid dirId, CancellationToken _) =>
+                ++calls > 100 ? throw new InvalidOperationException("Бесконечный обход") : dirs[dirId]);
+
+        var act = () => CreateSut().Handle(new MoveDirectoryCommand { DirectoryId = id, NewParentId = newParent }, default);
+
+        await act.Should().ThrowAsync<CircularMoveException>();
+        _storage.Verify(s => s.UpdateDirectory(It.IsAny<CloudDirectory>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
     public async Task Handle_Circular_DoesNotCommit()
     {
         var id = Guid.NewGuid();

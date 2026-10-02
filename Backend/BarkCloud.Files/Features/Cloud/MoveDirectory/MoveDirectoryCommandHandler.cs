@@ -57,10 +57,13 @@ public class MoveDirectoryCommandHandler : IRequestHandler<MoveDirectoryCommand,
 
             // Проверяем, что новый родитель не лежит в поддереве перемещаемой папки.
             // Идём вверх от newParent — если встретим directory.Id, значит это цикл.
+            // Повторно встреченная папка — цепочка предков уже зациклена (повреждённые данные):
+            // подвешивать папку к такой цепочке нельзя.
+            var visited = new HashSet<Guid> { newParent.Id };
             var cursorId = newParent.ParentId;
             while (cursorId.HasValue)
             {
-                if (cursorId.Value == directory.Id)
+                if (cursorId.Value == directory.Id || !visited.Add(cursorId.Value))
                     throw new CircularMoveException();
 
                 var ancestor = await _storage.GetDirectoryAsNoTracking(cursorId.Value, cancellationToken);

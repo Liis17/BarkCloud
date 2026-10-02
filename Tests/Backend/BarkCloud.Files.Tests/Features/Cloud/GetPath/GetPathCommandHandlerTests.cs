@@ -66,4 +66,28 @@ public class GetPathCommandHandlerTests
         response.Segments.Select(s => s.Name).Should().Equal("Root");
         response.FullPath.Should().Be("/Root/Child");
     }
+
+    [Fact]
+    public async Task Handle_CyclicAncestors_ThrowsTreeCorrupted()
+    {
+        var a = Guid.NewGuid();
+        var b = Guid.NewGuid();
+        var leaf = Guid.NewGuid();
+        // leaf висит на цикле a ↔ b.
+        var dirs = new Dictionary<Guid, CloudDirectory>
+        {
+            [leaf] = new() { Id = leaf, OwnerId = OwnerId, ParentId = a, Name = "Leaf" },
+            [a] = new() { Id = a, OwnerId = OwnerId, ParentId = b, Name = "A" },
+            [b] = new() { Id = b, OwnerId = OwnerId, ParentId = a, Name = "B" },
+        };
+        var calls = 0;
+        // Моки синхронны, поэтому зависание ловим счётчиком, а не таймаутом.
+        _storage.Setup(s => s.GetDirectoryAsNoTracking(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Guid id, CancellationToken _) =>
+                ++calls > 100 ? throw new InvalidOperationException("Бесконечный обход") : dirs[id]);
+
+        var act = () => CreateSut().Handle(new GetPathCommand { DirectoryId = leaf }, default);
+
+        await act.Should().ThrowAsync<DirectoryTreeCorruptedException>();
+    }
 }
