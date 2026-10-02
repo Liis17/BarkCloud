@@ -6,6 +6,8 @@ Parent: [[index]] · Module: [[modules/backend-configuration]] · Proto: [[modul
 Namespace C#: `BarkCloud.Proto.Configuration`
 Package: `barkcloud.configuration`
 
+C#-типы (сообщения, client и server-заглушка `ConfigurationApiBase`) генерируются один раз — в [[modules/backend-grpcserver]] (`GrpcServices="Both"`). Configuration не генерирует контракт сам, а наследует `ConfigurationApiBase` из GrpcServer: иначе одноимённые типы появлялись бы в двух связанных сборках (`CS0436`, Q01).
+
 ## Сервис `ConfigurationApi`
 
 Служебный API вызывается только серверными сервисами. Каждый RPC защищён bootstrap-заголовком `x-config-access-key` из `CONFIGURATION_ACCESS_KEY` (обязателен вне Development).
