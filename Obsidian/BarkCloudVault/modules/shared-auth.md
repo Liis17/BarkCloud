@@ -14,7 +14,7 @@ gRPC-интерсепторы для **исходящих** запросов м�
 
 | Файл | Назначение |
 |------|-----------|
-| `MetadataKeys.cs` | Имена ключей метаданных (`x-device`, `x-device-id`, `x-app`, `x-os`, `x-ip`, токен) |
+| `MetadataKeys.cs` | Имена ключей метаданных (`x-device`, `x-device-id`, `x-app`, `x-os`, `x-ip`, токен; `x-real-ip` — доверенный адрес для лимитов попыток: nginx перезаписывает его, Web выставляет сам, F14) |
 | `JwtClientInterceptor.cs` | Прокидывает JWT-токен в метаданных исходящих gRPC-запросов |
 | `XAppClientInterceptor.cs` | Прокидывает `X-App` (информация о приложении) |
 | `XDeviceClientInterceptor.cs` | Прокидывает `X-Device` (имя/название устройства) |

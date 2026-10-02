@@ -59,13 +59,13 @@ Tests/
 
 | Проект | Тестов | Покрытые компоненты |
 |--------|-------:|---------------------|
-| `BarkCloud.Identity.Tests` | 119 | 20/20 хендлеров (client + 6 `*Server` admin-вариантов), `Services/` (`JwtService`, `PasswordHasher`, `CodeGenerator`, `RefreshTokenGenerator`), консьюмеры |
+| `BarkCloud.Identity.Tests` | 274 | 20/20 хендлеров (client + 6 `*Server` admin-вариантов), `Services/` (`JwtService`, `PasswordHasher`, `CodeGenerator`, `RefreshTokenGenerator`, `AuthRateLimiter`), консьюмеры; хранилища на SQLite (`AuthPropertiesStorage*`, `AttemptCountersStorage`, счётчики попыток `reset_id`/кода, параллельные запросы → ровно `max`); лимиты F14 в `Auth`/`ResetPassword`/`ConfirmResetPassword`/`CreateAccount`/`ConfirmAccount`/TOTP/`SetPassword`/WebAuthn |
 | `BarkCloud.Users.Tests` | 81 юнит + 8 PostgreSQL | Все хендлеры (Devices×7, Privacy×2, Search/ListByIds/Contacts, ProfilePicture×2, ProfileServer, StorageLimit и пр.) + `SessionRevokedConsumer`; ID пользователей, миграции sequence и конкурентное создание |
 | `BarkCloud.Users.IntegrationTests` | 20 PostgreSQL | Уникальность логинов, конфликты записи, гонки переименования/вставки/подтверждения черновика и появления черновика между проверками, миграция F04 и откат |
-| `BarkCloud.Web.Tests` | 49 | Rendering (`Format`, `FileKind`, `CloudJson`), `AuthGateway` (маппинг x-error-code → `LoginOutcome`) |
+| `BarkCloud.Web.Tests` | 134 | Rendering (`Format`, `FileKind`, `CloudJson`), `AuthGateway` (маппинг x-error-code → `LoginOutcome`, в т.ч. `TooManyAttempts`), `BrowserContext.ResolveIp`/`DeviceInfo.ToMetadata` (`x-real-ip`), `AdminUnlockLimiter`, `AdminGate` и др. |
 | `BarkCloud.Files.Tests` | 167 | 43/44 хендлеров (Album×7, Cloud×26 — директории/корзина/шеринг/избранное/медиа, `GetFileData`/`GetFilesData`, `UploadFile` и др.), сервисы `ImageCompressor`/`AlbumViewBuilder`/`PhysicalStorageStatsProvider`, `SessionRevokedConsumer`. Пропущены: `UploadAvatarServer` (линейный S3/image-IO, `ImageCompressor` не `virtual`), `UserDeletedConsumer` (прямые `ExecuteDeleteAsync` по `FilesContext`), `VideoThumbnailExtractor`/`PreviewPersistenceService`/`*CleanupService` (IO/таймеры) |
 | `BarkCloud.Shared.SecurityUtilities.Tests` | 23 | `SecurityUtilities.EvaluatePasswordStrength`, `GetPasswordStrengthMessage` |
-| `BarkCloud.GrpcServer.Tests` | 17 | `TokenRevocationCache`, `MetricsCollector`, `ServerExceptionInterceptor` |
+| `BarkCloud.GrpcServer.Tests` | 41 | `TokenRevocationCache`, `MetricsCollector`, `ServerExceptionInterceptor`, `SourceIpResolver` (подделанные `x-ip-address`/XFF игнорируются, IPv6 → /64) |
 | `BarkCloud.Notification.Tests` | 34 | `EmailMasker`, `HtmlEmailTemplateParser`, `EmailQueueConsumer`, `EmailConfiguration`, `EmailSender` (локальный SMTP/TLS-стенд) |
 | `BarkCloud.Shared.Auth.Tests` | 8 | Все 6 client-interceptor'ов (`JwtClientInterceptor`, `XAppClientInterceptor`, `XOsClientInterceptor`, `XDeviceClientInterceptor`, `XDeviceIdInterceptor`, `XIpClientInterceptor`) |
 | `BarkCloud.Shared.Exceptions.Tests` | 4 | `ExceptionClientInterceptor` (маппинг error code → доменное исключение) |

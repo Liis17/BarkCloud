@@ -15,11 +15,12 @@ Parent: [[index]] · See also: [[api/identity-api]] · [[modules/shared-identity
 ### Domain
 - `AuthUserProperty.cs` (+ `WebAuthnUserHandle` — непубличный user handle WebAuthn; + поля email-challenge: `LastEmailAuthCode`, `EmailAuthCodePurpose`, `EmailAuthCodeIssuedAt`, `EmailAuthCodeExpiresAt`, `EmailAuthCodeAttempts` — см. «Email-код 2FA (F07)»)
 - `EmailAuthCodePurpose.cs` — назначение email-кода: `Login`, `EnableEmailOtp`
-- `ConfirmationCode.cs`, `ConfirmationCodeType.cs`
+- `ConfirmationCode.cs` (+ `Attempts` — попытки ввода, F14), `ConfirmationCodeType.cs`
+- `AuthAttemptCounter.cs` — счётчик попыток/отправок в окне по произвольному ключу (F14)
 - `OtpType.cs`
 - `RefreshToken.cs`
 - `RevokedSession.cs` — долговечный отзыв по времени и срок жизни записи ([[modules/session-revocation]])
-- `ResetPassword.cs`
+- `ResetPassword.cs` (+ `OtpAttempts` — попытки ввода кода, F14)
 - `UserPassword.cs`
 - `WebAuthnCredential.cs` — привязанный ключ FIDO2 (CredentialId, PublicKey, SignatureCounter, AaGuid)
 - `WebAuthnChallenge.cs` — временный challenge между begin/complete (TTL 5 мин)
@@ -36,6 +37,7 @@ Parent: [[index]] · See also: [[api/identity-api]] · [[modules/shared-identity
 - `RefreshTokenGenerator.cs` — генерация refresh-токенов
 - `CodeGenerator.cs` — генерация кодов подтверждения
 - `SessionIssuer.cs` — общий выпуск сессии (refresh+access, регистрация устройства, уведомление); используется входом по ключу (хвост `AuthCommandHandler`)
+- `AuthLimits.cs` — политика лимитов попыток и рассылки (F14); `AuthRateLimiter.cs` (`IAuthRateLimiter`, scoped) — применение политики по `RequestContext.SourceIp` / аккаунту / получателю
 - `PasswordChangedNotifier.cs` — письмо «Пароль успешно изменен» (`NotificationType.PasswordChanged`); общий хвост `SetPassword` (при смене, не при первичной установке) и `ConfirmResetPassword`
 - `Fido2` (пакет `Fido2` 4.0.1) регистрируется в `Program.cs` из `WebAuthn:RpId/ServerName/Origins`
 
@@ -54,6 +56,7 @@ Parent: [[index]] · See also: [[api/identity-api]] · [[modules/shared-identity
 ### Persistence
 - `Contexts/IdentityContext.cs`, `IdentityContextFactory.cs`
 - `Services/AuthPropertiesStorage.cs`
+- `Services/AttemptCountersStorage.cs` — атомарный `TryReserve(key, max, window)` / `Reset` для `AuthAttemptCounters` (F14)
 - `Services/ConfirmationCodesStorage.cs`
 - `Services/PasswordsStorage.cs`
 - `Services/RefreshTokensStorage.cs` — `RevokeSession`, `RevokeSessionSafe`, `RevokeAllSessions`: атомарные refresh-delete + отзыв; очистка истёкших записей ([[modules/session-revocation]])
@@ -74,6 +77,8 @@ Parent: [[index]] · See also: [[api/identity-api]] · [[modules/shared-identity
   - `20261001190754_EmailAuthCodeChallenge` — аддитивно: `EmailAuthCodePurpose`/`IssuedAt`/`ExpiresAt`/`Attempts` в `AuthUserProperties` (F07; `LastEmailAuthCode` не тронут)
 
   - `20261001194141_AddRevokedSessions` — таблица отзывов и индексы по `RevokedAt`/`ExpiresAt` (F10)
+  - `20261002101816_AddAuthAttemptCounters` — таблица счётчиков попыток (F14)
+  - `20261002102704_AddOtpAttempts` — `ResetPasswords.OtpAttempts`, `ConfirmationCodes.Attempts` (F14)
 
 ## Features (реализованные)
 
@@ -134,7 +139,7 @@ Parent: [[index]] · See also: [[api/identity-api]] · [[modules/shared-identity
 - Если `TryIssue` вернул `false`, хендлер входа всё равно бросает `OtpCodeNeedException` (клиент остаётся на вводе кода), но письмо не отправляется; кнопка «отправить ещё раз» заработает через минуту.
 - Старые коды после миграции имеют `ExpiresAt = NULL` и считаются просроченными. Код хранится открытым текстом (как `ResetPassword.OtpCode`).
 
-Остаётся вне F07: общие лимиты попыток входа/OTP по IP и аккаунту и троттлинг `FailedLogin`-писем (F14); у email-кода сброса пароля (`ConfirmResetPassword`) нет лимита попыток.
+Лимиты попыток входа/OTP по IP и аккаунту, троттлинг `FailedLogin` и лимит попыток email-кода сброса пароля добавлены в F14 — см. «Лимиты попыток и рассылки (F14)».
 
 ## Управление 2FA: ожидающий секрет и повторная аутентификация (F08)
 
@@ -147,7 +152,7 @@ Parent: [[index]] · See also: [[api/identity-api]] · [[modules/shared-identity
 
 Новая ошибка `InvalidPasswordException` («Неверный пароль») — в отличие от `InvalidOldPasswordException` (смена пароля) не говорит про «старый».
 
-**Лимит попыток пароля.** Проверка пароля — в `ReauthPasswordVerifier` (`Services/`, scoped; используют `Enable` и `Disable`): пустой пароль → `InvalidPasswordException` без расхода попытки; затем `IAuthPropertiesStorage.TryReserveReauthPasswordAttempt` **до** проверки хеша — один условный `ExecuteUpdate` (окно **15 мин**, **5 попыток**; окно открывается первой попыткой, `ReauthPasswordAttempts` / `ReauthPasswordWindowEndsAt` в `AuthUserProperty`), поэтому параллельный перебор не превысит лимит; нет строки `AuthUserProperty` — создаётся сразу с первой попыткой. Лимит исчерпан → `PasswordAttemptsExceededException` («Слишком много неверных попыток ввода пароля. Повторите позже») даже при верном пароле; верный пароль → `ResetReauthPasswordAttempts`. Метрика остаётся прежней (`otp_setup_failed_invalid_password` / `otp_disable_failed`). Побочный эффект: владелец сессии может на 15 мин заблокировать себе только эти операции (вход не затрагивается). Миграции: `AddPendingOtpSecret` (2 nullable-колонки), `AddReauthPasswordAttempts` (`int` + nullable `timestamptz`). Не охвачено: лимит попыток входа/старого пароля в `SetPassword`/`Auth` и перебор OTP (F14) — подбор пароля через них остаётся возможным; отзыв остальных сессий при смене 2FA.
+**Лимит попыток пароля.** Проверка пароля — в `ReauthPasswordVerifier` (`Services/`, scoped; используют `Enable` и `Disable`): пустой пароль → `InvalidPasswordException` без расхода попытки; затем `IAuthPropertiesStorage.TryReserveReauthPasswordAttempt` **до** проверки хеша — один условный `ExecuteUpdate` (окно **15 мин**, **5 попыток**; окно открывается первой попыткой, `ReauthPasswordAttempts` / `ReauthPasswordWindowEndsAt` в `AuthUserProperty`), поэтому параллельный перебор не превысит лимит; нет строки `AuthUserProperty` — создаётся сразу с первой попыткой. Лимит исчерпан → `PasswordAttemptsExceededException` («Слишком много неверных попыток ввода пароля. Повторите позже») даже при верном пароле; верный пароль → `ResetReauthPasswordAttempts`. Метрика остаётся прежней (`otp_setup_failed_invalid_password` / `otp_disable_failed`). Побочный эффект: владелец сессии может на 15 мин заблокировать себе только эти операции (вход не затрагивается). Миграции: `AddPendingOtpSecret` (2 nullable-колонки), `AddReauthPasswordAttempts` (`int` + nullable `timestamptz`). Лимит попыток входа, старого пароля в `SetPassword` и перебора TOTP закрыт в F14 (см. ниже); не охвачен отзыв остальных сессий при смене 2FA.
 
 ## Запрет регистрации (Features:RegistrationEnabled)
 
@@ -176,3 +181,26 @@ Parent: [[index]] · See also: [[api/identity-api]] · [[modules/shared-identity
 ## Долговечный отзыв сессий (F10)
 
 Identity — источник истины для отзывов; все реплики загружают снимок до старта Kestrel и обновляют кэш примерно каждые 5 с. `Logout`, удаление сессии, сброс пароля и `UserDeletedConsumer` используют storage без событий отзыва. При сбросе все прежние refresh удаляются, текущее устройство исключается только из access-отзыва. Подробности, ограничения секундного `iat`, изменения lifetime и порядок обновления — [[modules/session-revocation]].
+
+## Лимиты попыток и рассылки (F14)
+
+**Источник запроса.** IP-лимиты считаются по `RequestContext.SourceIp` (`SourceIpResolver` в [[modules/backend-grpcserver]]): валидный `X-Real-IP`, иначе адрес соединения; IPv4-mapped → IPv4, IPv6 → префикс /64. Клиентский `x-ip-address` и `X-Forwarded-For` не используются (nginx лишь дописывает к последнему свой адрес, первый задаёт клиент) — они остаются только в `RequestContext.IpAddress` для писем и логов. nginx перезаписывает `X-Real-IP` значением `$remote_addr`; Web вызывает Identity напрямую и сам передаёт адрес браузера метаданными `x-real-ip` (`DeviceInfo.ToMetadata`). Модель доверия держится на том, что Identity недоступен снаружи в обход nginx (порты в compose не публикуются) — см. [[structure/infrastructure]]. Нет адреса → предупреждение в лог и IP-лимит пропускается.
+
+**Хранилище.** Таблица `AuthAttemptCounters` (`Key` ≤200, `Count`, `WindowEndsAt`); `AttemptCountersStorage.TryReserve` — условный `ExecuteUpdate` (окно открывается первой попыткой, отказ не увеличивает счётчик и возвращает остаток окна), нет строки — вставка с обработкой гонки уникального ключа; просроченные более часа строки удаляются при вставке новой. Ключи: `{scope}:ip:{ip}`, `{scope}:{userId}`, для регистрации — `{scope}:{sha256(email)}`. Счётчики, привязанные к самой записи, лежат в ней: `ResetPassword.OtpAttempts`, `ConfirmationCode.Attempts` (условный `ExecuteUpdate` до сравнения кода; не зависят от IP).
+
+| Операция | Ключ | Лимит / окно | Отказ |
+|---|---|---|---|
+| `Auth` | IP | 60 / 15 мин | `TooManyRequestsException` |
+| `Auth` после поиска юзера | аккаунт | 10 / 15 мин, до bcrypt/TOTP/выдачи email-кода; сброс полным успешным входом | `PasswordAttemptsExceededException` |
+| письмо `FailedLogin` | аккаунт | 1 / 15 мин | письмо не шлётся |
+| `ResetPassword` | IP; аккаунт | 10 / ч; cooldown 60 с и 5 / ч на email-код | письмо не шлётся, отдаётся `ResetId` действующего запроса (нет такого → `TooManyRequestsException`) |
+| `ConfirmResetPassword` | IP; `reset_id` | 30 / 15 мин; 5 попыток (email и TOTP) | `TooManyRequestsException`; `NotValidOtpCodeException` |
+| `CreateAccount` | IP; получатель | 10 / ч; cooldown 60 с и 5 / ч (после создания черновика, только при включённой почте) | `TooManyRequestsException` |
+| `ConfirmAccount` | IP; `code_id` | 30 / 15 мин; 5 попыток | `TooManyRequestsException`; `ConfirmationCodeIncorrectException` |
+| `Begin/CompleteWebAuthnAssertion` | IP | 60 / 15 мин | `TooManyRequestsException` |
+| TOTP под токеном (`ConfirmOtp`, `Disable(Authenticator)`, `Enable` при замене) | аккаунт | 10 / 15 мин | `TooManyRequestsException` |
+| `SetPassword` (old_password) | аккаунт | общий reauth-счётчик F08, 5 / 15 мин; пустой старый пароль попытку не тратит | `PasswordAttemptsExceededException` |
+
+`TooManyRequestsException` (`Shared.Exceptions/Identity`, код `8F2B6D41-5A93-4C7E-B0D8-1E4A7C9F3B26`) несёт метаданные `x-retry-after-seconds` (клиентский интерсептор пересоздаёт исключение по коду без метаданных; Web показывает `Status.Detail`). Метрики: `auth_login_failed_locked`, `password_reset_confirmation_failed_attempts_exceeded`, `account_confirmation_failed_attempts_exceeded`, `password_reset_mail_throttled`, `account_confirmation_mail_throttled`, `password_change_failed_attempts_exceeded`.
+
+**Компромиссы.** Окно-блокировка аккаунта (как F08): знающий логин может держать вход жертвы закрытым до 15 мин за раз; смягчают IP-лимит и сброс счётчика успешным входом. Попытка по аккаунту тратится и на промежуточный вызов `Auth` до ввода кода 2FA. Лимит на `reset_id` тратят и верные коды, отвергнутые из-за «новый пароль = текущему». Лимит `ResetPassword` по аккаунту при отказе не раскрывает существование аккаунта (тот же вид ответа). Очистки просроченных `ConfirmationCodes`/`ResetPasswords`/`WebAuthnChallenges` по-прежнему нет. Клиенты Android/iOS/Mac новых кодов ошибок не знают — покажут общую ошибку.
