@@ -20,6 +20,7 @@ namespace BarkCloud.Identity.Tests.Features.SetPassword;
 public class SetPasswordCommandHandlerTests
 {
     private readonly Mock<IPasswordsStorage> _passwords = new();
+    private readonly Mock<IAuthPropertiesStorage> _authProps = new();
     private readonly Mock<IRefreshTokensStorage> _refreshTokens = new();
     private readonly Mock<PasswordChangedNotifier> _notifier;
     private readonly MetricsCollector _metrics = new();
@@ -35,11 +36,13 @@ public class SetPasswordCommandHandlerTests
             new RequestContext(),
             NullLogger<PasswordChangedNotifier>.Instance);
         _notifier.Setup(n => n.NotifyAsync(It.IsAny<long>())).Returns(Task.CompletedTask);
+        _authProps.Setup(s => s.TryReserveReauthPasswordAttempt(42)).ReturnsAsync(true);
     }
 
     private SetPasswordCommandHandler CreateSut() => new(
         UserContextFactory.Create(42),
         _passwords.Object,
+        _authProps.Object,
         _refreshTokens.Object,
         _notifier.Object,
         _metrics,
@@ -111,5 +114,64 @@ public class SetPasswordCommandHandlerTests
         var snap = _metrics.SnapshotAndReset();
         snap.Should().ContainKey("password_changes");
         snap.Should().ContainKey("password_changes_initial");
+    }
+
+    [Fact]
+    public async Task Handle_OldPasswordAttemptsExhausted_RejectsCorrectOldPasswordBeforeVerification()
+    {
+        _passwords.Setup(s => s.GetUserPasswordHash(42)).ReturnsAsync(PasswordHasher.HashPassword("oldp"));
+        _authProps.Setup(s => s.TryReserveReauthPasswordAttempt(42)).ReturnsAsync(false);
+
+        var act = () => CreateSut().Handle(
+            new SetPasswordCommand { OldPassword = "oldp", NewPassword = "newp" }, default);
+
+        await act.Should().ThrowAsync<PasswordAttemptsExceededException>();
+        _passwords.Verify(s => s.UpdateUserPasswordHash(It.IsAny<long>(), It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_EmptyOldPassword_DoesNotSpendAttempt()
+    {
+        _passwords.Setup(s => s.GetUserPasswordHash(42)).ReturnsAsync(PasswordHasher.HashPassword("oldp"));
+
+        var act = () => CreateSut().Handle(new SetPasswordCommand { NewPassword = "newp" }, default);
+
+        await act.Should().ThrowAsync<InvalidOldPasswordException>();
+        _authProps.Verify(s => s.TryReserveReauthPasswordAttempt(It.IsAny<long>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_WrongOldPassword_SpendsAttemptAndKeepsCounter()
+    {
+        _passwords.Setup(s => s.GetUserPasswordHash(42)).ReturnsAsync(PasswordHasher.HashPassword("oldp"));
+
+        var act = () => CreateSut().Handle(
+            new SetPasswordCommand { OldPassword = "wrong", NewPassword = "newp" }, default);
+
+        await act.Should().ThrowAsync<InvalidOldPasswordException>();
+        _authProps.Verify(s => s.TryReserveReauthPasswordAttempt(42), Times.Once);
+        _authProps.Verify(s => s.ResetReauthPasswordAttempts(It.IsAny<long>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_CorrectOldPassword_ResetsAttempts()
+    {
+        _passwords.Setup(s => s.GetUserPasswordHash(42)).ReturnsAsync(PasswordHasher.HashPassword("oldp"));
+        _passwords.Setup(s => s.UpdateUserPasswordHash(42, It.IsAny<string>())).ReturnsAsync(false);
+
+        await CreateSut().Handle(new SetPasswordCommand { OldPassword = "oldp", NewPassword = "newp" }, default);
+
+        _authProps.Verify(s => s.ResetReauthPasswordAttempts(42), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_InitialPasswordSet_DoesNotTouchAttemptCounter()
+    {
+        _passwords.Setup(s => s.GetUserPasswordHash(42)).ReturnsAsync((string?)null);
+        _passwords.Setup(s => s.UpdateUserPasswordHash(42, It.IsAny<string>())).ReturnsAsync(true);
+
+        await CreateSut().Handle(new SetPasswordCommand { NewPassword = "newp" }, default);
+
+        _authProps.Verify(s => s.TryReserveReauthPasswordAttempt(It.IsAny<long>()), Times.Never);
     }
 }

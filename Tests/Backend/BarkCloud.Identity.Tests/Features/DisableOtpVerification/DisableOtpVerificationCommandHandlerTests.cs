@@ -35,6 +35,7 @@ public class DisableOtpVerificationCommandHandlerTests
     private readonly Mock<UsersServerApi.UsersServerApiClient> _usersClient = new();
     private readonly Mock<NotificationQueueSender> _notifications;
     private readonly Mock<LocationClient> _location;
+    private readonly Mock<IAuthRateLimiter> _rateLimiter = new();
     private readonly MetricsCollector _metrics = new();
     private readonly ILogger<DisableOtpVerificationCommandHandler> _logger =
         NullLogger<DisableOtpVerificationCommandHandler>.Instance;
@@ -69,6 +70,7 @@ public class DisableOtpVerificationCommandHandlerTests
         _usersClient.Object,
         new RequestContext { DeviceName = "Pixel", OperationSystem = "Android", IpAddress = "1.1.1.1" },
         _metrics,
+        _rateLimiter.Object,
         _logger);
 
     [Fact]
@@ -218,5 +220,25 @@ public class DisableOtpVerificationCommandHandlerTests
 
         await act.Should().ThrowAsync<InvalidPasswordException>();
         _authProps.Verify(s => s.DisableEmailOtp(It.IsAny<long>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_AuthenticatorTotpLimitExceeded_RejectsValidCodeWithoutDisabling()
+    {
+        var key = KeyGeneration.GenerateRandomKey(20);
+        _authProps.Setup(s => s.GetUserAuthProperties(42)).ReturnsAsync(new AuthUserProperty
+        {
+            UserId = 42,
+            OtpEnabled = true,
+            OtpSecret = Base32Encoding.ToString(key)
+        });
+        _rateLimiter.Setup(l => l.EnsureTotpAttemptAsync(42)).ThrowsAsync(new TooManyRequestsException());
+
+        var act = () => CreateSut().Handle(
+            new DisableOtpVerificationCommand { OptType = OtpTypeId.Authenticator, OtpCode = new Totp(key).ComputeTotp() },
+            default);
+
+        await act.Should().ThrowAsync<TooManyRequestsException>();
+        _authProps.Verify(s => s.DisableOtp(It.IsAny<long>()), Times.Never);
     }
 }

@@ -33,6 +33,18 @@ public class AuthRateLimiter(IAttemptCountersStorage storage, RequestContext req
         return reservation.Allowed;
     }
 
+    public async Task EnsureTotpAttemptAsync(long userId)
+    {
+        var policy = AuthLimits.OtpByAccount;
+        var reservation = await storage.TryReserve(Key(policy, userId.ToString()), policy.Max, policy.Window);
+
+        if (!reservation.Allowed)
+        {
+            logger.LogWarning("Лимит {Scope} для пользователя {UserId} исчерпан", policy.Scope, userId);
+            throw new TooManyRequestsException(reservation.RetryAfter);
+        }
+    }
+
     public Task ResetAsync(AuthLimits.Policy policy, string subject) => storage.Reset(Key(policy, subject));
 
     private static string Key(AuthLimits.Policy policy, string subject) => $"{policy.Scope}:{subject}";

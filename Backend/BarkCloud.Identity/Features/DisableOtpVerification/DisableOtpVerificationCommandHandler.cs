@@ -29,12 +29,13 @@ public class DisableOtpVerificationCommandHandler : IRequestHandler<DisableOtpVe
     private readonly UsersServerApi.UsersServerApiClient _usersClient;
     private readonly RequestContext _requestContext;
     private readonly MetricsCollector _metrics;
+    private readonly IAuthRateLimiter _rateLimiter;
     private readonly ILogger<DisableOtpVerificationCommandHandler> _logger;
 
     public DisableOtpVerificationCommandHandler(UserContext userContext, IAuthPropertiesStorage authPropertiesStorage,
         ReauthPasswordVerifier reauthPassword, NotificationQueueSender notificationQueueSender,
         LocationClient locationClient, UsersServerApi.UsersServerApiClient usersClient, RequestContext requestContext,
-        MetricsCollector metrics, ILogger<DisableOtpVerificationCommandHandler> logger)
+        MetricsCollector metrics, IAuthRateLimiter rateLimiter, ILogger<DisableOtpVerificationCommandHandler> logger)
     {
         _userContext = userContext;
         _authPropertiesStorage = authPropertiesStorage;
@@ -44,6 +45,7 @@ public class DisableOtpVerificationCommandHandler : IRequestHandler<DisableOtpVe
         _usersClient = usersClient;
         _requestContext = requestContext;
         _metrics = metrics;
+        _rateLimiter = rateLimiter;
         _logger = logger;
     }
 
@@ -81,6 +83,9 @@ public class DisableOtpVerificationCommandHandler : IRequestHandler<DisableOtpVe
             oldMethod = "Authenticator приложение";
 
             _logger.LogDebug("Проверка OTP кода для отключения Authenticator 2FA");
+
+            // Шестизначный код под токеном: перебор ограничен по аккаунту.
+            await _rateLimiter.EnsureTotpAttemptAsync(_userContext.UserId);
 
             var totp = new Totp(Base32Encoding.ToBytes(otpConfigs.OtpSecret));
 

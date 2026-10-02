@@ -23,7 +23,8 @@ namespace BarkCloud.Identity.Features.Auth;
 public class AuthCommandHandler(UsersServerApi.UsersServerApiClient usersClient,
     IMediator mediator, IAuthPropertiesStorage authPropertiesStorage, NotificationQueueSender notificationQueueSender,
     IRefreshTokensStorage refreshTokensStorage, RequestContext requestContext, IPasswordsStorage passwordsStorage,
-    LocationClient locationClient, MetricsCollector metrics, ILogger<AuthCommandHandler> logger) : IRequestHandler<AuthCommand, AuthResponse>
+    LocationClient locationClient, MetricsCollector metrics, IAuthRateLimiter rateLimiter,
+    ILogger<AuthCommandHandler> logger) : IRequestHandler<AuthCommand, AuthResponse>
 {
 
     private const int ExpDaysRefreshToken = 9999;
@@ -70,6 +71,9 @@ public class AuthCommandHandler(UsersServerApi.UsersServerApiClient usersClient,
             ? Guid.NewGuid().ToString()
             : requestContext.DeviceId;
 
+        // Лимит по источнику — до обращения к Users: перебор логинов с одного адреса не доходит ни до поиска, ни до bcrypt.
+        await rateLimiter.EnsureSourceAsync(AuthLimits.AuthByIp);
+
         var usersRequest = new FindByLoginRequest();
 
         if (!string.IsNullOrEmpty(request.Username))
@@ -97,6 +101,23 @@ public class AuthCommandHandler(UsersServerApi.UsersServerApiClient usersClient,
             throw new InvalidLoginOrPasswordException();
         }
 
+        // Попытка по аккаунту занимается до проверки пароля/кода (параллельный перебор не превысит лимит) и не зависит
+        // от адреса источника. Сбрасывается только полным успешным входом.
+        var accountKey = user.User.Id.ToString();
+
+        if (!await rateLimiter.TryReserveAsync(AuthLimits.LoginByAccount, accountKey))
+        {
+            metrics.Increment("auth_login_failed");
+            metrics.Increment("auth_login_failed_locked");
+            logger.LogWarning(
+                "Вход заблокирован лимитом попыток для пользователя {UserId}. Логин: {Login}, IP: {IpAddress}",
+                user.User.Id,
+                login,
+                requestContext.IpAddress
+            );
+            throw new PasswordAttemptsExceededException();
+        }
+
         // Пароль проверяется первым: без него нельзя ни получить код 2FA, ни узнать, что 2FA включена.
         logger.LogDebug("Проверка пароля для пользователя {UserId}", user.User.Id);
 
@@ -112,6 +133,12 @@ public class AuthCommandHandler(UsersServerApi.UsersServerApiClient usersClient,
                 login,
                 requestContext.IpAddress
             );
+
+            // Письмо о неудачной попытке — не чаще раза в окно на аккаунт: иначе перебор превращается в рассылку жертве.
+            if (!await rateLimiter.TryReserveAsync(AuthLimits.FailedLoginMail, accountKey))
+            {
+                throw new InvalidLoginOrPasswordException();
+            }
 
             // Отправка уведомления о неудачной попытке входа
             var userContactInfo = await usersClient.GetUserContactsAsync(new GetUserContactsRequest { UserId = user.User.Id });
@@ -249,6 +276,8 @@ public class AuthCommandHandler(UsersServerApi.UsersServerApiClient usersClient,
             metrics.Increment("otp_email_verified");
             logger.LogDebug("Email OTP код успешно проверен для пользователя {UserId}", user.User.Id);
         }
+
+        await rateLimiter.ResetAsync(AuthLimits.LoginByAccount, accountKey);
 
         logger.LogInformation(
             "Успешная аутентификация пользователя {UserId} ({Login}) с устройства {DeviceName}, IP: {IpAddress}",

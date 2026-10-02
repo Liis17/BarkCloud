@@ -3,6 +3,7 @@ using BarkCloud.GrpcServer.Tracker;
 using BarkCloud.GrpcServer.XAuth;
 using BarkCloud.Identity.Infrastructure;
 using BarkCloud.Identity.Persistence.Services;
+using BarkCloud.Identity.Services;
 using BarkCloud.Proto.Identity;
 using BarkCloud.Proto.Users;
 using BarkCloud.Shared.Exceptions.Identity;
@@ -28,12 +29,13 @@ public class ConfirmOtpVerificationCommandHandler : IRequestHandler<ConfirmOtpVe
     private readonly RequestContext _requestContext;
     private readonly LocationClient _locationClient;
     private readonly MetricsCollector _metrics;
+    private readonly IAuthRateLimiter _rateLimiter;
     private readonly ILogger<ConfirmOtpVerificationCommandHandler> _logger;
 
     public ConfirmOtpVerificationCommandHandler(UserContext userContext, IAuthPropertiesStorage authPropertiesStorage,
         UsersServerApi.UsersServerApiClient usersClient, NotificationQueueSender notificationQueueSender,
         RequestContext requestContext, LocationClient locationClient, MetricsCollector metrics,
-        ILogger<ConfirmOtpVerificationCommandHandler> logger)
+        IAuthRateLimiter rateLimiter, ILogger<ConfirmOtpVerificationCommandHandler> logger)
     {
         _userContext = userContext;
         _authPropertiesStorage = authPropertiesStorage;
@@ -42,6 +44,7 @@ public class ConfirmOtpVerificationCommandHandler : IRequestHandler<ConfirmOtpVe
         _requestContext = requestContext;
         _locationClient = locationClient;
         _metrics = metrics;
+        _rateLimiter = rateLimiter;
         _logger = logger;
     }
 
@@ -78,6 +81,9 @@ public class ConfirmOtpVerificationCommandHandler : IRequestHandler<ConfirmOtpVe
                     );
                     throw new BarkCloud.Shared.Exceptions.Identity.OtpNotCreatedException();
                 }
+
+                // Шестизначный код под токеном: перебор ограничен по аккаунту.
+                await _rateLimiter.EnsureTotpAttemptAsync(_userContext.UserId);
 
                 var totp = new Totp(Base32Encoding.ToBytes(pendingSecret));
 
