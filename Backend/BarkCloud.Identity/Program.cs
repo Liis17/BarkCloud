@@ -97,6 +97,8 @@ public class Program
         builder.Services.AddTransient<JwtService>();
         builder.Services.AddTransient<IConfirmationCodesStorage, ConfirmationCodesStorage>();
         builder.Services.AddScoped<NotificationQueueSender>();
+        builder.Services.AddScoped<INotificationOutbox, NotificationOutbox>();
+        builder.Services.AddHostedService<NotificationOutboxWorker>();
         builder.Services.AddHttpClient<LocationClient>();
         builder.Services.AddScoped<LocationClient>();
         builder.Services.AddTransient<IAuthPropertiesStorage, AuthPropertiesStorage>();

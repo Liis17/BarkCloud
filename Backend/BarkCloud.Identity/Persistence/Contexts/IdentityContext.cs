@@ -26,6 +26,8 @@ public class IdentityContext : DbContext
 
     public DbSet<AuthAttemptCounter> AuthAttemptCounters { get; set; }
 
+    public DbSet<PendingNotification> PendingNotifications { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -52,5 +54,8 @@ public class IdentityContext : DbContext
             e.HasKey(x => x.Key);
             e.Property(x => x.Key).HasMaxLength(200);
         });
+
+        modelBuilder.Entity<PendingNotification>()
+            .HasIndex(x => x.NextAttemptAt);
     }
 }
