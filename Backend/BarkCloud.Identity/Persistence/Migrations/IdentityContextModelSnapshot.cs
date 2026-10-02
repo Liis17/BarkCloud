@@ -103,6 +103,9 @@ namespace BarkCloud.Identity.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer");
+
                     b.Property<DateTime>("Expires")
                         .HasColumnType("timestamp with time zone");
 
@@ -168,6 +171,9 @@ namespace BarkCloud.Identity.Persistence.Migrations
 
                     b.Property<bool>("IsApproved")
                         .HasColumnType("boolean");
+
+                    b.Property<int>("OtpAttempts")
+                        .HasColumnType("integer");
 
                     b.Property<string>("OtpCode")
                         .HasColumnType("text");

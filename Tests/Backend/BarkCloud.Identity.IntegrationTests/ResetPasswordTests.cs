@@ -137,6 +137,33 @@ public class ResetPasswordTests
         (await reader.RevokedSessions.SingleAsync()).DeviceId.Should().Be("other");
     }
 
+    [Fact]
+    public async Task ResetPassword_AfterMaxWrongCodes_RejectsCorrectCodeAndKeepsOldPassword()
+    {
+        await using var database = await PostgresIdentityDatabase.CreateAsync();
+        await using var setup = database.CreateContext();
+        var reset = await Seed(setup);
+
+        // Каждая попытка — своя область (контекст), как отдельные запросы; адрес источника в лимите не участвует.
+        for (var i = 0; i < AuthLimits.ChallengeMaxAttempts; i++)
+        {
+            await using var context = database.CreateContext();
+            var wrong = Command(reset.Id);
+            wrong.OtpCode = $"00000{i}";
+            await FluentActions.Awaiting(() => CreateHandler(context).Handle(wrong, default))
+                .Should().ThrowAsync<NotValidOtpCodeException>();
+        }
+
+        await using var final = database.CreateContext();
+        await FluentActions.Awaiting(() => CreateHandler(final).Handle(Command(reset.Id), default))
+            .Should().ThrowAsync<NotValidOtpCodeException>();
+
+        await using var reader = database.CreateContext();
+        (await new ResetPasswordsStorage(reader).GetResetPassword(reset.Id))!.IsApproved.Should().BeFalse();
+        PasswordHasher.VerifyPassword("old-password", await new PasswordsStorage(reader).GetUserPasswordHash(42))
+            .Should().BeTrue();
+    }
+
     private static async Task<Exception?> Capture(Func<Task> action)
     {
         try { await action(); return null; }
@@ -178,7 +205,9 @@ public class ResetPasswordTests
         notifier.Setup(n => n.NotifyAsync(It.IsAny<long>())).Returns(() => notify?.Invoke() ?? Task.CompletedTask);
         return new ConfirmResetPasswordCommandHandler(new ResetPasswordsStorage(context), new AuthPropertiesStorage(context),
             new PasswordsStorage(context), new RefreshTokensStorage(context, new JwtSettings { ExpiryMinutes = 60 }),
-            mediator.Object, notifier.Object, request, metrics, NullLogger<ConfirmResetPasswordCommandHandler>.Instance, context);
+            mediator.Object, notifier.Object, request, metrics,
+            new AuthRateLimiter(new AttemptCountersStorage(context), request, NullLogger<AuthRateLimiter>.Instance),
+            NullLogger<ConfirmResetPasswordCommandHandler>.Instance, context);
     }
 
     private sealed class CancelCommit(CancellationTokenSource cancellation) : DbTransactionInterceptor

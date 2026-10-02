@@ -21,7 +21,7 @@ namespace BarkCloud.Identity.Features.ConfirmAccount;
 public class ConfirmAccountCommandHandler(IConfirmationCodesStorage confirmationCodesStorage,
     UsersServerApi.UsersServerApiClient usersClient, IRefreshTokensStorage refreshTokensStorage, RequestContext requestContext,
     NotificationQueueSender notificationQueueSender, LocationClient locationClient, MetricsCollector metrics,
-    IRegistrationPolicy registrationPolicy,
+    IRegistrationPolicy registrationPolicy, IAuthRateLimiter rateLimiter,
     ILogger<ConfirmAccountCommandHandler> logger)
     : IRequestHandler<ConfirmAccountCommand, ConfirmAccountResponse>
 {
@@ -41,6 +41,8 @@ public class ConfirmAccountCommandHandler(IConfirmationCodesStorage confirmation
         }
 
         await registrationPolicy.EnsureRegistrationEnabledAsync(cancellationToken);
+
+        await rateLimiter.EnsureSourceAsync(AuthLimits.ConfirmAccountByIp);
 
         var codeId = Guid.Parse(request.CodeId);
 
@@ -79,6 +81,15 @@ public class ConfirmAccountCommandHandler(IConfirmationCodesStorage confirmation
                 code.Expires
             );
             throw new ConfirmationCodeExpiredException();
+        }
+
+        // Попытка по коду занимается до сравнения (параллельный перебор не превысит лимит) и не зависит от адреса источника.
+        if (!await confirmationCodesStorage.TryReserveAttempt(codeId, AuthLimits.ChallengeMaxAttempts))
+        {
+            metrics.Increment("account_confirmation_failed");
+            metrics.Increment("account_confirmation_failed_attempts_exceeded");
+            logger.LogWarning("Исчерпаны попытки ввода кода подтверждения {CodeId}, UserId {UserId}", codeId, code.OwnerId);
+            throw new ConfirmationCodeIncorrectException();
         }
 
         var equals = code.Value.Equals(request.Code, StringComparison.InvariantCultureIgnoreCase);

@@ -1,3 +1,6 @@
+using System.Security.Cryptography;
+using System.Text;
+
 using BarkCloud.GrpcServer.Metrics;
 using BarkCloud.GrpcServer.Tracker;
 using BarkCloud.Identity.Domain;
@@ -25,7 +28,7 @@ public class CreateAccountCommandHandler(UsersServerApi.UsersServerApiClient use
     IConfirmationCodesStorage confirationCodesStorage, NotificationQueueSender notificationQueueSender,
     RequestContext requestContext, LocationClient locationClient, MetricsCollector metrics,
     IRefreshTokensStorage refreshTokensStorage, IConfiguration configuration, IRegistrationPolicy registrationPolicy,
-    ILogger<CreateAccountCommandHandler> logger)
+    IAuthRateLimiter rateLimiter, ILogger<CreateAccountCommandHandler> logger)
     : IRequestHandler<CreateAccountCommand, CreateAccountResponse>
 {
     private const int ExpDaysRefreshToken = 9999;
@@ -58,6 +61,8 @@ public class CreateAccountCommandHandler(UsersServerApi.UsersServerApiClient use
         }
 
         await registrationPolicy.EnsureRegistrationEnabledAsync(cancellationToken);
+
+        await rateLimiter.EnsureSourceAsync(AuthLimits.CreateAccountByIp);
 
         var createAccountRequest = new AddDraftUserRequest()
         {
@@ -112,6 +117,18 @@ public class CreateAccountCommandHandler(UsersServerApi.UsersServerApiClient use
                     ExpirationDate = Timestamp.FromDateTime(DateTime.UtcNow.AddDays(ExpDaysRefreshToken))
                 }
             };
+        }
+
+        // Письмо с кодом уходит на адрес из запроса, а не владельцу аккаунта: ограничиваем по получателю,
+        // чтобы форму нельзя было использовать для рассылки на чужой адрес. После создания черновика —
+        // ошибки валидации (занятое имя/почта) не тратят лимит письма.
+        var recipient = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(request.Email.Trim().ToLowerInvariant())));
+
+        if (!await rateLimiter.TryReserveAsync(AuthLimits.RegistrationMailCooldown, recipient)
+            || !await rateLimiter.TryReserveAsync(AuthLimits.RegistrationMailHourly, recipient))
+        {
+            metrics.Increment("account_confirmation_mail_throttled");
+            throw new TooManyRequestsException();
         }
 
         var code = CodeGenerator.GenerateDigitalCode(6);

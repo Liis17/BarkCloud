@@ -3,6 +3,7 @@ using BarkCloud.GrpcServer.Tracker;
 using BarkCloud.Identity.Features.ResetPassword;
 using BarkCloud.Identity.Infrastructure;
 using BarkCloud.Identity.Persistence.Services;
+using BarkCloud.Identity.Services;
 using BarkCloud.Proto.Identity;
 using BarkCloud.Proto.Users;
 using BarkCloud.Shared.Exceptions.Identity;
@@ -27,6 +28,7 @@ public class ResetPasswordCommandHandlerTests
     private readonly Mock<UsersServerApi.UsersServerApiClient> _usersClient = new();
     private readonly Mock<NotificationQueueSender> _notifications;
     private readonly Mock<LocationClient> _location;
+    private readonly Mock<IAuthRateLimiter> _rateLimiter = new();
     private readonly MetricsCollector _metrics = new();
     private readonly ILogger<ResetPasswordCommandHandler> _logger = NullLogger<ResetPasswordCommandHandler>.Instance;
 
@@ -36,6 +38,7 @@ public class ResetPasswordCommandHandlerTests
         _notifications.Setup(n => n.SendNotification(It.IsAny<Notification>())).Returns(Task.CompletedTask);
         _location = new Mock<LocationClient>(new HttpClient(), new MetricsCollector(), NullLogger<LocationClient>.Instance);
         _location.Setup(c => c.GetLocation(It.IsAny<string>())).ReturnsAsync((IpLocation?)null);
+        _rateLimiter.Setup(l => l.TryReserveAsync(It.IsAny<AuthLimits.Policy>(), It.IsAny<string>())).ReturnsAsync(true);
     }
 
     private static IConfiguration EmailConfig(bool enabled) => new ConfigurationBuilder()
@@ -44,7 +47,7 @@ public class ResetPasswordCommandHandlerTests
 
     private ResetPasswordCommandHandler CreateSut(RequestContext? ctx = null, bool emailEnabled = true) => new(
         _resets.Object, _authProps.Object, _usersClient.Object,
-        ctx ?? FullContext(), _notifications.Object, _location.Object, _metrics, EmailConfig(emailEnabled), _logger);
+        ctx ?? FullContext(), _notifications.Object, _location.Object, _metrics, _rateLimiter.Object, EmailConfig(emailEnabled), _logger);
 
     private static RequestContext FullContext() => new()
     {
@@ -153,5 +156,91 @@ public class ResetPasswordCommandHandlerTests
 
         await act.Should().ThrowAsync<EmailServiceDisabledException>();
         _usersClient.Verify(c => c.FindByLoginAsync(It.IsAny<FindByLoginRequest>(), null, null, default), Times.Never);
+    }
+
+    private void ArrangeEmailUser()
+    {
+        _usersClient
+            .Setup(c => c.FindByLoginAsync(It.IsAny<FindByLoginRequest>(), null, null, default))
+            .Returns(GrpcCallHelpers.AsyncUnary(new FindByLoginResponse { User = new User { Id = 42, Username = "u" } }));
+        _usersClient
+            .Setup(c => c.GetUserContactsAsync(It.IsAny<GetUserContactsRequest>(), null, null, default))
+            .Returns(GrpcCallHelpers.AsyncUnary(new GetUserContactsResponse
+            {
+                User = new User { Id = 42, Username = "u" },
+                Contact = new UserContact { Email = "u@e" }
+            }));
+        _authProps.Setup(s => s.CheckOtpEnabled(42)).ReturnsAsync(false);
+        _resets.Setup(s => s.AddResetPassword(It.IsAny<DomainResetPassword>()))
+            .ReturnsAsync((DomainResetPassword r) => { r.Id = Guid.NewGuid(); return r; });
+    }
+
+    [Fact]
+    public async Task Handle_SourceLimitExceeded_ThrowsBeforeUserLookup()
+    {
+        _rateLimiter.Setup(l => l.EnsureSourceAsync(AuthLimits.ResetPasswordByIp)).ThrowsAsync(new TooManyRequestsException());
+
+        var act = () => CreateSut().Handle(new ResetPasswordCommand { Username = "u" }, default);
+
+        await act.Should().ThrowAsync<TooManyRequestsException>();
+        _usersClient.Verify(c => c.FindByLoginAsync(It.IsAny<FindByLoginRequest>(), null, null, default), Times.Never);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Handle_EmailMailThrottledWithActiveReset_ReturnsActiveResetIdWithoutNewMail(bool cooldownTripped)
+    {
+        ArrangeEmailUser();
+        var activeId = Guid.NewGuid();
+        _resets.Setup(s => s.GetActiveEmailReset(42)).ReturnsAsync(new DomainResetPassword { Id = activeId, UserId = 42 });
+        var tripped = cooldownTripped ? AuthLimits.ResetMailCooldown : AuthLimits.ResetMailHourly;
+        _rateLimiter.Setup(l => l.TryReserveAsync(tripped, "42")).ReturnsAsync(false);
+
+        var response = await CreateSut().Handle(new ResetPasswordCommand { Email = "u@e", OtpType = OtpType.Email }, default);
+
+        response.ResetId.Should().Be(activeId.ToString());
+        _resets.Verify(s => s.AddResetPassword(It.IsAny<DomainResetPassword>()), Times.Never);
+        _notifications.Verify(n => n.SendNotification(It.IsAny<Notification>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_EmailMailThrottledWithoutActiveReset_ThrowsTooManyRequests()
+    {
+        ArrangeEmailUser();
+        _resets.Setup(s => s.GetActiveEmailReset(42)).ReturnsAsync((DomainResetPassword?)null);
+        _rateLimiter.Setup(l => l.TryReserveAsync(AuthLimits.ResetMailHourly, "42")).ReturnsAsync(false);
+
+        var act = () => CreateSut().Handle(new ResetPasswordCommand { Email = "u@e", OtpType = OtpType.Email }, default);
+
+        await act.Should().ThrowAsync<TooManyRequestsException>();
+        _notifications.Verify(n => n.SendNotification(It.IsAny<Notification>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_CooldownTripped_DoesNotSpendHourlyBudget()
+    {
+        ArrangeEmailUser();
+        _resets.Setup(s => s.GetActiveEmailReset(42)).ReturnsAsync(new DomainResetPassword { Id = Guid.NewGuid(), UserId = 42 });
+        _rateLimiter.Setup(l => l.TryReserveAsync(AuthLimits.ResetMailCooldown, "42")).ReturnsAsync(false);
+
+        await CreateSut().Handle(new ResetPasswordCommand { Email = "u@e", OtpType = OtpType.Email }, default);
+
+        _rateLimiter.Verify(l => l.TryReserveAsync(AuthLimits.ResetMailHourly, It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_AuthenticatorType_DoesNotSpendMailBudget()
+    {
+        _usersClient
+            .Setup(c => c.FindByLoginAsync(It.IsAny<FindByLoginRequest>(), null, null, default))
+            .Returns(GrpcCallHelpers.AsyncUnary(new FindByLoginResponse { User = new User { Id = 42 } }));
+        _authProps.Setup(s => s.CheckOtpEnabled(42)).ReturnsAsync(true);
+        _resets.Setup(s => s.AddResetPassword(It.IsAny<DomainResetPassword>()))
+            .ReturnsAsync((DomainResetPassword r) => { r.Id = Guid.NewGuid(); return r; });
+
+        await CreateSut().Handle(new ResetPasswordCommand { Username = "u", OtpType = OtpType.Authenticator }, default);
+
+        _rateLimiter.Verify(l => l.TryReserveAsync(It.IsAny<AuthLimits.Policy>(), It.IsAny<string>()), Times.Never);
     }
 }

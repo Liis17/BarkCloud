@@ -4,6 +4,7 @@ using BarkCloud.Identity.Domain;
 using BarkCloud.Identity.Features.ConfirmAccount;
 using BarkCloud.Identity.Infrastructure;
 using BarkCloud.Identity.Persistence.Services;
+using BarkCloud.Identity.Services;
 using BarkCloud.Proto.Identity;
 using BarkCloud.Proto.Users;
 using BarkCloud.Shared.Exceptions.Identity;
@@ -24,6 +25,7 @@ public class ConfirmAccountCommandHandlerTests
     private readonly Mock<IRefreshTokensStorage> _refreshTokens = new();
     private readonly Mock<NotificationQueueSender> _notifications;
     private readonly Mock<LocationClient> _location;
+    private readonly Mock<IAuthRateLimiter> _rateLimiter = new();
     private readonly MetricsCollector _metrics = new();
     private readonly ILogger<ConfirmAccountCommandHandler> _logger = NullLogger<ConfirmAccountCommandHandler>.Instance;
 
@@ -33,11 +35,12 @@ public class ConfirmAccountCommandHandlerTests
         _notifications.Setup(n => n.SendNotification(It.IsAny<Notification>())).Returns(Task.CompletedTask);
         _location = new Mock<LocationClient>(new HttpClient(), new MetricsCollector(), NullLogger<LocationClient>.Instance);
         _location.Setup(c => c.GetLocation(It.IsAny<string>())).ReturnsAsync((IpLocation?)null);
+        _codes.Setup(s => s.TryReserveAttempt(It.IsAny<Guid>(), It.IsAny<int>())).ReturnsAsync(true);
     }
 
     private ConfirmAccountCommandHandler CreateSut(RequestContext? ctx = null, bool registrationEnabled = true) => new(
         _codes.Object, _usersClient.Object, _refreshTokens.Object, ctx ?? FullContext(),
-        _notifications.Object, _location.Object, _metrics, RegistrationPolicy(registrationEnabled), _logger);
+        _notifications.Object, _location.Object, _metrics, RegistrationPolicy(registrationEnabled), _rateLimiter.Object, _logger);
 
     private static IRegistrationPolicy RegistrationPolicy(bool enabled)
     {
@@ -180,5 +183,75 @@ public class ConfirmAccountCommandHandlerTests
         var snap = _metrics.SnapshotAndReset();
         snap.Should().ContainKey("accounts_confirmed");
         snap.Should().ContainKey("sessions_created");
+    }
+
+    private static ConfirmationCode ValidCode(Guid id) => new()
+    {
+        Id = id,
+        Type = ConfirmationCodeType.Registration,
+        Expires = DateTime.UtcNow.AddHours(1),
+        Value = "123456",
+        OwnerId = 42
+    };
+
+    [Fact]
+    public async Task Handle_SourceLimitExceeded_ThrowsBeforeCodeLookup()
+    {
+        _rateLimiter.Setup(l => l.EnsureSourceAsync(AuthLimits.ConfirmAccountByIp)).ThrowsAsync(new TooManyRequestsException());
+
+        var act = () => CreateSut().Handle(
+            new ConfirmAccountCommand { CodeId = Guid.NewGuid().ToString(), Code = "123456" }, default);
+
+        await act.Should().ThrowAsync<TooManyRequestsException>();
+        _codes.Verify(s => s.GetCode(It.IsAny<Guid>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_WrongCode_ReservesAttemptOnThatCodeBeforeComparison()
+    {
+        var codeId = Guid.NewGuid();
+        _codes.Setup(s => s.GetCode(codeId)).ReturnsAsync(ValidCode(codeId));
+
+        var act = () => CreateSut().Handle(new ConfirmAccountCommand { CodeId = codeId.ToString(), Code = "000000" }, default);
+
+        await act.Should().ThrowAsync<ConfirmationCodeIncorrectException>();
+        _codes.Verify(s => s.TryReserveAttempt(codeId, AuthLimits.ChallengeMaxAttempts), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_AttemptsExhausted_RejectsEvenCorrectCodeWithoutConfirming()
+    {
+        var codeId = Guid.NewGuid();
+        _codes.Setup(s => s.GetCode(codeId)).ReturnsAsync(ValidCode(codeId));
+        _codes.Setup(s => s.TryReserveAttempt(codeId, It.IsAny<int>())).ReturnsAsync(false);
+
+        var act = () => CreateSut().Handle(new ConfirmAccountCommand { CodeId = codeId.ToString(), Code = "123456" }, default);
+
+        await act.Should().ThrowAsync<ConfirmationCodeIncorrectException>();
+        _usersClient.Verify(c => c.ConfirmUserAsync(It.IsAny<ConfirmUserRequest>(), null, null, default), Times.Never);
+        _codes.Verify(s => s.DeleteCode(It.IsAny<Guid>()), Times.Never);
+        _metrics.SnapshotAndReset().Should().ContainKey("account_confirmation_failed_attempts_exceeded");
+    }
+
+    [Fact]
+    public async Task Handle_AttemptLimit_DoesNotDependOnSourceIp()
+    {
+        var codeId = Guid.NewGuid();
+        _codes.Setup(s => s.GetCode(codeId)).ReturnsAsync(ValidCode(codeId));
+
+        foreach (var ip in new[] { "203.0.113.7", "198.51.100.9" })
+        {
+            var ctx = FullContext();
+            var other = new RequestContext
+            {
+                DeviceName = ctx.DeviceName, OperationSystem = ctx.OperationSystem, AppName = ctx.AppName,
+                AppVersion = ctx.AppVersion, DeviceId = ctx.DeviceId, SourceIp = ip
+            };
+            var act = () => CreateSut(other).Handle(new ConfirmAccountCommand { CodeId = codeId.ToString(), Code = "000000" }, default);
+            await act.Should().ThrowAsync<ConfirmationCodeIncorrectException>();
+        }
+
+        // Счётчик привязан к коду: обе попытки с разных адресов заняты на одном и том же code_id.
+        _codes.Verify(s => s.TryReserveAttempt(codeId, AuthLimits.ChallengeMaxAttempts), Times.Exactly(2));
     }
 }

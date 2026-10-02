@@ -1,6 +1,9 @@
 using BarkCloud.GrpcServer.Metrics;
 using BarkCloud.Identity.Persistence.Contexts;
 using BarkCloud.Identity.Persistence.Services;
+using System.Security.Cryptography;
+using System.Text;
+
 using BarkCloud.Shared.Exceptions.Identity;
 
 using MediatR;
@@ -31,6 +34,7 @@ namespace BarkCloud.Identity.Features.ConfirmResetPassword
         private readonly PasswordChangedNotifier _passwordChangedNotifier;
         private readonly RequestContext requestContext;
         private readonly MetricsCollector _metrics;
+        private readonly IAuthRateLimiter _rateLimiter;
         private readonly ILogger<ConfirmResetPasswordCommandHandler> _logger;
         private readonly IdentityContext _context;
 
@@ -40,8 +44,8 @@ namespace BarkCloud.Identity.Features.ConfirmResetPassword
         public ConfirmResetPasswordCommandHandler(IResetPasswordsStorage resetPasswordsStorage, IAuthPropertiesStorage authPropertiesStorage,
             IPasswordsStorage passwordsStorage, IRefreshTokensStorage refreshTokensStorage, IMediator mediator,
             PasswordChangedNotifier passwordChangedNotifier,
-            RequestContext requestContext, MetricsCollector metrics, ILogger<ConfirmResetPasswordCommandHandler> logger,
-            IdentityContext context)
+            RequestContext requestContext, MetricsCollector metrics, IAuthRateLimiter rateLimiter,
+            ILogger<ConfirmResetPasswordCommandHandler> logger, IdentityContext context)
         {
             _resetPasswordsStorage = resetPasswordsStorage;
             _authPropertiesStorage = authPropertiesStorage;
@@ -51,6 +55,7 @@ namespace BarkCloud.Identity.Features.ConfirmResetPassword
             _passwordChangedNotifier = passwordChangedNotifier;
             this.requestContext = requestContext;
             _metrics = metrics;
+            _rateLimiter = rateLimiter;
             _logger = logger;
             _context = context;
         }
@@ -75,6 +80,8 @@ namespace BarkCloud.Identity.Features.ConfirmResetPassword
             {
                 throw new XAppInfoIsRequiedException();
             }
+
+            await _rateLimiter.EnsureSourceAsync(AuthLimits.ConfirmResetPasswordByIp);
 
             var resetPasswordInfo = await _resetPasswordsStorage.GetResetPassword(request.ResetId);
 
@@ -117,6 +124,20 @@ namespace BarkCloud.Identity.Features.ConfirmResetPassword
                 resetPasswordInfo.OtpType
             );
 
+            // Попытка по этому запросу занимается до сравнения кода (параллельный перебор не превысит лимит)
+            // и не зависит от адреса источника: исчерпав попытки, код надо запрашивать заново.
+            if (!await _resetPasswordsStorage.TryReserveOtpAttempt(request.ResetId, AuthLimits.ChallengeMaxAttempts))
+            {
+                _metrics.Increment("password_reset_confirmation_failed");
+                _metrics.Increment("password_reset_confirmation_failed_attempts_exceeded");
+                _logger.LogWarning(
+                    "Исчерпаны попытки ввода кода для Reset ID {ResetId}, пользователь {UserId}",
+                    request.ResetId,
+                    resetPasswordInfo.UserId
+                );
+                throw new NotValidOtpCodeException();
+            }
+
             if (resetPasswordInfo.OtpType == OtpType.Authenticator)
             {
                 var otpSecret = await _authPropertiesStorage.GetOtpSecretKey(resetPasswordInfo.UserId);
@@ -141,7 +162,7 @@ namespace BarkCloud.Identity.Features.ConfirmResetPassword
             }
             else
             {
-                if (!string.Equals(resetPasswordInfo.OtpCode, request.OtpCode, StringComparison.Ordinal))
+                if (!FixedTimeEquals(resetPasswordInfo.OtpCode, request.OtpCode))
                 {
                     _metrics.Increment("password_reset_confirmation_failed");
                     _metrics.Increment("otp_email_failed");
@@ -242,5 +263,11 @@ namespace BarkCloud.Identity.Features.ConfirmResetPassword
                 }
             };
         }
+
+        // Пустого сохранённого кода быть не должно, но «пусто == пусто» подтверждением считать нельзя.
+        private static bool FixedTimeEquals(string? stored, string? provided)
+            => !string.IsNullOrEmpty(stored)
+               && CryptographicOperations.FixedTimeEquals(
+                   Encoding.UTF8.GetBytes(stored), Encoding.UTF8.GetBytes(provided ?? string.Empty));
     }
 }

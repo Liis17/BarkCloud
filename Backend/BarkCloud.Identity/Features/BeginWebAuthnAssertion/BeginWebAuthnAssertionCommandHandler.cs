@@ -1,4 +1,5 @@
 using BarkCloud.Identity.Persistence.Services;
+using BarkCloud.Identity.Services;
 using BarkCloud.Proto.Identity;
 
 using Fido2NetLib;
@@ -11,11 +12,15 @@ namespace BarkCloud.Identity.Features.BeginWebAuthnAssertion;
 public class BeginWebAuthnAssertionCommandHandler(
     IWebAuthnStorage webAuthnStorage,
     IFido2 fido2,
+    IAuthRateLimiter rateLimiter,
     ILogger<BeginWebAuthnAssertionCommandHandler> logger)
     : IRequestHandler<BeginWebAuthnAssertionCommand, BeginWebAuthnAssertionResponse>
 {
     public async Task<BeginWebAuthnAssertionResponse> Handle(BeginWebAuthnAssertionCommand request, CancellationToken cancellationToken)
     {
+        // Публичный метод пишет challenge в БД на каждый вызов — ограничиваем по источнику.
+        await rateLimiter.EnsureSourceAsync(AuthLimits.WebAuthnByIp);
+
         // Passwordless: пустой allowCredentials → клиент покажет выбор любого resident-ключа
         // этого RP. Пользователь определяется на complete по user handle из assertion.
         var options = fido2.GetAssertionOptions(new GetAssertionOptionsParams
