@@ -567,6 +567,7 @@ export function FilesPage() {
     const available = albums.filter((a) => !inAlbums.has(a.id));
     const present = albums.filter((a) => inAlbums.has(a.id));
     const out: ContextItem[] = [
+      { label: 'Скачать', icon: 'download', onClick: () => download(entry) },
       { label: 'Копировать ссылку', icon: 'link', onClick: () => copyLink(entry.fileId) },
       { label: 'Создать публичную ссылку', icon: 'share', onClick: () => createShare(entry.fileId, entry.name, toast) },
       { label: 'Поделиться с пользователем', icon: 'user', onClick: () => setShareWith(entry) },

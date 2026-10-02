@@ -9,7 +9,7 @@ import { useContextMenu, type ContextItem } from '../ui/ContextMenu';
 import { PropertiesModal } from '../ui/PropertiesModal';
 import { ShareWithUserModal } from '../ui/ShareWithUserModal';
 import { SelectionBar } from '../ui/SelectionBar';
-import { apiGet, apiPost, downloadArchive } from '../../lib/api';
+import { apiGet, apiPost, downloadArchive, downloadFile } from '../../lib/api';
 import { createShare, createAlbumShare } from '../../lib/share';
 import { GRID_SIZES } from '../../lib/format';
 import { useDocumentHead } from '../../hooks/useDocumentHead';
@@ -170,6 +170,7 @@ export function AlbumDetail({ album, candidates, albums, gridSizes = GRID_SIZES,
   }
   function itemMenu(m: CardFile): ContextItem[] {
     return [
+      { label: 'Скачать', icon: 'download', onClick: () => downloadFile(m.id).catch((e: Error) => toast(e.message || 'Не удалось скачать', 'err')) },
       { label: 'Сделать обложкой', icon: 'photo', onClick: () => setCover(m.id) },
       { label: 'Добавить в избранное', icon: 'star', onClick: () => addToFavorites(m.id) },
       { label: 'Создать публичную ссылку', icon: 'share', onClick: () => createShare(m.id, m.name, toast) },

@@ -3,6 +3,8 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import { Loading } from '../components/ui/EmptyState';
 import { usePageHeader } from '../hooks/usePageHeader';
+import { useSearchHitMenu } from '../hooks/useSearchHitMenu';
+import { useToast } from '../hooks/useToast';
 import { apiGet } from '../lib/api';
 import { isGridSection, matchLabel, openSearchHit, searchHitIconName, SECTION_LABEL, type SearchHit, type SearchResponse, type SearchSection, type SearchSectionKey } from '../lib/search';
 
@@ -10,12 +12,30 @@ const ORDER: SearchSectionKey[] = ['photos', 'videos', 'files', 'tracks', 'album
 
 type SectionState = SearchSection & { loadingMore?: boolean; error?: string };
 
+type HitMenuHandler = (e: React.MouseEvent, hit: SearchHit) => void;
+
+const sameHit = (a: SearchHit, b: SearchHit) => a.kind === b.kind && a.id === b.id;
+
 export function SearchPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const q = new URLSearchParams(location.search).get('q')?.trim() || '';
   const [sections, setSections] = React.useState<SectionState[] | null>(null);
   const [error, setError] = React.useState<string | null>(null);
+  const [toastNode, toast] = useToast();
+
+  function patchHit(hit: SearchHit, patch: Partial<SearchHit>) {
+    setSections((current) => current?.map((section) => ({ ...section, items: section.items.map((item) => sameHit(item, hit) ? { ...item, ...patch } : item) })) || null);
+  }
+  function removeHit(hit: SearchHit) {
+    setSections((current) => current?.map((section) => ({ ...section, items: section.items.filter((item) => !sameHit(item, hit)) })) || null);
+  }
+  const { overlay, openMenu } = useSearchHitMenu({
+    toast,
+    onRenamed: (hit, title) => patchHit(hit, { title }),
+    onRemoved: removeHit,
+    onPatched: patchHit,
+  });
 
   usePageHeader(() => ({
     title: q ? `Поиск: ${q}` : 'Поиск',
@@ -70,32 +90,36 @@ export function SearchPage() {
 
   const visible = (sections || []).filter((section) => section.items.length > 0 || section.unavailable);
   if (visible.length === 0) {
-    return <div className="search-page-empty"><Icon.search size={34} /><h2>Ничего не найдено</h2><p>Попробуйте другое имя, тег или имя исполнителя.</p></div>;
+    return <><div className="search-page-empty"><Icon.search size={34} /><h2>Ничего не найдено</h2><p>Попробуйте другое имя, тег или имя исполнителя.</p></div>{overlay}{toastNode}</>;
   }
 
   return (
-    <div className="search-page">
-      <div className="search-page-summary">Результаты по «{q}»</div>
-      {visible.map((section) => (
-        <section className="search-section" key={section.key}>
-          <div className="search-section-head"><h2>{SECTION_LABEL[section.key]}</h2><span>{section.items.length}{section.hasMore ? '+' : ''}</span></div>
-          {section.unavailable ? (
-            <div className="search-section-unavailable">Раздел временно недоступен. Остальные результаты поиска показаны.</div>
-          ) : isGridSection(section.key) ? (
-            <div className="search-result-grid">{section.items.map((hit) => <GridHit key={`${hit.kind}:${hit.id}`} hit={hit} onOpen={() => openSearchHit(hit, navigate)} />)}</div>
-          ) : (
-            <div className="search-result-list">{section.items.map((hit) => <ListHit key={`${hit.kind}:${hit.id}`} hit={hit} onOpen={() => openSearchHit(hit, navigate)} />)}</div>
-          )}
-          {section.error && <div className="search-section-error">{section.error}</div>}
-          {section.hasMore && !section.unavailable && <button className="btn outlined search-more" onClick={() => loadMore(section)} disabled={section.loadingMore}>{section.loadingMore ? 'Загружаем…' : 'Показать ещё'}</button>}
-        </section>
-      ))}
-    </div>
+    <>
+      <div className="search-page">
+        <div className="search-page-summary">Результаты по «{q}»</div>
+        {visible.map((section) => (
+          <section className="search-section" key={section.key}>
+            <div className="search-section-head"><h2>{SECTION_LABEL[section.key]}</h2><span>{section.items.length}{section.hasMore ? '+' : ''}</span></div>
+            {section.unavailable ? (
+              <div className="search-section-unavailable">Раздел временно недоступен. Остальные результаты поиска показаны.</div>
+            ) : isGridSection(section.key) ? (
+              <div className="search-result-grid">{section.items.map((hit) => <GridHit key={`${hit.kind}:${hit.id}`} hit={hit} onOpen={() => openSearchHit(hit, navigate)} onMenu={openMenu} />)}</div>
+            ) : (
+              <div className="search-result-list">{section.items.map((hit) => <ListHit key={`${hit.kind}:${hit.id}`} hit={hit} onOpen={() => openSearchHit(hit, navigate)} onMenu={openMenu} />)}</div>
+            )}
+            {section.error && <div className="search-section-error">{section.error}</div>}
+            {section.hasMore && !section.unavailable && <button className="btn outlined search-more" onClick={() => loadMore(section)} disabled={section.loadingMore}>{section.loadingMore ? 'Загружаем…' : 'Показать ещё'}</button>}
+          </section>
+        ))}
+      </div>
+      {overlay}
+      {toastNode}
+    </>
   );
 }
 
-function GridHit({ hit, onOpen }: { hit: SearchHit; onOpen: () => void }) {
-  return <button type="button" className="search-grid-hit" onClick={onOpen}>
+function GridHit({ hit, onOpen, onMenu }: { hit: SearchHit; onOpen: () => void; onMenu: HitMenuHandler }) {
+  return <button type="button" className="search-grid-hit" onClick={onOpen} onContextMenu={(e) => onMenu(e, hit)}>
     <HitPreview hit={hit} large />
     <span className="search-hit-title">{hit.title}</span>
     {hit.subtitle && <span className="search-hit-subtitle">{hit.subtitle}</span>}
@@ -104,8 +128,8 @@ function GridHit({ hit, onOpen }: { hit: SearchHit; onOpen: () => void }) {
   </button>;
 }
 
-function ListHit({ hit, onOpen }: { hit: SearchHit; onOpen: () => void }) {
-  return <button type="button" className="search-list-hit" onClick={onOpen}>
+function ListHit({ hit, onOpen, onMenu }: { hit: SearchHit; onOpen: () => void; onMenu: HitMenuHandler }) {
+  return <button type="button" className="search-list-hit" onClick={onOpen} onContextMenu={(e) => onMenu(e, hit)}>
     <HitPreview hit={hit} />
     <span className="search-list-copy"><b>{hit.title}</b>{hit.subtitle && <small>{hit.subtitle}</small>}<MatchReason hit={hit} /></span>
     {hit.favorite && <span className="search-favorite" aria-label="Избранное">★</span>}

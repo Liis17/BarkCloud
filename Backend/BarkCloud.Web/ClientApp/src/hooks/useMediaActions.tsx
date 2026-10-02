@@ -5,7 +5,7 @@ import { RenameModal } from '../components/ui/RenameModal';
 import { ConfirmModal } from '../components/ui/ConfirmModal';
 import { PropertiesModal } from '../components/ui/PropertiesModal';
 import { useAlbumMembership } from './useAlbumMembership';
-import { apiGet, apiPost, pickFiles } from '../lib/api';
+import { apiGet, apiPost, downloadFile, pickFiles } from '../lib/api';
 import { uploadFile } from '../lib/uploadSessions';
 import { createShare } from '../lib/share';
 import { ShareWithUserModal } from '../components/ui/ShareWithUserModal';
@@ -23,6 +23,8 @@ interface UseMediaActionsArgs {
   onRemoved?: (media: MediaItem) => void;
   onItemPatched?: (id: string, patch: Partial<MediaItem>) => void;
   reloadAlbums?: () => void;
+  /** Удалять конкретную запись каталога (entryIds[0]), а не все записи файла: для списков, где элемент — одна запись (поиск). */
+  deleteByEntry?: boolean;
 }
 
 /** Действия над медиа, экспонированные наружу (панель Lightbox). Модалки
@@ -48,7 +50,7 @@ function bustPreviews(m: MediaItem): Partial<MediaItem> {
 }
 
 /** Полный набор действий контекстного меню для медиа галереи (Фото/Видео). */
-export function useMediaActions({ albums, toast, onRenamed, onRemoved, onItemPatched, reloadAlbums }: UseMediaActionsArgs) {
+export function useMediaActions({ albums, toast, onRenamed, onRemoved, onItemPatched, reloadAlbums, deleteByEntry }: UseMediaActionsArgs) {
   const navigate = useNavigate();
   const [menu, setMenu] = React.useState<{ x: number; y: number; media: MediaItem } | null>(null);
   const [rename, setRename] = React.useState<MediaItem | null>(null);
@@ -78,6 +80,13 @@ export function useMediaActions({ albums, toast, onRenamed, onRemoved, onItemPat
       toast((e as Error).message || 'Не удалось скопировать', 'err');
     }
   }
+  async function download(m: MediaItem) {
+    try {
+      await downloadFile(m.id);
+    } catch (e) {
+      toast((e as Error).message || 'Не удалось скачать', 'err');
+    }
+  }
   async function doRename(m: MediaItem, name: string) {
     const entryId = m.entryIds && m.entryIds[0];
     if (!entryId) {
@@ -95,7 +104,9 @@ export function useMediaActions({ albums, toast, onRenamed, onRemoved, onItemPat
   }
   async function doDelete(m: MediaItem) {
     try {
-      await apiPost('/api/cloud/media/delete', { fileId: m.id });
+      const entryId = deleteByEntry ? m.entryIds && m.entryIds[0] : undefined;
+      if (entryId) await apiPost('/api/cloud/entry/delete', { entryId });
+      else await apiPost('/api/cloud/media/delete', { fileId: m.id });
       setConfirm(null);
       onRemoved && onRemoved(m);
       toast('Перемещено в корзину');
@@ -161,6 +172,7 @@ export function useMediaActions({ albums, toast, onRenamed, onRemoved, onItemPat
     const available = (albums || []).filter((a) => !inAlbums.has(a.id));
     const present = (albums || []).filter((a) => inAlbums.has(a.id));
     const out: ContextItem[] = [
+      { label: 'Скачать', icon: 'download', onClick: () => download(m) },
       { label: 'Копировать ссылку', icon: 'link', onClick: () => copyLink(m) },
       { label: 'Создать публичную ссылку', icon: 'share', onClick: () => createShare(m.id, m.name, toast) },
       { label: 'Поделиться с пользователем', icon: 'user', onClick: () => setShareWith(m) },
