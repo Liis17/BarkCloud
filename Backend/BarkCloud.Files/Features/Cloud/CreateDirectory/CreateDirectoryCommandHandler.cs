@@ -36,6 +36,10 @@ public class CreateDirectoryCommandHandler : IRequestHandler<CreateDirectoryComm
         if (string.IsNullOrWhiteSpace(name))
             throw new DirectoryNameConflictException();
 
+        // Проверка родителя и запись ссылки на него — одна граница: параллельное удаление родителя
+        // оставило бы новую папку с ParentId на уже удалённую.
+        await using var treeLock = await _storage.LockTree(ownerId, cancellationToken);
+
         // Если указан родитель — он должен существовать и принадлежать пользователю
         if (request.ParentId.HasValue)
         {
@@ -61,6 +65,7 @@ public class CreateDirectoryCommandHandler : IRequestHandler<CreateDirectoryComm
         };
 
         await _storage.AddDirectory(directory, cancellationToken);
+        await treeLock.CommitAsync(cancellationToken);
 
         _logger.LogInformation(
             "Создана папка {DirectoryId} (Name: {Name}, Parent: {ParentId}, Owner: {OwnerId})",

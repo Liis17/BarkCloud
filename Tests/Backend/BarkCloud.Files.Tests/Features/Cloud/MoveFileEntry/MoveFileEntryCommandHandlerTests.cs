@@ -15,6 +15,12 @@ public class MoveFileEntryCommandHandlerTests
 {
     private const long OwnerId = 42;
     private readonly Mock<ICloudHierarchyStorage> _storage = new();
+    private readonly Mock<ICloudTreeLock> _treeLock = new();
+
+    public MoveFileEntryCommandHandlerTests()
+    {
+        _storage.Setup(s => s.LockTree(OwnerId, It.IsAny<CancellationToken>())).ReturnsAsync(_treeLock.Object);
+    }
 
     private MoveFileEntryCommandHandler CreateSut() => new(
         _storage.Object,
@@ -98,5 +104,44 @@ public class MoveFileEntryCommandHandlerTests
         await CreateSut().Handle(new MoveFileEntryCommand { EntryId = id, NewDirectoryId = newDir }, default);
 
         _storage.Verify(s => s.UpdateFileEntry(It.Is<DomainFileEntry>(e => e.DirectoryId == newDir), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_HappyPath_LocksTreeBeforeReadingAndCommitsAfterUpdate()
+    {
+        var id = Guid.NewGuid();
+        var newDir = Guid.NewGuid();
+        var calls = new List<string>();
+        _storage.Setup(s => s.LockTree(OwnerId, It.IsAny<CancellationToken>()))
+            .Callback(() => calls.Add("lock")).ReturnsAsync(_treeLock.Object);
+        _storage.Setup(s => s.GetFileEntry(id, It.IsAny<CancellationToken>()))
+            .Callback(() => calls.Add("read"))
+            .ReturnsAsync(new DomainFileEntry { Id = id, OwnerId = OwnerId, DirectoryId = CloudHierarchyStorage.RootDirectoryId, Name = "f.jpg" });
+        _storage.Setup(s => s.GetDirectoryAsNoTracking(newDir, It.IsAny<CancellationToken>()))
+            .Callback(() => calls.Add("check"))
+            .ReturnsAsync(new CloudDirectory { Id = newDir, OwnerId = OwnerId });
+        _storage.Setup(s => s.UpdateFileEntry(It.IsAny<DomainFileEntry>(), It.IsAny<CancellationToken>()))
+            .Callback(() => calls.Add("update")).Returns(Task.CompletedTask);
+        _treeLock.Setup(l => l.CommitAsync(It.IsAny<CancellationToken>()))
+            .Callback(() => calls.Add("commit")).Returns(Task.CompletedTask);
+
+        await CreateSut().Handle(new MoveFileEntryCommand { EntryId = id, NewDirectoryId = newDir }, default);
+
+        calls.Should().Equal("lock", "read", "check", "update", "commit");
+    }
+
+    [Fact]
+    public async Task Handle_NewDirectoryNotFound_DoesNotCommit()
+    {
+        var id = Guid.NewGuid();
+        var newDir = Guid.NewGuid();
+        _storage.Setup(s => s.GetFileEntry(id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new DomainFileEntry { Id = id, OwnerId = OwnerId, DirectoryId = CloudHierarchyStorage.RootDirectoryId });
+        _storage.Setup(s => s.GetDirectoryAsNoTracking(newDir, It.IsAny<CancellationToken>())).ReturnsAsync((CloudDirectory?)null);
+
+        var act = () => CreateSut().Handle(new MoveFileEntryCommand { EntryId = id, NewDirectoryId = newDir }, default);
+
+        await act.Should().ThrowAsync<DirectoryNotFoundException>();
+        _treeLock.Verify(l => l.CommitAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 }

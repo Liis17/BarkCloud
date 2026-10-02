@@ -47,6 +47,10 @@ public class AttachFileCommandHandler : IRequestHandler<AttachFileCommand, Cloud
         if (string.IsNullOrWhiteSpace(name))
             throw new DirectoryNameConflictException();
 
+        // Проверка (или выбор системной) папки и запись ссылки на неё — одна граница: параллельное
+        // удаление папки оставило бы живую запись в несуществующей папке.
+        await using var treeLock = await _storage.LockTree(ownerId, cancellationToken);
+
         // Валидируем директорию (если указана). При route_by_media_kind папка определяется
         // ниже по типу медиа, поэтому присланный directory_id игнорируется.
         Guid storageDirectoryId = CloudHierarchyStorage.RootDirectoryId;
@@ -112,6 +116,7 @@ public class AttachFileCommandHandler : IRequestHandler<AttachFileCommand, Cloud
         };
 
         await _storage.AddFileEntry(entry, cancellationToken);
+        await treeLock.CommitAsync(cancellationToken);
 
         _logger.LogInformation(
             "Файл {FileId} привязан к директории {DirectoryId} как {EntryId} (Name: {Name}, Owner: {OwnerId})",
