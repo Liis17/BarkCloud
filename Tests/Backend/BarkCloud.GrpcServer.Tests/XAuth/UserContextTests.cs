@@ -38,4 +38,33 @@ public class UserContextTests
 
         sut.IssuedAt.Should().Be(DateTime.MinValue);
     }
+
+    [Fact]
+    public void SessionId_ReadFromSessionClaim()
+    {
+        var sut = Create(
+            new Claim(IdentityClaims.UserId, "42"),
+            new Claim(IdentityClaims.TokenType, "User"),
+            new Claim(IdentityClaims.SessionId, "17"));
+
+        sut.SessionId.Should().Be(17);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("not-a-number")]
+    public void SessionId_MissingOrInvalidClaim_IsNull(string? value)
+    {
+        var claims = new List<Claim>
+        {
+            new(IdentityClaims.UserId, "42"),
+            new(IdentityClaims.TokenType, "User")
+        };
+        if (value is not null)
+        {
+            claims.Add(new Claim(IdentityClaims.SessionId, value));
+        }
+
+        Create(claims.ToArray()).SessionId.Should().BeNull();
+    }
 }

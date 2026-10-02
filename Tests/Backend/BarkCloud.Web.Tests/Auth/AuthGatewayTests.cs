@@ -42,17 +42,24 @@ public class AuthGatewayTests
     }
 
     // User-JWT как у Identity (HS256, те же клеймы), но с управляемым iat.
-    private static string Jwt(long userId = 42, string deviceId = "d1", DateTime? issuedAt = null, string secret = Secret)
+    private static string Jwt(long userId = 42, string deviceId = "d1", DateTime? issuedAt = null, string secret = Secret,
+        long? sessionId = null)
     {
         var now = DateTime.UtcNow;
+        var claims = new List<Claim>
+        {
+            new(IdentityClaims.UserId, userId.ToString()),
+            new(IdentityClaims.TokenType, TokenType.User.ToString()),
+            new(IdentityClaims.DeviceId, deviceId)
+        };
+        if (sessionId.HasValue)
+        {
+            claims.Add(new Claim(IdentityClaims.SessionId, sessionId.Value.ToString()));
+        }
+
         var descriptor = new SecurityTokenDescriptor
         {
-            Subject = new ClaimsIdentity(new List<Claim>
-            {
-                new(IdentityClaims.UserId, userId.ToString()),
-                new(IdentityClaims.TokenType, TokenType.User.ToString()),
-                new(IdentityClaims.DeviceId, deviceId)
-            }),
+            Subject = new ClaimsIdentity(claims),
             IssuedAt = issuedAt ?? now.AddMinutes(-10),
             NotBefore = now.AddMinutes(-10),
             Expires = now.AddMinutes(50),
@@ -240,5 +247,22 @@ public class AuthGatewayTests
         var user = await CreateSut().AuthenticateAsync(http);
 
         user.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task AuthenticateAsync_SessionRevocation_RejectsOldSessionAndAcceptsNewOneIssuedBefore()
+    {
+        _revocations.Revoke(42, "d1", DateTime.UtcNow, DateTime.UtcNow.AddHours(1), maxSessionId: 5);
+        var oldSession = HttpWithCookies(Jwt(sessionId: 5));
+        var noSid = HttpWithCookies(Jwt());
+        // iat новой сессии не имеет значения: отзыв по сессии время не сравнивает.
+        var newSession = HttpWithCookies(Jwt(sessionId: 6, issuedAt: DateTime.UtcNow.AddMinutes(-30)));
+
+        (await CreateSut().AuthenticateAsync(oldSession)).Should().BeNull();
+        (await CreateSut().AuthenticateAsync(noSid)).Should().BeNull();
+        var user = await CreateSut().AuthenticateAsync(newSession);
+
+        user.Should().NotBeNull();
+        user!.SessionId.Should().Be(6);
     }
 }

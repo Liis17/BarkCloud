@@ -96,4 +96,69 @@ public class TokenRevocationCacheTests
         sut.IsRevoked(1, "d1", second).Should().BeTrue();
         sut.IsRevoked(1, "d1", second.AddSeconds(1)).Should().BeFalse();
     }
+
+    [Fact]
+    public void RevokeBySession_OldSessionAndTokenWithoutSidRevoked_NewSessionValidRegardlessOfTime()
+    {
+        var sut = new TokenRevocationCache();
+        var second = DateTimeOffset.FromUnixTimeSeconds(DateTimeOffset.UtcNow.ToUnixTimeSeconds()).UtcDateTime;
+        sut.Revoke(1, "d1", second.AddMilliseconds(100), second.AddHours(1), maxSessionId: 5);
+
+        // Новая сессия выдана в ту же секунду (одинаковый iat), но её sid больше порога.
+        sut.IsRevoked(1, "d1", second, sessionId: 5).Should().BeTrue();
+        sut.IsRevoked(1, "d1", second, sessionId: 4).Should().BeTrue();
+        sut.IsRevoked(1, "d1", second, sessionId: 6).Should().BeFalse();
+        sut.IsRevoked(1, "d1", second.AddHours(-1), sessionId: 6).Should().BeFalse("время при отзыве по сессии не применяется");
+        sut.IsRevoked(1, "d1", second.AddHours(1)).Should().BeTrue("токен без sid выдан до появления sid, т.е. раньше сброса");
+    }
+
+    [Fact]
+    public void RevokeBySession_DoesNotAffectOtherDevicesAndUsers()
+    {
+        var sut = new TokenRevocationCache();
+        sut.Revoke(1, "d1", DateTime.UtcNow, DateTime.UtcNow.AddHours(1), maxSessionId: 5);
+
+        sut.IsRevoked(1, "d2", DateTime.UtcNow, sessionId: 1).Should().BeFalse();
+        sut.IsRevoked(2, "d1", DateTime.UtcNow, sessionId: 1).Should().BeFalse();
+    }
+
+    [Fact]
+    public void RevokeBySessionThenByTime_ThresholdsAreIndependent()
+    {
+        var sut = new TokenRevocationCache();
+        var now = DateTime.UtcNow;
+        sut.Revoke(1, "d1", now.AddMinutes(-10), now.AddHours(1), maxSessionId: 5);
+        // Позже на устройстве выполнен logout: все токены, выданные до него, отозваны.
+        sut.Revoke(1, "d1", now, now.AddHours(1));
+
+        sut.IsRevoked(1, "d1", now.AddMinutes(-1), sessionId: 6).Should().BeTrue("выдан до logout");
+        sut.IsRevoked(1, "d1", now.AddMinutes(1), sessionId: 6).Should().BeFalse("новый вход после logout");
+        sut.IsRevoked(1, "d1", now.AddMinutes(1), sessionId: 5).Should().BeTrue("порог сессии сохранён");
+    }
+
+    [Fact]
+    public void RevokeBySession_OutOfOrderAndDuplicateRecords_KeepsMaximumThresholdAndExpiry()
+    {
+        var sut = new TokenRevocationCache();
+        var now = DateTime.UtcNow;
+        sut.Revoke(1, "d1", now, now.AddHours(2), maxSessionId: 9);
+        sut.Revoke(1, "d1", now, now.AddHours(1), maxSessionId: 5);
+        sut.Revoke(1, "d1", now, now.AddHours(2), maxSessionId: 9);
+
+        sut.IsRevoked(1, "d1", now, sessionId: 9).Should().BeTrue();
+        sut.IsRevoked(1, "d1", now, sessionId: 10).Should().BeFalse();
+    }
+
+    [Fact]
+    public void Cleanup_RemovesExpiredSessionRevocation()
+    {
+        var sut = new TokenRevocationCache();
+        sut.Revoke(1, "expired", DateTime.UtcNow, DateTime.UtcNow.AddSeconds(-1), maxSessionId: 5);
+        sut.Revoke(2, "live", DateTime.UtcNow, DateTime.UtcNow.AddHours(1), maxSessionId: 5);
+
+        sut.Cleanup();
+
+        sut.IsRevoked(1, "expired", DateTime.UtcNow, sessionId: 1).Should().BeFalse();
+        sut.IsRevoked(2, "live", DateTime.UtcNow, sessionId: 1).Should().BeTrue();
+    }
 }

@@ -64,7 +64,7 @@ public class RevocationSyncService(
     {
         foreach (var session in batch.Sessions)
         {
-            cache.Revoke(session.UserId, session.DeviceId, session.RevokedAt, session.ExpiresAt);
+            cache.Revoke(session.UserId, session.DeviceId, session.RevokedAt, session.ExpiresAt, session.MaxSessionId);
         }
 
         cache.Cleanup();

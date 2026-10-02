@@ -22,6 +22,11 @@ public class GrpcRevocationFeedTests
             UserId = 42, DeviceId = "d1", RevokedAt = Timestamp.FromDateTime(now.AddSeconds(-1)),
             ExpiresAt = Timestamp.FromDateTime(now.AddHours(1))
         });
+        response.Sessions.Add(new RevokedSession
+        {
+            UserId = 42, DeviceId = "d2", RevokedAt = Timestamp.FromDateTime(now.AddSeconds(-1)),
+            ExpiresAt = Timestamp.FromDateTime(now.AddHours(1)), MaxSessionId = 17
+        });
         var client = new Mock<SessionRevocationApi.SessionRevocationApiClient>();
         client.Setup(x => x.GetRevokedSessionsAsync(It.IsAny<GetRevokedSessionsRequest>(), null,
                 It.IsAny<DateTime?>(), cancellation.Token))
@@ -31,7 +36,9 @@ public class GrpcRevocationFeedTests
         var batch = await sut.FetchAsync(since, cancellation.Token);
 
         batch.ServerTime.Should().Be(now);
-        batch.Sessions.Should().Equal(new SessionRevocation(42, "d1", now.AddSeconds(-1), now.AddHours(1)));
+        batch.Sessions.Should().Equal(
+            new SessionRevocation(42, "d1", now.AddSeconds(-1), now.AddHours(1)),
+            new SessionRevocation(42, "d2", now.AddSeconds(-1), now.AddHours(1), 17));
         client.Verify(x => x.GetRevokedSessionsAsync(
             It.Is<GetRevokedSessionsRequest>(r => r.ChangedSince == null ? !since.HasValue : r.ChangedSince.ToDateTime() == since),
             null, It.Is<DateTime?>(d => d >= now && d <= DateTime.UtcNow.AddSeconds(10)), cancellation.Token), Times.Once);

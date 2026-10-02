@@ -11,6 +11,9 @@ public sealed class WebUser
 
     /// <summary>Момент выдачи access-токена (<c>iat</c>); по нему сверяется момент отзыва сессии.</summary>
     public DateTime IssuedAt { get; init; }
+
+    /// <summary>Идентификатор сессии (<c>x-session-id</c>); нет клейма — <c>null</c>.</summary>
+    public long? SessionId { get; init; }
 }
 
 public enum LoginOutcome

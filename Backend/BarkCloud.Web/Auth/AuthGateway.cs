@@ -229,7 +229,7 @@ public sealed class AuthGateway
     /// <summary>Сессия токена отозвана после его выдачи. Без DeviceId проверка пропускается — как в XAuth.</summary>
     private bool IsRevoked(WebUser user)
         => !string.IsNullOrEmpty(user.DeviceId)
-           && _revocations.IsRevoked(user.UserId, user.DeviceId, user.IssuedAt);
+           && _revocations.IsRevoked(user.UserId, user.DeviceId, user.IssuedAt, user.SessionId);
 
     private bool TryReadUser(string token, out WebUser? user, out bool expired)
     {
@@ -255,7 +255,10 @@ public sealed class AuthGateway
                 DeviceId = principal.FindFirst(IdentityClaims.DeviceId)?.Value,
                 AccessToken = token,
                 // Нет iat — MinValue (fail-safe: при отзыве такой токен считается отозванным)
-                IssuedAt = (validated as JwtSecurityToken)?.IssuedAt ?? DateTime.MinValue
+                IssuedAt = (validated as JwtSecurityToken)?.IssuedAt ?? DateTime.MinValue,
+                SessionId = long.TryParse(principal.FindFirst(IdentityClaims.SessionId)?.Value, out var sessionId)
+                    ? sessionId
+                    : null
             };
             return true;
         }

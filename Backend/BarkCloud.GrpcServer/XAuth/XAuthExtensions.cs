@@ -70,7 +70,10 @@ public static class XAuthExtensions
                                     ?? (context.SecurityToken as JwtSecurityToken)?.IssuedAt
                                     ?? DateTime.MinValue;
 
-                                if (cache.IsRevoked(userId, deviceId, issuedAt))
+                                long? sessionId = long.TryParse(
+                                    principal?.FindFirst(IdentityClaims.SessionId)?.Value, out var sid) ? sid : null;
+
+                                if (cache.IsRevoked(userId, deviceId, issuedAt, sessionId))
                                 {
                                     context.Fail("Session has been revoked");
                                 }

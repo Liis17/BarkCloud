@@ -24,4 +24,6 @@ message RevokedSession {
   string device_id = 2;
   google.protobuf.Timestamp revoked_at = 3;
   google.protobuf.Timestamp expires_at = 4;
+  // Задано — отзыв по сессии: отклоняются токены с sid <= значения (и без sid), revoked_at порог времени не задаёт.
+  optional int64 max_session_id = 5;
 }

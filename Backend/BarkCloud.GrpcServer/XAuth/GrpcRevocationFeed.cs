@@ -18,7 +18,8 @@ public class GrpcRevocationFeed(SessionRevocationApi.SessionRevocationApiClient 
             deadline: DateTime.UtcNow.AddSeconds(10), cancellationToken: cancellationToken);
         var response = await call.ResponseAsync;
         return new RevocationBatch(response.Sessions.Select(x => new SessionRevocation(
-            x.UserId, x.DeviceId, x.RevokedAt.ToDateTime(), x.ExpiresAt.ToDateTime())).ToList(),
+            x.UserId, x.DeviceId, x.RevokedAt.ToDateTime(), x.ExpiresAt.ToDateTime(),
+            x.HasMaxSessionId ? x.MaxSessionId : null)).ToList(),
             response.ServerTime.ToDateTime());
     }
 }
