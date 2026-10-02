@@ -167,6 +167,62 @@ public class RevocationSyncServiceTests
     }
 
     [Fact]
+    public async Task Loop_FullResyncRecoversRevocationCommittedAfterOverlap()
+    {
+        var clock = new TestClock();
+        clock.SetUtcNow(Now);
+        var feed = new CommitAwareFeed(clock);
+        var cache = new TokenRevocationCache();
+        using var sut = CreateSut(cache, feed, clock);
+        await sut.StartAsync(default);
+        await clock.NextDelay();
+        await Tick(clock, 2);
+
+        // Транзакция отзыва стартовала 2 минуты назад и закоммитилась только сейчас.
+        var revokedAt = clock.GetUtcNow().UtcDateTime.AddMinutes(-2);
+        feed.Commit(new SessionRevocation(42, "d1", revokedAt, revokedAt.AddHours(1)));
+        await Tick(clock, 9);
+
+        cache.IsRevoked(42, "d1", revokedAt.AddSeconds(-1)).Should().BeFalse("incremental-опрос пропускает запись старше overlap");
+        feed.Requests.Count(x => x is null).Should().Be(1);
+
+        await Tick(clock, 1);
+
+        cache.IsRevoked(42, "d1", revokedAt.AddSeconds(-1)).Should().BeTrue();
+        feed.Requests.Count(x => x is null).Should().Be(2);
+        await sut.StopAsync(default);
+    }
+
+    [Fact]
+    public async Task Loop_FailedFullResync_IsRetriedOnNextTick()
+    {
+        var feed = new Mock<IRevocationFeed>();
+        feed.SetupSequence(x => x.FetchAsync(null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new RevocationBatch([], Now))
+            .ThrowsAsync(new IOException("offline"))
+            .ReturnsAsync(new RevocationBatch([Revoked], Now));
+        feed.Setup(x => x.FetchAsync(It.Is<DateTime?>(since => since.HasValue), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new RevocationBatch([], Now));
+        var clock = new TestClock();
+        var cache = new TokenRevocationCache();
+        using var sut = CreateSut(cache, feed.Object, clock);
+        await sut.StartAsync(default);
+        await clock.NextDelay();
+
+        await Tick(clock, 11);
+        feed.Verify(x => x.FetchAsync(null, It.IsAny<CancellationToken>()), Times.Once);
+
+        await Tick(clock, 1);
+        feed.Verify(x => x.FetchAsync(null, It.IsAny<CancellationToken>()), Times.Exactly(2));
+        cache.IsRevoked(42, "d1", Now.AddMinutes(-1)).Should().BeFalse();
+
+        await Tick(clock, 1);
+        feed.Verify(x => x.FetchAsync(null, It.IsAny<CancellationToken>()), Times.Exactly(3));
+        cache.IsRevoked(42, "d1", Now.AddMinutes(-1)).Should().BeTrue();
+        await sut.StopAsync(default);
+    }
+
+    [Fact]
     public async Task TwoReplicas_ConvergeAndDelayedRevocationDoesNotRejectNewLogin()
     {
         IReadOnlyList<SessionRevocation> sessions = [];
@@ -210,6 +266,36 @@ public class RevocationSyncServiceTests
 
         cache.IsRevoked(1, "expired", Now.AddHours(-3)).Should().BeFalse();
         await sut.StopAsync(default);
+    }
+
+    // Каждый тик: сдвиг на интервал опроса и ожидание, пока цикл обработает ответ и снова встанет в ожидание.
+    private static async Task Tick(TestClock clock, int count)
+    {
+        for (var i = 0; i < count; i++)
+        {
+            clock.Advance(TimeSpan.FromSeconds(5));
+            await clock.NextDelay();
+        }
+    }
+
+    /// <summary>Повторяет фильтрацию <c>DbRevocationFeed</c>: видны только закоммиченные записи, incremental — по <c>RevokedAt</c>.</summary>
+    private sealed class CommitAwareFeed(TimeProvider clock) : IRevocationFeed
+    {
+        private readonly List<SessionRevocation> _committed = [];
+
+        public List<DateTime?> Requests { get; } = [];
+
+        public void Commit(SessionRevocation session) => _committed.Add(session);
+
+        public Task<RevocationBatch> FetchAsync(DateTime? changedSince, CancellationToken cancellationToken)
+        {
+            Requests.Add(changedSince);
+            var serverTime = clock.GetUtcNow().UtcDateTime;
+            var sessions = _committed
+                .Where(x => x.ExpiresAt > serverTime && (changedSince is null || x.RevokedAt >= changedSince))
+                .ToList();
+            return Task.FromResult(new RevocationBatch(sessions, serverTime));
+        }
     }
 
     private sealed class TestClock : FakeTimeProvider
