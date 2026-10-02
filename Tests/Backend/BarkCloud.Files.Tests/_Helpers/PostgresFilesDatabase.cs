@@ -1,6 +1,7 @@
 using BarkCloud.Files.Persistence;
 
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 
 using Npgsql;
 
@@ -72,8 +73,13 @@ public sealed class PostgresFilesDatabase : IAsyncDisposable
         }
     }
 
-    public FilesContext CreateContext() => new(
-        new DbContextOptionsBuilder<FilesContext>().UseNpgsql(_dataSource).Options);
+    public FilesContext CreateContext(params IInterceptor[] interceptors)
+    {
+        var options = new DbContextOptionsBuilder<FilesContext>().UseNpgsql(_dataSource);
+        if (interceptors.Length > 0)
+            options.AddInterceptors(interceptors);
+        return new FilesContext(options.Options);
+    }
 
     public async ValueTask DisposeAsync()
     {
