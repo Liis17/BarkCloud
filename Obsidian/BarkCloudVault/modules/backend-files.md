@@ -46,7 +46,7 @@ Web использует server-owned `UploadSession` и состояния `upl
 - `AlbumApiService.cs` — gRPC `AlbumApi` (альбомы)
 - `MusicApiService.cs` — gRPC `MusicApi`: список аудиотреков, temp-URL трека, CRUD плейлистов, ручной порядок, публичные ссылки и приватные гранты
 - `FilesController.cs` — HTTP-контроллер: V2 raw-part `PUT /file-upload/{sessionId}/parts/{partNumber}`, legacy upload и download
-- `LegacyUploadAdmissionFilter.cs` — resource-фильтр legacy `POST /upload/{uploadId:guid}`: допуск, потолок размера, бюджет и Kestrel-лимиты на запрос **до** чтения тела (F12); см. [[modules/upload-2]]
+- `LegacyUploadAdmissionFilter.cs` — resource-фильтр legacy `POST /upload/{uploadId:guid}`: допуск, потолок размера, бюджет и Kestrel-лимиты на запрос (минимальная скорость — только на HTTP/1.x) **до** чтения тела (F12); см. [[modules/upload-2]]
 
 ### Services
 - `ImageCompressor.cs` — сжатие изображений и генерация превью (на **SixLabors.ImageSharp**; HEIC/HEIF **не декодирует** — для них см. `HeicImageConverter`). `GenerateVideoPreviewsAsync` делает горизонтальный холст 16:9 для каждого размера (1024/512/128): размытый затемнённый cover-фон + исходный кадр, вписанный целиком поверх него; обычные фото- и квадратные аудио-превью используют отдельные методы

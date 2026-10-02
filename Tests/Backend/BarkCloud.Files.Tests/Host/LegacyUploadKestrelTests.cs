@@ -16,6 +16,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.AspNetCore.Mvc.ApplicationParts;
+using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -40,17 +41,20 @@ public class LegacyUploadKestrelTests : IAsyncLifetime
     };
     private WebApplication _app = null!;
     private HttpClient _client = null!;
+    private HttpClient _http2Client = null!;
     private long _bodyBytesRead;
 
     public async Task InitializeAsync()
     {
         var builder = WebApplication.CreateBuilder();
         builder.Logging.ClearProviders();
-        builder.WebHost.UseUrls("http://127.0.0.1:0");
+        // Как в проде: отдельные порты HTTP/1 (веб) и HTTP/2 (gRPC); MVC-контроллеры отдаются на обоих.
         builder.WebHost.ConfigureKestrel(o =>
         {
             o.Limits.MaxRequestBodySize = 32 * 1024 * 1024;
             o.Limits.MinRequestBodyDataRate = null;
+            o.Listen(IPAddress.Loopback, 0, l => l.Protocols = HttpProtocols.Http1);
+            o.Listen(IPAddress.Loopback, 0, l => l.Protocols = HttpProtocols.Http2);
         });
 
         _quota.Setup(x => x.GetSnapshotAsync(It.IsAny<long>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
@@ -102,14 +106,23 @@ public class LegacyUploadKestrelTests : IAsyncLifetime
         _app.MapControllers();
         await _app.StartAsync();
 
-        var address = _app.Services.GetRequiredService<IServer>()
-            .Features.Get<IServerAddressesFeature>()!.Addresses.Single();
-        _client = new HttpClient { BaseAddress = new Uri(address), Timeout = TimeSpan.FromSeconds(30) };
+        // Адреса идут в порядке Listen: HTTP/1, затем HTTP/2 (h2c с предварительным знанием).
+        var addresses = _app.Services.GetRequiredService<IServer>()
+            .Features.Get<IServerAddressesFeature>()!.Addresses.ToList();
+        _client = new HttpClient { BaseAddress = new Uri(addresses[0]), Timeout = TimeSpan.FromSeconds(30) };
+        _http2Client = new HttpClient
+        {
+            BaseAddress = new Uri(addresses[1]),
+            DefaultRequestVersion = HttpVersion.Version20,
+            DefaultVersionPolicy = HttpVersionPolicy.RequestVersionExact,
+            Timeout = TimeSpan.FromSeconds(30)
+        };
     }
 
     public async Task DisposeAsync()
     {
         _client.Dispose();
+        _http2Client.Dispose();
         await _app.DisposeAsync();
         _database.Dispose();
     }
@@ -189,6 +202,33 @@ public class LegacyUploadKestrelTests : IAsyncLifetime
     public async Task ValidUpload_ReachesHandlerAndReleasesBudget()
     {
         var fileId = await AddPlaceholderAsync();
+        SetupSuccessfulUpload(fileId);
+        using var content = Multipart(new ZeroStream(2048));
+
+        using var response = await _client.PostAsync($"/upload/{fileId}", content);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await response.Content.ReadAsStringAsync()).Should().Contain(fileId.ToString());
+        _app.Services.GetRequiredService<LegacyUploadBudget>().BufferedBytes.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task ValidUpload_OverHttp2_ReachesHandlerAndReleasesBudget()
+    {
+        var fileId = await AddPlaceholderAsync();
+        SetupSuccessfulUpload(fileId);
+        using var content = Multipart(new ZeroStream(2048));
+
+        using var response = await _http2Client.PostAsync($"/upload/{fileId}", content);
+
+        response.Version.Should().Be(HttpVersion.Version20);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await response.Content.ReadAsStringAsync()).Should().Contain(fileId.ToString());
+        _app.Services.GetRequiredService<LegacyUploadBudget>().BufferedBytes.Should().Be(0);
+    }
+
+    private void SetupSuccessfulUpload(Guid fileId)
+    {
         _mediator.Setup(x => x.Send(It.IsAny<UploadFileCommand>(), It.IsAny<CancellationToken>()))
             .Returns(async (UploadFileCommand command, CancellationToken _) =>
             {
@@ -201,13 +241,6 @@ public class LegacyUploadKestrelTests : IAsyncLifetime
                 await guard.MarkProcessingCompletedAsync(command.QuotaReservationId!.Value, CancellationToken.None);
                 return fileId.ToString();
             });
-        using var content = Multipart(new ZeroStream(2048));
-
-        using var response = await _client.PostAsync($"/upload/{fileId}", content);
-
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-        (await response.Content.ReadAsStringAsync()).Should().Contain(fileId.ToString());
-        _app.Services.GetRequiredService<LegacyUploadBudget>().BufferedBytes.Should().Be(0);
     }
 
     private sealed class CountingStream(Stream inner) : Stream

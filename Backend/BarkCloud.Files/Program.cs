@@ -33,7 +33,7 @@ public class Program
         // Тело запроса ограничено 32 МиБ (> 20 МиБ gRPC MaxReceiveMessageSize). Загрузки больше
         // задают свой лимит сами: part-PUT — [DisableRequestSizeLimit], legacy upload —
         // LegacyUploadAdmissionFilter. Минимальная скорость снята глобально (part-PUT на медленном
-        // канале иначе оборвётся); для legacy upload её выставляет фильтр на запрос.
+        // канале иначе оборвётся); для legacy upload её выставляет фильтр на запрос (только HTTP/1.x).
         builder.WebHost.ConfigureKestrel(o =>
         {
             o.Limits.MaxRequestBodySize = 32 * 1024 * 1024;
