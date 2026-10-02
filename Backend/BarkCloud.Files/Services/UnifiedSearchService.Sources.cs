@@ -1,6 +1,7 @@
 using System.Linq.Expressions;
 
 using BarkCloud.Files.Domain;
+using BarkCloud.Files.Persistence;
 using BarkCloud.Proto.Files;
 
 using Microsoft.EntityFrameworkCore;
@@ -324,7 +325,7 @@ public partial class UnifiedSearchService
 
         if (query.Wants(SearchHitKind.SharedFile))
         {
-            var rows = (from grant in _context.FileGrants.AsNoTracking()
+            var rows = (from grant in _context.FileGrants.AsNoTracking().WhereOwnerFileNotTrashed(_context)
                         join file in _context.UploadedFiles.AsNoTracking().WhereReady() on grant.FileId equals file.Id
                         where grant.RecipientId == recipientId
                         select new SharedFileRow { Grant = grant, File = file })

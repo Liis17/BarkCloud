@@ -60,12 +60,14 @@ public class GrantStorage : IGrantStorage
     /// <summary>
     /// Страница «мне доступны» получателя по (CreatedAt desc, Id desc) с cursor-пагинацией.
     /// Возвращает limit+1 элемент для определения наличия следующей страницы.
+    /// Файлы в корзине выдавшего владельца пропускаются (фильтр до LIMIT — страница остаётся полной).
     /// </summary>
     public async Task<List<FileGrant>> ListSharedWithMePage(
         long recipientId, DateTime? cursorCreatedAt, Guid? cursorGrantId, int limit, CancellationToken cancellationToken = default)
     {
         var query = _context.FileGrants
             .AsNoTracking()
+            .WhereOwnerFileNotTrashed(_context)
             .Where(x => x.RecipientId == recipientId);
 
         if (cursorCreatedAt.HasValue && cursorGrantId.HasValue)
