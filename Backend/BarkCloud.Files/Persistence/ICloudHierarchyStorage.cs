@@ -4,6 +4,7 @@ namespace BarkCloud.Files.Persistence;
 
 public interface ICloudHierarchyStorage
 {
+    Task<ICloudTreeLock> LockTree(long ownerId, CancellationToken cancellationToken = default);
     Task<CloudDirectory?> GetDirectory(Guid id, CancellationToken cancellationToken = default);
     Task<CloudDirectory?> GetDirectoryAsNoTracking(Guid id, CancellationToken cancellationToken = default);
     Task<bool> DirectoryNameExists(long ownerId, Guid? parentId, string name, CancellationToken cancellationToken = default);
