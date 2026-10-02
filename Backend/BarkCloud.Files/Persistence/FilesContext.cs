@@ -112,10 +112,15 @@ public class FilesContext : DbContext
         {
             // Уникальность имени папки в рамках одного владельца и одного родителя
             b.HasIndex(x => new { x.OwnerId, x.ParentId, x.Name }).IsUnique();
+            // NULL в ParentId не участвует в прежней уникальности — корень защищаем отдельно.
+            b.HasIndex(x => new { x.OwnerId, x.Name })
+                .IsUnique()
+                .HasFilter("\"ParentId\" IS NULL");
             // Быстрый листинг детей конкретной директории владельца
             b.HasIndex(x => new { x.OwnerId, x.ParentId });
-            // Быстрый поиск системной папки владельца по типу (авто-распределение загрузок).
+            // У владельца одна системная папка каждого типа, независимо от имени и родителя.
             b.HasIndex(x => new { x.OwnerId, x.SystemKind })
+                .IsUnique()
                 .HasFilter("\"SystemKind\" <> 0");
         });
 

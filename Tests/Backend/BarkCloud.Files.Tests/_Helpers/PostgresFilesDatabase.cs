@@ -2,6 +2,8 @@ using BarkCloud.Files.Persistence;
 
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 
 using Npgsql;
 
@@ -39,7 +41,7 @@ public sealed class PostgresFilesDatabase : IAsyncDisposable
             ? $"Для PostgreSQL-тестов задайте {ConnectionStringVariable}."
             : null;
 
-    public static async Task<PostgresFilesDatabase> CreateAsync()
+    public static async Task<PostgresFilesDatabase> CreateAsync(string? targetMigration = null)
     {
         var connectionString = Environment.GetEnvironmentVariable(ConnectionStringVariable);
         if (string.IsNullOrWhiteSpace(connectionString))
@@ -50,7 +52,7 @@ public sealed class PostgresFilesDatabase : IAsyncDisposable
             Database = "postgres",
             Pooling = false,
         }.ConnectionString;
-        var databaseName = $"barkcloud_files_f13_{Guid.NewGuid():N}";
+        var databaseName = $"barkcloud_files_test_{Guid.NewGuid():N}";
 
         await using (var connection = new NpgsqlConnection(adminConnectionString))
         {
@@ -63,7 +65,7 @@ public sealed class PostgresFilesDatabase : IAsyncDisposable
         try
         {
             await using var context = database.CreateContext();
-            await context.Database.MigrateAsync();
+            await context.GetService<IMigrator>().MigrateAsync(targetMigration);
             return database;
         }
         catch

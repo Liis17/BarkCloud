@@ -51,11 +51,30 @@ NextCloud-подобная иерархия папок и файловых за�
 
 - **Замок структуры.** `ICloudHierarchyStorage.LockTree(ownerId)` открывает транзакцию EF и на Npgsql берёт `pg_advisory_xact_lock(hashtextextended('cloud-tree:{ownerId}', 0))`. Ключ не совпадает с замком квоты (`StorageQuotaService`: `pg_advisory_xact_lock(ownerId)`), чтобы замки не мешали друг другу. На SQLite (юнит-тесты) берётся только транзакция. Возвращает `ICloudTreeLock` (`CommitAsync` + `DisposeAsync`; без коммита — откат и снятие замка).
 - **Где используется:** `MoveDirectory` и `DeleteDirectory`. Порядок строгий: замок → чтение папок (отслеживаемые сущности EF иначе останутся устаревшими) → проверки → запись → `CommitAsync`. Параллельные «A в B» и «B в A» выполняются по очереди: второй видит `A.ParentId == B` и получает `CircularMove`. Move внутрь удаляемого поддерева либо выполняется до удаления (папка уходит вместе с поддеревом), либо получает `DirectoryNotFound`.
-- **Вне замка:** `CreateDirectory`, `RenameDirectory`, `EnsureSystemDirectory` — они не могут создать цикл; уникальность имён корневых папок — отдельная находка F16.
+- **Вне замка:** `CreateDirectory`, `RenameDirectory`, `EnsureSystemDirectory` — они не могут создать цикл; уникальность имён и системных типов закреплена индексами F16 (см. ниже).
 - **Защита обходов от повреждённых данных:** `GetSubtree` пропускает уже посещённые папки (конечен и отдаёт каждую папку один раз, в том числе при самопетле); на нём держатся `DeleteDirectory`, `CreateArchive`, `ResolveFolderShare`, `RevokeFolderShare`, `FolderGrantAccessService`. Подъём по предкам в `MoveDirectory` при повторной папке отвечает `CircularMoveException`; в `GetPath` — `DirectoryTreeCorruptedException` ([[modules/shared-exceptions]]). `CreateArchive.RelativeDirPath` уже был ограничен счётчиком.
 - **Не сделано:** уже существующие циклы в БД не чинятся автоматически. Их можно посчитать запросом с рекурсивным CTE по `CloudDirectories`; цикл недостижим из корня, но виден по ID (поиск, гранты, публичные ссылки).
 
 Тесты: юнит — `CloudHierarchyStorageTests` (`GetSubtree` на цикле/самопетле), `GetPathCommandHandlerTests`, `MoveDirectoryCommandHandlerTests` (порядок замок → чтение → запись → коммит, цикл выше нового родителя), `DeleteDirectoryCommandHandlerTests`. Интеграционные на PostgreSQL — `Persistence/CloudTreeConcurrencyPostgresTests` (хелпер `_Helpers/PostgresFilesDatabase`, переменная `BARKCLOUD_TEST_POSTGRES`, без неё пропускаются): оба хендлера останавливаются на барьере после проверки и до записи; без `LockTree` оба теста падают. Для CI сервис PostgreSQL включён у Files в `tests.yml`, `backend-service-ci.yml`, `tests-backend-manual.yml`.
+
+## Уникальность папок (F16)
+
+`FilesContext` защищает папки тремя unique-индексами:
+- `(OwnerId, ParentId, Name)` — прежний индекс имён вложенных папок.
+- `IX_CloudDirectories_OwnerId_Name`: `(OwnerId, Name) WHERE ParentId IS NULL` — имена корневых папок. Отдельный индекс нужен, поскольку PostgreSQL считает NULL различными в прежнем составном ключе.
+- `IX_CloudDirectories_OwnerId_SystemKind`: `(OwnerId, SystemKind) WHERE SystemKind <> 0` — один системный тип на владельца независимо от имени и расположения; обычные папки с `None` исключены.
+
+`CloudHierarchyStorage.AddDirectory` и `UpdateDirectory` преобразуют только PostgreSQL `23505` двух индексов имён в прежний `DirectoryNameConflictException`. Неуспешная сущность отсоединяется, чтобы следующая запись не повторяла конфликт. Другие ошибки не маскируются. `UpdateDirectory` сохраняет изменения отслеживаемой папки (`GetDirectory`) без `Update(entity)`, поэтому устаревший снимок при переименовании/переносе не перезаписывает `SystemKind`.
+
+`EnsureSystemDirectory` идемпотентен при параллельных вызовах:
+- Сначала перечитывает папку по типу через `AsNoTracking`; переименованная/перемещённая системная папка сохраняет свой ID.
+- Обычная корневая папка с каноническим именем повышается через `PromoteSystemDirectory`: условный `ExecuteUpdate` проверяет ID, владельца, имя, `ParentId == null` и `SystemKind == None`. При изменении строки повторяется чтение. Во внешней транзакции для этой записи создаётся savepoint, при ошибке он откатывается и освобождается.
+- Другой системный тип с каноническим именем сохраняется; новая папка получает свободное имя через `UniqueNameResolver` (` (1)`, ` (2)`…). Если при пустом первом чтении обычная папка появилась конкурентно, пробуется исходное имя: конфликт корневого индекса приводит к повторному чтению и повышению, а не к лишнему суффиксу.
+- Конфликт вставки корневого/системного индекса откатывается `SaveChanges`; отсоединяется только проигравшая Added-сущность. Следующая итерация возвращает ID победителя или заново выбирает имя. Повторы учитывают отмену запроса; чужие unique-нарушения не повторяются.
+
+Миграция `20261002020415_EnforceUniqueCloudDirectories` в одной транзакции берёт `SHARE ROW EXCLUSIVE` на `CloudDirectories`, проверяет существующие дубли и только затем меняет индексы. При дублях выдаёт ошибку `F16` с владельцем, ключом и ID (до 20 групп каждого типа), полностью откатывается и **не меняет данные**. Оператор разрешает дубли отдельно, сохраняя нужные папки/ссылки; затем миграция повторяется. `Down` убирает корневой индекс и возвращает системному прежнюю неуникальность. При выкладке остановить записи всех реплик Files на время миграции; сервис применяет её при старте.
+
+Тесты: `CloudDirectoryUniquenessPostgresTests` (18 сценариев: создания, переименование/перенос ↔ создание, повышение ↔ создание во внешних транзакциях, запись тем же контекстом после конфликта, суффиксы, условное повышение, устаревший `SystemKind`, границы владельца/родителя и отмена); `CloudDirectoryMigrationPostgresTests` (4 сценария: оба вида старых дублей, ограничение диагностики, up/down/up с файлами/публичными ссылками/грантами). Хелпер `PostgresFilesDatabase.CreateAsync(targetMigration)` поддерживает старую схему, `CreateContext(interceptors)` — барьеры перед реальной записью; базы изолированы (`barkcloud_files_test_<guid>`). Проверено на PostgreSQL 18.6: 449 тестов Files, без ошибок/пропусков; EF `has-pending-model-changes` не обнаруживает расхождений. API/proto и регистр/нормализация имён не менялись.
 
 ## Host (gRPC)
 

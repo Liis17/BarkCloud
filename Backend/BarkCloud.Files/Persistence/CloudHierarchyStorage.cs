@@ -1,7 +1,11 @@
 using BarkCloud.Files.Domain;
+using BarkCloud.Files.Helpers;
+using BarkCloud.Shared.Exceptions.Files;
 
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
+
+using Npgsql;
 
 namespace BarkCloud.Files.Persistence;
 
@@ -88,9 +92,25 @@ public class CloudHierarchyStorage : ICloudHierarchyStorage
     public async Task<CloudDirectory> AddDirectory(CloudDirectory directory, CancellationToken cancellationToken = default)
     {
         _context.CloudDirectories.Add(directory);
-        await _context.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException error) when (error.InnerException is PostgresException postgres && IsDirectoryNameConflict(postgres))
+        {
+            _context.Entry(directory).State = EntityState.Detached;
+            throw new DirectoryNameConflictException();
+        }
         return directory;
     }
+
+    private static bool IsDirectoryNameConflict(PostgresException error) =>
+        error.SqlState == PostgresErrorCodes.UniqueViolation && error.ConstraintName is
+            "IX_CloudDirectories_OwnerId_Name" or "IX_CloudDirectories_OwnerId_ParentId_Name";
+
+    private static bool IsSystemDirectoryConflict(PostgresException error) =>
+        error.SqlState == PostgresErrorCodes.UniqueViolation && error.ConstraintName is
+            "IX_CloudDirectories_OwnerId_Name" or "IX_CloudDirectories_OwnerId_SystemKind";
 
     /// <summary>
     /// Возвращает id системной папки владельца указанного типа, создавая её при отсутствии.
@@ -99,43 +119,105 @@ public class CloudHierarchyStorage : ICloudHierarchyStorage
     /// </summary>
     public async Task<Guid> EnsureSystemDirectory(long ownerId, CloudDirectorySystemKind kind, string canonicalName, CancellationToken cancellationToken = default)
     {
-        var existing = await _context.CloudDirectories
-            .FirstOrDefaultAsync(x => x.OwnerId == ownerId && x.SystemKind == kind, cancellationToken);
-        if (existing is not null)
-            return existing.Id;
-
-        // Есть пользовательская папка с тем же именем в корне — повышаем её до системной,
-        // чтобы не упереться в уникальный индекс (OwnerId, ParentId, Name) и не плодить дубль.
-        var byName = await _context.CloudDirectories
-            .FirstOrDefaultAsync(x => x.OwnerId == ownerId && x.ParentId == null && x.Name == canonicalName, cancellationToken);
-        if (byName is not null)
+        while (true)
         {
-            byName.SystemKind = kind;
-            byName.UpdatedAt = DateTime.UtcNow;
-            await _context.SaveChangesAsync(cancellationToken);
-            return byName.Id;
+            cancellationToken.ThrowIfCancellationRequested();
+            var existing = await _context.CloudDirectories
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.OwnerId == ownerId && x.SystemKind == kind, cancellationToken);
+            if (existing is not null)
+                return existing.Id;
+
+            var byName = await _context.CloudDirectories
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.OwnerId == ownerId && x.ParentId == null && x.Name == canonicalName, cancellationToken);
+            if (byName?.SystemKind == CloudDirectorySystemKind.None)
+            {
+                try
+                {
+                    if (await PromoteSystemDirectory(byName.Id, ownerId, kind, canonicalName, cancellationToken) == 1)
+                        return byName.Id;
+                }
+                catch (PostgresException error) when (IsSystemDirectoryConflict(error))
+                {
+                    // Другой запрос уже создал папку этого типа — перечитаем победителя.
+                }
+                continue;
+            }
+
+            // Если имени ещё не было, пробуем именно его: конкурентное обычное создание
+            // должно привести к повторному чтению и повышению папки, а не к лишнему суффиксу.
+            var name = byName is null ? canonicalName : await UniqueNameResolver.ResolveAsync(canonicalName,
+                (candidate, ct) => DirectoryNameExists(ownerId, null, candidate, ct), cancellationToken);
+            var now = DateTime.UtcNow;
+            var directory = new CloudDirectory
+            {
+                Id = Guid.NewGuid(),
+                OwnerId = ownerId,
+                ParentId = null,
+                Name = name,
+                SystemKind = kind,
+                CreatedAt = now,
+                UpdatedAt = now
+            };
+            _context.CloudDirectories.Add(directory);
+            try
+            {
+                await _context.SaveChangesAsync(cancellationToken);
+                return directory.Id;
+            }
+            catch (DbUpdateException error) when (error.InnerException is PostgresException postgres && IsSystemDirectoryConflict(postgres))
+            {
+                // SaveChanges откатывает запись (и savepoint внешней транзакции), но EF всё ещё
+                // считает проигравшую сущность Added. Убираем только её перед повторным чтением.
+                _context.Entry(directory).State = EntityState.Detached;
+            }
         }
+    }
 
-        var now = DateTime.UtcNow;
-        var directory = new CloudDirectory
+    private async Task<int> PromoteSystemDirectory(Guid id, long ownerId, CloudDirectorySystemKind kind,
+        string canonicalName, CancellationToken cancellationToken)
+    {
+        var transaction = _context.Database.CurrentTransaction;
+        var savepoint = $"ensure_system_directory_{Guid.NewGuid():N}";
+        if (transaction is not null)
+            await transaction.CreateSavepointAsync(savepoint, cancellationToken);
+
+        try
         {
-            Id = Guid.NewGuid(),
-            OwnerId = ownerId,
-            ParentId = null,
-            Name = canonicalName,
-            SystemKind = kind,
-            CreatedAt = now,
-            UpdatedAt = now
-        };
-        _context.CloudDirectories.Add(directory);
-        await _context.SaveChangesAsync(cancellationToken);
-        return directory.Id;
+            // ExecuteUpdate не создаёт savepoint сам. Условие не даёт перезаписать тип
+            // или повысить папку, которую между чтением и записью переименовали/переместили.
+            return await _context.CloudDirectories
+                .Where(x => x.Id == id && x.OwnerId == ownerId && x.ParentId == null &&
+                    x.Name == canonicalName && x.SystemKind == CloudDirectorySystemKind.None)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(x => x.SystemKind, kind)
+                    .SetProperty(x => x.UpdatedAt, DateTime.UtcNow), cancellationToken);
+        }
+        catch
+        {
+            if (transaction is not null)
+                await transaction.RollbackToSavepointAsync(savepoint, CancellationToken.None);
+            throw;
+        }
+        finally
+        {
+            if (transaction is not null)
+                await transaction.ReleaseSavepointAsync(savepoint, CancellationToken.None);
+        }
     }
 
     public async Task UpdateDirectory(CloudDirectory directory, CancellationToken cancellationToken = default)
     {
-        _context.CloudDirectories.Update(directory);
-        await _context.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException error) when (error.InnerException is PostgresException postgres && IsDirectoryNameConflict(postgres))
+        {
+            _context.Entry(directory).State = EntityState.Detached;
+            throw new DirectoryNameConflictException();
+        }
     }
 
     public async Task<List<CloudDirectory>> ListSubdirectories(long ownerId, Guid? parentId, CancellationToken cancellationToken = default)

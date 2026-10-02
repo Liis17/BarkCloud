@@ -154,9 +154,14 @@ namespace BarkCloud.Files.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("OwnerId", "Name")
+                        .IsUnique()
+                        .HasFilter("\"ParentId\" IS NULL");
+
                     b.HasIndex("OwnerId", "ParentId");
 
                     b.HasIndex("OwnerId", "SystemKind")
+                        .IsUnique()
                         .HasFilter("\"SystemKind\" <> 0");
 
                     b.HasIndex("OwnerId", "ParentId", "Name")
