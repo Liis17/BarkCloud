@@ -26,23 +26,17 @@ public class UploadedFilesStorage : IUploadedFilesStorage
     public async Task UpdateFile(UploadFile file)
     {
         _context.UploadedFiles.Update(file);
+        // Владельцев меняют только атомарные операции (FileOwnership): список в устаревшем снимке
+        // файла затёр бы параллельно добавленных или снятых владельцев.
+        _context.Entry(file).Property(f => f.Uploaders).IsModified = false;
         await _context.SaveChangesAsync();
     }
 
     /// <summary>
-    /// Adds a user to the uploaders list if not already present.
+    /// Adds a user to the uploaders list if not already present (атомарно, см. <see cref="FileOwnership"/>).
     /// </summary>
-    public async Task AddUploaderToFile(Guid fileId, long userId)
-    {
-        var file = await _context.UploadedFiles.FirstOrDefaultAsync(x => x.Id == fileId);
-        if (file == null) return;
-
-        if (!file.Uploaders.Contains(userId))
-        {
-            file.Uploaders.Add(userId);
-            await _context.SaveChangesAsync();
-        }
-    }
+    public Task AddUploaderToFile(Guid fileId, long userId) =>
+        _context.AddUploaderAsync(fileId, userId);
 
     public async Task<UploadFile?> GetFile(Guid id)
     {
@@ -127,14 +121,8 @@ public class UploadedFilesStorage : IUploadedFilesStorage
     /// <summary>
     /// Снимает <paramref name="userId"/> из Uploaders файла (для декремента квоты).
     /// </summary>
-    public async Task RemoveUploaderFromFile(Guid fileId, long userId, CancellationToken cancellationToken = default)
-    {
-        var file = await _context.UploadedFiles.FirstOrDefaultAsync(x => x.Id == fileId, cancellationToken);
-        if (file is null) return;
-
-        if (file.Uploaders.Remove(userId))
-            await _context.SaveChangesAsync(cancellationToken);
-    }
+    public Task RemoveUploaderFromFile(Guid fileId, long userId, CancellationToken cancellationToken = default) =>
+        _context.RemoveUploaderAsync(fileId, userId, cancellationToken);
 
     /// <summary>
     /// Gets the total storage used by a specific user in bytes.
@@ -335,6 +323,8 @@ public class UploadedFilesStorage : IUploadedFilesStorage
     /// </summary>
     public async Task RemovePreviewsForOriginal(Guid originalFileId, long ownerId, CancellationToken cancellationToken = default)
     {
+        await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+
         var oldPreviews = await _context.FilePreviews
             .Where(p => p.OriginalFileId == originalFileId)
             .ToListAsync(cancellationToken);
@@ -342,28 +332,14 @@ public class UploadedFilesStorage : IUploadedFilesStorage
         if (oldPreviews.Count == 0)
             return;
 
-        var oldPreviewFileIds = oldPreviews.Select(p => p.PreviewFileId).ToList();
-        var oldPreviewFiles = await _context.UploadedFiles
-            .Where(f => oldPreviewFileIds.Contains(f.Id))
-            .ToListAsync(cancellationToken);
-
         // Превью дедуплицируются по SHA256 — один блоб может быть привязан к нескольким оригиналам.
         // Снимаем владельца только если у него не осталось другого оригинала на этот же превью-блоб,
         // иначе тот файл лишился бы превью (пустой Uploaders → блоб добьёт OrphanBlobCleanupService).
-        foreach (var pf in oldPreviewFiles)
-        {
-            var stillNeeded = await _context.FilePreviews
-                .AsNoTracking()
-                .AnyAsync(p => p.PreviewFileId == pf.Id
-                    && p.OriginalFileId != originalFileId
-                    && _context.UploadedFiles.Any(o => o.Id == p.OriginalFileId && o.Uploaders.Contains(ownerId)),
-                    cancellationToken);
-
-            if (!stillNeeded)
-                pf.Uploaders.Remove(ownerId);
-        }
+        await _context.ReleasePreviewOwnerAsync(
+            oldPreviews.Select(p => p.PreviewFileId).ToList(), ownerId, [originalFileId], cancellationToken);
 
         _context.FilePreviews.RemoveRange(oldPreviews);
         await _context.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
     }
 }

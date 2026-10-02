@@ -2,6 +2,8 @@ using BarkCloud.Files.Domain;
 using BarkCloud.Files.Persistence;
 using BarkCloud.Files.Tests._Helpers;
 
+using Microsoft.EntityFrameworkCore;
+
 namespace BarkCloud.Files.Tests.Persistence;
 
 public sealed class UploadedFilesStorageTests : IDisposable
@@ -132,6 +134,98 @@ public sealed class UploadedFilesStorageTests : IDisposable
 
         stats.Should().Be(new UserMediaStats(0, 0));
     }
+
+    [Fact]
+    public async Task AddUploaderToFile_AddsOwnerOnce_AndIgnoresUnknownFile()
+    {
+        var file = ReadyFile(1, MediaKind.Photo, 10);
+        _database.Context.UploadedFiles.Add(file);
+        await _database.Context.SaveChangesAsync();
+        var storage = new UploadedFilesStorage(_database.Context);
+
+        await storage.AddUploaderToFile(file.Id, 2);
+        await storage.AddUploaderToFile(file.Id, 2);
+        await storage.AddUploaderToFile(Guid.NewGuid(), 3);
+
+        (await StoredUploaders(file.Id)).Should().Equal(1, 2);
+    }
+
+    [Fact]
+    public async Task RemoveUploaderFromFile_RemovesOnlyThatOwner_AndIgnoresMissingOwner()
+    {
+        var file = ReadyFile(1, MediaKind.Photo, 10);
+        file.Uploaders.Add(2);
+        _database.Context.UploadedFiles.Add(file);
+        await _database.Context.SaveChangesAsync();
+        var storage = new UploadedFilesStorage(_database.Context);
+
+        await storage.RemoveUploaderFromFile(file.Id, 1);
+        await storage.RemoveUploaderFromFile(file.Id, 1);
+        await storage.RemoveUploaderFromFile(Guid.NewGuid(), 2);
+
+        (await StoredUploaders(file.Id)).Should().Equal(2);
+    }
+
+    [Fact]
+    public async Task UpdateFile_StaleSnapshot_DoesNotOverwriteUploaders()
+    {
+        var file = ReadyFile(1, MediaKind.Photo, 10);
+        _database.Context.UploadedFiles.Add(file);
+        await _database.Context.SaveChangesAsync();
+        _database.Context.ChangeTracker.Clear();
+        var storage = new UploadedFilesStorage(_database.Context);
+        var stale = (await storage.GetFile(file.Id))!;
+
+        // Пока у вызывающего на руках устаревший снимок, владельцев меняет другой запрос.
+        using (var other = _database.CreateAdditionalContext())
+            await new UploadedFilesStorage(other).AddUploaderToFile(file.Id, 2);
+        stale.Size = 99;
+        await storage.UpdateFile(stale);
+
+        _database.Context.ChangeTracker.Clear();
+        var stored = await _database.Context.UploadedFiles.SingleAsync(x => x.Id == file.Id);
+        stored.Size.Should().Be(99);
+        stored.Uploaders.Should().Equal(1, 2);
+    }
+
+    [Fact]
+    public async Task RemovePreviewsForOriginal_KeepsSharedPreviewOwner_AndReleasesPrivateOne()
+    {
+        const long ownerId = 1;
+        var video = ReadyFile(ownerId, MediaKind.Video, 10);
+        var otherVideo = ReadyFile(ownerId, MediaKind.Video, 10);
+        var shared = ReadyFile(ownerId, MediaKind.Photo, 1);
+        var privatePreview = ReadyFile(ownerId, MediaKind.Photo, 1);
+        _database.Context.UploadedFiles.AddRange(video, otherVideo, shared, privatePreview);
+        _database.Context.FilePreviews.AddRange(
+            Preview(video.Id, shared.Id, 128), Preview(otherVideo.Id, shared.Id, 128),
+            Preview(video.Id, privatePreview.Id, 512));
+        await _database.Context.SaveChangesAsync();
+
+        await new UploadedFilesStorage(_database.Context).RemovePreviewsForOriginal(video.Id, ownerId);
+
+        (await StoredUploaders(shared.Id)).Should().Equal(ownerId);
+        (await StoredUploaders(privatePreview.Id)).Should().BeEmpty();
+        (await _database.Context.FilePreviews.AsNoTracking().Select(x => x.OriginalFileId).ToListAsync())
+            .Should().OnlyContain(x => x == otherVideo.Id);
+    }
+
+    private async Task<List<long>> StoredUploaders(Guid fileId)
+    {
+        _database.Context.ChangeTracker.Clear();
+        return (await _database.Context.UploadedFiles.SingleAsync(x => x.Id == fileId)).Uploaders;
+    }
+
+    private static FilePreview Preview(Guid originalId, Guid previewId, int width) => new()
+    {
+        Id = Guid.NewGuid(),
+        OriginalFileId = originalId,
+        PreviewFileId = previewId,
+        TargetWidth = width,
+        ActualWidth = width,
+        ActualHeight = width,
+        CreatedAt = DateTime.UtcNow
+    };
 
     private static UploadFile ReadyFile(long ownerId, MediaKind kind, long size) => new()
     {
