@@ -7,6 +7,8 @@ using BarkCloud.Torrent.Host;
 using BarkCloud.Torrent.Persistence;
 using BarkCloud.Torrent.Tests._Helpers;
 
+using Grpc.Core;
+
 using Microsoft.Extensions.Configuration;
 
 namespace BarkCloud.Torrent.Tests.Host;
@@ -112,5 +114,26 @@ public class TorrentApiServiceTests : IAsyncLifetime
 
         _store.Verify(s => s.Remove(_entity), Times.Once);
         Engine.Get(_entity.Id).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task StreamProgress_SessionRevokedBySessionThreshold_ThrowsUnauthenticated()
+    {
+        var revocations = new TokenRevocationCache();
+        revocations.Revoke(UserId, "device-1", DateTime.UtcNow, DateTime.UtcNow.AddHours(1), maxSessionId: 5);
+        var service = new TorrentApiService(
+            UserContextFactory.Create(UserId, sessionId: 5),
+            revocations,
+            _store.Object,
+            Engine,
+            import: null!,
+            scopeFactory: null!,
+            new ConfigurationBuilder().Build(),
+            new MetricsCollector());
+
+        var act = () => service.StreamProgress(
+            new StreamProgressRequest(), Mock.Of<IServerStreamWriter<TorrentProgressSnapshot>>(), _context);
+
+        (await act.Should().ThrowAsync<RpcException>()).Which.StatusCode.Should().Be(StatusCode.Unauthenticated);
     }
 }

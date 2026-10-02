@@ -9,7 +9,7 @@ namespace BarkCloud.Torrent.Tests._Helpers;
 
 internal static class UserContextFactory
 {
-    public static UserContext Create(long userId)
+    public static UserContext Create(long userId, long? sessionId = null)
     {
         var claims = new List<Claim>
         {
@@ -17,6 +17,10 @@ internal static class UserContextFactory
             new(IdentityClaims.TokenType, TokenType.User.ToString()),
             new(IdentityClaims.DeviceId, "device-1"),
         };
+        if (sessionId.HasValue)
+        {
+            claims.Add(new(IdentityClaims.SessionId, sessionId.Value.ToString()));
+        }
 
         var accessor = new HttpContextAccessor
         {

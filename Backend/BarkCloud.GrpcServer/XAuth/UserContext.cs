@@ -17,6 +17,9 @@ public class UserContext
     /// (fail-safe: при отзыве сессии такой токен считается отозванным).</summary>
     public DateTime IssuedAt { get; } = DateTime.MinValue;
 
+    /// <summary>Идентификатор сессии (клейм <c>x-session-id</c>); нет клейма — <c>null</c>.</summary>
+    public long? SessionId { get; }
+
     public bool IsAuthenticated => UserId != 0 && TokenType != TokenType.Unknown;
 
     public UserContext(IHttpContextAccessor httpContextAccessor)
@@ -33,6 +36,11 @@ public class UserContext
             TokenType = type;
 
             DeviceId = principal.FindFirst(IdentityClaims.DeviceId)?.Value;
+
+            if (long.TryParse(principal.FindFirst(IdentityClaims.SessionId)?.Value, out var sessionId))
+            {
+                SessionId = sessionId;
+            }
 
             if (long.TryParse(principal.FindFirst(JwtRegisteredClaimNames.Iat)?.Value, out var iat))
             {

@@ -385,7 +385,7 @@ public class TorrentApiService : TorrentApi.TorrentApiBase
             // Аутентификация проверяется только при открытии вызова, поэтому отзыв сессии
             // (logout, удаление устройства) во время долгого стрима проверяем на каждой итерации.
             if (_userContext.DeviceId is { Length: > 0 } deviceId
-                && _revocations.IsRevoked(userId, deviceId, _userContext.IssuedAt))
+                && _revocations.IsRevoked(userId, deviceId, _userContext.IssuedAt, _userContext.SessionId))
             {
                 throw new RpcException(new Status(StatusCode.Unauthenticated, "Сессия отозвана"));
             }
