@@ -96,6 +96,7 @@ services:
     restart: always
     environment:
       <<: *common-variables
+      SMTP_ALLOW_INSECURE: "${SMTP_ALLOW_INSECURE:-false}"
     networks:
       - barkcloud-network
     depends_on:

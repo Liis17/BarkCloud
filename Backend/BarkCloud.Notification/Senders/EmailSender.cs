@@ -3,8 +3,11 @@ using BarkCloud.Notification.Helpers;
 using BarkCloud.Notification.Parsers;
 using BarkCloud.Shared.Queue.Notifications;
 
-using System.Net;
-using System.Net.Mail;
+using MailKit;
+using MailKit.Net.Smtp;
+using MailKit.Security;
+
+using MimeKit;
 
 namespace BarkCloud.Notification.Senders;
 
@@ -34,15 +37,9 @@ public class EmailSender
 
         try
         {
-            ServicePointManager.ServerCertificateValidationCallback =
-                (sender, certificate, chain, errors) => true;
-
-            using var smtpClient = new SmtpClient(_emailConfiguration.Host, _emailConfiguration.Port)
-            {
-                Credentials = new NetworkCredential(_emailConfiguration.SenderEmail, _emailConfiguration.SenderPassword),
-                EnableSsl = true,
-                DeliveryMethod = SmtpDeliveryMethod.Network
-            };
+            using var smtpClient = CreateSmtpClient();
+            if (_emailConfiguration.AllowInsecure)
+                smtpClient.ServerCertificateValidationCallback = (_, _, _, _) => true;
 
             _logger.LogDebug(
                 "Парсинг HTML шаблона для типа уведомления {NotificationType}",
@@ -51,12 +48,11 @@ public class EmailSender
 
             var body = await _templateParser.Parse(notification.Type, notification.Payload);
 
-            using var mailMessage = new MailMessage();
-            mailMessage.From = new MailAddress(_emailConfiguration.SenderEmail);
+            using var mailMessage = new MimeMessage();
+            mailMessage.From.Add(MailboxAddress.Parse(_emailConfiguration.SenderEmail));
             mailMessage.Subject = notification.Title;
-            mailMessage.Body = body;
-            mailMessage.IsBodyHtml = true;
-            mailMessage.To.Add(new MailAddress(notification.Address));
+            mailMessage.Body = new TextPart("html") { Text = body };
+            mailMessage.To.Add(MailboxAddress.Parse(notification.Address));
 
             _logger.LogDebug(
                 "Отправка email через SMTP сервер {Host}:{Port}",
@@ -64,14 +60,23 @@ public class EmailSender
                 _emailConfiguration.Port
             );
 
-            await smtpClient.SendMailAsync(mailMessage);
+            var socketOptions = _emailConfiguration.Port == 465
+                ? SecureSocketOptions.SslOnConnect
+                : _emailConfiguration.AllowInsecure
+                    ? SecureSocketOptions.StartTlsWhenAvailable
+                    : SecureSocketOptions.StartTls;
+            await smtpClient.ConnectAsync(_emailConfiguration.Host, _emailConfiguration.Port, socketOptions);
+            if (smtpClient.Capabilities.HasFlag(SmtpCapabilities.Authentication))
+                await smtpClient.AuthenticateAsync(_emailConfiguration.SenderEmail, _emailConfiguration.SenderPassword);
+            await smtpClient.SendAsync(mailMessage);
+            await smtpClient.DisconnectAsync(true);
 
             _logger.LogInformation(
                 "Email успешно отправлен на {Email}",
                 EmailMasker.Mask(notification.Address)
             );
         }
-        catch (SmtpException ex)
+        catch (SmtpCommandException ex)
         {
             _logger.LogError(
                 ex,
@@ -91,4 +96,6 @@ public class EmailSender
             throw;
         }
     }
+
+    protected virtual SmtpClient CreateSmtpClient() => new();
 }

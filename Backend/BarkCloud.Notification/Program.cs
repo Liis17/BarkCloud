@@ -15,6 +15,8 @@ public class Program
 {
     public static void Main(string[] args)
     {
+        var allowInsecure = EmailConfiguration.ParseAllowInsecure(
+            Environment.GetEnvironmentVariable("SMTP_ALLOW_INSECURE"));
         var builder = WebApplication.CreateBuilder(args);
 
         builder.LoadConfiguration(ServiceId.Notification);
@@ -23,6 +25,7 @@ public class Program
         builder.Services.AddBarkCloudMetrics("BarkCloud.Notification");
 
         builder.Services.AddSettings<EmailConfiguration>(builder.Configuration, "Email");
+        builder.Services.PostConfigure<EmailConfiguration>(settings => settings.AllowInsecure = allowInsecure);
         builder.Services.AddMassTransit(x =>
         {
             x.AddConsumer<EmailQueueConsumer>();
@@ -46,6 +49,8 @@ public class Program
         builder.Services.AddTransient<HtmlEmailTemplateParser>();
 
         var app = builder.Build();
+        if (allowInsecure)
+            app.Logger.LogWarning("SMTP_ALLOW_INSECURE=true: проверка сертификата SMTP отключена; разрешена отправка без TLS");
         app.UseRouting();
 
         app.Lifetime.ApplicationStopped.Register(Log.CloseAndFlush);
