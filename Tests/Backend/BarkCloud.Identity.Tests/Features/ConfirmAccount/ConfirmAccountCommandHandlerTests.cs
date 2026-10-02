@@ -11,8 +11,6 @@ using BarkCloud.Shared.Exceptions.Identity;
 using BarkCloud.Shared.Queue.Notifications;
 using BarkCloud.TestKit;
 
-using MassTransit;
-
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -23,24 +21,19 @@ public class ConfirmAccountCommandHandlerTests
     private readonly Mock<IConfirmationCodesStorage> _codes = new();
     private readonly Mock<UsersServerApi.UsersServerApiClient> _usersClient = new();
     private readonly Mock<IRefreshTokensStorage> _refreshTokens = new();
-    private readonly Mock<NotificationQueueSender> _notifications;
-    private readonly Mock<LocationClient> _location;
+    private readonly Mock<INotificationOutbox> _outbox = new();
     private readonly Mock<IAuthRateLimiter> _rateLimiter = new();
     private readonly MetricsCollector _metrics = new();
     private readonly ILogger<ConfirmAccountCommandHandler> _logger = NullLogger<ConfirmAccountCommandHandler>.Instance;
 
     public ConfirmAccountCommandHandlerTests()
     {
-        _notifications = new Mock<NotificationQueueSender>(Mock.Of<IPublishEndpoint>(), new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build());
-        _notifications.Setup(n => n.SendNotification(It.IsAny<Notification>())).Returns(Task.CompletedTask);
-        _location = new Mock<LocationClient>(new HttpClient(), new MetricsCollector(), NullLogger<LocationClient>.Instance);
-        _location.Setup(c => c.GetLocation(It.IsAny<string>())).ReturnsAsync((IpLocation?)null);
         _codes.Setup(s => s.TryReserveAttempt(It.IsAny<Guid>(), It.IsAny<int>())).ReturnsAsync(true);
     }
 
     private ConfirmAccountCommandHandler CreateSut(RequestContext? ctx = null, bool registrationEnabled = true) => new(
         _codes.Object, _usersClient.Object, _refreshTokens.Object, ctx ?? FullContext(),
-        _notifications.Object, _location.Object, _metrics, RegistrationPolicy(registrationEnabled), _rateLimiter.Object, _logger);
+        _outbox.Object, _metrics, RegistrationPolicy(registrationEnabled), _rateLimiter.Object, _logger);
 
     private static IRegistrationPolicy RegistrationPolicy(bool enabled)
     {
@@ -87,7 +80,8 @@ public class ConfirmAccountCommandHandlerTests
         _codes.Verify(s => s.GetCode(It.IsAny<Guid>()), Times.Never);
         _usersClient.Verify(c => c.ConfirmUserAsync(It.IsAny<ConfirmUserRequest>(), null, null, default), Times.Never);
         _refreshTokens.Verify(s => s.CreateNewRefreshToken(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<int>()), Times.Never);
-        _notifications.Verify(n => n.SendNotification(It.IsAny<Notification>()), Times.Never);
+        _outbox.Verify(o => o.EnqueueAsync(
+            It.IsAny<long>(), It.IsAny<NotificationType>(), It.IsAny<string>(), It.IsAny<Dictionary<string, string>>()), Times.Never);
     }
 
     [Fact]
@@ -161,16 +155,6 @@ public class ConfirmAccountCommandHandlerTests
         _usersClient
             .Setup(c => c.ConfirmUserAsync(It.IsAny<ConfirmUserRequest>(), null, null, default))
             .Returns(GrpcCallHelpers.AsyncUnary(new ConfirmUserResponse()));
-        _usersClient
-            .Setup(c => c.GetByIdAsync(It.IsAny<GetByIdRequest>(), null, null, default))
-            .Returns(GrpcCallHelpers.AsyncUnary(new GetByIdResponse { User = new User { Id = 42, Username = "u" } }));
-        _usersClient
-            .Setup(c => c.GetUserContactsAsync(It.IsAny<GetUserContactsRequest>(), null, null, default))
-            .Returns(GrpcCallHelpers.AsyncUnary(new GetUserContactsResponse
-            {
-                User = new User { Id = 42, Username = "u" },
-                Contact = new UserContact { Email = "u@e" }
-            }));
 
         var response = await CreateSut().Handle(
             new ConfirmAccountCommand { CodeId = codeId.ToString(), Code = "123456" },
@@ -183,6 +167,26 @@ public class ConfirmAccountCommandHandlerTests
         var snap = _metrics.SnapshotAndReset();
         snap.Should().ContainKey("accounts_confirmed");
         snap.Should().ContainKey("sessions_created");
+    }
+
+    [Fact]
+    public async Task Handle_HappyPath_QueuesRegistrationMailWithoutAskingUsersForContacts()
+    {
+        var codeId = Guid.NewGuid();
+        _codes.Setup(s => s.GetCode(codeId)).ReturnsAsync(ValidCode(codeId));
+        _usersClient
+            .Setup(c => c.ConfirmUserAsync(It.IsAny<ConfirmUserRequest>(), null, null, default))
+            .Returns(GrpcCallHelpers.AsyncUnary(new ConfirmUserResponse()));
+
+        await CreateSut().Handle(new ConfirmAccountCommand { CodeId = codeId.ToString(), Code = "123456" }, default);
+
+        // Контакты, геолокацию и отправку берёт на себя воркер outbox: подтверждение уже необратимо.
+        _outbox.Verify(o => o.EnqueueAsync(
+            42, NotificationType.SuccessfulRegistration, "Успешная регистрация",
+            It.Is<Dictionary<string, string>>(p => p["devicename"] == "Pixel")), Times.Once);
+        _usersClient.Verify(
+            c => c.GetUserContactsAsync(It.IsAny<GetUserContactsRequest>(), null, null, default), Times.Never);
+        _usersClient.Verify(c => c.GetByIdAsync(It.IsAny<GetByIdRequest>(), null, null, default), Times.Never);
     }
 
     private static ConfirmationCode ValidCode(Guid id) => new()

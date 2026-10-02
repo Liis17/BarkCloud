@@ -1,9 +1,6 @@
-using BarkCloud.Identity.Infrastructure;
 using BarkCloud.Identity.Persistence.Services;
 using BarkCloud.Identity.Services;
 using BarkCloud.Proto.Identity;
-using BarkCloud.Proto.Users;
-using BarkCloud.Shared.Identity;
 using BarkCloud.Shared.Queue.Notifications;
 
 using MediatR;
@@ -13,19 +10,16 @@ namespace BarkCloud.Identity.Features.ForceSetPasswordServer;
 public class ForceSetPasswordServerCommandHandler : IRequestHandler<ForceSetPasswordServerCommand, ForceSetPasswordServerResponse>
 {
     private readonly IPasswordsStorage _passwordsStorage;
-    private readonly NotificationQueueSender _notificationQueueSender;
-    private readonly UsersServerApi.UsersServerApiClient _usersClient;
+    private readonly INotificationOutbox _notificationOutbox;
     private readonly ILogger<ForceSetPasswordServerCommandHandler> _logger;
 
     public ForceSetPasswordServerCommandHandler(
         IPasswordsStorage passwordsStorage,
-        NotificationQueueSender notificationQueueSender,
-        UsersServerApi.UsersServerApiClient usersClient,
+        INotificationOutbox notificationOutbox,
         ILogger<ForceSetPasswordServerCommandHandler> logger)
     {
         _passwordsStorage = passwordsStorage;
-        _notificationQueueSender = notificationQueueSender;
-        _usersClient = usersClient;
+        _notificationOutbox = notificationOutbox;
         _logger = logger;
     }
 
@@ -38,37 +32,16 @@ public class ForceSetPasswordServerCommandHandler : IRequestHandler<ForceSetPass
 
         _logger.LogInformation("Пароль успешно изменён для пользователя {UserId} (admin)", request.UserId);
 
-        try
-        {
-            var userInfo = await _usersClient.GetByIdAsync(new GetByIdRequest { UserId = request.UserId });
-            var userContacts = await _usersClient.GetUserContactsAsync(new GetUserContactsRequest { UserId = request.UserId });
-
-            if (!string.IsNullOrEmpty(userContacts.Contact?.Email))
+        // Адрес и имя подберёт воркер outbox; нет адреса — письмо не отправляется.
+        await _notificationOutbox.EnqueueAsync(
+            request.UserId,
+            NotificationType.PasswordChangedByAdmin,
+            "Пароль изменён администратором",
+            new Dictionary<string, string>
             {
-                var notification = new EmailNotification
-                {
-                    OwnerId = request.UserId,
-                    Address = userContacts.Contact.Email,
-                    CreatedAt = DateTime.UtcNow,
-                    Payload = new Dictionary<string, string>
-                    {
-                        { "username", userInfo.User?.Username ?? string.Empty },
-                        { "adminusername", "AdminPanel" },
-                        { "datetime", DateTime.UtcNow.ToString("dd.MM.yyyy HH:mm:ss") }
-                    },
-                    ServiceId = ServiceId.Identity,
-                    Title = "Пароль изменён администратором",
-                    Type = NotificationType.PasswordChangedByAdmin
-                };
-
-                await _notificationQueueSender.SendNotification(notification);
-                _logger.LogInformation("Email-уведомление о смене пароля отправлено пользователю {UserId}", request.UserId);
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Не удалось отправить email-уведомление пользователю {UserId}", request.UserId);
-        }
+                { "adminusername", "AdminPanel" },
+                { "datetime", DateTime.UtcNow.ToString("dd.MM.yyyy HH:mm:ss") }
+            });
 
         return new ForceSetPasswordServerResponse();
     }
