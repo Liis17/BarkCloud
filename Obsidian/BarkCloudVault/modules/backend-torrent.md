@@ -18,7 +18,7 @@
 
 ## Устройство
 - `Program.cs` — `LoadConfiguration(ServiceId.Torrent)`, gRPC+XAuth+EF+MassTransit, http1 через `SetRunningAddress` (RunSettings:Http1Port).
-- `Infrastructure/TorrentEngineService` — singleton-обёртка `ClientEngine`, словарь Guid→`TorrentManager`, `AutoSaveLoadFastResume`.
+- `Infrastructure/TorrentEngineService` — singleton-обёртка `ClientEngine`, словарь Guid→`TorrentManager`, `AutoSaveLoadFastResume`. Pause/Resume/Remove одного торрента идут под его замком (`ManagedTorrent.Gate`) с повторной проверкой реестра после захвата. Запись реестра снимается **только после** успешного `Engine.RemoveAsync`: при сбое Stop/Remove торрент остаётся управляемым, повтор безопасен (повторный `Engine.RemoveAsync` для уже снятого менеджера не бросает и доудаляет файлы — проверено на MonoTorrent 3.0.2). Вызовы MonoTorrent вынесены в `protected virtual` (`Stop/Remove/Pause/StartManagerAsync`) — через них тесты имитируют отказы.
 - `Infrastructure/TorrentPersistenceService` — тик 5 c: трафик накопительно в БД (переживает рестарт), прогресс/статус/пиры.
 - `Infrastructure/TorrentStartupService` — восстановление торрентов из БД при старте (re-add + приоритеты файлов).
 - `Infrastructure/TorrentImportService` — импорт файла в облако: `FilesApi.GetUploadUrl` → POST на `cloud-files:{FILES_HTTP1PORT}/upload/{id}` → `CloudApi.AttachFile` (проброс JWT пользователя).
@@ -26,6 +26,8 @@
 - `Host/TorrentController` — http1 download (Range, проверка владельца).
 - `Consumers/UserDeletedConsumer` — чистит торренты и папку пользователя при удалении аккаунта.
 - Отзыв сессий — `GrpcRevocationFeed` из Identity, снимок до Kestrel и poll 5 с; HTTP/gRPC и `StreamProgress` продолжают проверять `TokenRevocationCache`. Прежний consumer удалён ([[modules/session-revocation]]).
+
+Порядок «движок → БД»: `PauseTorrent`/`ResumeTorrent` сначала вызывают движок и только потом сохраняют `Paused`; `RemoveTorrent` и `UserDeletedConsumer` удаляют строки БД и каталог лишь после успешного снятия торрентов с движка. Ошибка на любом шаге отдаётся клиенту, состояние остаётся «торрент жив», повтор сходится.
 
 Приоритет файла в `TorrentMapper` преобразуется явно между enum API (`Skip/Low/Normal/High`) и
 enum MonoTorrent (`DoNotDownload/Low/Normal/High`): их числовые значения не совпадают.

@@ -282,18 +282,19 @@ public class TorrentApiService : TorrentApi.TorrentApiBase
     public override async Task<TorrentEmpty> PauseTorrent(TorrentIdRequest request, ServerCallContext context)
     {
         var entity = await RequireOwned(request.Id);
+        // Сначала движок: при его сбое флаг в БД не меняется и вызов можно повторить.
+        await _engine.PauseAsync(entity.Id);
         entity.Paused = true;
         await _store.SaveChanges();
-        await _engine.PauseAsync(entity.Id);
         return new TorrentEmpty();
     }
 
     public override async Task<TorrentEmpty> ResumeTorrent(TorrentIdRequest request, ServerCallContext context)
     {
         var entity = await RequireOwned(request.Id);
+        await _engine.ResumeAsync(entity.Id);
         entity.Paused = false;
         await _store.SaveChanges();
-        await _engine.ResumeAsync(entity.Id);
         return new TorrentEmpty();
     }
 

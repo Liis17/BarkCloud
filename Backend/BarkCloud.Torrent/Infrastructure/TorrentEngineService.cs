@@ -30,6 +30,8 @@ public class TorrentEngineService : IAsyncDisposable
         // Для накопления суммарного трафика поверх сессионных счётчиков движка (переживают рестарт в БД).
         public long LastSessionDownloaded;
         public long LastSessionUploaded;
+        // Сериализует Pause/Resume/Remove одного торрента.
+        internal readonly SemaphoreSlim Gate = new(1, 1);
     }
 
     public Task InitializeAsync(string cacheDirectory, int peerPort)
@@ -119,28 +121,53 @@ public class TorrentEngineService : IAsyncDisposable
         return managed;
     }
 
-    public async Task PauseAsync(Guid id)
-    {
-        if (_managed.TryGetValue(id, out var m))
-            await m.Manager.PauseAsync();
-    }
+    public Task PauseAsync(Guid id) => RunExclusiveAsync(id, m => PauseManagerAsync(m.Manager));
 
-    public async Task ResumeAsync(Guid id)
-    {
-        if (_managed.TryGetValue(id, out var m))
-            await m.Manager.StartAsync();
-    }
+    public Task ResumeAsync(Guid id) => RunExclusiveAsync(id, m => StartManagerAsync(m.Manager));
 
-    public async Task RemoveAsync(Guid id, bool deleteData)
+    /// <summary>
+    /// Запись в реестре снимается только после успешного удаления из движка: при сбое торрент
+    /// остаётся управляемым и вызов можно повторить. Торрента нет в реестре — no-op.
+    /// </summary>
+    public Task RemoveAsync(Guid id, bool deleteData) => RunExclusiveAsync(id, async m =>
     {
-        if (!_managed.TryRemove(id, out var m))
+        await StopManagerAsync(m.Manager);
+
+        // Сбой удаления файлов случается уже после снятия менеджера с движка. Повторный вызов
+        // для снятого менеджера не бросает и доудаляет данные, поэтому повтор безопасен.
+        var mode = deleteData ? RemoveMode.CacheDataAndDownloadedData : RemoveMode.CacheDataOnly;
+        await RemoveManagerAsync(m.Manager, mode);
+
+        _managed.TryRemove(new KeyValuePair<Guid, ManagedTorrent>(id, m));
+    });
+
+    protected virtual Task PauseManagerAsync(TorrentManager manager) => manager.PauseAsync();
+
+    protected virtual Task StartManagerAsync(TorrentManager manager) => manager.StartAsync();
+
+    protected virtual Task StopManagerAsync(TorrentManager manager) =>
+        manager.State is TorrentState.Stopped or TorrentState.Error ? Task.CompletedTask : manager.StopAsync();
+
+    protected virtual Task RemoveManagerAsync(TorrentManager manager, RemoveMode mode) => Engine.RemoveAsync(manager, mode);
+
+    private async Task RunExclusiveAsync(Guid id, Func<ManagedTorrent, Task> operation)
+    {
+        if (!_managed.TryGetValue(id, out var m))
             return;
 
-        if (m.Manager.State != TorrentState.Stopped && m.Manager.State != TorrentState.Error)
-            await m.Manager.StopAsync();
+        await m.Gate.WaitAsync();
+        try
+        {
+            // Параллельное удаление могло завершиться, пока ждали замок.
+            if (!_managed.TryGetValue(id, out var current) || !ReferenceEquals(current, m))
+                return;
 
-        var mode = deleteData ? RemoveMode.CacheDataAndDownloadedData : RemoveMode.CacheDataOnly;
-        await Engine.RemoveAsync(m.Manager, mode);
+            await operation(m);
+        }
+        finally
+        {
+            m.Gate.Release();
+        }
     }
 
     public async Task SetFilePriorityAsync(Guid id, int fileIndex, Priority priority)
