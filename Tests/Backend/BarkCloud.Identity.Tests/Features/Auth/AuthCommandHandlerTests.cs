@@ -2,7 +2,6 @@ using BarkCloud.GrpcServer.Metrics;
 using BarkCloud.GrpcServer.Tracker;
 using BarkCloud.Identity.Domain;
 using BarkCloud.Identity.Features.Auth;
-using BarkCloud.Identity.Features.CreateToken;
 using BarkCloud.Identity.Infrastructure;
 using BarkCloud.Identity.Persistence.Services;
 using BarkCloud.Identity.Services;
@@ -14,8 +13,6 @@ using BarkCloud.TestKit;
 
 using MassTransit;
 
-using MediatR;
-
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -26,10 +23,10 @@ public class AuthCommandHandlerTests
     private static readonly string PasswordHash = BCrypt.Net.BCrypt.HashPassword("p");
 
     private readonly Mock<UsersServerApi.UsersServerApiClient> _usersClient = new();
-    private readonly Mock<IMediator> _mediator = new();
     private readonly Mock<IAuthPropertiesStorage> _authProps = new();
     private readonly Mock<NotificationQueueSender> _notifications;
-    private readonly Mock<IRefreshTokensStorage> _refreshTokens = new();
+    private readonly Mock<INotificationOutbox> _outbox = new();
+    private readonly Mock<SessionIssuer> _sessions;
     private readonly Mock<IPasswordsStorage> _passwords = new();
     private readonly Mock<LocationClient> _location;
     private readonly Mock<IAuthRateLimiter> _rateLimiter = new();
@@ -47,13 +44,24 @@ public class AuthCommandHandlerTests
             NullLogger<LocationClient>.Instance);
         _location.Setup(c => c.GetLocation(It.IsAny<string>())).ReturnsAsync((IpLocation?)null);
 
+        _sessions = new Mock<SessionIssuer>(
+            Mock.Of<UsersServerApi.UsersServerApiClient>(), Mock.Of<MediatR.IMediator>(), _outbox.Object,
+            Mock.Of<Identity.Persistence.Services.IRefreshTokensStorage>(), new RequestContext(), _location.Object,
+            _metrics, NullLogger<SessionIssuer>.Instance);
+        _sessions.Setup(s => s.IssueAsync(It.IsAny<long>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new AuthResponse
+            {
+                AccessToken = new Token { Value = "access" },
+                RefreshToken = new Token { Value = "refresh" }
+            });
+
         // По умолчанию лимиты не сработали; отдельные тесты переопределяют нужную политику.
         _rateLimiter.Setup(l => l.TryReserveAsync(It.IsAny<AuthLimits.Policy>(), It.IsAny<string>())).ReturnsAsync(true);
     }
 
     private AuthCommandHandler CreateSut(RequestContext? ctx = null) => new(
-        _usersClient.Object, _mediator.Object, _authProps.Object, _notifications.Object,
-        _refreshTokens.Object, ctx ?? FullContext(), _passwords.Object, _location.Object, _metrics, _rateLimiter.Object, _logger);
+        _usersClient.Object, _authProps.Object, _notifications.Object, _outbox.Object, _sessions.Object,
+        ctx ?? FullContext(), _passwords.Object, _location.Object, _metrics, _rateLimiter.Object, _logger);
 
     private static RequestContext FullContext(string? sourceIp = null) => new()
     {
@@ -228,9 +236,7 @@ public class AuthCommandHandlerTests
             new AuthCommand { Username = "u", Password = "p", OtpCode = "123456" }, default);
 
         await act.Should().ThrowAsync<NotValidOtpCodeException>();
-        _refreshTokens.Verify(
-            s => s.CreateNewRefreshToken(It.IsAny<string>(), It.IsAny<long>(), It.IsAny<string>(), It.IsAny<int>()),
-            Times.Never);
+        _sessions.Verify(s => s.IssueAsync(It.IsAny<long>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -246,9 +252,7 @@ public class AuthCommandHandlerTests
 
         response.AccessToken.Value.Should().Be("access");
         _authProps.Verify(s => s.TryConsumeEmailAuthCode(1, EmailAuthCodePurpose.Login, "123456"), Times.Once);
-        _refreshTokens.Verify(
-            s => s.CreateNewRefreshToken(It.IsAny<string>(), 1, "device-1", It.IsAny<int>()),
-            Times.Once);
+        _sessions.Verify(s => s.IssueAsync(1, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     /// <summary>Пользователь с паролем "p" и всем необходимым для успешного входа.</summary>
@@ -264,16 +268,9 @@ public class AuthCommandHandlerTests
                 User = new User { Id = id, Username = "u" },
                 Contact = new UserContact { Email = "u@e" }
             }));
-        _usersClient
-            .Setup(c => c.RegisterDeviceAsync(It.IsAny<RegisterDeviceRequest>(), null, null, default))
-            .Returns(GrpcCallHelpers.AsyncUnary(new RegisterDeviceResponse()));
 
         _authProps.Setup(s => s.GetUserAuthProperties(id)).ReturnsAsync(props);
         _passwords.Setup(s => s.GetUserPasswordHash(id)).ReturnsAsync(PasswordHash);
-
-        _mediator
-            .Setup(m => m.Send(It.IsAny<CreateTokenCommand>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new CreateTokenResponse { AccessToken = new Token { Value = "access" } });
     }
 
     [Fact]
@@ -302,45 +299,41 @@ public class AuthCommandHandlerTests
     }
 
     [Fact]
-    public async Task Handle_HappyPath_ReturnsRefreshAndAccessTokens()
+    public async Task Handle_HappyPath_ReturnsTokensFromSharedSessionIssuer()
     {
-        _usersClient
-            .Setup(c => c.FindByLoginAsync(It.IsAny<FindByLoginRequest>(), null, null, default))
-            .Returns(GrpcCallHelpers.AsyncUnary(new FindByLoginResponse
-            {
-                User = new User { Id = 42, Username = "u" }
-            }));
-        _usersClient
-            .Setup(c => c.GetUserContactsAsync(It.IsAny<GetUserContactsRequest>(), null, null, default))
-            .Returns(GrpcCallHelpers.AsyncUnary(new GetUserContactsResponse
-            {
-                User = new User { Id = 42, Username = "u" },
-                Contact = new UserContact { Email = "u@e" }
-            }));
-        _usersClient
-            .Setup(c => c.RegisterDeviceAsync(It.IsAny<RegisterDeviceRequest>(), null, null, default))
-            .Returns(GrpcCallHelpers.AsyncUnary(new RegisterDeviceResponse()));
+        SetupUser(42, null);
+        using var cts = new CancellationTokenSource();
 
-        _authProps.Setup(s => s.GetUserAuthProperties(42)).ReturnsAsync((AuthUserProperty?)null);
-        _passwords.Setup(s => s.GetUserPasswordHash(42))
-            .ReturnsAsync(BCrypt.Net.BCrypt.HashPassword("right"));
-
-        _mediator
-            .Setup(m => m.Send(It.IsAny<CreateTokenCommand>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new CreateTokenResponse
-            {
-                AccessToken = new Token { Value = "access" }
-            });
-
-        var response = await CreateSut().Handle(new AuthCommand { Username = "u", Password = "right" }, default);
+        var response = await CreateSut().Handle(new AuthCommand { Username = "u", Password = "p" }, cts.Token);
 
         response.AccessToken.Value.Should().Be("access");
-        response.RefreshToken.Value.Should().NotBeNullOrWhiteSpace();
-        _refreshTokens.Verify(s => s.DeleteRefreshTokensByDeviceIdSafe("device-1", 42), Times.Once);
-        _refreshTokens.Verify(
-            s => s.CreateNewRefreshToken(It.IsAny<string>(), 42, "device-1", It.IsAny<int>()),
-            Times.Once);
-        _notifications.Verify(n => n.SendNotification(It.IsAny<EmailNotification>()), Times.AtLeastOnce);
+        response.RefreshToken.Value.Should().Be("refresh");
+        _sessions.Verify(s => s.IssueAsync(42, cts.Token), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_HappyPath_DoesNotSendLoginMailItself()
+    {
+        SetupUser(42, null);
+
+        await CreateSut().Handle(new AuthCommand { Username = "u", Password = "p" }, default);
+
+        // Письмо о входе ставит в очередь SessionIssuer, а не синхронная отправка из хендлера.
+        _notifications.Verify(n => n.SendNotification(It.IsAny<Notification>()), Times.Never);
+        _usersClient.Verify(
+            c => c.GetUserContactsAsync(It.IsAny<GetUserContactsRequest>(), null, null, default), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_SessionIssuerFails_PropagatesException()
+    {
+        SetupUser(42, null);
+        _sessions.Setup(s => s.IssueAsync(It.IsAny<long>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("db down"));
+
+        var act = () => CreateSut().Handle(new AuthCommand { Username = "u", Password = "p" }, default);
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
     }
 
     // ───────── F14: лимиты попыток ─────────
@@ -438,8 +431,23 @@ public class AuthCommandHandlerTests
         var act = () => CreateSut().Handle(new AuthCommand { Username = "u", Password = "wrong" }, default);
 
         await act.Should().ThrowAsync<InvalidLoginOrPasswordException>();
-        _notifications.Verify(
-            n => n.SendNotification(It.Is<EmailNotification>(e => e.Type == NotificationType.FailedLogin)), Times.Once);
+        _outbox.Verify(o => o.EnqueueAsync(
+            1, NotificationType.FailedLogin, "Неуспешная попытка входа в аккаунт",
+            It.Is<Dictionary<string, string>>(p => p["devicename"] == "Pixel" && p["os"] == "Android 14")), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_WrongPassword_FailedLoginMailDoesNotTouchUsersOrLocation()
+    {
+        SetupUser(1, null);
+
+        var act = () => CreateSut().Handle(new AuthCommand { Username = "u", Password = "wrong" }, default);
+
+        await act.Should().ThrowAsync<InvalidLoginOrPasswordException>();
+        _notifications.Verify(n => n.SendNotification(It.IsAny<Notification>()), Times.Never);
+        _usersClient.Verify(
+            c => c.GetUserContactsAsync(It.IsAny<GetUserContactsRequest>(), null, null, default), Times.Never);
+        _location.Verify(c => c.GetLocation(It.IsAny<string>()), Times.Never);
     }
 
     [Fact]
@@ -451,7 +459,8 @@ public class AuthCommandHandlerTests
         var act = () => CreateSut().Handle(new AuthCommand { Username = "u", Password = "wrong" }, default);
 
         await act.Should().ThrowAsync<InvalidLoginOrPasswordException>();
-        _notifications.Verify(n => n.SendNotification(It.IsAny<Notification>()), Times.Never);
+        _outbox.Verify(o => o.EnqueueAsync(
+            It.IsAny<long>(), It.IsAny<NotificationType>(), It.IsAny<string>(), It.IsAny<Dictionary<string, string>>()), Times.Never);
         _usersClient.Verify(
             c => c.GetUserContactsAsync(It.IsAny<GetUserContactsRequest>(), null, null, default), Times.Never);
         _location.Verify(c => c.GetLocation(It.IsAny<string>()), Times.Never);

@@ -1,16 +1,13 @@
 using BarkCloud.GrpcServer.Metrics;
+using BarkCloud.GrpcServer.Tracker;
 using BarkCloud.Identity.Features.CreateSessionForUserServer;
-using BarkCloud.Identity.Features.CreateToken;
 using BarkCloud.Identity.Infrastructure;
 using BarkCloud.Identity.Persistence.Services;
+using BarkCloud.Identity.Services;
 using BarkCloud.Proto.Identity;
 using BarkCloud.Proto.Users;
-using BarkCloud.Shared.Queue.Notifications;
-using BarkCloud.TestKit;
 
 using Grpc.Core;
-
-using MassTransit;
 
 using MediatR;
 
@@ -20,44 +17,27 @@ namespace BarkCloud.Identity.Tests.Features.CreateSessionForUserServer;
 
 public class CreateSessionForUserServerCommandHandlerTests
 {
-    private readonly Mock<UsersServerApi.UsersServerApiClient> _usersClient = new();
-    private readonly Mock<IMediator> _mediator = new();
-    private readonly Mock<NotificationQueueSender> _notifications;
-    private readonly Mock<IRefreshTokensStorage> _refreshTokens = new();
-    private readonly Mock<LocationClient> _location;
+    private readonly Mock<SessionIssuer> _sessions;
     private readonly MetricsCollector _metrics = new();
 
     public CreateSessionForUserServerCommandHandlerTests()
     {
-        _notifications = new Mock<NotificationQueueSender>(Mock.Of<IPublishEndpoint>(), new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build());
-        _notifications.Setup(n => n.SendNotification(It.IsAny<Notification>())).Returns(Task.CompletedTask);
-
-        _location = new Mock<LocationClient>(new HttpClient(), new MetricsCollector(), NullLogger<LocationClient>.Instance);
-        _location.Setup(c => c.GetLocation(It.IsAny<string>())).ReturnsAsync((IpLocation?)null);
-
-        _mediator.Setup(m => m.Send(It.IsAny<CreateTokenCommand>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new CreateTokenResponse { AccessToken = new Token { Value = "at" } });
-
-        _usersClient
-            .Setup(c => c.RegisterDeviceAsync(It.IsAny<RegisterDeviceRequest>(), null, null, default))
-            .Returns(GrpcCallHelpers.AsyncUnary(new RegisterDeviceResponse()));
-        _usersClient
-            .Setup(c => c.GetUserContactsAsync(It.IsAny<GetUserContactsRequest>(), null, null, default))
-            .Returns(GrpcCallHelpers.AsyncUnary(new GetUserContactsResponse
+        _sessions = new Mock<SessionIssuer>(
+            Mock.Of<UsersServerApi.UsersServerApiClient>(), Mock.Of<IMediator>(), Mock.Of<INotificationOutbox>(),
+            Mock.Of<IRefreshTokensStorage>(), new RequestContext(),
+            new Mock<LocationClient>(new HttpClient(), new MetricsCollector(), NullLogger<LocationClient>.Instance).Object,
+            _metrics, NullLogger<SessionIssuer>.Instance);
+        _sessions
+            .Setup(s => s.IssueAsync(It.IsAny<long>(), It.IsAny<SessionDevice>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new AuthResponse
             {
-                User = new User { Id = 7, Username = "barker" },
-                Contact = new UserContact { Email = "u@e" }
-            }));
+                AccessToken = new Token { Value = "at" },
+                RefreshToken = new Token { Value = "rt" }
+            });
     }
 
     private CreateSessionForUserServerCommandHandler CreateSut() => new(
-        _usersClient.Object,
-        _mediator.Object,
-        _notifications.Object,
-        _refreshTokens.Object,
-        _location.Object,
-        _metrics,
-        NullLogger<CreateSessionForUserServerCommandHandler>.Instance);
+        _sessions.Object, _metrics, NullLogger<CreateSessionForUserServerCommandHandler>.Instance);
 
     private static CreateSessionForUserServerCommand ValidCommand() => new()
     {
@@ -81,33 +61,28 @@ public class CreateSessionForUserServerCommandHandlerTests
         }, default);
 
         await act.Should().ThrowAsync<RpcException>();
-        _refreshTokens.Verify(s => s.CreateNewRefreshToken(
-            It.IsAny<string>(), It.IsAny<long>(), It.IsAny<string>(), It.IsAny<int>()), Times.Never);
+        _sessions.Verify(
+            s => s.IssueAsync(It.IsAny<long>(), It.IsAny<SessionDevice>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
-    public async Task Handle_ValidRequest_CreatesSessionAndReturnsTokens()
+    public async Task Handle_ValidRequest_IssuesSessionForRequestedDeviceAndReturnsTokens()
     {
-        var response = await CreateSut().Handle(ValidCommand(), default);
+        using var cts = new CancellationTokenSource();
+
+        var response = await CreateSut().Handle(ValidCommand(), cts.Token);
 
         response.AccessToken.Value.Should().Be("at");
-        response.RefreshToken.Value.Should().NotBeNullOrEmpty();
-        _refreshTokens.Verify(s => s.DeleteRefreshTokensByDeviceIdSafe("d1", 7), Times.Once);
-        _refreshTokens.Verify(s => s.CreateNewRefreshToken(It.IsAny<string>(), 7, "d1", It.IsAny<int>()), Times.Once);
-        var snap = _metrics.SnapshotAndReset();
-        snap["server_sessions_created"].Should().Be(1);
-        snap["sessions_created"].Should().Be(1);
+        response.RefreshToken.Value.Should().Be("rt");
+        _sessions.Verify(s => s.IssueAsync(
+            7, new SessionDevice("d1", "Pixel", "Android", "BarkCloud", "1.1.1.1"), cts.Token), Times.Once);
     }
 
     [Fact]
-    public async Task Handle_ValidRequest_RegistersDeviceAndSendsLoginNotification()
+    public async Task Handle_ValidRequest_CountsServerSession()
     {
         await CreateSut().Handle(ValidCommand(), default);
 
-        _usersClient.Verify(c => c.RegisterDeviceAsync(
-            It.Is<RegisterDeviceRequest>(r => r.DeviceId == "d1" && r.UserId == 7),
-            null, null, default), Times.Once);
-        _notifications.Verify(n => n.SendNotification(It.Is<EmailNotification>(
-            e => e.Type == NotificationType.SuccessfulLogin && e.Address == "u@e")), Times.Once);
+        _metrics.SnapshotAndReset()["server_sessions_created"].Should().Be(1);
     }
 }

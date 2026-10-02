@@ -42,13 +42,7 @@ public class ConfirmResetPasswordCommandHandlerTests : IDisposable
 
     public ConfirmResetPasswordCommandHandlerTests()
     {
-        _notifier = new Mock<PasswordChangedNotifier>(
-            Mock.Of<UsersServerApi.UsersServerApiClient>(),
-            new Mock<NotificationQueueSender>(Mock.Of<IPublishEndpoint>(),
-                new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build()).Object,
-            new Mock<LocationClient>(new HttpClient(), new MetricsCollector(), NullLogger<LocationClient>.Instance).Object,
-            new RequestContext(),
-            NullLogger<PasswordChangedNotifier>.Instance);
+        _notifier = new Mock<PasswordChangedNotifier>(Mock.Of<INotificationOutbox>(), new RequestContext());
         _notifier.Setup(n => n.NotifyAsync(It.IsAny<long>())).Returns(Task.CompletedTask);
 
         _refreshTokens.Setup(s => s.RevokeAllSessions(42, "device-1", default)).ReturnsAsync(0);
