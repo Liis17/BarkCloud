@@ -85,6 +85,51 @@ public sealed class GrantStorageTests : IDisposable
         (await Storage().RecipientHasAccess(RecipientId + 1, fileId)).Should().BeFalse();
     }
 
+    [Fact]
+    public async Task ListSharedWithMePage_SkipsFilesInGrantorTrash()
+    {
+        var live = Guid.NewGuid();
+        var trashed = Guid.NewGuid();
+        var withoutEntry = Guid.NewGuid();
+        await Seed(
+            Grant(OwnerId, live), Entry(OwnerId, live),
+            Grant(OwnerId, trashed), Entry(OwnerId, trashed, isDeleted: true),
+            Grant(OwnerId, withoutEntry));
+
+        var page = await Storage().ListSharedWithMePage(RecipientId, null, null, limit: 10);
+
+        page.Select(x => x.FileId).Should().BeEquivalentTo(new[] { live, withoutEntry });
+    }
+
+    [Fact]
+    public async Task ListSharedWithMePage_FiltersBeforeLimit_KeepsPageFull()
+    {
+        var baseTime = DateTime.UtcNow;
+        var fileIds = Enumerable.Range(0, 4).Select(_ => Guid.NewGuid()).ToList();
+        var newestTrashed = Grant(OwnerId, fileIds[0], createdAt: baseTime);
+        await Seed(
+            newestTrashed, Entry(OwnerId, fileIds[0], isDeleted: true),
+            Grant(OwnerId, fileIds[1], createdAt: baseTime.AddMinutes(-1)),
+            Grant(OwnerId, fileIds[2], createdAt: baseTime.AddMinutes(-2)),
+            Grant(OwnerId, fileIds[3], createdAt: baseTime.AddMinutes(-3)));
+
+        var page = await Storage().ListSharedWithMePage(RecipientId, null, null, limit: 2);
+
+        // limit+1 элемент для признака следующей страницы: корзина не «съедает» место на странице.
+        page.Select(x => x.FileId).Should().Equal(fileIds[1], fileIds[2], fileIds[3]);
+    }
+
+    [Fact]
+    public async Task ListByOwnerPage_StillListsGrantsOfFilesInOwnTrash()
+    {
+        var fileId = Guid.NewGuid();
+        await Seed(Grant(OwnerId, fileId), Entry(OwnerId, fileId, isDeleted: true));
+
+        var page = await Storage().ListByOwnerPage(OwnerId, null, null, limit: 10);
+
+        page.Select(x => x.FileId).Should().Equal(fileId);
+    }
+
     private GrantStorage Storage() => new(_database.Context);
 
     private async Task Seed(params object[] entities)
@@ -93,13 +138,13 @@ public sealed class GrantStorageTests : IDisposable
         await _database.Context.SaveChangesAsync();
     }
 
-    private static FileGrant Grant(long ownerId, Guid fileId, long recipientId = RecipientId) => new()
+    private static FileGrant Grant(long ownerId, Guid fileId, long recipientId = RecipientId, DateTime? createdAt = null) => new()
     {
         Id = Guid.NewGuid(),
         OwnerId = ownerId,
         RecipientId = recipientId,
         FileId = fileId,
-        CreatedAt = DateTime.UtcNow,
+        CreatedAt = createdAt ?? DateTime.UtcNow,
     };
 
     private static CloudFileEntry Entry(long ownerId, Guid fileId, bool isDeleted = false, string? name = null) => new()

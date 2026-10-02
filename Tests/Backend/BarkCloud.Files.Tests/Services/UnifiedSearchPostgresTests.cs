@@ -412,7 +412,11 @@ public sealed class UnifiedSearchPostgresTests(SearchCatalogFixture fixture) : I
         fileByTarget.Id.Should().Be(c.FileGrant.ToString());
         folder.FileId.Should().Be(c.SharedDirId.ToString());
         playlist.Id.Should().Be(c.PlaylistGrant.ToString());
-        foreach (var (kind, id) in new[] { (SearchHitKind.SharedFile, c.FileGrantForOtherRecipient), (SearchHitKind.SharedFile, c.UnreadySharedGrant) })
+        foreach (var (kind, id) in new[]
+                 {
+                     (SearchHitKind.SharedFile, c.FileGrantForOtherRecipient), (SearchHitKind.SharedFile, c.UnreadySharedGrant),
+                     (SearchHitKind.SharedFile, c.TrashedSharedGrant)
+                 })
         {
             var act = () => recipient.ResolveHit(Ref(kind, id), default);
 
@@ -613,7 +617,7 @@ public sealed class Catalog
     public Guid AlbumExact, AlbumPrefix, AlbumDescription, ForeignAlbum;
     public Guid PlaylistPrefix, PlaylistDescription;
     public Guid DynamicExact, DirPrefix, DirSub, DirRecent, ForeignDir;
-    public Guid FileGrant, DirGrant, PlaylistGrant, SharedFileId, SharedDirId, SharedPlaylistId, FileGrantForOtherRecipient, UnreadySharedGrant;
+    public Guid FileGrant, DirGrant, PlaylistGrant, SharedFileId, SharedDirId, SharedPlaylistId, FileGrantForOtherRecipient, UnreadySharedGrant, TrashedSharedGrant;
     public List<SeededFile> Bulk = [];
     public SeededFile BulkNeedle = null!;
     public string[] HiddenTitles = [];
@@ -850,7 +854,10 @@ public sealed class Catalog
         var sharedFile = NewFile("report-shared.pdf", MediaKind.Document, At(2), [Other]);
         var unreadyShared = NewFile("report-unready.pdf", MediaKind.Document, At(2), [Other], ready: false);
         var forThird = NewFile("report-for-300.pdf", MediaKind.Document, At(2), [Other]);
-        files.AddRange([sharedFile, unreadyShared, forThird]);
+        // Файл, который владелец-даритель переместил в корзину: грант сохраняется, но получатель его не видит.
+        var trashedShared = NewFile("report-trashed-shared.pdf", MediaKind.Document, At(2), [Other]);
+        files.AddRange([sharedFile, unreadyShared, forThird, trashedShared]);
+        entries.Add(NewEntry(trashedShared, "report-trashed-shared.pdf", Other, deleted: true, deletedAt: At(76)));
         c.SharedFileId = sharedFile.Id;
         var sharedPlaylist = new MusicPlaylist { Id = Guid.NewGuid(), OwnerId = Other, Name = "report mix shared", CreatedAt = At(2), UpdatedAt = At(2) };
         playlists.Add(sharedPlaylist);
@@ -861,18 +868,20 @@ public sealed class Catalog
         c.PlaylistGrant = Guid.NewGuid();
         c.FileGrantForOtherRecipient = Guid.NewGuid();
         c.UnreadySharedGrant = Guid.NewGuid();
+        c.TrashedSharedGrant = Guid.NewGuid();
         var fileGrants = new List<FileGrant>
         {
             new() { Id = c.FileGrant, OwnerId = Other, RecipientId = Owner, FileId = sharedFile.Id, CreatedAt = At(10) },
             new() { Id = c.UnreadySharedGrant, OwnerId = Other, RecipientId = Owner, FileId = unreadyShared.Id, CreatedAt = At(11) },
             new() { Id = c.FileGrantForOtherRecipient, OwnerId = Other, RecipientId = ThirdUser, FileId = forThird.Id, CreatedAt = At(12) },
+            new() { Id = c.TrashedSharedGrant, OwnerId = Other, RecipientId = Owner, FileId = trashedShared.Id, CreatedAt = At(13) },
         };
         var dirGrants = new List<DirectoryGrant> { new() { Id = c.DirGrant, OwnerId = Other, RecipientId = Owner, DirectoryId = c.SharedDirId, CreatedAt = At(20) } };
         var playlistGrants = new List<MusicPlaylistGrant> { new() { Id = c.PlaylistGrant, OwnerId = Other, RecipientId = Owner, PlaylistId = sharedPlaylist.Id, CreatedAt = At(15) } };
 
         hiddenTitles.AddRange(["report-foreign.jpg", "report-preview.jpg", "report-pending.jpg", "report-avatar.jpg", "report-orig.jpg",
-            "report-unready.pdf", "report-for-300.pdf", "report-restored.jpg", "report-c.jpg", "other.jpg", "old-a.jpg", "plain.bin", "IMG_0001.jpg"]);
-        hiddenFileIds.AddRange([foreignFile.Id, previewByName.Id, pending.Id, avatar.Id, renamed.FileId, unreadyShared.Id, forThird.Id,
+            "report-unready.pdf", "report-for-300.pdf", "report-trashed-shared.pdf", "report-restored.jpg", "report-c.jpg", "other.jpg", "old-a.jpg", "plain.bin", "IMG_0001.jpg"]);
+        hiddenFileIds.AddRange([foreignFile.Id, previewByName.Id, pending.Id, avatar.Id, renamed.FileId, unreadyShared.Id, forThird.Id, trashedShared.Id,
             restoredFile.Id, twoNotMatching.Id, c.OtherWithDocumentTitle.FileId, c.TrackWithDocumentTitle.FileId]);
         c.HiddenTitles = hiddenTitles.ToArray();
         c.HiddenFileIds = hiddenFileIds.ToArray();
