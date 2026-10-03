@@ -298,10 +298,9 @@
   min-height: 88px;
   padding: 12px 16px;
   border: 1px solid var(--md-outline-variant);
-  border-radius: 28px;
+  border-radius: var(--r-xl);
   background: color-mix(in srgb, var(--md-primary) 7%, var(--md-surface-container-high));
-  box-shadow: 0 12px 34px rgba(0,0,0,.24);
-  backdrop-filter: blur(16px);
+  box-shadow: var(--el-3);
 }
 
 .mp-cover {
@@ -333,7 +332,7 @@
   height: 44px;
 }
 
-.mp-volume input {
+.mp-volume .m3-slider {
   width: 110px;
 }
 
@@ -344,10 +343,10 @@
   width: min(430px, calc(100vw - 32px));
   padding: 16px;
   border: 1px solid var(--md-outline-variant);
-  border-radius: 24px;
+  border-radius: var(--r-xl);
   background: var(--md-surface-container-high);
   color: var(--md-on-surface);
-  box-shadow: 0 16px 40px rgba(0,0,0,.22);
+  box-shadow: var(--el-3);
 }
 
 .mp-eq-head {
@@ -360,27 +359,13 @@
 
 .mp-eq-title {
   font-size: 16px;
-  font-weight: 720;
+  font-weight: 500;
 }
 
 .mp-eq-sub {
   margin-top: 2px;
   color: var(--md-on-surface-variant);
   font-size: 12px;
-}
-
-.mp-eq-switch {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--md-on-surface-variant);
-  font-size: 13px;
-  font-weight: 650;
-  cursor: pointer;
-}
-
-.mp-eq-switch input {
-  accent-color: var(--md-primary);
 }
 
 .mp-eq-presets {
@@ -392,22 +377,27 @@
 
 .mp-eq-presets button {
   min-width: 0;
-  height: 34px;
-  border: 0;
-  border-radius: 999px;
+  height: 32px;
+  border: 1px solid var(--md-outline-variant);
+  border-radius: var(--r-sm);
   padding: 0 10px;
-  background: color-mix(in srgb, var(--md-on-surface) 6%, transparent);
+  background: transparent;
   color: var(--md-on-surface-variant);
   font: inherit;
   font-size: 12px;
-  font-weight: 650;
+  font-weight: 500;
   cursor: pointer;
+  transition: background var(--d-short);
 }
 
-.mp-eq-presets button:hover,
+.mp-eq-presets button:hover {
+  background: color-mix(in srgb, var(--md-on-surface) 8%, transparent);
+}
+
 .mp-eq-presets button.active {
-  background: var(--md-primary-container);
-  color: var(--md-on-primary-container);
+  border-color: transparent;
+  background: var(--md-secondary-container);
+  color: var(--md-on-secondary-container);
 }
 
 .mp-eq-sliders {
@@ -423,7 +413,7 @@
   min-width: 0;
   color: var(--md-on-surface-variant);
   font-size: 12px;
-  font-weight: 650;
+  font-weight: 500;
 }
 
 .mp-eq-gain {
@@ -432,12 +422,11 @@
   font-variant-numeric: tabular-nums;
 }
 
-.mp-eq-band input {
-  width: 34px;
-  height: 112px;
-  accent-color: var(--md-primary);
-  writing-mode: vertical-lr;
-  direction: rtl;
+/* Вертикальный слайдер: горизонтальный повёрнут на -90°, поля компенсируют размер бокса */
+.mp-eq-band .m3-slider {
+  width: 112px;
+  margin: 40px -40px;
+  transform: rotate(-90deg);
 }
 
 .mp-eq-actions {
@@ -712,8 +701,9 @@
   .mp-eq-sliders {
     gap: 6px;
   }
-  .mp-eq-band input {
-    height: 96px;
+  .mp-eq-band .m3-slider {
+    width: 96px;
+    margin: 32px -32px;
   }
   .playlist-head {
     grid-template-columns: auto 64px minmax(0, 1fr);

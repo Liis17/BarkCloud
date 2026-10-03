@@ -2,6 +2,8 @@ import React from 'react';
 import { Icon } from '../Icon';
 import { EQUALIZER_BANDS, EQUALIZER_PRESETS, useAudioPlayer } from '../../hooks/useAudioPlayer';
 import { formatDuration } from '../../lib/format';
+import { Slider } from '../ui/Slider';
+import { Switch } from '../ui/Switch';
 
 export function MiniPlayer() {
   const player = useAudioPlayer();
@@ -19,12 +21,10 @@ export function MiniPlayer() {
         <div className="mp-title">{track.title || track.file.name}</div>
         <div className="mp-sub">{track.artist || track.album || 'Неизвестный исполнитель'}</div>
         <div className="mp-progress">
-          <input
-            type="range"
-            min={0}
+          <Slider
             max={Math.max(1, player.duration)}
             value={Math.min(player.currentTime, Math.max(1, player.duration))}
-            onChange={(e) => player.seek(Number(e.currentTarget.value))}
+            onChange={player.seek}
             aria-label="Позиция трека"
           />
           <span>{formatDuration(player.currentTime)} / {formatDuration(player.duration || track.duration)}</span>
@@ -49,17 +49,13 @@ export function MiniPlayer() {
       </div>
       <div className="mp-volume">
         <button className="icon-btn" onClick={() => player.setMuted(!player.muted)} title={player.muted ? 'Включить звук' : 'Выключить звук'}>
-          {player.muted ? '0' : Math.round(player.volume * 100)}
+          {player.muted || player.volume === 0 ? <Icon.volumeX size={20} /> : <Icon.volume size={20} />}
         </button>
-        <input
-          type="range"
-          min={0}
-          max={1}
-          step={0.01}
+        <Slider
           value={player.muted ? 0 : player.volume}
-          onChange={(e) => {
+          onChange={(v) => {
             player.setMuted(false);
-            player.setVolume(Number(e.currentTarget.value));
+            player.setVolume(v);
           }}
           aria-label="Громкость музыки"
         />
@@ -71,14 +67,7 @@ export function MiniPlayer() {
               <div className="mp-eq-title">Эквалайзер</div>
               <div className="mp-eq-sub">{player.equalizer.enabled ? 'Активен' : 'Отключён'}</div>
             </div>
-            <label className="mp-eq-switch">
-              <input
-                type="checkbox"
-                checked={player.equalizer.enabled}
-                onChange={(e) => player.setEqualizerEnabled(e.currentTarget.checked)}
-              />
-              <span>Вкл</span>
-            </label>
+            <Switch on={player.equalizer.enabled} onChange={player.setEqualizerEnabled} label="Эквалайзер" />
           </div>
           <div className="mp-eq-presets">
             {EQUALIZER_PRESETS.map((preset) => (
@@ -97,13 +86,12 @@ export function MiniPlayer() {
               return (
                 <label key={band.frequency} className="mp-eq-band">
                   <span className="mp-eq-gain">{gain > 0 ? `+${gain}` : gain}</span>
-                  <input
-                    type="range"
+                  <Slider
                     min={-12}
                     max={12}
                     step={1}
                     value={gain}
-                    onChange={(e) => player.setEqualizerGain(i, Number(e.currentTarget.value))}
+                    onChange={(v) => player.setEqualizerGain(i, v)}
                     aria-label={`${band.label} Гц`}
                   />
                   <span>{band.label}</span>
