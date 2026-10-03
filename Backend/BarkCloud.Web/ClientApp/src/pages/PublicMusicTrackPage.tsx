@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import { PublicShareHeader, PublicShareShell, PublicStatus } from '../components/public/PublicShareShell';
 import { useDocumentHead } from '../hooks/useDocumentHead';
+import { AudioBar } from '../components/media/MediaPlayer';
 
 interface ShareInfo {
   found: boolean;
@@ -110,7 +111,7 @@ export function PublicMusicTrackPage() {
         <div className="public-track-body">
           <div className="public-track-title">{titleFromName(state.name)}</div>
           <div className="public-track-sub">Аудиотрек</div>
-          <audio ref={persistAudioVolumeRef} src={state.downloadUrl} controls />
+          <AudioBar onMediaRef={persistAudioVolumeRef} src={state.downloadUrl} />
         </div>
       </div>
     </PublicShareShell>
