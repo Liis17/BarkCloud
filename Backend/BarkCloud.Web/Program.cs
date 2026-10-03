@@ -136,6 +136,11 @@ builder.Services.AddHostedService(sp => sp.GetRequiredService<DeploymentJobServi
 builder.Services.AddSingleton<FeatureConfigurationGateway>();
 builder.Services.AddSingleton<S3AccessChecker>();
 builder.Services.AddSingleton<ConfigurationManagementGateway>();
+builder.Services.AddSingleton<MigrationS3ClientFactory>();
+builder.Services.AddSingleton<S3MigrationCopier>();
+builder.Services.AddSingleton<IStorageMigrationControl, StorageMigrationControl>();
+builder.Services.AddSingleton<StorageMigrationService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<StorageMigrationService>());
 builder.Services.AddScoped<AuthGateway>();
 builder.Services.AddScoped<RegistrationGateway>();
 builder.Services.AddScoped<PasswordResetGateway>();

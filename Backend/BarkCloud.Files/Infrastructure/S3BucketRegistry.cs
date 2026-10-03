@@ -3,6 +3,7 @@ using Amazon.S3;
 
 using BarkCloud.Files.Configurations;
 using BarkCloud.Files.Domain;
+using BarkCloud.GrpcServer;
 
 using System.Security.Cryptography;
 using System.Text;
@@ -159,6 +160,8 @@ public class S3BucketRegistry : IDisposable
             BucketName = section["BucketName"] ?? bucketId,
             IsLegacy = true,
             IsActive = false,
+            Region = section["Region"] ?? string.Empty,
+            ForcePathStyle = !bool.TryParse(section["ForcePathStyle"], out var pathStyle) || pathStyle,
             IsR2 = (section["ServiceUrl"] ?? string.Empty).Contains(".r2.cloudflarestorage.com", StringComparison.OrdinalIgnoreCase)
         };
         Validate(profile);
@@ -170,8 +173,10 @@ public class S3BucketRegistry : IDisposable
         var config = new AmazonS3Config
         {
             ServiceURL = R2Endpoint(profile),
-            ForcePathStyle = true
+            ForcePathStyle = profile.ForcePathStyle
         };
+        if (!string.IsNullOrEmpty(profile.Region))
+            config.AuthenticationRegion = profile.Region;
         if (profile.IsR2)
         {
             config.AuthenticationRegion = "auto";
@@ -181,17 +186,11 @@ public class S3BucketRegistry : IDisposable
         return new AmazonS3Client(new BasicAWSCredentials(profile.AccessKey, profile.SecretKey), config);
     }
 
-    private static string R2Endpoint(StorageProfileOptions profile)
-    {
-        if (!profile.IsR2)
-            return profile.ServiceUrl;
-        var uri = new UriBuilder(profile.ServiceUrl) { Scheme = Uri.UriSchemeHttps, Port = -1 };
-        return uri.Uri.ToString().TrimEnd('/');
-    }
+    private static string R2Endpoint(StorageProfileOptions profile) => S3Endpoint.Normalize(profile.ServiceUrl, profile.IsR2);
 
     private static string ClientKey(StorageProfileOptions profile)
     {
-        var value = $"{R2Endpoint(profile)}|{profile.AccessKey}|{profile.SecretKey}|{profile.IsR2}";
+        var value = $"{R2Endpoint(profile)}|{profile.AccessKey}|{profile.SecretKey}|{profile.IsR2}|{profile.Region}|{profile.ForcePathStyle}";
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
     }
 

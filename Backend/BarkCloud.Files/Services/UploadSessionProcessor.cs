@@ -79,6 +79,11 @@ public sealed class UploadSessionProcessor
         {
             throw;
         }
+        catch (BarkCloud.Shared.Exceptions.Files.StorageMigrationPausedException)
+        {
+            session.ProcessingAttempts--;
+            throw;
+        }
         catch (FileIntegrityException error)
         {
             await FailAsync(session, "integrity_mismatch", error.Message, cancellationToken);

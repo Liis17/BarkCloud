@@ -20,6 +20,10 @@ public sealed class StorageProfile
 
     public bool IsR2 { get; set; }
 
+    public string Region { get; set; } = string.Empty;
+
+    public bool ForcePathStyle { get; set; } = true;
+
     public bool IsActive { get; set; }
 
     public bool IsLegacy { get; set; }

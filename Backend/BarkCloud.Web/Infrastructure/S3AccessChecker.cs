@@ -11,7 +11,9 @@ public sealed record S3AccessCheckRequest(
     string AccessKey,
     string SecretKey,
     string BucketName,
-    bool IsR2);
+    bool IsR2,
+    string Region = "",
+    bool ForcePathStyle = true);
 
 public sealed record StorageAccessCheckResult(bool Success, string Message);
 
@@ -44,8 +46,9 @@ public class S3AccessChecker
             var config = new AmazonS3Config
             {
                 ServiceURL = request.IsR2 ? R2Endpoint(serviceUrl) : serviceUrl,
-                ForcePathStyle = true
+                ForcePathStyle = request.ForcePathStyle
             };
+            if (!string.IsNullOrEmpty(request.Region)) config.AuthenticationRegion = request.Region;
             if (request.IsR2)
             {
                 config.AuthenticationRegion = "auto";

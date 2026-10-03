@@ -9,10 +9,14 @@ public class S3Uploader
     private const int MaximumParts = 10_000;
 
     private readonly S3BucketRegistry _registry;
+    private readonly StorageMigrationGate? _migrationGate;
 
-    public S3Uploader(S3BucketRegistry registry)
+    public S3Uploader(S3BucketRegistry registry) : this(registry, null) { }
+
+    public S3Uploader(S3BucketRegistry registry, StorageMigrationGate? migrationGate)
     {
         _registry = registry;
+        _migrationGate = migrationGate;
     }
 
     public virtual Task<string> UploadAsync(
@@ -37,6 +41,7 @@ public class S3Uploader
         string contentType,
         CancellationToken cancellationToken)
     {
+        await using var lease = _migrationGate is null ? null : await _migrationGate.EnterAsync(storageProfileId, false, cancellationToken);
         var profile = _registry.GetProfile(storageProfileId);
         var client = _registry.GetClientForProfile(storageProfileId);
         var size = data.CanSeek ? data.Length - data.Position : -1;
@@ -67,6 +72,7 @@ public class S3Uploader
         string key,
         CancellationToken cancellationToken)
     {
+        await using var lease = _migrationGate is null ? null : await _migrationGate.EnterAsync(storageProfileId, false, cancellationToken);
         var profile = _registry.GetProfile(storageProfileId);
         var client = _registry.GetClientForProfile(storageProfileId);
         await client.DeleteObjectAsync(new DeleteObjectRequest

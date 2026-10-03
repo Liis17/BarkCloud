@@ -47,7 +47,9 @@ public sealed record ServerStorageProfileDto(
     DateTimeOffset? EditedAt,
     string EditedBy,
     string EditedFrom,
-    string QuotaBytes);
+    string QuotaBytes,
+    string Region = "",
+    bool ForcePathStyle = true);
 
 public sealed record ServerStorageRevisionDto(
     long Id,
@@ -80,7 +82,9 @@ public sealed record StorageProfileEdit(
     string? ProfileId,
     bool ConfirmLegacyMutation,
     string QuotaValue = "0",
-    string QuotaUnit = "gb");
+    string QuotaUnit = "gb",
+    string? Region = null,
+    bool? ForcePathStyle = null);
 
 public sealed class ConfigurationManagementGateway(
     ConfigurationApi.ConfigurationApiClient configuration,
@@ -207,7 +211,7 @@ public sealed class ConfigurationManagementGateway(
             new GetStorageProfilesRequest(), _headers, cancellationToken: cancellationToken);
         var current = FindStorageProfile(profiles.Profiles, edit);
         var accessKey = string.IsNullOrEmpty(edit.AccessKey) ? current?.AccessKey ?? string.Empty : edit.AccessKey;
-        var response = await configuration.SaveStorageProfileAsync(new SaveStorageProfileRequest
+        var request = new SaveStorageProfileRequest
         {
             Role = edit.Role,
             ServiceUrl = edit.ServiceUrl,
@@ -222,7 +226,10 @@ public sealed class ConfigurationManagementGateway(
             EditedFrom = "web-settings",
             QuotaValue = edit.QuotaValue,
             QuotaUnit = edit.QuotaUnit
-        }, _headers, cancellationToken: cancellationToken);
+        };
+        if (edit.Region is not null) request.Region = edit.Region;
+        if (edit.ForcePathStyle is not null) request.ForcePathStyle = edit.ForcePathStyle.Value;
+        var response = await configuration.SaveStorageProfileAsync(request, _headers, cancellationToken: cancellationToken);
         return new ConfigurationMutationResult(response.Success, response.Message, ["files"]);
     }
 
@@ -244,7 +251,8 @@ public sealed class ConfigurationManagementGateway(
             string.IsNullOrEmpty(edit.AccessKey) ? current?.AccessKey ?? string.Empty : edit.AccessKey,
             string.IsNullOrEmpty(edit.SecretKey) ? current?.SecretKey ?? string.Empty : edit.SecretKey,
             edit.BucketName,
-            edit.IsR2), cancellationToken);
+            edit.IsR2, edit.Region ?? current?.Region ?? string.Empty,
+            edit.ForcePathStyle ?? (current is null || !current.HasForcePathStyle || current.ForcePathStyle)), cancellationToken);
     }
 
     public async Task<ConfigurationMutationResult> ActivateStorageProfileAsync(
@@ -331,7 +339,27 @@ public sealed class ConfigurationManagementGateway(
         profile.EditedAt?.ToDateTimeOffset(),
         profile.EditedBy,
         profile.EditedFrom,
-        profile.QuotaBytes.ToString(CultureInfo.InvariantCulture));
+        profile.QuotaBytes.ToString(CultureInfo.InvariantCulture), profile.Region,
+        !profile.HasForcePathStyle || profile.ForcePathStyle);
+
+    public async Task<IReadOnlyList<StorageProfileItem>> GetStorageConnectionsAsync(CancellationToken cancellationToken = default)
+    {
+        var response = await configuration.GetStorageProfilesAsync(new GetStorageProfilesRequest(), _headers, cancellationToken: cancellationToken);
+        return response.Profiles.ToArray();
+    }
+
+    public async Task RelocateStorageAsync(string sourceUrl, string sourceBucket, IEnumerable<string> profileIds,
+        StorageProfileItem destination, string migrationId, string actor, CancellationToken ct)
+    {
+        var request = new RelocateStorageProfilesRequest
+        {
+            SourceServiceUrl = sourceUrl, SourceBucketName = sourceBucket, Destination = destination,
+            MigrationId = migrationId, EditedBy = actor
+        };
+        request.ProfileIds.AddRange(profileIds);
+        var response = await configuration.RelocateStorageProfilesAsync(request, _headers, cancellationToken: ct);
+        if (!response.Success) throw new InvalidOperationException(response.Message);
+    }
 
     private static StorageProfileItem? FindStorageProfile(
         IEnumerable<StorageProfileItem> profiles,

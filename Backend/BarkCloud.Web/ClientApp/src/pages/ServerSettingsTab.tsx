@@ -5,6 +5,7 @@ import { Icon } from '../components/Icon';
 import { Select } from '../components/ui/Select';
 import { useApiResource } from '../hooks/useApiResource';
 import { plural } from '../lib/format';
+import { MigrationApplyPanel } from '../components/settings/MigrationApplyPanel';
 
 interface ServerSetting {
   serviceId: number; section: string; key: string; value: string;
@@ -21,6 +22,7 @@ interface StorageProfile {
   hasAccessKey: boolean; hasSecretKey: boolean; bucketName: string; isR2: boolean;
   isActive: boolean; isLegacy: boolean; quotaBytes?: string;
   editedAt: string | null; editedBy: string; editedFrom: string;
+  region?: string; forcePathStyle?: boolean;
 }
 interface StorageRevision {
   id: number; profileId: string; changedAt: string | null; changedBy: string;
@@ -34,6 +36,7 @@ interface MutationResult { success: boolean; message: string; restartTargets: st
 type QuotaUnit = 'gb' | 'tb' | 'pb';
 interface StorageDraft {
   serviceUrl: string; accessKey: string; secretKey: string; bucketName: string; isR2: boolean;
+  region: string; forcePathStyle: boolean;
   quotaValue: string; quotaUnit: QuotaUnit;
 }
 interface Confirmation { title: string; lines: string[]; run: () => Promise<void> }
@@ -51,13 +54,13 @@ const STORAGE_ROLES: Record<string, string> = {
   universal: 'Универсальное', avatars: 'Аватары', images: 'Изображения', videos: 'Видео',
   audio: 'Аудио', documents: 'Документы', other: 'Прочие файлы', previews: 'Превью',
 };
-const STORAGE_FIELD_NAMES = ['Endpoint', 'Bucket', 'Access key Credentials', 'Secret key Credentials', 'Квота S3 бакета', 'Cloudflare R2'];
+const STORAGE_FIELD_NAMES = ['Endpoint', 'Bucket', 'Access key Credentials', 'Secret key Credentials', 'Регион Region', 'Адресация ForcePathStyle', 'Квота S3 бакета', 'Cloudflare R2', 'Применить миграцию'];
 const STORAGE_FIELDS = 'S3 ' + STORAGE_FIELD_NAMES.join(' ');
 const QUOTA_UNIT_BYTES: Record<QuotaUnit, bigint> = { gb: 1024n ** 3n, tb: 1024n ** 4n, pb: 1024n ** 5n };
 const settingId = (setting: ServerSetting) => setting.serviceId + ':' + setting.section + ':' + setting.key;
 const settingName = (setting: ServerSetting) => setting.section + (setting.key ? ':' + setting.key : '');
 const matches = (value: string, query: string) => !query || value.toLocaleLowerCase('ru-RU').includes(query);
-const EMPTY_DRAFT: StorageDraft = { serviceUrl: '', accessKey: '', secretKey: '', bucketName: '', isR2: false, quotaValue: '0', quotaUnit: 'gb' };
+const EMPTY_DRAFT: StorageDraft = { serviceUrl: '', accessKey: '', secretKey: '', bucketName: '', isR2: false, region: '', forcePathStyle: true, quotaValue: '0', quotaUnit: 'gb' };
 
 function quotaInputFromBytes(value = '0'): { value: string; unit: QuotaUnit } {
   try {
@@ -71,7 +74,7 @@ function quotaInputFromBytes(value = '0'): { value: string; unit: QuotaUnit } {
 function profileDraft(profile?: StorageProfile): StorageDraft {
   const quota = quotaInputFromBytes(profile?.quotaBytes);
   return { ...EMPTY_DRAFT, serviceUrl: profile?.serviceUrl || '', bucketName: profile?.bucketName || '',
-    isR2: profile?.isR2 || false, quotaValue: quota.value, quotaUnit: quota.unit };
+    isR2: profile?.isR2 || false, region: profile?.region || '', forcePathStyle: profile?.forcePathStyle ?? true, quotaValue: quota.value, quotaUnit: quota.unit };
 }
 function quotaLabel(profile?: StorageProfile) {
   if (!profile?.quotaBytes || profile.quotaBytes === '0') return 'Безлимит';
@@ -240,6 +243,8 @@ function StorageEditor({ role, selected, profiles, revisions, draft, setDraft, o
       !selected || selected.serviceUrl !== draft.serviceUrl ? 'Endpoint: ' + (selected?.serviceUrl ? selected.serviceUrl + ' → ' : '') + draft.serviceUrl : '',
       !selected || selected.bucketName !== draft.bucketName ? 'Bucket: ' + (selected?.bucketName ? selected.bucketName + ' → ' : '') + draft.bucketName : '',
       !selected || selected.isR2 !== draft.isR2 ? 'Cloudflare R2: ' + (draft.isR2 ? 'да' : 'нет') : '',
+      !selected || initial.region !== draft.region ? 'Регион: ' + (draft.region || 'автоматически') : '',
+      !selected || initial.forcePathStyle !== draft.forcePathStyle ? 'Адресация: ' + (draft.forcePathStyle ? 'Path style' : 'Virtual host') : '',
       initial.quotaValue !== draft.quotaValue || initial.quotaUnit !== draft.quotaUnit || !selected ? 'Квота: ' + draft.quotaValue + ' ' + draft.quotaUnit.toUpperCase() + (draft.quotaValue === '0' ? ' (безлимит)' : '') : '',
       draft.accessKey ? 'Access key: заменить' : '', draft.secretKey ? 'Secret key: заменить' : '',
       legacy ? 'Legacy-профиль используется существующими файлами. Изменение требует подтверждения.' : '',
@@ -266,6 +271,9 @@ function StorageEditor({ role, selected, profiles, revisions, draft, setDraft, o
           <button type="button" className="icon-btn" aria-label={showSecret ? 'Скрыть введённый secret key' : 'Показать введённый secret key'} disabled={!draft.secretKey} onClick={() => setShowSecret(!showSecret)}><Icon.eye size={18} /></button></div>{fieldError('secretKey')}
       </label>
       <p className="storage-credentials-help"><Highlight value="Оставьте поля ключей пустыми, чтобы сохранить текущие credentials." query={query} /></p>
+      <label><span><Highlight value="Регион" query={query} /></span><input aria-label="Регион S3" value={draft.region} onChange={(event) => edit('region', event.target.value)} placeholder={draft.isR2 ? 'auto' : 'Автоматически'} /></label>
+      <label><span><Highlight value="Адресация бакета" query={query} /></span><Select aria-label="Адресация бакета S3" value={draft.forcePathStyle ? 'path' : 'virtual'} disabled={busy}
+        options={[{ value: 'path', label: 'Path style · endpoint/bucket' }, { value: 'virtual', label: 'Virtual host · bucket.endpoint' }]} onChange={(value) => edit('forcePathStyle', value === 'path')} /></label>
       <label><span><Highlight value="Квота S3 бакета" query={query} /></span><div className="storage-quota-control">
         <input aria-label="Квота S3 бакета" type="number" min="0" step="1" inputMode="numeric" value={draft.quotaValue} aria-invalid={!!errors.quotaValue} onChange={(event) => edit('quotaValue', event.target.value)} />
         <Select<QuotaUnit> aria-label="Единица квоты" value={draft.quotaUnit} onChange={(v) => edit('quotaUnit', v)} options={[{ value: 'gb', label: 'ГБ' }, { value: 'tb', label: 'ТБ' }, { value: 'pb', label: 'ПБ' }]} />
@@ -296,9 +304,10 @@ function StorageEditor({ role, selected, profiles, revisions, draft, setDraft, o
   </article>;
 }
 
-function StorageSection({ profiles, revisions, query, onChanged, onExpired, open, onToggle }: {
+function StorageSection({ profiles, revisions, query, onChanged, onExpired, open, onToggle, active }: {
   profiles: StorageProfile[]; revisions: StorageRevision[]; query: string; onChanged: Changed; onExpired: () => void;
   open: boolean; onToggle: (event: React.SyntheticEvent<HTMLDetailsElement>) => void;
+  active: boolean;
 }) {
   const legacyRoles = Array.from(new Set(profiles.filter((profile) => profile.isLegacy).map((profile) => profile.role)));
   const roles = [...Object.keys(STORAGE_ROLES), ...legacyRoles];
@@ -327,6 +336,7 @@ function StorageSection({ profiles, revisions, query, onChanged, onExpired, open
   }
   return <details className="set-card server-storage-section" hidden={!visible} open={open} onToggle={onToggle}>
     <summary className="set-card-head server-group-summary"><div><strong className="ttl">S3-профили</strong><small>Роли для новых файлов, подключение и квоты бакетов</small></div><span className="server-section-count">{profiles.length} профилей{dirtyFields ? ' · ' + dirtyFields + ' изменено' : ''}</span></summary>
+    <MigrationApplyPanel active={active && open && visible} onExpired={onExpired} onApplied={() => onChanged([])} />
     <div className={'storage-workspace' + (mobileDetail ? ' show-detail' : '')}>
       <div className="storage-role-list">
         {roles.map((item, index) => {
@@ -444,7 +454,7 @@ export default function ServerSettingsTab({ active = true, onAccessExpired = () 
       </div>
     </details>
     <StorageSection profiles={data.storageProfiles} revisions={data.storageRevisions} query={query} onChanged={changed} onExpired={onAccessExpired}
-      open={!!query || expanded.has('s3')} onToggle={(event) => toggle('s3', event)} />
+      active={active} open={!!query || expanded.has('s3')} onToggle={(event) => toggle('s3', event)} />
     {confirmation && <Confirm confirmation={confirmation} onClose={() => setConfirmation(null)} />}
   </div>;
 }

@@ -305,7 +305,9 @@ public class ConfigurationApiService : BarkCloud.Proto.Configuration.Configurati
                 request.IsLegacy,
                 string.IsNullOrWhiteSpace(request.ProfileId) ? null : request.ProfileId,
                 request.ConfirmLegacyMutation,
-                quotaBytes),
+                quotaBytes,
+                request.HasRegion ? request.Region : null,
+                request.HasForcePathStyle ? request.ForcePathStyle : null),
                 request.EditedBy, request.EditedFrom, context.CancellationToken);
             return new SaveStorageProfileResponse
             {
@@ -317,6 +319,26 @@ public class ConfigurationApiService : BarkCloud.Proto.Configuration.Configurati
         catch (Exception exception)
         {
             return new SaveStorageProfileResponse { Success = false, Message = exception.Message };
+        }
+    }
+
+    public override async Task<UpdateConfigurationResponse> RelocateStorageProfiles(
+        RelocateStorageProfilesRequest request, ServerCallContext context)
+    {
+        try
+        {
+            var destination = request.Destination ?? throw new InvalidOperationException("Укажите целевой S3.");
+            await _storageProfiles.RelocateAsync(request.SourceServiceUrl, request.SourceBucketName,
+                request.ProfileIds.ToArray(), new StorageProfileInput("", destination.ServiceUrl,
+                    destination.AccessKey, destination.SecretKey, destination.BucketName,
+                    destination.IsR2, false, null, false, 0, destination.Region,
+                    destination.HasForcePathStyle ? destination.ForcePathStyle : true),
+                request.MigrationId, request.EditedBy, context.CancellationToken);
+            return new UpdateConfigurationResponse { Success = true, Message = "S3-профили переключены" };
+        }
+        catch (InvalidOperationException exception)
+        {
+            return new UpdateConfigurationResponse { Success = false, Message = exception.Message };
         }
     }
 
@@ -403,6 +425,8 @@ public class ConfigurationApiService : BarkCloud.Proto.Configuration.Configurati
         BucketName = profile.BucketName,
         QuotaBytes = profile.QuotaBytes,
         IsR2 = profile.IsR2,
+        Region = profile.Region,
+        ForcePathStyle = profile.ForcePathStyle,
         IsActive = profile.IsActive,
         IsLegacy = profile.IsLegacy,
         CreatedAt = Google.Protobuf.WellKnownTypes.Timestamp.FromDateTime(AsUtc(profile.CreatedAt)),

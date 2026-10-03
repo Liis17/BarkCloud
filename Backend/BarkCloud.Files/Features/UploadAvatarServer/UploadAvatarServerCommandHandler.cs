@@ -21,6 +21,7 @@ public class UploadAvatarServerCommandHandler : IRequestHandler<UploadAvatarServ
     private readonly IConfiguration _configuration;
     private readonly RunSettings _runSettings;
     private readonly ILogger<UploadAvatarServerCommandHandler> _logger;
+    private readonly StorageMigrationGate? _migrationGate;
 
     public UploadAvatarServerCommandHandler(
         IUploadedFilesStorage uploadedFilesStorage,
@@ -29,7 +30,8 @@ public class UploadAvatarServerCommandHandler : IRequestHandler<UploadAvatarServ
         ImageCompressor imageCompressor,
         IConfiguration configuration,
         RunSettings runSettings,
-        ILogger<UploadAvatarServerCommandHandler> logger)
+        ILogger<UploadAvatarServerCommandHandler> logger,
+        StorageMigrationGate? migrationGate = null)
     {
         _uploadedFilesStorage = uploadedFilesStorage;
         _s3Uploader = s3Uploader;
@@ -38,12 +40,15 @@ public class UploadAvatarServerCommandHandler : IRequestHandler<UploadAvatarServ
         _configuration = configuration;
         _runSettings = runSettings;
         _logger = logger;
+        _migrationGate = migrationGate;
     }
 
     public async Task<UploadAvatarServerResponse> Handle(UploadAvatarServerCommand request, CancellationToken cancellationToken)
     {
         var mainProfileId = _bucketRegistry.ResolveWriteProfileId(UploadFileType.UserAvatar, Domain.MediaKind.Photo, false);
         var previewProfileId = _bucketRegistry.ResolveWriteProfileId(UploadFileType.UserAvatar, Domain.MediaKind.Photo, true);
+        await using var migrationActivity = _migrationGate is null ? null : await _migrationGate.TrackUploadAsync(
+            [mainProfileId, previewProfileId], cancellationToken);
         var baseUrl = FileUrlHelper.GetPublicBaseUrl(_configuration, _runSettings);
 
         // Обработка изображения на сервере (ресайз + JPEG) —

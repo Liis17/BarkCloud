@@ -337,7 +337,8 @@ public class ConfigurationStorage : IConfigurationStorage
                      ("AccessKey", profile.AccessKey),
                      ("SecretKey", profile.SecretKey),
                      ("BucketName", profile.BucketName),
-                     ("ForcePathStyle", "true")
+                     ("ForcePathStyle", profile.ForcePathStyle.ToString()),
+                     ("Region", profile.Region)
                  })
         {
             selected[$"{section}:{key}"] = new ConfigurationItem

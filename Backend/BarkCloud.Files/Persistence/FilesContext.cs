@@ -21,6 +21,9 @@ public class FilesContext : DbContext
 
     public DbSet<UploadSessionPart> UploadSessionParts { get; set; }
 
+    public DbSet<StorageCutover> StorageCutovers { get; set; }
+    public DbSet<StorageWriteActivity> StorageWriteActivities { get; set; }
+
     public DbSet<TempFile> TempFiles { get; set; }
 
     public DbSet<FileHash> FileHashes { get; set; }
@@ -72,6 +75,12 @@ public class FilesContext : DbContext
         modelBuilder.AddInboxStateEntity();
         modelBuilder.AddOutboxMessageEntity();
         modelBuilder.AddOutboxStateEntity();
+
+        modelBuilder.Entity<StorageCutover>(b =>
+        {
+            b.HasKey(x => x.MigrationId);
+            b.HasIndex(x => new { x.SourceServiceUrl, x.SourceBucketName }).IsUnique();
+        });
 
         modelBuilder.Entity<UploadFile>()
             .Property(file => file.StorageProfileId)

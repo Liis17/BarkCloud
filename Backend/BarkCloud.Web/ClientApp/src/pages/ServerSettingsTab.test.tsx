@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import ServerSettingsTab from './ServerSettingsTab';
 import { jsonResponse, serverSettings, setting, storageProfile } from '../test/settingsFixtures';
@@ -8,10 +8,14 @@ function mockServer(data = serverSettings) {
   const fetchMock = vi.fn((path: string, _init?: RequestInit) => Promise.resolve(jsonResponse(
     path === '/api/settings/server' ? data : { success: true, message: 'Доступ подтверждён', restartTargets: ['files'] },
   )));
-  vi.stubGlobal('fetch', fetchMock);
+  vi.stubGlobal('fetch', (path: string, init?: RequestInit) => ['/api/settings/migration/jobs', '/api/settings/migration/cutovers'].includes(path)
+    ? Promise.resolve(jsonResponse([])) : fetchMock(path, init));
   return fetchMock;
 }
-async function expandAll() { fireEvent.click(await screen.findByRole('button', { name: 'Развернуть всё' })); }
+async function expandAll() {
+  const button = await screen.findByRole('button', { name: 'Развернуть всё' });
+  await act(async () => { fireEvent.click(button); });
+}
 function editor() { return within(document.querySelector('.storage-profile-card') as HTMLElement); }
 async function confirm() { fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Подтвердить' })); }
 
@@ -190,7 +194,8 @@ describe('ServerSettingsTab', () => {
   it('ищет названия S3-полей и показывает ошибки рядом с полями до записи', async () => {
     const fetchMock = mockServer({ ...serverSettings, storageProfiles: [] });
     render(<ServerSettingsTab />);
-    fireEvent.change(await screen.findByLabelText('Поиск по параметрам конфигурации'), { target: { value: 'Endpoint' } });
+    const search = await screen.findByLabelText('Поиск по параметрам конфигурации');
+    await act(async () => { fireEvent.change(search, { target: { value: 'Endpoint' } }); });
     expect((document.querySelector('.server-storage-section') as HTMLDetailsElement).open).toBe(true);
     expect(screen.getByText(/0 параметров · 1 поле S3/)).toBeTruthy();
     fireEvent.change(editor().getByLabelText('Endpoint'), { target: { value: 'invalid' } });

@@ -43,6 +43,10 @@ public interface IMultipartUploadStore
         string uploadId,
         CancellationToken cancellationToken);
 
+    // Coordinator calls this only while it holds the migration admission lease.
+    Task AbortUnderAdmissionAsync(string storageProfileId, string key, string uploadId, CancellationToken cancellationToken) =>
+        AbortAsync(storageProfileId, key, uploadId, cancellationToken);
+
     Task<MultipartObjectInfo?> HeadAsync(
         string storageProfileId,
         string key,

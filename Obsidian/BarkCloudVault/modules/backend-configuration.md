@@ -52,6 +52,10 @@ Typed validation ограничивает TCP-порты диапазоном `1
 
 ## S3-профили
 
+`Region` (по умолчанию пустой) и `ForcePathStyle` (по умолчанию true) сохраняются в профиле, protobuf, compatibility projection и startup-конфигурации Files. Старые Save-запросы без optional полей не сбрасывают эти настройки.
+
+`RelocateStorageProfiles` атомарно заменяет подключение всех профилей исходного endpoint/bucket после [[modules/web-s3-migration]]. Состав ID проверяется под транзакционной блокировкой; ID, версии, роли, IsActive/IsLegacy и квоты сохраняются, история получает MigrationRelocation. Повтор того же migrationId после потерянного ответа идемпотентен только при полном совпадении назначенного подключения.
+
 Web-редактор использует список ролей и отдельную форму, сохраняет пустые credentials и неизменённую квоту, проверяет черновик без записи и показывает подтверждение изменений без ключей. См. [[modules/web-settings]].
 
 Роли: `universal`, `avatars`, `images`, `videos`, `audio`, `documents`, `other`, `previews`, а также compatibility-роли `user-avatars-old` и `cloud-files-old`.

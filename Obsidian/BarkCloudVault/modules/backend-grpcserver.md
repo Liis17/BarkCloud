@@ -15,6 +15,7 @@ Parent: [[index]]
 ### Корневые
 - `WebApplicationBuilderExtensions.cs` — расширения для `WebApplicationBuilder` (регистрация Kestrel/gRPC/Serilog и т.п.)
 - `ServiceCollectionExtensions.cs` — расширения DI
+- `S3Endpoint.cs` — единый фактический endpoint S3 для Configuration, Files и Web (R2 принудительно использует HTTPS и стандартный порт); SHA-256 полного подключения позволяет [[modules/web-s3-migration]] подтвердить загруженные Files credentials без их сохранения в барьере или возврата в статусе.
 - `SerilogExtensions.cs` — настройка Serilog с экспортом в Seq и выводом в stdout во всех
   окружениях; если `Seq:ServerUrl` не задан, используется Docker-адрес
   `http://cloud-seq:5341` из production compose. Поэтому стартовые ошибки доступны через

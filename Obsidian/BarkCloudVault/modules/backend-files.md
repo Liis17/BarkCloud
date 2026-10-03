@@ -179,6 +179,14 @@ Web использует server-owned `UploadSession` и состояния `upl
 
 `MusicApiService` опирается на `MusicLibraryService`, а не на MediatR-slices. Аудиофайлы определяются по `MediaKind.Audio`; при загрузке сервер вытаскивает теги/длительность и embedded artwork, а для обложки создаёт превью 128/512. Треки возвращаются с temp-URL оригинала и URL обложек. Плейлисты владельца приватные по умолчанию, поддерживают ручной порядок только для владельца (`can_reorder=true`), кастомную обложку из фото и динамическую fallback-обложку по первому треку. Доступ: публичный токен (`ResolveMusicPlaylistShare`, страница `/mpl/{token}`) или приватный грант пользователю (`ListSharedPlaylistsWithMe`).
 
+## Барьер миграции S3
+
+[[modules/web-s3-migration]] использует `StorageMigrationGate`, таблицы `StorageCutovers`/`StorageWriteActivities` и служебные RPC [[api/files-api]]. Admission resumable/legacy uploads и аватаров учитывается до начала работы; draining ждёт Uploading, Processing, CleanupPending и целые legacy/avatar pipelines. Resumable сессии фото, видео и аудио учитывают отдельный профиль превью до завершения обработки; MIME проверяется с fallback по имени файла. S3Uploader и S3MultipartUploadStore держат shared advisory lease на изменение; freeze берёт exclusive lease, затем блокирует записи и удаления, включая фоновые операции. Незарегистрированный multipart при отказе Save очищается под уже удерживаемым admission lease. Чтение не блокируется.
+
+Applying-барьер переживает рестарт и становится applied только после загрузки нового endpoint/bucket/Region/ForcePathStyle/IsR2 для всех связанных профилей и совпадения SHA-256 полного подключения, включая credentials. Сам барьер хранит только хеш. Старый экземпляр Files остаётся закрытым для исходного бакета даже после applied. Lifetime locks активностей позволяют безопасно очищать оборванные HTTP uploads, сохраняя операции живых реплик. `StorageMigrationPausedException` возвращает конфликт для legacy HTTP и не расходует попытки обработки resumable upload.
+
+S3BucketRegistry передаёт сохранённые Region и ForcePathStyle клиентам; старые профили продолжают использовать автоматический регион и path style. ID привязок в UploadedFiles/FilePreviews не меняются при переключении.
+
 ## Зависимости
 
 - Использует: `BarkCloud.Proto`, `BarkCloud.GrpcServer`, `BarkCloud.Shared.*`, EF Core, PostgreSQL, MinIO (S3 SDK), RabbitMQ, MediatR, **SixLabors.ImageSharp** (превью изображений), **FFMpegCore** (превью видео), **MetadataExtractor** (EXIF фото), **UglyToad.PdfPig** (метаданные PDF), **DocumentFormat.OpenXml** (метаданные DOCX/XLSX/PPTX)
