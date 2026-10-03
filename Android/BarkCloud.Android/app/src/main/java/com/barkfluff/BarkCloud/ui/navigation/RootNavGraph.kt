@@ -30,7 +30,8 @@ fun RootNavGraph(deepLink: Uri? = null) {
     val navController = rememberNavController()
 
     LaunchedEffect(sessionActive.value) {
-        if (!sessionActive.value) {
+        // Уже на логине навигировать не нужно: launchSingleTop пересоздаёт экран, и ввод в поля ломается.
+        if (!sessionActive.value && navController.currentDestination?.route != ROUTE_LOGIN) {
             navController.navigate(ROUTE_LOGIN) {
                 popUpTo(ROUTE_MAIN) { inclusive = true }
                 launchSingleTop = true
