@@ -927,7 +927,9 @@ input[type=checkbox]:disabled { opacity: .38; cursor: default; }
 .lb-actions .icon-btn:hover { background: rgba(255,255,255,.16); color: #fff; }
 .lb-actions .icon-btn:disabled { opacity: .35; cursor: default; }
 .lb-actions .icon-btn:disabled:hover { background: transparent; }
-.lb-actions .icon-btn.danger:hover { background: color-mix(in srgb, var(--md-error) 38%, transparent); }
+/* Панель всегда тёмная, поэтому красный фиксированный: --md-error в тёмной теме бледно-розовый */
+.lb-actions .icon-btn.danger { color: #FF5449; }
+.lb-actions .icon-btn.danger:hover { background: color-mix(in srgb, #FF5449 24%, transparent); color: #FF5449; }
 /* Прозрачные кнопки перелистывания по краям — проявляются при наведении */
 .lb-nav {
   position: absolute; top: 50%; transform: translateY(-50%);
