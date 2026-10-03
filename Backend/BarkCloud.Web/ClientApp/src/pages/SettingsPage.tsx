@@ -1491,7 +1491,7 @@ function StorageTab({ storage }: { storage: SettingsState['storage'] }) {
       <div className="set-card-head"><h3>Личное хранилище</h3><div className="sub">Ваши файлы и лимит аккаунта</div></div>
       <div className="set-card-body">
         <div className="storage-total">{storage.used} {storage.unit}<span>{storage.total > 0 ? `из ${storage.total} ${storage.unit}` : 'безлимит'}</span></div>
-        {storage.total > 0 && <progress max="100" value={storage.percent} aria-label="Использование личного хранилища" />}
+        {storage.total > 0 && <div className="bar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={storage.percent} aria-label="Использование личного хранилища"><div className="bar-fill" style={{ width: `${storage.percent}%` }} /></div>}
         {storage.breakdown.map((item) => <div className="storage-breakdown-row" key={item.k}><span>{item.k}</span><strong>{item.v}</strong></div>)}
         {storage.total > 0 && <small>Свободно {storage.freeLabel}</small>}
       </div>
@@ -1510,7 +1510,7 @@ function StorageTab({ storage }: { storage: SettingsState['storage'] }) {
       <div className="set-card-head"><h3>S3-бакеты</h3><div className="sub">Все активные уникальные бакеты</div></div>
       <div className="set-card-body">
         {s3.allS3StatsAvailable && <><div className="storage-total">{s3.allS3UsedLabel}<span>{s3.allS3HasFiniteQuota ? `из ${s3.allS3QuotaLabel}` : 'безлимит'}</span></div>
-          {s3.allS3HasFiniteQuota && <progress max="100" value={s3.allS3Percent} aria-label="Использование S3-бакетов" />}</>}
+          {s3.allS3HasFiniteQuota && <div className="bar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={s3.allS3Percent} aria-label="Использование S3-бакетов"><div className="bar-fill" style={{ width: `${s3.allS3Percent}%` }} /></div>}</>}
         <StorageStatsStatus state={s3.allS3State} updatedAt={s3.allS3UpdatedAt} />
       </div>
     </div>}

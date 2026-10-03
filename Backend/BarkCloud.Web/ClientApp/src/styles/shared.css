@@ -134,6 +134,10 @@
   --el-3: 0 4px 8px rgba(0,0,0,.35), 0 1px 3px rgba(0,0,0,.50);
 }
 
+/* Нативные части контролов (календарь даты, список select) — в тон теме */
+:root { color-scheme: light; }
+:root[data-theme="dark"] { color-scheme: dark; }
+
 html, body {
   height: 100%;
   background: var(--md-surface);
@@ -449,6 +453,25 @@ img.avatar { object-fit: cover; }
 .icon-btn.primary { background: var(--md-primary); color: var(--md-on-primary); }
 .icon-btn.primary:hover { background: color-mix(in srgb, var(--md-on-primary) 8%, var(--md-primary)); color: var(--md-on-primary); }
 .icon-btn.primary:active { background: color-mix(in srgb, var(--md-on-primary) 12%, var(--md-primary)); }
+
+/* ── M3 Checkbox: 18px, рамка 2px, при отметке — заливка primary с галочкой ── */
+input[type=checkbox] {
+  -webkit-appearance: none; appearance: none;
+  flex-shrink: 0; display: inline-grid; place-content: center;
+  width: 18px; height: 18px; margin: 0;
+  border: 2px solid var(--md-on-surface-variant); border-radius: 2px;
+  background: transparent; cursor: pointer;
+  transition: background var(--d-short), border-color var(--d-short);
+}
+input[type=checkbox]::before {
+  content: ''; width: 12px; height: 12px;
+  background: var(--md-on-primary);
+  clip-path: polygon(14% 44%, 0 58%, 38% 96%, 100% 22%, 86% 8%, 38% 68%);
+  transform: scale(0); transition: transform var(--d-short) var(--m-emph);
+}
+input[type=checkbox]:checked { background: var(--md-primary); border-color: var(--md-primary); }
+input[type=checkbox]:checked::before { transform: scale(1); }
+input[type=checkbox]:disabled { opacity: .38; cursor: default; }
 
 /* ── M3 Expressive Slider (components/ui/Slider.tsx) ──────────────
    Дорожка 16px, ручка — вертикальная планка 4×32 с зазором 6px.
@@ -1293,7 +1316,7 @@ body:has(.mini-player) .toast-stack { bottom: 128px; }
   background: var(--md-surface-container-low);
   border: 1px solid var(--md-outline);
   border-radius: var(--r-sm);
-  padding: 8px 10px; color: var(--md-on-surface); font-size: 13px;
+  padding: 8px 10px; color: var(--md-on-surface); font: inherit; font-size: 13px;
 }
 .df-rule select { flex: 0 0 auto; max-width: 40%; }
 .df-rule input { min-width: 0; flex: 1; }
