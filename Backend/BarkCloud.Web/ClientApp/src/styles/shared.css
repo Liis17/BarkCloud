@@ -964,6 +964,7 @@ input[type=checkbox]:disabled { opacity: .38; cursor: default; }
   padding: 32px 12px 8px;
   background: linear-gradient(180deg, transparent, rgba(0,0,0,.7));
   transition: opacity var(--d-med) var(--m-emph);
+  container-type: inline-size;
 }
 .video-player.idle { cursor: none; }
 .video-player.idle .video-player-bar { opacity: 0; pointer-events: none; }
@@ -972,6 +973,13 @@ input[type=checkbox]:disabled { opacity: .38; cursor: default; }
 .video-player-bar .icon-btn:hover { background: rgba(255,255,255,.16); color: #fff; }
 .video-player-bar .media-time { color: rgba(255,255,255,.85); }
 .video-player-bar .m3-slider { --active: #fff; --inactive: rgba(255,255,255,.3); }
+/* Узкий плеер (вертикальное видео): таймлайн — отдельной строкой на всю ширину, громкость скрыта (остаётся mute) */
+@container (max-width: 520px) {
+  .media-controls { flex-wrap: wrap; row-gap: 0; }
+  .media-controls .media-seek { order: -1; flex: 1 0 100%; }
+  .media-controls .media-time { flex: 1 1 auto; }
+  .media-controls .media-volume { display: none; }
+}
 .shared-folder-video video { max-width: 92vw; max-height: 80vh; }
 
 .audio-bar .media-controls { gap: 4px; }
