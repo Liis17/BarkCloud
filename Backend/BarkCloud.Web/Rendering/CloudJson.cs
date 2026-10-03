@@ -60,7 +60,8 @@ public static class CloudJson
             ["createdAt"] = Iso(f.CreatedAt),
             ["uploadedAt"] = Iso(f.UploadedAt),
             // Полноразмерный JPEG для просмотра (HEIC и пр. браузеро-недружелюбные); пусто — показывать оригинал.
-            ["jpegViewUrl"] = f.JpegViewUrl
+            ["jpegViewUrl"] = f.JpegViewUrl,
+            ["placeholder"] = Placeholder(f.Placeholder)
         };
 
         // Тех-метаданные видео для тайла галереи (длительность/кодеки/битрейт/HDR) — только для VIDEO.
@@ -86,6 +87,12 @@ public static class CloudJson
         name = d.Name,
         createdAt = Iso(d.CreatedAt),
         updatedAt = Iso(d.UpdatedAt)
+    };
+
+    public static object? Placeholder(FilePlaceholderInfo? placeholder) => placeholder is null ? null : new
+    {
+        colors = placeholder.Colors.ToArray(),
+        aspectRatio = placeholder.AspectRatio
     };
 
     public static object Album(AlbumInfo a) => new

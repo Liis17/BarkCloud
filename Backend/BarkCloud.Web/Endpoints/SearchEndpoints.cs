@@ -4,6 +4,7 @@ using BarkCloud.Proto.Files;
 using BarkCloud.Proto.Torrent;
 using BarkCloud.Web.Auth;
 using BarkCloud.Web.Infrastructure;
+using BarkCloud.Web.Rendering;
 
 using Grpc.Core;
 
@@ -268,6 +269,7 @@ public static class SearchEndpoints
         title = hit.Title,
         subtitle = hit.Subtitle,
         previewUrl = hit.PreviewUrl,
+        placeholder = CloudJson.Placeholder(hit.Placeholder),
         mediaKind = hit.MediaKind.ToString().Replace("MediaKind", "", StringComparison.Ordinal).ToLowerInvariant(),
         favorite = hit.Favorite,
         matchField = hit.MatchField,

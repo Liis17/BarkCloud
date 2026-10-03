@@ -237,6 +237,12 @@ message UploadFileInfo {
   string jpeg_view_file_id = 16; // file_id полноразмерного JPEG-вида для просмотра (web/не-Apple); пусто — нет (видео/документ/легаси)
   string jpeg_view_url = 17; // Ссылка на скачивание JPEG-вида (для отображения в фуллвьювере). Оригинал — отдельной кнопкой «скачать»
   VideoMeta video_meta = 18; // Тех-метаданные видео для тайла галереи (только media_kind=VIDEO); присутствие — через HasVideoMeta
+  FilePlaceholderInfo placeholder = 19; // Цветной плейсхолдер области превью; отсутствует до обработки
+}
+
+message FilePlaceholderInfo {
+  repeated string colors = 1; // Девять #RRGGBB: слева направо, сверху вниз
+  float aspect_ratio = 2; // Пропорции области: квадрат фото или вся миниатюра видео
 }
 
 // Краткие тех-параметры видео для отображения на тайле галереи (подмножество FileMetadataInfo).
@@ -1209,6 +1215,7 @@ message SearchHit {
   google.protobuf.Timestamp created_at = 12;
   int64 size = 13;
   string owner_name = 14;
+  FilePlaceholderInfo placeholder = 15;
 }
 
 message GetFileSearchMetadataRequest {

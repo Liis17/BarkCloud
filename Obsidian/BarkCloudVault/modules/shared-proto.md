@@ -36,6 +36,8 @@ Parent: [[index]]
 
 ## Поисковые контракты
 
+`FilePlaceholderInfo` передаёт девять `colors` и `aspect_ratio` в `UploadFileInfo.placeholder` (19) и `SearchHit.placeholder` (15). Существующие номера полей сохранены. Пакетное получение и SVG-восстановление — [[modules/image-placeholders]].
+
 `files_api.proto` содержит `SearchApi`: `Search` (секции с отдельными limit/cursor), `ResolveHit`, `GetFileSearchMetadata`, `ReplaceFileSearchMetadata`; общие типы — `SearchSection`, `SearchHitKind`, `SearchHit`. `torrent_api.proto` содержит cursor-RPC `SearchTorrents`. Оба сервиса требуют пользовательский JWT.
 
 Storage-контракты: `configuration_api.proto` передаёт `StorageProfileItem.quota_bytes` и принимает `quota_value/quota_unit` при сохранении профиля; `files_api.proto` добавляет в `GetUserStorageInfoResponse` поля `all_s3_*` для суммарной фактической статистики S3. Подробности — [[api/configuration-api]] и [[api/files-api]].

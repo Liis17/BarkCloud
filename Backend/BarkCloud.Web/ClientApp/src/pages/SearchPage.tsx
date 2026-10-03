@@ -1,4 +1,5 @@
 import React from 'react';
+import { MediaThumb } from '../components/media/MediaThumb';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import { Loading } from '../components/ui/EmptyState';
@@ -142,6 +143,19 @@ function MatchReason({ hit }: { hit: SearchHit }) {
 }
 
 function HitPreview({ hit, large = false }: { hit: SearchHit; large?: boolean }) {
+  if (hit.mediaKind === 'photo' || hit.mediaKind === 'video') {
+    return <MediaThumb
+      className={'thumb search-hit-preview' + (large ? ' large' : '')}
+      sizes={large ? '240px' : '44px'}
+      colorPlaceholder
+      media={{
+        id: hit.fileId || hit.id,
+        kind: hit.mediaKind,
+        previews: hit.previewUrl ? [{ w: 512, target: 512, url: hit.previewUrl }] : [],
+        placeholder: hit.placeholder,
+      }}
+    />;
+  }
   const Glyph = Icon[searchHitIconName(hit)];
   return <span className={'search-hit-preview' + (large ? ' large' : '')}>{hit.previewUrl ? <img src={hit.previewUrl} alt="" /> : <Glyph size={large ? 30 : 20} />}</span>;
 }

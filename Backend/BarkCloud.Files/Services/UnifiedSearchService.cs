@@ -1,5 +1,6 @@
 using BarkCloud.Files.Domain;
 using BarkCloud.Files.Helpers;
+using BarkCloud.Files.Mapping;
 using BarkCloud.Files.Persistence;
 using BarkCloud.GrpcServer.Settings;
 using BarkCloud.GrpcServer.XAuth;
@@ -88,7 +89,7 @@ public partial class UnifiedSearchService
             var hasMore = hits.Count > limit;
             var visible = hits.Take(limit).ToList();
             var result = new SearchSectionResult { Section = page.Section, HasMore = hasMore };
-            result.Hits.AddRange(visible.Select(x => x.Build(enrichment)));
+            result.Hits.AddRange(visible.Select(x => BuildHit(x, enrichment)));
             if (hasMore && visible.Count > 0)
                 result.NextCursor = SearchCursor.Encode(visible[^1].Rank, visible[^1].Similarity, visible[^1].SortAt, visible[^1].Kind.ToString(), visible[^1].Id);
             response.Sections.Add(result);
@@ -121,7 +122,7 @@ public partial class UnifiedSearchService
         var hit = hits.FirstOrDefault(x => x.Kind == request.Kind)
                   ?? throw new RpcException(new Status(StatusCode.NotFound, "Результат больше недоступен"));
         var enrichment = await LoadEnrichment(hit.FileId.HasValue ? [hit.FileId.Value] : [], cancellationToken);
-        return hit.Build(enrichment);
+        return BuildHit(hit, enrichment);
     }
 
     public async Task<FileSearchMetadata> GetFileSearchMetadata(Guid fileId, CancellationToken cancellationToken)
@@ -222,6 +223,7 @@ public partial class UnifiedSearchService
         Dictionary<Guid, List<FileTag>> Tags,
         HashSet<Guid> FavoriteIds,
         Dictionary<Guid, List<FilePreview>> Previews,
+        Dictionary<Guid, FilePlaceholder> Placeholders,
         string PublicBaseUrl);
 
     private async Task<FileEnrichment> LoadEnrichment(ICollection<Guid> fileIds, CancellationToken cancellationToken)
@@ -243,11 +245,24 @@ public partial class UnifiedSearchService
             .Select(x => x.FileId)
             .ToListAsync(cancellationToken)).ToHashSet();
         var previews = ids.Count == 0 ? new Dictionary<Guid, List<FilePreview>>() : await _context.FilePreviews.AsNoTracking()
-            .Where(x => ids.Contains(x.OriginalFileId) && x.TargetWidth > 0)
+            .Where(x => ids.Contains(x.OriginalFileId) && x.TargetWidth >= 0)
             .GroupBy(x => x.OriginalFileId)
             .ToDictionaryAsync(x => x.Key, x => x.OrderBy(p => p.TargetWidth).ToList(), cancellationToken);
 
-        return new FileEnrichment(metadata, aliases, tags, favoriteIds, previews, FileUrlHelper.GetPublicBaseUrl(_configuration, _runSettings));
+        var placeholders = ids.Count == 0 ? new Dictionary<Guid, FilePlaceholder>() : await _context.FilePlaceholders.AsNoTracking()
+            .Where(x => ids.Contains(x.FileId))
+            .ToDictionaryAsync(x => x.FileId, cancellationToken);
+
+        return new FileEnrichment(metadata, aliases, tags, favoriteIds, previews, placeholders, FileUrlHelper.GetPublicBaseUrl(_configuration, _runSettings));
+    }
+
+    private static SearchHit BuildHit(PendingHit pending, FileEnrichment data)
+    {
+        var hit = pending.Build(data);
+        if (pending.FileId is { } fileId && hit.MediaKind is ProtoMediaKind.Photo or ProtoMediaKind.Video
+            && data.Placeholders.TryGetValue(fileId, out var placeholder))
+            hit.Placeholder = placeholder.ToGrpc();
+        return hit;
     }
 
     private static SearchHit OwnedFileHit(UploadFile file, CloudFileEntry? entry, bool trash, SearchHitKind kind, string query, FileEnrichment data)

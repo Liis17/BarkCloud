@@ -29,6 +29,25 @@ public class CloudJsonTests
         card["sizeLabel"].Should().Be("2 КБ");
         card["width"].Should().Be(1920);
         card["height"].Should().Be(1080);
+        card["placeholder"].Should().BeNull();
+    }
+
+    [Fact]
+    public void Media_EmbedsPlaceholderInSameJsonResponse()
+    {
+        var file = SampleFile();
+        file.Placeholder = new FilePlaceholderInfo
+        {
+            Colors = { Enumerable.Repeat("#112233", 9) }, AspectRatio = 1.5f
+        };
+
+        var card = CloudJson.Media(file);
+        using var json = System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(card));
+
+        var placeholder = json.RootElement.GetProperty("placeholder");
+        placeholder.GetProperty("colors").EnumerateArray().Select(c => c.GetString())
+            .Should().Equal(Enumerable.Repeat("#112233", 9));
+        placeholder.GetProperty("aspectRatio").GetSingle().Should().Be(1.5f);
     }
 
     [Fact]

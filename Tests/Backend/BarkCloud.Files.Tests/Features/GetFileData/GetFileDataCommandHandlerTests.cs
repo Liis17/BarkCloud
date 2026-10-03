@@ -28,6 +28,8 @@ public class GetFileDataCommandHandlerTests
     {
         _files.Setup(s => s.GetFile(file.Id)).ReturnsAsync(file);
         _files.Setup(s => s.GetPreviewsForFile(file.Id, It.IsAny<CancellationToken>())).ReturnsAsync(new List<FilePreview>());
+        _files.Setup(s => s.GetPlaceholdersForFiles(It.IsAny<IEnumerable<Guid>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<Guid, FilePlaceholder>());
     }
 
     private static UploadFileEntity ReadyFile(Guid id, UploadFileType type, params long[] uploaders) => new()
@@ -55,10 +57,17 @@ public class GetFileDataCommandHandlerTests
     {
         var fileId = Guid.NewGuid();
         SetupFile(ReadyFile(fileId, UploadFileType.CloudFile, OwnerId));
+        _files.Setup(s => s.GetPlaceholdersForFiles(It.IsAny<IEnumerable<Guid>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<Guid, FilePlaceholder>
+            {
+                [fileId] = new() { FileId = fileId, Colors = Enumerable.Repeat("#112233", 9).ToArray(), AspectRatio = 1 }
+            });
 
         var response = await CreateSut().Handle(new GetFileDataCommand { FileId = fileId, UserId = OwnerId }, default);
 
         response.FileInfo.Id.Should().Be(fileId.ToString());
+        response.FileInfo.Placeholder.Colors.Should().Equal(Enumerable.Repeat("#112233", 9));
+        response.FileInfo.Placeholder.AspectRatio.Should().Be(1);
     }
 
     [Theory]

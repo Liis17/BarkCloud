@@ -63,6 +63,7 @@ public class SearchFilesCommandHandler : IRequestHandler<SearchFilesCommand, Sea
         var fileIds = page.Select(e => e.FileId).Distinct().ToList();
         var filesById = (await _uploadedFiles.GetFiles(fileIds)).ToDictionary(f => f.Id);
         var previewsByOriginal = await _uploadedFiles.GetPreviewsForFiles(filesById.Keys, cancellationToken);
+        var placeholders = await _uploadedFiles.GetPlaceholdersForFiles(filesById.Keys, cancellationToken);
         var baseUrl = FileUrlHelper.GetPublicBaseUrl(_configuration, _runSettings);
 
         foreach (var e in page)
@@ -84,7 +85,7 @@ public class SearchFilesCommandHandler : IRequestHandler<SearchFilesCommand, Sea
             response.Files.Add(new FileEntryDetailed
             {
                 Entry = entryInfo,
-                File = file.ToGrpc(baseUrl, previews)
+                File = file.ToGrpc(baseUrl, previews, placeholder: placeholders.GetValueOrDefault(file.Id))
             });
         }
 

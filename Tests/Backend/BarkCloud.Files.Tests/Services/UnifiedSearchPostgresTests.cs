@@ -62,6 +62,8 @@ public sealed class UnifiedSearchPostgresTests(SearchCatalogFixture fixture) : I
         exact.Favorite.Should().BeTrue();
         exact.Size.Should().Be(1234);
         exact.PreviewUrl.Should().Be($"http://localhost:7026/download/{c.ExactPreview512}");
+        exact.Placeholder.Colors.Should().Equal(Enumerable.Repeat("#112233", 9));
+        exact.Placeholder.AspectRatio.Should().Be(1);
         exact.CreatedAt.ToDateTime().Should().Be(c.Exact.CreatedAt);
 
         var tagged = result.Hits.Single(x => x.Id == c.TagExact.EntryId.ToString());
@@ -917,6 +919,12 @@ public sealed class Catalog
         db.FileMetadata.AddRange(metadata);
         db.FavoriteFiles.AddRange(favorites);
         db.FilePreviews.AddRange(previews);
+        db.FilePlaceholders.Add(new FilePlaceholder
+        {
+            FileId = c.Exact.FileId,
+            SourceFilePreviewId = previews.Single(p => p.OriginalFileId == c.Exact.FileId && p.TargetWidth == 128).Id,
+            Colors = Enumerable.Repeat("#112233", 9).ToArray(), AspectRatio = 1
+        });
         db.FileGrants.AddRange(fileGrants);
         db.DirectoryGrants.AddRange(dirGrants);
         db.MusicPlaylistGrants.AddRange(playlistGrants);

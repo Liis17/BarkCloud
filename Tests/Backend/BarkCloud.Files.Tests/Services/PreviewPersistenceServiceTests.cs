@@ -69,9 +69,10 @@ public sealed class PreviewPersistenceServiceTests : IDisposable
         await SeedHash(view);
         var original = await SeedBlob(2);
 
-        var id = await CreateSut().PersistJpegViewAsync(original, Bytes, 100, 80, Profile, default);
+        var viewResult = await CreateSut().PersistJpegViewAsync(original, Bytes, 100, 80, Profile, default);
 
-        id.Should().Be(view.Id);
+        viewResult.FileId.Should().Be(view.Id);
+        viewResult.SavedBytes.Should().BeSameAs(Bytes);
         (await StoredUploaders(view.Id)).Should().BeEquivalentTo([1L, 2L]);
         (await _db.Context.FilePreviews.AsNoTracking().SingleAsync(x => x.OriginalFileId == original.Id))
             .TargetWidth.Should().Be(0);
@@ -84,10 +85,30 @@ public sealed class PreviewPersistenceServiceTests : IDisposable
         await SeedHash(orphan);
         var original = await SeedBlob(2);
 
-        var id = await CreateSut().PersistJpegViewAsync(original, Bytes, 100, 80, Profile, default);
+        var viewResult = await CreateSut().PersistJpegViewAsync(original, Bytes, 100, 80, Profile, default);
 
-        id.Should().NotBe(orphan.Id);
-        (await StoredUploaders(id)).Should().Equal(2);
+        viewResult.FileId.Should().NotBe(orphan.Id);
+        viewResult.SavedBytes.Should().BeSameAs(Bytes);
+        (await StoredUploaders(viewResult.FileId)).Should().Equal(2);
+    }
+
+    [Fact]
+    public async Task PersistJpegView_ExistingLink_DoesNotClaimFreshBytesBelongToStoredBlob()
+    {
+        var view = await SeedBlob(1);
+        var original = await SeedBlob(2);
+        _db.Context.FilePreviews.Add(new FilePreview
+        {
+            Id = Guid.NewGuid(), OriginalFileId = original.Id, PreviewFileId = view.Id,
+            TargetWidth = 0, ActualWidth = 100, ActualHeight = 80, CreatedAt = DateTime.UtcNow
+        });
+        await _db.Context.SaveChangesAsync();
+
+        var result = await CreateSut().PersistJpegViewAsync(original, [9, 8, 7], 100, 80, Profile, default);
+
+        result.FileId.Should().Be(view.Id);
+        result.SavedBytes.Should().BeNull();
+        _s3.Verify(s => s.UploadAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<Stream>(), It.IsAny<string>()), Times.Never);
     }
 
     private PreviewPersistenceService CreateSut() => new(

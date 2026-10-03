@@ -1,5 +1,5 @@
 import type { NavigateFunction } from 'react-router-dom';
-import type { CardFile, MediaItem, MediaKind } from './types';
+import type { CardFile, FilePlaceholder, MediaItem, MediaKind } from './types';
 
 export type SearchSectionKey = 'photos' | 'videos' | 'files' | 'tracks' | 'albums' | 'playlists' | 'folders' | 'shared' | 'trash' | 'torrents';
 export type SearchHitKind = 'photo' | 'video' | 'file' | 'track' | 'album' | 'playlist' | 'folder' | 'dynamicFolder' | 'sharedFile' | 'sharedFolder' | 'sharedPlaylist' | 'trash' | 'torrent';
@@ -12,6 +12,7 @@ export interface SearchHit {
   title: string;
   subtitle: string;
   previewUrl: string;
+  placeholder?: FilePlaceholder | null;
   mediaKind: string;
   favorite: boolean;
   matchField: string;
@@ -93,6 +94,7 @@ export function searchHitToCardFile(hit: SearchHit): CardFile {
     width: 0,
     height: 0,
     previews: hit.previewUrl ? [{ w: 512, target: 512, url: hit.previewUrl }] : [],
+    placeholder: hit.placeholder,
     createdAt: hit.createdAt,
     uploadedAt: hit.createdAt,
   };

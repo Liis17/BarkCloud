@@ -2,6 +2,8 @@
 
 Parent: [[index]] · See also: [[api/files-api]] · [[modules/upload-2]] · [[modules/backend-files-cloud]] · [[modules/shared-queue]]
 
+Превью фото/видео и девять цветов для веб-плейсхолдера: [[modules/image-placeholders]] — расчёт, таблица `FilePlaceholders`, общий пайплайн и фоновый воркер.
+
 ## Назначение
 
 Сервис файлов. Основные ответственности:

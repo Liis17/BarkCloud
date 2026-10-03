@@ -18,6 +18,10 @@ public class ListUserMediaCommandHandlerTests
     private readonly Mock<ICloudHierarchyStorage> _hierarchy = new();
     private readonly Mock<IFileMetadataStorage> _metadata = new();
 
+    public ListUserMediaCommandHandlerTests() =>
+        _files.Setup(s => s.GetPlaceholdersForFiles(It.IsAny<IEnumerable<Guid>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<Guid, FilePlaceholder>());
+
     private ListUserMediaCommandHandler CreateSut() => new(
         _files.Object, _hierarchy.Object, _metadata.Object,
         UserContextFactory.Create(OwnerId),
@@ -44,6 +48,11 @@ public class ListUserMediaCommandHandlerTests
             .ReturnsAsync(new List<UploadFileEntity> { new() { Id = fileId, MediaKind = MediaKind.Photo } });
         _files.Setup(s => s.GetPreviewsForFiles(It.IsAny<IEnumerable<Guid>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Dictionary<Guid, List<FilePreview>>());
+        _files.Setup(s => s.GetPlaceholdersForFiles(It.IsAny<IEnumerable<Guid>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<Guid, FilePlaceholder>
+            {
+                [fileId] = new() { FileId = fileId, Colors = Enumerable.Repeat("#112233", 9).ToArray(), AspectRatio = 1 }
+            });
         _hierarchy.Setup(s => s.GetLiveEntriesForFiles(OwnerId, It.IsAny<IReadOnlyCollection<Guid>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<DomainFileEntry>
             {
@@ -55,6 +64,7 @@ public class ListUserMediaCommandHandlerTests
 
         var item = response.Items.Should().ContainSingle().Subject;
         item.File.Id.Should().Be(fileId.ToString());
+        item.File.Placeholder.Colors.Should().Equal(Enumerable.Repeat("#112233", 9));
         item.EntriesCount.Should().Be(2);
         item.EntryNames.Should().HaveCount(2);
         item.EntryIds.Should().HaveCount(2);

@@ -61,6 +61,7 @@ public class GetFilesDataCommandHandler : IRequestHandler<GetFilesDataCommand, G
 
         var previewsByOriginal = await _uploadedFilesStorage.GetPreviewsForFiles(
             files.Select(f => f.Id), cancellationToken);
+        var placeholders = await _uploadedFilesStorage.GetPlaceholdersForFiles(files.Select(f => f.Id), cancellationToken);
 
         return new GetFilesDataResponse
         {
@@ -68,7 +69,8 @@ public class GetFilesDataCommandHandler : IRequestHandler<GetFilesDataCommand, G
             {
                 files.Select(x => x.ToGrpc(
                     baseUrl,
-                    previewsByOriginal.TryGetValue(x.Id, out var ps) ? ps : null))
+                    previewsByOriginal.TryGetValue(x.Id, out var ps) ? ps : null,
+                    placeholder: placeholders.GetValueOrDefault(x.Id)))
             }
         };
     }

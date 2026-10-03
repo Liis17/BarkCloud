@@ -13,6 +13,7 @@ public interface IUploadedFilesStorage
     Task<UploadFile?> GetOriginalByPreviewFileId(Guid previewFileId, CancellationToken cancellationToken = default);
     Task<List<FilePreview>> GetPreviewsForFile(Guid originalFileId, CancellationToken cancellationToken = default);
     Task<Dictionary<Guid, List<FilePreview>>> GetPreviewsForFiles(IEnumerable<Guid> originalFileIds, CancellationToken cancellationToken = default);
+    Task<Dictionary<Guid, FilePlaceholder>> GetPlaceholdersForFiles(IEnumerable<Guid> fileIds, CancellationToken cancellationToken = default);
     Task RemoveUploaderFromFile(Guid fileId, long userId, CancellationToken cancellationToken = default);
     Task<long> GetUserStorageUsed(long userId);
     Task<Dictionary<UploadFileType, long>> GetUserStorageByType(long userId);

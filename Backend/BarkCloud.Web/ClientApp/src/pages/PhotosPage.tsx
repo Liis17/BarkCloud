@@ -34,7 +34,7 @@ function Photo({ m, selecting, checked, onToggle, onOpen, onMenu }: {
       onClick={(e) => (e.shiftKey ? onToggle(true) : selecting ? onToggle(false) : onOpen(m))}
       onContextMenu={(e) => onMenu(e, m)}
     >
-      <MediaThumb media={m} sizes={GRID_SIZES} />
+      <MediaThumb media={m} sizes={GRID_SIZES} colorPlaceholder />
       <button className="selbox" onClick={(e) => { e.stopPropagation(); onToggle(e.shiftKey); }} title="Выбрать">
         {checked ? <Icon.check size={14} /> : null}
       </button>

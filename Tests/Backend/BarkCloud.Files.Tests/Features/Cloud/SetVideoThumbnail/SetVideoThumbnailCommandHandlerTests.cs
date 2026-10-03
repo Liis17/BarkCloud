@@ -127,7 +127,7 @@ public class SetVideoThumbnailCommandHandlerTests
             .ReturnsAsync(previews);
 
         var previewPersistence = new Mock<PreviewPersistenceService>(
-            null!, null!, s3.Object, null!, NullLogger<PreviewPersistenceService>.Instance)
+            null!, null!, s3.Object, null!, NullLogger<PreviewPersistenceService>.Instance, null!)
         {
             CallBase = false
         };
