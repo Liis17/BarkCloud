@@ -47,7 +47,9 @@ public static class SettingsEndpoints
         string? ProfileId,
         bool ConfirmLegacyMutation,
         string? QuotaValue,
-        string? QuotaUnit);
+        string? QuotaUnit,
+        string? Region = null,
+        bool? ForcePathStyle = null);
     public sealed record ServerStorageActivateBody(string? ProfileId);
     public sealed record ServerStorageDisableBody(string? Role);
     public sealed record ReservedNameBody(string? Name);
@@ -97,6 +99,8 @@ public static class SettingsEndpoints
             }));
 
         // ───────── Настройки сервера (обычная сессия + AdminGate) ─────────
+
+        api.MapStorageMigrationEndpoints();
 
         api.MapGet("/server", (HttpContext http, AuthGateway auth, AdminGate admin, ConfigurationManagementGateway configuration) =>
             DoAdmin(http, auth, admin, async user =>
@@ -462,7 +466,7 @@ public static class SettingsEndpoints
         }
     }
 
-    private static async Task<IResult> DoAdmin(
+    internal static async Task<IResult> DoAdmin(
         HttpContext http,
         AuthGateway auth,
         AdminGate admin,
@@ -497,7 +501,7 @@ public static class SettingsEndpoints
         body.ProfileId,
         body.ConfirmLegacyMutation,
         body.QuotaValue ?? "0",
-        body.QuotaUnit ?? "gb");
+        body.QuotaUnit ?? "gb", body.Region, body.ForcePathStyle);
 
     private static IResult MapRpc(RpcException ex)
     {

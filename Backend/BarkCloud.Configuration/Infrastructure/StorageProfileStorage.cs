@@ -1,4 +1,5 @@
 using BarkCloud.Configuration.Domain;
+using BarkCloud.GrpcServer;
 using BarkCloud.GrpcServer.Metrics;
 
 using Microsoft.EntityFrameworkCore;
@@ -17,7 +18,9 @@ public sealed record StorageProfileInput(
     bool IsLegacy,
     string? ProfileId,
     bool ConfirmLegacyMutation,
-    long QuotaBytes = 0);
+    long QuotaBytes = 0,
+    string? Region = null,
+    bool? ForcePathStyle = null);
 
 public static class StorageProfileRoles
 {
@@ -77,6 +80,11 @@ public sealed class StorageProfileStorage
         await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
         var profiles = await LockedProfilesAsync(cancellationToken);
         var target = ResolveTarget(profiles, input);
+        input = input with
+        {
+            Region = input.Region?.Trim() ?? target?.Region ?? string.Empty,
+            ForcePathStyle = input.ForcePathStyle ?? target?.ForcePathStyle ?? true
+        };
         if (target is not null && target.Role != input.Role)
             throw new InvalidOperationException($"Storage profile '{target.ProfileId}' belongs to role '{target.Role}'.");
         var secret = string.IsNullOrEmpty(input.SecretKey) ? target?.SecretKey ?? string.Empty : input.SecretKey;
@@ -158,6 +166,62 @@ public sealed class StorageProfileStorage
         await transaction.CommitAsync(cancellationToken);
         _metrics.Increment("storage_profile_writes");
         return saved;
+    }
+
+    public async Task RelocateAsync(
+        string sourceServiceUrl,
+        string sourceBucketName,
+        IReadOnlyCollection<string> profileIds,
+        StorageProfileInput destination,
+        string migrationId,
+        string editedBy,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(migrationId) || profileIds.Count == 0)
+            throw new InvalidOperationException("Укажите миграцию и исходные профили.");
+        ValidateComplete(destination.ServiceUrl, destination.AccessKey, destination.SecretKey, destination.BucketName);
+        await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+        var profiles = await LockedProfilesAsync(cancellationToken);
+        var expected = profileIds.ToHashSet(StringComparer.Ordinal);
+        var sourceUrl = S3Endpoint.Normalize(sourceServiceUrl, profiles.FirstOrDefault(x => expected.Contains(x.ProfileId))?.IsR2 == true);
+        var targetUrl = S3Endpoint.Normalize(destination.ServiceUrl, destination.IsR2);
+        if (sourceUrl.Equals(targetUrl, StringComparison.OrdinalIgnoreCase)
+            && sourceBucketName == destination.BucketName.Trim())
+            throw new InvalidOperationException("Нельзя перенести бакет в самого себя.");
+        var actor = NormalizeActor(editedBy);
+        var auditSource = $"s3-migration:{migrationId}";
+        var sourceProfiles = profiles.Where(profile =>
+            S3Endpoint.Normalize(profile.ServiceUrl, profile.IsR2).Equals(sourceUrl, StringComparison.OrdinalIgnoreCase)
+            && profile.BucketName == sourceBucketName).ToArray();
+        // A lost RPC response must not turn a committed relocation into a second mutation.
+        if (sourceProfiles.Length == 0 && expected.Count == profileIds.Count
+            && profiles.Count(profile => expected.Contains(profile.ProfileId)
+                && profile.EditedFrom == auditSource
+                && S3Endpoint.Normalize(profile.ServiceUrl, profile.IsR2).Equals(targetUrl, StringComparison.OrdinalIgnoreCase)
+                && profile.BucketName == destination.BucketName.Trim()
+                && profile.AccessKey == destination.AccessKey.Trim() && profile.SecretKey == destination.SecretKey
+                && profile.IsR2 == destination.IsR2 && profile.Region == (destination.Region?.Trim() ?? string.Empty)
+                && profile.ForcePathStyle == (destination.ForcePathStyle ?? true)) == expected.Count)
+        {
+            await transaction.CommitAsync(cancellationToken);
+            return;
+        }
+        if (expected.Count != profileIds.Count || !expected.SetEquals(sourceProfiles.Select(x => x.ProfileId)))
+            throw new InvalidOperationException("Исходные S3-профили изменились. Переключение отменено.");
+        if (profiles.Any(profile => !expected.Contains(profile.ProfileId)
+            && S3Endpoint.Normalize(profile.ServiceUrl, profile.IsR2).Equals(targetUrl, StringComparison.OrdinalIgnoreCase)
+            && profile.BucketName == destination.BucketName.Trim()))
+            throw new InvalidOperationException("Целевой бакет уже используется другим S3-профилем.");
+
+        destination = destination with { Region = destination.Region?.Trim() ?? string.Empty, ForcePathStyle = destination.ForcePathStyle ?? true };
+        foreach (var profile in sourceProfiles)
+        {
+            var before = Snapshot(profile);
+            Apply(profile, destination, destination.SecretKey, actor, auditSource);
+            AddRevision(profile.ProfileId, before, profile, "MigrationRelocation", actor, auditSource);
+        }
+        await _context.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
     }
 
     public async Task ActivateAsync(
@@ -269,6 +333,8 @@ public sealed class StorageProfileStorage
             BucketName = input.BucketName.Trim(),
             QuotaBytes = input.QuotaBytes,
             IsR2 = input.IsR2,
+            Region = input.Region ?? string.Empty,
+            ForcePathStyle = input.ForcePathStyle ?? true,
             IsLegacy = legacy,
             IsActive = !legacy,
             CreatedAt = now,
@@ -292,6 +358,8 @@ public sealed class StorageProfileStorage
         target.SecretKey = secret;
         target.BucketName = input.BucketName.Trim();
         target.IsR2 = input.IsR2;
+        target.Region = input.Region ?? target.Region;
+        target.ForcePathStyle = input.ForcePathStyle ?? target.ForcePathStyle;
         target.EditedAt = DateTime.UtcNow;
         target.EditedBy = actor;
         target.EditedFrom = source;
@@ -351,6 +419,8 @@ public sealed class StorageProfileStorage
         profile.BucketName,
         profile.QuotaBytes,
         profile.IsR2,
+        profile.Region,
+        profile.ForcePathStyle,
         profile.IsActive,
         profile.IsLegacy
     });
@@ -361,7 +431,9 @@ public sealed class StorageProfileStorage
     private static bool LocationChanged(StorageProfile profile, StorageProfileInput input) =>
         !string.Equals(profile.ServiceUrl, NormalizeUrl(input.ServiceUrl), StringComparison.OrdinalIgnoreCase)
         || !string.Equals(profile.BucketName, input.BucketName.Trim(), StringComparison.Ordinal)
-        || profile.IsR2 != input.IsR2;
+        || profile.IsR2 != input.IsR2
+        || profile.Region != input.Region
+        || profile.ForcePathStyle != input.ForcePathStyle;
 
     private static bool SameLocation(StorageProfile left, StorageProfile right) =>
         string.Equals(left.ServiceUrl, right.ServiceUrl, StringComparison.OrdinalIgnoreCase)
@@ -369,12 +441,8 @@ public sealed class StorageProfileStorage
         && left.IsR2 == right.IsR2;
 
     private static bool SamePhysicalBucket(StorageProfile left, StorageProfile right) =>
-        string.Equals(NormalizeEndpoint(left.ServiceUrl), NormalizeEndpoint(right.ServiceUrl), StringComparison.OrdinalIgnoreCase)
+        string.Equals(S3Endpoint.Normalize(left.ServiceUrl, left.IsR2), S3Endpoint.Normalize(right.ServiceUrl, right.IsR2), StringComparison.OrdinalIgnoreCase)
         && string.Equals(left.BucketName, right.BucketName, StringComparison.Ordinal);
-
-    private static string NormalizeEndpoint(string value) => Uri.TryCreate(value, UriKind.Absolute, out var uri)
-        ? uri.GetLeftPart(UriPartial.Path).TrimEnd('/')
-        : NormalizeUrl(value);
 
     private static string NormalizeUrl(string value) => value.Trim().TrimEnd('/');
 

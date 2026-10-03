@@ -120,6 +120,7 @@ public class Program
             services.GetRequiredService<LegacyUploadQuotaGuard>());
         builder.Services.AddScoped<UploadSessionMaintenance>();
         builder.Services.AddSingleton<IMultipartUploadStore, S3MultipartUploadStore>();
+        builder.Services.AddSingleton<StorageMigrationGate>();
         builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddScoped<ITrashPurgeService, TrashPurgeService>();
         builder.Services.AddSingleton<IPhysicalStorageStatsProvider, PhysicalStorageStatsProvider>();
@@ -190,6 +191,7 @@ public class Program
             var ctx = scope.ServiceProvider.GetRequiredService<FilesContext>();
             ctx.Database.Migrate();
         }
+        app.Services.GetRequiredService<StorageMigrationGate>().InitializeAsync(CancellationToken.None).GetAwaiter().GetResult();
 
         app.MapGrpcReflectionService();
 

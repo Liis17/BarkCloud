@@ -20,10 +20,13 @@ C#-типы (сообщения, client и server-заглушка `Configuratio
 | `GetAllConfigurations` | Все settings-таблицы с metadata для админского Web |
 | `GetConfigurationHistory` | История одного ключа |
 | `RollbackConfiguration` | Транзакционный откат к `PreviousValue` выбранной ревизии |
+| `RelocateStorageProfiles` | Атомарная замена подключения всех профилей исходного физического бакета с сохранением ID и ревизиями MigrationRelocation; `migration_id` обеспечивает безопасный повтор |
 | `GetStorageProfiles` | Все версии S3-профилей; optional audit metadata |
 | `SaveStorageProfile` | Создание версии, legacy correction или credentials rotation |
 | `ActivateStorageProfile` | Выбор версии для новых записей роли |
 | `DisableStorageRole` | Отключение специализированной роли для новых записей |
+
+`StorageProfileItem.region` и optional `force_path_style` передают параметры S3 клиента. SaveStorageProfileRequest использует optional `region`/`force_path_style`, чтобы отсутствующие поля старых клиентов сохраняли текущие значения. См. [[modules/web-s3-migration]].
 
 Исходные номера старых RPC и полей сохранены; новые поля `ConfigurationItem` добавлены совместимо: `is_sensitive`, `has_value`, `is_read_only`, `value_kind`, `restart_targets`.
 

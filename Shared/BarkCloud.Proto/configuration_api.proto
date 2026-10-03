@@ -30,6 +30,7 @@ service ConfigurationApi {
   rpc SaveStorageProfile(SaveStorageProfileRequest) returns(SaveStorageProfileResponse);
   rpc ActivateStorageProfile(ActivateStorageProfileRequest) returns(UpdateConfigurationResponse);
   rpc DisableStorageRole(DisableStorageRoleRequest) returns(UpdateConfigurationResponse);
+  rpc RelocateStorageProfiles(RelocateStorageProfilesRequest) returns(UpdateConfigurationResponse);
 }
 
 message GetConfigurationRequest{
@@ -184,6 +185,8 @@ message StorageProfileItem {
   string edited_from = 16;
   bool has_secret_key = 17;
   int64 quota_bytes = 18;
+  string region = 19;
+  optional bool force_path_style = 20;
 }
 
 message StorageProfileRevisionItem {
@@ -216,6 +219,17 @@ message SaveStorageProfileRequest {
   string edited_from = 11;
   string quota_value = 12; // Целое число из Web-формы; "0" означает безлимит
   string quota_unit = 13; // gb | tb | pb, двоичные единицы
+  optional string region = 14;
+  optional bool force_path_style = 15;
+}
+
+message RelocateStorageProfilesRequest {
+  string source_service_url = 1;
+  string source_bucket_name = 2;
+  repeated string profile_ids = 3;
+  StorageProfileItem destination = 4;
+  string migration_id = 5;
+  string edited_by = 6;
 }
 
 message SaveStorageProfileResponse {

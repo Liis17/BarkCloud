@@ -97,7 +97,8 @@ public class FilesController : Controller
         try
         {
             reservation = await _legacyQuota.ReserveAsync(
-                uploadId, file.FileName, file.Length, HttpContext.RequestAborted);
+                uploadId, file.FileName, file.Length, HttpContext.RequestAborted,
+                HttpContext.Items[LegacyUploadAdmissionFilter.MigrationActivityKey] as string);
         }
         catch (BarkCloud.Shared.Exceptions.Files.UploadQuotaExceededException ex)
         {
@@ -115,6 +116,10 @@ public class FilesController : Controller
         catch (FileAlreadyUploadedException ex)
         {
             return BadRequest(ex.Message);
+        }
+        catch (BarkCloud.Shared.Exceptions.Files.StorageMigrationPausedException ex)
+        {
+            return Conflict(new { error = ex.ErrorMessage, code = ex.ErrorCode });
         }
 
         if (!reservation.RequiresProcessing)

@@ -6,6 +6,7 @@ using BarkCloud.Files.Features.GetFilesData;
 using BarkCloud.Files.Features.GetUserStorageInfoServer;
 using BarkCloud.Files.Features.UploadAvatarServer;
 using BarkCloud.Files.Services;
+using BarkCloud.Files.Infrastructure;
 using BarkCloud.Proto.Files;
 using BarkCloud.Shared.Identity;
 
@@ -22,12 +23,28 @@ public class FilesServerApiService : FilesServerApi.FilesServerApiBase
 {
     private readonly IMediator _mediator;
     private readonly MusicLibraryService _music;
+    private readonly StorageMigrationGate? _migrationGate;
 
-    public FilesServerApiService(IMediator mediator, MusicLibraryService music)
+    public FilesServerApiService(IMediator mediator, MusicLibraryService music, StorageMigrationGate? migrationGate = null)
     {
         _mediator = mediator;
         _music = music;
+        _migrationGate = migrationGate;
     }
+
+    private StorageMigrationGate MigrationGate => _migrationGate
+        ?? throw new RpcException(new Status(StatusCode.Unimplemented, "Миграция S3 не настроена."));
+
+    public override Task<StorageCutoverStatus> BeginStorageCutover(StorageCutoverRequest request, ServerCallContext context)
+        => MigrationGate.BeginAsync(request, context.CancellationToken);
+    public override Task<StorageCutoverStatus> FreezeStorageCutover(StorageCutoverIdRequest request, ServerCallContext context)
+        => MigrationGate.FreezeAsync(request.MigrationId, context.CancellationToken);
+    public override Task<StorageCutoverStatus> MarkStorageCutoverApplying(StorageCutoverIdRequest request, ServerCallContext context)
+        => MigrationGate.MarkApplyingAsync(request.MigrationId, context.CancellationToken);
+    public override Task<StorageCutoverStatus> CancelStorageCutover(StorageCutoverIdRequest request, ServerCallContext context)
+        => MigrationGate.CancelAsync(request.MigrationId, context.CancellationToken);
+    public override Task<StorageCutoversResponse> GetStorageCutovers(StorageCutoverIdRequest request, ServerCallContext context)
+        => MigrationGate.GetAsync(request.MigrationId, context.CancellationToken);
 
     public override Task<GetFileDataResponse> GetFileData(GetFileDataRequest request, ServerCallContext context)
     {

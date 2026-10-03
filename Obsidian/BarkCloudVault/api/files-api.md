@@ -148,6 +148,8 @@ Package: `barkcloud.files`
 
 ## Сервис: `FilesServerApi` (служебный)
 
+Для [[modules/web-s3-migration]] добавлены service-only RPC: BeginStorageCutover, FreezeStorageCutover, MarkStorageCutoverApplying, CancelStorageCutover и GetStorageCutovers. Идентификатор migration_id связывает долговечный барьер Files с временной задачей Web. Состояния: draining → frozen → applying → applied; active_uploads включает session uploads (также по их отдельному preview profile для фото/видео/аудио) и учтённые HTTP/avatar pipelines. Begin получает target_connection_hash для подтверждения всех параметров и credentials после рестарта; БД хранит только хеш, статус его не возвращает. В контракте возвращаются только адреса, настройки подключения и ID профилей, без credentials. Web проверяет Configuration перед отменой и повторным перезапуском.
+
 Все RPC реализованы:
 
 | RPC | Назначение |

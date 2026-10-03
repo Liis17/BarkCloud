@@ -14,6 +14,7 @@ function mockSettings(admin = { enabled: false, unlocked: false }) {
     const data: Record<string, unknown> = {
       '/api/settings/context': { admin }, '/api/settings/profile': profile,
       '/api/settings/server': serverSettings, '/api/settings/system': system,
+      '/api/settings/migration/sources': [], '/api/settings/migration/jobs': [], '/api/settings/migration/cutovers': [],
       '/api/settings/privacy': { profileVisibility: 0, emailVisibility: 0, lastSeenVisibility: 0, searchableByUsername: true },
       '/api/system/jobs': { jobs: [] }, '/api/system/branches': { services: [] },
       '/api/system/services?includeVersions=false': { dockerOk: true, services: [] },

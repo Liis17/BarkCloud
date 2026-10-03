@@ -124,6 +124,8 @@ public static class WebApplicationBuilderExtensions
                 configurationDictionary[$"{prefix}:BucketName"] = profile.BucketName;
                 configurationDictionary[$"{prefix}:QuotaBytes"] = profile.QuotaBytes.ToString(CultureInfo.InvariantCulture);
                 configurationDictionary[$"{prefix}:IsR2"] = profile.IsR2.ToString();
+                configurationDictionary[$"{prefix}:Region"] = profile.Region;
+                configurationDictionary[$"{prefix}:ForcePathStyle"] = (!profile.HasForcePathStyle || profile.ForcePathStyle).ToString();
                 configurationDictionary[$"{prefix}:IsActive"] = profile.IsActive.ToString();
                 configurationDictionary[$"{prefix}:IsLegacy"] = profile.IsLegacy.ToString();
             }

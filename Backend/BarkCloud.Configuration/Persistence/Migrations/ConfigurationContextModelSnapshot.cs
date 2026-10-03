@@ -119,6 +119,11 @@ namespace BarkCloud.Configuration.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<bool>("ForcePathStyle")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
 
@@ -130,6 +135,10 @@ namespace BarkCloud.Configuration.Persistence.Migrations
 
                     b.Property<long>("QuotaBytes")
                         .HasColumnType("bigint");
+
+                    b.Property<string>("Region")
+                        .IsRequired()
+                        .HasColumnType("text");
 
                     b.Property<string>("Role")
                         .IsRequired()

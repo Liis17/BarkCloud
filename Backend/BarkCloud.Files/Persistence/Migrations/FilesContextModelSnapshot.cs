@@ -845,6 +845,77 @@ namespace BarkCloud.Files.Persistence.Migrations
                     b.ToTable("ShareLinks");
                 });
 
+            modelBuilder.Entity("BarkCloud.Files.Domain.StorageCutover", b =>
+                {
+                    b.Property<string>("MigrationId")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ProfileIdsJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("SourceBucketName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("SourceServiceUrl")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("TargetBucketName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("TargetConnectionHash")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<bool>("TargetForcePathStyle")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("TargetIsR2")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("TargetRegion")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("TargetServiceUrl")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("MigrationId");
+
+                    b.HasIndex("SourceServiceUrl", "SourceBucketName")
+                        .IsUnique();
+
+                    b.ToTable("StorageCutovers");
+                });
+
+            modelBuilder.Entity("BarkCloud.Files.Domain.StorageWriteActivity", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("text");
+
+                    b.Property<Guid?>("FileId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ProfileIdsJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("StorageWriteActivities");
+                });
+
             modelBuilder.Entity("BarkCloud.Files.Domain.TempFile", b =>
                 {
                     b.Property<Guid>("Id")

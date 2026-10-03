@@ -9,10 +9,12 @@ namespace BarkCloud.Files.Infrastructure;
 public sealed class S3MultipartUploadStore : IMultipartUploadStore
 {
     private readonly S3BucketRegistry _registry;
+    private readonly StorageMigrationGate? _migrationGate;
 
-    public S3MultipartUploadStore(S3BucketRegistry registry)
+    public S3MultipartUploadStore(S3BucketRegistry registry, StorageMigrationGate? migrationGate = null)
     {
         _registry = registry;
+        _migrationGate = migrationGate;
     }
 
     public async Task<string> InitiateAsync(
@@ -49,6 +51,7 @@ public sealed class S3MultipartUploadStore : IMultipartUploadStore
         long size,
         CancellationToken cancellationToken)
     {
+        await using var lease = _migrationGate is null ? null : await _migrationGate.EnterAsync(storageProfileId, false, cancellationToken);
         var profile = _registry.GetProfile(storageProfileId);
         var response = await _registry.GetClientForProfile(storageProfileId)
             .UploadPartAsync(new UploadPartRequest
@@ -107,6 +110,7 @@ public sealed class S3MultipartUploadStore : IMultipartUploadStore
         IReadOnlyList<MultipartUploadPart> parts,
         CancellationToken cancellationToken)
     {
+        await using var lease = _migrationGate is null ? null : await _migrationGate.EnterAsync(storageProfileId, false, cancellationToken);
         var profile = _registry.GetProfile(storageProfileId);
         var response = await _registry.GetClientForProfile(storageProfileId)
             .CompleteMultipartUploadAsync(new CompleteMultipartUploadRequest
@@ -124,6 +128,12 @@ public sealed class S3MultipartUploadStore : IMultipartUploadStore
         string key,
         string uploadId,
         CancellationToken cancellationToken)
+    {
+        await using var lease = _migrationGate is null ? null : await _migrationGate.EnterAsync(storageProfileId, false, cancellationToken);
+        await AbortUnderAdmissionAsync(storageProfileId, key, uploadId, cancellationToken);
+    }
+
+    public async Task AbortUnderAdmissionAsync(string storageProfileId, string key, string uploadId, CancellationToken cancellationToken)
     {
         var profile = _registry.GetProfile(storageProfileId);
         await _registry.GetClientForProfile(storageProfileId)

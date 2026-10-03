@@ -2,6 +2,7 @@ using BarkCloud.Files.Domain;
 using BarkCloud.Files.Exceptions;
 using BarkCloud.Files.Extensions;
 using BarkCloud.Files.Persistence;
+using BarkCloud.Files.Infrastructure;
 
 using Microsoft.EntityFrameworkCore;
 
@@ -10,18 +11,20 @@ namespace BarkCloud.Files.Services;
 public readonly record struct LegacyUploadReservation(Guid SessionId, bool RequiresProcessing);
 
 /// <summary>Результат допуска до чтения тела: потолок размера файла для этого запроса.</summary>
-public readonly record struct LegacyUploadAdmission(long OwnerId, UploadFileType FileType, long MaxBytes);
+public readonly record struct LegacyUploadAdmission(long OwnerId, UploadFileType FileType, long MaxBytes,
+    StorageMigrationGate.UploadActivity? Activity = null);
 
 public sealed class LegacyUploadQuotaGuard(
     FilesContext context,
     IStorageQuotaService quota,
     TimeProvider time,
-    LegacyUploadOptions? options = null) : ILegacyUploadCompletionMarker
+    LegacyUploadOptions? options = null,
+    StorageMigrationGate? migrationGate = null) : ILegacyUploadCompletionMarker
 {
     private readonly LegacyUploadOptions _options = options ?? new LegacyUploadOptions();
 
     /// <summary>
-    /// Проверка разрешения до чтения тела запроса: только чтение, ничего не резервирует.
+    /// Проверка до чтения тела; при миграции учитывает весь HTTP upload как активную операцию.
     /// Точное и атомарное резервирование остаётся за <see cref="ReserveAsync"/>.
     /// </summary>
     public async Task<LegacyUploadAdmission> AdmitAsync(
@@ -54,6 +57,7 @@ public sealed class LegacyUploadQuotaGuard(
         if (file.IsReady())
             throw new FileAlreadyUploadedException("Файл уже был загружен");
 
+
         var ownerId = file.Uploaders.FirstOrDefault();
         var maxBytes = file.Type == UploadFileType.UserAvatar
             ? _options.MaxAvatarBytes
@@ -77,14 +81,17 @@ public sealed class LegacyUploadQuotaGuard(
             }
         }
 
-        return new LegacyUploadAdmission(ownerId, file.Type, maxBytes);
+        var activity = migrationGate is null ? null : await migrationGate.TrackUploadAsync(
+            migrationGate.LegacyUploadProfiles(file.Type), cancellationToken, fileId);
+        return new LegacyUploadAdmission(ownerId, file.Type, maxBytes, activity);
     }
 
     public async Task<LegacyUploadReservation> ReserveAsync(
         Guid fileId,
         string fileName,
         long fileSize,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? admissionId = null)
     {
         await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
         var file = await context.UploadedFiles
@@ -131,6 +138,9 @@ public sealed class LegacyUploadQuotaGuard(
         var snapshot = await quota.GetSnapshotAsync(
             file.Uploaders.FirstOrDefault(), acquireTransactionLock: true, cancellationToken);
         snapshot.EnsureCanReserve(fileSize);
+        if (migrationGate is not null) file.StorageProfileId = migrationGate.ResolveLegacyProfile(file, fileName);
+        var tracked = migrationGate is not null && await migrationGate.IsTrackedAsync(admissionId, file.StorageProfileId, cancellationToken);
+        await using var admission = migrationGate is null ? null : await migrationGate.EnterAsync(file.StorageProfileId, !tracked, cancellationToken);
 
         var now = time.GetUtcNow().UtcDateTime;
         var session = new UploadSession

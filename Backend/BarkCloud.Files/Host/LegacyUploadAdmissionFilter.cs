@@ -24,6 +24,7 @@ public sealed class LegacyUploadAdmissionFilter(
     ILogger<LegacyUploadAdmissionFilter> logger) : IAsyncResourceFilter
 {
     private const int RetryAfterSeconds = 30;
+    public const string MigrationActivityKey = "barkcloud.migration-activity";
 
     public async Task OnResourceExecutionAsync(ResourceExecutingContext context, ResourceExecutionDelegate next)
     {
@@ -81,6 +82,15 @@ public sealed class LegacyUploadAdmissionFilter(
             Reject(context, "already_uploaded", uploadId, contentLength, new BadRequestObjectResult(ex.Message));
             return;
         }
+        catch (BarkCloud.Shared.Exceptions.Files.StorageMigrationPausedException ex)
+        {
+            Reject(context, "migration", uploadId, contentLength,
+                new ConflictObjectResult(new { error = ex.ErrorMessage, code = ex.ErrorCode }));
+            return;
+        }
+
+        await using var migrationActivity = admission.Activity;
+        if (migrationActivity is not null) http.Items[MigrationActivityKey] = migrationActivity.Id;
 
         if (contentLength is { } length && length - options.MultipartOverheadBytes > admission.MaxBytes)
         {

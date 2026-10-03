@@ -44,6 +44,7 @@ public sealed class UploadSessionCoordinator
     private readonly S3BucketRegistry _profiles;
     private readonly TimeProvider _time;
     private readonly ILogger<UploadSessionCoordinator> _logger;
+    private readonly StorageMigrationGate? _migrationGate;
 
     public UploadSessionCoordinator(
         FilesContext context,
@@ -52,7 +53,8 @@ public sealed class UploadSessionCoordinator
         IUploadProcessingPublisher processing,
         S3BucketRegistry profiles,
         TimeProvider time,
-        ILogger<UploadSessionCoordinator> logger)
+        ILogger<UploadSessionCoordinator> logger,
+        StorageMigrationGate? migrationGate = null)
     {
         _context = context;
         _quota = quota;
@@ -61,6 +63,7 @@ public sealed class UploadSessionCoordinator
         _profiles = profiles;
         _time = time;
         _logger = logger;
+        _migrationGate = migrationGate;
     }
 
     public async Task<UploadSessionResult> CreateAsync(
@@ -102,6 +105,8 @@ public sealed class UploadSessionCoordinator
         var fileId = Guid.NewGuid();
         var mediaKind = descriptor.FileName.GetMediaKind();
         var profileId = _profiles.ResolveWriteProfileId(UploadFileType.CloudFile, mediaKind, isPreview: false);
+        await using var admission = _migrationGate is null ? null : await _migrationGate.EnterUploadAdmissionAsync(
+            profileId, descriptor.FileName, descriptor.ContentType, cancellationToken);
         var uploadToken = GenerateToken();
         string? multipartUploadId = null;
 
@@ -164,7 +169,7 @@ public sealed class UploadSessionCoordinator
             {
                 try
                 {
-                    await _objects.AbortAsync(
+                    await _objects.AbortUnderAdmissionAsync(
                         profileId, fileId.ToString(), multipartUploadId, CancellationToken.None);
                 }
                 catch (Exception abortError)

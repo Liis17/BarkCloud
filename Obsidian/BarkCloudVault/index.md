@@ -29,6 +29,7 @@
   - [[modules/session-revocation]] — Долговечный отзыв сессий, атомарная запись в Identity и синхронизация всех реплик (F10)
 - [[modules/backend-web]] — Веб-клиент (HTTP-страницы для браузера + gRPC-клиент к микросервисам, логин/cookie/JWT)
   - [[modules/web-system-updates]] — Обслуживание: обновление/перезапуск бэкенда из настроек (docker.sock, helper-контейнер, админ-пароль)
+  - [[modules/web-s3-migration]] — Копирование бакетов S3 с проверкой SHA-256 и безопасным финальным переключением всех связанных профилей
 
 ### 📦 Модули — Shared
 - [[modules/shared-proto]] — Proto-контракты gRPC (общие для backend и клиентов)
@@ -66,6 +67,7 @@
 
 ### 🔧 API & gRPC
 - [[api/configuration-api]] — gRPC API сервиса Configuration
+- [[api/web-s3-migration-api]] — Административный HTTP API фонового копирования и применения миграции
 - [[api/identity-api]] — gRPC API сервиса Identity (Auth, OTP, RefreshToken)
 - [[api/session-revocation-api]] — Служебный gRPC feed долговечных отзывов сессий
 - [[api/users-api]] — gRPC API сервиса Users (профиль, устройства, contacts, draft)

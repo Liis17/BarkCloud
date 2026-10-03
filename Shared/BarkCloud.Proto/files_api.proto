@@ -106,6 +106,11 @@ service CloudApi {
 }
 
 service FilesServerApi {
+  rpc BeginStorageCutover(StorageCutoverRequest) returns(StorageCutoverStatus);
+  rpc FreezeStorageCutover(StorageCutoverIdRequest) returns(StorageCutoverStatus);
+  rpc MarkStorageCutoverApplying(StorageCutoverIdRequest) returns(StorageCutoverStatus);
+  rpc CancelStorageCutover(StorageCutoverIdRequest) returns(StorageCutoverStatus);
+  rpc GetStorageCutovers(StorageCutoverIdRequest) returns(StorageCutoversResponse);
   rpc GetFileData(GetFileDataRequest) returns(GetFileDataResponse); // Получить информацию о загруженном файле
 
   rpc GetFilesData(GetFilesDataRequest) returns(GetFilesDataResponse); // Получить информацию о загруженных файлах
@@ -122,6 +127,35 @@ service FilesServerApi {
 
   rpc ResolveMusicPlaylistShare(ResolveMusicPlaylistShareRequest) returns(ResolveMusicPlaylistShareResponse); // Резолв публичного музыкального плейлиста → треки с публичными URL
 }
+
+message StorageCutoverIdRequest { string migration_id = 1; }
+message StorageCutoverRequest {
+  string migration_id = 1;
+  string source_service_url = 2;
+  string source_bucket_name = 3;
+  repeated string profile_ids = 4;
+  string target_service_url = 5;
+  string target_bucket_name = 6;
+  string target_region = 7;
+  bool target_force_path_style = 8;
+  bool target_is_r2 = 9;
+  // SHA-256 of the expected complete connection, including credentials. Never returned in status.
+  string target_connection_hash = 10;
+}
+message StorageCutoverStatus {
+  string migration_id = 1;
+  string state = 2;
+  int32 active_uploads = 3;
+  string source_service_url = 4;
+  string source_bucket_name = 5;
+  repeated string profile_ids = 6;
+  string target_service_url = 7;
+  string target_bucket_name = 8;
+  string target_region = 9;
+  bool target_force_path_style = 10;
+  bool target_is_r2 = 11;
+}
+message StorageCutoversResponse { repeated StorageCutoverStatus cutovers = 1; }
 
 service AlbumApi {
   rpc CreateAlbum         (CreateAlbumRequest)         returns (AlbumInfo);            // Создать альбом

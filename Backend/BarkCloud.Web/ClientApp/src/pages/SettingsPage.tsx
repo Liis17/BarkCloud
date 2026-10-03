@@ -14,6 +14,7 @@ import { Select } from '../components/ui/Select';
 import type { Privacy, Session, SettingsState } from '../lib/types';
 
 const ServerSettingsTab = React.lazy(() => import('./ServerSettingsTab'));
+const MigrationTab = React.lazy(() => import('./MigrationTab'));
 
 interface WebAuthnKey {
   id: string;
@@ -1670,6 +1671,7 @@ const SECTIONS: NavItem[] = [
   { key: 'appearance', label: 'Внешний вид', icon: 'palette' },
   { key: 'system', label: 'Обслуживание', icon: 'server' },
   { key: 'server-settings', label: 'Настройки сервера', icon: 'settings' },
+  { key: 'migration', label: 'Миграция', icon: 'server' },
 ];
 const SEARCH_ITEMS = [
   ['account', 'Профиль', 'Аватар, имя и фамилия'], ['account', 'Email', 'Адрес для входа'],
@@ -1687,8 +1689,9 @@ const SEARCH_ITEMS = [
   ['appearance', 'Тема', 'Светлая, тёмная, системная'],
   ['system', 'Обслуживание', 'Контейнеры, обновление, перезапуск, каналы'],
   ['server-settings', 'Параметры сервисов', 'Серверные конфигурации'],
-  ['server-settings', 'S3-профили', 'Endpoint, bucket, credentials, квоты'],
+  ['server-settings', 'S3-профили', 'Endpoint, bucket, credentials, квоты, регион, адресация, применить миграцию'],
   ['server-settings', 'Зарезервированные имена', 'Имена пользователей'],
+  ['migration', 'Миграция', 'Копирование бакета S3, перенос, endpoint, credentials, Cloudflare R2, прогресс'],
 ];
 const SECTION_PATHS: Record<string, string> = {
   account: '/api/settings/profile', security: '/api/settings/security/2fa', privacy: '/api/settings/privacy',
@@ -1707,6 +1710,9 @@ function SettingsPanel({ section, active, admin, flash, onUnlockedChange }: {
   if (section === 'appearance') return <AppearanceTab />;
   if (section === 'server-settings') return <React.Suspense fallback={<Loading label="Загрузка редактора…" />}>
     <ServerSettingsTab active={active} onAccessExpired={() => onUnlockedChange(false)} />
+  </React.Suspense>;
+  if (section === 'migration') return <React.Suspense fallback={<Loading label="Загрузка миграции…" />}>
+    <MigrationTab active={active} onExpired={() => onUnlockedChange(false)} />
   </React.Suspense>;
   let content: React.ReactNode = null;
   if (resource.data) switch (section) {
@@ -1751,7 +1757,7 @@ export function SettingsPage() {
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
   const go = (key: string) => { setSection(key); window.location.hash = key; };
-  const nav = SECTIONS.filter((item) => item.key === 'system' ? admin.enabled : item.key === 'server-settings' ? admin.enabled && admin.unlocked : true);
+  const nav = SECTIONS.filter((item) => item.key === 'system' ? admin.enabled : ['server-settings', 'migration'].includes(item.key) ? admin.enabled && admin.unlocked : true);
   const activeLabel = SECTIONS.find((item) => item.key === active)!.label;
   const [search, setSearch] = React.useState('');
   const [target, setTarget] = React.useState<string | null>(null);
@@ -1804,14 +1810,14 @@ export function SettingsPage() {
         })}</nav>
         {context.error && <div className="settings-context-error" role="alert">Не удалось проверить доступ <button className="btn text" onClick={() => void context.reload()}>Повторить</button></div>}
       </div>
-      <div className={'set-content' + (['system', 'server-settings', 'storage'].includes(active) ? ' wide' : '')} ref={contentRef}>
+      <div className={'set-content' + (['system', 'server-settings', 'storage', 'migration'].includes(active) ? ' wide' : '')} ref={contentRef}>
         {panels.map((key) => {
-          const isAdmin = ['system', 'server-settings'].includes(key);
+          const isAdmin = ['system', 'server-settings', 'migration'].includes(key);
           if (isAdmin && !context.data) return key === active ? <Loading key={key} label="Проверяем доступ…" /> : null;
           if (isAdmin && !admin.enabled) return key === active ? <div key={key} className="server-empty">Администрирование не настроено</div> : null;
-          if (key === 'server-settings' && !admin.unlocked && key !== active) return null;
+          if (['server-settings', 'migration'].includes(key) && !admin.unlocked && key !== active) return null;
           return <section key={key} hidden={key !== active} aria-label={SECTIONS.find((item) => item.key === key)?.label}>
-            <SettingsPanel section={key === 'server-settings' && !admin.unlocked ? 'system' : key} active={key === active}
+            <SettingsPanel section={['server-settings', 'migration'].includes(key) && !admin.unlocked ? 'system' : key} active={key === active}
               admin={admin} flash={flash} onUnlockedChange={onUnlockedChange} />
           </section>;
         })}
