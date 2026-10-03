@@ -49,7 +49,13 @@ public class GetUserStorageInfoServerCommandHandler : IRequestHandler<GetUserSto
             AllS3UsedStorage = allS3Stats.UsedBytes,
             AllS3QuotaStorage = allS3Stats.QuotaBytes,
             AllS3HasFiniteQuota = allS3Stats.HasFiniteQuota,
-            AllS3StatsAvailable = allS3Stats.IsAvailable
+            AllS3StatsAvailable = allS3Stats.IsAvailable,
+            PhysicalStatsState = storageStats.State,
+            PhysicalStatsUpdatedAt = storageStats.UpdatedAt is { } physicalAt
+                ? Google.Protobuf.WellKnownTypes.Timestamp.FromDateTimeOffset(physicalAt) : null,
+            AllS3StatsState = allS3Stats.State,
+            AllS3StatsUpdatedAt = allS3Stats.UpdatedAt is { } s3At
+                ? Google.Protobuf.WellKnownTypes.Timestamp.FromDateTimeOffset(s3At) : null
         };
 
         foreach (var (fileType, size) in storageByType)

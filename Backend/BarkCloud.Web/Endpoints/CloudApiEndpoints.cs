@@ -41,7 +41,8 @@ public static class CloudApiEndpoints
             if (user is null)
                 return Results.Json(new { error = "Не авторизован" }, Json, statusCode: 401);
 
-            var v = await data.BuildShellAsync(user, http);
+            var includeStorage = !string.Equals(http.Request.Query["includeStorage"], "false", StringComparison.OrdinalIgnoreCase);
+            var v = await data.BuildShellAsync(user, http, includeStorage);
             int.TryParse(v.GetValueOrDefault("storage.percent"), out var percent);
             double.TryParse(v.GetValueOrDefault("storage.other_pct"), NumberStyles.Float, CultureInfo.InvariantCulture, out var otherPct);
             double.TryParse(v.GetValueOrDefault("storage.s3_pct"), NumberStyles.Float, CultureInfo.InvariantCulture, out var s3Pct);
@@ -58,7 +59,7 @@ public static class CloudApiEndpoints
                     role = v.GetValueOrDefault("user.role"),
                     avatarUrl = v.GetValueOrDefault("user.avatar_url")
                 },
-                storage = new
+                storage = includeStorage ? new
                 {
                     usedLabel = v.GetValueOrDefault("storage.used_label"),
                     totalLabel = v.GetValueOrDefault("storage.total_label"),
@@ -70,7 +71,7 @@ public static class CloudApiEndpoints
                     allS3Percent,
                     allS3HasFiniteQuota,
                     allS3StatsAvailable
-                },
+                } : null,
                 app = new
                 {
                     version = v.GetValueOrDefault("app.version"),
@@ -92,7 +93,7 @@ public static class CloudApiEndpoints
             if (user is null)
                 return Results.Json(new { error = "Не авторизован" }, Json, statusCode: 401);
 
-            return Results.Json(await data.BuildStorageAsync(user), Json);
+            return Results.Json(await data.BuildStorageAsync(user, http.RequestAborted), Json);
         });
 
         // ───────────────────────── Каталоги ─────────────────────────

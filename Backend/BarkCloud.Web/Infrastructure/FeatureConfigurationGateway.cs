@@ -24,6 +24,7 @@ public sealed class FeatureConfigurationGateway(
             var response = await configuration.GetConfigurationAsync(
                 new GetConfigurationRequest { ServiceId = (int)ServiceId.Web },
                 _headers,
+                deadline: DateTime.UtcNow.AddSeconds(3),
                 cancellationToken: cancellationToken);
 
             var item = response.Configurations.FirstOrDefault(c =>

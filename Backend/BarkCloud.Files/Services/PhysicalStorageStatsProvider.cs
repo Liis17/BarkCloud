@@ -5,83 +5,36 @@ namespace BarkCloud.Files.Services;
 public sealed class PhysicalStorageStatsProvider : IPhysicalStorageStatsProvider
 {
     private const string DefaultStoragePath = "/mnt/minio-data";
-    private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(5);
-
     private readonly IConfiguration _configuration;
     private readonly ILogger<PhysicalStorageStatsProvider> _logger;
-    private readonly SemaphoreSlim _refreshLock = new(1, 1);
-
-    private PhysicalStorageStats? _cachedStats;
-    private DateTimeOffset _cachedAt;
+    private readonly StorageStatsCache<PhysicalStorageStats> _cache;
 
     public PhysicalStorageStatsProvider(
         IConfiguration configuration,
-        ILogger<PhysicalStorageStatsProvider> logger)
+        ILogger<PhysicalStorageStatsProvider> logger,
+        IHostApplicationLifetime? lifetime = null,
+        TimeProvider? timeProvider = null)
     {
         _configuration = configuration;
         _logger = logger;
+        _cache = new(token => Task.FromResult(CalculateStats(token)), timeProvider ?? TimeProvider.System,
+            logger, lifetime?.ApplicationStopping ?? CancellationToken.None);
     }
 
-    public async Task<PhysicalStorageStats> GetStatsAsync(CancellationToken cancellationToken = default)
+    public Task<PhysicalStorageStats> GetStatsAsync(CancellationToken cancellationToken = default)
+        => GetAsync(_cache.HasValue, cancellationToken);
+
+    public Task<PhysicalStorageStats> GetSnapshotAsync(CancellationToken cancellationToken = default)
+        => GetAsync(true, cancellationToken);
+
+    private async Task<PhysicalStorageStats> GetAsync(bool nonBlocking, CancellationToken cancellationToken)
     {
-        var cached = _cachedStats;
-        if (cached is not null)
+        var snapshot = await _cache.GetAsync(nonBlocking, cancellationToken);
+        return (snapshot.Value ?? new PhysicalStorageStats(0, 0, 0, 0)) with
         {
-            // Значение есть (пусть и протухшее) — отдаём мгновенно, скан папки гоним в фоне.
-            // Пока облако простаивает, объём диска не меняется, поэтому stale-значение точно.
-            if (DateTimeOffset.UtcNow - _cachedAt >= CacheDuration)
-            {
-                TriggerBackgroundRefresh();
-            }
-
-            return cached;
-        }
-
-        // Холодный старт процесса: кэша ещё нет — считаем синхронно один раз.
-        await _refreshLock.WaitAsync(cancellationToken);
-        try
-        {
-            if (_cachedStats is not null)
-            {
-                return _cachedStats;
-            }
-
-            var stats = CalculateStats(cancellationToken);
-            _cachedStats = stats;
-            _cachedAt = DateTimeOffset.UtcNow;
-
-            return stats;
-        }
-        finally
-        {
-            _refreshLock.Release();
-        }
-    }
-
-    private void TriggerBackgroundRefresh()
-    {
-        if (!_refreshLock.Wait(0))
-        {
-            return; // обновление уже идёт
-        }
-
-        _ = Task.Run(() =>
-        {
-            try
-            {
-                var stats = CalculateStats(CancellationToken.None);
-                _cachedStats = stats;
-                _cachedAt = DateTimeOffset.UtcNow;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Фоновое обновление статистики хранилища не выполнено");
-            }
-            finally
-            {
-                _refreshLock.Release();
-            }
-        });
+            State = snapshot.State,
+            UpdatedAt = snapshot.UpdatedAt
+        };
     }
 
     private PhysicalStorageStats CalculateStats(CancellationToken cancellationToken)
@@ -160,10 +113,12 @@ public sealed class PhysicalStorageStatsProvider : IPhysicalStorageStatsProvider
         catch (IOException ex)
         {
             _logger.LogWarning(ex, "Storage probe failed while reading {StoragePath}", rootPath);
+            throw;
         }
         catch (UnauthorizedAccessException ex)
         {
             _logger.LogWarning(ex, "Storage probe cannot access {StoragePath}", rootPath);
+            throw;
         }
 
         return total;

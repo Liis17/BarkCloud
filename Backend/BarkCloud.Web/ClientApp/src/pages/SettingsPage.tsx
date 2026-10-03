@@ -1,6 +1,8 @@
 import React from 'react';
 import { Icon } from '../components/Icon';
 import { Loading } from '../components/ui/EmptyState';
+import { StorageStatsStatus } from '../components/ui/StorageStatsStatus';
+import { useApiResource } from '../hooks/useApiResource';
 import { usePageHeader } from '../hooks/usePageHeader';
 import { plural } from '../lib/format';
 import { maintenanceWaitPath } from '../lib/maintenance';
@@ -23,9 +25,9 @@ interface ApiResp<T = unknown> {
   status: number;
   data: T | null;
 }
-async function apiJson<T = unknown>(method: string, path: string, body?: unknown): Promise<ApiResp<T>> {
+async function apiJson<T = unknown>(method: string, path: string, body?: unknown, signal?: AbortSignal): Promise<ApiResp<T>> {
   const r = await fetch(path, {
-    method,
+    method, signal,
     credentials: 'same-origin',
     headers: body ? { 'Content-Type': 'application/json' } : undefined,
     body: body ? JSON.stringify(body) : undefined,
@@ -36,9 +38,10 @@ async function apiJson<T = unknown>(method: string, path: string, body?: unknown
   } catch {
     /* пусто */
   }
+  if (r.status === 401) window.location.href = "/login";
   return { ok: r.ok, status: r.status, data };
 }
-const sGet = <T,>(p: string) => apiJson<T>('GET', p);
+const sGet = <T,>(p: string, signal?: AbortSignal) => apiJson<T>('GET', p, undefined, signal);
 const sPost = <T,>(p: string, b?: unknown) => apiJson<T>('POST', p, b);
 const errMsg = (res: ApiResp, fallback?: string): string => {
   const m = res.data && typeof res.data === 'object' ? (res.data as { message?: string }).message : undefined;
@@ -70,27 +73,22 @@ const SVC_LABELS: Record<string, string> = {
   web: 'Веб-клиент',
 };
 
-function Toggle({ on, onChange, disabled }: { on: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
-  return (
-    <div
-      className={'toggle' + (on ? ' on' : '')}
-      onClick={() => {
-        if (!disabled) onChange(!on);
-      }}
-      style={disabled ? { opacity: 0.5, cursor: 'default' } : undefined}
-    />
-  );
+function Toggle({ on, onChange, disabled, label }: { on: boolean; onChange: (v: boolean) => void; disabled?: boolean; label?: string }) {
+  return <button type="button" role="switch" aria-checked={on} aria-label={label || 'Переключить настройку'}
+    className={'toggle' + (on ? ' on' : '')} disabled={disabled} onClick={() => onChange(!on)} />;
 }
 
 function Field({ label, help, children, end }: { label: React.ReactNode; help?: React.ReactNode; children?: React.ReactNode; end?: React.ReactNode }) {
+  const action = React.isValidElement<{ label?: string }>(end) && end.type === Toggle && typeof label === 'string'
+    ? React.cloneElement(end, { label }) : end;
   return (
-    <div className="field-row">
+    <div className="field-row" data-setting-label={typeof label === "string" ? label : undefined}>
       <div className="lbl">
         {label}
         {help && <span className="help">{help}</span>}
       </div>
       <div>{children}</div>
-      <div className="right-end">{end}</div>
+      <div className="right-end">{action}</div>
     </div>
   );
 }
@@ -255,6 +253,7 @@ function VersionBadge({ service }: { service: Svc }) {
   if (version.state === 'ready' && version.updateAvailable === false) {
     return <span className="pill-info ok"><Icon.check size={12} /> Актуально</span>;
   }
+  if (version.state === 'checking') return <span className="pill-info"><span className="spin" /> Проверяем…</span>;
   return <span className="pill-info warn"><Icon.info size={12} /> Версия не определена</span>;
 }
 
@@ -264,10 +263,11 @@ interface ProgressState {
   autoClose: boolean;
 }
 
-function SystemSection({ admin, system, onUnlockedChange }: {
+function SystemSection({ admin, system, onUnlockedChange, active }: {
   admin: SettingsState['admin'];
   system: SettingsState['system'];
   onUnlockedChange?: (value: boolean) => void;
+  active: boolean;
 }) {
   const [unlocked, setUnlocked] = React.useState(admin.unlocked);
   const [password, setPassword] = React.useState('');
@@ -290,39 +290,70 @@ function SystemSection({ admin, system, onUnlockedChange }: {
     setTimeout(() => setToast(null), 4200);
   };
 
-  const loadServices = React.useCallback(async () => {
-    try {
-      const serviceRes = await sGet<ServicesSnap>('/api/system/services');
-      if (serviceRes.status === 403) {
-        setUnlocked(false);
-        onUnlockedChange?.(false);
-        return;
-      }
-      if (!serviceRes.ok || !serviceRes.data) {
-        setServices([]);
-        setDockerErr(errMsg(serviceRes, `Сервер ответил ${serviceRes.status}`));
-        return;
-      }
+  const servicesRequest = React.useRef<AbortController | null>(null);
+  const [versionsLoading, setVersionsLoading] = React.useState(false);
+  React.useEffect(() => () => servicesRequest.current?.abort(), []);
+  React.useEffect(() => { setUnlocked(admin.unlocked); }, [admin.unlocked]);
 
-      setServices(serviceRes.data.services || []);
+  const loadServices = React.useCallback(async () => {
+    servicesRequest.current?.abort();
+    const controller = new AbortController();
+    servicesRequest.current = controller;
+    setVersionsLoading(true);
+    let statusesLoaded = false;
+    const expired = () => { setUnlocked(false); onUnlockedChange?.(false); };
+    const branchesTask = sGet<BranchSnap>('/api/system/branches', controller.signal)
+      .then((response) => {
+        if (controller.signal.aborted) return;
+        if (response.status === 403) { expired(); return; }
+        setBranches(response.ok ? response.data : null);
+      }).catch(() => { if (!controller.signal.aborted) setBranches(null); });
+    try {
+      const serviceRes = await sGet<ServicesSnap>('/api/system/services?includeVersions=false', controller.signal);
+      if (controller.signal.aborted) return;
+      if (serviceRes.status === 403) { expired(); return; }
+      if (!serviceRes.ok || !serviceRes.data) {
+        setServices([]); setDockerErr(errMsg(serviceRes)); return;
+      }
+      setServices((serviceRes.data.services || []).map((service) => ({ ...service,
+        version: { ...versionOf(service), state: service.state === 'unavailable' ? 'unknown' : 'checking' } })));
       setDockerErr(serviceRes.data.dockerOk ? null : serviceRes.data.error || 'Docker недоступен');
       setLastMaintenance(serviceRes.data.lastMaintenance || null);
-
-      const branchRes = await sGet<BranchSnap>('/api/system/branches');
-      if (branchRes.ok && branchRes.data) setBranches(branchRes.data);
-      else setBranches(null);
-    } catch (e) {
-      setServices([]);
-      setDockerErr(String(e));
+      statusesLoaded = true;
+      if (!serviceRes.data.dockerOk) return;
+      const versions = await sGet<ServicesSnap>('/api/system/services', controller.signal);
+      if (controller.signal.aborted) return;
+      if (versions.status === 403) { expired(); return; }
+      if (versions.ok && versions.data) {
+        const byService = new Map(versions.data.services.map((service) => [service.service, versionOf(service)]));
+        setServices((current) => current?.map((service) => ({ ...service, version: byService.get(service.service) || versionOf(service) })) || []);
+      } else {
+        setServices((current) => current?.map((service) => ({ ...service, version: { ...versionOf(service),
+          state: 'registry_unavailable', error: errMsg(versions, 'Не удалось проверить версии') } })) || []);
+      }
+    } catch (error) {
+      if (!controller.signal.aborted) {
+        if (statusesLoaded) {
+          setServices((current) => current?.map((service) => ({ ...service, version: { ...versionOf(service),
+            state: 'registry_unavailable', error: 'Не удалось проверить версии' } })) || []);
+        } else {
+          setServices([]);
+          setDockerErr(error instanceof Error ? error.message : 'Не удалось получить состояние контейнеров');
+        }
+      }
+    } finally {
+      if (!controller.signal.aborted) setVersionsLoading(false);
+      await branchesTask;
     }
   }, [onUnlockedChange]);
 
   React.useEffect(() => {
-    if (unlocked) {
+    if (unlocked && active) {
       setServices(null);
       void loadServices();
     }
-  }, [unlocked, loadServices]);
+    return () => servicesRequest.current?.abort();
+  }, [unlocked, active, loadServices]);
 
   React.useEffect(() => {
     if (!unlocked || resumedJobs.current) return;
@@ -538,7 +569,7 @@ function SystemSection({ admin, system, onUnlockedChange }: {
   }
 
   async function updateAvailable() {
-    const count = (services || []).filter((service) => service.composeService && service.updateAvailable === true).length;
+    const count = (services || []).filter((service) => service.composeService && versionOf(service).updateAvailable === true).length;
     if (!count || dockerErr) return;
     if (!window.confirm(`Обновить доступные сервисы (${count})? Web, если доступно обновление, будет последним.`)) return;
     await runQueuedAction(`Обновление доступных сервисов (${count})`, '/api/system/update-available', 'Update', true);
@@ -597,7 +628,7 @@ function SystemSection({ admin, system, onUnlockedChange }: {
     );
   } else {
     const branchByService = new Map((branches?.services || []).map((branch) => [branch.service, branch]));
-    const availableCount = services.filter((service) => service.composeService && service.updateAvailable === true).length;
+    const availableCount = services.filter((service) => service.composeService && versionOf(service).updateAvailable === true).length;
     const hasActiveJob = progress?.job.state === 'Queued' || progress?.job.state === 'Running';
     const hasConfiguredServices = services.some((service) => service.composeService);
 
@@ -610,7 +641,7 @@ function SystemSection({ admin, system, onUnlockedChange }: {
           end={
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
               {registrationBusy && <span className="spin" />}
-              <Toggle on={registrationEnabled} onChange={toggleRegistration} disabled={registrationBusy} />
+              <Toggle label="Регистрация новых аккаунтов" on={registrationEnabled} onChange={toggleRegistration} disabled={registrationBusy} />
             </div>
           }
         >
@@ -664,13 +695,12 @@ function SystemSection({ admin, system, onUnlockedChange }: {
 
         <div className="svc-table" role="table" aria-label="Сервисы BarkCloud">
           <div className="svc-head" role="row">
-            <span>Сервис</span>
-            <span>Состояние</span>
-            <span>Канал</span>
-            <span>Текущая</span>
-            <span>Последняя</span>
-            <span>Обновление</span>
-            <span>Действия</span>
+            <span role="columnheader">Сервис</span>
+            <span role="columnheader">Состояние</span>
+            <span role="columnheader">Канал</span>
+            <span role="columnheader">Текущая</span>
+            <span role="columnheader">Доступная</span>
+            <span role="columnheader">Действия</span>
           </div>
           {services.map((service) => {
             const version = versionOf(service);
@@ -684,7 +714,7 @@ function SystemSection({ admin, system, onUnlockedChange }: {
             const selectedBranch = branch?.branch || version.branch || 'master';
             return (
               <div key={service.service} className={'svc-row' + (service.isWeb ? ' svc-row-web' : '')} role="row">
-                <div className="svc-cell svc-service" data-label="Сервис">
+                <div role="cell" className="svc-cell svc-service" data-label="Сервис">
                   <div className="svc-main">
                     <div className="svc-ic"><Icon.server size={20} /></div>
                     <div className="svc-info">
@@ -701,8 +731,8 @@ function SystemSection({ admin, system, onUnlockedChange }: {
                     </div>
                   </div>
                 </div>
-                <div className="svc-cell" data-label="Состояние"><SvcStatus state={service.state} status={service.status} /></div>
-                <div className="svc-cell svc-channel" data-label="Канал">
+                <div role="cell" className="svc-cell" data-label="Состояние"><SvcStatus state={service.state} status={service.status} /></div>
+                <div role="cell" className="svc-cell svc-channel" data-label="Канал">
                   {branch ? (
                     <>
                       <select
@@ -719,32 +749,32 @@ function SystemSection({ admin, system, onUnlockedChange }: {
                     </>
                   ) : <span className="svc-muted">—</span>}
                 </div>
-                <div className="svc-cell svc-version" data-label="Текущая">
+                <div role="cell" className="svc-cell svc-version" data-label="Текущая">
                   <span>{version.currentVersion || 'не определена'}</span>
                   {version.tag && version.tag !== version.currentVersion && <small>{version.tag}</small>}
                 </div>
-                <div className="svc-cell svc-version" data-label="Последняя">
+                <div role="cell" className="svc-cell svc-version svc-latest" data-label="Доступная">
                   <span>{version.latestVersion || '—'}</span>
+                  <VersionBadge service={service} />
                 </div>
-                <div className="svc-cell svc-update" data-label="Обновление"><VersionBadge service={service} /></div>
-                <div className="svc-cell svc-actions" data-label="Действия">
+                <div role="cell" className="svc-cell svc-actions" data-label="Действия">
                   {rowBusy ? <span className="spin" /> : (
                     <>
-                      <button className="iconb" title="Обновить" disabled={actionDisabled} onClick={() => service.isWeb ? webSelf('update') : void svcAction(service.service, 'Update')}>
+                      <button className="iconb" title="Обновить" aria-label={`Обновить ${service.service}`} disabled={actionDisabled || versionsLoading} onClick={() => service.isWeb ? webSelf('update') : void svcAction(service.service, 'Update')}>
                         <Icon.download size={19} />
                       </button>
-                      <button className="iconb" title="Перезапустить" disabled={lifecycleDisabled} onClick={() => service.isWeb ? webSelf('restart') : void svcAction(service.service, 'Restart')}>
+                      <button className="iconb" title="Перезапустить" aria-label={`Перезапустить ${service.service}`} disabled={lifecycleDisabled} onClick={() => service.isWeb ? webSelf('restart') : void svcAction(service.service, 'Restart')}>
                         <Icon.refresh size={19} />
                       </button>
-                      {!service.isWeb && (service.state === 'running' ? (
+                      {!service.isWeb && <details className="svc-more"><summary className="iconb" aria-label={`Другие действия ${service.service}`}>⋯</summary><div className="svc-more-menu">{service.state === 'running' ? (
                         <button className="iconb" title="Остановить" disabled={lifecycleDisabled} onClick={() => void svcAction(service.service, 'Stop')}>
-                          <Icon.power size={19} />
+                          <Icon.power size={19} /> Остановить
                         </button>
                       ) : (
                         <button className="iconb" title="Запустить" disabled={lifecycleDisabled} onClick={() => void svcAction(service.service, 'Start')}>
-                          <Icon.play size={19} />
+                          <Icon.play size={19} /> Запустить
                         </button>
-                      ))}
+                      )}</div></details>}
                     </>
                   )}
                 </div>
@@ -958,11 +988,11 @@ function AccountTab({ profile, flash }: { profile: SettingsState['profile']; fla
           <div className="sub">Имя, фото и описание, видимые другим</div>
         </div>
         <div className="set-card-body">
-          <div style={{ display: 'flex', gap: 20, alignItems: 'center' }}>
+          <div className="avatar-edit" style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
             <div className="avatar-big">{avatarUrl ? <img src={avatarUrl} alt="" /> : profile.initials}</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1 }}>
               <div style={{ fontSize: 14, color: 'var(--md-on-surface-variant)' }}>Изменить аватар. Рекомендуется не меньше 256×256.</div>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                 <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={onPickFile} />
                 <button className="btn" onClick={() => fileRef.current && fileRef.current.click()} disabled={avatarBusy}>
                   {avatarBusy ? <span className="spin" /> : <Icon.upload size={16} />} Загрузить
@@ -1451,42 +1481,37 @@ const DISK_S3_COLOR = '#9A4F1E';
 
 function StorageTab({ storage }: { storage: SettingsState['storage'] }) {
   const disk = storage.disk;
-  return (
-    <div className="set-card">
-      <div className="set-card-head">
-        <h3>Хранилище</h3>
-        <div className="sub" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-          <span>
-            {disk.usedLabel} из {disk.totalLabel} использовано на диске
-          </span>
-          <span className="pill-info warn">{disk.usedPct}%</span>
-        </div>
-      </div>
+  const diskAvailable = disk.state !== 'loading' && !(disk.state === 'error' && !disk.updatedAt);
+  const s3 = storage.s3;
+  return <div className="settings-storage-grid">
+    <div className="set-card" data-setting-label="Личное хранилище">
+      <div className="set-card-head"><h3>Личное хранилище</h3><div className="sub">Ваши файлы и лимит аккаунта</div></div>
       <div className="set-card-body">
-        <div className="stor-bar">
-          <span style={{ width: `${disk.otherPct}%`, background: DISK_OTHER_COLOR }} />
-          <span style={{ width: `${disk.s3Pct}%`, background: DISK_S3_COLOR }} />
-        </div>
-        <div className="stor-legend">
-          <div className="item">
-            <span className="sw" style={{ background: DISK_OTHER_COLOR }} />
-            <span className="k">Другие данные</span>
-            <span className="v">{disk.otherLabel}</span>
-          </div>
-          <div className="item">
-            <span className="sw" style={{ background: DISK_S3_COLOR }} />
-            <span className="k">Локальный S3</span>
-            <span className="v">{disk.s3Label}</span>
-          </div>
-          <div className="item">
-            <span className="sw" style={{ background: 'var(--md-surface-container-high)', border: '1px solid var(--md-outline-variant)' }} />
-            <span className="k">Свободно</span>
-            <span className="v">{disk.freeLabel}</span>
-          </div>
-        </div>
+        <div className="storage-total">{storage.used} {storage.unit}<span>{storage.total > 0 ? `из ${storage.total} ${storage.unit}` : 'безлимит'}</span></div>
+        {storage.total > 0 && <progress max="100" value={storage.percent} aria-label="Использование личного хранилища" />}
+        {storage.breakdown.map((item) => <div className="storage-breakdown-row" key={item.k}><span>{item.k}</span><strong>{item.v}</strong></div>)}
+        {storage.total > 0 && <small>Свободно {storage.freeLabel}</small>}
       </div>
     </div>
-  );
+    <div className="set-card" data-setting-label="Диск сервера">
+      <div className="set-card-head"><h3>Диск сервера</h3><div className="sub">{diskAvailable ? `${disk.usedLabel} из ${disk.totalLabel}` : disk.state === 'error' ? 'Ошибка подсчёта' : 'Подсчитываем…'}</div></div>
+      <div className="set-card-body">
+        {diskAvailable && <><div className="stor-bar"><span style={{ width: `${disk.otherPct}%`, background: DISK_OTHER_COLOR }} /><span style={{ width: `${disk.s3Pct}%`, background: DISK_S3_COLOR }} /></div>
+          <div className="stor-legend"><div className="item"><span className="sw" style={{ background: DISK_OTHER_COLOR }} /><span className="k">Другие данные</span><span className="v">{disk.otherLabel}</span></div>
+          <div className="item"><span className="sw" style={{ background: DISK_S3_COLOR }} /><span className="k">Локальный S3</span><span className="v">{disk.s3Label}</span></div>
+          <div className="item"><span className="k">Свободно</span><span className="v">{disk.freeLabel}</span></div></div></>}
+        <StorageStatsStatus state={disk.state} updatedAt={disk.updatedAt} />
+      </div>
+    </div>
+    {s3 && <div className="set-card" data-setting-label="S3-бакеты">
+      <div className="set-card-head"><h3>S3-бакеты</h3><div className="sub">Все активные уникальные бакеты</div></div>
+      <div className="set-card-body">
+        {s3.allS3StatsAvailable && <><div className="storage-total">{s3.allS3UsedLabel}<span>{s3.allS3HasFiniteQuota ? `из ${s3.allS3QuotaLabel}` : 'безлимит'}</span></div>
+          {s3.allS3HasFiniteQuota && <progress max="100" value={s3.allS3Percent} aria-label="Использование S3-бакетов" />}</>}
+        <StorageStatsStatus state={s3.allS3State} updatedAt={s3.allS3UpdatedAt} />
+      </div>
+    </div>}
+  </div>;
 }
 
 // ─────────── Устройства и сессии ───────────
@@ -1615,9 +1640,9 @@ function AppearanceTab() {
       <div className="set-card-body">
         <Field label="Тема">
           <div className="theme-row">
-            <div className={'theme-swatch light' + (theme === 'light' ? ' on' : '')} onClick={() => pick('light')} title="Светлая" />
-            <div className={'theme-swatch dark' + (theme === 'dark' ? ' on' : '')} onClick={() => pick('dark')} title="Тёмная" />
-            <div className={'theme-swatch auto' + (theme === 'auto' ? ' on' : '')} onClick={() => pick('auto')} title="Как в системе" />
+            <button className={'theme-swatch light' + (theme === 'light' ? ' on' : '')} onClick={() => pick('light')} aria-label="Светлая" aria-pressed={theme === 'light'} />
+            <button className={'theme-swatch dark' + (theme === 'dark' ? ' on' : '')} onClick={() => pick('dark')} aria-label="Тёмная" aria-pressed={theme === 'dark'} />
+            <button className={'theme-swatch auto' + (theme === 'auto' ? ' on' : '')} onClick={() => pick('auto')} aria-label="Как в системе" aria-pressed={theme === 'auto'} />
           </div>
         </Field>
         <div style={{ fontSize: 13, color: 'var(--md-on-surface-variant)' }}>
@@ -1636,139 +1661,164 @@ interface NavItem {
   icon: string;
 }
 
+const SECTIONS: NavItem[] = [
+  { key: 'account', label: 'Аккаунт', icon: 'user' },
+  { key: 'security', label: 'Безопасность', icon: 'lock' },
+  { key: 'privacy', label: 'Приватность', icon: 'eye' },
+  { key: 'storage', label: 'Хранилище', icon: 'server' },
+  { key: 'sessions', label: 'Устройства и сессии', icon: 'device' },
+  { key: 'appearance', label: 'Внешний вид', icon: 'palette' },
+  { key: 'system', label: 'Обслуживание', icon: 'server' },
+  { key: 'server-settings', label: 'Настройки сервера', icon: 'settings' },
+];
+const SEARCH_ITEMS = [
+  ['account', 'Профиль', 'Аватар, имя и фамилия'], ['account', 'Email', 'Адрес для входа'],
+  ['account', 'Имя пользователя', 'Username'], ['account', 'О себе', 'Описание профиля'],
+  ['account', 'Опасная зона', 'Удаление аккаунта'], ['security', 'Пароль', 'Смена пароля'],
+  ['security', 'Ключи безопасности', 'WebAuthn, FIDO2, YubiKey'],
+  ['security', 'Двухфакторная аутентификация', '2FA, TOTP, коды по email'],
+  ['privacy', 'Профиль', 'Видимость профиля'], ['privacy', 'Email', 'Видимость почты'],
+  ['privacy', 'Был в сети', 'Время последнего посещения'],
+  ['privacy', 'Поиск по имени пользователя', 'Доступность в поиске'],
+  ['storage', 'Личное хранилище', 'Использование и лимит аккаунта'],
+  ['storage', 'Диск сервера', 'Свободное место, локальный S3'],
+  ['storage', 'S3-бакеты', 'Размер объектов и квота'],
+  ['sessions', 'Устройства и сессии', 'Активные устройства, выход'],
+  ['appearance', 'Тема', 'Светлая, тёмная, системная'],
+  ['system', 'Обслуживание', 'Контейнеры, обновление, перезапуск, каналы'],
+  ['server-settings', 'Параметры сервисов', 'Серверные конфигурации'],
+  ['server-settings', 'S3-профили', 'Endpoint, bucket, credentials, квоты'],
+  ['server-settings', 'Зарезервированные имена', 'Имена пользователей'],
+];
+const SECTION_PATHS: Record<string, string> = {
+  account: '/api/settings/profile', security: '/api/settings/security/2fa', privacy: '/api/settings/privacy',
+  storage: '/api/settings/storage', sessions: '/api/settings/sessions', system: '/api/settings/system',
+};
+const settingsStoragePending = (data: unknown) => {
+  const storage = data as SettingsState['storage'];
+  return ['loading', 'refreshing'].includes(storage.disk.state || '') || ['loading', 'refreshing'].includes(storage.s3?.allS3State || '');
+};
+
+function SettingsPanel({ section, active, admin, flash, onUnlockedChange }: {
+  section: string; active: boolean; admin: SettingsState['admin']; flash: Flash; onUnlockedChange: (value: boolean) => void;
+}) {
+  const resource = useApiResource<unknown>(SECTION_PATHS[section] || null, active,
+    section === 'storage' ? settingsStoragePending : undefined);
+  if (section === 'appearance') return <AppearanceTab />;
+  if (section === 'server-settings') return <React.Suspense fallback={<Loading label="Загрузка редактора…" />}>
+    <ServerSettingsTab active={active} onAccessExpired={() => onUnlockedChange(false)} />
+  </React.Suspense>;
+  let content: React.ReactNode = null;
+  if (resource.data) switch (section) {
+    case 'account': content = <AccountTab profile={resource.data as SettingsState['profile']} flash={flash} />; break;
+    case 'security': {
+      const data = resource.data as { authenticator: boolean; email: boolean };
+      content = <SecurityTab security={{ authenticator: data.authenticator, emailOtp: data.email, twoFa: data.authenticator || data.email }} flash={flash} />;
+      break;
+    }
+    case 'privacy': content = <PrivacyTab privacy={resource.data as Privacy} flash={flash} />; break;
+    case 'storage': content = <StorageTab storage={resource.data as SettingsState['storage']} />; break;
+    case 'sessions': content = <SessionsTab sessions={(resource.data as { sessions: Session[] }).sessions} flash={flash} />; break;
+    case 'system': content = <SystemSection admin={admin} system={resource.data as SettingsState['system']} active={active} onUnlockedChange={onUnlockedChange} />; break;
+  }
+  return <>
+    {resource.error && <div className="sys-banner err" role="alert">{resource.error.message}<button className="btn text" onClick={() => void resource.reload()}>Повторить</button></div>}
+    {!resource.data && !resource.error ? <Loading label="Загрузка раздела…" /> : content}
+  </>;
+}
+
 export function SettingsPage() {
-  const [data, setData] = React.useState<SettingsState | null>(null);
-  const [adminUnlocked, setAdminUnlocked] = React.useState(false);
-  const [err, setErr] = React.useState<string | null>(null);
+  const context = useApiResource<{ admin: SettingsState['admin'] }>('/api/settings/context');
+  const [adminOverride, setAdminOverride] = React.useState<boolean | null>(null);
+  const admin = { enabled: context.data?.admin.enabled || false, unlocked: adminOverride ?? context.data?.admin.unlocked ?? false };
+  React.useEffect(() => { if (context.data) setAdminOverride(context.data.admin.unlocked); }, [context.data]);
   const [toast, setToast] = React.useState<{ kind: 'ok' | 'err'; msg: string } | null>(null);
-  const flash = React.useCallback<Flash>((kind, msg) => {
-    setToast({ kind, msg });
-    setTimeout(() => setToast(null), 4200);
-  }, []);
-
+  const flash = React.useCallback<Flash>((kind, msg) => { setToast({ kind, msg }); }, []);
   React.useEffect(() => {
-    sGet<SettingsState>('/api/settings/full')
-      .then((res) => {
-        if (res.status === 401) {
-          window.location.href = '/login';
-          return;
-        }
-        if (res.ok && res.data) {
-          setData(res.data);
-          setAdminUnlocked(res.data.admin.unlocked);
-        }
-        else setErr('Не удалось загрузить настройки');
-      })
-      .catch(() => setErr('Не удалось загрузить настройки'));
-  }, []);
-
-  const nav: NavItem[] = React.useMemo(
-    () => [
-      { key: 'account', label: 'Аккаунт', icon: 'user' },
-      { key: 'security', label: 'Безопасность', icon: 'lock' },
-      { key: 'privacy', label: 'Приватность', icon: 'eye' },
-      { key: 'storage', label: 'Хранилище', icon: 'server' },
-      { key: 'sessions', label: 'Устройства и сессии', icon: 'device' },
-      { key: 'appearance', label: 'Внешний вид', icon: 'palette' },
-      ...(data?.admin.enabled ? [{ key: 'system', label: 'Обслуживание', icon: 'server' }] : []),
-      ...(data?.admin.enabled && adminUnlocked
-        ? [{ key: 'server-settings', label: 'Настройки сервера', icon: 'settings' }]
-        : []),
-    ],
-    [data, adminUnlocked],
-  );
-  const navKeys = nav.map((n) => n.key);
-
-  const [section, setSection] = React.useState(() => {
-    const h = (window.location.hash || '').replace('#', '');
-    return h || 'account';
-  });
-
+    if (!toast) return;
+    const timer = window.setTimeout(() => setToast(null), 4200);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
+  const onUnlockedChange = React.useCallback((value: boolean) => setAdminOverride(value), []);
+  const [section, setSection] = React.useState(() => window.location.hash.slice(1) || 'account');
+  const active = SECTIONS.some((item) => item.key === section) ? section : 'account';
+  const [visited, setVisited] = React.useState<string[]>([active]);
+  const panels = visited.includes(active) ? visited : [...visited, active];
+  React.useEffect(() => { setVisited((current) => current.includes(active) ? current : [...current, active]); }, [active]);
   React.useEffect(() => {
-    const onHash = () => {
-      const h = (window.location.hash || '').replace('#', '');
-      if (h) setSection(h);
-    };
+    const onHash = () => setSection(window.location.hash.slice(1) || 'account');
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
+  const go = (key: string) => { setSection(key); window.location.hash = key; };
+  const nav = SECTIONS.filter((item) => item.key === 'system' ? admin.enabled : item.key === 'server-settings' ? admin.enabled && admin.unlocked : true);
+  const activeLabel = SECTIONS.find((item) => item.key === active)!.label;
+  const [search, setSearch] = React.useState('');
+  const [target, setTarget] = React.useState<string | null>(null);
+  const contentRef = React.useRef<HTMLDivElement>(null);
+  const query = search.trim().toLocaleLowerCase('ru-RU');
+  const results = SEARCH_ITEMS.filter(([key, label, help]) => nav.some((item) => item.key === key)
+    && `${label} ${help} ${SECTIONS.find((item) => item.key === key)?.label}`.toLocaleLowerCase('ru-RU').includes(query));
+  React.useEffect(() => {
+    if (!target || !contentRef.current) return;
+    const container = contentRef.current;
+    let timer: number | undefined;
+    const find = () => {
+      const element = Array.from(container.querySelectorAll<HTMLElement>('[data-setting-label], h3, .ttl'))
+        .find((item) => !item.closest('[hidden]') && (item.dataset.settingLabel || item.textContent?.trim()) === target);
+      if (!element) return;
+      element.tabIndex = -1;
+      element.focus({ preventScroll: true });
+      element.scrollIntoView?.({ block: 'nearest' });
+      element.classList.add('settings-search-hit');
+      timer = window.setTimeout(() => { element.classList.remove('settings-search-hit'); setTarget(null); }, 1800);
+      observer.disconnect();
+    };
+    const observer = new MutationObserver(find);
+    observer.observe(container, { childList: true, subtree: true });
+    find();
+    return () => { observer.disconnect(); window.clearTimeout(timer); };
+  }, [target, active]);
+  usePageHeader(() => ({ title: 'Настройки', documentTitle: `Настройки: ${activeLabel}`, search: false,
+    kicker: <><span>Прочее</span><span className="sep">/</span><span className="cur">Настройки</span></>,
+    contentClass: 'settings-content' }), [activeLabel]);
 
-  const go = (key: string) => {
-    setSection(key);
-    window.location.hash = key;
-  };
-
-  const active = navKeys.includes(section) ? section : 'account';
-  const activeLabel = nav.find((n) => n.key === active)?.label || 'Аккаунт';
-
-  usePageHeader(
-    () => ({
-      title: 'Настройки',
-      documentTitle: `Настройки: ${activeLabel}`,
-      kicker: (
-        <>
-          <span>Прочее</span>
-          <span className="sep">/</span>
-          <span className="cur">Настройки</span>
-        </>
-      ),
-      search: false,
-    }),
-    [activeLabel],
-  );
-
-  if (err) return <div style={{ color: 'var(--md-error)', padding: 24 }}>{err}</div>;
-  if (!data) return <Loading label="Загрузка настроек…" />;
-
-  let content: React.ReactNode;
-  switch (active) {
-    case 'security':
-      content = <SecurityTab security={data.security} flash={flash} />;
-      break;
-    case 'privacy':
-      content = <PrivacyTab privacy={data.privacy} flash={flash} />;
-      break;
-    case 'storage':
-      content = <StorageTab storage={data.storage} />;
-      break;
-    case 'sessions':
-      content = <SessionsTab sessions={data.sessions} flash={flash} />;
-      break;
-    case 'appearance':
-      content = <AppearanceTab />;
-      break;
-    case 'system':
-      content = <SystemSection admin={data.admin} system={data.system} onUnlockedChange={setAdminUnlocked} />;
-      break;
-    case 'server-settings':
-      content = (
-        <React.Suspense fallback={<Loading label="Загрузка настроек сервера…" />}>
-          <ServerSettingsTab />
-        </React.Suspense>
-      );
-      break;
-    default:
-      content = <AccountTab profile={data.profile} flash={flash} />;
-  }
-
-  return (
-    <>
-      <div className="settings-shell">
-        <div className="set-nav">
-          <div className="set-nav-label">Разделы</div>
-          {nav.map((n) => {
-            const Ic = Icon[n.icon];
-            return (
-              <button key={n.key} className={active === n.key ? 'on' : ''} onClick={() => go(n.key)}>
-                <Ic size={20} />
-                {n.label}
-              </button>
-            );
-          })}
+  return <>
+    <div className="settings-shell">
+      <div className="set-nav">
+        <div className="settings-search">
+          <label htmlFor="settings-search">Поиск по настройкам</label>
+          <div className="settings-search-input"><Icon.search size={18} /><input id="settings-search" type="search" value={search}
+            placeholder="Название пункта…" onChange={(event) => setSearch(event.target.value)} />
+            {search && <button className="icon-btn" aria-label="Очистить поиск настроек" onClick={() => setSearch('')}><Icon.x size={16} /></button>}</div>
+          {query && <div className="settings-search-results" aria-label="Результаты поиска настроек">
+            {results.length === 0 ? <div className="server-empty">Ничего не найдено</div> : results.map(([key, label, help]) =>
+              <button key={`${key}:${label}`} onClick={() => { go(key); setTarget(label); setSearch(''); }}><strong>{label}</strong><small>{SECTIONS.find((item) => item.key === key)?.label} · {help}</small></button>)}
+          </div>}
         </div>
-        <div className="set-content">{content}</div>
+        <label className="settings-mobile-nav">Раздел<select aria-label="Раздел настроек" value={active} onChange={(event) => go(event.target.value)}>
+          {!nav.some((item) => item.key === active) && <option value={active}>{activeLabel}</option>}
+          {nav.map((item) => <option key={item.key} value={item.key}>{item.label}</option>)}
+        </select></label>
+        <nav className="settings-desktop-nav" aria-label="Разделы настроек">{nav.map((item) => {
+          const Ic = Icon[item.icon];
+          return <button key={item.key} className={active === item.key ? 'on' : ''} aria-current={active === item.key ? 'page' : undefined} onClick={() => go(item.key)}><Ic size={20} />{item.label}</button>;
+        })}</nav>
+        {context.error && <div className="settings-context-error" role="alert">Не удалось проверить доступ <button className="btn text" onClick={() => void context.reload()}>Повторить</button></div>}
       </div>
-      <Toast toast={toast} />
-    </>
-  );
+      <div className={'set-content' + (['system', 'server-settings', 'storage'].includes(active) ? ' wide' : '')} ref={contentRef}>
+        {panels.map((key) => {
+          const isAdmin = ['system', 'server-settings'].includes(key);
+          if (isAdmin && !context.data) return key === active ? <Loading key={key} label="Проверяем доступ…" /> : null;
+          if (isAdmin && !admin.enabled) return key === active ? <div key={key} className="server-empty">Администрирование не настроено</div> : null;
+          if (key === 'server-settings' && !admin.unlocked && key !== active) return null;
+          return <section key={key} hidden={key !== active} aria-label={SECTIONS.find((item) => item.key === key)?.label}>
+            <SettingsPanel section={key === 'server-settings' && !admin.unlocked ? 'system' : key} active={key === active}
+              admin={admin} flash={flash} onUnlockedChange={onUnlockedChange} />
+          </section>;
+        })}
+      </div>
+    </div>
+    <Toast toast={toast} />
+  </>;
 }

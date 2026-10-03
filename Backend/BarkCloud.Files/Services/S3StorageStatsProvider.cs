@@ -8,57 +8,34 @@ namespace BarkCloud.Files.Services;
 
 public sealed class S3StorageStatsProvider : IS3StorageStatsProvider
 {
-    private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(5);
-
     private readonly S3BucketRegistry _registry;
-    private readonly TimeProvider _timeProvider;
-    private readonly ILogger<S3StorageStatsProvider> _logger;
-    private readonly SemaphoreSlim _refreshLock = new(1, 1);
-
-    private S3StorageStats? _lastSuccessful;
-    private DateTimeOffset? _lastAttemptAt;
+    private readonly StorageStatsCache<S3StorageStats> _cache;
 
     public S3StorageStatsProvider(
         S3BucketRegistry registry,
         TimeProvider timeProvider,
-        ILogger<S3StorageStatsProvider> logger)
+        ILogger<S3StorageStatsProvider> logger,
+        IHostApplicationLifetime? lifetime = null)
     {
         _registry = registry;
-        _timeProvider = timeProvider;
-        _logger = logger;
+        _cache = new(ReadStatsAsync, timeProvider, logger, lifetime?.ApplicationStopping ?? CancellationToken.None);
     }
 
-    public async Task<S3StorageStats> GetStatsAsync(CancellationToken cancellationToken = default)
-    {
-        await _refreshLock.WaitAsync(cancellationToken);
-        try
-        {
-            var now = _timeProvider.GetUtcNow();
-            if (_lastAttemptAt is { } cachedAttempt && now - cachedAttempt < CacheDuration)
-                return _lastSuccessful ?? S3StorageStats.Unavailable;
+    public Task<S3StorageStats> GetStatsAsync(CancellationToken cancellationToken = default)
+        => GetAsync(false, cancellationToken);
 
-            try
-            {
-                var stats = await ReadStatsAsync(cancellationToken);
-                _lastSuccessful = stats;
-                _lastAttemptAt = _timeProvider.GetUtcNow();
-                return stats;
-            }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-            {
-                throw;
-            }
-            catch (Exception exception)
-            {
-                _lastAttemptAt = _timeProvider.GetUtcNow();
-                _logger.LogWarning(exception, "Не удалось получить суммарный размер S3-бакетов; используем последнюю успешную статистику, если она есть.");
-                return _lastSuccessful ?? S3StorageStats.Unavailable;
-            }
-        }
-        finally
+    public Task<S3StorageStats> GetSnapshotAsync(CancellationToken cancellationToken = default)
+        => GetAsync(true, cancellationToken);
+
+    private async Task<S3StorageStats> GetAsync(bool nonBlocking, CancellationToken cancellationToken)
+    {
+        var snapshot = await _cache.GetAsync(nonBlocking, cancellationToken);
+        var value = snapshot.Value ?? S3StorageStats.Unavailable;
+        return value with
         {
-            _refreshLock.Release();
-        }
+            State = snapshot.State == "ready" && !value.IsAvailable ? "not_configured" : snapshot.State,
+            UpdatedAt = snapshot.UpdatedAt
+        };
     }
 
     private async Task<S3StorageStats> ReadStatsAsync(CancellationToken cancellationToken)

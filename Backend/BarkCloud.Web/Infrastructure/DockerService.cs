@@ -116,7 +116,9 @@ public sealed class DockerService : IDockerDeployment
     // ───────────────────────── Статус ─────────────────────────
 
     /// <summary>Статусы всех управляемых сервисов (running/exited/not_found и тег образа).</summary>
-    public async Task<ServicesSnapshot> GetServicesStatusAsync()
+    public Task<ServicesSnapshot> GetServicesStatusAsync() => GetServicesStatusAsync(includeImageDigests: true);
+
+    public async Task<ServicesSnapshot> GetServicesStatusAsync(bool includeImageDigests)
     {
         var byName = new Dictionary<string, (string State, string Status, string Image)>();
         var dockerOk = true;
@@ -163,7 +165,7 @@ public sealed class DockerService : IDockerDeployment
             };
         }).ToList();
 
-        if (dockerOk)
+        if (dockerOk && includeImageDigests)
         {
             services = (await Task.WhenAll(services.Select(async service =>
                 service with { ImageDigest = await GetContainerImageDigestAsync(service.Container, service.Image) }))).ToList();

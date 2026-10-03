@@ -53,7 +53,7 @@ public sealed class PageDataBuilder
 
     // ───────────────────────── Общий каркас (GET /api/me) ─────────────────────────
 
-    public async Task<Dictionary<string, string?>> BuildShellAsync(WebUser user, HttpContext http)
+    public async Task<Dictionary<string, string?>> BuildShellAsync(WebUser user, HttpContext http, bool includeStorage = true)
     {
         var token = BrowserContext.UserToken(user.AccessToken);
 
@@ -87,8 +87,11 @@ public sealed class PageDataBuilder
         };
 
         // Оба gRPC-вызова запускаем сразу, ждём параллельно — профиль не блокируется storage.
-        var profileTask = _users.GetUserAsync(new GetUserRequest { UserId = user.UserId }, token);
-        var storageTask = _files.GetUserStorageInfoAsync(new GetUserStorageInfoRequest(), token);
+        var profileTask = _users.GetUserAsync(new GetUserRequest { UserId = user.UserId }, token,
+            deadline: DateTime.UtcNow.AddSeconds(3), cancellationToken: http.RequestAborted);
+        var storageTask = includeStorage
+            ? _files.GetUserStorageInfoAsync(new GetUserStorageInfoRequest(), token, cancellationToken: http.RequestAborted)
+            : null;
 
         User? profile = null;
 
@@ -108,7 +111,10 @@ public sealed class PageDataBuilder
         catch (RpcException ex)
         {
             _logger.LogWarning("GetUser не выполнен: {Status}", ex.StatusCode);
+            if (!includeStorage) throw;
         }
+
+        if (storageTask is null) return vars;
 
         try
         {
@@ -142,47 +148,82 @@ public sealed class PageDataBuilder
     /// Только блок хранилища для сайдбара (GET /api/storage) — без профиля.
     /// Показывает заполнение физического диска сервера (не-S3 + S3), как и вкладка настроек.
     /// </summary>
-    public async Task<object> BuildStorageAsync(WebUser user)
+    public async Task<object> BuildStorageAsync(WebUser user, CancellationToken cancellationToken = default)
     {
-        var token = BrowserContext.UserToken(user.AccessToken);
+        var response = await _files.GetUserStorageInfoAsync(
+            new GetUserStorageInfoRequest { NonBlockingStats = true }, BrowserContext.UserToken(user.AccessToken),
+            deadline: DateTime.UtcNow.AddSeconds(3), cancellationToken: cancellationToken);
+        return SidebarStorage(response);
+    }
 
-        long diskTotal = 0, diskOther = 0, diskS3 = 0, allS3Used = 0, allS3Quota = 0;
-        var allS3Available = false;
-        var allS3HasFiniteQuota = false;
-        try
-        {
-            var storage = await _files.GetUserStorageInfoAsync(new GetUserStorageInfoRequest(), token);
-            diskTotal = storage.TotalAvailableStorage;
-            diskOther = storage.DiskUsedStorage;
-            diskS3 = storage.S3UsedStorage;
-            allS3Used = storage.AllS3UsedStorage;
-            allS3Quota = storage.AllS3QuotaStorage;
-            allS3Available = storage.AllS3StatsAvailable;
-            allS3HasFiniteQuota = storage.AllS3HasFiniteQuota;
-        }
-        catch (RpcException ex)
-        {
-            _logger.LogWarning("Storage/GetUserStorageInfo не выполнен: {Status}", ex.StatusCode);
-        }
-
-        var diskUsed = diskOther + diskS3;
-
+    private static object SidebarStorage(GetUserStorageInfoResponse storage)
+    {
+        var diskTotal = storage.TotalAvailableStorage;
+        var diskUsed = storage.DiskUsedStorage + storage.S3UsedStorage;
         return new
         {
-            usedLabel = Format.Size(diskUsed),
-            totalLabel = Format.Size(diskTotal),
+            usedLabel = Format.Size(diskUsed), totalLabel = Format.Size(diskTotal),
             percent = Format.Percent(diskUsed, diskTotal),
-            otherPct = PctOf(diskOther, diskTotal),
-            s3Pct = PctOf(diskS3, diskTotal),
-            allS3UsedLabel = Format.Size(allS3Used),
-            allS3QuotaLabel = Format.Size(allS3Quota),
-            allS3Percent = !allS3Available ? 0 : allS3HasFiniteQuota
-                ? Format.Percent(allS3Used, allS3Quota)
-                : 100,
-            allS3HasFiniteQuota,
-            allS3StatsAvailable = allS3Available
+            otherPct = PctOf(storage.DiskUsedStorage, diskTotal), s3Pct = PctOf(storage.S3UsedStorage, diskTotal),
+            state = string.IsNullOrEmpty(storage.PhysicalStatsState) ? "ready" : storage.PhysicalStatsState,
+            updatedAt = storage.PhysicalStatsUpdatedAt?.ToDateTimeOffset(),
+            allS3UsedLabel = Format.Size(storage.AllS3UsedStorage),
+            allS3QuotaLabel = Format.Size(storage.AllS3QuotaStorage),
+            allS3Percent = !storage.AllS3StatsAvailable ? 0 : storage.AllS3HasFiniteQuota
+                ? Format.Percent(storage.AllS3UsedStorage, storage.AllS3QuotaStorage) : 100,
+            allS3HasFiniteQuota = storage.AllS3HasFiniteQuota,
+            allS3StatsAvailable = storage.AllS3StatsAvailable,
+            allS3State = string.IsNullOrEmpty(storage.AllS3StatsState)
+                ? storage.AllS3StatsAvailable ? "ready" : "error" : storage.AllS3StatsState,
+            allS3UpdatedAt = storage.AllS3StatsUpdatedAt?.ToDateTimeOffset()
         };
     }
+
+    public object BuildSettingsContext(HttpContext http) => new
+    {
+        admin = new { enabled = _admin.Enabled, unlocked = _admin.IsUnlocked(http) }
+    };
+
+    public async Task<object> BuildProfileAsync(WebUser user, CancellationToken cancellationToken)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(3);
+        var profileTask = _users.GetUserAsync(new GetUserRequest { UserId = user.UserId },
+            BrowserContext.UserToken(user.AccessToken), deadline: deadline, cancellationToken: cancellationToken).ResponseAsync;
+        var contactsTask = _usersServer.GetUserContactsAsync(new GetUserContactsRequest { UserId = user.UserId },
+            deadline: deadline, cancellationToken: cancellationToken).ResponseAsync;
+        await Task.WhenAll(profileTask, contactsTask);
+        var profile = profileTask.Result.User;
+        var name = $"{profile.FirstName} {profile.LastName}".Trim();
+        return new
+        {
+            initials = Format.Initials(profile.FirstName, profile.LastName),
+            firstName = profile.FirstName, lastName = profile.LastName,
+            name = string.IsNullOrEmpty(name) ? profile.Username : name,
+            email = contactsTask.Result.Contact?.Email ?? "", username = profile.Username, bio = profile.Bio,
+            avatarUrl = profile.ProfilePicture, avatarPreviewUrl = profile.ProfilePicturePreview
+        };
+    }
+
+    public async Task<object> BuildSettingsStorageAsync(WebUser user, CancellationToken cancellationToken)
+    {
+        var token = BrowserContext.UserToken(user.AccessToken);
+        var deadline = DateTime.UtcNow.AddSeconds(3);
+        var storageTask = _files.GetUserStorageInfoAsync(new GetUserStorageInfoRequest { NonBlockingStats = true },
+            token, deadline: deadline, cancellationToken: cancellationToken).ResponseAsync;
+        var devicesTask = _users.GetDevicesAsync(new GetDevicesRequest(), token,
+            deadline: deadline, cancellationToken: cancellationToken).ResponseAsync;
+        await Task.WhenAll(storageTask, devicesTask);
+        var (block, _) = await BuildStorageAsync(token, null, devicesTask.Result.Devices.Count, storageTask.Result);
+        return block;
+    }
+
+    public async Task<object> BuildSystemAsync(CancellationToken cancellationToken) => new
+    {
+        version = _config.Value("App:Version", AppVersion.Current),
+        edition = _config.Value("App:Edition", "self-host"),
+        emailEnabled = _config.EmailEnabled(),
+        registrationEnabled = await _features.RegistrationEnabledAsync(cancellationToken)
+    };
 
     // ───────────────────────── Settings ─────────────────────────
 
@@ -294,7 +335,7 @@ public sealed class PageDataBuilder
 
     // ───────────────────────── Helpers ─────────────────────────
 
-    private async Task<(object Block, long Limit)> BuildStorageAsync(Metadata token, User? profile, int devicesCount)
+    private async Task<(object Block, long Limit)> BuildStorageAsync(Metadata token, User? profile, int devicesCount, GetUserStorageInfoResponse? snapshot = null)
     {
         long used = 0, limit = ResolveLimit(0, profile?.StorageLimitGb ?? 0);
         long diskTotal = 0, diskOther = 0, diskS3 = 0;
@@ -302,7 +343,8 @@ public sealed class PageDataBuilder
 
         try
         {
-            var storage = await _files.GetUserStorageInfoAsync(new GetUserStorageInfoRequest(), token);
+            var storage = snapshot ?? await _files.GetUserStorageInfoAsync(new GetUserStorageInfoRequest(), token);
+            snapshot = storage;
             used = storage.TotalUsedStorage;
             limit = ResolveLimit(storage.StorageLimit, profile?.StorageLimitGb ?? 0);
             diskTotal = storage.TotalAvailableStorage;
@@ -349,8 +391,11 @@ public sealed class PageDataBuilder
             autoUpload = true,
             devicesCount = $"{devicesCount} {Plural(devicesCount, "устройство", "устройства", "устройств")}",
             trashLabel = "—",
+            s3 = snapshot is null ? null : SidebarStorage(snapshot),
             disk = new
             {
+                state = snapshot is null ? "error" : string.IsNullOrEmpty(snapshot.PhysicalStatsState) ? "ready" : snapshot.PhysicalStatsState,
+                updatedAt = snapshot?.PhysicalStatsUpdatedAt?.ToDateTimeOffset(),
                 totalLabel = Format.Size(diskTotal),
                 usedLabel = Format.Size(diskUsed),
                 otherLabel = Format.Size(diskOther),

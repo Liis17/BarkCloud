@@ -116,7 +116,8 @@ public static class SystemEndpoints
             MaintenanceOperationStore maintenance) =>
             await Guard(http, auth, admin) is { } fail
                 ? fail
-                : Results.Ok(await GetEnrichedServicesAsync(docker, compose, registry, maintenance)));
+                : Results.Ok(await GetEnrichedServicesAsync(docker, compose, registry, maintenance,
+                    !string.Equals(http.Request.Query["includeVersions"], "false", StringComparison.OrdinalIgnoreCase))));
 
         api.MapGet("/branches", async (
             HttpContext http,
@@ -143,7 +144,7 @@ public static class SystemEndpoints
                 });
             }
 
-            var snapshot = await docker.GetServicesStatusAsync();
+            var snapshot = await docker.GetServicesStatusAsync(includeImageDigests: false);
             var runningByService = snapshot.Services.ToDictionary(
                 service => service.Service,
                 service => ComposeImageService.BranchFromImage(service.Image)
@@ -323,9 +324,10 @@ public static class SystemEndpoints
         DockerService docker,
         ComposeImageService compose,
         DockerRegistryService registry,
-        MaintenanceOperationStore maintenance)
+        MaintenanceOperationStore maintenance,
+        bool includeVersions = true)
     {
-        var snapshot = await docker.GetServicesStatusAsync();
+        var snapshot = await docker.GetServicesStatusAsync(includeImageDigests: includeVersions);
         IReadOnlyDictionary<string, ComposeImageInfo> composeImages;
         try
         {
@@ -342,9 +344,9 @@ public static class SystemEndpoints
             var composeReference = composeImage is null ? null : ComposeImageService.ImageReference(composeImage);
             var image = DockerRegistryService.ResolveImageReference(service.Image, composeReference);
             var imageDigest = service.ImageDigest;
-            if (image is not null && !string.Equals(image, service.Image, StringComparison.OrdinalIgnoreCase))
+            if (includeVersions && image is not null && !string.Equals(image, service.Image, StringComparison.OrdinalIgnoreCase))
                 imageDigest = await docker.GetContainerImageDigestAsync(service.Container, image);
-            var version = service.State == "unavailable"
+            var version = !includeVersions || service.State == "unavailable"
                 ? new ImageVersionStatus
                 {
                     Branch = composeImage?.Branch,

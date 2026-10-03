@@ -153,9 +153,9 @@ public class FilesApiService : FilesApi.FilesApiBase
 
     public override async Task<GetUserStorageInfoResponse> GetUserStorageInfo(GetUserStorageInfoRequest request, ServerCallContext context)
     {
-        var command = new GetUserStorageInfoCommand();
+        var command = new GetUserStorageInfoCommand { NonBlockingStats = request.NonBlockingStats };
 
-        return await _mediator.Send(command);
+        return await _mediator.Send(command, context.CancellationToken);
     }
 
     public override async Task<GetFileMetadataResponse> GetFileMetadata(GetFileMetadataRequest request, ServerCallContext context)

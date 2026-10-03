@@ -122,6 +122,7 @@ public class Program
         builder.Services.AddScoped<ITrashPurgeService, TrashPurgeService>();
         builder.Services.AddSingleton<IPhysicalStorageStatsProvider, PhysicalStorageStatsProvider>();
         builder.Services.AddSingleton<IS3StorageStatsProvider, S3StorageStatsProvider>();
+        builder.Services.AddHostedService<StorageStatsWarmupService>();
         builder.Services.AddHostedService<TempFileCleanupService>();
         builder.Services.AddHostedService<TrashCleanupService>();
         builder.Services.AddHostedService<OrphanBlobCleanupService>();

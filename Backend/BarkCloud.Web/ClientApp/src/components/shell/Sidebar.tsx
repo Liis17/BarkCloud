@@ -1,6 +1,8 @@
 import { NavLink, Link } from 'react-router-dom';
 import { Icon } from '../Icon';
+import { StorageStatsStatus } from '../ui/StorageStatsStatus';
 import { useShell } from '../../hooks/useShell';
+import type { SidebarStorage } from '../../lib/types';
 
 interface NavItem {
   key: string;
@@ -30,7 +32,7 @@ const NAV_OTHER: NavItem[] = [
 function NavRow({ item }: { item: NavItem }) {
   const IconC = Icon[item.icon];
   return (
-    <NavLink to={item.to} className={({ isActive }) => 'sb-item' + (isActive ? ' active' : '')}>
+    <NavLink to={item.to} aria-label={item.label} title={item.label} className={({ isActive }) => 'sb-item' + (isActive ? ' active' : '')}>
       <span className="ico">
         <IconC size={22} />
       </span>
@@ -39,10 +41,13 @@ function NavRow({ item }: { item: NavItem }) {
   );
 }
 
-export function Sidebar() {
+export function Sidebar({ profileError = false, storageError = false, statistics }: { profileError?: boolean; storageError?: boolean; statistics?: SidebarStorage | null }) {
   const shell = useShell();
   const user = shell?.user;
-  const storage = shell?.storage;
+  const storage = statistics === undefined ? shell?.storage : statistics;
+  const diskAvailable = !!storage && storage.state !== 'loading' && !(storage.state === 'error' && !storage.updatedAt);
+  const diskState = storageError ? 'error' : storage?.state ?? (storage ? 'ready' : 'loading');
+  const s3State = storageError ? 'error' : storage?.allS3State ?? (storage ? storage.allS3StatsAvailable ? 'ready' : 'error' : 'loading');
   const app = shell?.app;
 
   return (
@@ -80,31 +85,30 @@ export function Sidebar() {
           <div className="sb-storage-head">
             <span>Хранилище</span>
             <span className="used">
-              {storage?.usedLabel} / {storage?.totalLabel}
+              {diskAvailable ? `${storage!.usedLabel} / ${storage!.totalLabel}` : storageError ? 'Ошибка загрузки' : diskState === 'error' ? 'Ошибка подсчёта' : 'Подсчитываем…'}
             </span>
           </div>
-          <div className="bar">
+          <div className={"bar" + (diskState === 'loading' ? " pending" : "")}>
             <div style={{ display: 'flex', height: '100%', width: '100%' }}>
-              <div style={{ width: (storage?.otherPct ?? 0) + '%', background: 'var(--md-on-surface-variant)' }} />
-              <div style={{ width: (storage?.s3Pct ?? 0) + '%', background: '#9A4F1E' }} />
+              <div style={{ width: (diskAvailable ? storage!.otherPct : 0) + '%', background: 'var(--md-on-surface-variant)' }} />
+              <div style={{ width: (diskAvailable ? storage!.s3Pct : 0) + '%', background: '#9A4F1E' }} />
             </div>
           </div>
-          <div className="sb-storage-foot">
-            <span>{storage?.percent ?? 0}% использовано</span>
-          </div>
+          {diskAvailable && <div className="sb-storage-foot"><span>{storage!.percent}% использовано</span></div>}
+          {(storageError || storage && storage.state !== 'loading') && <StorageStatsStatus state={storageError ? 'error' : storage?.state} updatedAt={storage?.updatedAt} />}
         </div>
         <div className="sb-storage-row">
           <div className="sb-storage-head">
             <span>S3-бакеты</span>
             <span className="used">
-              {!storage?.allS3StatsAvailable ? 'недоступно' : storage.allS3HasFiniteQuota
+              {!storage?.allS3StatsAvailable ? s3State === 'loading' ? 'Подсчитываем…' : s3State === 'not_configured' ? 'не настроен' : 'недоступно' : storage.allS3HasFiniteQuota
                 ? `${storage.allS3UsedLabel} / ${storage.allS3QuotaLabel}`
                 : `${storage.allS3UsedLabel} · безлимит`}
             </span>
           </div>
-          <div className="bar" role="progressbar" aria-label="Использование S3-хранилища"
+          <div className={"bar" + (s3State === "loading" ? " pending" : "")} role="progressbar" aria-label="Использование S3-хранилища"
             aria-valuemin={0} aria-valuemax={100}
-            aria-valuenow={!storage?.allS3StatsAvailable ? 0 : storage.allS3HasFiniteQuota
+            aria-valuenow={!storage?.allS3StatsAvailable ? undefined : storage.allS3HasFiniteQuota
               ? storage.allS3Percent : 100}>
             <div className="bar-fill" style={{
               width: (!storage?.allS3StatsAvailable ? 0 : storage.allS3HasFiniteQuota
@@ -112,23 +116,23 @@ export function Sidebar() {
               background: '#9A4F1E',
             }} />
           </div>
-          <div className="sb-storage-foot">
-            <span>{!storage?.allS3StatsAvailable ? 'недоступно' : storage.allS3HasFiniteQuota
-              ? `${storage.allS3Percent}% использовано` : 'безлимит'}</span>
-          </div>
+          {storage?.allS3StatsAvailable && <div className="sb-storage-foot">
+            <span>{storage.allS3HasFiniteQuota ? `${storage.allS3Percent}% использовано` : 'безлимит'}</span>
+          </div>}
+          {s3State !== 'loading' && <StorageStatsStatus state={s3State} updatedAt={storage?.allS3UpdatedAt} />}
         </div>
       </div>
 
-      <Link className="sb-user" to="/settings">
+      <Link className="sb-user" to="/settings" aria-label={user?.displayName ? `Аккаунт ${user.displayName}` : 'Аккаунт'} title="Аккаунт">
         {user?.avatarUrl ? (
           <img className="avatar" src={user.avatarUrl} alt="" />
         ) : (
-          <div className="avatar">{user?.initials || '?'}</div>
+          <div className="avatar">{user?.initials || <Icon.user size={20} />}</div>
         )}
         <div className="who">
-          <div className="uname">{user?.displayName || 'Пользователь'}</div>
+          <div className="uname">{user?.displayName || (profileError ? 'Профиль недоступен' : 'Загрузка профиля…')}</div>
           <div className="uhost">
-            {user?.role} · {shell?.server.host}
+            {[user?.role, shell?.server.host].filter(Boolean).join(' · ')}
           </div>
         </div>
         <span className="chev">

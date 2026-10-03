@@ -425,6 +425,7 @@ message CheckFileHashesResponse {
 }
 
 message GetUserStorageInfoRequest {
+  bool non_blocking_stats = 1; // Вернуть последний замер и обновить статистику в фоне (Web)
 }
 
 // ============ CloudApi messages ============
@@ -706,6 +707,10 @@ message GetUserStorageInfoResponse {
   int64 all_s3_quota_storage = 9; // Сумма настроенных квот уникальных бакетов
   bool all_s3_has_finite_quota = 10; // Все активные уникальные бакеты имеют положительную квоту
   bool all_s3_stats_available = 11; // Удалось получить полную статистику S3 либо есть успешный stale-снимок
+  string physical_stats_state = 12; // loading / ready / refreshing / error
+  google.protobuf.Timestamp physical_stats_updated_at = 13;
+  string all_s3_stats_state = 14; // loading / ready / refreshing / error / not_configured
+  google.protobuf.Timestamp all_s3_stats_updated_at = 15;
 }
 
 // ============ AlbumApi messages ============

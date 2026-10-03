@@ -21,6 +21,7 @@ export function ConfirmModal({
 }: ConfirmModalProps) {
   const [busy, setBusy] = React.useState(false);
   async function run() {
+    if (busy) return;
     setBusy(true);
     try {
       await onConfirm();
@@ -31,10 +32,10 @@ export function ConfirmModal({
   return (
     <Modal
       title={title}
-      onClose={onClose}
+      onClose={busy ? undefined : onClose}
       actions={
         <>
-          <button className="btn text" onClick={onClose}>
+          <button className="btn text" onClick={onClose} disabled={busy}>
             Отмена
           </button>
           <button className={'btn ' + (danger ? 'danger' : 'primary')} onClick={run} disabled={busy}>
