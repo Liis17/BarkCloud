@@ -15,6 +15,10 @@
     <string name="login_error_invalid_credentials">Неверный логин или пароль</string>
     <string name="login_error_network">Не удалось связаться с сервером</string>
     <string name="login_coming_soon">Скоро</string>
+    <string name="login_server_host_label">Адрес сервера</string>
+    <string name="login_server_identity_port_label">Порт Identity</string>
+    <string name="login_server_users_port_label">Порт Users</string>
+    <string name="login_server_files_port_label">Порт Files</string>
 
     <!-- Bottom navigation (5 табов, как в iOS) -->
     <string name="tab_gallery">Галерея</string>
@@ -147,6 +151,8 @@
 
     <!-- Gallery -->
     <string name="gallery_upload_selected">Загрузить (%1$d)</string>
+    <string name="gallery_selection_mode">Режим выбора</string>
+    <string name="viewer_play_video">Воспроизвести видео</string>
     <string name="gallery_auto_upload">Автозагрузка</string>
     <string name="gallery_free_device_space">Удалить копии с устройства (%1$d)</string>
     <string name="gallery_device_copies_deleted">Удалено с устройства: %1$d</string>
@@ -167,6 +173,12 @@
     <string name="share_uploading">Загружаем файлы</string>
     <string name="share_staging">Готовим файлы к фоновой загрузке</string>
     <string name="share_queued">Загрузка поставлена в очередь</string>
+    <string name="settings_uploads_title">Загрузки</string>
+    <string name="upload_auto_title">Автозагрузка медиатеки</string>
+    <string name="upload_auto_manual_note">Ручная отправка всегда доступна при наличии сети.</string>
+    <string name="upload_policy_wifi">Только Wi‑Fi</string>
+    <string name="upload_policy_any">Wi‑Fi и мобильная сеть</string>
+    <string name="upload_policy_off">Отключено</string>
     <string name="share_upload_done">Загрузка завершена</string>
     <string name="share_upload_failed">Не загрузилось файлов: %1$d</string>
 
@@ -181,6 +193,9 @@
         <item quantity="many">%1$d файлов загружено</item>
         <item quantity="other">%1$d файлов загружено</item>
     </plurals>
+    <string name="upload_v1_cancelled_message">Загрузка отменена при обновлении приложения — добавьте файл заново</string>
+    <string name="upload_error_quota_exceeded">Недостаточно свободного места в облаке</string>
+    <string name="upload_error_empty_file">Пустые файлы не поддерживаются</string>
 
     <!-- Settings -->
     <string name="settings_title">Настройки</string>

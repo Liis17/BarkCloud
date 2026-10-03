@@ -2,7 +2,6 @@ package com.barkfluff.BarkCloud.data.upload
 
 import android.content.Context
 import android.net.Uri
-import android.provider.OpenableColumns
 import com.barkfluff.BarkCloud.data.persistence.BarkCloudDatabase
 import com.barkfluff.BarkCloud.data.persistence.UploadDao
 import com.barkfluff.BarkCloud.net.queryFileName
@@ -25,12 +24,16 @@ class UploadQueueStore(
     val recentJobs: Flow<List<UploadJob>> = dao.observeRecent()
 
     suspend fun initialize() {
-        dao.recoverInterruptedUploads()
-        dao.recoverInterruptedAttachments()
         migrateLegacyQueue()
+        migrateV1Jobs()
         dao.deleteCompletedBefore(System.currentTimeMillis() - COMPLETED_RETENTION_MILLIS)
     }
 
+    /**
+     * Всегда копирует источник в app-private staging: Upload 2.0 требует повторного
+     * чтения регионов файла (SHA-256 до create, окна частей после) — стримить из
+     * content:// с skip по смещению ненадёжно.
+     */
     suspend fun enqueue(
         uri: Uri,
         fileName: String = queryFileName(appContext, uri),
@@ -40,16 +43,13 @@ class UploadQueueStore(
         albumId: String? = null,
         mediaKey: String? = null,
         mediaHash: String? = null,
-        stageSource: Boolean = true,
     ): UploadJob = withContext(Dispatchers.IO) {
         val id = UUID.randomUUID().toString()
-        val staged = if (stageSource) stage(uri, id, fileName) else null
-        val bytes = staged?.length() ?: querySize(uri)
+        val staged = stage(uri, id, fileName)
         val job = UploadJob(
             id = id,
             source = source,
-            sourceUri = if (stageSource) null else uri.toString(),
-            stagedFilePath = staged?.absolutePath,
+            stagedFilePath = staged.absolutePath,
             mediaKey = mediaKey,
             mediaHash = mediaHash,
             fileName = fileName.ifBlank { "file" },
@@ -58,9 +58,11 @@ class UploadQueueStore(
             directoryId = directoryId,
             albumId = albumId,
             phase = UploadPhase.QUEUED,
+            idempotencyKey = UUID.randomUUID().toString(),
+            sessionId = null,
+            partSize = 0L,
             preparedFileId = null,
-            uploadUrl = null,
-            bytesTotal = bytes.coerceAtLeast(0L),
+            bytesTotal = staged.length(),
             bytesSent = 0L,
             errorMessage = null,
             createdAtMillis = System.currentTimeMillis(),
@@ -70,31 +72,54 @@ class UploadQueueStore(
         job
     }
 
-    suspend fun nextActive(): UploadJob? = dao.nextActive()
     suspend fun activeJobs(): List<UploadJob> = dao.activeJobs()
     suspend fun byId(id: String): UploadJob? = dao.byId(id)
+
     suspend fun setProgress(id: String, sent: Long, total: Long, phase: UploadPhase) =
         dao.setProgress(id, sent.coerceAtLeast(0L), total.coerceAtLeast(0L), phase)
 
-    suspend fun markUploaded(id: String, fileId: String) = dao.markUploaded(id, fileId)
-    suspend fun prepareUpload(id: String, fileId: String, uploadUrl: String) = dao.prepareUpload(id, fileId, uploadUrl)
     suspend fun setPhase(id: String, phase: UploadPhase, error: String? = null) = dao.setPhase(id, phase, error)
+    suspend fun setHash(id: String, hash: String, bytesTotal: Long) = dao.setHash(id, hash, bytesTotal)
+    suspend fun bindSession(id: String, sessionId: String, idempotencyKey: String, fileId: String, partSize: Long) =
+        dao.bindSession(id, sessionId, idempotencyKey, fileId, partSize)
 
     suspend fun complete(job: UploadJob) {
         dao.markCompleted(job.id, System.currentTimeMillis())
         job.stagedFilePath?.let { File(it).delete() }
     }
 
-    suspend fun retry(id: String) {
-        val job = dao.byId(id) ?: return
-        dao.update(job.copy(phase = if (job.preparedFileId == null) UploadPhase.QUEUED else UploadPhase.UPLOADED, errorMessage = null))
+    /** Байты уже на сервере — локальная копия больше не нужна, задача ждёт только привязки. */
+    suspend fun dropStaging(id: String) {
+        dao.byId(id)?.stagedFilePath?.let { File(it).delete() }
     }
 
+    /**
+     * Retry: с живой сессией — снова в UPLOADING (worker сделает resume и сам разберёт
+     * серверное состояние: UPLOADING/PROCESSING/READY); без сессии — с начала.
+     * UPLOADED_NOT_ATTACHED повторяет только привязку.
+     */
+    suspend fun retry(id: String) {
+        val job = dao.byId(id) ?: return
+        val phase = when {
+            job.phase == UploadPhase.UPLOADED_NOT_ATTACHED -> UploadPhase.ATTACHING
+            job.sessionId != null -> UploadPhase.UPLOADING
+            else -> UploadPhase.QUEUED
+        }
+        dao.update(job.copy(phase = phase, errorMessage = null))
+    }
+
+    /**
+     * Отмена: помечает CANCELLED и удаляет staging. Серверную сессию отменяет worker,
+     * заметив фазу (или при следующем запуске через [cancelledWithSessions]).
+     */
     suspend fun cancel(id: String) {
         val job = dao.byId(id) ?: return
         dao.update(job.copy(phase = UploadPhase.CANCELLED))
         job.stagedFilePath?.let { File(it).delete() }
     }
+
+    suspend fun cancelledWithSessions(): List<UploadJob> = dao.cancelledWithSession()
+    suspend fun clearSession(id: String) = dao.clearSession(id)
 
     suspend fun pauseBackup() = dao.pauseBackup()
     suspend fun resumeBackup() = dao.resumeBackup()
@@ -116,13 +141,6 @@ class UploadQueueStore(
         return destination
     }
 
-    private fun querySize(uri: Uri): Long = runCatching {
-        appContext.contentResolver.query(uri, arrayOf(OpenableColumns.SIZE), null, null, null)?.use { cursor ->
-            val column = cursor.getColumnIndex(OpenableColumns.SIZE)
-            if (cursor.moveToFirst() && column >= 0 && !cursor.isNull(column)) cursor.getLong(column) else 0L
-        } ?: 0L
-    }.getOrDefault(0L)
-
     private suspend fun migrateLegacyQueue() = withContext(Dispatchers.IO) {
         val prefs = appContext.getSharedPreferences(LEGACY_PREFS_NAME, Context.MODE_PRIVATE)
         val raw = prefs.getString(LEGACY_ITEMS, null) ?: return@withContext
@@ -137,7 +155,6 @@ class UploadQueueStore(
                 UploadJob(
                     id = item.optString("id").ifBlank { UUID.randomUUID().toString() },
                     source = UploadSource.MANUAL,
-                    sourceUri = null,
                     stagedFilePath = path,
                     mediaKey = null,
                     mediaHash = null,
@@ -147,8 +164,10 @@ class UploadQueueStore(
                     directoryId = directoryId,
                     albumId = item.optString("albumId").ifBlank { null },
                     phase = UploadPhase.QUEUED,
+                    idempotencyKey = UUID.randomUUID().toString(),
+                    sessionId = null,
+                    partSize = 0L,
                     preparedFileId = null,
-                    uploadUrl = null,
                     bytesTotal = file.length(),
                     bytesSent = 0L,
                     errorMessage = null,
@@ -160,9 +179,24 @@ class UploadQueueStore(
         prefs.edit().clear().apply()
     }
 
+    /**
+     * Одноразовая миграция V1→V2 (паритет с iOS): активные legacy-задачи отменяются
+     * вместе со staging — multipart-задачи несовместимы с V2-воркером. Терминальные
+     * строки остаются как история.
+     */
+    private suspend fun migrateV1Jobs() = withContext(Dispatchers.IO) {
+        val prefs = appContext.getSharedPreferences(V2_MIGRATION_PREFS, Context.MODE_PRIVATE)
+        if (prefs.getBoolean(V2_MIGRATION_MARKER, false)) return@withContext
+        dao.v1ActiveJobs().forEach { job -> job.stagedFilePath?.let { File(it).delete() } }
+        dao.cancelV1Jobs(appContext.getString(com.barkfluff.BarkCloud.R.string.upload_v1_cancelled_message))
+        prefs.edit().putBoolean(V2_MIGRATION_MARKER, true).apply()
+    }
+
     private companion object {
         const val LEGACY_PREFS_NAME = "barkcloud_upload_queue"
         const val LEGACY_ITEMS = "items"
+        const val V2_MIGRATION_PREFS = "barkcloud_upload2"
+        const val V2_MIGRATION_MARKER = "migration.v1"
         const val COMPLETED_RETENTION_MILLIS = 24L * 60L * 60L * 1000L
     }
 }

@@ -1,6 +1,11 @@
 package com.barkfluff.BarkCloud.ui.main
 
 import android.net.Uri
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.Scaffold
@@ -10,11 +15,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.navigation.NavType
+import androidx.navigation.navArgument
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
-import androidx.navigation.navArgument
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.barkfluff.BarkCloud.R
@@ -25,6 +30,9 @@ import com.barkfluff.BarkCloud.ui.favorites.FavoritesScreen
 import com.barkfluff.BarkCloud.ui.files.CloudBrowserScreen
 import com.barkfluff.BarkCloud.ui.gallery.GalleryScreen
 import com.barkfluff.BarkCloud.ui.media.MediaTabScreen
+import com.barkfluff.BarkCloud.ui.navigation.FadeThroughEnter
+import com.barkfluff.BarkCloud.ui.navigation.FadeThroughExit
+import com.barkfluff.BarkCloud.ui.navigation.drillIn
 import com.barkfluff.BarkCloud.ui.settings.AppLockSettingsScreen
 import com.barkfluff.BarkCloud.ui.settings.DevicesScreen
 import com.barkfluff.BarkCloud.ui.shared.SharedFolderBrowserScreen
@@ -76,7 +84,11 @@ fun MainScreen(
     Scaffold(
         bottomBar = {
             Column {
-                if (uploadState.isActive) {
+                AnimatedVisibility(
+                    visible = uploadState.isActive,
+                    enter = expandVertically() + fadeIn(),
+                    exit = shrinkVertically() + fadeOut(),
+                ) {
                     GlobalUploadBanner(uploadState) { navController.navigate("uploads/root") }
                 }
                 MainBottomBar(navController)
@@ -87,6 +99,10 @@ fun MainScreen(
             navController = navController,
             startDestination = MainDestination.Default.route,
             modifier = Modifier.padding(padding),
+            enterTransition = FadeThroughEnter,
+            exitTransition = FadeThroughExit,
+            popEnterTransition = FadeThroughEnter,
+            popExitTransition = FadeThroughExit,
         ) {
             navigation(startDestination = "gallery/root", route = MainDestination.Gallery.route) {
                 composable("gallery/root") {
@@ -110,7 +126,7 @@ fun MainScreen(
                         },
                     )
                 }
-                composable(
+                drillIn(
                     route = "files/local?path={path}",
                     arguments = listOf(navArgument("path") { type = NavType.StringType }),
                 ) { entry ->
@@ -119,7 +135,7 @@ fun MainScreen(
                         onNavigateUp = { navController.popBackStack() },
                     )
                 }
-                composable(
+                drillIn(
                     route = "files/cloud?dir={dir}&title={title}",
                     arguments = listOf(
                         navArgument("dir") { type = NavType.StringType; defaultValue = "" },
@@ -135,14 +151,14 @@ fun MainScreen(
                         onNavigateUp = { navController.popBackStack() },
                     )
                 }
-                composable("files/shared") {
+                drillIn("files/shared") {
                     SharedHubScreen(
                         onOpenSharedFolder = { id, name ->
                             navController.navigate("files/shared/folder?dir=$id&title=${Uri.encode(name)}")
                         },
                     )
                 }
-                composable(
+                drillIn(
                     route = "files/shared/folder?dir={dir}&title={title}",
                     arguments = listOf(
                         navArgument("dir") { type = NavType.StringType },
@@ -158,7 +174,7 @@ fun MainScreen(
                         onNavigateUp = { navController.popBackStack() },
                     )
                 }
-                composable(
+                drillIn(
                     route = "files/smart/{folderId}?title={title}",
                     arguments = listOf(
                         navArgument("folderId") { type = NavType.StringType },
@@ -182,7 +198,7 @@ fun MainScreen(
                         onOpenFavorites = { navController.navigate("albums/favorites") },
                     )
                 }
-                composable(
+                drillIn(
                     route = "albums/detail/{albumId}?name={name}",
                     arguments = listOf(
                         navArgument("albumId") { type = NavType.StringType },
@@ -195,7 +211,7 @@ fun MainScreen(
                         onNavigateUp = { navController.popBackStack() },
                     )
                 }
-                composable("albums/favorites") {
+                drillIn("albums/favorites") {
                     FavoritesScreen(onNavigateUp = { navController.popBackStack() })
                 }
             }
@@ -219,30 +235,30 @@ fun MainScreen(
                         onSignedOut = onSignOut,
                     )
                 }
-                composable("settings/editProfile") {
+                drillIn("settings/editProfile") {
                     EditProfileScreen(onNavigateUp = { navController.popBackStack() })
                 }
-                composable("settings/privacy") {
+                drillIn("settings/privacy") {
                     PrivacySettingsScreen(onNavigateUp = { navController.popBackStack() })
                 }
-                composable("settings/devices") {
+                drillIn("settings/devices") {
                     DevicesScreen(onNavigateUp = { navController.popBackStack() })
                 }
-                composable("settings/cache") {
+                drillIn("settings/cache") {
                     CacheSettingsScreen(onNavigateUp = { navController.popBackStack() })
                 }
-                composable("settings/uploads") {
+                drillIn("settings/uploads") {
                     UploadSettingsScreen(onNavigateUp = { navController.popBackStack() })
                 }
-                composable("settings/applock") {
+                drillIn("settings/applock") {
                     AppLockSettingsScreen(onNavigateUp = { navController.popBackStack() })
                 }
-                composable("settings/vault") {
+                drillIn("settings/vault") {
                     VaultScreen(onNavigateUp = { navController.popBackStack() })
                 }
             }
 
-            composable("uploads/root") {
+            drillIn("uploads/root") {
                 UploadQueueScreen(onNavigateUp = { navController.popBackStack() })
             }
         }

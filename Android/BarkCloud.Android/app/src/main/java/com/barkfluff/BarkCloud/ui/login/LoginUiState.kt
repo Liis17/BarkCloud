@@ -9,6 +9,10 @@ data class LoginUiState(
     val isLoading: Boolean = false,
     val credentialsError: String? = null,
     val snackbarMessage: String? = null,
+    val serverHost: String = "",
+    val serverIdentityPort: String = "",
+    val serverUsersPort: String = "",
+    val serverFilesPort: String = "",
 ) {
     val canSubmit: Boolean
         get() = !isLoading &&
@@ -18,5 +22,6 @@ data class LoginUiState(
 
     companion object {
         const val OTP_LENGTH = 6
+        const val PORT_MAX_LENGTH = 5
     }
 }

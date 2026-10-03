@@ -10,13 +10,14 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -41,7 +42,7 @@ import com.barkfluff.BarkCloud.R
 import com.barkfluff.BarkCloud.data.cache.FileCacheSettings
 import com.barkfluff.BarkCloud.files.ui.formatSize
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun CacheSettingsScreen(
     onNavigateUp: () -> Unit,
@@ -83,7 +84,7 @@ fun CacheSettingsScreen(
             ElevatedCard(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(stringResource(R.string.cache_size), style = MaterialTheme.typography.titleMedium)
-                    LinearProgressIndicator(
+                    LinearWavyProgressIndicator(
                         progress = {
                             if (state.maxCacheBytes > 0) {
                                 (state.cacheSize.toFloat() / state.maxCacheBytes).coerceIn(0f, 1f)
@@ -181,10 +182,10 @@ private fun ChipRow(
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         options.forEach { value ->
-            AssistChip(
+            FilterChip(
+                selected = value == selected,
                 onClick = { onSelect(value) },
                 label = { Text(label(value)) },
-                enabled = value != selected,
             )
         }
     }

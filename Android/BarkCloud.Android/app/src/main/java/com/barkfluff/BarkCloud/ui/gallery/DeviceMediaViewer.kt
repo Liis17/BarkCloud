@@ -16,6 +16,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil3.compose.AsyncImage
+import androidx.compose.ui.res.stringResource
+import com.barkfluff.BarkCloud.R
 import com.barkfluff.BarkCloud.data.gallery.DeviceMedia
 import androidx.compose.foundation.layout.size
 
@@ -46,7 +48,7 @@ fun DeviceMediaViewer(
             if (media.isVideo) {
                 Icon(
                     imageVector = Icons.Filled.PlayCircle,
-                    contentDescription = null,
+                    contentDescription = stringResource(R.string.viewer_play_video),
                     tint = Color.White,
                     modifier = Modifier
                         .size(72.dp)

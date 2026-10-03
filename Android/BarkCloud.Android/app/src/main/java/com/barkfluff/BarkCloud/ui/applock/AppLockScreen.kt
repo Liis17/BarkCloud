@@ -1,5 +1,8 @@
 package com.barkfluff.BarkCloud.ui.applock
 
+import android.view.HapticFeedbackConstants
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -31,7 +34,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
@@ -39,6 +44,7 @@ import com.barkfluff.BarkCloud.BarkCloudApplication
 import com.barkfluff.BarkCloud.R
 import com.barkfluff.BarkCloud.data.BiometricAvailability
 import com.barkfluff.BarkCloud.data.BiometricGate
+import com.barkfluff.BarkCloud.ui.theme.BarkMotion
 import kotlinx.coroutines.launch
 
 internal const val PIN_LENGTH = 6
@@ -144,13 +150,23 @@ fun AppLockScreen(onUnlocked: () -> Unit) {
 internal fun PinDots(length: Int, total: Int) {
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         repeat(total) { index ->
+            val filled = index < length
+            val scale by animateFloatAsState(
+                targetValue = if (filled) 1f else 0.6f,
+                animationSpec = BarkMotion.spatial(),
+                label = "pinDotScale",
+            )
+            val color by animateColorAsState(
+                targetValue = if (filled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                animationSpec = BarkMotion.effect(),
+                label = "pinDotColor",
+            )
             Box(
                 modifier = Modifier
                     .size(14.dp)
+                    .scale(scale)
                     .clip(CircleShape)
-                    .background(
-                        if (index < length) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
-                    ),
+                    .background(color),
             )
         }
     }
@@ -177,11 +193,15 @@ internal fun PinKeypad(onDigit: (Char) -> Unit, onBackspace: () -> Unit) {
 
 @Composable
 private fun KeypadDigit(digit: Char, onClick: () -> Unit) {
+    val view = LocalView.current
     Box(
         modifier = Modifier
             .size(56.dp)
             .clip(CircleShape)
-            .clickable(onClick = onClick),
+            .clickable(onClick = {
+                view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                onClick()
+            }),
         contentAlignment = Alignment.Center,
     ) {
         Text(digit.toString(), style = MaterialTheme.typography.headlineSmall)

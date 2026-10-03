@@ -124,7 +124,6 @@ class GalleryViewModel(
                         destination = UploadDestination.SYSTEM_BY_MEDIA_KIND,
                         mediaKey = media.mediaKey,
                         mediaHash = hash,
-                        stageSource = false,
                     )
                     mediaDao.upsert(mediaState(media, hash, MediaCloudStatus.QUEUED))
                 }.onFailure { failures++ }

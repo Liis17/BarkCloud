@@ -1,5 +1,10 @@
 package com.barkfluff.BarkCloud.ui.shared
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -24,6 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.barkfluff.BarkCloud.R
+import com.barkfluff.BarkCloud.ui.theme.BarkMotion
 import kotlinx.coroutines.launch
 
 /** Контейнер таба «Общие файлы»: 3 сегмента — публичные ссылки, исходящие и входящие гранты. */
@@ -62,10 +68,19 @@ fun SharedHubScreen(
                 }
             }
 
-            when (segment) {
-                0 -> MySharesScreen(onSnackbar = onSnackbar)
-                1 -> MyOutgoingSharesScreen(onSnackbar = onSnackbar)
-                else -> SharedWithMeScreen(onOpenFolder = onOpenSharedFolder, onSnackbar = onSnackbar)
+            AnimatedContent(
+                targetState = segment,
+                transitionSpec = {
+                    (fadeIn(BarkMotion.effect()) + scaleIn(BarkMotion.effect(), initialScale = 0.96f))
+                        .togetherWith(fadeOut(BarkMotion.effect()))
+                },
+                label = "sharedSegment",
+            ) { index ->
+                when (index) {
+                    0 -> MySharesScreen(onSnackbar = onSnackbar)
+                    1 -> MyOutgoingSharesScreen(onSnackbar = onSnackbar)
+                    else -> SharedWithMeScreen(onOpenFolder = onOpenSharedFolder, onSnackbar = onSnackbar)
+                }
             }
         }
     }

@@ -107,7 +107,6 @@ class AutoUploadWorker(
                     destination = UploadDestination.SYSTEM_BY_MEDIA_KIND,
                     mediaKey = media.mediaKey,
                     mediaHash = hash,
-                    stageSource = false,
                 )
                 mediaDao.upsert(
                     MediaCloudState(

@@ -1,6 +1,6 @@
 # Android — App
 
-Parent: [[index]] · See also: [[modules/shared-proto]] · [[api/identity-api]] · [[modules/backend-grpcserver]] · [[modules/ios-app]]
+Parent: [[index]] · Upload 2.0: [[modules/android-upload2]] · See also: [[modules/shared-proto]] · [[api/identity-api]] · [[modules/backend-grpcserver]] · [[modules/ios-app]]
 
 ## Назначение
 
@@ -8,10 +8,23 @@ Parent: [[index]] · See also: [[modules/shared-proto]] · [[api/identity-api]] 
 
 ## Реализованный функционал (паритет с iOS)
 
+### Обновление: Material 3 Expressive — визуальный слой (2026-10-03)
+
+Приведение UI к визуальному языку Android 16/17 (M3 Expressive), в рамках material3 1.4.0-alpha18:
+
+- **Моушен**: переходы NavHost — fade through для табов (`MainScreen`/`RootNavGraph`), shared axis X для drill-in через helper `drillIn()` (`ui/navigation/NavMotion.kt`, токены spatial.default/effect.default). `AnimatedContent` на сегментах MediaTab/SharedHub, `AnimatedVisibility` для GlobalUploadBanner и оверлея AppLock (вход fade+scale, выход мгновенный — security), spring-анимация PIN-точек (`BarkMotion`), хаптики: клавиатура PIN (KEYBOARD_TAP) и свайпы корзины (CONFIRM).
+- **Expressive-компоненты**: `LoadingIndicator` вместо экранных `CircularProgressIndicator` (в кнопках/бейджах остался CPI), `LinearWavyProgressIndicator` для детерминированных прогрессов (хранилище, кеш, очередь загрузок, баннер, операции LocalBrowser, ShareActivity), `HorizontalFloatingToolbar` для режима выделения галереи (вместо полноширинной кнопки), `LargeTopAppBar` (collapsing) на Настройках, `FilterChip` вместо AssistChip-переключателей (CacheSettings, UploadSettings, SmartFolderFormDialog — комбинатор/вид стали явным single-select).
+- **Адаптивность**: `GridCells.Adaptive(120dp/180dp)` вместо `Fixed(3)`/`Fixed(2)` во всех гридах — колонки растут на планшетах/landscape без material3-adaptive.
+- **Бренд-палитра**: `Color.kt` — фирменная тёплая схема (seed #9A4F1E), синхронизирована с веб-клиентом (`shared.css`), включая surface-container'ы и outline; на Android 12+ по-прежнему перекрывается Dynamic Color.
+- **Система**: splash screen (`core-splashscreen` 1.2.0, `Theme.BarkCloud.Splash`, фон #FFF8F5) на MainActivity; `android:enableOnBackInvokedCallback=true` (predictive back); scrim-оверлеи переведены с хардкода `Color.Black` на роль `colorScheme.scrim`.
+- **Мелочи**: захардкоженные строки UploadSettings/Settings вынесены в `strings.xml`; `contentDescription` для select-режима галереи, play-кнопок вьюеров, back-стрелок; шаблонные purple/teal цвета удалены из `colors.xml`. Лаунчер-иконка — осознанно оставлена системной заглушкой (бренд-иконки нет).
+
+Не сделано (нет в alpha18 / вне скоупа): Flexible-топбары, SplitButton, ButtonGroup, карусели, MaterialShapes-морфинг (`graphics-shapes` подключена, не используется), material3-adaptive (NavigationSuiteScape, List-Detail), Material Symbols, бренд-иконка.
+
 ### Обновление: сессия, очередь и автозагрузка
 
 - **Сессия**: `GlobalParam` использует `TokenStore` — единый зашифрованный blob в credential-protected storage, ключ AES-GCM хранится в Android Keystore. На первом запуске мигрируются прежние `EncryptedSharedPreferences`; `TokenRefresher` обновляет access-token за 60 секунд до истечения и сериализует параллельные refresh-запросы. `Auth` и `CreateToken` уходят без старого auth-header; невалидный refresh очищает сессию и возвращает приложение на login.
-- **Очередь загрузок**: Room-база `barkcloud-local.db` хранит `UploadJob` и `MediaCloudState`. Очередь восстанавливает прерванные фазы (`UPLOADING`/`ATTACHING`), сохраняет байтовый прогресс, `file_id` и upload URL, поэтому повторяет незавершённый шаг, а не создаёт новый файл. Ручные, gallery, album, share и backup-загрузки обслуживает один foreground `UploadWorker`.
+- **Очередь загрузок (Upload 2.0, с 2026-10-03 — см. [[modules/android-upload2]])**: Room-база `barkcloud-local.db` (v2) хранит `UploadJob` с сессией Upload 2.0 (`sessionId/idempotencyKey/partSize`) и `MediaCloudState`. Фазы: `QUEUED → HASHING → CREATING_SESSION → UPLOADING → COMPLETING → PROCESSING → ATTACHING → COMPLETED` (+`UPLOADED_NOT_ATTACHED`, `PAUSED` для backup). Возобновление опирается на серверный список частей (`ResumeUploadSession`), не на локальный прогресс; до **4 файлов параллельно**, части файла последовательно. Источник всегда копируется в staging (`filesDir/upload_queue`), включая backup. Ручные, gallery, album, share и backup-загрузки обслуживает один foreground `UploadWorker`; data plane — `PUT /file-upload/{session}/parts/{n}` на nginx :443 (`FILES_UPLOAD_BASE`). Аватар — legacy V1 multipart.
 - **Маршрутизация**: gallery, media picker, backup и системный Share target используют `route_by_media_kind` → серверные «Фото»/«Видео»/«Другие документы». Upload из облачного браузера остаётся в выбранной папке; upload в альбом сначала размещается в системной папке, затем добавляется в альбом.
 - **Автозагрузка**: `AutoUploadWorker` только сканирует MediaStore, кеширует SHA-256 и версию (`id`, тип, размер, дата изменения) в Room и подаёт максимум 20 backup-задач в общую очередь. Политика в настройках: Wi‑Fi (по умолчанию), любая сеть или off; off ставит backup-задачи на паузу, не трогая ручные. При открытом приложении MediaStore observer с debounce запускает повторный scan; в фоне действует hourly WorkManager.
 - **Галерея/кеш**: статусы файлов устройства разделены на checking/not-in-cloud/queued/uploading/in-cloud/error; бейдж «в облаке» появляется только после upload+attach. Перед `MediaStore.createDeleteRequest` наличие перепроверяется на сервере. Device и cloud grids сгруппированы по дате съёмки/создания. Coil имеет выделенный 256 MiB disk cache для preview/аватаров; originals остались в управляемом LRU-кеше. В настройках профиля `ProfileViewModel` для собственного аватара сначала выбирает `profile_picture`, а `profile_picture_preview` оставляет fallback.
@@ -72,9 +85,10 @@ app/src/main/java/com/barkfluff/BarkCloud/
 │   ├── AuthInterceptor.kt     — заголовок x-auth-token (динамически, без base64)
 │   ├── ClientMetadataInterceptor.kt — x-device-id/name, x-os-name, x-app-name/version, x-ip-address (base64 NO_WRAP)
 │   ├── GrpcError.kt           — StatusRuntimeException.errorCode() из трейлера x-error-code
+│   ├── ServerSettings.kt      — runtime-адрес/порты сервера (override с логина, дефолты BuildConfig)
 │   └── AuthErrorCodes.kt      — GUID-коды OTP_REQUIRED / INVALID_CREDENTIALS
 ├── ui/
-│   ├── navigation/RootNavGraph.kt — гейт login ↔ main по hasValidRefreshToken() + оверлей AppLockScreen (Box поверх NavHost)
+│   ├── navigation/RootNavGraph.kt — гейт login ↔ main по hasValidRefreshToken() + оверлей AppLockScreen (Box поверх NavHost); при `!sessionActive` на login не навигирует (иначе `launchSingleTop` пересоздаёт LoginScreen и ломает ввод в поля)
 │   ├── login/                 — LoginScreen, LoginUiState, LoginViewModel (логин/пароль + OTP)
 │   ├── main/                  — MainScreen (Scaffold + вложенный NavHost), MainDestination (5 табов), MainBottomBar
 │   ├── applock/                — AppLockScreen (биометрия+PIN keypad), PinDots/PinKeypad (internal, переиспользуются в settings)
@@ -146,15 +160,15 @@ work и обновляет progress notification через `UploadNotification`
 Ручные загрузки из `GalleryViewModel`, `MediaGridViewModel`, `AlbumDetailViewModel`,
 `CloudBrowserViewModel` и входящие файлы из `ShareActivity` больше не грузятся напрямую из UI. Они копируют
 исходный `content://` URI в app-private staging (`files/upload_queue`) через
-`UploadQueueStore.enqueue(...)`, сохраняют JSON-очередь в `SharedPreferences` и
-запускают unique one-time `UploadWorker`.
+`UploadQueueStore.enqueue(...)` (Room-очередь) и запускают unique one-time `UploadWorker`.
 
-`UploadWorker` читает staged-файлы, поднимает `GlobalParam`/`GrpcManager`/
-`FileTransferService`/`CloudRepository`, загружает файлы последовательно и удаляет
-элементы очереди после успеха. Для cloud browser сохраняется `directoryId`, поэтому
-файл после upload прикрепляется к выбранной папке; для загрузки в альбом сохраняется
-`albumId`, и после получения `fileId` worker вызывает `AlbumRepository.addItems`.
-Worker использует
+**Upload 2.0 (актуально, с 2026-10-03):** воркер гоняет до 4 файлов параллельно
+через возобновляемые сессии (`create → PUT части → complete → poll ready → attach`),
+части файла последовательно; восстановление после рестарта — через серверный
+`ResumeUploadSession`. Подробная карта — [[modules/android-upload2]].
+
+Для cloud browser сохраняется `directoryId`, поэтому файл после upload прикрепляется к выбранной папке; для загрузки в альбом сохраняется
+`albumId`, и после получения `fileId` worker вызывает `AlbumRepository.addItems`. Worker использует
 `ForegroundInfo(..., ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)` и требует
 permissions `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_DATA_SYNC`, `POST_NOTIFICATIONS`.
 `MainActivity` запрашивает `POST_NOTIFICATIONS` на Android 13+.
@@ -198,7 +212,7 @@ notification.
 - `x-auth-token` — JWT, **без** base64. Добавляет `AuthInterceptor` динамически на каждый запрос.
 - `x-device-id`, `x-device-name`, `x-os-name`, `x-app-name`, `x-app-version`, `x-ip-address` — статичны (считаются один раз), base64 `NO_WRAP` (перенос строки сломал бы `Convert.FromBase64String` на сервере). Добавляет `ClientMetadataInterceptor`.
 
-Оба цепляются в `GrpcManager.identityStub()`. Адрес — `BuildConfig.IDENTITY_API_ADDRESS` (`https://cloud.barkfluff.com:7020`); TLS терминируется на nginx ([[structure/infrastructure]]), сертификат самоподписанный → клиент доверяет всем (trust-all `X509TrustManager`). Паритет с iOS, где те же заголовки разнесены по 5 интерсепторам ([[modules/ios-app]]).
+Оба цепляются в `GrpcManager.identityStub()`. Адрес — runtime из `ServerSettings` (`grpc/ServerSettings.kt`): по умолчанию дефолты сборки из `BuildConfig` (`https://cloud.barkfluff.com:7020` и т.д.), но переопределяется на экране входа — раскрывающаяся «Настройки сервера» (адрес + порты Identity/Users/Files, сохранение в SharedPreferences `barkcloud_server` при submit; хост можно вводить с `http://`/`https://`, без scheme — https). Все адреса (`GrpcManager`, `GrpcEndpoint.filesWebBase/fileUploadBase`, `SharedModels.filesWebHost`) читаются из `ServerSettings` (object с `init(context)` в `Application.onCreate`). TLS терминируется на nginx ([[structure/infrastructure]]), сертификат самоподписанный → клиент доверяет всем (trust-all `X509TrustManager`). Паритет с iOS, где те же заголовки разнесены по 5 интерсепторам ([[modules/ios-app]]).
 
 Коды ошибок-GUID (`AuthErrorCodes`) приходят в трейлере `x-error-code`; `AuthRepository` транслирует их в `AuthResult`.
 
@@ -211,7 +225,7 @@ notification.
 | `compileSdk` / `targetSdk` | 36 |
 | `versionCode` / `versionName` | 1 / 1.0 |
 | Java / jvmTarget | 11 |
-| `BuildConfig.IDENTITY_API_ADDRESS` | `https://cloud.barkfluff.com:7020` |
+| `BuildConfig.IDENTITY_API_ADDRESS` | `https://cloud.barkfluff.com:7020` (дефолт `ServerSettings`, переопределяется на логине) |
 
 Plugins: `android.application`, `kotlin.android`, `kotlin.compose`, `protobuf` (через version catalog `libs`).
 

@@ -29,14 +29,16 @@ import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material.icons.outlined.Storage
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.LargeTopAppBar
+import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -45,6 +47,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -54,6 +57,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -64,7 +68,7 @@ import com.barkfluff.BarkCloud.R
 import com.barkfluff.BarkCloud.files.ui.formatSize
 import com.barkfluff.BarkCloud.ui.components.RemoteImage
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun SettingsScreen(
     onEditProfile: () -> Unit,
@@ -104,8 +108,10 @@ fun SettingsScreen(
         viewModel.snackbarShown()
     }
 
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     Scaffold(
-        topBar = { CenterAlignedTopAppBar(title = { Text(stringResource(R.string.settings_title)) }) },
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        topBar = { LargeTopAppBar(title = { Text(stringResource(R.string.settings_title)) }, scrollBehavior = scrollBehavior) },
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
@@ -137,7 +143,7 @@ fun SettingsScreen(
                     HorizontalDivider()
                     SettingsRow(Icons.Outlined.Devices, stringResource(R.string.settings_devices), onDevices)
                     HorizontalDivider()
-                    SettingsRow(Icons.Outlined.CloudUpload, "Загрузки", onUploadSettings)
+                    SettingsRow(Icons.Outlined.CloudUpload, stringResource(R.string.settings_uploads_title), onUploadSettings)
                     HorizontalDivider()
                     SettingsRow(Icons.Outlined.Storage, stringResource(R.string.cache_title), onCache)
                     HorizontalDivider()
@@ -172,10 +178,10 @@ fun SettingsScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(Color.Black.copy(alpha = 0.3f)),
+                        .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.3f)),
                     contentAlignment = Alignment.Center,
                 ) {
-                    CircularProgressIndicator()
+                    LoadingIndicator()
                 }
             }
         }
@@ -238,7 +244,7 @@ private fun ProfileHeader(
             }
             if (state.isUpdatingAvatar) {
                 Box(
-                    Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.4f)),
+                    Modifier.fillMaxSize().background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.4f)),
                     contentAlignment = Alignment.Center,
                 ) { CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(28.dp)) }
             } else {
@@ -273,13 +279,14 @@ private fun ProfileHeader(
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun StorageCard(used: Long, limit: Long) {
     val context = LocalContext.current
     ElevatedCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(stringResource(R.string.settings_storage_title), style = MaterialTheme.typography.titleMedium)
-            LinearProgressIndicator(
+            LinearWavyProgressIndicator(
                 progress = { if (limit > 0) (used.toFloat() / limit).coerceIn(0f, 1f) else 0f },
                 modifier = Modifier.fillMaxWidth(),
             )

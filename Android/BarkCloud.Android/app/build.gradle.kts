@@ -41,6 +41,12 @@ android {
             "FILES_WEB_BASE",
             "\"https://cloud.barkfluff.com:7025/web\""
         )
+        // Data plane Upload 2.0: nginx маршрутизирует /file-upload/ с 443 напрямую в Files.
+        buildConfigField(
+            "String",
+            "FILES_UPLOAD_BASE",
+            "\"https://cloud.barkfluff.com\""
+        )
     }
 
     buildTypes {
@@ -137,6 +143,7 @@ dependencies {
     androidTestImplementation(composeBom)
 
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.core.splashscreen)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.graphics)
@@ -175,6 +182,8 @@ dependencies {
     testImplementation(libs.mockk)
     testImplementation(libs.turbine)
     testImplementation(libs.kotlinx.coroutines.test)
+    // Реальный org.json в JVM-тестах (в android.jar только кидающий стабы).
+    testImplementation("org.json:json:20240303")
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.junit)
 }

@@ -82,11 +82,7 @@ fun PublicShareItem.publicUrl(): String? {
     return "${filesWebHost()}/$path/$token"
 }
 
-private fun filesWebHost(): String {
-    val address = com.barkfluff.BarkCloud.BuildConfig.FILES_API_ADDRESS // "https://host:7025"
-    val (scheme, hostPort) = address.split("://", limit = 2).let { it[0] to it.getOrElse(1) { address } }
-    return "$scheme://${hostPort.substringBefore(":")}"
-}
+private fun filesWebHost(): String = com.barkfluff.BarkCloud.grpc.ServerSettings.webHostBase
 
 // ============ Я поделился (гранты конкретным пользователям) ============
 

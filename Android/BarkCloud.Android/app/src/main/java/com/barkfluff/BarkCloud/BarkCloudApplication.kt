@@ -32,6 +32,7 @@ import com.barkfluff.BarkCloud.data.vault.VaultStore
 import com.barkfluff.BarkCloud.files.data.LocalFileRepository
 import com.barkfluff.BarkCloud.grpc.ClientMetadataInterceptor
 import com.barkfluff.BarkCloud.grpc.GrpcManager
+import com.barkfluff.BarkCloud.grpc.ServerSettings
 import com.barkfluff.BarkCloud.net.FileTransferService
 import com.barkfluff.BarkCloud.net.InsecureHttp
 import kotlinx.coroutines.CoroutineScope
@@ -105,6 +106,7 @@ class BarkCloudApplication : Application(), SingletonImageLoader.Factory {
 
     override fun onCreate() {
         super.onCreate()
+        ServerSettings.init(this)
         globalParam = GlobalParam(this)
         grpcManager = GrpcManager(globalParam, ClientMetadataInterceptor.create(this))
         authRepository = AuthRepository(grpcManager, globalParam)

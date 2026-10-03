@@ -16,8 +16,10 @@ class ClientMetadataInterceptorTest {
 
     private fun headersAfterStart(): Metadata {
         // Используем рефлексию для приватного конструктора — реальный create() требует
-        // Android Context, поэтому статические значения подсовываем напрямую.
-        val ctor: Constructor<*> = ClientMetadataInterceptor::class.java.declaredConstructors.first()
+        // Android Context, поэтому статические значения подсовываем напрямую. Берём
+        // именно основной конструктор: рядом лежит synthetic с DefaultConstructorMarker.
+        val ctor: Constructor<*> = ClientMetadataInterceptor::class.java.declaredConstructors
+            .first { it.parameterCount == 6 }
         ctor.isAccessible = true
         val interceptor = ctor.newInstance(
             "deviceId-b64",

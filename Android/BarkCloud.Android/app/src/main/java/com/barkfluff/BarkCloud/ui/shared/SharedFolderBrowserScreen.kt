@@ -13,7 +13,9 @@ import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
@@ -42,7 +44,7 @@ import com.barkfluff.BarkCloud.files.data.FileShareHelper
 import com.barkfluff.BarkCloud.files.data.MimeIcon
 import com.barkfluff.BarkCloud.ui.components.MediaThumb
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun SharedFolderBrowserScreen(
     directoryId: String,
@@ -95,7 +97,7 @@ fun SharedFolderBrowserScreen(
             }
 
             if (state.isLoading) {
-                CircularProgressIndicator(Modifier.align(Alignment.Center))
+                LoadingIndicator(Modifier.align(Alignment.Center))
             } else if (!state.found) {
                 Text(
                     text = stringResource(R.string.files_empty_folder),

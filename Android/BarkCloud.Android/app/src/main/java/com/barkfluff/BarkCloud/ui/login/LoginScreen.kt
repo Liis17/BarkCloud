@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -85,6 +86,10 @@ fun LoginScreen(
             onOtpChange = viewModel::onOtpChange,
             onSubmit = viewModel::submit,
             onComingSoon = viewModel::onComingSoon,
+            onServerHostChange = viewModel::onServerHostChange,
+            onServerIdentityPortChange = viewModel::onServerIdentityPortChange,
+            onServerUsersPortChange = viewModel::onServerUsersPortChange,
+            onServerFilesPortChange = viewModel::onServerFilesPortChange,
         )
     }
 }
@@ -99,6 +104,10 @@ private fun LoginContent(
     onOtpChange: (String) -> Unit,
     onSubmit: () -> Unit,
     onComingSoon: () -> Unit,
+    onServerHostChange: (String) -> Unit,
+    onServerIdentityPortChange: (String) -> Unit,
+    onServerUsersPortChange: (String) -> Unit,
+    onServerFilesPortChange: (String) -> Unit,
 ) {
     Box(
         modifier = Modifier
@@ -151,17 +160,27 @@ private fun LoginContent(
                         onChange = onOtpChange,
                     )
                 } else {
-                    CredentialsFields(
-                        login = state.login,
-                        password = state.password,
-                        passwordVisible = state.passwordVisible,
-                        credentialsError = state.credentialsError,
-                        enabled = !state.isLoading,
-                        onLoginChange = onLoginChange,
-                        onPasswordChange = onPasswordChange,
-                        onPasswordVisibilityToggle = onPasswordVisibilityToggle,
-                        onImeSubmit = onSubmit,
-                    )
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        CredentialsFields(
+                            login = state.login,
+                            password = state.password,
+                            passwordVisible = state.passwordVisible,
+                            credentialsError = state.credentialsError,
+                            enabled = !state.isLoading,
+                            onLoginChange = onLoginChange,
+                            onPasswordChange = onPasswordChange,
+                            onPasswordVisibilityToggle = onPasswordVisibilityToggle,
+                            onImeSubmit = onSubmit,
+                        )
+                        ServerSettingsSection(
+                            state = state,
+                            enabled = !state.isLoading,
+                            onHostChange = onServerHostChange,
+                            onIdentityPortChange = onServerIdentityPortChange,
+                            onUsersPortChange = onServerUsersPortChange,
+                            onFilesPortChange = onServerFilesPortChange,
+                        )
+                    }
                 }
             }
 
@@ -262,6 +281,75 @@ private fun CredentialsFields(
             modifier = Modifier.fillMaxWidth(),
         )
     }
+}
+
+@Composable
+private fun ServerSettingsSection(
+    state: LoginUiState,
+    enabled: Boolean,
+    onHostChange: (String) -> Unit,
+    onIdentityPortChange: (String) -> Unit,
+    onUsersPortChange: (String) -> Unit,
+    onFilesPortChange: (String) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        OutlinedTextField(
+            value = state.serverHost,
+            onValueChange = onHostChange,
+            label = { Text(stringResource(R.string.login_server_host_label)) },
+            singleLine = true,
+            enabled = enabled,
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+            shape = MaterialTheme.shapes.medium,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+            PortField(
+                value = state.serverIdentityPort,
+                label = stringResource(R.string.login_server_identity_port_label),
+                enabled = enabled,
+                onChange = onIdentityPortChange,
+                modifier = Modifier.weight(1f),
+            )
+            PortField(
+                value = state.serverUsersPort,
+                label = stringResource(R.string.login_server_users_port_label),
+                enabled = enabled,
+                onChange = onUsersPortChange,
+                modifier = Modifier.weight(1f),
+            )
+            PortField(
+                value = state.serverFilesPort,
+                label = stringResource(R.string.login_server_files_port_label),
+                enabled = enabled,
+                onChange = onFilesPortChange,
+                modifier = Modifier.weight(1f),
+            )
+        }
+    }
+}
+
+@Composable
+private fun PortField(
+    value: String,
+    label: String,
+    enabled: Boolean,
+    onChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onChange,
+        label = { Text(label) },
+        singleLine = true,
+        enabled = enabled,
+        keyboardOptions = KeyboardOptions(
+            keyboardType = KeyboardType.Number,
+            imeAction = ImeAction.Next,
+        ),
+        shape = MaterialTheme.shapes.medium,
+        modifier = modifier,
+    )
 }
 
 @Composable

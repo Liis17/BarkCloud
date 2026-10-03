@@ -11,7 +11,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.PersonRemove
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LoadingIndicator
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
@@ -37,6 +38,7 @@ import com.barkfluff.BarkCloud.data.cloud.OutgoingShareGroup
 import com.barkfluff.BarkCloud.files.ui.formatDate
 import com.barkfluff.BarkCloud.ui.components.MediaThumb
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun MyOutgoingSharesScreen(
     onSnackbar: (String) -> Unit,
@@ -80,14 +82,14 @@ fun MyOutgoingSharesScreen(
             if (state.isLoadingMore) {
                 item {
                     Box(Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator()
+                        LoadingIndicator()
                     }
                 }
             }
         }
 
         if (state.isLoading) {
-            CircularProgressIndicator(Modifier.align(Alignment.Center))
+            LoadingIndicator(Modifier.align(Alignment.Center))
         }
         if (state.isEmpty) {
             Text(

@@ -1,6 +1,12 @@
 package com.barkfluff.BarkCloud.ui.navigation
 
 import android.net.Uri
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.scaleIn
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -43,6 +49,10 @@ fun RootNavGraph(deepLink: Uri? = null) {
         NavHost(
             navController = navController,
             startDestination = startDestination,
+            enterTransition = FadeThroughEnter,
+            exitTransition = FadeThroughExit,
+            popEnterTransition = FadeThroughEnter,
+            popExitTransition = FadeThroughExit,
         ) {
             composable(ROUTE_LOGIN) {
                 LoginScreen(
@@ -69,7 +79,17 @@ fun RootNavGraph(deepLink: Uri? = null) {
 
         val shouldShowLock by app.appLockManager.shouldShowLock.collectAsStateWithLifecycle()
         // Лок актуален только для аутентифицированной сессии — до логина показывать нечего.
-        if (shouldShowLock && sessionActive.value) {
+        // Появление — быстрый fade+scale (effect-пружина), исчезновение мгновенное: это
+        // security-оверлей, не допустимо показывать контент под ним дольше необходимого.
+        AnimatedVisibility(
+            visible = shouldShowLock && sessionActive.value,
+            enter = fadeIn(spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessHigh)) +
+                scaleIn(
+                    animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessHigh),
+                    initialScale = 0.96f,
+                ),
+            exit = ExitTransition.None,
+        ) {
             AppLockScreen(onUnlocked = { app.appLockManager.unlock() })
         }
     }

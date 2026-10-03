@@ -1,6 +1,5 @@
 package com.barkfluff.BarkCloud.data.cloud
 
-import android.net.Uri
 import barkcloud.files.FilesApiOuterClass.AddFavoriteRequest
 import barkcloud.files.FilesApiOuterClass.AttachFileRequest
 import barkcloud.files.FilesApiOuterClass.CheckFileHashesRequest
@@ -21,10 +20,8 @@ import barkcloud.files.FilesApiOuterClass.RemoveFavoriteRequest
 import barkcloud.files.FilesApiOuterClass.RenameDirectoryRequest
 import barkcloud.files.FilesApiOuterClass.RenameFileEntryRequest
 import barkcloud.files.FilesApiOuterClass.RestoreFromTrashRequest
-import barkcloud.files.FilesApiOuterClass.UploadFileType
 import com.barkfluff.BarkCloud.grpc.GrpcManager
 import com.barkfluff.BarkCloud.net.FileTransferService
-import java.io.File
 
 /**
  * Доступ к сервису Files: галерея (`ListUserMedia`), каталоги (`CloudApi`), корзина,
@@ -152,6 +149,8 @@ class CloudRepository(
         directoryId: String,
         name: String,
         routeByMediaKind: Boolean = false,
+        uploadSessionId: String = "",
+        isUploadRetry: Boolean = false,
     ) {
         grpc.cloudStub().attachFile(
             AttachFileRequest.newBuilder()
@@ -159,6 +158,8 @@ class CloudRepository(
                 .setDirectoryId(directoryId)
                 .setName(name)
                 .setRouteByMediaKind(routeByMediaKind)
+                .setUploadSessionId(uploadSessionId)
+                .setIsUploadRetry(isUploadRetry)
                 .build(),
         )
     }
@@ -241,33 +242,5 @@ class CloudRepository(
 
     // MARK: Загрузка
 
-    /**
-     * Загрузить файл в облако. Если задан [directoryId] — привязать к папке.
-     * Возвращает `file_id` блоба (из ответа сервера; учитывает дедупликацию).
-     */
-    suspend fun uploadFile(
-        uri: Uri,
-        fileName: String,
-        directoryId: String? = null,
-        routeByMediaKind: Boolean = false,
-        onProgress: (Long, Long) -> Unit = { _, _ -> },
-    ): String {
-        val target = transfer.getUploadUrl(UploadFileType.CLOUD_FILE)
-        val fileId = transfer.upload(uri, fileName, target.url, onProgress)
-        if (routeByMediaKind || directoryId != null) attachFile(fileId, directoryId.orEmpty(), fileName, routeByMediaKind)
-        return fileId
-    }
-
-    suspend fun uploadFile(
-        file: File,
-        fileName: String,
-        directoryId: String? = null,
-        routeByMediaKind: Boolean = false,
-        onProgress: (Long, Long) -> Unit = { _, _ -> },
-    ): String {
-        val target = transfer.getUploadUrl(UploadFileType.CLOUD_FILE)
-        val fileId = transfer.upload(file, fileName, target.url, onProgress)
-        if (routeByMediaKind || directoryId != null) attachFile(fileId, directoryId.orEmpty(), fileName, routeByMediaKind)
-        return fileId
-    }
+    // Загрузка байтов идёт через очередь Upload 2.0 (data/upload), а не напрямую из репозитория.
 }

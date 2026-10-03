@@ -12,8 +12,9 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -43,7 +44,7 @@ import com.barkfluff.BarkCloud.ui.components.CloudMediaViewer
 import com.barkfluff.BarkCloud.ui.components.MediaThumb
 import com.barkfluff.BarkCloud.ui.components.rememberRemoteOpener
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun SmartFolderDetailScreen(
     folderId: String,
@@ -94,7 +95,7 @@ fun SmartFolderDetailScreen(
                 modifier = Modifier.fillMaxSize(),
             ) {
                 LazyVerticalGrid(
-                    columns = GridCells.Fixed(3),
+                    columns = GridCells.Adaptive(minSize = 120.dp),
                     state = gridState,
                     modifier = Modifier.fillMaxSize(),
                 ) {
@@ -112,7 +113,7 @@ fun SmartFolderDetailScreen(
                 )
             }
             if (state.isLoading || state.isLoadingMore) {
-                CircularProgressIndicator(Modifier.align(Alignment.Center))
+                LoadingIndicator(Modifier.align(Alignment.Center))
             }
         }
     }
