@@ -758,7 +758,7 @@ tr.selected .row-actions { opacity: 1; }
 .ftable tbody tr.selected td { border-color: transparent; }
 .ftable th.selcell, .ftable td.selcell { width: 44px; padding: 12px 0 12px 24px; text-align: center; }
 .ftable td.selcell { display: table-cell; }
-.ftable .selcell input { width: 16px; height: 16px; cursor: pointer; accent-color: var(--md-primary); }
+.ftable .selcell input { vertical-align: middle; }
 .ftable tbody tr.checked { background: color-mix(in srgb, var(--md-primary) 12%, transparent); }
 .ftable tbody tr.checked .row-actions { opacity: 1; }
 
@@ -982,7 +982,6 @@ tr.selected .row-actions { opacity: 1; }
 .storage-total span { display: block; color: var(--md-on-surface-variant); font-size: 13px; line-height: 20px; font-weight: 400; }
 .storage-breakdown-row { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; }
 .storage-breakdown-row strong { font-weight: 500; }
-.settings-storage-grid progress { width: 100%; height: 8px; accent-color: var(--md-primary); }
 .settings-storage-grid .stor-legend { flex-direction: column; gap: 8px; margin-top: 0; }
 .settings-storage-grid .stor-legend .v { margin-left: auto; }
 .storage-stats-status { display: block; font-size: 11px; line-height: 16px; color: var(--md-on-surface-variant); }
@@ -1061,7 +1060,6 @@ details[open] > .server-group-summary::before, .server-config-section[open] > su
 .storage-credentials-help { grid-column: 1 / -1; font-size: 11px; line-height: 17px; color: var(--md-on-surface-variant); margin: 0; }
 .storage-quota-control { display: grid; grid-template-columns: minmax(0, 1fr) 80px; gap: 6px; }
 .storage-profile-grid .server-check { flex-direction: row; align-items: center; gap: 8px; }
-.server-check input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--md-primary); }
 .storage-profile-footer { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--md-outline-variant); }
 .storage-profile-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .storage-history { margin-top: 20px; padding-top: 12px; border-top: 1px solid var(--md-outline-variant); color: var(--md-on-surface-variant); font-size: 13px; }
@@ -1353,9 +1351,8 @@ details[open] > .server-group-summary::before, .server-config-section[open] > su
   justify-content: space-between;
   gap: 16px;
   padding: 14px clamp(18px, 4vw, 42px);
-  background: color-mix(in srgb, var(--md-surface) 86%, transparent);
+  background: var(--md-surface);
   border-bottom: 1px solid var(--md-outline-variant);
-  backdrop-filter: blur(14px);
 }
 .public-brand {
   display: inline-flex;
