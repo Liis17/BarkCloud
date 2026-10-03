@@ -20,7 +20,7 @@ public sealed class PostgresFilesDatabase : IAsyncDisposable
 
     private readonly string _adminConnectionString;
     private readonly string _databaseName;
-    private readonly NpgsqlDataSource _dataSource;
+    public NpgsqlDataSource DataSource { get; }
 
     private PostgresFilesDatabase(string adminConnectionString, string databaseName)
     {
@@ -32,7 +32,7 @@ public sealed class PostgresFilesDatabase : IAsyncDisposable
             Pooling = true,
             MaxPoolSize = 20,
         };
-        _dataSource = NpgsqlDataSource.Create(connectionString.ConnectionString);
+        DataSource = NpgsqlDataSource.Create(connectionString.ConnectionString);
     }
 
     public static string? SkipReason =>
@@ -77,7 +77,7 @@ public sealed class PostgresFilesDatabase : IAsyncDisposable
 
     public FilesContext CreateContext(params IInterceptor[] interceptors)
     {
-        var options = new DbContextOptionsBuilder<FilesContext>().UseNpgsql(_dataSource);
+        var options = new DbContextOptionsBuilder<FilesContext>().UseNpgsql(DataSource);
         if (interceptors.Length > 0)
             options.AddInterceptors(interceptors);
         return new FilesContext(options.Options);
@@ -85,7 +85,7 @@ public sealed class PostgresFilesDatabase : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        await _dataSource.DisposeAsync();
+        await DataSource.DisposeAsync();
         await using var connection = new NpgsqlConnection(_adminConnectionString);
         await connection.OpenAsync();
         await using var command = new NpgsqlCommand($"DROP DATABASE \"{_databaseName}\" WITH (FORCE)", connection);

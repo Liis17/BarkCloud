@@ -88,6 +88,12 @@ dotnet test BarkCloud.slnx -c Release --collect:"XPlat Code Coverage"
 dotnet test Tests/Backend/BarkCloud.Identity.Tests/BarkCloud.Identity.Tests.csproj
 ```
 
+## PostgreSQL-тесты Files
+
+`Tests/Backend/BarkCloud.Files.Tests/_Helpers/PostgresFilesDatabase` создаёт отдельную БД с миграциями Files по `BARKCLOUD_TEST_POSTGRES` и удаляет только её. Его `DataSource` используется и в `CreateContext`, и при регистрации scoped-контекстов в `StorageMigrationGatePostgresTests`. Получать новую строку через `context.Database.GetConnectionString()` нельзя: у созданного из `NpgsqlDataSource` подключения пароль скрыт, поэтому новый пул теряет аутентификацию.
+
+Проверки барьера [[modules/web-s3-migration]] нужно запускать на PostgreSQL с обязательной SCRAM-аутентификацией, как в CI (`postgres:18` с `POSTGRES_PASSWORD`). Локальный `trust` скрывает потерю пароля. Без `BARKCLOUD_TEST_POSTGRES` тесты локально пропускаются, при `CI=true` — падают; полный прогон Files в CI должен включать PostgreSQL-тесты.
+
 ## PostgreSQL-тесты Users (F05)
 
 `Tests/Backend/BarkCloud.Users.Tests/Persistence/UsersStoragePostgresTests.cs` использует реальные `UsersContext`, миграции и `UsersStorage`; категория — `PostgreSQL`. В `_Helpers/` находятся `PostgresUsersDatabase`, `PostgresFactAttribute` и `PostgresTheoryAttribute`.

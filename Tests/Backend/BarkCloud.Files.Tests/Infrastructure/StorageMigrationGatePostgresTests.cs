@@ -89,9 +89,7 @@ public sealed class StorageMigrationGatePostgresTests
             TargetServiceUrl = "https://target.example", TargetBucketName = "to", TargetForcePathStyle = true };
         public Fixture(PostgresFilesDatabase database)
         {
-            using var context = database.CreateContext();
-            var connection = context.Database.GetConnectionString()!;
-            _services = new ServiceCollection().AddDbContext<FilesContext>(o => o.UseNpgsql(connection)).BuildServiceProvider();
+            _services = new ServiceCollection().AddDbContext<FilesContext>(o => o.UseNpgsql(database.DataSource)).BuildServiceProvider();
             var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["StorageProfiles:universal:ProfileId"] = "universal-v1", ["StorageProfiles:universal:Role"] = "universal",
