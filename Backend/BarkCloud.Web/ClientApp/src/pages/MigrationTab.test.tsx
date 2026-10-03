@@ -26,6 +26,37 @@ async function fill() {
 }
 
 describe('Миграция S3', () => {
+  it.each([
+    ['cloud-video.s3.fra.databucket.eu', 'https://cloud-video.s3.fra.databucket.eu'],
+    ['  minio.example:9000  ', 'https://minio.example:9000'],
+    ['http://127.0.0.1:9000', 'http://127.0.0.1:9000'],
+  ])('проверяет endpoint %s и отправляет полный адрес %s', async (entered, expected) => {
+    const fetch = mockMigration(); render(<MigrationTab onExpired={() => {}} />);
+    await fill();
+    fireEvent.change(screen.getByLabelText('Endpoint назначения'), { target: { value: entered } });
+    const check = screen.getByRole('button', { name: 'Проверить доступ и запись' });
+    expect(check).toHaveProperty('disabled', false);
+    fireEvent.click(check);
+    await screen.findByRole('button', { name: 'Перенести' });
+    const request = fetch.mock.calls.find(([path]) => path.endsWith('/check'));
+    expect(JSON.parse(request?.[1]?.body as string).destination.serviceUrl).toBe(expected);
+  });
+
+  it('объясняет невалидный endpoint рядом с полем и снимает ошибку после исправления', async () => {
+    mockMigration(); render(<MigrationTab onExpired={() => {}} />);
+    await fill();
+    const endpoint = screen.getByLabelText('Endpoint назначения');
+    fireEvent.change(endpoint, { target: { value: 'ftp://target.example' } });
+    expect(screen.getByRole('button', { name: 'Проверить доступ и запись' })).toHaveProperty('disabled', true);
+    expect(endpoint.getAttribute('aria-invalid')).toBe('true');
+    expect(document.getElementById(endpoint.getAttribute('aria-describedby')!)?.textContent).toContain('HTTP');
+    fireEvent.change(endpoint, { target: { value: 'target.example' } });
+    fireEvent.blur(endpoint);
+    expect(endpoint).toHaveProperty('value', 'https://target.example');
+    expect(endpoint.getAttribute('aria-invalid')).toBe('false');
+    expect(screen.getByRole('button', { name: 'Проверить доступ и запись' })).toHaveProperty('disabled', false);
+  });
+
   it('проверяет доступ только после заполнения, инвалидирует проверку и запускает по серверному ID', async () => {
     const localWrites = vi.fn(); const sessionWrites = vi.fn();
     vi.stubGlobal('localStorage', { setItem: localWrites }); vi.stubGlobal('sessionStorage', { setItem: sessionWrites });

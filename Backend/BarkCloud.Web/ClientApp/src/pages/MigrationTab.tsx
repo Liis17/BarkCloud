@@ -6,12 +6,18 @@ import { MigrationProgress } from '../components/settings/MigrationProgress';
 import { MigrationApiError, MigrationConnection, MigrationSource, migrationRequest, useStorageMigration } from '../hooks/useStorageMigration';
 
 const EMPTY: MigrationConnection = { serviceUrl: '', bucketName: '', accessKey: '', secretKey: '', region: '', forcePathStyle: true, isR2: false };
-export function validMigrationConnection(value: MigrationConnection) {
+function normalizeMigrationEndpoint(value: string) {
+  const endpoint = value.trim();
+  return endpoint && !endpoint.includes('://') ? 'https://' + endpoint : endpoint;
+}
+function validMigrationEndpoint(value: string) {
   try {
-    const url = new URL(value.serviceUrl);
-    return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password && !url.search && !url.hash
-      && !!value.bucketName.trim() && !!value.accessKey.trim() && !!value.secretKey;
+    const url = new URL(normalizeMigrationEndpoint(value));
+    return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password && !url.search && !url.hash;
   } catch { return false; }
+}
+export function validMigrationConnection(value: MigrationConnection) {
+  return validMigrationEndpoint(value.serviceUrl) && !!value.bucketName.trim() && !!value.accessKey.trim() && !!value.secretKey;
 }
 
 export default function MigrationTab({ active = true, onExpired }: { active?: boolean; onExpired: () => void }) {
@@ -23,6 +29,8 @@ export default function MigrationTab({ active = true, onExpired }: { active?: bo
   const [busy, setBusy] = React.useState(false);
   const [message, setMessage] = React.useState('');
   const [error, setError] = React.useState('');
+  const endpointHintId = React.useId();
+  const endpointError = !!target.serviceUrl.trim() && !validMigrationEndpoint(target.serviceUrl);
   const expired = React.useRef(onExpired); expired.current = onExpired;
   const source = sources.find(x => x.id === sourceId);
   const running = status.jobs.some(x => ['queued', 'running', 'stopping'].includes(x.state)) || status.cutovers.length > 0;
@@ -41,7 +49,8 @@ export default function MigrationTab({ active = true, onExpired }: { active?: bo
   async function check() {
     setBusy(true); setError(''); setMessage('');
     try {
-      const result = await migrationRequest<{ validationId: string; message: string }>('/api/settings/migration/check', { sourceId, destination: target });
+      const destination = { ...target, serviceUrl: normalizeMigrationEndpoint(target.serviceUrl) };
+      const result = await migrationRequest<{ validationId: string; message: string }>('/api/settings/migration/check', { sourceId, destination });
       setValidationId(result.validationId); setMessage(result.message);
     } catch (e) {
       setValidationId(null);
@@ -78,7 +87,12 @@ export default function MigrationTab({ active = true, onExpired }: { active?: bo
       <article className="migration-connection-card" aria-label="Целевое хранилище">
         <div className="migration-card-title"><span className="migration-step">2</span><div><h3>Назначение</h3><small>Отдельный пустой бакет на другом S3</small></div></div>
         <fieldset className="migration-fields" disabled={busy || running}><legend className="sr-only">Подключение назначения</legend>
-          <label className="migration-field"><span>Endpoint</span><input aria-label="Endpoint назначения" type="url" value={target.serviceUrl} placeholder="https://s3.example.com" onChange={e => edit('serviceUrl', e.target.value)} autoComplete="off" spellCheck={false} /></label>
+          <label className="migration-field"><span>Endpoint</span><input aria-label="Endpoint назначения" inputMode="url" value={target.serviceUrl} placeholder="https://s3.example.com"
+            aria-invalid={endpointError} aria-describedby={endpointHintId} onChange={e => edit('serviceUrl', e.target.value)}
+            onBlur={() => { const endpoint = normalizeMigrationEndpoint(target.serviceUrl); if (validMigrationEndpoint(endpoint) && endpoint !== target.serviceUrl) edit('serviceUrl', endpoint); }}
+            autoComplete="off" autoCapitalize="none" spellCheck={false} />
+            <small id={endpointHintId} className={endpointError ? 'migration-note migration-error' : 'migration-note'}>{endpointError
+              ? 'Укажите адрес HTTP или HTTPS без логина, пароля, параметров и #.' : 'Без протокола используем HTTPS.'}</small></label>
           <label className="migration-field"><span>Bucket</span><input aria-label="Bucket назначения" value={target.bucketName} onChange={e => edit('bucketName', e.target.value)} autoComplete="off" spellCheck={false} /></label>
           <label className="migration-field"><span>Access key</span><input aria-label="Access key назначения" type="password" value={target.accessKey} onChange={e => edit('accessKey', e.target.value)} autoComplete="off" spellCheck={false} /></label>
           <label className="migration-field"><span>Secret key</span><input aria-label="Secret key назначения" type="password" value={target.secretKey} onChange={e => edit('secretKey', e.target.value)} autoComplete="new-password" spellCheck={false} /></label>
