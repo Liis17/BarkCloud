@@ -5,6 +5,7 @@ import { PublicShareHeader, PublicShareShell, PublicStatus } from '../components
 import { PublicViewerActions } from '../components/public/PublicViewerActions';
 import { useDocumentHead } from '../hooks/useDocumentHead';
 import { persistVolumeRef } from '../lib/volume';
+import { VideoPlayer } from '../components/media/MediaPlayer';
 
 interface PubDir {
   id: string;
@@ -182,7 +183,7 @@ export function PublicFolderPage() {
         >
           <div onClick={(e) => e.stopPropagation()} className="public-viewer-body">
             {viewer.mediaKind === 'video' ? (
-              <video ref={persistVolumeRef} src={viewer.downloadUrl} controls autoPlay />
+              <VideoPlayer onMediaRef={persistVolumeRef} src={viewer.downloadUrl} autoPlay />
             ) : (
               <img src={viewer.downloadUrl} alt={viewer.name} />
             )}

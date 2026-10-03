@@ -5,6 +5,7 @@ import { PublicShareHeader, PublicShareShell, PublicStatus } from '../components
 import { PublicViewerActions } from '../components/public/PublicViewerActions';
 import { useDocumentHead } from '../hooks/useDocumentHead';
 import { persistVolumeRef } from '../lib/volume';
+import { VideoPlayer } from '../components/media/MediaPlayer';
 
 interface ShareInfo {
   found: boolean;
@@ -95,11 +96,10 @@ export function PublicViewPage() {
       <div className="public-view-card">
         <div className="public-preview">
           {isVideo && info.downloadUrl ? (
-            <video
-              ref={persistVolumeRef}
+            <VideoPlayer
+              onMediaRef={persistVolumeRef}
               src={info.downloadUrl}
               poster={info.previewUrl || undefined}
-              controls
             />
           ) : hasPreview ? (
             <img

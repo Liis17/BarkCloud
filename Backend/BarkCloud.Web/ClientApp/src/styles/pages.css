@@ -1558,8 +1558,8 @@ details[open] > .server-group-summary::before, .server-config-section[open] > su
   color: var(--md-on-surface-variant);
   font-size: 14px;
 }
-.public-track-body audio {
-  width: 100%;
+.public-track-body .audio-bar {
+  margin-top: 8px;
 }
 .public-grid {
   display: grid;
@@ -1661,14 +1661,12 @@ details[open] > .server-group-summary::before, .server-config-section[open] > su
   margin-top: 20px;
   padding: 12px 16px;
   border: 1px solid var(--md-outline-variant);
-  border-radius: 28px;
+  border-radius: var(--r-xl);
   background: color-mix(in srgb, var(--md-primary) 7%, var(--md-surface-container-high));
-  box-shadow: 0 12px 34px rgba(0,0,0,.24);
-  backdrop-filter: blur(16px);
+  box-shadow: var(--el-3);
 }
-.public-music-player audio {
-  width: 100%;
-  margin-top: 8px;
+.public-music-player .audio-bar {
+  margin-top: 4px;
 }
 .public-breadcrumb {
   display: flex;

@@ -4,6 +4,7 @@ import { useContextMenu } from '../ui/ContextMenu';
 import { useOptionalAudioPlayer } from '../../hooks/useAudioPlayer';
 import { apiGet, proxiedImageUrl } from '../../lib/api';
 import { persistVolumeRef } from '../../lib/volume';
+import { VideoPlayer } from './MediaPlayer';
 import { pickDocumentIcon, useDocumentHead } from '../../hooks/useDocumentHead';
 import type { MediaActionsApi } from '../../hooks/useMediaActions';
 import type { CardFile, MediaItem } from '../../lib/types';
@@ -108,6 +109,7 @@ export function Lightbox({ items, index = 0, media, onClose, actions }: Lightbox
         onClose && onClose();
         return;
       }
+      if (e.target instanceof HTMLInputElement) return; // слайдеры плеера сами обрабатывают стрелки
       if (e.key === 'ArrowLeft') {
         if (isVideo && videoRef.current) videoRef.current.currentTime = Math.max(0, videoRef.current.currentTime - 5);
         else go(-1);
@@ -227,13 +229,12 @@ export function Lightbox({ items, index = 0, media, onClose, actions }: Lightbox
           </div>
         )}
         {ready && isVideo && (
-          <video
-            ref={(el) => {
+          <VideoPlayer
+            onMediaRef={(el) => {
               videoRef.current = el;
               persistVolumeRef(el);
             }}
             src={url!}
-            controls
             autoPlay
           />
         )}

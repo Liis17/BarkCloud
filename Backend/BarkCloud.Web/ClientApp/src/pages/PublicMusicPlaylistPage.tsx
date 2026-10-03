@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import { PublicShareHeader, PublicShareShell, PublicStatus } from '../components/public/PublicShareShell';
 import { useDocumentHead } from '../hooks/useDocumentHead';
+import { AudioBar } from '../components/media/MediaPlayer';
 import { formatDuration } from '../lib/format';
 import type { MusicTrack } from '../lib/types';
 
@@ -138,7 +139,7 @@ export function PublicMusicPlaylistPage() {
           <div className="mp-meta">
             <div className="mp-title">{current.title || current.file.name}</div>
             <div className="mp-sub">{current.artist || 'Неизвестный исполнитель'}</div>
-            <audio ref={(el) => { audioRef.current = el; persistAudioVolumeRef(el); }} src={current.url} controls autoPlay onEnded={playNext} />
+            <AudioBar onMediaRef={(el) => { audioRef.current = el; persistAudioVolumeRef(el); }} src={current.url} autoPlay onEnded={playNext} />
           </div>
         </div>
       )}

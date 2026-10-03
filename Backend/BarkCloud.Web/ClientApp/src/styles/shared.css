@@ -888,6 +888,37 @@ img.avatar { object-fit: cover; }
 .lightbox:hover .lb-nav { opacity: .8; }
 .lb-nav:hover { background: rgba(0,0,0,.5); opacity: 1; }
 
+/* ── Медиаплеер (components/media/MediaPlayer.tsx) ─────────────── */
+.media-controls { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.media-controls .icon-btn { flex: 0 0 auto; }
+.media-controls .media-seek { flex: 1 1 auto; }
+.media-controls .media-volume { flex: 0 0 96px; width: 96px; }
+.media-time { flex: 0 0 auto; font-size: 12px; letter-spacing: .4px; font-variant-numeric: tabular-nums; color: var(--md-on-surface-variant); white-space: nowrap; }
+
+.video-player {
+  position: relative; display: inline-flex; max-width: 100%;
+  border-radius: var(--r-sm); overflow: hidden; background: #000; outline: none;
+}
+.video-player video { display: block; cursor: pointer; border-radius: 0; }
+.video-player:focus-visible { box-shadow: 0 0 0 2px var(--md-primary); }
+.video-player-bar {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  padding: 32px 12px 8px;
+  background: linear-gradient(180deg, transparent, rgba(0,0,0,.7));
+  transition: opacity var(--d-med) var(--m-emph);
+}
+.video-player.idle { cursor: none; }
+.video-player.idle .video-player-bar { opacity: 0; pointer-events: none; }
+/* Поверх кадра — светлые контролы независимо от темы */
+.video-player-bar .icon-btn { color: #fff; }
+.video-player-bar .icon-btn:hover { background: rgba(255,255,255,.16); color: #fff; }
+.video-player-bar .media-time { color: rgba(255,255,255,.85); }
+.video-player-bar .m3-slider { --active: #fff; --inactive: rgba(255,255,255,.3); }
+.shared-folder-video video { max-width: 92vw; max-height: 80vh; }
+
+.audio-bar .media-controls { gap: 4px; }
+@media (max-width: 600px) { .media-controls .media-volume { display: none; } }
+
 /* Toasts */
 .toast-stack {
   position: fixed; right: 20px; bottom: 20px; z-index: 1200;
