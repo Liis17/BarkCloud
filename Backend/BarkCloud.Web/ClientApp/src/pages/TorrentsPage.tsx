@@ -40,8 +40,8 @@ const PRIORITY_OPTS = [
 
 function ProgressBar({ value }: { value: number }) {
   return (
-    <div style={{ height: 6, borderRadius: 4, background: 'var(--md-surface-variant)', overflow: 'hidden' }}>
-      <div style={{ height: '100%', width: `${Math.round(value * 100)}%`, background: 'var(--md-primary)', transition: 'width .3s' }} />
+    <div className="bar tor-bar">
+      <div className="bar-fill" style={{ width: `${Math.round(value * 100)}%` }} />
     </div>
   );
 }
@@ -67,22 +67,21 @@ function FilesPanel({ torrent, onToast }: { torrent: Torrent; onToast: (m: strin
     } catch (e) { onToast((e as Error).message, 'err'); }
   };
 
-  if (!files) return <div style={{ padding: 12, color: 'var(--md-on-surface-variant)' }}>Загрузка файлов…</div>;
+  if (!files) return <div className="tor-files-msg">Загрузка файлов…</div>;
 
   return (
-    <div style={{ padding: '4px 0 8px' }}>
+    <div className="tor-files">
       {files.map((f) => (
-        <div key={f.index} style={{ display: 'grid', gridTemplateColumns: '1fr 90px 150px 120px', gap: 12, alignItems: 'center', padding: '6px 12px' }}>
-          <div style={{ minWidth: 0 }}>
-            <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{f.path}</div>
-            <div style={{ marginTop: 4 }}><ProgressBar value={f.progress} /></div>
+        <div key={f.index} className="tor-file">
+          <div className="tor-file-main">
+            <div className="tor-name">{f.path}</div>
+            <ProgressBar value={f.progress} />
           </div>
-          <div style={{ fontSize: 13, color: 'var(--md-on-surface-variant)' }}>{fmtBytes(f.size)}</div>
-          <select value={f.priority} onChange={(e) => changePriority(f.index, Number(e.target.value))}
-            style={{ padding: '4px 6px', borderRadius: 6, border: '1px solid var(--md-outline)', background: 'var(--md-surface)', color: 'inherit' }}>
+          <div className="tor-meta">{fmtBytes(f.size)}</div>
+          <select className="tor-priority" value={f.priority} onChange={(e) => changePriority(f.index, Number(e.target.value))}>
             {PRIORITY_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
-          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+          <div className="tor-actions">
             <a className="icon-btn" href={T.downloadUrl(torrent.id, f.index)} title="Скачать" target="_blank" rel="noreferrer"><Icon.download size={18} /></a>
             {f.progress >= 1 && <button className="icon-btn" title="В облако" onClick={() => importFile(f.index)}><Icon.cloud size={18} /></button>}
           </div>
@@ -110,18 +109,18 @@ function TorrentRow({ t, onToast, forceOpen = false }: { t: Torrent; onToast: (m
   };
 
   return (
-    <div style={{ border: '1px solid var(--md-outline-variant)', borderRadius: 12, padding: 14, marginBottom: 10, background: 'var(--md-surface)' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <button className="icon-btn" onClick={() => setOpen((v) => !v)} title="Файлы">
-          <Icon.chev size={18} style={{ transform: open ? 'rotate(90deg)' : 'none', transition: 'transform .2s' }} />
+    <div className="tor-card">
+      <div className="tor-head">
+        <button className={'icon-btn tor-expand' + (open ? ' open' : '')} onClick={() => setOpen((v) => !v)} title="Файлы">
+          <Icon.chev size={18} />
         </button>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
-            <div style={{ fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.name || t.infoHash}</div>
-            <span style={{ fontSize: 12, padding: '2px 8px', borderRadius: 20, background: 'var(--md-surface-variant)', whiteSpace: 'nowrap' }}>{STATUS_RU[t.status] ?? t.status}</span>
+        <div className="tor-main">
+          <div className="tor-title-row">
+            <div className="tor-name tor-title">{t.name || t.infoHash}</div>
+            <span className="tor-status">{STATUS_RU[t.status] ?? t.status}</span>
           </div>
-          <div style={{ margin: '8px 0 6px' }}><ProgressBar value={t.progress} /></div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 16px', fontSize: 12, color: 'var(--md-on-surface-variant)' }}>
+          <ProgressBar value={t.progress} />
+          <div className="tor-stats">
             <span>{Math.round(t.progress * 100)}% из {fmtBytes(t.totalSize)}</span>
             <span>↓ {fmtSpeed(t.downloadSpeed)}</span>
             <span>↑ {fmtSpeed(t.uploadSpeed)}</span>
@@ -131,7 +130,7 @@ function TorrentRow({ t, onToast, forceOpen = false }: { t: Torrent; onToast: (m
             {t.status === 'downloading' && <span>ETA {fmtEta(t.etaSeconds)}</span>}
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 6 }}>
+        <div className="tor-actions">
           {paused
             ? <button className="icon-btn" title="Возобновить" onClick={() => act(T.resumeTorrent(t.id))}><Icon.play size={18} /></button>
             : <button className="icon-btn" title="Пауза" onClick={() => act(T.pauseTorrent(t.id))}><Icon.pause size={18} /></button>}
@@ -176,14 +175,13 @@ function AddModal({ onClose, onToast }: { onClose: () => void; onToast: (m: stri
   return (
     <Modal title="Добавить торрент" onClose={onClose}
       actions={<>
-        <button className="btn" onClick={onClose}>Отмена</button>
+        <button className="btn text" onClick={onClose}>Отмена</button>
         <button className="btn primary" disabled={busy || !magnet.trim()} onClick={submitMagnet}>Добавить</button>
       </>}>
-      <label style={{ display: 'block', fontSize: 13, marginBottom: 6 }}>Magnet-ссылка</label>
-      <input value={magnet} onChange={(e) => setMagnet(e.target.value)} placeholder="magnet:?xt=urn:btih:…" autoFocus
-        style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--md-outline)', background: 'var(--md-surface)', color: 'inherit' }} />
-      <div style={{ margin: '16px 0 8px', color: 'var(--md-on-surface-variant)', fontSize: 13 }}>или загрузите .torrent-файл:</div>
-      <input ref={fileRef} type="file" accept=".torrent" style={{ display: 'none' }}
+      <label className="field-label">Magnet-ссылка</label>
+      <input type="text" value={magnet} onChange={(e) => setMagnet(e.target.value)} placeholder="magnet:?xt=urn:btih:…" autoFocus />
+      <label className="field-label">или загрузите .torrent-файл:</label>
+      <input ref={fileRef} type="file" accept=".torrent" hidden
         onChange={(e) => { const f = e.target.files?.[0]; if (f) submitFile(f); }} />
       <button className="btn" disabled={busy} onClick={() => fileRef.current?.click()}>
         <Icon.upload size={16} /> Выбрать .torrent
@@ -230,7 +228,7 @@ export function TorrentsPage() {
   }), []);
 
   return (
-    <div className={'dropzone' + (over ? ' drop-over' : '')} {...dropHandlers} style={{ padding: 16, maxWidth: 1100, margin: '0 auto' }}>
+    <div {...dropHandlers} className={'dropzone tor-page' + (over ? ' drop-over' : '')}>
       {over && <FileDropOverlay detail=".torrent-файлы будут добавлены напрямую, остальные загрузятся в облако" />}
       {torrents.length === 0
         ? <EmptyState icon="torrent" title="Нет торрентов" hint="Добавьте magnet-ссылку или .torrent-файл" />
