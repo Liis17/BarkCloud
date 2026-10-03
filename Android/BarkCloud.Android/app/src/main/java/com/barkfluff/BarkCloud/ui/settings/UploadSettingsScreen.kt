@@ -7,9 +7,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
@@ -23,8 +23,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.barkfluff.BarkCloud.BarkCloudApplication
+import com.barkfluff.BarkCloud.R
 import com.barkfluff.BarkCloud.data.gallery.AutoUploadNetworkPolicy
 import com.barkfluff.BarkCloud.data.gallery.AutoUploadScheduler
 import com.barkfluff.BarkCloud.data.gallery.AutoUploadSettings
@@ -56,10 +58,10 @@ fun UploadSettingsScreen(onNavigateUp: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Загрузки") },
+                title = { Text(stringResource(R.string.settings_uploads_title)) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateUp) {
-                        Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = null)
+                        Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = stringResource(R.string.files_back))
                     }
                 },
             )
@@ -71,11 +73,11 @@ fun UploadSettingsScreen(onNavigateUp: () -> Unit) {
         ) {
             ElevatedCard(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("Автозагрузка медиатеки")
-                    Text("Ручная отправка всегда доступна при наличии сети.")
-                    PolicyChip("Только Wi‑Fi", AutoUploadNetworkPolicy.WIFI_ONLY, selected, ::select)
-                    PolicyChip("Wi‑Fi и мобильная сеть", AutoUploadNetworkPolicy.ANY_NETWORK, selected, ::select)
-                    PolicyChip("Отключено", AutoUploadNetworkPolicy.OFF, selected, ::select)
+                    Text(stringResource(R.string.upload_auto_title))
+                    Text(stringResource(R.string.upload_auto_manual_note))
+                    PolicyChip(stringResource(R.string.upload_policy_wifi), AutoUploadNetworkPolicy.WIFI_ONLY, selected, ::select)
+                    PolicyChip(stringResource(R.string.upload_policy_any), AutoUploadNetworkPolicy.ANY_NETWORK, selected, ::select)
+                    PolicyChip(stringResource(R.string.upload_policy_off), AutoUploadNetworkPolicy.OFF, selected, ::select)
                 }
             }
         }
@@ -89,5 +91,5 @@ private fun PolicyChip(
     selected: AutoUploadNetworkPolicy,
     onSelect: (AutoUploadNetworkPolicy) -> Unit,
 ) {
-    AssistChip(onClick = { onSelect(policy) }, enabled = policy != selected, label = { Text(title) })
+    FilterChip(selected = policy == selected, onClick = { onSelect(policy) }, label = { Text(title) })
 }

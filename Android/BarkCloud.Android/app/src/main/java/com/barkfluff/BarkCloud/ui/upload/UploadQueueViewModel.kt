@@ -31,7 +31,10 @@ data class UploadQueueUiState(val jobs: List<UploadJob> = emptyList()) {
 
     private companion object {
         const val SESSION_WINDOW_MILLIS = 60L * 60L * 1000L
-        val ACTIVE_PHASES = setOf(UploadPhase.QUEUED, UploadPhase.UPLOADING, UploadPhase.UPLOADED, UploadPhase.ATTACHING)
+        val ACTIVE_PHASES = setOf(
+            UploadPhase.QUEUED, UploadPhase.HASHING, UploadPhase.CREATING_SESSION,
+            UploadPhase.UPLOADING, UploadPhase.COMPLETING, UploadPhase.PROCESSING, UploadPhase.ATTACHING,
+        )
     }
 }
 

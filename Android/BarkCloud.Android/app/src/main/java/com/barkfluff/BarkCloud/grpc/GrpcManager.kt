@@ -7,7 +7,6 @@ import barkcloud.files.FilesApiGrpcKt
 import barkcloud.identity.IdentityApiGrpcKt
 import barkcloud.identity.IdentityApiOuterClass.CreateTokenRequest
 import barkcloud.users.UsersApiGrpcKt
-import com.barkfluff.BarkCloud.BuildConfig
 import com.barkfluff.BarkCloud.data.GlobalParam
 import com.barkfluff.BarkCloud.data.TokenRefresher
 import com.barkfluff.BarkCloud.net.InsecureTls
@@ -43,22 +42,22 @@ class GrpcManager(
     }
 
     fun identityStub(): IdentityApiGrpcKt.IdentityApiCoroutineStub =
-        IdentityApiGrpcKt.IdentityApiCoroutineStub(channelFor(BuildConfig.IDENTITY_API_ADDRESS))
+        IdentityApiGrpcKt.IdentityApiCoroutineStub(channelFor(ServerSettings.identityAddress))
 
     fun usersStub(): UsersApiGrpcKt.UsersApiCoroutineStub =
-        UsersApiGrpcKt.UsersApiCoroutineStub(channelFor(BuildConfig.USERS_API_ADDRESS))
+        UsersApiGrpcKt.UsersApiCoroutineStub(channelFor(ServerSettings.usersAddress))
 
     fun filesStub(): FilesApiGrpcKt.FilesApiCoroutineStub =
-        FilesApiGrpcKt.FilesApiCoroutineStub(channelFor(BuildConfig.FILES_API_ADDRESS))
+        FilesApiGrpcKt.FilesApiCoroutineStub(channelFor(ServerSettings.filesAddress))
 
     fun cloudStub(): CloudApiGrpcKt.CloudApiCoroutineStub =
-        CloudApiGrpcKt.CloudApiCoroutineStub(channelFor(BuildConfig.FILES_API_ADDRESS))
+        CloudApiGrpcKt.CloudApiCoroutineStub(channelFor(ServerSettings.filesAddress))
 
     fun albumStub(): AlbumApiGrpcKt.AlbumApiCoroutineStub =
-        AlbumApiGrpcKt.AlbumApiCoroutineStub(channelFor(BuildConfig.FILES_API_ADDRESS))
+        AlbumApiGrpcKt.AlbumApiCoroutineStub(channelFor(ServerSettings.filesAddress))
 
     fun dynamicFolderStub(): DynamicFolderApiGrpcKt.DynamicFolderApiCoroutineStub =
-        DynamicFolderApiGrpcKt.DynamicFolderApiCoroutineStub(channelFor(BuildConfig.FILES_API_ADDRESS))
+        DynamicFolderApiGrpcKt.DynamicFolderApiCoroutineStub(channelFor(ServerSettings.filesAddress))
 
     suspend fun validAccessToken(): String? = tokenRefresher.validAccessToken()
 
@@ -70,7 +69,7 @@ class GrpcManager(
         }
 
     private fun publicIdentityStub(): IdentityApiGrpcKt.IdentityApiCoroutineStub =
-        IdentityApiGrpcKt.IdentityApiCoroutineStub(publicChannelFor(BuildConfig.IDENTITY_API_ADDRESS))
+        IdentityApiGrpcKt.IdentityApiCoroutineStub(publicChannelFor(ServerSettings.identityAddress))
 
     private fun publicChannelFor(address: String): Channel =
         publicChannels.computeIfAbsent(address) {

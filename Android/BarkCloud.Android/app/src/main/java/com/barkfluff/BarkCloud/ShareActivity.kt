@@ -13,8 +13,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.LinearWavyProgressIndicator
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
@@ -37,6 +38,7 @@ class ShareActivity : ComponentActivity() {
     private var isRunning by mutableStateOf(false)
     private var message by mutableStateOf("")
 
+    @OptIn(ExperimentalMaterial3ExpressiveApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val uris = streamUris(intent)
@@ -52,8 +54,8 @@ class ShareActivity : ComponentActivity() {
                     Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineSmall)
                     Text(message, modifier = Modifier.padding(top = 12.dp))
                     if (isRunning) {
-                        CircularProgressIndicator(modifier = Modifier.padding(top = 20.dp))
-                        LinearProgressIndicator(
+                        LoadingIndicator(modifier = Modifier.padding(top = 20.dp))
+                        LinearWavyProgressIndicator(
                             progress = { if (total > 0) done.toFloat() / total else 0f },
                             modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
                         )

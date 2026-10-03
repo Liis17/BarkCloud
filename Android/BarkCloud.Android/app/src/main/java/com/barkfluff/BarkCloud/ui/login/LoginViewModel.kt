@@ -7,6 +7,7 @@ import androidx.lifecycle.viewmodel.CreationExtras
 import com.barkfluff.BarkCloud.BarkCloudApplication
 import com.barkfluff.BarkCloud.data.AuthRepository
 import com.barkfluff.BarkCloud.data.AuthResult
+import com.barkfluff.BarkCloud.grpc.ServerSettings
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -19,7 +20,7 @@ class LoginViewModel(
     private val authRepository: AuthRepository,
 ) : ViewModel() {
 
-    private val _state = MutableStateFlow(LoginUiState())
+    private val _state = MutableStateFlow(initialState())
     val state: StateFlow<LoginUiState> = _state.asStateFlow()
 
     private val _events = Channel<LoginEvent>(Channel.BUFFERED)
@@ -49,6 +50,22 @@ class LoginViewModel(
         _state.update { it.copy(snackbarMessage = COMING_SOON) }
     }
 
+    fun onServerHostChange(value: String) {
+        _state.update { it.copy(serverHost = value) }
+    }
+
+    fun onServerIdentityPortChange(value: String) {
+        _state.update { it.copy(serverIdentityPort = sanitizePort(value)) }
+    }
+
+    fun onServerUsersPortChange(value: String) {
+        _state.update { it.copy(serverUsersPort = sanitizePort(value)) }
+    }
+
+    fun onServerFilesPortChange(value: String) {
+        _state.update { it.copy(serverFilesPort = sanitizePort(value)) }
+    }
+
     fun snackbarShown() {
         _state.update { it.copy(snackbarMessage = null) }
     }
@@ -56,6 +73,12 @@ class LoginViewModel(
     fun submit() {
         val current = _state.value
         if (!current.canSubmit) return
+        ServerSettings.save(
+            host = current.serverHost,
+            identityPort = current.serverIdentityPort,
+            usersPort = current.serverUsersPort,
+            filesPort = current.serverFilesPort,
+        )
         _state.update { it.copy(isLoading = true, credentialsError = null) }
 
         viewModelScope.launch {
@@ -97,6 +120,16 @@ class LoginViewModel(
             }
         }
     }
+
+    private fun initialState(): LoginUiState = LoginUiState(
+        serverHost = ServerSettings.host,
+        serverIdentityPort = ServerSettings.identityPort.toString(),
+        serverUsersPort = ServerSettings.usersPort.toString(),
+        serverFilesPort = ServerSettings.filesPort.toString(),
+    )
+
+    private fun sanitizePort(value: String): String =
+        value.filter { it.isDigit() }.take(LoginUiState.PORT_MAX_LENGTH)
 
     sealed class LoginEvent {
         data object NavigateToMain : LoginEvent()

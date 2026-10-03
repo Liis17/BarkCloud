@@ -12,7 +12,7 @@ object UploadNotification {
     const val ID = 4201
     private const val CHANNEL_ID = "barkcloud_uploads"
 
-    fun build(context: Context, done: Int, total: Int, title: String): Notification {
+    fun build(context: Context, done: Int, total: Int, title: String, percent: Int? = null): Notification {
         ensureChannel(context)
         val max = total.coerceAtLeast(1)
         val progress = done.coerceIn(0, max)
@@ -25,10 +25,10 @@ object UploadNotification {
             .setProgress(max, progress, false)
 
         if (Build.VERSION.SDK_INT >= 36) {
-            val percent = ((progress * 100) / max).coerceIn(0, 100)
+            val stylePercent = (percent ?: ((progress * 100) / max)).coerceIn(0, 100)
             builder.setStyle(
                 Notification.ProgressStyle()
-                    .setProgress(percent)
+                    .setProgress(stylePercent)
                     .setStyledByProgress(true)
             )
         }

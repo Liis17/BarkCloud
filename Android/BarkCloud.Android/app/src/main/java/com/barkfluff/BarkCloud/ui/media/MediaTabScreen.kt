@@ -1,5 +1,10 @@
 package com.barkfluff.BarkCloud.ui.media
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -30,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import com.barkfluff.BarkCloud.R
 import com.barkfluff.BarkCloud.data.cloud.CloudMediaKind
 import com.barkfluff.BarkCloud.ui.albums.AlbumsGridScreen
+import com.barkfluff.BarkCloud.ui.theme.BarkMotion
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -77,10 +83,19 @@ fun MediaTabScreen(
                 }
             }
 
-            when (segment) {
-                0 -> MediaGridScreen(kind = CloudMediaKind.PHOTO, onSnackbar = onSnackbar)
-                1 -> MediaGridScreen(kind = CloudMediaKind.VIDEO, onSnackbar = onSnackbar)
-                else -> AlbumsGridScreen(onOpenAlbum = onOpenAlbum, onSnackbar = onSnackbar)
+            AnimatedContent(
+                targetState = segment,
+                transitionSpec = {
+                    (fadeIn(BarkMotion.effect()) + scaleIn(BarkMotion.effect(), initialScale = 0.96f))
+                        .togetherWith(fadeOut(BarkMotion.effect()))
+                },
+                label = "mediaSegment",
+            ) { index ->
+                when (index) {
+                    0 -> MediaGridScreen(kind = CloudMediaKind.PHOTO, onSnackbar = onSnackbar)
+                    1 -> MediaGridScreen(kind = CloudMediaKind.VIDEO, onSnackbar = onSnackbar)
+                    else -> AlbumsGridScreen(onOpenAlbum = onOpenAlbum, onSnackbar = onSnackbar)
+                }
             }
         }
     }

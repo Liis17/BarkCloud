@@ -41,6 +41,7 @@
 
 ### 📱 Модули — Android
 - [[modules/android-app]] — Нативный Android-клиент (Kotlin, Compose, Material 3): логин+OTP, 5 табов, локальный файл-браузер, gRPC
+  - [[modules/android-upload2]] — Upload 2.0 на Android: возобновляемые сессии, 4 параллельных файла, resume по серверным частям
 
 ### 📱 Модули — iOS
 - [[modules/ios-app]] — Нативный iOS-клиент (SwiftUI, Swift 5, iOS 18+), полный паритет с Android — реализован

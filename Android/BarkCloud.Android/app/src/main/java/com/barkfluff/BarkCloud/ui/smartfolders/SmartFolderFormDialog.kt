@@ -12,6 +12,7 @@ import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -72,25 +73,25 @@ fun SmartFolderFormDialog(
                     singleLine = true,
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    AssistChip(
-                        onClick = {
-                            combinator = if (combinator == DfCombinator.DF_ALL) {
-                                DfCombinator.DF_ANY
-                            } else {
-                                DfCombinator.DF_ALL
-                            }
-                        },
-                        label = { Text(combinator.title()) },
+                    FilterChip(
+                        selected = combinator == DfCombinator.DF_ALL,
+                        onClick = { combinator = DfCombinator.DF_ALL },
+                        label = { Text(stringResource(R.string.smart_folder_match_all)) },
                     )
-                    AssistChip(
-                        onClick = {
-                            viewMode = if (viewMode == DfViewMode.DF_VIEW_GRID) {
-                                DfViewMode.DF_VIEW_LIST
-                            } else {
-                                DfViewMode.DF_VIEW_GRID
-                            }
-                        },
-                        label = { Text(viewMode.title()) },
+                    FilterChip(
+                        selected = combinator == DfCombinator.DF_ANY,
+                        onClick = { combinator = DfCombinator.DF_ANY },
+                        label = { Text(stringResource(R.string.smart_folder_match_any)) },
+                    )
+                    FilterChip(
+                        selected = viewMode == DfViewMode.DF_VIEW_GRID,
+                        onClick = { viewMode = DfViewMode.DF_VIEW_GRID },
+                        label = { Text(stringResource(R.string.smart_folder_view_grid)) },
+                    )
+                    FilterChip(
+                        selected = viewMode == DfViewMode.DF_VIEW_LIST,
+                        onClick = { viewMode = DfViewMode.DF_VIEW_LIST },
+                        label = { Text(stringResource(R.string.smart_folder_view_list)) },
                     )
                 }
                 rules.forEachIndexed { index, rule ->
@@ -219,14 +220,6 @@ private fun operatorsFor(field: DfField): List<DfOperator> = when (field) {
 
 private fun defaultValue(field: DfField): String =
     if (field == DfField.DF_MEDIA_KIND) "1" else ""
-
-@Composable
-private fun DfCombinator.title(): String =
-    stringResource(if (this == DfCombinator.DF_ANY) R.string.smart_folder_match_any else R.string.smart_folder_match_all)
-
-@Composable
-private fun DfViewMode.title(): String =
-    stringResource(if (this == DfViewMode.DF_VIEW_LIST) R.string.smart_folder_view_list else R.string.smart_folder_view_grid)
 
 @Composable
 private fun DfField.title(): String = stringResource(

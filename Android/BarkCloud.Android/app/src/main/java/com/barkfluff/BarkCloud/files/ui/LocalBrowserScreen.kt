@@ -32,10 +32,11 @@ import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -63,7 +64,7 @@ import com.barkfluff.BarkCloud.files.data.FileShareHelper
 import com.barkfluff.BarkCloud.files.domain.FsEntry
 import com.barkfluff.BarkCloud.files.domain.FsSort
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun LocalBrowserScreen(
     initialPath: String,
@@ -287,7 +288,7 @@ fun LocalBrowserScreen(
             }
 
             state.pendingOp?.let { op ->
-                LinearProgressIndicator(
+                LinearWavyProgressIndicator(
                     progress = { op.progress },
                     modifier = Modifier
                         .align(Alignment.TopCenter)

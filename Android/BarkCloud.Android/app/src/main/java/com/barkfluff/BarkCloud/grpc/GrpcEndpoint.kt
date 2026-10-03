@@ -1,17 +1,20 @@
 package com.barkfluff.BarkCloud.grpc
 
 import android.net.Uri
-import com.barkfluff.BarkCloud.BuildConfig
 
 /**
  * Конфигурация эндпоинтов файлового сервиса. nginx терминирует TLS и маршрутизирует
  * gRPC по портам (Identity :7020, Users :7021, Files :7025). HTTP-раздача файлов —
- * `:7025/web/{upload|download}/{id}`.
+ * `:7025/web/{upload|download}/{id}`. Адрес и порты переопределяются на экране
+ * входа — см. [ServerSettings].
  */
 object GrpcEndpoint {
 
     /** База HTTP-раздачи файлов (`/web/download/{id}`, `/web/upload/{id}`). */
-    val filesWebBase: String get() = BuildConfig.FILES_WEB_BASE
+    val filesWebBase: String get() = ServerSettings.filesWebBase
+
+    /** База data plane Upload 2.0 (`/file-upload/{session}/parts/{n}`, nginx :443). */
+    val fileUploadBase: String get() = ServerSettings.fileUploadBase
 
     /**
      * Перестраивает ссылку скачивания файла на актуальный эндпоинт Files. Часть

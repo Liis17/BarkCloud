@@ -1,6 +1,5 @@
 package com.barkfluff.BarkCloud.ui.upload
 
-import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -17,7 +16,8 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -35,7 +35,7 @@ import com.barkfluff.BarkCloud.data.upload.UploadPhase
 import com.barkfluff.BarkCloud.ui.components.MediaThumb
 import java.io.File
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun UploadQueueScreen(
     onNavigateUp: () -> Unit,
@@ -66,6 +66,7 @@ fun UploadQueueScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun UploadJobRow(job: UploadJob, onRetry: () -> Unit, onCancel: () -> Unit) {
     Card(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
@@ -75,7 +76,7 @@ fun UploadJobRow(job: UploadJob, onRetry: () -> Unit, onCancel: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             MediaThumb(
-                model = job.stagedFilePath?.let(::File) ?: job.sourceUri?.let(Uri::parse),
+                model = job.stagedFilePath?.let(::File),
                 isVideo = job.mimeType?.startsWith("video/") == true,
                 contentDescription = job.fileName,
                 modifier = Modifier.size(52.dp),
@@ -83,15 +84,19 @@ fun UploadJobRow(job: UploadJob, onRetry: () -> Unit, onCancel: () -> Unit) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(job.fileName, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(job.phase.label(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                if (job.phase in setOf(UploadPhase.UPLOADING, UploadPhase.QUEUED, UploadPhase.UPLOADED, UploadPhase.ATTACHING)) {
-                    LinearProgressIndicator(
+                if (job.phase in setOf(
+                        UploadPhase.QUEUED, UploadPhase.HASHING, UploadPhase.CREATING_SESSION,
+                        UploadPhase.UPLOADING, UploadPhase.COMPLETING, UploadPhase.PROCESSING, UploadPhase.ATTACHING,
+                    )
+                ) {
+                    LinearWavyProgressIndicator(
                         progress = { if (job.bytesTotal > 0) (job.bytesSent.toFloat() / job.bytesTotal).coerceIn(0f, 1f) else 0f },
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
                 job.errorMessage?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
             }
-            if (job.phase == UploadPhase.FAILED) {
+            if (job.phase == UploadPhase.FAILED || job.phase == UploadPhase.UPLOADED_NOT_ATTACHED) {
                 IconButton(onClick = onRetry) { Icon(Icons.Outlined.Refresh, contentDescription = "Повторить") }
             } else if (job.phase != UploadPhase.COMPLETED) {
                 IconButton(onClick = onCancel) { Icon(Icons.Outlined.Cancel, contentDescription = "Отменить") }
@@ -100,7 +105,7 @@ fun UploadJobRow(job: UploadJob, onRetry: () -> Unit, onCancel: () -> Unit) {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun GlobalUploadBanner(state: UploadQueueUiState, onOpen: () -> Unit) {
     val current = state.current ?: return
@@ -114,7 +119,7 @@ fun GlobalUploadBanner(state: UploadQueueUiState, onOpen: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             MediaThumb(
-                model = current.stagedFilePath?.let(::File) ?: current.sourceUri?.let(Uri::parse),
+                model = current.stagedFilePath?.let(::File),
                 isVideo = current.mimeType?.startsWith("video/") == true,
                 contentDescription = current.fileName,
                 modifier = Modifier.size(38.dp),
@@ -122,7 +127,7 @@ fun GlobalUploadBanner(state: UploadQueueUiState, onOpen: () -> Unit) {
             Column(Modifier.weight(1f)) {
                 Text("Загрузка ${state.completed}/${state.total}", style = MaterialTheme.typography.labelLarge)
                 Text(current.fileName, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall)
-                LinearProgressIndicator(progress = { state.progress }, modifier = Modifier.fillMaxWidth().padding(top = 4.dp))
+                LinearWavyProgressIndicator(progress = { state.progress }, modifier = Modifier.fillMaxWidth().padding(top = 4.dp))
             }
         }
     }
@@ -130,8 +135,11 @@ fun GlobalUploadBanner(state: UploadQueueUiState, onOpen: () -> Unit) {
 
 private fun UploadPhase.label(): String = when (this) {
     UploadPhase.QUEUED -> "В очереди"
+    UploadPhase.HASHING, UploadPhase.CREATING_SESSION -> "Подготовка"
     UploadPhase.UPLOADING -> "Отправляется"
+    UploadPhase.COMPLETING, UploadPhase.PROCESSING -> "Обработка на сервере"
     UploadPhase.UPLOADED, UploadPhase.ATTACHING -> "Размещается в облаке"
+    UploadPhase.UPLOADED_NOT_ATTACHED -> "Ожидает размещения"
     UploadPhase.PAUSED -> "На паузе"
     UploadPhase.FAILED -> "Ошибка"
     UploadPhase.COMPLETED -> "Готово"

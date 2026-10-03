@@ -77,7 +77,7 @@ fun AlbumsGridScreen(
             modifier = Modifier.fillMaxSize(),
         ) {
             LazyVerticalGrid(
-                columns = GridCells.Fixed(2),
+                columns = GridCells.Adaptive(minSize = 180.dp),
                 state = gridState,
                 modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),

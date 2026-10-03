@@ -6,7 +6,7 @@ Parent: [[modules/backend-files]] · Web: [[modules/backend-web]] · API: [[api/
 
 Upload 2.0 — основной транспорт загрузки файлов из Web. Control plane остаётся cookie-auth API Web и gRPC `FilesApi`, а data plane идёт напрямую `Browser → nginx/Vite → Files HTTP/1 → S3/MinIO`. Web больше не принимает и не пересылает байты V2-файлов.
 
-V2 включён для массовой Web-загрузки, обложек музыкальных плейлистов и ручных превью видео; Web-релиз поднят до `v1.4.0`. Legacy `GetUploadUrl`, `/upload/{id}`, `/web/upload/{id}` и `/api/files/upload` сохранены для мобильных/desktop-клиентов и ручного rollback.
+V2 включён для массовой Web-загрузки, обложек музыкальных плейлистов и ручных превью видео; Web-релиз поднят до `v1.4.0`. Клиенты: iOS — с 2026-09-16 ([[modules/ios-background-upload]]), Android — с 2026-10-03 ([[modules/android-upload2]]). Legacy `GetUploadUrl`, `/upload/{id}`, `/web/upload/{id}` и `/api/files/upload` сохранены для аватаров мобильных клиентов, desktop-клиентов и ручного rollback.
 
 ## Состояния и готовность
 

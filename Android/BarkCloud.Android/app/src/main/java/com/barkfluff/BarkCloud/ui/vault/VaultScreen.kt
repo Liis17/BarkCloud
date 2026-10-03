@@ -16,10 +16,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.VisibilityOff
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -53,7 +54,7 @@ import com.barkfluff.BarkCloud.ui.components.CloudMediaViewer
 import com.barkfluff.BarkCloud.ui.components.MediaThumb
 import com.barkfluff.BarkCloud.ui.components.rememberRemoteOpener
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun VaultScreen(
     onNavigateUp: () -> Unit,
@@ -107,7 +108,7 @@ fun VaultScreen(
                         }
                     }
                 }
-                VaultLockState.UNLOCKING -> CircularProgressIndicator(Modifier.align(Alignment.Center))
+                VaultLockState.UNLOCKING -> LoadingIndicator(Modifier.align(Alignment.Center))
                 VaultLockState.UNLOCKED -> {
                     if (state.items.isEmpty()) {
                         Text(
@@ -116,7 +117,7 @@ fun VaultScreen(
                             modifier = Modifier.align(Alignment.Center),
                         )
                     } else {
-                        LazyVerticalGrid(columns = GridCells.Fixed(3), modifier = Modifier.fillMaxSize()) {
+                        LazyVerticalGrid(columns = GridCells.Adaptive(minSize = 120.dp), modifier = Modifier.fillMaxSize()) {
                             items(state.items, key = { it.fileId }) { item ->
                                 VaultCell(
                                     item = item,

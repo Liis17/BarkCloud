@@ -9,17 +9,20 @@ import android.provider.MediaStore
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -28,14 +31,18 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.outlined.Checklist
+import androidx.compose.material.icons.outlined.CloudUpload
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.RadioButtonUnchecked
 import androidx.compose.material3.Button
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.HorizontalFloatingToolbar
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -52,6 +59,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -64,6 +72,7 @@ import com.barkfluff.BarkCloud.data.gallery.DeviceMedia
 import com.barkfluff.BarkCloud.data.gallery.MediaCloudStatus
 import com.barkfluff.BarkCloud.ui.components.MediaThumb
 import com.barkfluff.BarkCloud.ui.components.mediaDateSections
+import com.barkfluff.BarkCloud.ui.theme.BarkMotion
 
 private fun requiredMediaPermissions(): Array<String> =
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -72,7 +81,7 @@ private fun requiredMediaPermissions(): Array<String> =
         arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
     }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun GalleryScreen(
     viewModel: GalleryViewModel = viewModel(factory = GalleryViewModel.factory()),
@@ -127,7 +136,7 @@ fun GalleryScreen(
                         IconButton(onClick = viewModel::toggleSelecting) {
                             Icon(
                                 if (state.selecting) Icons.Outlined.Close else Icons.Outlined.Checklist,
-                                contentDescription = null,
+                                contentDescription = stringResource(R.string.gallery_selection_mode),
                             )
                         }
                     }
@@ -136,12 +145,25 @@ fun GalleryScreen(
         },
         bottomBar = {
             if (state.selecting && state.selected.isNotEmpty()) {
-                Button(
-                    onClick = viewModel::uploadSelected,
-                    enabled = !state.isQueueing,
-                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                // M3 Expressive: контекстные действия режима выделения — floating toolbar,
+                // а не полноширинная кнопка.
+                Box(
+                    Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 16.dp),
+                    contentAlignment = Alignment.Center,
                 ) {
-                    Text(stringResource(R.string.gallery_upload_selected, state.selected.size))
+                    HorizontalFloatingToolbar(expanded = true) {
+                        Text(
+                            stringResource(R.string.gallery_upload_selected, state.selected.size),
+                            style = MaterialTheme.typography.labelLarge,
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        IconButton(onClick = viewModel::uploadSelected, enabled = !state.isQueueing) {
+                            Icon(
+                                Icons.Outlined.CloudUpload,
+                                contentDescription = stringResource(R.string.gallery_upload_selected, state.selected.size),
+                            )
+                        }
+                    }
                 }
             } else if (state.reclaimableCount > 0) {
                 OutlinedButton(
@@ -165,7 +187,7 @@ fun GalleryScreen(
                 PermissionRationale(onGrant = { launcher.launch(permissions) })
             } else {
                 LazyVerticalGrid(
-                    columns = GridCells.Fixed(3),
+                    columns = GridCells.Adaptive(minSize = 120.dp),
                     modifier = Modifier.fillMaxSize(),
                 ) {
                     dateSections.forEach { section ->
@@ -195,12 +217,16 @@ fun GalleryScreen(
 
             if (state.isQueueing) {
                 Box(
-                    Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.35f)),
+                    Modifier.fillMaxSize().background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.35f)),
                     contentAlignment = Alignment.Center,
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        CircularProgressIndicator()
-                        Text(text = stringResource(R.string.share_staging), color = Color.White, modifier = Modifier.padding(top = 12.dp))
+                        LoadingIndicator()
+                        Text(
+                            text = stringResource(R.string.share_staging),
+                            color = Color.White,
+                            modifier = Modifier.padding(top = 12.dp),
+                        )
                     }
                 }
             }
@@ -233,6 +259,16 @@ private fun GalleryCell(
     onLongPress: () -> Unit,
 ) {
     LaunchedEffect(media.id) { onAppear() }
+    val badgeScale by animateFloatAsState(
+        targetValue = if (selected) 1f else 0f,
+        animationSpec = BarkMotion.spatial(),
+        label = "selectBadgeScale",
+    )
+    val overlayAlpha by animateFloatAsState(
+        targetValue = if (selected) 0.25f else 0f,
+        animationSpec = BarkMotion.effect(),
+        label = "selectOverlayAlpha",
+    )
     Box(
         modifier = Modifier
             .aspectRatio(1f)
@@ -262,17 +298,23 @@ private fun GalleryCell(
             )
         }
         if (selecting) {
-            Icon(
-                if (selected) Icons.Filled.CheckCircle else Icons.Outlined.RadioButtonUnchecked,
-                contentDescription = null,
-                tint = if (selected) MaterialTheme.colorScheme.primary else Color.White,
-                modifier = Modifier.align(Alignment.TopEnd).padding(4.dp).size(22.dp),
-            )
-            if (selected) {
-                Box(
-                    Modifier.fillMaxSize().background(MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)),
+            if (!selected) {
+                Icon(
+                    Icons.Outlined.RadioButtonUnchecked,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.align(Alignment.TopEnd).padding(4.dp).size(22.dp),
                 )
             }
+            Icon(
+                Icons.Filled.CheckCircle,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.align(Alignment.TopEnd).padding(4.dp).size(22.dp).scale(badgeScale),
+            )
+            Box(
+                Modifier.fillMaxSize().background(MaterialTheme.colorScheme.primary.copy(alpha = overlayAlpha)),
+            )
         }
     }
 }
