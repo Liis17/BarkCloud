@@ -58,9 +58,10 @@ describe('ServerSettingsTab', () => {
     render(<ServerSettingsTab />);
     await expandAll();
     expect(editor().getByLabelText('Квота S3 бакета')).toHaveProperty('value', '2');
-    expect(editor().getByLabelText('Единица квоты')).toHaveProperty('value', 'tb');
+    expect(editor().getByRole('combobox', { name: 'Единица квоты' }).textContent).toBe('ТБ');
     fireEvent.change(editor().getByLabelText('Квота S3 бакета'), { target: { value: '3' } });
-    fireEvent.change(editor().getByLabelText('Единица квоты'), { target: { value: 'pb' } });
+    fireEvent.click(editor().getByRole('combobox', { name: 'Единица квоты' }));
+    fireEvent.click(screen.getByRole('option', { name: 'ПБ' }));
     fireEvent.click(editor().getByRole('button', { name: 'Сохранить профиль' }));
     expect(within(await screen.findByRole('dialog')).getByText('Квота: 3 PB')).toBeTruthy();
     expect(fetchMock.mock.calls.some(([path]) => path.endsWith('/storage/profile'))).toBe(false);

@@ -2,6 +2,7 @@ import React from 'react';
 import { Loading } from '../components/ui/EmptyState';
 import { ConfirmModal } from '../components/ui/ConfirmModal';
 import { Icon } from '../components/Icon';
+import { Select } from '../components/ui/Select';
 import { useApiResource } from '../hooks/useApiResource';
 import { plural } from '../lib/format';
 
@@ -162,9 +163,8 @@ function SettingEditor({ setting, query, onSaved, onDirty, onExpired }: {
         {!setting.isReadOnly && setting.restartTargets.length > 0 && <span title="После сохранения нужен перезапуск"> · ↻ {setting.restartTargets.join(', ')}</span>}</small>
     </div>
     <div className="server-setting-control">
-      {setting.valueKind === 'boolean' ? <select aria-label={settingName(setting)} value={value} disabled={setting.isReadOnly || busy} onChange={(event) => setValue(event.target.value)}>
-        <option value="true">Включено</option><option value="false">Выключено</option>
-      </select> : <input aria-label={settingName(setting)} type={type} value={value} disabled={setting.isReadOnly || busy}
+      {setting.valueKind === 'boolean' ? <Select aria-label={settingName(setting)} value={value} disabled={setting.isReadOnly || busy} onChange={setValue}
+        options={[{ value: 'true', label: 'Включено' }, { value: 'false', label: 'Выключено' }]} /> : <input aria-label={settingName(setting)} type={type} value={value} disabled={setting.isReadOnly || busy}
         placeholder={!setting.isReadOnly && setting.isSensitive && setting.hasValue ? 'Задано — новое значение для замены' : ''}
         onChange={(event) => setValue(event.target.value)} />}
       {!setting.isReadOnly && <button className="btn primary" disabled={!dirty || busy} onClick={save}>{busy ? 'Сохраняем…' : 'Сохранить'}</button>}
@@ -268,7 +268,7 @@ function StorageEditor({ role, selected, profiles, revisions, draft, setDraft, o
       <p className="storage-credentials-help"><Highlight value="Оставьте поля ключей пустыми, чтобы сохранить текущие credentials." query={query} /></p>
       <label><span><Highlight value="Квота S3 бакета" query={query} /></span><div className="storage-quota-control">
         <input aria-label="Квота S3 бакета" type="number" min="0" step="1" inputMode="numeric" value={draft.quotaValue} aria-invalid={!!errors.quotaValue} onChange={(event) => edit('quotaValue', event.target.value)} />
-        <select aria-label="Единица квоты" value={draft.quotaUnit} onChange={(event) => edit('quotaUnit', event.target.value as QuotaUnit)}><option value="gb">ГБ</option><option value="tb">ТБ</option><option value="pb">ПБ</option></select>
+        <Select<QuotaUnit> aria-label="Единица квоты" value={draft.quotaUnit} onChange={(v) => edit('quotaUnit', v)} options={[{ value: 'gb', label: 'ГБ' }, { value: 'tb', label: 'ТБ' }, { value: 'pb', label: 'ПБ' }]} />
       </div><small>0 = безлимит. Квота общая для одинаковых endpoint и bucket.</small>
         {selected?.quotaBytes && selected.quotaBytes !== '0' && initial.quotaValue === '0' && <small>Текущая квота: {quotaLabel(selected)}. Введите целое значение для замены.</small>}{fieldError('quotaValue')}</label>
       <label className="server-check"><input type="checkbox" checked={draft.isR2} onChange={(event) => edit('isR2', event.target.checked)} /><span><Highlight value="Cloudflare R2" query={query} /></span></label>

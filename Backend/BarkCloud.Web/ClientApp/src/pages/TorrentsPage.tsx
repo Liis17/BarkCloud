@@ -2,6 +2,7 @@ import React from 'react';
 import { useLocation } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import { Modal } from '../components/ui/Modal';
+import { Select } from '../components/ui/Select';
 import { EmptyState } from '../components/ui/EmptyState';
 import { FileDropOverlay } from '../components/ui/FileDropOverlay';
 import { useToast } from '../hooks/useToast';
@@ -78,9 +79,7 @@ function FilesPanel({ torrent, onToast }: { torrent: Torrent; onToast: (m: strin
             <ProgressBar value={f.progress} />
           </div>
           <div className="tor-meta">{fmtBytes(f.size)}</div>
-          <select className="tor-priority" value={f.priority} onChange={(e) => changePriority(f.index, Number(e.target.value))}>
-            {PRIORITY_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
+          <Select aria-label="Приоритет" value={f.priority} options={PRIORITY_OPTS} onChange={(v) => changePriority(f.index, v)} />
           <div className="tor-actions">
             <a className="icon-btn" href={T.downloadUrl(torrent.id, f.index)} title="Скачать" target="_blank" rel="noreferrer"><Icon.download size={18} /></a>
             {f.progress >= 1 && <button className="icon-btn" title="В облако" onClick={() => importFile(f.index)}><Icon.cloud size={18} /></button>}
