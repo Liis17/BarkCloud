@@ -2,10 +2,10 @@ import React from 'react';
 import { useParams } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import { PublicShareHeader, PublicShareShell, PublicStatus } from '../components/public/PublicShareShell';
-import { PublicViewerActions } from '../components/public/PublicViewerActions';
+import { PublicFileTile } from '../components/public/PublicTile';
+import { PublicViewer } from '../components/public/PublicViewer';
+import { countLabel, isPublicMedia } from '../components/public/publicFile';
 import { useDocumentHead } from '../hooks/useDocumentHead';
-import { persistVolumeRef } from '../lib/volume';
-import { VideoPlayer } from '../components/media/MediaPlayer';
 
 interface PubFile {
   fileId: string;
@@ -26,18 +26,6 @@ interface AlbumListing {
   nextCursorId: string;
 }
 
-function fmtSize(bytes: number): string {
-  if (!bytes) return '';
-  const u = ['Б', 'КБ', 'МБ', 'ГБ', 'ТБ'];
-  let i = 0;
-  let v = bytes;
-  while (v >= 1024 && i < u.length - 1) {
-    v /= 1024;
-    i++;
-  }
-  return (i === 0 ? v.toFixed(0) : v.toFixed(v < 10 ? 1 : 0)).replace('.', ',') + ' ' + u[i];
-}
-
 /** Публичная страница альбома по шаринг-ссылке (/al/:token). Без авторизации; контент динамический. */
 export function PublicAlbumPage() {
   const { token } = useParams<{ token: string }>();
@@ -47,7 +35,7 @@ export function PublicAlbumPage() {
   const [state, setState] = React.useState<'loading' | 'notfound' | 'ok'>('loading');
   const [loadingMore, setLoadingMore] = React.useState(false);
   const [viewer, setViewer] = React.useState<PubFile | null>(null);
-  const firstPreview = items.find((f) => (f.mediaKind === 'photo' || f.mediaKind === 'video') && f.previewUrl)?.previewUrl || null;
+  const firstPreview = items.find((f) => isPublicMedia(f.mediaKind) && f.previewUrl)?.previewUrl || null;
   const headTitle = viewer?.name || album?.name || (state === 'notfound' ? 'Альбом недоступен' : 'Публичный альбом');
   const headIconUrl = viewer?.previewUrl || firstPreview;
 
@@ -99,95 +87,58 @@ export function PublicAlbumPage() {
   }
 
   function openFile(f: PubFile) {
-    if (f.mediaKind === 'photo' || f.mediaKind === 'video') setViewer(f);
+    if (isPublicMedia(f.mediaKind)) setViewer(f);
     else if (f.downloadUrl) window.location.href = f.downloadUrl;
   }
 
   if (state === 'loading') {
-    return <PublicStatus icon={Icon.photo} title="Открываем альбом" loading />;
+    return <PublicStatus title="Открываем альбом" loading />;
   }
   if (state === 'notfound') {
     return (
       <PublicStatus
-        icon={Icon.photo}
         title="Альбом недоступен"
         text="Альбом не найден или владелец отозвал доступ."
       />
     );
   }
 
+  const photos = items.filter((f) => f.mediaKind === 'photo').length;
+  const videos = items.filter((f) => f.mediaKind === 'video').length;
   return (
     <PublicShareShell>
       <PublicShareHeader
+        variant="collection"
         icon={Icon.photo}
+        label="Альбом"
         coverUrl={firstPreview || undefined}
         title={album?.name || 'Публичный альбом'}
         subtitle={album?.description || undefined}
-        meta={`${items.length} ${items.length === 1 ? 'элемент' : 'элементов'}`}
+        chips={[
+          countLabel(items.length, 'элемент', 'элемента', 'элементов'),
+          photos > 0 && videos > 0 && `${photos} фото · ${videos} видео`,
+        ]}
       />
 
-        {items.length === 0 ? (
-          <div className="public-empty">Альбом пуст.</div>
-        ) : (
-          <div className="public-grid">
-            {items.map((f) => {
-              const isMedia = f.mediaKind === 'photo' || f.mediaKind === 'video';
-              return (
-                <button
-                  key={f.fileId}
-                  onClick={() => openFile(f)}
-                  title={f.name}
-                  className="public-tile"
-                >
-                  <div className="public-tile-media">
-                    {isMedia && f.previewUrl ? (
-                      <img src={f.previewUrl} alt={f.name} />
-                    ) : (
-                      <Icon.file size={40} />
-                    )}
-                    {f.mediaKind === 'video' && (
-                      <span className="public-play">
-                        <Icon.play size={34} />
-                      </span>
-                    )}
-                  </div>
-                  <div className="public-tile-title">{f.name}</div>
-                  <div className="public-tile-sub">{f.fileSize > 0 ? fmtSize(f.fileSize) : ''}</div>
-                </button>
-              );
-            })}
-          </div>
-        )}
+      {items.length === 0 ? (
+        <div className="public-empty">Альбом пуст.</div>
+      ) : (
+        <section className="public-grid is-album" aria-label="Элементы публичного альбома">
+          {items.map((f) => (
+            <PublicFileTile key={f.fileId} file={f} plain onOpen={() => openFile(f)} />
+          ))}
+        </section>
+      )}
 
-        {cursor && (
-          <div style={{ textAlign: 'center', marginTop: 20 }}>
-            <button className="btn outlined" onClick={loadMore} disabled={loadingMore}>
-              {loadingMore ? 'Загрузка…' : 'Показать ещё'}
-            </button>
-          </div>
-        )}
-
-      {viewer && (
-        <div
-          onClick={() => setViewer(null)}
-          className="public-viewer"
-        >
-          <div onClick={(e) => e.stopPropagation()} className="public-viewer-body">
-            {viewer.mediaKind === 'video' ? (
-              <VideoPlayer onMediaRef={persistVolumeRef} src={viewer.downloadUrl} autoPlay />
-            ) : (
-              <img src={viewer.downloadUrl} alt={viewer.name} />
-            )}
-            <PublicViewerActions
-              name={viewer.name}
-              downloadHref={viewer.downloadUrl}
-              mediaKind={viewer.mediaKind}
-              imageSrc={viewer.downloadUrl}
-              onClose={() => setViewer(null)}
-            />
-          </div>
+      {cursor && (
+        <div className="public-more">
+          <button className="public-pill is-tonal public-st" type="button" onClick={loadMore} disabled={loadingMore}>
+            {loadingMore ? 'Загрузка…' : 'Показать ещё'}
+          </button>
         </div>
       )}
+
+      {viewer && <PublicViewer file={viewer} onClose={() => setViewer(null)} />}
     </PublicShareShell>
   );
 }

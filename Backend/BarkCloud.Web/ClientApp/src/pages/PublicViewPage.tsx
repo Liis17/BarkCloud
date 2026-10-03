@@ -2,7 +2,8 @@ import React from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import { PublicShareHeader, PublicShareShell, PublicStatus } from '../components/public/PublicShareShell';
-import { PublicViewerActions } from '../components/public/PublicViewerActions';
+import { describePublicFile, fmtSize } from '../components/public/publicFile';
+import { usePublicShareActions } from '../components/public/usePublicShareActions';
 import { useDocumentHead } from '../hooks/useDocumentHead';
 import { persistVolumeRef } from '../lib/volume';
 import { VideoPlayer } from '../components/media/MediaPlayer';
@@ -19,18 +20,6 @@ interface ShareInfo {
   downloadPath: string;
 }
 
-function fmtSize(bytes: number): string {
-  if (!bytes) return '';
-  const u = ['Б', 'КБ', 'МБ', 'ГБ', 'ТБ'];
-  let i = 0;
-  let v = bytes;
-  while (v >= 1024 && i < u.length - 1) {
-    v /= 1024;
-    i++;
-  }
-  return (i === 0 ? v.toFixed(0) : v.toFixed(v < 10 ? 1 : 0)).replace('.', ',') + ' ' + u[i];
-}
-
 /** Публичная страница просмотра файла по шаринг-ссылке (/v/:token). Без авторизации. */
 export function PublicViewPage() {
   const { token } = useParams<{ token: string }>();
@@ -39,6 +28,7 @@ export function PublicViewPage() {
   const headInfo = typeof state === 'object' ? state : null;
   const headTitle = headInfo ? headInfo.name : state === 'notfound' ? 'Ссылка недоступна' : 'Публичный файл';
   const headIconUrl = headInfo?.previewUrl || null;
+  const { copyLink, copyImage, toastNode } = usePublicShareActions(headInfo?.downloadUrl || headInfo?.previewUrl);
 
   useDocumentHead(
     () => ({ title: headTitle, iconUrl: headIconUrl }),
@@ -65,12 +55,11 @@ export function PublicViewPage() {
   }, [navigate, token]);
 
   if (state === 'loading') {
-    return <PublicStatus icon={Icon.cloud} title="Открываем файл" loading />;
+    return <PublicStatus title="Открываем файл" loading />;
   }
   if (state === 'notfound') {
     return (
       <PublicStatus
-        icon={Icon.link}
         title="Ссылка недоступна"
         text="Файл не найден или владелец отозвал доступ."
       />
@@ -78,45 +67,72 @@ export function PublicViewPage() {
   }
 
   const info = state;
+  const isPhoto = info.mediaKind === 'photo';
   const isVideo = info.mediaKind === 'video';
-  const hasPreview = (info.mediaKind === 'photo' || info.mediaKind === 'video') && !!info.previewUrl;
+  const file = describePublicFile(info.name, info.mediaKind);
+  const downloadHref = info.downloadPath || `/s/${token}`;
   return (
     <PublicShareShell>
       <PublicShareHeader
-        icon={info.mediaKind === 'video' ? Icon.video : info.mediaKind === 'photo' ? Icon.photo : Icon.file}
-        label="Публичный файл BarkCloud"
+        variant="file"
+        icon={isVideo ? Icon.video : isPhoto ? Icon.photo : Icon.file}
+        tone={file.tone}
+        label="Публичный файл"
         title={info.name}
-        meta={info.fileSize > 0 ? fmtSize(info.fileSize) : undefined}
+        chips={[file.typeLabel, info.fileSize > 0 && fmtSize(info.fileSize)]}
       >
-        <a className="btn primary" href={info.downloadPath || `/s/${token}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-          <Icon.download size={18} /> Скачать
+        <button className="public-fab public-st" type="button" title="Копировать ссылку" aria-label="Копировать ссылку" onClick={copyLink}>
+          <Icon.link size={24} />
+        </button>
+        {isPhoto && (
+          <button className="public-fab public-st" type="button" title="Скопировать изображение" aria-label="Скопировать изображение" onClick={copyImage}>
+            <Icon.copy size={24} />
+          </button>
+        )}
+        <a className="public-pill is-lg public-st" href={downloadHref}>
+          <Icon.download size={24} />
+          Скачать
         </a>
       </PublicShareHeader>
 
-      <div className="public-view-card">
-        <div className="public-preview">
-          {isVideo && info.downloadUrl ? (
-            <VideoPlayer
-              onMediaRef={persistVolumeRef}
-              src={info.downloadUrl}
-              poster={info.previewUrl || undefined}
-            />
-          ) : hasPreview ? (
-            <img
-              src={info.previewUrl}
-              alt={info.name}
-            />
-          ) : (
-            <Icon.file size={56} />
-          )}
-        </div>
-        <PublicViewerActions
-          name={info.name}
-          downloadHref={info.downloadPath || `/s/${token}`}
-          mediaKind={info.mediaKind}
-          imageSrc={info.downloadUrl || info.previewUrl}
-        />
-      </div>
+      {isVideo || isPhoto ? (
+        <section className="public-stage">
+          <div className={'public-stage-media' + (isVideo ? ' is-video' : '')}>
+            {isVideo && info.downloadUrl ? (
+              <VideoPlayer
+                onMediaRef={persistVolumeRef}
+                src={info.downloadUrl}
+                poster={info.previewUrl || undefined}
+                bigPlay
+              />
+            ) : info.previewUrl ? (
+              <img src={info.previewUrl} alt={info.name} />
+            ) : (
+              <div className="public-stage-empty public-ph">
+                <span className="public-ph-tile">{isVideo ? <Icon.video size={36} /> : <Icon.photo size={36} />}</span>
+              </div>
+            )}
+          </div>
+        </section>
+      ) : (
+        <section className="public-nopreview">
+          <div className="public-sheet">
+            <div className="public-sheet-body">
+              <span style={{ width: '70%' }} />
+              <span style={{ width: '100%' }} />
+              <span style={{ width: '100%' }} />
+              <span style={{ width: '85%' }} />
+              <span style={{ width: '60%' }} />
+            </div>
+            <span className="public-sheet-badge">{file.ext || 'ФАЙЛ'}</span>
+          </div>
+          <div>
+            <h2>Предпросмотр недоступен</h2>
+            <p>Файл открывается после скачивания.</p>
+          </div>
+        </section>
+      )}
+      {toastNode}
     </PublicShareShell>
   );
 }

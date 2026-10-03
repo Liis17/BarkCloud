@@ -94,12 +94,14 @@ interface VideoPlayerProps {
   poster?: string;
   autoPlay?: boolean;
   className?: string;
+  /** Крупная кнопка Play по центру кадра, пока видео не играет (публичная страница файла). */
+  bigPlay?: boolean;
   onMediaRef?: (el: HTMLVideoElement | null) => void;
 }
 
 /** Видеоплеер с M3-контролами поверх кадра (вместо нативных controls).
  *  Клавиши при фокусе на плеере: Space/K — пауза, M — звук, F — полный экран. */
-export function VideoPlayer({ src, poster, autoPlay, className, onMediaRef }: VideoPlayerProps) {
+export function VideoPlayer({ src, poster, autoPlay, className, bigPlay, onMediaRef }: VideoPlayerProps) {
   const [el, ref] = useMediaElement<HTMLVideoElement>(onMediaRef);
   const state = useMediaState(el);
   const wrap = React.useRef<HTMLDivElement>(null);
@@ -146,6 +148,11 @@ export function VideoPlayer({ src, poster, autoPlay, className, onMediaRef }: Vi
       onKeyDown={onKeyDown}
     >
       <video ref={ref} src={src} poster={poster} autoPlay={autoPlay} playsInline onClick={() => togglePlay(el)} onDoubleClick={toggleFull} />
+      {bigPlay && !state.playing && (
+        <button className="video-player-play" onClick={() => togglePlay(el)} title="Играть" aria-label="Играть">
+          <Icon.play size={40} />
+        </button>
+      )}
       <div className="video-player-bar">
         <MediaControls el={el} state={state} fullscreen={{ active: isFull, toggle: toggleFull }} />
       </div>
