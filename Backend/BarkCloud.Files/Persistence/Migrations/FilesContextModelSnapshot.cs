@@ -515,6 +515,31 @@ namespace BarkCloud.Files.Persistence.Migrations
                     b.ToTable("FileMetadata");
                 });
 
+            modelBuilder.Entity("BarkCloud.Files.Domain.FilePlaceholder", b =>
+                {
+                    b.Property<Guid>("FileId")
+                        .HasColumnType("uuid");
+
+                    b.Property<float>("AspectRatio")
+                        .HasColumnType("real");
+
+                    b.PrimitiveCollection<string[]>("Colors")
+                        .IsRequired()
+                        .HasColumnType("text[]");
+
+                    b.Property<Guid>("SourceFilePreviewId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("FileId");
+
+                    b.HasIndex("SourceFilePreviewId");
+
+                    b.ToTable("FilePlaceholders", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_FilePlaceholders_ColorCount", "cardinality(\"Colors\") = 9");
+                        });
+                });
+
             modelBuilder.Entity("BarkCloud.Files.Domain.FilePreview", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1189,6 +1214,21 @@ namespace BarkCloud.Files.Persistence.Migrations
                     b.HasIndex("Created");
 
                     b.ToTable("OutboxState");
+                });
+
+            modelBuilder.Entity("BarkCloud.Files.Domain.FilePlaceholder", b =>
+                {
+                    b.HasOne("BarkCloud.Files.Domain.UploadFile", null)
+                        .WithOne()
+                        .HasForeignKey("BarkCloud.Files.Domain.FilePlaceholder", "FileId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("BarkCloud.Files.Domain.FilePreview", null)
+                        .WithMany()
+                        .HasForeignKey("SourceFilePreviewId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("BarkCloud.Files.Domain.FileSearchAlias", b =>

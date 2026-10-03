@@ -598,12 +598,15 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
         // Он регистрируется как превью (TargetWidth=0), поэтому раздаётся публично, автоматически
         // исключается из галереи и чистится при удалении оригинала. Сам оригинал остаётся
         // доступен только по временным ссылкам.
+        byte[]? savedJpegViewBytes = null;
         if (file.Type == UploadFileType.CloudFile && isImageContent && jpegViewBytes is not null)
         {
             try
             {
-                file.JpegViewFileId = await _previewPersistence.PersistJpegViewAsync(
+                var view = await _previewPersistence.PersistJpegViewAsync(
                     file, jpegViewBytes, file.ImageWidth ?? 0, file.ImageHeight ?? 0, previewProfileId, cancellationToken);
+                file.JpegViewFileId = view.FileId;
+                savedJpegViewBytes = view.SavedBytes;
             }
             catch (Exception ex)
             {
@@ -648,6 +651,12 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
                 _logger.LogWarning(ex, "Не удалось сохранить одно или несколько превью файла {FileId}", file.Id);
             }
         }
+
+        // Для маленьких фото обычных превью может не быть — используем готовый JpegView.
+        if (generatedPreviews is not { Count: > 0 } && file.JpegViewFileId is { } viewId && jpegViewBytes is not null)
+            await _previewPersistence.EnsurePlaceholderAsync(file,
+                savedJpegViewBytes is not null ? new Dictionary<Guid, byte[]> { [viewId] = savedJpegViewBytes } : null,
+                cancellationToken);
 
         // 5) Метаданные блоба. Сохраняем только для CloudFile (для аватаров не имеет смысла).
         if (extractedMetadata is not null && file.Type == UploadFileType.CloudFile)

@@ -66,6 +66,31 @@ public class UnifiedSearchServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task ResolveHit_SmallPhoto_ReturnsJpegViewAndPlaceholder()
+    {
+        var (fileId, entryId) = await AddCloudFile(MediaKind.Photo);
+        var (previewId, _) = await AddCloudFile(MediaKind.Photo);
+        var sourceId = Guid.NewGuid();
+        _db.Context.FilePreviews.Add(new FilePreview
+        {
+            Id = sourceId, OriginalFileId = fileId, PreviewFileId = previewId,
+            TargetWidth = 0, ActualWidth = 20, ActualHeight = 10, CreatedAt = DateTime.UtcNow
+        });
+        _db.Context.FilePlaceholders.Add(new FilePlaceholder
+        {
+            FileId = fileId, SourceFilePreviewId = sourceId,
+            Colors = Enumerable.Repeat("#112233", 9).ToArray(), AspectRatio = 1
+        });
+        await _db.Context.SaveChangesAsync();
+
+        var hit = await CreateService().ResolveHit(new SearchHitReference { Kind = SearchHitKind.Photo, Id = entryId.ToString() }, default);
+
+        hit.PreviewUrl.Should().Be($"http://localhost:7026/download/{previewId}");
+        hit.Placeholder.Colors.Should().Equal(Enumerable.Repeat("#112233", 9));
+        hit.Placeholder.AspectRatio.Should().Be(1);
+    }
+
+    [Fact]
     public async Task ResolveHit_UnknownId_ReturnsNotFound()
     {
         await AddCloudFile(MediaKind.Photo);

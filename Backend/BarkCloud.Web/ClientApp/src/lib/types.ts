@@ -8,6 +8,11 @@ export interface Preview {
   url: string;
 }
 
+export interface FilePlaceholder {
+  colors: string[];
+  aspectRatio: number;
+}
+
 /** Тех-метаданные видео для тайла галереи (CloudJson.Card.video; только kind === 'video'). */
 export interface VideoMeta {
   duration?: number; // секунды
@@ -29,6 +34,7 @@ export interface CardFile {
   width: number;
   height: number;
   previews: Preview[];
+  placeholder?: FilePlaceholder | null;
   createdAt: string | null;
   uploadedAt: string | null;
   /** Полноразмерный JPEG для просмотра (HEIC и пр.); пусто/нет — показывать оригинал. */

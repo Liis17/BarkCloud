@@ -70,6 +70,7 @@ public class ListUserMediaCommandHandler : IRequestHandler<ListUserMediaCommand,
         var pageFileIds = page.Select(f => f.Id).ToList();
 
         var previewsByOriginal = await _uploadedFiles.GetPreviewsForFiles(pageFileIds, cancellationToken);
+        var placeholders = await _uploadedFiles.GetPlaceholdersForFiles(pageFileIds, cancellationToken);
         var baseUrl = FileUrlHelper.GetPublicBaseUrl(_configuration, _runSettings);
 
         // Тех-метаданные видео (длительность/кодеки/битрейт/HDR) — для тайлов галереи видео.
@@ -102,7 +103,7 @@ public class ListUserMediaCommandHandler : IRequestHandler<ListUserMediaCommand,
             metaByFileId?.TryGetValue(file.Id, out videoMeta);
             var item = new UserImageItem
             {
-                File = file.ToGrpc(baseUrl, previews, videoMeta)
+                File = file.ToGrpc(baseUrl, previews, videoMeta, placeholders.GetValueOrDefault(file.Id))
             };
 
             if (entriesByFileId.TryGetValue(file.Id, out var meta))

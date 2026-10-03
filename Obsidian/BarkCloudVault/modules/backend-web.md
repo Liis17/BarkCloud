@@ -1,5 +1,7 @@
 # Backend — Web
 
+Плейсхолдеры миниатюр на страницах фото, видео, поиска и в сетке динамических папок: [[modules/image-placeholders]] — контракт цветов и жизненный цикл `MediaThumb`.
+
 Parent: [[index]] · See also: [[api/identity-api]] · [[api/users-api]] · [[api/files-api]] · [[modules/shared-identity]] · [[modules/shared-auth]]
 
 Дочерние: [[modules/web-system-updates]] — раздел «Обслуживание» (обновление/перезапуск бэкенда из настроек); [[modules/web-settings]] — загрузка, поиск, конфигурации и S3-редактор настроек.

@@ -20,19 +20,22 @@ public class PreviewPersistenceService
     private readonly S3Uploader _s3Uploader;
     private readonly FilesContext _context;
     private readonly ILogger<PreviewPersistenceService> _logger;
+    private readonly FilePlaceholderService? _placeholders;
 
     public PreviewPersistenceService(
         IUploadedFilesStorage filesStorage,
         IFileHashesStorage hashesStorage,
         S3Uploader s3Uploader,
         FilesContext context,
-        ILogger<PreviewPersistenceService> logger)
+        ILogger<PreviewPersistenceService> logger,
+        FilePlaceholderService? placeholders = null)
     {
         _filesStorage = filesStorage;
         _hashesStorage = hashesStorage;
         _s3Uploader = s3Uploader;
         _context = context;
         _logger = logger;
+        _placeholders = placeholders;
     }
 
     /// <summary>
@@ -50,6 +53,7 @@ public class PreviewPersistenceService
                 .Where(x => x.OriginalFileId == original.Id)
                 .ToListAsync(cancellationToken))
             .ToDictionary(x => x.TargetWidth);
+        var bytesByPreviewFile = new Dictionary<Guid, byte[]>();
 
         foreach (var item in previews)
         {
@@ -72,7 +76,10 @@ public class PreviewPersistenceService
                     original,
                     NewLink(original.Id, existingPreviewFileId.Value, item.TargetWidth, item.ActualWidth, item.ActualHeight),
                     cancellationToken))
+            {
+                bytesByPreviewFile[existingPreviewFileId.Value] = item.Bytes;
                 continue;
+            }
 
             var previewFileId = Guid.NewGuid();
             using var ms = new MemoryStream(item.Bytes);
@@ -99,19 +106,46 @@ public class PreviewPersistenceService
 
             _context.FilePreviews.Add(
                 NewLink(original.Id, previewFileId, item.TargetWidth, item.ActualWidth, item.ActualHeight));
+            bytesByPreviewFile[previewFileId] = item.Bytes;
         }
 
         await _context.SaveChangesAsync(cancellationToken);
+        await EnsurePlaceholderAsync(original, bytesByPreviewFile, cancellationToken);
+    }
+
+    /// <summary>Необязательная обработка превью: ошибка цветов не ломает загрузку файла.</summary>
+    public virtual async Task EnsurePlaceholderAsync(
+        UploadFile original,
+        IReadOnlyDictionary<Guid, byte[]>? previewBytes,
+        CancellationToken cancellationToken)
+    {
+        if (_placeholders is null)
+            return;
+
+        try
+        {
+            await _placeholders.EnsureAsync(original, previewBytes,
+                overwriteExisting: true, cancellationToken: cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Не удалось сохранить цвета превью файла {FileId}", original.Id);
+        }
     }
 
     /// <summary>
     /// Сохраняет полноразмерный JPEG-вид оригинала («JpegView») как отдельный блоб и
     /// связывает его через <see cref="FilePreview"/> со служебной шириной <c>TargetWidth = 0</c>.
     /// За счёт этой связки блоб автоматически исключается из галереи (листинги пропускают
-    /// превью-блобы) и чистится при удалении оригинала. Возвращает file_id вида.
+    /// превью-блобы) и чистится при удалении оригинала. Возвращает file_id и подтверждённые
+    /// байты созданного/дедуплицированного блоба; у ранее существующей связки байты не подтверждены.
     /// Дедуп по SHA256 — как у обычных превью.
     /// </summary>
-    public virtual async Task<Guid> PersistJpegViewAsync(
+    public virtual async Task<(Guid FileId, byte[]? SavedBytes)> PersistJpegViewAsync(
         UploadFile original,
         byte[] jpegBytes,
         int width,
@@ -122,7 +156,7 @@ public class PreviewPersistenceService
         var existing = await _context.FilePreviews
             .FirstOrDefaultAsync(x => x.OriginalFileId == original.Id && x.TargetWidth == 0, cancellationToken);
         if (existing is not null)
-            return existing.PreviewFileId;
+            return (existing.PreviewFileId, null);
 
         string viewHash;
         using (var sha256 = SHA256.Create())
@@ -134,7 +168,7 @@ public class PreviewPersistenceService
         if (existingByHash.HasValue
             && await TryLinkExistingBlobAsync(
                 original, NewLink(original.Id, existingByHash.Value, 0, width, height), cancellationToken))
-            return existingByHash.Value;
+            return (existingByHash.Value, jpegBytes);
 
         var viewFileId = Guid.NewGuid();
         using var ms = new MemoryStream(jpegBytes);
@@ -162,7 +196,7 @@ public class PreviewPersistenceService
         _context.FilePreviews.Add(NewLink(original.Id, viewFileId, 0, width, height));
 
         await _context.SaveChangesAsync(cancellationToken);
-        return viewFileId;
+        return (viewFileId, jpegBytes);
     }
 
     private static FilePreview NewLink(Guid originalId, Guid previewFileId, int targetWidth, int actualWidth, int actualHeight) => new()

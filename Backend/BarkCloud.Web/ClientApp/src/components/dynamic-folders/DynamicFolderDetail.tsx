@@ -197,7 +197,7 @@ export function DynamicFolderDetail({ folder, onBack, onChanged, toast, albums, 
         onClick={(e) => clickItem(m, e.shiftKey)}
         onContextMenu={(e) => actions.openMenu(e, m)}
       >
-        <MediaThumb media={m} sizes={GRID_SIZES} />
+        <MediaThumb media={m} sizes={GRID_SIZES} colorPlaceholder={folder.viewMode !== 1} />
         <button
           className="selbox"
           onClick={(e) => {

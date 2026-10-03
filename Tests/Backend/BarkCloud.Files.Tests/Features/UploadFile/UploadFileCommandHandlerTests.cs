@@ -44,7 +44,7 @@ public class UploadFileCommandHandlerTests
         _metadataExtractor = new Mock<FileMetadataExtractor>(NullLogger<FileMetadataExtractor>.Instance);
         _previewPersistence = new Mock<PreviewPersistenceService>(
             _files.Object, _hashes.Object, _s3.Object, /* FilesContext */ null!,
-            NullLogger<PreviewPersistenceService>.Instance);
+            NullLogger<PreviewPersistenceService>.Instance, null!);
     }
 
     private UploadFileCommandHandler CreateSut(IUploadTempFileProvider? tempFiles = null) => new(
@@ -158,7 +158,7 @@ public class UploadFileCommandHandlerTests
             .Setup(p => p.PersistJpegViewAsync(
                 It.IsAny<UploadFileEntity>(), It.IsAny<byte[]>(), It.IsAny<int>(), It.IsAny<int>(),
                 It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(viewId);
+            .ReturnsAsync((viewId, (byte[]?)viewBytes));
 
         var response = await CreateSut().Handle(
             new UploadFileCommand { FileId = id, FileName = "photo.jpg", FileStream = MakeStream() }, default);
@@ -170,6 +170,10 @@ public class UploadFileCommandHandlerTests
             It.IsAny<UploadFileEntity>(), viewBytes, It.IsAny<int>(), It.IsAny<int>(), "test-bucket", It.IsAny<CancellationToken>()),
             Times.Once);
         _files.Verify(s => s.UpdateFile(It.Is<UploadFileEntity>(f => f.JpegViewFileId == viewId)), Times.Once);
+        _previewPersistence.Verify(p => p.EnsurePlaceholderAsync(
+            It.IsAny<UploadFileEntity>(),
+            It.Is<IReadOnlyDictionary<Guid, byte[]>?>(bytes => bytes != null && bytes.ContainsKey(viewId) && bytes[viewId] == viewBytes),
+            It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Theory]

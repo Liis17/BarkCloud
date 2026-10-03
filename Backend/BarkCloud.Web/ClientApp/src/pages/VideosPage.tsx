@@ -95,7 +95,7 @@ function VideoCard({ m, selecting, checked, onToggle, onOpen, onMenu }: {
       onContextMenu={(e) => onMenu(e, m)}
     >
       <div className="vthumb">
-        <MediaThumb media={m} sizes="(max-width: 700px) 100vw, 320px" />
+        <MediaThumb media={m} sizes="(max-width: 700px) 100vw, 320px" colorPlaceholder />
         <button className="selbox" onClick={(e) => { e.stopPropagation(); onToggle(e.shiftKey); }} title="Выбрать">
           {checked ? <Icon.check size={14} /> : null}
         </button>
@@ -294,7 +294,7 @@ export function VideosPage() {
           <>
             {featured && (
               <div className="featured-vid" onClick={() => setLightbox(0)} onContextMenu={(e) => actionsCtx.openMenu(e, featured)}>
-                <MediaThumb media={featured} sizes="100vw" />
+                <MediaThumb media={featured} sizes="100vw" colorPlaceholder />
                 <div className="overlay">
                   <div className="kicker">
                     <span className="pin">★ Последнее</span>

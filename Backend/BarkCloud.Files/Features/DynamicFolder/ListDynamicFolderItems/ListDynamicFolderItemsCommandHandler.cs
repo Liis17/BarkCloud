@@ -90,6 +90,7 @@ public class ListDynamicFolderItemsCommandHandler : IRequestHandler<ListDynamicF
 
         var fileIds = page.Select(f => f.Id).ToList();
         var previewsByFile = await _filesStorage.GetPreviewsForFiles(fileIds, cancellationToken);
+        var placeholders = await _filesStorage.GetPlaceholdersForFiles(fileIds, cancellationToken);
         var baseUrl = FileUrlHelper.GetPublicBaseUrl(_configuration, _runSettings);
 
         // Записи каталога владельца — нужны фронту для переименования/удаления/«показать в папке».
@@ -112,7 +113,7 @@ public class ListDynamicFolderItemsCommandHandler : IRequestHandler<ListDynamicF
                 continue;
 
             previewsByFile.TryGetValue(file.Id, out var previews);
-            var item = new UserImageItem { File = file.ToGrpc(baseUrl, previews) };
+            var item = new UserImageItem { File = file.ToGrpc(baseUrl, previews, placeholder: placeholders.GetValueOrDefault(file.Id)) };
             if (duplicateGroupByFileId is not null && duplicateGroupByFileId.TryGetValue(file.Id, out var groupKey))
                 item.DuplicateGroupKey = groupKey;
             if (entriesByFileId.TryGetValue(file.Id, out var meta))

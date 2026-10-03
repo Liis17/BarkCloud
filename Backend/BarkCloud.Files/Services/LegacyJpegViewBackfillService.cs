@@ -152,13 +152,15 @@ public class LegacyJpegViewBackfillService : BackgroundService
                 jpegView = await compressor.EncodeFullJpegAsync(src, 90, ct);
             }
 
-            var viewId = await previewPersistence.PersistJpegViewAsync(
+            var view = await previewPersistence.PersistJpegViewAsync(
                 file, jpegView, file.ImageWidth ?? 0, file.ImageHeight ?? 0, previewProfileId, ct);
+            await previewPersistence.EnsurePlaceholderAsync(file,
+                view.SavedBytes is not null ? new Dictionary<Guid, byte[]> { [view.FileId] = view.SavedBytes } : null, ct);
 
-            file.JpegViewFileId = viewId;
+            file.JpegViewFileId = view.FileId;
             await filesStorage.UpdateFile(file);
 
-            _logger.LogInformation("JpegView создан для легаси-файла {FileId} -> {ViewId}", file.Id, viewId);
+            _logger.LogInformation("JpegView создан для легаси-файла {FileId} -> {ViewId}", file.Id, view.FileId);
         }
         finally
         {

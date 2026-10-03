@@ -18,7 +18,8 @@ public static class UploadFileMapping
         this UploadFile file,
         string? publicBaseUrl = null,
         IReadOnlyList<FilePreview>? previews = null,
-        FileMetadata? videoMetadata = null)
+        FileMetadata? videoMetadata = null,
+        FilePlaceholder? placeholder = null)
     {
         var info = new UploadFileInfo
         {
@@ -39,6 +40,8 @@ public static class UploadFileMapping
         };
 
         info.Uploaders.AddRange(file.Uploaders);
+        if (placeholder is not null)
+            info.Placeholder = placeholder.ToGrpc();
 
         // TargetWidth == 0 — служебная связка JpegView (полноразмерный вид), не обычное превью.
         var realPreviews = previews?.Where(x => x.TargetWidth > 0).OrderBy(x => x.TargetWidth).ToList();
@@ -88,4 +91,10 @@ public static class UploadFileMapping
 
         return info;
     }
+
+    public static FilePlaceholderInfo ToGrpc(this FilePlaceholder placeholder) => new()
+    {
+        Colors = { placeholder.Colors },
+        AspectRatio = placeholder.AspectRatio
+    };
 }

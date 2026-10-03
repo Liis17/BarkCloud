@@ -3,6 +3,8 @@
 Parent: [[index]] · Module: [[modules/backend-files]] · Upload: [[modules/upload-2]] · Cloud: [[modules/backend-files-cloud]] · Proto: [[modules/shared-proto]] · Клиентский гайд: [[api/files-client-guide]]
 
 Файл: `Shared/BarkCloud.Proto/files_api.proto`
+
+Галереи, динамические папки, поиск и получение данных файлов возвращают `FilePlaceholderInfo` вместе с информацией о файле: `UploadFileInfo.placeholder=19`, `SearchHit.placeholder=15`; `colors` содержит 9 строк `#RRGGBB`, `aspect_ratio` — пропорции обработанной области. Подробности — [[modules/image-placeholders]].
 Namespace C#: `BarkCloud.Proto.Files`
 Package: `barkcloud.files`
 

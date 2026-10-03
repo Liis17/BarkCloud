@@ -106,7 +106,7 @@ export function MediaSearchResults({ q, albums, toast, reloadAlbums }: {
           <div className="photo-grid">
             {items.map((m, idx) => (
               <div key={m.id + idx} className="photo" onClick={() => setLightbox(idx)} onContextMenu={(e) => actionsCtx.openMenu(e, m)}>
-                <MediaThumb media={m} sizes={GRID_SIZES} />
+                <MediaThumb media={m} sizes={GRID_SIZES} colorPlaceholder />
                 {m.kind === 'video' && (
                   <div className="vbadge">
                     <Icon.play size={10} /> видео

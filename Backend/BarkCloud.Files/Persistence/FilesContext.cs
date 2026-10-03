@@ -31,6 +31,8 @@ public class FilesContext : DbContext
 
     public DbSet<FilePreview> FilePreviews { get; set; }
 
+    public DbSet<FilePlaceholder> FilePlaceholders { get; set; }
+
     public DbSet<Album> Albums { get; set; }
 
     public DbSet<AlbumItem> AlbumItems { get; set; }
@@ -149,6 +151,19 @@ public class FilesContext : DbContext
             // Обратный поиск «к какому оригиналу относится это превью» —
             // нужен при подчистке Uploaders/дедупликации.
             b.HasIndex(x => x.PreviewFileId);
+        });
+
+        modelBuilder.Entity<FilePlaceholder>(b =>
+        {
+            b.HasKey(x => x.FileId);
+            b.Property(x => x.Colors).IsRequired();
+            b.HasOne<UploadFile>().WithOne().HasForeignKey<FilePlaceholder>(x => x.FileId)
+                .OnDelete(DeleteBehavior.Cascade);
+            b.HasOne<FilePreview>().WithMany().HasForeignKey(x => x.SourceFilePreviewId)
+                .OnDelete(DeleteBehavior.Cascade);
+            b.ToTable("FilePlaceholders", table => table.HasCheckConstraint(
+                "CK_FilePlaceholders_ColorCount",
+                Database.IsNpgsql() ? "cardinality(\"Colors\") = 9" : "json_array_length(\"Colors\") = 9"));
         });
 
         modelBuilder.Entity<Album>(b =>

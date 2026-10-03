@@ -32,6 +32,18 @@ public class UploadedFilesStorage : IUploadedFilesStorage
         await _context.SaveChangesAsync();
     }
 
+    public async Task<Dictionary<Guid, FilePlaceholder>> GetPlaceholdersForFiles(
+        IEnumerable<Guid> fileIds, CancellationToken cancellationToken = default)
+    {
+        var ids = fileIds.Distinct().ToArray();
+        if (ids.Length == 0)
+            return [];
+
+        return await _context.FilePlaceholders.AsNoTracking()
+            .Where(x => ids.Contains(x.FileId))
+            .ToDictionaryAsync(x => x.FileId, cancellationToken);
+    }
+
     /// <summary>
     /// Adds a user to the uploaders list if not already present (атомарно, см. <see cref="FileOwnership"/>).
     /// </summary>

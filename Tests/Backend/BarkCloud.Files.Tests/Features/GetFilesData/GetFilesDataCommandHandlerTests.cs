@@ -36,6 +36,8 @@ public class GetFilesDataCommandHandlerTests
 
     private void SetupFiles(params UploadFileEntity[] files)
     {
+        _files.Setup(s => s.GetPlaceholdersForFiles(It.IsAny<IEnumerable<Guid>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<Guid, FilePlaceholder>());
         _files.Setup(s => s.GetFiles(It.IsAny<List<Guid>>())).ReturnsAsync(files.ToList());
         _files.Setup(s => s.GetPreviewsForFiles(It.IsAny<IEnumerable<Guid>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Dictionary<Guid, List<FilePreview>>());
@@ -59,12 +61,21 @@ public class GetFilesDataCommandHandlerTests
         SetupFiles(
             ReadyFile(first, UploadFileType.CloudFile, OwnerId),
             ReadyFile(second, UploadFileType.CloudFile, OwnerId, OtherUserId));
+        _files.Setup(s => s.GetPlaceholdersForFiles(It.IsAny<IEnumerable<Guid>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<Guid, FilePlaceholder>
+            {
+                [first] = new() { FileId = first, Colors = Enumerable.Repeat("#112233", 9).ToArray(), AspectRatio = 1 },
+                [second] = new() { FileId = second, Colors = Enumerable.Repeat("#445566", 9).ToArray(), AspectRatio = 1.5f }
+            });
 
         var response = await CreateSut().Handle(
             new GetFilesDataCommand { FileIds = new List<Guid> { first, second }, UserId = OwnerId }, default);
 
         response.FilesInfos.Should().HaveCount(2);
         response.FilesInfos.Select(f => f.Id).Should().BeEquivalentTo(new[] { first.ToString(), second.ToString() });
+        response.FilesInfos.Single(f => f.Id == first.ToString()).Placeholder.Colors.Should().Equal(Enumerable.Repeat("#112233", 9));
+        response.FilesInfos.Single(f => f.Id == second.ToString()).Placeholder.AspectRatio.Should().Be(1.5f);
+        _files.Verify(s => s.GetPlaceholdersForFiles(It.Is<IEnumerable<Guid>>(ids => ids.Count() == 2), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]

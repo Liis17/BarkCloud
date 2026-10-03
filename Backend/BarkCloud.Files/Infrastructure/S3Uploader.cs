@@ -79,7 +79,7 @@ public class S3Uploader
     public virtual Task<Stream> DownloadAsync(string storageProfileId, string key) =>
         DownloadAsync(storageProfileId, key, CancellationToken.None);
 
-    public async Task<Stream> DownloadAsync(
+    public virtual async Task<Stream> DownloadAsync(
         string storageProfileId,
         string key,
         CancellationToken cancellationToken)

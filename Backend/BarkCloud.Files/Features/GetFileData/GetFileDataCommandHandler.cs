@@ -62,10 +62,11 @@ public class GetFileDataCommandHandler : IRequestHandler<GetFileDataCommand, Get
         var baseUrl = FileUrlHelper.GetPublicBaseUrl(_configuration, _runSettings);
 
         var previews = await _uploadedFilesStorage.GetPreviewsForFile(file.Id, cancellationToken);
+        var placeholders = await _uploadedFilesStorage.GetPlaceholdersForFiles([file.Id], cancellationToken);
 
         return new GetFileDataResponse()
         {
-            FileInfo = file.ToGrpc(baseUrl, previews)
+            FileInfo = file.ToGrpc(baseUrl, previews, placeholder: placeholders.GetValueOrDefault(file.Id))
         };
     }
 }
