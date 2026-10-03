@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { UploadIndicator } from './UploadIndicator';
 import { UploadManagerProvider, useUploadActions, type AttachOptions } from '../../hooks/useUploadManager';
@@ -64,6 +64,28 @@ function renderUploads(files: File[], attachOptions: AttachOptions = {}) {
   );
 }
 
+function EnqueueBatches({ batches }: { batches: File[][] }) {
+  const { enqueue } = useUploadActions();
+  return <>{batches.map((files, index) => (
+    <button key={index} onClick={() => enqueue(files, {})}>Добавить партию {index + 1}</button>
+  ))}</>;
+}
+
+function renderBatches(batches: File[][], strict = false) {
+  const content = (
+    <UploadManagerProvider>
+      <EnqueueBatches batches={batches} />
+      <UploadIndicator />
+    </UploadManagerProvider>
+  );
+  return render(strict ? <React.StrictMode>{content}</React.StrictMode> : content);
+}
+
+function duplicateFiles(count: number, prefix = 'duplicate') {
+  return Array.from({ length: count }, (_, index) =>
+    new File(['file'], `${prefix}-${index}.txt`, { type: 'text/plain' }));
+}
+
 beforeEach(() => {
   hashFileMock.mockResolvedValue('a'.repeat(64));
   checkDuplicateMock.mockResolvedValue({ exists: false, locations: [] });
@@ -80,6 +102,133 @@ beforeEach(() => {
 afterEach(() => vi.clearAllMocks());
 
 describe('UploadIndicator', () => {
+  it.each([4, 7])('skips all %i duplicates after one batch decision', async (count) => {
+    checkDuplicateMock.mockResolvedValue({ exists: true, locations: [] });
+    renderBatches([duplicateFiles(count)]);
+    fireEvent.click(screen.getByText('Добавить партию 1'));
+    fireEvent.click(await screen.findByTitle(/Загрузка/));
+    await screen.findByRole('dialog');
+    await waitFor(() => expect(checkDuplicateMock).toHaveBeenCalledTimes(4));
+
+    fireEvent.click(screen.getByText('Пропустить все'));
+
+    await waitFor(() => expect(screen.getAllByText('Пропущен')).toHaveLength(count));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(checkDuplicateMock).toHaveBeenCalledTimes(count);
+    expect(createSessionMock).not.toHaveBeenCalled();
+    expect(uploadPartsMock).not.toHaveBeenCalled();
+  });
+
+  it('uploads all queued and subsequent duplicates after one batch decision', async () => {
+    checkDuplicateMock.mockResolvedValue({ exists: true, locations: [] });
+    renderBatches([duplicateFiles(7)]);
+    fireEvent.click(screen.getByText('Добавить партию 1'));
+    fireEvent.click(await screen.findByTitle(/Загрузка/));
+    await screen.findByRole('dialog');
+    await waitFor(() => expect(checkDuplicateMock).toHaveBeenCalledTimes(4));
+
+    fireEvent.click(screen.getByText('Загрузить все'));
+
+    await waitFor(() => expect(screen.getAllByText('Загружен')).toHaveLength(7));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(createSessionMock).toHaveBeenCalledTimes(7);
+    expect(uploadPartsMock).toHaveBeenCalledTimes(7);
+  });
+
+  it.each([false, true])('keeps single-file decisions separate (StrictMode: %s)', async (strict) => {
+    checkDuplicateMock.mockResolvedValue({ exists: true, locations: [] });
+    renderBatches([duplicateFiles(3)], strict);
+    fireEvent.click(screen.getByText('Добавить партию 1'));
+    fireEvent.click(await screen.findByTitle(/Загрузка/));
+    await screen.findByRole('dialog');
+    await waitFor(() => expect(checkDuplicateMock).toHaveBeenCalledTimes(3));
+
+    fireEvent.click(screen.getByText('Пропустить'));
+    await waitFor(() => expect(screen.getByRole('dialog').textContent).toContain('duplicate-1.txt'));
+    expect(screen.getAllByText('Пропущен')).toHaveLength(1);
+    fireEvent.click(screen.getByText('Загрузить ещё раз'));
+    await waitFor(() => expect(screen.getByRole('dialog').textContent).toContain('duplicate-2.txt'));
+    await screen.findByText('Загружен');
+    fireEvent.click(screen.getByText('Пропустить'));
+
+    await waitFor(() => expect(screen.getAllByText('Пропущен')).toHaveLength(2));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(uploadPartsMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('uploads new files in a batch whose duplicates were skipped', async () => {
+    hashFileMock.mockImplementation(async (file) => file.name === 'new.txt' ? 'b'.repeat(64) : 'a'.repeat(64));
+    checkDuplicateMock.mockImplementation(async (hash) => ({ exists: hash === 'a'.repeat(64), locations: [] }));
+    renderBatches([[...duplicateFiles(5), new File(['file'], 'new.txt', { type: 'text/plain' })]]);
+    fireEvent.click(screen.getByText('Добавить партию 1'));
+    fireEvent.click(await screen.findByTitle(/Загрузка/));
+    await screen.findByRole('dialog');
+    await waitFor(() => expect(checkDuplicateMock).toHaveBeenCalledTimes(4));
+
+    fireEvent.click(screen.getByText('Пропустить все'));
+
+    await waitFor(() => expect(screen.getAllByText('Пропущен')).toHaveLength(5));
+    await screen.findByText('Загружен');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(createSessionMock).toHaveBeenCalledTimes(1);
+    expect(createSessionMock).toHaveBeenCalledWith(expect.objectContaining({ fileName: 'new.txt' }));
+  });
+
+  it('preserves queued questions belonging to a different batch', async () => {
+    checkDuplicateMock.mockResolvedValue({ exists: true, locations: [] });
+    renderBatches([duplicateFiles(2, 'first'), duplicateFiles(2, 'second')]);
+    fireEvent.click(screen.getByText('Добавить партию 1'));
+    fireEvent.click(await screen.findByTitle(/Загрузка/));
+    await screen.findByRole('dialog');
+    await waitFor(() => expect(checkDuplicateMock).toHaveBeenCalledTimes(2));
+    fireEvent.click(screen.getByText('Добавить партию 2'));
+    await waitFor(() => expect(checkDuplicateMock).toHaveBeenCalledTimes(4));
+
+    fireEvent.click(screen.getByText('Пропустить все'));
+
+    await waitFor(() => expect(screen.getAllByText('Пропущен')).toHaveLength(2));
+    expect(screen.getByRole('dialog').textContent).toContain('second-0.txt');
+    expect(createSessionMock).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByText('Загрузить все'));
+    await waitFor(() => expect(screen.getAllByText('Загружен')).toHaveLength(2));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(uploadPartsMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('applies the batch decision to duplicate checks that finish later', async () => {
+    let finishCheck!: (result: { exists: boolean; locations: [] }) => void;
+    checkDuplicateMock.mockResolvedValueOnce({ exists: true, locations: [] });
+    checkDuplicateMock.mockImplementationOnce(() => new Promise((resolve) => { finishCheck = resolve; }));
+    renderBatches([duplicateFiles(2)]);
+    fireEvent.click(screen.getByText('Добавить партию 1'));
+    fireEvent.click(await screen.findByTitle(/Загрузка/));
+    await screen.findByRole('dialog');
+    await waitFor(() => expect(checkDuplicateMock).toHaveBeenCalledTimes(2));
+
+    fireEvent.click(screen.getByText('Пропустить все'));
+    await act(async () => finishCheck({ exists: true, locations: [] }));
+
+    await waitFor(() => expect(screen.getAllByText('Пропущен')).toHaveLength(2));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(createSessionMock).not.toHaveBeenCalled();
+  });
+
+  it('skips queued duplicates once in StrictMode', async () => {
+    checkDuplicateMock.mockResolvedValue({ exists: true, locations: [] });
+    renderBatches([duplicateFiles(7)], true);
+    fireEvent.click(screen.getByText('Добавить партию 1'));
+    fireEvent.click(await screen.findByTitle(/Загрузка/));
+    await screen.findByRole('dialog');
+    await waitFor(() => expect(checkDuplicateMock).toHaveBeenCalledTimes(4));
+
+    fireEvent.click(screen.getByText('Пропустить все'));
+
+    await waitFor(() => expect(screen.getAllByText('Пропущен')).toHaveLength(7));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(checkDuplicateMock).toHaveBeenCalledTimes(7);
+    expect(createSessionMock).not.toHaveBeenCalled();
+  });
+
   it('places active uploads before completed tasks', async () => {
     uploadPartsMock.mockImplementation(async (file, _session, onProgress) => {
       if (file.name === 'done.txt') {

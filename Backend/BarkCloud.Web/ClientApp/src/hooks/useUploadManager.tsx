@@ -79,6 +79,7 @@ export interface UploadSummary {
 }
 
 interface DupPromptReq {
+  batchId: string;
   fileName: string;
   locations: DuplicateLocation[];
   resolve: (d: DuplicateDecision) => void;
@@ -111,6 +112,7 @@ export function UploadManagerProvider({ children }: { children: React.ReactNode 
   const [rev, setRev] = React.useState(0);
   const [attachVersion, setAttachVersion] = React.useState(0);
   const [dupPrompt, setDupPrompt] = React.useState<DupPromptReq | null>(null);
+  const dupPromptRef = React.useRef<DupPromptReq | null>(null);
   const dupQueueRef = React.useRef<DupPromptReq[]>([]);
   const batchDecisionsRef = React.useRef<Map<string, DuplicateDecision>>(new Map());
   const tryStartMoreRef = React.useRef<() => void>(() => undefined);
@@ -125,32 +127,40 @@ export function UploadManagerProvider({ children }: { children: React.ReactNode 
   touchRef.current = touch;
 
   const showNextDup = React.useCallback(() => {
-    if (dupQueueRef.current.length > 0) setDupPrompt(dupQueueRef.current.shift()!);
+    if (dupPromptRef.current) return;
+    const next = dupQueueRef.current.shift() ?? null;
+    dupPromptRef.current = next;
+    setDupPrompt(next);
   }, []);
 
   const answerDuplicate = React.useCallback((decision: DuplicateDecision) => {
-    setDupPrompt((current) => {
-      current?.resolve(decision);
-      return null;
-    });
-  }, []);
-
-  React.useEffect(() => {
-    if (!dupPrompt) showNextDup();
-  }, [dupPrompt, showNextDup]);
+    const current = dupPromptRef.current;
+    if (!current) return;
+    dupPromptRef.current = null;
+    if (decision === 'skip-all' || decision === 'upload-all') {
+      batchDecisionsRef.current.set(current.batchId, decision);
+      const pending = dupQueueRef.current;
+      dupQueueRef.current = [];
+      for (const request of pending) {
+        if (request.batchId === current.batchId) request.resolve(decision);
+        else dupQueueRef.current.push(request);
+      }
+    }
+    current.resolve(decision);
+    showNextDup();
+  }, [showNextDup]);
 
   const askDuplicateRef = React.useRef(
-    (_fileName: string, _locations: DuplicateLocation[]): Promise<DuplicateDecision> => Promise.resolve('upload'),
+    (_batchId: string, _fileName: string, _locations: DuplicateLocation[]): Promise<DuplicateDecision> => Promise.resolve('upload'),
   );
-  askDuplicateRef.current = (fileName, locations) => new Promise((resolve) => {
-    const request: DupPromptReq = { fileName, locations, resolve };
-    setDupPrompt((current) => {
-      if (current) {
-        dupQueueRef.current.push(request);
-        return current;
-      }
-      return request;
-    });
+  askDuplicateRef.current = (batchId, fileName, locations) => new Promise((resolve) => {
+    const decision = batchDecisionsRef.current.get(batchId);
+    if (decision === 'skip-all' || decision === 'upload-all') {
+      resolve(decision);
+      return;
+    }
+    dupQueueRef.current.push({ batchId, fileName, locations, resolve });
+    showNextDup();
   });
 
   const attachTask = React.useCallback(async (
@@ -291,15 +301,7 @@ export function UploadManagerProvider({ children }: { children: React.ReactNode 
         touchRef.current(task);
         const duplicate = await checkDuplicateHash(task.sha256!);
         if (duplicate.exists) {
-          const batchDecision = batchDecisionsRef.current.get(task.batchId);
-          let decision: DuplicateDecision;
-          if (batchDecision === 'skip-all' || batchDecision === 'upload-all') {
-            decision = batchDecision;
-          } else {
-            decision = await askDuplicateRef.current(task.fileName, duplicate.locations);
-            if (decision === 'skip-all' || decision === 'upload-all')
-              batchDecisionsRef.current.set(task.batchId, decision);
-          }
+          const decision = await askDuplicateRef.current(task.batchId, task.fileName, duplicate.locations);
           if (decision === 'skip' || decision === 'skip-all') {
             task.status = 'skipped';
             task.progress = 1;
