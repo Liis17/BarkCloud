@@ -94,6 +94,7 @@ function FilesPanel({ torrent, onToast }: { torrent: Torrent; onToast: (m: strin
 
 function TorrentRow({ t, onToast, forceOpen = false }: { t: Torrent; onToast: (m: string, k?: 'ok' | 'err') => void; forceOpen?: boolean }) {
   const [open, setOpen] = React.useState(false);
+  const [removing, setRemoving] = React.useState(false);
   const paused = t.status === 'paused';
 
   React.useEffect(() => {
@@ -103,10 +104,9 @@ function TorrentRow({ t, onToast, forceOpen = false }: { t: Torrent; onToast: (m
   const act = (fn: Promise<unknown>, ok?: string) =>
     fn.then(() => ok && onToast(ok)).catch((e) => onToast((e as Error).message, 'err'));
 
-  const remove = () => {
-    const del = window.confirm('Удалить торрент? Нажмите OK — удалить и файлы с диска, Отмена — оставить запись.');
-    // OK → удалить с файлами; для «оставить файлы» пользователь выбирает второй диалог
-    if (del) act(T.removeTorrent(t.id, true), 'Торрент и файлы удалены');
+  const remove = (deleteFiles: boolean) => {
+    setRemoving(false);
+    act(T.removeTorrent(t.id, deleteFiles), deleteFiles ? 'Торрент и файлы удалены' : 'Торрент удалён, файлы оставлены');
   };
 
   return (
@@ -135,10 +135,20 @@ function TorrentRow({ t, onToast, forceOpen = false }: { t: Torrent; onToast: (m
           {paused
             ? <button className="icon-btn" title="Возобновить" onClick={() => act(T.resumeTorrent(t.id))}><Icon.play size={18} /></button>
             : <button className="icon-btn" title="Пауза" onClick={() => act(T.pauseTorrent(t.id))}><Icon.pause size={18} /></button>}
-          <button className="icon-btn" title="Удалить" onClick={remove}><Icon.trash size={18} /></button>
+          <button className="icon-btn" title="Удалить" onClick={() => setRemoving(true)}><Icon.trash size={18} /></button>
         </div>
       </div>
       {open && <FilesPanel torrent={t} onToast={onToast} />}
+      {removing && (
+        <Modal title="Удалить торрент?" onClose={() => setRemoving(false)}
+          actions={<>
+            <button className="btn text" onClick={() => setRemoving(false)}>Отмена</button>
+            <button className="btn outlined" onClick={() => remove(false)}>Оставить файлы</button>
+            <button className="btn danger" onClick={() => remove(true)}>Удалить с файлами</button>
+          </>}>
+          <div className="confirm-msg">«{t.name || t.infoHash}» будет удалён из списка. Скачанные файлы можно оставить на диске или удалить вместе с ним.</div>
+        </Modal>
+      )}
     </div>
   );
 }

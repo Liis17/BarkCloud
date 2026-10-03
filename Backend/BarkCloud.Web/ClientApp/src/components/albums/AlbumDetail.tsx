@@ -15,6 +15,7 @@ import { GRID_SIZES } from '../../lib/format';
 import { useDocumentHead } from '../../hooks/useDocumentHead';
 import { useMediaActions } from '../../hooks/useMediaActions';
 import { useSelection } from '../../hooks/useSelection';
+import { useConfirm } from '../../hooks/useDialog';
 import type { Album, CardFile, Page } from '../../lib/types';
 import type { ToastPush } from '../../hooks/useToast';
 
@@ -38,6 +39,7 @@ export function AlbumDetail({ album, candidates, albums, gridSizes = GRID_SIZES,
   const [picking, setPicking] = React.useState(false);
   const [props, setProps] = React.useState<CardFile | null>(null);
   const [shareWith, setShareWith] = React.useState<CardFile | null>(null);
+  const [confirmNode, confirm] = useConfirm();
   const [archiving, setArchiving] = React.useState(false);
   const { menu, openAt } = useContextMenu();
   const sel = useSelection();
@@ -100,7 +102,7 @@ export function AlbumDetail({ album, candidates, albums, gridSizes = GRID_SIZES,
     }
   }
   async function removeAlbum() {
-    if (!window.confirm('Удалить альбом? Файлы останутся в облаке.')) return;
+    if (!(await confirm({ title: 'Удалить альбом?', message: 'Файлы останутся в облаке.', confirmLabel: 'Удалить', danger: true }))) return;
     try {
       await apiPost('/api/albums/delete', { album: album.id });
       onChanged();
@@ -296,6 +298,7 @@ export function AlbumDetail({ album, candidates, albums, gridSizes = GRID_SIZES,
         <ShareWithUserModal fileId={shareWith.id} fileName={shareWith.name} onClose={() => setShareWith(null)} toast={toast} />
       )}
       {menu}
+      {confirmNode}
     </div>
   );
 }

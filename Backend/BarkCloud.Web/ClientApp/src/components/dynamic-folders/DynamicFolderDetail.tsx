@@ -8,6 +8,7 @@ import { ConfirmModal } from '../ui/ConfirmModal';
 import { DynamicFolderFormModal } from './DynamicFolderFormModal';
 import { useMediaActions } from '../../hooks/useMediaActions';
 import { useSelection } from '../../hooks/useSelection';
+import { useConfirm } from '../../hooks/useDialog';
 import { apiGet, apiPost, deleteEntriesBatch, deleteMediaBatch } from '../../lib/api';
 import { GRID_SIZES, kindRu, fmtFull, plural } from '../../lib/format';
 import { useDocumentHead } from '../../hooks/useDocumentHead';
@@ -29,6 +30,7 @@ export function DynamicFolderDetail({ folder, onBack, onChanged, toast, albums, 
   const [lightbox, setLightbox] = React.useState<number | null>(null);
   const [editing, setEditing] = React.useState(false);
   const [bulkConfirm, setBulkConfirm] = React.useState(false);
+  const [confirmNode, confirm] = useConfirm();
   const fsel = useSelection();
   const isDuplicateFolder = folder.id === 'sys-duplicate-media' || folder.id === 'sys-duplicate-files';
 
@@ -148,7 +150,7 @@ export function DynamicFolderDetail({ folder, onBack, onChanged, toast, albums, 
     }
   }
   async function removeFolder() {
-    if (!window.confirm('Удалить умную папку? Файлы останутся в облаке.')) return;
+    if (!(await confirm({ title: 'Удалить умную папку?', message: 'Файлы останутся в облаке.', confirmLabel: 'Удалить', danger: true }))) return;
     try {
       await apiPost('/api/dynamic-folders/delete', { folder: folder.id });
       onChanged();
@@ -310,6 +312,7 @@ export function DynamicFolderDetail({ folder, onBack, onChanged, toast, albums, 
       )}
       {lightbox !== null && <Lightbox items={media} index={lightbox} actions={actions.api} onClose={() => setLightbox(null)} />}
       {actions.overlay}
+      {confirmNode}
     </div>
   );
 }

@@ -134,7 +134,7 @@ export function ShareWithUserModal({
                 {u.username && <div style={{ fontSize: 12, color: 'var(--md-on-surface-variant)' }}>@{u.username}</div>}
               </div>
               {shared.has(u.id) ? (
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: 'var(--md-primary, #7aa2ff)' }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: 'var(--md-primary)' }}>
                   <Icon.check size={16} /> Выдан
                 </span>
               ) : (

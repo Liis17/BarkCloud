@@ -91,7 +91,7 @@ export function Sidebar({ profileError = false, storageError = false, statistics
           <div className={"bar" + (diskState === 'loading' ? " pending" : "")}>
             <div style={{ display: 'flex', height: '100%', width: '100%' }}>
               <div style={{ width: (diskAvailable ? storage!.otherPct : 0) + '%', background: 'var(--md-on-surface-variant)' }} />
-              <div style={{ width: (diskAvailable ? storage!.s3Pct : 0) + '%', background: '#9A4F1E' }} />
+              <div style={{ width: (diskAvailable ? storage!.s3Pct : 0) + '%', background: 'var(--md-primary)' }} />
             </div>
           </div>
           {diskAvailable && <div className="sb-storage-foot"><span>{storage!.percent}% использовано</span></div>}
@@ -113,7 +113,7 @@ export function Sidebar({ profileError = false, storageError = false, statistics
             <div className="bar-fill" style={{
               width: (!storage?.allS3StatsAvailable ? 0 : storage.allS3HasFiniteQuota
                 ? storage.allS3Percent : 100) + '%',
-              background: '#9A4F1E',
+              background: 'var(--md-primary)',
             }} />
           </div>
           {storage?.allS3StatsAvailable && <div className="sb-storage-foot">

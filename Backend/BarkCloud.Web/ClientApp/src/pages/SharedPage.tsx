@@ -4,6 +4,7 @@ import { Icon } from '../components/Icon';
 import { EmptyState, Loading } from '../components/ui/EmptyState';
 import { SharedFolderModal } from '../components/ui/SharedFolderModal';
 import { useToast } from '../hooks/useToast';
+import { useConfirm } from '../hooks/useDialog';
 import { usePageHeader } from '../hooks/usePageHeader';
 import { apiGet, apiPost } from '../lib/api';
 import { plural } from '../lib/format';
@@ -309,6 +310,7 @@ export function SharedPage() {
   const [sharedCursor, setSharedCursor] = React.useState<Cursor>(null);
   const [moreBusy, setMoreBusy] = React.useState(false);
   const [toastNode, toast] = useToast();
+  const [confirmNode, confirm] = useConfirm();
 
   const loadPublic = React.useCallback(() => {
     setLinks(null);
@@ -464,7 +466,7 @@ export function SharedPage() {
     const isMusicPlaylist = link.kind === 'musicPlaylist';
     const what = isFolder ? 'папку' : isAlbum ? 'альбом' : isMusicPlaylist ? 'плейлист' : 'файл';
     const extra = isFolder ? ' Публичные ссылки на файлы внутри тоже будут сняты.' : '';
-    if (!window.confirm(`Отозвать ссылку на «${link.name || what}»? Ссылка перестанет работать.${extra}`)) return;
+    if (!(await confirm({ title: 'Отозвать ссылку?', message: `Ссылка на «${link.name || what}» перестанет работать.${extra}`, confirmLabel: 'Отозвать', danger: true }))) return;
     try {
       if (isFolder) await apiPost('/api/folder-shares/revoke', { folderShareId: link.id });
       else if (isAlbum) await apiPost('/api/album-shares/revoke', { albumShareId: link.id });
@@ -477,7 +479,7 @@ export function SharedPage() {
     }
   }
   async function revokeGrant(grantId: string, file: SharedFile, user: SharedOwner) {
-    if (!window.confirm(`Отозвать доступ ${ownerName(user)} к «${file.name}»?`)) return;
+    if (!(await confirm({ title: 'Отозвать доступ?', message: `${ownerName(user)} потеряет доступ к «${file.name}».`, confirmLabel: 'Отозвать', danger: true }))) return;
     try {
       await apiPost('/api/shared/revoke-grant', { grantId });
       setIShared((prev) => (prev ? prev.filter((it) => it.grantId !== grantId) : prev));
@@ -487,7 +489,7 @@ export function SharedPage() {
     }
   }
   async function revokeFolderGrant(grantId: string, name: string, user: SharedOwner) {
-    if (!window.confirm(`Отозвать доступ ${ownerName(user)} к папке «${name}»?`)) return;
+    if (!(await confirm({ title: 'Отозвать доступ?', message: `${ownerName(user)} потеряет доступ к папке «${name}».`, confirmLabel: 'Отозвать', danger: true }))) return;
     try {
       await apiPost('/api/shared/revoke-folder-grant', { grantId });
       setISharedFolders((prev) => (prev ? prev.filter((it) => it.grantId !== grantId) : prev));
@@ -525,6 +527,7 @@ export function SharedPage() {
   return (
     <>
       {toastNode}
+      {confirmNode}
 
       <div className="sh-tabs">
         <button className={'sh-tab' + (tab === 'public' ? ' on' : '')} onClick={() => setTab('public')}>
