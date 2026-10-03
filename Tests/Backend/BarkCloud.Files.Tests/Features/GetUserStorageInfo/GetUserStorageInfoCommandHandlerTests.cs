@@ -27,6 +27,29 @@ public class GetUserStorageInfoCommandHandlerTests
         NullLogger<GetUserStorageInfoCommandHandler>.Instance);
 
     [Fact]
+    public async Task Handle_NonBlockingRequestUsesSnapshotsAndIncludesSeparateStates()
+    {
+        var updatedAt = DateTimeOffset.UtcNow.AddMinutes(-6);
+        _storageStats.Setup(provider => provider.GetSnapshotAsync(default)).ReturnsAsync(
+            new PhysicalStorageStats(2_000, 800, 700, 500) { State = "refreshing", UpdatedAt = updatedAt });
+        _s3StorageStats.Setup(provider => provider.GetSnapshotAsync(default)).ReturnsAsync(
+            S3StorageStats.Unavailable with { State = "loading" });
+        _quota.Setup(provider => provider.GetSnapshotAsync(42, false, default))
+            .ReturnsAsync(new StorageQuotaSnapshot(null, 0, 0));
+        _files.Setup(storage => storage.GetUserStorageByType(42)).ReturnsAsync(new Dictionary<UploadFileType, long>());
+
+        var response = await CreateSut().Handle(new GetUserStorageInfoCommand { NonBlockingStats = true }, default);
+
+        response.PhysicalStatsState.Should().Be("refreshing");
+        response.PhysicalStatsUpdatedAt.ToDateTimeOffset().Should().Be(updatedAt);
+        response.AllS3StatsState.Should().Be("loading");
+        response.AllS3StatsUpdatedAt.Should().BeNull();
+        response.DiskUsedStorage.Should().Be(700);
+        _storageStats.Verify(provider => provider.GetStatsAsync(It.IsAny<CancellationToken>()), Times.Never);
+        _s3StorageStats.Verify(provider => provider.GetStatsAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
     public async Task Handle_ReturnsLimitConvertedFromGbToBytes()
     {
         _quota.Setup(x => x.GetSnapshotAsync(42, false, default))

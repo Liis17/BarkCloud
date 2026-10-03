@@ -52,6 +52,8 @@ Typed validation ограничивает TCP-порты диапазоном `1
 
 ## S3-профили
 
+Web-редактор использует список ролей и отдельную форму, сохраняет пустые credentials и неизменённую квоту, проверяет черновик без записи и показывает подтверждение изменений без ключей. См. [[modules/web-settings]].
+
 Роли: `universal`, `avatars`, `images`, `videos`, `audio`, `documents`, `other`, `previews`, а также compatibility-роли `user-avatars-old` и `cloud-files-old`.
 
 - Смена endpoint, bucket или `IsR2` активного обычного профиля создаёт следующую версию и деактивирует старую.

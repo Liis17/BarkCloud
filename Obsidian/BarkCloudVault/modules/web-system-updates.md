@@ -111,6 +111,7 @@ Cache-Control `no-store`, непрозрачный operation ID и query-пар�
 - `/updating`, `/restarting`, `/maintenance-wait.js` — страницы и скрипт ожидания;
 - `POST /api/system/unlock`, `POST /api/system/lock`, `GET /api/system/services` (статус,
   канал, current/latest SemVer, updateAvailable, versionState/versionError);
+- `GET /api/system/services?includeVersions=false` — быстрый снимок Docker и канала Compose без digest-inspect и запросов версий в реестр; по умолчанию полный ответ сохранён;
 - `GET /api/system/branches`, `POST /api/system/services/{svc}/branch` с `{ branch }`;
 - `POST /api/system/services/{svc}/{update|restart|start|stop}` — ставит одну операцию в очередь;
 - `POST /api/system/update-available`, `POST /api/system/update-all`,
@@ -131,9 +132,9 @@ Docker может не сохранять `RepoDigests`, а `.Image` тогда 
 
 ## UI
 
-`ClientApp/src/pages/SettingsPage.tsx` (`SystemSection`) показывает адаптивную таблицу/карточки:
-статус, канал, текущую и последнюю SemVer, badge доступного обновления, действия и раскрываемую
-техническую ошибку. Кнопки — «Обновить доступные (N)», «Обновить все», «Перезапустить все» и
+`ClientApp/src/pages/SettingsPage.tsx` (`SystemSection`) сначала загружает быстрые статусы, затем догружает версии полным запросом; каналы загружаются независимо через `/branches` (также без digest-inspect). Ответ версий обновляет только version-поля, сохраняя снимок Docker; ошибка реестра показывается отдельно. Запросы отменяются при уходе из раздела.
+
+Компактная таблица содержит сервис, статус, канал, текущую и доступную версию, действия; при рабочей ширине меньше 700 px строки становятся карточками. Массовые действия собраны в общей панели; start/stop находятся в меню сервиса, диагностика раскрывается по запросу. Поиск и адаптивная компоновка общих настроек — [[modules/web-settings]]. Кнопки — «Обновить доступные (N)», «Обновить все», «Перезапустить все» и
 «Обновить статус». Модалка прогресса опрашивает серверную задачу каждые 2 секунды, показывает
 skipped-шаги, команду/stderr и rollback, а при `requiresReconnect` переводит на `/updating` или
 `/restarting`.

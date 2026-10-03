@@ -71,6 +71,15 @@ public static class SettingsEndpoints
         });
 
 
+        api.MapGet("/context", (HttpContext http, AuthGateway auth, PageDataBuilder data) =>
+            Do(http, auth, (_, _) => Task.FromResult(Results.Ok(data.BuildSettingsContext(http)))));
+        api.MapGet("/profile", (HttpContext http, AuthGateway auth, PageDataBuilder data) =>
+            Do(http, auth, async (user, _) => Results.Ok(await data.BuildProfileAsync(user, http.RequestAborted))));
+        api.MapGet("/storage", (HttpContext http, AuthGateway auth, PageDataBuilder data) =>
+            Do(http, auth, async (user, _) => Results.Ok(await data.BuildSettingsStorageAsync(user, http.RequestAborted))));
+        api.MapGet("/system", (HttpContext http, AuthGateway auth, PageDataBuilder data) =>
+            Do(http, auth, async (_, _) => Results.Ok(await data.BuildSystemAsync(http.RequestAborted))));
+
         api.MapPost("/system/registration", (HttpContext http, AuthGateway auth, AdminGate admin, FeatureConfigurationGateway features, RegistrationBody body) =>
             Do(http, auth, async (user, _) =>
             {

@@ -39,8 +39,15 @@ public class GetUserStorageInfoCommandHandler : IRequestHandler<GetUserStorageIn
             _userContext.UserId
         );
 
-        var storageStats = await _storageStatsProvider.GetStatsAsync(cancellationToken);
-        var allS3Stats = await _s3StorageStatsProvider.GetStatsAsync(cancellationToken);
+        var storageTask = request.NonBlockingStats
+            ? _storageStatsProvider.GetSnapshotAsync(cancellationToken)
+            : _storageStatsProvider.GetStatsAsync(cancellationToken);
+        var s3Task = request.NonBlockingStats
+            ? _s3StorageStatsProvider.GetSnapshotAsync(cancellationToken)
+            : _s3StorageStatsProvider.GetStatsAsync(cancellationToken);
+        await Task.WhenAll(storageTask, s3Task);
+        var storageStats = await storageTask;
+        var allS3Stats = await s3Task;
         var quota = await _quota.GetSnapshotAsync(
             _userContext.UserId, acquireTransactionLock: false, cancellationToken);
 
@@ -58,7 +65,13 @@ public class GetUserStorageInfoCommandHandler : IRequestHandler<GetUserStorageIn
             AllS3UsedStorage = allS3Stats.UsedBytes,
             AllS3QuotaStorage = allS3Stats.QuotaBytes,
             AllS3HasFiniteQuota = allS3Stats.HasFiniteQuota,
-            AllS3StatsAvailable = allS3Stats.IsAvailable
+            AllS3StatsAvailable = allS3Stats.IsAvailable,
+            PhysicalStatsState = storageStats.State,
+            PhysicalStatsUpdatedAt = storageStats.UpdatedAt is { } physicalAt
+                ? Google.Protobuf.WellKnownTypes.Timestamp.FromDateTimeOffset(physicalAt) : null,
+            AllS3StatsState = allS3Stats.State,
+            AllS3StatsUpdatedAt = allS3Stats.UpdatedAt is { } s3At
+                ? Google.Protobuf.WellKnownTypes.Timestamp.FromDateTimeOffset(s3At) : null
         };
 
         // Добавляем информацию по типам файлов

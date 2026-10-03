@@ -9,35 +9,22 @@ import { UploadManagerProvider } from '../../hooks/useUploadManager';
 import { AudioPlayerProvider } from '../../hooks/useAudioPlayer';
 import { useDocumentHead } from '../../hooks/useDocumentHead';
 import { MiniPlayer } from '../music/MiniPlayer';
-import { apiGet } from '../../lib/api';
-import type { Shell } from '../../lib/types';
+import { useApiResource } from '../../hooks/useApiResource';
+import { storagePending } from '../ui/StorageStatsStatus';
+import type { Shell, SidebarStorage } from '../../lib/types';
 
 /** Каркас приложения: layout-route. Грузит /api/me один раз, держит Sidebar/Topbar/Footbar
  *  смонтированными, меняется только <Outlet/> при переходах между вкладками. */
 export function AppShell() {
-  const [shell, setShell] = React.useState<Shell | null>(null);
+  const profile = useApiResource<Shell>('/api/me?includeStorage=false');
+  const storage = useApiResource<SidebarStorage>('/api/storage', true, storagePending);
+  const shell = React.useMemo(() => profile.data ? { ...profile.data, storage: storage.data } : null, [profile.data, storage.data]);
   const [header, setHeader] = React.useState<PageHeader>({ title: '' });
   const { pathname } = useLocation();
-  const firstPath = React.useRef(true);
-
+  const previousPath = React.useRef(pathname);
   React.useEffect(() => {
-    // 401 внутри apiGet сам редиректит на /login.
-    apiGet<Shell>('/api/me')
-      .then(setShell)
-      .catch(() => {});
-  }, []);
-
-  // Блок хранилища обновляется при каждом переключении вкладки (pathname, без ?q=);
-  // первое срабатывание пропускаем — storage только что пришёл из /api/me.
-  React.useEffect(() => {
-    if (firstPath.current) {
-      firstPath.current = false;
-      return;
-    }
-    apiGet<Shell['storage']>('/api/storage')
-      .then((storage) => setShell((prev) => (prev ? { ...prev, storage } : prev)))
-      .catch(() => {});
-  }, [pathname]);
+    if (previousPath.current !== pathname) { previousPath.current = pathname; void storage.reload(); }
+  }, [pathname, storage.reload]);
 
   const headerCtx = React.useMemo(() => ({ header, setHeader }), [header]);
   const documentTitle = header.documentTitle ?? (typeof header.title === 'string' ? header.title : '');
@@ -53,8 +40,8 @@ export function AppShell() {
       <UploadManagerProvider>
         <AudioPlayerProvider>
           <PageHeaderContext.Provider value={headerCtx}>
-            <div className="app">
-              <Sidebar />
+            <div className={'app' + (header.contentClass === 'settings-content' ? ' app-settings' : '')}>
+              <Sidebar statistics={storage.data} profileError={!!profile.error} storageError={!!storage.error} />
               <div className="main">
                 <Topbar {...header} />
                 <div className={'content' + (header.contentClass ? ' ' + header.contentClass : '')}>

@@ -268,13 +268,18 @@ export interface SharedMusicPlaylist {
 
 // ───────────────────────── Каркас (GET /api/me) ─────────────────────────
 
+export type StatsState = 'loading' | 'ready' | 'refreshing' | 'error' | 'not_configured';
+export interface SidebarStorage {
+  usedLabel: string; totalLabel: string; percent: number; otherPct: number; s3Pct: number;
+  allS3UsedLabel: string; allS3QuotaLabel: string; allS3Percent: number;
+  allS3HasFiniteQuota: boolean; allS3StatsAvailable: boolean;
+  state?: StatsState; updatedAt?: string | null;
+  allS3State?: StatsState; allS3UpdatedAt?: string | null;
+}
+
 export interface Shell {
   user: { initials: string; displayName: string; role: string; avatarUrl: string };
-  storage: {
-    usedLabel: string; totalLabel: string; percent: number; otherPct: number; s3Pct: number;
-    allS3UsedLabel: string; allS3QuotaLabel: string; allS3Percent: number;
-    allS3HasFiniteQuota: boolean; allS3StatsAvailable: boolean;
-  };
+  storage: SidebarStorage | null;
   app: { version: string; edition: string };
   server: { host: string };
   sync: { status: string; lastAt: string };
@@ -330,7 +335,10 @@ export interface SettingsState {
     autoUpload: boolean;
     devicesCount: string;
     trashLabel: string;
+    s3?: SidebarStorage | null;
     disk: {
+      state?: StatsState;
+      updatedAt?: string | null;
       totalLabel: string;
       usedLabel: string;
       otherLabel: string;
