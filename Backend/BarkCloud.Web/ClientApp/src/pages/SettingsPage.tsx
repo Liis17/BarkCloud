@@ -9,6 +9,7 @@ import { maintenanceWaitPath } from '../lib/maintenance';
 import { applyTheme, getTheme, type Theme } from '../lib/theme';
 import { webauthnRegister, webauthnSupported } from '../lib/webauthn';
 import { useConfirm, usePrompt } from '../hooks/useDialog';
+import { Switch as Toggle } from '../components/ui/Switch';
 import type { Privacy, Session, SettingsState } from '../lib/types';
 
 const ServerSettingsTab = React.lazy(() => import('./ServerSettingsTab'));
@@ -73,11 +74,6 @@ const SVC_LABELS: Record<string, string> = {
   torrent: 'Torrent',
   web: 'Веб-клиент',
 };
-
-function Toggle({ on, onChange, disabled, label }: { on: boolean; onChange: (v: boolean) => void; disabled?: boolean; label?: string }) {
-  return <button type="button" role="switch" aria-checked={on} aria-label={label || 'Переключить настройку'}
-    className={'toggle' + (on ? ' on' : '')} disabled={disabled} onClick={() => onChange(!on)} />;
-}
 
 function Field({ label, help, children, end }: { label: React.ReactNode; help?: React.ReactNode; children?: React.ReactNode; end?: React.ReactNode }) {
   const action = React.isValidElement<{ label?: string }>(end) && end.type === Toggle && typeof label === 'string'

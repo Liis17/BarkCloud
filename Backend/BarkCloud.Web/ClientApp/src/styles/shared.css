@@ -440,6 +440,50 @@ img.avatar { object-fit: cover; }
 }
 .icon-btn:hover { background: color-mix(in srgb, var(--md-on-surface) 8%, transparent); color: var(--md-on-surface); }
 .icon-btn:active { background: color-mix(in srgb, var(--md-on-surface) 12%, transparent); }
+/* M3 Filled icon button */
+.icon-btn.primary { background: var(--md-primary); color: var(--md-on-primary); }
+.icon-btn.primary:hover { background: color-mix(in srgb, var(--md-on-primary) 8%, var(--md-primary)); color: var(--md-on-primary); }
+.icon-btn.primary:active { background: color-mix(in srgb, var(--md-on-primary) 12%, var(--md-primary)); }
+.icon-btn:focus-visible { outline: 2px solid var(--md-primary); outline-offset: 2px; }
+
+/* ── M3 Expressive Slider (components/ui/Slider.tsx) ──────────────
+   Дорожка 16px, ручка — вертикальная планка 4×32 с зазором 6px.
+   --f: доля значения 0..1; центр ручки = 2px + (100% - 4px) * f. */
+.m3-slider {
+  --track: 16px; --thumb-w: 4px; --thumb-h: 32px; --gap: 6px;
+  --active: var(--md-primary); --inactive: var(--md-secondary-container);
+  --c: calc(var(--thumb-w) / 2 + (100% - var(--thumb-w)) * var(--f, 0));
+  -webkit-appearance: none; appearance: none;
+  width: 100%; min-width: 0; height: var(--thumb-h);
+  margin: 0; background: transparent; cursor: pointer;
+}
+.m3-slider::-webkit-slider-runnable-track {
+  height: var(--track); border-radius: var(--r-full);
+  background: linear-gradient(90deg,
+    var(--active) 0 calc(var(--c) - var(--thumb-w) / 2 - var(--gap)),
+    transparent 0 calc(var(--c) + var(--thumb-w) / 2 + var(--gap)),
+    var(--inactive) 0);
+}
+.m3-slider::-moz-range-track {
+  height: var(--track); border-radius: var(--r-full);
+  background: linear-gradient(90deg,
+    var(--active) 0 calc(var(--c) - var(--thumb-w) / 2 - var(--gap)),
+    transparent 0 calc(var(--c) + var(--thumb-w) / 2 + var(--gap)),
+    var(--inactive) 0);
+}
+.m3-slider::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: var(--thumb-w); height: var(--thumb-h);
+  margin-top: calc((var(--track) - var(--thumb-h)) / 2);
+  border: none; border-radius: var(--r-full); background: var(--active);
+}
+.m3-slider::-moz-range-thumb {
+  width: var(--thumb-w); height: var(--thumb-h);
+  border: none; border-radius: var(--r-full); background: var(--active);
+}
+.m3-slider:focus-visible { outline: none; }
+.m3-slider:focus-visible::-webkit-slider-thumb { outline: 2px solid var(--md-primary); outline-offset: 2px; }
+.m3-slider:focus-visible::-moz-range-thumb { outline: 2px solid var(--md-primary); outline-offset: 2px; }
 .icon-btn .dot-badge {
   position: absolute; top: 9px; right: 10px;
   width: 8px; height: 8px;
