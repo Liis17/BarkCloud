@@ -1598,15 +1598,30 @@ details[open] > .server-group-summary::before, .server-config-section[open] > su
   max-height: min(72vh, 720px);
   object-fit: contain;
 }
-.public-stage-media.is-video {
-  background-color: #1b1511;
-  background-image: radial-gradient(rgba(255,255,255,.08) 1px, transparent 1.6px);
-  background-size: 18px 18px;
+.public-stage-media.is-video { background: none; }
+/* Плеер не уже 560px и не подстраивается под ширину кадра: кадр по центру без подложки,
+   панель управления лежит поверх на всю ширину плеера (у вертикального видео выходит за края кадра). */
+.public-stage-media .video-player,
+.public-viewer-media .video-player {
+  justify-content: center;
+  min-width: min(100%, 560px);
+  overflow: visible;
+  background: none;
+  border-radius: 0;
 }
-.public-stage-media .video-player { border-radius: 24px; }
-.public-stage-media video { width: auto; max-width: 100%; max-height: min(72vh, 720px); }
-.public-stage-media .video-player-bar { padding: 0 16px 16px; background: none; }
-.public-stage-media .video-player-bar .media-controls {
+/* В оверлее контейнер сам подгоняется по содержимому — процент не резолвится, берём ширину окна */
+.public-viewer-media .video-player { min-width: min(560px, calc(100vw - 48px)); }
+.public-stage-media video { width: auto; max-width: 100%; max-height: min(72vh, 720px); border-radius: 24px; }
+.public-stage-media .video-player:fullscreen,
+.public-viewer-media .video-player:fullscreen { background: #000; }
+.public-stage-media .video-player:fullscreen video,
+.public-viewer-media .video-player:fullscreen video { width: 100%; height: 100%; max-width: none; max-height: none; border-radius: 0; }
+.public-stage-media .video-player:fullscreen .video-player-bar .media-controls,
+.public-viewer-media .video-player:fullscreen .video-player-bar .media-controls { max-width: 960px; margin-inline: auto; }
+.public-stage-media .video-player-bar,
+.public-viewer-media .video-player-bar { padding: 0 16px 16px; background: none; }
+.public-stage-media .video-player-bar .media-controls,
+.public-viewer-media .video-player-bar .media-controls {
   padding: 6px 10px;
   border-radius: 999px;
   background: rgba(20,14,10,.72);
@@ -2049,7 +2064,6 @@ details[open] > .server-group-summary::before, .server-config-section[open] > su
   border-radius: 20px;
   object-fit: contain;
 }
-.public-viewer-media .video-player { border-radius: 20px; }
 .public-viewer-actions {
   align-self: center;
   display: flex;
