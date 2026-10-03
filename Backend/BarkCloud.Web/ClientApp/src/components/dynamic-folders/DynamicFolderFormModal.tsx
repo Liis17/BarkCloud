@@ -4,6 +4,7 @@ import { Icon } from '../Icon';
 import { apiPost } from '../../lib/api';
 import type { DynamicFolder, DynamicFolderRule } from '../../lib/types';
 import type { ToastPush } from '../../hooks/useToast';
+import { Select } from '../ui/Select';
 
 // Коды совпадают с proto DfField / DfOperator / DfCombinator.
 type Op = { v: number; label: string };
@@ -154,20 +155,8 @@ export function DynamicFolderFormModal({ folder, onClose, onSaved, toast }: Prop
           const def = fieldDef(r.field);
           return (
             <div className="df-rule" key={i}>
-              <select value={r.field} onChange={(e) => changeField(i, Number(e.target.value))}>
-                {FIELDS.map((f) => (
-                  <option key={f.v} value={f.v}>
-                    {f.label}
-                  </option>
-                ))}
-              </select>
-              <select value={r.op} onChange={(e) => changeOp(i, Number(e.target.value))}>
-                {def.ops.map((o) => (
-                  <option key={o.v} value={o.v}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
+              <Select aria-label="Поле" value={r.field} options={FIELDS.map((f) => ({ value: f.v, label: f.label }))} onChange={(v) => changeField(i, v)} />
+              <Select aria-label="Условие" value={r.op} options={def.ops.map((o) => ({ value: o.v, label: o.label }))} onChange={(v) => changeOp(i, v)} />
               <RuleValue def={def} rule={r} onChange={(v) => setRule(i, { value: v })} />
               <button className="icon-btn" title="Удалить условие" onClick={() => removeRule(i)} disabled={rules.length === 1}>
                 <Icon.x size={16} />
@@ -196,13 +185,7 @@ export function DynamicFolderFormModal({ folder, onClose, onSaved, toast }: Prop
 function RuleValue({ def, rule, onChange }: { def: FieldDef; rule: DynamicFolderRule; onChange: (v: string) => void }) {
   if (def.kind === 'mediakind')
     return (
-      <select value={rule.value || '1'} onChange={(e) => onChange(e.target.value)}>
-        {MEDIA_KINDS.map((k) => (
-          <option key={k.v} value={k.v}>
-            {k.label}
-          </option>
-        ))}
-      </select>
+      <Select aria-label="Формат" value={rule.value || '1'} options={MEDIA_KINDS.map((k) => ({ value: k.v, label: k.label }))} onChange={onChange} />
     );
 
   if (def.kind === 'date') {

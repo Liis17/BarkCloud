@@ -10,6 +10,7 @@ import { applyTheme, getTheme, type Theme } from '../lib/theme';
 import { webauthnRegister, webauthnSupported } from '../lib/webauthn';
 import { useConfirm, usePrompt } from '../hooks/useDialog';
 import { Switch as Toggle } from '../components/ui/Switch';
+import { Select } from '../components/ui/Select';
 import type { Privacy, Session, SettingsState } from '../lib/types';
 
 const ServerSettingsTab = React.lazy(() => import('./ServerSettingsTab'));
@@ -735,14 +736,13 @@ function SystemSection({ admin, system, onUnlockedChange, active }: {
                 <div role="cell" className="svc-cell svc-channel" data-label="Канал">
                   {branch ? (
                     <>
-                      <select
+                      <Select
                         value={selectedBranch}
                         disabled={actionDisabled}
-                        onChange={(event) => { if (event.target.value !== selectedBranch) void changeBranch(service.service, event.target.value); }}
+                        options={branch.branches.map((item) => ({ value: item, label: item }))}
+                        onChange={(v) => void changeBranch(service.service, v)}
                         aria-label={`Канал ${SVC_LABELS[service.service] || service.service}`}
-                      >
-                        {branch.branches.map((item) => <option key={item} value={item}>{item}</option>)}
-                      </select>
+                      />
                       {branch.runningBranch && branch.runningBranch !== branch.branch && (
                         <small className="svc-channel-drift">запущен: {branch.runningBranch}</small>
                       )}
@@ -1418,6 +1418,7 @@ const VIS_OPTS = [
   { v: 1, l: 'Контактам' },
   { v: 2, l: 'Никому' },
 ];
+const VIS_LABELS = { profileVisibility: 'Видимость профиля', emailVisibility: 'Видимость email', lastSeenVisibility: 'Видимость «был в сети»' };
 
 function PrivacyTab({ privacy, flash }: { privacy: Privacy; flash: Flash }) {
   const [p, setP] = React.useState<Privacy>(privacy);
@@ -1438,13 +1439,7 @@ function PrivacyTab({ privacy, flash }: { privacy: Privacy; flash: Flash }) {
   }
 
   const sel = (k: 'profileVisibility' | 'emailVisibility' | 'lastSeenVisibility') => (
-    <select value={p[k]} onChange={(e) => set(k, parseInt(e.target.value, 10))}>
-      {VIS_OPTS.map((o) => (
-        <option key={o.v} value={o.v}>
-          {o.l}
-        </option>
-      ))}
-    </select>
+    <Select value={p[k]} options={VIS_OPTS.map((o) => ({ value: o.v, label: o.l }))} onChange={(v) => set(k, v)} aria-label={VIS_LABELS[k]} />
   );
 
   return (
@@ -1801,10 +1796,8 @@ export function SettingsPage() {
               <button key={`${key}:${label}`} onClick={() => { go(key); setTarget(label); setSearch(''); }}><strong>{label}</strong><small>{SECTIONS.find((item) => item.key === key)?.label} · {help}</small></button>)}
           </div>}
         </div>
-        <label className="settings-mobile-nav">Раздел<select aria-label="Раздел настроек" value={active} onChange={(event) => go(event.target.value)}>
-          {!nav.some((item) => item.key === active) && <option value={active}>{activeLabel}</option>}
-          {nav.map((item) => <option key={item.key} value={item.key}>{item.label}</option>)}
-        </select></label>
+        <div className="settings-mobile-nav">Раздел<Select aria-label="Раздел настроек" value={active} onChange={go}
+          options={[...(nav.some((item) => item.key === active) ? [] : [{ value: active, label: activeLabel }]), ...nav.map((item) => ({ value: item.key, label: item.label }))]} /></div>
         <nav className="settings-desktop-nav" aria-label="Разделы настроек">{nav.map((item) => {
           const Ic = Icon[item.icon];
           return <button key={item.key} className={active === item.key ? 'on' : ''} aria-current={active === item.key ? 'page' : undefined} onClick={() => go(item.key)}><Ic size={20} />{item.label}</button>;
