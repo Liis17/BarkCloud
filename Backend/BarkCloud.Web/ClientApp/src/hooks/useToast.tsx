@@ -1,4 +1,5 @@
 import React from 'react';
+import { Icon } from '../components/Icon';
 
 export type ToastKind = 'ok' | 'err';
 export type ToastPush = (msg: string, kind?: ToastKind) => void;
@@ -20,8 +21,9 @@ export function useToast(): [React.ReactElement, ToastPush] {
   const node = (
     <div className="toast-stack">
       {toasts.map((t) => (
-        <div key={t.id} className={'toast ' + t.kind}>
-          {t.msg}
+        <div key={t.id} className={'toast ' + t.kind} role="status">
+          {t.kind === 'ok' ? <Icon.check size={18} /> : <Icon.x size={18} />}
+          <span>{t.msg}</span>
         </div>
       ))}
     </div>

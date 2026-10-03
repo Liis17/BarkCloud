@@ -93,9 +93,11 @@ function Field({ label, help, children, end }: { label: React.ReactNode; help?: 
 function Toast({ toast }: { toast: { kind: 'ok' | 'err'; msg: string } | null }) {
   if (!toast) return null;
   return (
-    <div className={'sys-toast ' + toast.kind}>
-      {toast.kind === 'ok' ? <Icon.check size={18} /> : <Icon.x size={18} />}
-      <span>{toast.msg}</span>
+    <div className="toast-stack">
+      <div className={'toast ' + toast.kind} role="status">
+        {toast.kind === 'ok' ? <Icon.check size={18} /> : <Icon.x size={18} />}
+        <span>{toast.msg}</span>
+      </div>
     </div>
   );
 }
