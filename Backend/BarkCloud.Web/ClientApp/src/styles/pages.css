@@ -123,6 +123,13 @@
 .file-icon.zip { background: #FFE0B2; color: #6D4C00; }
 .file-icon.code { background: #B2DFDB; color: #004D40; }
 .file-icon.audio { background: #F8BBD0; color: #880E4F; }
+:root[data-theme="dark"] .file-icon.img { background: #1E4D22; color: #C8E6C9; }
+:root[data-theme="dark"] .file-icon.vid { background: #3D2E6B; color: #E3DAF5; }
+:root[data-theme="dark"] .file-icon.doc { background: #0D3A66; color: #D2E6FB; }
+:root[data-theme="dark"] .file-icon.pdf { background: #6B1A1A; color: #FFDAD6; }
+:root[data-theme="dark"] .file-icon.zip { background: #5A3A00; color: #FFDDB3; }
+:root[data-theme="dark"] .file-icon.code { background: #00423A; color: #B2DFDB; }
+:root[data-theme="dark"] .file-icon.audio { background: #5E1A3A; color: #FFD8E6; }
 
 /* Music */
 .music-page {

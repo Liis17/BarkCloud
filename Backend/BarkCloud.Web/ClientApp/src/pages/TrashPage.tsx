@@ -5,6 +5,7 @@ import { EmptyState, Loading } from '../components/ui/EmptyState';
 import { ConfirmModal } from '../components/ui/ConfirmModal';
 import { SelectionBar } from '../components/ui/SelectionBar';
 import { useToast } from '../hooks/useToast';
+import { useConfirm } from '../hooks/useDialog';
 import { usePageHeader } from '../hooks/usePageHeader';
 import { useSelection } from '../hooks/useSelection';
 import { apiGet, apiPost, type BatchSummary } from '../lib/api';
@@ -77,6 +78,7 @@ export function TrashPage() {
   const [items, setItems] = React.useState<TrashItem[] | null>(null);
   const [bulkPurgeConfirm, setBulkPurgeConfirm] = React.useState(false);
   const [toastNode, toast] = useToast();
+  const [confirmNode, confirm] = useConfirm();
   const fsel = useSelection();
 
   const load = React.useCallback(() => {
@@ -105,7 +107,7 @@ export function TrashPage() {
     }
   }
   async function purge(item: TrashItem) {
-    if (!window.confirm(`Удалить «${item.name}» навсегда? Это действие необратимо.`)) return;
+    if (!(await confirm({ title: 'Удалить навсегда?', message: `«${item.name}» будет удалён без возможности восстановления.`, confirmLabel: 'Удалить', danger: true }))) return;
     try {
       await apiPost('/api/cloud/trash/purge', { entryId: item.entryId });
       load();
@@ -147,7 +149,7 @@ export function TrashPage() {
   }
   async function empty() {
     if (!items || !items.length) return;
-    if (!window.confirm('Очистить корзину? Все файлы будут удалены навсегда.')) return;
+    if (!(await confirm({ title: 'Очистить корзину?', message: 'Все файлы будут удалены навсегда.', confirmLabel: 'Очистить', danger: true }))) return;
     try {
       await apiPost('/api/cloud/trash/empty', {});
       load();
@@ -183,6 +185,7 @@ export function TrashPage() {
   return (
     <>
       {toastNode}
+      {confirmNode}
       <SelectionBar
         count={fsel.count}
         onClear={fsel.clear}

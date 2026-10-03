@@ -8,6 +8,7 @@ import { plural } from '../lib/format';
 import { maintenanceWaitPath } from '../lib/maintenance';
 import { applyTheme, getTheme, type Theme } from '../lib/theme';
 import { webauthnRegister, webauthnSupported } from '../lib/webauthn';
+import { useConfirm, usePrompt } from '../hooks/useDialog';
 import type { Privacy, Session, SettingsState } from '../lib/types';
 
 const ServerSettingsTab = React.lazy(() => import('./ServerSettingsTab'));
@@ -284,6 +285,7 @@ function SystemSection({ admin, system, onUnlockedChange, active }: {
   const [registrationBusy, setRegistrationBusy] = React.useState(false);
   const trackedJobs = React.useRef(new Set<string>());
   const resumedJobs = React.useRef(false);
+  const [confirmNode, confirm] = useConfirm();
 
   const flash = (kind: 'ok' | 'err', msg: string) => {
     setToast({ kind, msg });
@@ -564,26 +566,26 @@ function SystemSection({ admin, system, onUnlockedChange, active }: {
 
   async function updateAll() {
     if (!services?.length || dockerErr) return;
-    if (!window.confirm('Обновить все application-сервисы? Web будет обновлён последним, после чего страница переподключится.')) return;
+    if (!(await confirm({ title: 'Обновить все сервисы?', message: 'Web будет обновлён последним, после чего страница переподключится.', confirmLabel: 'Обновить' }))) return;
     await runQueuedAction('Обновление всех сервисов', '/api/system/update-all', 'Update', true);
   }
 
   async function updateAvailable() {
     const count = (services || []).filter((service) => service.composeService && versionOf(service).updateAvailable === true).length;
     if (!count || dockerErr) return;
-    if (!window.confirm(`Обновить доступные сервисы (${count})? Web, если доступно обновление, будет последним.`)) return;
+    if (!(await confirm({ title: `Обновить доступные сервисы (${count})?`, message: 'Web, если для него доступно обновление, будет последним.', confirmLabel: 'Обновить' }))) return;
     await runQueuedAction(`Обновление доступных сервисов (${count})`, '/api/system/update-available', 'Update', true);
   }
 
   async function restartAll() {
     if (!services?.length || dockerErr) return;
-    if (!window.confirm('Перезапустить все application-сервисы? Web будет последним, затем страница переподключится.')) return;
+    if (!(await confirm({ title: 'Перезапустить все сервисы?', message: 'Web будет последним, затем страница переподключится.', confirmLabel: 'Перезапустить' }))) return;
     await runQueuedAction('Перезапуск всех сервисов', '/api/system/restart-all', 'Restart');
   }
 
   async function webSelf(kind: 'update' | 'restart') {
     const title = kind === 'update' ? 'Обновление веб-клиента' : 'Перезапуск веб-клиента';
-    if (!window.confirm(`${title}? Страница ненадолго станет недоступна и перезагрузится автоматически.`)) return;
+    if (!(await confirm({ title: `${title}?`, message: 'Страница ненадолго станет недоступна и перезагрузится автоматически.', confirmLabel: kind === 'update' ? 'Обновить' : 'Перезапустить' }))) return;
     const path = kind === 'update' ? '/api/system/web/update-self' : '/api/system/web/restart-self';
     try {
       const previousStartedAt = await readServerStartedAt();
@@ -801,6 +803,7 @@ function SystemSection({ admin, system, onUnlockedChange, active }: {
 
   return (
     <>
+      {confirmNode}
       <div className="set-card" id="sec-system">
         <div className="set-card-head">
           <h3>Обслуживание</h3>
@@ -1107,6 +1110,7 @@ function SecurityTab({ security, flash }: { security: SettingsState['security'];
   const [auth2fa, setAuth2fa] = React.useState(security.authenticator);
   const [email2fa, setEmail2fa] = React.useState(security.emailOtp);
   const [pwdOpen, setPwdOpen] = React.useState(false);
+  const [promptNode, prompt] = usePrompt();
   const [oldPwd, setOldPwd] = React.useState('');
   const [newPwd, setNewPwd] = React.useState('');
   const [confirmPwd, setConfirmPwd] = React.useState('');
@@ -1235,7 +1239,7 @@ function SecurityTab({ security, flash }: { security: SettingsState['security'];
         return;
       }
       const attestationJson = await webauthnRegister(begin.data.optionsJson);
-      const name = (window.prompt('Название ключа', 'Ключ безопасности') || 'Ключ безопасности').trim();
+      const name = (await prompt({ title: 'Название ключа', label: 'Название', initial: 'Ключ безопасности' })) || 'Ключ безопасности';
       const complete = await sPost('/api/settings/security/webauthn/register/complete', {
         challengeId: begin.data.challengeId,
         attestation: JSON.parse(attestationJson),
@@ -1262,6 +1266,7 @@ function SecurityTab({ security, flash }: { security: SettingsState['security'];
 
   return (
     <>
+      {promptNode}
       <div className="set-card">
         <div className="set-card-head">
           <h3>Пароль</h3>
@@ -1477,7 +1482,7 @@ function PrivacyTab({ privacy, flash }: { privacy: Privacy; flash: Flash }) {
 // ─────────── Хранилище ───────────
 
 const DISK_OTHER_COLOR = 'var(--md-on-surface-variant)';
-const DISK_S3_COLOR = '#9A4F1E';
+const DISK_S3_COLOR = 'var(--md-primary)';
 
 function StorageTab({ storage }: { storage: SettingsState['storage'] }) {
   const disk = storage.disk;
@@ -1522,9 +1527,10 @@ function SessionsTab({ sessions: initial, flash }: { sessions: Session[]; flash:
   const [renaming, setRenaming] = React.useState<string | null>(null);
   const [renameVal, setRenameVal] = React.useState('');
   const [revokingAll, setRevokingAll] = React.useState(false);
+  const [confirmNode, confirm] = useConfirm();
 
   async function revoke(s: Session) {
-    if (!window.confirm(`Завершить сессию «${s.device}»?`)) return;
+    if (!(await confirm({ title: 'Завершить сессию?', message: `Устройство «${s.device}» будет отключено.`, confirmLabel: 'Отключить', danger: true }))) return;
     setBusy((b) => ({ ...b, [s.deviceId]: true }));
     const res = await sPost('/api/settings/sessions/revoke', { deviceId: s.deviceId });
     setBusy((b) => ({ ...b, [s.deviceId]: false }));
@@ -1534,7 +1540,7 @@ function SessionsTab({ sessions: initial, flash }: { sessions: Session[]; flash:
     } else flash('err', errMsg(res));
   }
   async function revokeOthers() {
-    if (!window.confirm('Завершить все сессии, кроме текущей?')) return;
+    if (!(await confirm({ title: 'Завершить все сессии?', message: 'Все устройства, кроме этого, будут отключены.', confirmLabel: 'Завершить', danger: true }))) return;
     setRevokingAll(true);
     const res = await sPost<{ revoked: number }>('/api/settings/sessions/revoke-others');
     if (res.ok) {
@@ -1619,6 +1625,7 @@ function SessionsTab({ sessions: initial, flash }: { sessions: Session[]; flash:
           </button>
         </div>
       </div>
+      {confirmNode}
     </div>
   );
 }

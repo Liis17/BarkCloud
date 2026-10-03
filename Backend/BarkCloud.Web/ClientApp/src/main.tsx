@@ -2,6 +2,8 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 
+import '@fontsource-variable/roboto-flex';
+import '@fontsource/roboto-mono/400.css';
 import './styles/shared.css';
 import './styles/pages.css';
 

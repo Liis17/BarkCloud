@@ -136,7 +136,7 @@ html, body {
   height: 100%;
   background: var(--md-surface);
   color: var(--md-on-surface);
-  font-family: 'Roboto Flex', 'Roboto', system-ui, sans-serif;
+  font-family: 'Roboto Flex Variable', 'Roboto Flex', 'Roboto', system-ui, sans-serif;
   font-feature-settings: 'ss01';
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
@@ -421,7 +421,7 @@ img.avatar { object-fit: cover; }
 .search-suggest-copy { min-width: 0; display: grid; gap: 1px; }
 .search-suggest-copy b, .search-suggest-copy small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .search-suggest-copy small { color: var(--md-on-surface-variant); font-size: 12px; }
-.search-favorite { margin-left: auto; color: #b66b00; flex: 0 0 auto; }
+.search-favorite { margin-left: auto; color: var(--md-warning); flex: 0 0 auto; }
 .search-all { margin-top: 6px; justify-content: center; color: var(--md-primary); font-weight: 600; }
 
 .tb-actions { display: flex; gap: 8px; align-items: center; }
@@ -859,7 +859,7 @@ img.avatar { object-fit: cover; }
 }
 @keyframes bc-slide { from { transform: translateX(20px); opacity: 0; } to { transform: none; opacity: 1; } }
 .toast.ok { background: var(--md-surface-container-highest); color: var(--md-on-surface); }
-.toast.err { background: #FFDAD6; color: #410002; }
+.toast.err { background: var(--md-error-container); color: var(--md-on-error-container); }
 
 /* ============ Контекстное меню (ПКМ) ============ */
 .ctx-backdrop { position: fixed; inset: 0; z-index: 1300; }
