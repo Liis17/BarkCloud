@@ -27,6 +27,25 @@ async function fill() {
 
 describe('Миграция S3', () => {
   it.each([
+    ['checking-existing', 'Проверка существующих копий'],
+    ['reading', 'Чтение части из источника'],
+    ['final-reading', 'Чтение части для досинхронизации'],
+  ])('объясняет этап %s и учитывает уже проверенные копии', async (phase, label) => {
+    mockMigration([{ ...job, phase, copiedBytes: '60', currentBytes: '0', copiedFiles: 6 }]);
+    render(<MigrationTab onExpired={() => {}} />);
+    expect(await screen.findByText(label)).toBeTruthy();
+    expect(screen.getByRole('progressbar').getAttribute('aria-valuenow')).toBe('60');
+    expect(screen.getByText('6 / 10')).toBeTruthy();
+  });
+
+  it('после остановки объясняет запуск новой задачи с существующими копиями', async () => {
+    mockMigration([{ ...job, state: 'cancelled', canCancel: false }]); render(<MigrationTab onExpired={() => {}} />);
+    expect(await screen.findByText(/Новая задача проверит их и докопирует оставшиеся файлы/)).toBeTruthy();
+    expect(screen.getByText(/После перезапуска Web запустите новую задачу с тем же назначением/)).toBeTruthy();
+    expect(screen.queryByText(/требует пустого бакета/)).toBeNull();
+  });
+
+  it.each([
     ['cloud-video.s3.fra.databucket.eu', 'https://cloud-video.s3.fra.databucket.eu'],
     ['  minio.example:9000  ', 'https://minio.example:9000'],
     ['http://127.0.0.1:9000', 'http://127.0.0.1:9000'],

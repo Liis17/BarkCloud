@@ -17,7 +17,9 @@ public class MigrationS3ClientFactory
         var config = new AmazonS3Config
         {
             ServiceURL = S3Endpoint.Normalize(connection.ServiceUrl, connection.IsR2),
-            ForcePathStyle = connection.ForcePathStyle
+            ForcePathStyle = connection.ForcePathStyle,
+            Timeout = TimeSpan.FromMinutes(30),
+            ConnectTimeout = TimeSpan.FromSeconds(30)
         };
         if (!string.IsNullOrEmpty(connection.Region)) config.AuthenticationRegion = connection.Region;
         if (connection.IsR2)
@@ -55,7 +57,7 @@ public sealed class S3MigrationCopier(MigrationS3ClientFactory clients)
     public async Task CheckAsync(MigrationConnection target, CancellationToken ct)
     {
         using var client = clients.Create(target);
-        await EnsureEmptyAsync(client, target.BucketName, ct);
+        await EnsureBucketAsync(client, target.BucketName, ct);
         var key = ".barkcloud-migration-check/" + Guid.NewGuid().ToString("N");
         var content = RandomNumberGenerator.GetBytes(32);
         PutObjectResponse? written = null;
@@ -103,15 +105,10 @@ public sealed class S3MigrationCopier(MigrationS3ClientFactory clients)
                 }
             }
         }
-        await EnsureEmptyAsync(client, target.BucketName, ct);
     }
 
-    public static async Task EnsureEmptyAsync(IAmazonS3 client, string bucket, CancellationToken ct)
-    {
-        var response = await client.ListObjectsV2Async(new ListObjectsV2Request { BucketName = bucket, MaxKeys = 1 }, ct);
-        if (response.S3Objects?.Count > 0)
-            throw new InvalidOperationException("Целевой бакет должен быть пустым. Существующие объекты не удаляются.");
-    }
+    public static async Task EnsureBucketAsync(IAmazonS3 client, string bucket, CancellationToken ct) =>
+        await client.ListObjectsV2Async(new ListObjectsV2Request { BucketName = bucket, MaxKeys = 1 }, ct);
 
     public static async IAsyncEnumerable<MigrationObject> ListAsync(IAmazonS3 client, string bucket,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
@@ -140,8 +137,7 @@ public sealed class S3MigrationCopier(MigrationS3ClientFactory clients)
             await AbortPendingAsync(targetClient, target.BucketName, pending[0], pending[1], ct);
             File.Delete(pendingPath);
         }
-        using var response = await ReadSourceAsync(sourceClient, new GetObjectRequest
-        { BucketName = source.BucketName, Key = item.Key, EtagToMatch = string.IsNullOrEmpty(item.Etag) ? null : item.Etag }, ct);
+        var response = await SourceMetadataAsync(sourceClient, source.BucketName, item, ct);
         var size = response.ContentLength;
         using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
         var partPath = Path.Combine(directory, "part-" + Guid.NewGuid().ToString("N"));
@@ -157,14 +153,15 @@ public sealed class S3MigrationCopier(MigrationS3ClientFactory clients)
             if (size <= PartSize)
             {
                 await using var part = new FileStream(partPath, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None, 65536, FileOptions.Asynchronous);
-                await ReadPartAsync(response.ResponseStream, part, size, hash, ct);
+                await DownloadRangeAsync(sourceClient, source.BucketName, item.Key, response.ETag, 0, size, size, part, true, ct);
+                await AppendHashAsync(part, hash, ct);
                 var request = new PutObjectRequest
                 {
                     BucketName = target.BucketName, Key = item.Key, InputStream = part,
                     AutoCloseStream = false, AutoResetStreamPosition = false,
                     DisablePayloadSigning = target.IsR2, DisableDefaultChecksumValidation = target.IsR2
                 };
-                CopyHeaders(response, request.Headers, request.Metadata);
+                CopyHeaders(response.Metadata, response.Headers, request.Headers, request.Metadata);
                 request.StreamTransferProgress += (_, args) => progress(new(Math.Min(size, args.TransferredBytes), "copying", originalName));
                 await targetClient.PutObjectAsync(request, ct);
                 uploaded = size;
@@ -172,7 +169,7 @@ public sealed class S3MigrationCopier(MigrationS3ClientFactory clients)
             else
             {
                 var initiation = new InitiateMultipartUploadRequest { BucketName = target.BucketName, Key = item.Key };
-                CopyHeaders(response, initiation.Headers, initiation.Metadata);
+                CopyHeaders(response.Metadata, response.Headers, initiation.Headers, initiation.Metadata);
                 uploadId = (await targetClient.InitiateMultipartUploadAsync(initiation, ct)).UploadId;
                 await File.WriteAllTextAsync(pendingPath, System.Text.Json.JsonSerializer.Serialize(new[] { item.Key, uploadId }), ct);
                 var parts = new List<PartETag>();
@@ -180,7 +177,10 @@ public sealed class S3MigrationCopier(MigrationS3ClientFactory clients)
                 {
                     var length = Math.Min(partSize, size - uploaded);
                     await using var part = new FileStream(partPath, FileMode.Create, FileAccess.ReadWrite, FileShare.None, 65536, FileOptions.Asynchronous);
-                    await ReadPartAsync(response.ResponseStream, part, length, hash, ct);
+                    progress(new(uploaded, "reading", originalName));
+                    await DownloadRangeAsync(sourceClient, source.BucketName, item.Key, response.ETag, uploaded, length, size, part, true, ct);
+                    await AppendHashAsync(part, hash, ct);
+                    progress(new(uploaded, "copying", originalName));
                     var baseline = uploaded;
                     var request = new UploadPartRequest
                     {
@@ -201,8 +201,8 @@ public sealed class S3MigrationCopier(MigrationS3ClientFactory clients)
             completed = true;
             var sourceHash = hash.GetHashAndReset();
             progress(new(uploaded, "verifying", originalName));
-            using var copy = await targetClient.GetObjectAsync(new GetObjectRequest { BucketName = target.BucketName, Key = item.Key }, ct);
-            var targetHash = await SHA256.HashDataAsync(copy.ResponseStream, ct);
+            var copy = await targetClient.GetObjectMetadataAsync(target.BucketName, item.Key, ct);
+            var targetHash = await HashObjectAsync(targetClient, target.BucketName, item.Key, copy.ContentLength, copy.ETag, partPath, false, ct);
             if (copy.ContentLength != size || !CryptographicOperations.FixedTimeEquals(sourceHash, targetHash))
                 throw new InvalidOperationException("Контрольная сумма или размер копии не совпали с источником.");
             foreach (var key in response.Metadata.Keys)
@@ -230,6 +230,30 @@ public sealed class S3MigrationCopier(MigrationS3ClientFactory clients)
         }
     }
 
+    public async Task<MigrationObject?> VerifyExistingAsync(IAmazonS3 sourceClient, MigrationConnection source,
+        IAmazonS3 targetClient, MigrationConnection target, MigrationObject item, string directory,
+        Action<MigrationProgress> progress, CancellationToken ct)
+    {
+        GetObjectMetadataResponse existing;
+        try { existing = await targetClient.GetObjectMetadataAsync(target.BucketName, item.Key, ct); }
+        catch (AmazonS3Exception e) when (e.StatusCode == HttpStatusCode.NotFound) { return null; }
+        var original = await SourceMetadataAsync(sourceClient, source.BucketName, item, ct);
+        if (original.ContentLength != existing.ContentLength || MetadataHash(original.Metadata, original.Headers) != MetadataHash(existing.Metadata, existing.Headers))
+            return null;
+        Directory.CreateDirectory(directory);
+        var partPath = Path.Combine(directory, "verify-" + Guid.NewGuid().ToString("N"));
+        progress(new(0, "checking-existing", original.Metadata["original-filename"]));
+        try
+        {
+            var sourceHash = await HashObjectAsync(sourceClient, source.BucketName, item.Key, original.ContentLength, original.ETag, partPath, true, ct);
+            var targetHash = await HashObjectAsync(targetClient, target.BucketName, item.Key, existing.ContentLength, existing.ETag, partPath, false, ct);
+            if (!CryptographicOperations.FixedTimeEquals(sourceHash, targetHash)) return null;
+            return new(item.Key, original.ContentLength, original.ETag ?? "", item.LastModified ?? original.LastModified,
+                Convert.ToHexString(sourceHash), MetadataHash(original.Metadata, original.Headers));
+        }
+        finally { File.Delete(partPath); }
+    }
+
     public static string MetadataHash(MetadataCollection metadata, HeadersCollection headers) => Convert.ToHexString(
         SHA256.HashData(System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(new
         {
@@ -247,11 +271,59 @@ public sealed class S3MigrationCopier(MigrationS3ClientFactory clients)
         catch (AmazonS3Exception e) when (e.ErrorCode == "NoSuchUpload" || e.StatusCode == HttpStatusCode.NotFound) { }
     }
 
-    private static void CopyHeaders(GetObjectResponse source, HeadersCollection headers, MetadataCollection metadata)
+    private static void CopyHeaders(MetadataCollection sourceMetadata, HeadersCollection sourceHeaders, HeadersCollection headers, MetadataCollection metadata)
     {
         foreach (var key in ObjectHeaders)
-            if (!string.IsNullOrEmpty(source.Headers[key])) headers[key] = source.Headers[key];
-        foreach (var key in source.Metadata.Keys) metadata[key] = source.Metadata[key];
+            if (!string.IsNullOrEmpty(sourceHeaders[key])) headers[key] = sourceHeaders[key];
+        foreach (var key in sourceMetadata.Keys) metadata[key] = sourceMetadata[key];
+    }
+
+    private static async Task<GetObjectMetadataResponse> SourceMetadataAsync(IAmazonS3 client, string bucket, MigrationObject item, CancellationToken ct)
+    {
+        GetObjectMetadataResponse response;
+        try { response = await client.GetObjectMetadataAsync(bucket, item.Key, ct); }
+        catch (AmazonS3Exception e) when (e.StatusCode == HttpStatusCode.NotFound) { throw new MigrationSourceMissingException(); }
+        if (!string.IsNullOrEmpty(item.Etag) && item.Etag != response.ETag)
+            throw new AmazonS3Exception("Source changed") { StatusCode = HttpStatusCode.PreconditionFailed };
+        return response;
+    }
+
+    private static async Task<byte[]> HashObjectAsync(IAmazonS3 client, string bucket, string key, long size, string? etag,
+        string partPath, bool source, CancellationToken ct)
+    {
+        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        for (long offset = 0; offset < size; offset += PartSize)
+        {
+            var length = Math.Min(PartSize, size - offset);
+            await using var part = new FileStream(partPath, FileMode.Create, FileAccess.ReadWrite, FileShare.None, 65536, FileOptions.Asynchronous);
+            await DownloadRangeAsync(client, bucket, key, etag, offset, length, size, part, source, ct);
+            await AppendHashAsync(part, hash, ct);
+        }
+        return hash.GetHashAndReset();
+    }
+
+    private static async Task DownloadRangeAsync(IAmazonS3 client, string bucket, string key, string? etag, long offset,
+        long length, long size, Stream part, bool source, CancellationToken ct)
+    {
+        if (length == 0) { part.Position = 0; return; }
+        for (var attempt = 0; ; attempt++)
+        {
+            part.SetLength(0); part.Position = 0;
+            try
+            {
+                var request = new GetObjectRequest { BucketName = bucket, Key = key, EtagToMatch = etag,
+                    ByteRange = new ByteRange(offset, offset + length - 1) };
+                using var response = source ? await ReadSourceAsync(client, request, ct) : await client.GetObjectAsync(request, ct);
+                if (response.ContentLength != length || response.ContentRange != $"bytes {offset}-{offset + length - 1}/{size}")
+                    throw new InvalidOperationException("S3 вернул неверный размер или диапазон объекта.");
+                await ReadPartAsync(response.ResponseStream, part, length, ct);
+                return;
+            }
+            catch (Exception e) when (attempt < 2 && !ct.IsCancellationRequested &&
+                (e is IOException or HttpRequestException or TimeoutException or OperationCanceledException
+                    || e is AmazonS3Exception s3 && ((int)s3.StatusCode >= 500 || s3.ErrorCode is "RequestTimeout" or "RequestTimeoutException")))
+            { await Task.Delay(TimeSpan.FromSeconds(attempt + 1), ct); }
+        }
     }
 
     private static async Task<GetObjectResponse> ReadSourceAsync(IAmazonS3 client, GetObjectRequest request, CancellationToken ct)
@@ -260,20 +332,37 @@ public sealed class S3MigrationCopier(MigrationS3ClientFactory clients)
         catch (AmazonS3Exception e) when (e.StatusCode == HttpStatusCode.NotFound) { throw new MigrationSourceMissingException(); }
     }
 
-    private static async Task ReadPartAsync(Stream source, Stream part, long length, IncrementalHash hash, CancellationToken ct)
+    private static async Task ReadPartAsync(Stream source, Stream part, long length, CancellationToken ct)
     {
         var buffer = ArrayPool<byte>.Shared.Rent(65536);
         try
         {
+            using var idle = CancellationTokenSource.CreateLinkedTokenSource(ct);
             for (long read = 0; read < length;)
             {
-                var count = await source.ReadAsync(buffer.AsMemory(0, (int)Math.Min(buffer.Length, length - read)), ct);
-                if (count == 0) throw new InvalidOperationException("Источник завершился до заявленного размера объекта.");
-                hash.AppendData(buffer, 0, count);
+                idle.CancelAfter(TimeSpan.FromMinutes(5));
+                int count;
+                try { count = await source.ReadAsync(buffer.AsMemory(0, (int)Math.Min(buffer.Length, length - read)), idle.Token); }
+                catch (OperationCanceledException) when (!ct.IsCancellationRequested) { throw new TimeoutException("S3 read stalled"); }
+                idle.CancelAfter(Timeout.InfiniteTimeSpan);
+                if (count == 0) throw new InvalidOperationException("Контрольная сумма или размер копии не совпали: поток завершился раньше ожидаемого.");
                 await part.WriteAsync(buffer.AsMemory(0, count), ct);
                 read += count;
             }
             await part.FlushAsync(ct);
+            part.Position = 0;
+        }
+        finally { ArrayPool<byte>.Shared.Return(buffer); }
+    }
+
+    private static async Task AppendHashAsync(Stream part, IncrementalHash hash, CancellationToken ct)
+    {
+        part.Position = 0;
+        var buffer = ArrayPool<byte>.Shared.Rent(65536);
+        try
+        {
+            int count;
+            while ((count = await part.ReadAsync(buffer, ct)) != 0) hash.AppendData(buffer, 0, count);
             part.Position = 0;
         }
         finally { ArrayPool<byte>.Shared.Return(buffer); }

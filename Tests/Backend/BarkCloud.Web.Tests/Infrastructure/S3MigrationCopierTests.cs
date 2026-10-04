@@ -14,6 +14,85 @@ public sealed class S3MigrationCopierTests
     private static readonly MigrationConnection Target = new("https://target.example", "target-access", "target-secret", "to");
 
     [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Copy_RetriesS3RequestTimeoutOrHttpClientTimeoutWithoutRestartingTheObject(bool s3Timeout)
+    {
+        var source = new MigrationS3Fake(true)
+        {
+            FailReadOnce = s3Timeout ? new Amazon.S3.AmazonS3Exception("untrusted timeout message")
+                { StatusCode = HttpStatusCode.BadRequest, ErrorCode = "RequestTimeout" } : new TaskCanceledException("HTTP timeout")
+        };
+        var target = new MigrationS3Fake(); source.Put("key", [1, 2, 3]);
+        var directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+        try
+        {
+            await new S3MigrationCopier(new MigrationFakeClients(source, target)).CopyAsync(source.Client.Object, Source,
+                target.Client.Object, Target, new("key", 3, "", null), directory, _ => {}, default);
+            source.Client.Verify(x => x.GetObjectAsync(It.IsAny<GetObjectRequest>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
+            target.Written.Should().Equal("key"); target.Objects["key"].Data.Should().Equal(1, 2, 3);
+        }
+        finally { if (Directory.Exists(directory)) Directory.Delete(directory, true); }
+    }
+
+    [Fact]
+    public async Task Multipart_BrokenRangeRetriesOnlyThatRangeWithoutDuplicatingPartsOrHashInput()
+    {
+        var source = new MigrationS3Fake(true) { DisconnectReadOffsetOnce = S3MigrationCopier.PartSize };
+        var target = new MigrationS3Fake(); source.Put("large", new byte[S3MigrationCopier.PartSize + 128 * 1024]);
+        var item = source.Objects["large"]; var uploads = 0;
+        target.OnUploadPart = () => { uploads++; source.OpenReads.Should().Be(0); };
+        var directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+        try
+        {
+            var result = await new S3MigrationCopier(new MigrationFakeClients(source, target)).CopyAsync(source.Client.Object, Source,
+                target.Client.Object, Target, new("large", item.Data.LongLength, item.Etag, item.Modified), directory, _ => {}, default);
+            source.Reads.Select(x => x.ByteRange.Start).Should().Equal(0, S3MigrationCopier.PartSize, S3MigrationCopier.PartSize);
+            uploads.Should().Be(2); result.Sha256.Should().Be(Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(item.Data)));
+            target.Objects["large"].Data.Should().Equal(item.Data);
+        }
+        finally { if (Directory.Exists(directory)) Directory.Delete(directory, true); }
+    }
+
+    [Fact]
+    public async Task Multipart_SourceChangeBetweenRangesAbortsUploadAndClearsTemporaryBuffers()
+    {
+        var source = new MigrationS3Fake(true); var target = new MigrationS3Fake();
+        source.Put("large", new byte[S3MigrationCopier.PartSize + 3]); var item = source.Objects["large"];
+        target.OnUploadPart = () => source.Objects["large"] = item with { Etag = "changed" };
+        var directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+        try
+        {
+            await FluentActions.Awaiting(() => new S3MigrationCopier(new MigrationFakeClients(source, target)).CopyAsync(source.Client.Object, Source,
+                target.Client.Object, Target, new("large", item.Data.LongLength, item.Etag, item.Modified), directory, _ => {}, default))
+                .Should().ThrowAsync<Amazon.S3.AmazonS3Exception>().Where(e => e.StatusCode == HttpStatusCode.PreconditionFailed);
+            target.Client.Verify(x => x.AbortMultipartUploadAsync(It.IsAny<AbortMultipartUploadRequest>(), It.IsAny<CancellationToken>()), Times.Once);
+            target.Written.Should().BeEmpty(); Directory.GetFiles(directory).Should().BeEmpty();
+        }
+        finally { if (Directory.Exists(directory)) Directory.Delete(directory, true); }
+    }
+
+    [Fact]
+    public async Task Multipart_ReleasesSourceConnectionBeforeSlowPartUploadAndUsesBoundedConditionalRanges()
+    {
+        var source = new MigrationS3Fake(true); var target = new MigrationS3Fake();
+        source.Put("large", new byte[S3MigrationCopier.PartSize + 3]); var item = source.Objects["large"];
+        target.OnUploadPart = () => source.OpenReads.Should().Be(0, "source GET must not stay idle while a slow destination receives the part");
+        var directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+        try
+        {
+            await new S3MigrationCopier(new MigrationFakeClients(source, target)).CopyAsync(source.Client.Object, Source,
+                target.Client.Object, Target, new("large", item.Data.LongLength, item.Etag, item.Modified), directory, _ => {}, default);
+            source.Reads.Should().HaveCount(2);
+            source.Reads[0].ByteRange.Start.Should().Be(0); source.Reads[0].ByteRange.End.Should().Be(S3MigrationCopier.PartSize - 1);
+            source.Reads[1].ByteRange.Start.Should().Be(S3MigrationCopier.PartSize);
+            source.Reads.Should().OnlyContain(x => x.EtagToMatch == item.Etag);
+            target.Objects["large"].Data.Should().Equal(item.Data);
+        }
+        finally { if (Directory.Exists(directory)) Directory.Delete(directory, true); }
+    }
+
+    [Theory]
     [InlineData("nested/кириллица +%?#/file.txt", "данные")]
     [InlineData("empty/", "")]
     public async Task Copy_PreservesExactKeysMetadataAndHeadersWithoutWritingToSource(string key, string text)
@@ -97,12 +176,12 @@ public sealed class S3MigrationCopierTests
     }
 
     [Fact]
-    public async Task Check_RejectsNonEmptyDestinationWithoutDeletingAnything()
+    public async Task Check_AllowsPartialDestinationAndOnlyDeletesItsTestObject()
     {
         var source = new MigrationS3Fake(true); var target = new MigrationS3Fake(); target.Put("existing", [1]);
-        var action = () => new S3MigrationCopier(new MigrationFakeClients(source, target)).CheckAsync(Target, default);
-        await action.Should().ThrowAsync<InvalidOperationException>().WithMessage("*пустым*");
-        target.Deleted.Should().BeEmpty(); target.Written.Should().BeEmpty();
+        await new S3MigrationCopier(new MigrationFakeClients(source, target)).CheckAsync(Target, default);
+        target.Objects.Should().ContainSingle().Which.Key.Should().Be("existing");
+        target.Deleted.Should().ContainSingle().Which.Key.Should().StartWith(".barkcloud-migration-check/");
     }
 
     [Fact]

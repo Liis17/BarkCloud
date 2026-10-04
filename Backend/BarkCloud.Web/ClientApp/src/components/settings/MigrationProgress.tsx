@@ -3,10 +3,11 @@ import { MigrationJob, migrationRequest, MigrationApiError } from '../../hooks/u
 import '../../styles/migration.css';
 
 const PHASES: Record<string, string> = {
-  counting: 'Подсчёт объектов', copying: 'Копирование', verifying: 'Проверка содержимого',
+  counting: 'Подсчёт объектов', 'checking-existing': 'Проверка существующих копий',
+  reading: 'Чтение части из источника', copying: 'Копирование', verifying: 'Проверка содержимого',
   copied: 'Копирование завершено', draining: 'Ожидание активных загрузок',
   'final-counting': 'Финальный подсчёт', 'final-copying': 'Финальная досинхронизация',
-  'final-verifying': 'Финальная проверка содержимого', applying: 'Сохранение подключений',
+  'final-reading': 'Чтение части для досинхронизации', 'final-verifying': 'Финальная проверка содержимого', applying: 'Сохранение подключений',
   restarting: 'Перезапуск и проверка Files', completed: 'Миграция применена',
 };
 export function migrationPercent(job: MigrationJob) {
@@ -69,6 +70,6 @@ export function MigrationProgress({ job, onRefresh, onExpired, applyLink = false
       {applyLink && job.canApply && <a className="btn primary" href="/settings#server-settings">К применению миграции</a>}
     </div>
     {job.state === 'copied' && <p className="migration-note">Источник остаётся доступным. Примените миграцию в основных настройках S3: перед сменой подключения новые и изменённые объекты будут скопированы ещё раз.</p>}
-    {job.state === 'cancelled' && <p className="migration-note">Частичные копии остаются в назначении. Новая задача требует пустого бакета.</p>}
+    {job.state === 'cancelled' && <p className="migration-note">Частичные копии остаются в назначении. Новая задача проверит их и докопирует оставшиеся файлы.</p>}
   </article>;
 }

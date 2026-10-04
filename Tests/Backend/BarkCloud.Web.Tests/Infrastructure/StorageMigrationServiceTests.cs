@@ -5,6 +5,7 @@ using BarkCloud.Proto.Files;
 using BarkCloud.Web.Infrastructure;
 
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Logging;
 
 namespace BarkCloud.Web.Tests.Infrastructure;
 
@@ -34,16 +35,96 @@ public sealed class StorageMigrationServiceTests
     }
 
     [Fact]
-    public async Task Start_RechecksEmptyDestinationAndUsesOnlyServerValidatedParameters()
+    public async Task Start_AllowsExistingObjectsAndUsesOnlyServerValidatedParameters()
     {
         using var fixture = new Fixture();
+        fixture.Source.Put("a", [1, 2]); fixture.Target.Put("a", [1, 2]);
+        fixture.Target.Objects["a"] = fixture.Target.Objects["a"] with { Etag = "different-multipart-etag-2" };
+        fixture.Source.Put("b", [3, 4]); fixture.Target.Put("b", [8, 9]);
+        fixture.Source.Put("c", [5]);
+        fixture.Source.Put("d", [6], new() { ["custom"] = "source" }); fixture.Target.Put("d", [6], new() { ["custom"] = "old" });
         await fixture.Service.StartAsync(default);
         var validation = await fixture.Prepare();
         fixture.Target.Put("external", [1]);
         var job = fixture.Service.Start(validation.ValidationId, "admin");
-        var failed = await fixture.Wait(job.Id, "failed");
-        failed.Error.Should().Contain("пустым"); fixture.Source.Written.Should().BeEmpty();
-        fixture.Target.Objects.Should().ContainSingle();
+        var done = await fixture.Wait(job.Id, "copied");
+        done.CopiedBytes.Should().Be("6"); done.CopiedFiles.Should().Be(4);
+        fixture.Target.Written.Should().NotContain("a").And.Contain(["b", "c", "d"]);
+        fixture.Target.Objects["b"].Data.Should().Equal(3, 4);
+        fixture.Target.Objects["d"].Metadata.Should().BeEquivalentTo(fixture.Source.Objects["d"].Metadata);
+        fixture.Target.Objects["external"].Data.Should().Equal(1);
+        fixture.Source.Written.Should().BeEmpty(); fixture.Source.Deleted.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Resume_ExistingCopyScanKeepsVerifiedCountersAndFinishesBeforeNewUploads()
+    {
+        using var fixture = new Fixture();
+        fixture.Source.Put("a", [1, 2]); fixture.Target.Put("a", [1, 2]);
+        fixture.Source.Put("b", [3, 4, 5]); fixture.Target.Put("b", [3, 4, 5]); fixture.Source.Put("c", [6]);
+        await fixture.Service.StartAsync(default); var check = await fixture.Prepare();
+        fixture.Target.CorruptReadKey = "b";
+        var job = fixture.Service.Start(check.ValidationId, "admin"); var failed = await fixture.Wait(job.Id, "failed");
+        failed.Phase.Should().Be("checking-existing"); failed.CopiedBytes.Should().Be("2"); failed.CopiedFiles.Should().Be(1);
+        fixture.Target.Written.Should().NotContain("c");
+        fixture.Target.CorruptReadKey = null;
+        fixture.Target.OnPut = key =>
+        {
+            key.Should().Be("c"); var progress = fixture.Service.GetJob(job.Id);
+            progress.CopiedBytes.Should().Be("5"); progress.CopiedFiles.Should().Be(2);
+        };
+        fixture.Service.Retry(job.Id); var done = await fixture.Wait(job.Id, "copied");
+        done.CopiedBytes.Should().Be("6"); done.CopiedFiles.Should().Be(3);
+        fixture.Target.Written.Should().NotContain("a").And.NotContain("b").And.Contain("c");
+    }
+
+    [Fact]
+    public async Task Failure_ReportsExceptionTypeAndSafeS3CodeWithoutRawMessagesOrCredentials()
+    {
+        using var fixture = new Fixture(); fixture.Source.Put("a", [1]);
+        var logger = new Mock<ILogger<StorageMigrationService>>(); using var service = fixture.NewService(logger.Object);
+        await service.StartAsync(default);
+        try
+        {
+            var selected = (await service.GetSourcesAsync()).Single();
+            var check = await service.CheckAsync(selected.Id, Fixture.TargetConnection, "admin", default);
+            fixture.Target.Client.Setup(x => x.PutObjectAsync(It.Is<Amazon.S3.Model.PutObjectRequest>(r => r.Key == "a"), It.IsAny<CancellationToken>()))
+                .ThrowsAsync(new Amazon.S3.AmazonS3Exception("target-secret source-access PRIVATE")
+                { StatusCode = System.Net.HttpStatusCode.GatewayTimeout, ErrorCode = "RequestTimeout" });
+            var job = service.Start(check.ValidationId, "admin");
+            for (var i = 0; i < 500 && service.GetJob(job.Id).State != "failed"; i++) await Task.Delay(10);
+            var failed = service.GetJob(job.Id); failed.State.Should().Be("failed");
+            failed.Error.Should().Contain("HTTP 504").And.Contain("RequestTimeout").And.NotContain("target-secret").And.NotContain("PRIVATE");
+            var log = logger.Invocations.Single(x => x.Method.Name == "Log");
+            log.Arguments[2].ToString().Should().Contain("AmazonS3Exception").And.Contain("504").And.Contain("RequestTimeout").And.NotContain("PRIVATE");
+            log.Arguments[3].Should().BeNull("raw SDK exceptions may contain secrets");
+            StorageMigrationService.SafeError(new Amazon.S3.AmazonS3Exception("PRIVATE") { ErrorCode = "PRIVATE", StatusCode = System.Net.HttpStatusCode.BadRequest })
+                .Should().Contain("HTTP 400").And.NotContain("PRIVATE");
+            StorageMigrationService.SafeError(new IOException("PRIVATE")).Should().Contain("Соединение").And.NotContain("PRIVATE");
+        }
+        finally { await service.StopAsync(default); }
+    }
+
+    [Fact]
+    public async Task NewTaskAfterWebRestart_VerifiesExistingObjectsAndOnlyCopiesRemainingFiles()
+    {
+        using var fixture = new Fixture();
+        fixture.Source.Put("a", [1, 2]); fixture.Source.Put("b", [3, 4, 5]);
+        await fixture.Service.StartAsync(default);
+        fixture.Target.FailPutKey = "b";
+        var validation = await fixture.Prepare(); var initial = fixture.Service.Start(validation.ValidationId, "admin");
+        (await fixture.Wait(initial.Id, "failed")).CopiedBytes.Should().Be("2");
+        await fixture.Service.StopAsync(default);
+        fixture.Target.FailPutKey = null; fixture.Target.Written.Clear();
+        using var restarted = fixture.NewService(); await restarted.StartAsync(default);
+        var selected = (await restarted.GetSourcesAsync()).Single();
+        var checkedTarget = await restarted.CheckAsync(selected.Id, Fixture.TargetConnection, "admin", default);
+        var next = restarted.Start(checkedTarget.ValidationId, "admin");
+        for (var i = 0; i < 500 && restarted.GetJob(next.Id).State is not ("copied" or "failed"); i++) await Task.Delay(10);
+        var done = restarted.GetJob(next.Id); done.State.Should().Be("copied");
+        done.CopiedBytes.Should().Be("5"); done.CopiedFiles.Should().Be(2);
+        fixture.Target.Written.Where(x => !x.StartsWith(".barkcloud-migration-check/")).Should().Equal("b");
+        await restarted.StopAsync(default);
     }
 
     [Fact]
@@ -242,8 +323,8 @@ public sealed class StorageMigrationServiceTests
             { Events.Add("restart"); if (RestartFails) throw new InvalidOperationException("Restart failed"); Barriers.Single(x => x.MigrationId == id).State = "applied"; return Task.CompletedTask; });
             Service = NewService();
         }
-        public StorageMigrationService NewService()
-        { var clients = new MigrationFakeClients(Source, Target); return new(_control.Object, clients, new S3MigrationCopier(clients), NullLogger<StorageMigrationService>.Instance); }
+        public StorageMigrationService NewService(ILogger<StorageMigrationService>? logger = null)
+        { var clients = new MigrationFakeClients(Source, Target); return new(_control.Object, clients, new S3MigrationCopier(clients), logger ?? NullLogger<StorageMigrationService>.Instance); }
         public async Task<MigrationCheckResult> Prepare()
         {
             var source = (await Service.GetSourcesAsync()).Single();

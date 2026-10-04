@@ -93,6 +93,7 @@ public sealed class S3MigrationIntegrationTests
                     profile.SecretKey = target.SecretKey; profile.Region = target.Region; profile.ForcePathStyle = target.ForcePathStyle; return Task.CompletedTask; });
             control.Setup(x => x.RestartAndVerifyAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).Returns(() => { barrier!.State = "applied"; return Task.CompletedTask; });
             using var worker = new StorageMigrationService(control.Object, factory, copier, NullLogger<StorageMigrationService>.Instance);
+            using var restarted = new StorageMigrationService(control.Object, factory, copier, NullLogger<StorageMigrationService>.Instance);
             await worker.StartAsync(default);
             try
             {
@@ -107,15 +108,26 @@ public sealed class S3MigrationIntegrationTests
                 var after = await List(first, source.BucketName); after.Should().BeEquivalentTo(before);
                 var copies = await List(second, target.BucketName); copies.Select(x => x.Key).Should().BeEquivalentTo(uploaded);
 
+                // A fresh Web worker has no manifest: verify existing content instead of uploading new versions.
+                await worker.StopAsync(default); await restarted.StartAsync(default);
+                check = await restarted.CheckAsync(selected.Id, target, "integration", default);
+                var resumed = restarted.Start(check.ValidationId, "integration");
+                while (restarted.GetJob(resumed.Id).State is "queued" or "running") await Task.Delay(100, deadline.Token);
+                var resumedCopy = restarted.GetJob(resumed.Id);
+                resumedCopy.State.Should().Be("copied", resumedCopy.Error);
+                resumedCopy.CopiedFiles.Should().Be(uploaded.Count); resumedCopy.CopiedBytes.Should().Be(done.CopiedBytes);
+                (await second.ListVersionsAsync(new ListVersionsRequest { BucketName = target.BucketName })).Versions.Should().HaveCount(uploaded.Count,
+                    "matching existing objects, including multipart, must not create another version after Web restarts");
+
                 // The main copy is live: final sync must transmit only a new and a changed object.
                 using (var changed = new MemoryStream([1, 2, 3, 4, 5, 6, 7]))
                     await first.PutObjectAsync(new PutObjectRequest { BucketName = source.BucketName, Key = "avatars/original.jpg", InputStream = changed, ContentType = "image/jpeg", AutoCloseStream = false });
                 using (var added = new MemoryStream([10, 11]))
                     await first.PutObjectAsync(new PutObjectRequest { BucketName = source.BucketName, Key = "new/created.txt", InputStream = added, ContentType = "text/plain", AutoCloseStream = false });
                 uploaded.Add("new/created.txt"); var frozenSource = await List(first, source.BucketName);
-                await worker.ApplyAsync(job.Id, default);
-                while (worker.GetJob(job.Id).State is "queued" or "running") await Task.Delay(100, deadline.Token);
-                var applied = worker.GetJob(job.Id); applied.State.Should().Be("completed", applied.Error);
+                await restarted.ApplyAsync(resumed.Id, default);
+                while (restarted.GetJob(resumed.Id).State is "queued" or "running") await Task.Delay(100, deadline.Token);
+                var applied = restarted.GetJob(resumed.Id); applied.State.Should().Be("completed", applied.Error);
                 applied.CopiedFiles.Should().Be(uploaded.Count);
                 (await List(first, source.BucketName)).Should().BeEquivalentTo(frozenSource);
                 var versionsAfterSync = (await second.ListVersionsAsync(new ListVersionsRequest { BucketName = target.BucketName })).Versions;
@@ -139,7 +151,7 @@ public sealed class S3MigrationIntegrationTests
                 using var ranged = new MemoryStream(); await range.ResponseStream.CopyToAsync(ranged); ranged.ToArray().Should().Equal(2, 3, 4);
                 copies.Single(x => x.Key == largeKey).Etag.Should().Contain("-2");
             }
-            finally { await worker.StopAsync(default); }
+            finally { await worker.StopAsync(default); await restarted.StopAsync(default); }
         }
         finally
         {
