@@ -55,7 +55,7 @@
   читает `configuration` и пишет в БД на чистом старте (см. [[modules/backend-configuration]]).
   Внешние адреса обязательны (дефолт — домен + порт сервиса), SMTP опционален (пусто → без почты);
   карточка SMTP видна только при включённом `notification`.
-- **Безопасность SMTP:** при включённом `notification` генератор добавляет `SMTP_ALLOW_INSECURE=false` с пояснением в `.env` и передаёт `${SMTP_ALLOW_INSECURE:-false}` в `environment` сервиса `cloud-notification`. Переменная управляется вручную через Docker/.env; относится непосредственно к Notification, а не к конфигурации БД. Значение `true` разрешает недоверенный сертификат и SMTP без TLS (кроме implicit TLS на 465). См. [[modules/backend-notification]].
+- **Безопасность SMTP:** переменной `SMTP_ALLOW_INSECURE` больше нет — флаг `Email:AllowInsecure` (недоверенный сертификат / SMTP без TLS, кроме implicit TLS на 465) задаётся в Web-настройках, а не в `.env`/compose. См. [[modules/backend-notification]].
 - **Папка временных архивов** (`ARCHIVE_TEMP_PATH` → том `/mnt/archive-temp` сервиса `files`):
   карточка «Файлы — временные архивы», всегда видна (files — ядро). Пусто → named volume
   `archive_temp`, который Docker создаёт от root, а `files` работает под uid 1654 и не может

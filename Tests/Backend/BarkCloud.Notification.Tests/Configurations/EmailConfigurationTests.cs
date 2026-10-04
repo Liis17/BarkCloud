@@ -1,6 +1,6 @@
 using BarkCloud.Notification.Configurations;
 
-using System.Diagnostics;
+using Microsoft.Extensions.Configuration;
 
 namespace BarkCloud.Notification.Tests.Configurations;
 
@@ -8,52 +8,29 @@ public class EmailConfigurationTests
 {
     [Theory]
     [InlineData(null, false)]
-    [InlineData("", false)]
-    [InlineData("   ", false)]
     [InlineData("false", false)]
-    [InlineData("FALSE", false)]
     [InlineData("true", true)]
-    [InlineData(" TRUE ", true)]
-    public void ParseAllowInsecure_OnlyExplicitTrueEnablesInsecureSmtp(string? value, bool expected)
+    public void AllowInsecure_BindsFromEmailSection_AndIsOffWhenMissing(string? value, bool expected)
     {
-        EmailConfiguration.ParseAllowInsecure(value).Should().Be(expected);
-    }
+        var values = new Dictionary<string, string?> { ["Email:Host"] = "mail.example.test" };
+        if (value is not null)
+            values["Email:AllowInsecure"] = value;
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(values).Build();
 
-    [Theory]
-    [InlineData("1")]
-    [InlineData("yes")]
-    [InlineData("invalid")]
-    public void ParseAllowInsecure_InvalidValuePreventsStartup(string value)
-    {
-        var act = () => EmailConfiguration.ParseAllowInsecure(value);
+        var settings = configuration.GetSection("Email").Get<EmailConfiguration>()!;
 
-        act.Should().Throw<FormatException>();
+        settings.AllowInsecure.Should().Be(expected);
     }
 
     [Fact]
-    public async Task Startup_InvalidEnvironmentFlag_FailsBeforeLoadingRemoteConfiguration()
+    public void AllowInsecure_InvalidValue_FailsBinding()
     {
-        var startInfo = new ProcessStartInfo("dotnet")
-        {
-            RedirectStandardError = true,
-            RedirectStandardOutput = true
-        };
-        startInfo.ArgumentList.Add(typeof(EmailConfiguration).Assembly.Location);
-        startInfo.Environment["SMTP_ALLOW_INSECURE"] = "invalid";
-        using var process = Process.Start(startInfo)!;
-        var error = process.StandardError.ReadToEndAsync();
-        var output = process.StandardOutput.ReadToEndAsync();
-        try
-        {
-            await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(10));
-            process.ExitCode.Should().NotBe(0);
-            (await error).Should().Contain("SMTP_ALLOW_INSECURE").And.Contain(nameof(FormatException));
-            await output;
-        }
-        finally
-        {
-            if (!process.HasExited)
-                process.Kill(entireProcessTree: true);
-        }
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { ["Email:AllowInsecure"] = "yes" })
+            .Build();
+
+        var act = () => configuration.GetSection("Email").Get<EmailConfiguration>();
+
+        act.Should().Throw<InvalidOperationException>();
     }
 }

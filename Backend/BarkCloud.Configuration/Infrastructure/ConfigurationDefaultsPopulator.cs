@@ -187,6 +187,8 @@ public class ConfigurationDefaultsPopulator
         if (DatabaseNames.TryGetValue(entry.ServiceId, out var database) && entry.Section == database.Section)
             return $"Host={_postgresHost};Database={database.Database};Username={_postgresUsername};Password={_postgresPassword};Maximum Pool Size=20;Connection Idle Lifetime=60;Connection Pruning Interval=10";
 
+        if (entry.ServiceId == ServiceId.Notification && entry.Section == "Email" && entry.Key == "AllowInsecure")
+            return "false";
         if (entry.ServiceId == ServiceId.Notification && entry.Section == "Email")
             return EmptyAsNull(entry.Key switch
             {

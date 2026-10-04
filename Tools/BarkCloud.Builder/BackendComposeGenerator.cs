@@ -140,7 +140,6 @@ services:
     restart: always
     environment:
       <<: *common-variables
-      SMTP_ALLOW_INSECURE: "${SMTP_ALLOW_INSECURE:-false}"
     networks:
       - barkcloud-network
     depends_on:
@@ -447,8 +446,6 @@ volumes:
             K("EMAIL_PORT", m.EmailPort);
             K("EMAIL_SENDER_EMAIL", m.EmailSenderEmail);
             K("EMAIL_SENDER_PASSWORD", m.EmailSenderPassword);
-            sb.Append("# true отключает проверку SMTP-сертификата и разрешает отправку без TLS; по умолчанию false\n");
-            K("SMTP_ALLOW_INSECURE", "false");
         }
 
         return sb.ToString();
