@@ -149,6 +149,20 @@ public class SettingsCatalogTests
         entry.RestartTargets.Should().BeEquivalentTo("notification", "identity", "web");
     }
 
+    [Fact]
+    public void EmailAllowInsecure_IsBooleanAndRestartsOnlyNotification()
+    {
+        var entry = SettingsCatalog.Resolve(ServiceId.Notification, "Email", "AllowInsecure");
+
+        entry.ValueKind.Should().Be(SettingValueKind.Boolean);
+        entry.IsSensitive.Should().BeFalse();
+        entry.IsEnvironmentManaged.Should().BeFalse();
+        entry.RestartTargets.Should().BeEquivalentTo("notification");
+        SettingsValueValidator.ValidateAndNormalize(entry, " TRUE ").Should().Be("true");
+        var act = () => SettingsValueValidator.ValidateAndNormalize(entry, "yes");
+        act.Should().Throw<InvalidOperationException>();
+    }
+
     [Theory]
     [InlineData("relative/path")]
     [InlineData("ftp://example.com")]

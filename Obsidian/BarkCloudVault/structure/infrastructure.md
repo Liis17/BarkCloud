@@ -78,7 +78,6 @@ MinIO остаётся локальным universal/fallback-хранилище�
 
 - `CONFIGURATION_SERVICE_URL` — URL gRPC сервиса конфигурации (раздаётся всем)
 - `CONFIGURATION_ACCESS_KEY` — общий bootstrap-ключ Configuration и всех потребителей; вне Development отсутствие ключа останавливает `cloud-configuration`
-- `SMTP_ALLOW_INSECURE` — только для SMTP в `cloud-notification`: дефолт `false` требует TLS и доверенный сертификат; `true` отключает проверку сертификата и разрешает plaintext на портах STARTTLS, если сервер не поддерживает TLS (465 всегда implicit TLS). Значение читается при старте, после изменения контейнер нужно пересоздать. См. [[modules/backend-notification]].
 - `ASPNETCORE_ENVIRONMENT`
 - `CONFIGURATION_HOST/DATABASE/USERNAME/PASSWORD/PORT` — БД самого Configuration
 - `POSTGRES_USER/PASSWORD/DB/PORT` — общая Postgres

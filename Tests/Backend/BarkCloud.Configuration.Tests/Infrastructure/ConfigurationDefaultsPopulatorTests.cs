@@ -54,8 +54,11 @@ public sealed class ConfigurationDefaultsPopulatorTests : IDisposable
         second.Single(item => item.ServiceId == ServiceId.Unknown
                               && item.Section == "RabbitMQ"
                               && item.Key == "Username").Value.Should().BeEmpty();
-        second.Where(item => item.ServiceId == ServiceId.Notification && item.Section == "Email")
+        second.Where(item => item.ServiceId == ServiceId.Notification && item.Section == "Email" && item.Key != "AllowInsecure")
             .Should().OnlyContain(item => item.Value == string.Empty);
+        second.Single(item => item.ServiceId == ServiceId.Notification
+                              && item.Section == "Email"
+                              && item.Key == "AllowInsecure").Value.Should().Be("false");
 
         var universal = await _context.StorageProfiles.SingleAsync();
         universal.ProfileId.Should().Be("universal-v1");

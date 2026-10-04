@@ -108,6 +108,8 @@ public static class SettingsCatalog
             restartTargets: ["notification", "identity", "web"]);
         Add(entries, ServiceId.Notification, "Email", "SenderPassword", SettingValueKind.Password, true,
             restartTargets: ["notification", "identity", "web"]);
+        Add(entries, ServiceId.Notification, "Email", "AllowInsecure", SettingValueKind.Boolean,
+            restartTargets: ["notification"]);
 
         AddService(entries, ServiceId.Users,
             ("IdentityService", "Host", SettingValueKind.Url, false, false),

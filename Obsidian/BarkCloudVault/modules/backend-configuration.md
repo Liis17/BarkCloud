@@ -20,7 +20,7 @@ Parent: [[index]] · See also: [[api/configuration-api]] · [[structure/infrastr
 
 Typed validation ограничивает TCP-порты диапазоном `1..65535`, а длительности — положительными целыми. Источник последнего изменения для каждого ключа выбирается из `SettingsHistory` на стороне БД, без материализации всего append-only журнала.
 
-`Features:EmailEnabled` не хранится: `GetConfigurationCommandHandler` вычисляет его по полноте четырёх SMTP-полей Notification. `Features:RegistrationEnabled` хранится в `GlobalSettings`; быстрый toggle Web использует тот же API обновления.
+`Features:EmailEnabled` не хранится: `GetConfigurationCommandHandler` вычисляет его по полноте четырёх SMTP-полей Notification (`Email:AllowInsecure` в проверку не входит). `Email:AllowInsecure` (Notification, Boolean, restart-цель только `notification`) отключает проверку SMTP-сертификата; популятор досевает `false`, см. [[modules/backend-notification]]. `Features:RegistrationEnabled` хранится в `GlobalSettings`; быстрый toggle Web использует тот же API обновления.
 
 ## Seed при старте
 
