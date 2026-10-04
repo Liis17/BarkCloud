@@ -22,13 +22,15 @@ public sealed record MigrationSource(string Id, string ServiceUrl, string Bucket
 public sealed record MigrationCheckResult(string ValidationId, string Message);
 public sealed record MigrationCutover(string Id, string State, MigrationSource Source, MigrationLocation Destination,
     int ActiveUploads, bool CanCancel, bool CanRecover);
-public sealed record MigrationObject(string Key, long Size, string Etag, DateTime? LastModified, string? Sha256 = null, string? MetadataHash = null);
+public sealed record MigrationObject(string Key, long Size, string Etag, DateTime? LastModified, string? Sha256 = null, string? MetadataHash = null, string? CopyReason = null);
+public sealed record MigrationExistingCheck(MigrationObject? Verified, string? CopyReason);
 public sealed record MigrationProgress(long UploadedBytes, string Phase, string? FileName = null);
 public sealed class MigrationSourceMissingException : Exception;
 public sealed record MigrationJobSnapshot(string Id, string State, string Phase, MigrationSource Source,
     MigrationLocation Destination, string TotalBytes, string CopiedBytes, string CurrentBytes,
     long TotalFiles, long CopiedFiles, string? CurrentKey, string? CurrentName,
-    string? Error, int ActiveUploads, bool CanCancel, bool CanRetry, bool CanApply, DateTime CreatedAt);
+    string? Error, int ActiveUploads, bool CanCancel, bool CanRetry, bool CanApply, DateTime CreatedAt,
+    long SkippedFiles = 0, long UploadedFiles = 0, string? CurrentReason = null);
 
 internal sealed class StorageMigrationJob(MigrationSource source, MigrationConnection sourceConnection,
     MigrationConnection destination, string actor, string workDirectory, string? id = null)
@@ -61,12 +63,15 @@ internal sealed class StorageMigrationJob(MigrationSource source, MigrationConne
     public long CurrentBytes { get; set; }
     public long TotalFiles { get; set; }
     public long CopiedFiles { get; set; }
+    public long SkippedFiles { get; set; }
+    public long UploadedFiles { get; set; }
     public long BaseCopiedBytes { get; set; }
     public long BaseCopiedFiles { get; set; }
     public long BaseTotalBytes { get; set; }
     public long BaseTotalFiles { get; set; }
     public string? CurrentKey { get; set; }
     public string? CurrentName { get; set; }
+    public string? CurrentReason { get; set; }
     public string? Error { get; set; }
     public int ActiveUploads { get; set; }
     public void Update(Action update) { lock (Sync) update(); }
@@ -78,6 +83,6 @@ internal sealed class StorageMigrationJob(MigrationSource source, MigrationConne
             CurrentBytes.ToString(System.Globalization.CultureInfo.InvariantCulture), TotalFiles, CopiedFiles,
             CurrentKey, CurrentName, Error, ActiveUploads,
             (!PointOfNoReturn || State == "failed" && !ConfigurationApplied) && State is not ("completed" or "cancelled"), State == "failed",
-            State == "copied", CreatedAt);
+            State == "copied", CreatedAt, SkippedFiles, UploadedFiles, CurrentReason);
     }
 }

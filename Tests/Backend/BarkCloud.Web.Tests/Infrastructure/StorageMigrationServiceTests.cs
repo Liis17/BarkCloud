@@ -12,6 +12,32 @@ namespace BarkCloud.Web.Tests.Infrastructure;
 public sealed class StorageMigrationServiceTests
 {
     [Fact]
+    public async Task ExistingCopies_MetadataHeaderCasingMustNotCauseAnotherUpload()
+    {
+        using var fixture = new Fixture();
+        fixture.Source.Put("a", [1, 2], new() { ["Original-Filename"] = "video.mp4", ["Custom"] = "Value" });
+        fixture.Target.Put("a", [1, 2], new() { ["original-filename"] = "video.mp4", ["custom"] = "Value" });
+        fixture.Source.Put("missing", [3]);
+        await fixture.Service.StartAsync(default); var job = await fixture.Copy();
+        job.CopiedBytes.Should().Be("3"); job.CopiedFiles.Should().Be(2);
+        job.SkippedFiles.Should().Be(1); job.UploadedFiles.Should().Be(1);
+        fixture.Target.Written.Where(x => !x.StartsWith(".barkcloud-migration-check/")).Should().Equal(new[] { "missing" },
+            "HTTP metadata names are case-insensitive, so an already correct object must not be uploaded again");
+    }
+
+    [Fact]
+    public async Task ExistingCopies_DefaultDestinationHeadersAcceptedByCopyMustNotCauseAnotherUpload()
+    {
+        using var fixture = new Fixture();
+        fixture.Source.Put("a", [1, 2], headers: new());
+        fixture.Target.Put("a", [1, 2], headers: new() { ["Content-Type"] = "application/octet-stream", ["Cache-Control"] = "private" });
+        fixture.Source.Put("missing", [3]);
+        await fixture.Service.StartAsync(default); var job = await fixture.Copy();
+        job.CopiedBytes.Should().Be("3"); job.CopiedFiles.Should().Be(2);
+        fixture.Target.Written.Where(x => !x.StartsWith(".barkcloud-migration-check/")).Should().Equal("missing");
+    }
+
+    [Fact]
     public async Task Sources_GroupPhysicalBucketsIncludingLegacyVersionsWithoutSecrets()
     {
         using var fixture = new Fixture();
@@ -43,12 +69,19 @@ public sealed class StorageMigrationServiceTests
         fixture.Source.Put("b", [3, 4]); fixture.Target.Put("b", [8, 9]);
         fixture.Source.Put("c", [5]);
         fixture.Source.Put("d", [6], new() { ["custom"] = "source" }); fixture.Target.Put("d", [6], new() { ["custom"] = "old" });
+        var reasons = new Dictionary<string, string?>();
+        fixture.Target.OnPut = key =>
+        {
+            if (!key.StartsWith(".barkcloud-migration-check/")) reasons[key] = fixture.Service.GetJobs().Single().CurrentReason;
+        };
         await fixture.Service.StartAsync(default);
         var validation = await fixture.Prepare();
         fixture.Target.Put("external", [1]);
         var job = fixture.Service.Start(validation.ValidationId, "admin");
         var done = await fixture.Wait(job.Id, "copied");
         done.CopiedBytes.Should().Be("6"); done.CopiedFiles.Should().Be(4);
+        done.SkippedFiles.Should().Be(1); done.UploadedFiles.Should().Be(3);
+        reasons.Should().BeEquivalentTo(new Dictionary<string, string?> { ["b"] = "content", ["c"] = "missing", ["d"] = "metadata" });
         fixture.Target.Written.Should().NotContain("a").And.Contain(["b", "c", "d"]);
         fixture.Target.Objects["b"].Data.Should().Equal(3, 4);
         fixture.Target.Objects["d"].Metadata.Should().BeEquivalentTo(fixture.Source.Objects["d"].Metadata);
@@ -66,6 +99,7 @@ public sealed class StorageMigrationServiceTests
         fixture.Target.CorruptReadKey = "b";
         var job = fixture.Service.Start(check.ValidationId, "admin"); var failed = await fixture.Wait(job.Id, "failed");
         failed.Phase.Should().Be("checking-existing"); failed.CopiedBytes.Should().Be("2"); failed.CopiedFiles.Should().Be(1);
+        failed.SkippedFiles.Should().Be(1); failed.UploadedFiles.Should().Be(0);
         fixture.Target.Written.Should().NotContain("c");
         fixture.Target.CorruptReadKey = null;
         fixture.Target.OnPut = key =>
@@ -75,6 +109,7 @@ public sealed class StorageMigrationServiceTests
         };
         fixture.Service.Retry(job.Id); var done = await fixture.Wait(job.Id, "copied");
         done.CopiedBytes.Should().Be("6"); done.CopiedFiles.Should().Be(3);
+        done.SkippedFiles.Should().Be(2); done.UploadedFiles.Should().Be(1);
         fixture.Target.Written.Should().NotContain("a").And.NotContain("b").And.Contain("c");
     }
 
@@ -123,6 +158,7 @@ public sealed class StorageMigrationServiceTests
         for (var i = 0; i < 500 && restarted.GetJob(next.Id).State is not ("copied" or "failed"); i++) await Task.Delay(10);
         var done = restarted.GetJob(next.Id); done.State.Should().Be("copied");
         done.CopiedBytes.Should().Be("5"); done.CopiedFiles.Should().Be(2);
+        done.SkippedFiles.Should().Be(1); done.UploadedFiles.Should().Be(1);
         fixture.Target.Written.Where(x => !x.StartsWith(".barkcloud-migration-check/")).Should().Equal("b");
         await restarted.StopAsync(default);
     }
@@ -138,11 +174,13 @@ public sealed class StorageMigrationServiceTests
         var job = fixture.Service.Start(validation.ValidationId, "admin");
         var failed = await fixture.Wait(job.Id, "failed");
         failed.CopiedBytes.Should().Be("2"); failed.CopiedFiles.Should().Be(1); failed.CurrentKey.Should().Be("b");
+        failed.UploadedFiles.Should().Be(1);
         JsonSerializer.Serialize(failed).Should().NotContain("target-secret").And.NotContain("source-secret");
         fixture.Target.CorruptReadKey = null;
         fixture.Service.Retry(job.Id);
         var done = await fixture.Wait(job.Id, "copied");
         done.CopiedBytes.Should().Be("5"); done.CopiedFiles.Should().Be(2);
+        done.UploadedFiles.Should().Be(2);
         fixture.Target.Written.Count(x => x == "a").Should().Be(1);
         fixture.Target.Written.Count(x => x == "b").Should().Be(2);
         fixture.Target.Objects["b"].Data.Should().Equal(3, 4, 5);
@@ -160,6 +198,7 @@ public sealed class StorageMigrationServiceTests
         await fixture.Service.ApplyAsync(job.Id, default);
         var done = await fixture.Wait(job.Id, "completed");
         done.CopiedBytes.Should().Be("4"); done.CopiedFiles.Should().Be(3);
+        done.UploadedFiles.Should().Be(4, "counts confirmed upload operations, including a changed object in final sync");
         fixture.Target.Written.Should().Equal("b", "c");
         fixture.Profiles.Select(x => x.ProfileId).Should().BeEquivalentTo("images-v1", "images-v2", "cloud-files-old-v1");
         fixture.Profiles.Should().OnlyContain(x => x.ServiceUrl == Fixture.TargetConnection.ServiceUrl && x.BucketName == "to");
