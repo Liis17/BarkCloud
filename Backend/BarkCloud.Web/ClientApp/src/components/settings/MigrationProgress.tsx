@@ -4,11 +4,16 @@ import '../../styles/migration.css';
 
 const PHASES: Record<string, string> = {
   counting: 'Подсчёт объектов', 'checking-existing': 'Проверка существующих копий',
-  reading: 'Чтение части из источника', copying: 'Копирование', verifying: 'Проверка содержимого',
+  reading: 'Чтение части из источника', copying: 'Копирование', verifying: 'Проверка загруженной копии',
   copied: 'Копирование завершено', draining: 'Ожидание активных загрузок',
   'final-counting': 'Финальный подсчёт', 'final-copying': 'Финальная досинхронизация',
   'final-reading': 'Чтение части для досинхронизации', 'final-verifying': 'Финальная проверка содержимого', applying: 'Сохранение подключений',
   restarting: 'Перезапуск и проверка Files', completed: 'Миграция применена',
+};
+const COPY_REASONS: Record<string, string> = {
+  missing: 'Такого S3-ключа нет в назначении', size: 'Объект уже есть, но размер отличается',
+  metadata: 'Объект уже есть, но метаданные отличаются', content: 'Объект уже есть, но SHA-256 содержимого отличается',
+  'source-changed': 'Источник изменился после первоначальной проверки',
 };
 export function migrationPercent(job: MigrationJob) {
   if (['copied', 'completed'].includes(job.state)) return 100;
@@ -45,6 +50,8 @@ export function MigrationProgress({ job, onRefresh, onExpired, applyLink = false
   const [busy, setBusy] = React.useState(false);
   const [message, setMessage] = React.useState('');
   const percent = migrationPercent(job);
+  const reason = job.currentReason?.startsWith('header:')
+    ? 'Объект уже есть, но отличается заголовок ' + job.currentReason.slice(7) : COPY_REASONS[job.currentReason || ''];
   async function act(action: string) {
     setBusy(true); setMessage('');
     try { await migrationRequest('/api/settings/migration/jobs/' + job.id + '/' + action, {}); await onRefresh(); }
@@ -60,8 +67,9 @@ export function MigrationProgress({ job, onRefresh, onExpired, applyLink = false
     <WavyProgress value={percent} animated={job.state === 'running'} label="Прогресс переноса" />
     <div className="migration-stats"><span>{migrationBytes(job.copiedBytes)} / {migrationBytes(job.totalBytes)}<small>Подтверждено после чтения копий</small></span>
       <span>{job.copiedFiles.toLocaleString('ru-RU')} / {job.totalFiles.toLocaleString('ru-RU')}<small>Проверенных файлов</small></span></div>
+    {job.skippedFiles !== undefined && job.uploadedFiles !== undefined && <p className="migration-note">Без повторной загрузки: {job.skippedFiles.toLocaleString('ru-RU')} · Успешных загрузок с проверкой: {job.uploadedFiles.toLocaleString('ru-RU')}</p>}
     {job.phase === 'draining' && <p>Активных загрузок и обработок: {job.activeUploads}. Они завершатся перед переключением.</p>}
-    {job.currentKey !== null && <div className="migration-current">{job.currentName && <strong>{job.currentName}</strong>}<small>Полный S3-ключ</small><code>{job.currentKey}</code></div>}
+    {job.currentKey !== null && <div className="migration-current">{job.currentName && <strong>{job.currentName}</strong>}<small>Полный S3-ключ</small><code>{job.currentKey}</code>{reason && <p>{reason}</p>}</div>}
     {job.error && <p className="migration-error" role="alert">{job.error}</p>}
     {message && <p className="migration-error" role="alert">{message}</p>}
     <div className="migration-actions">

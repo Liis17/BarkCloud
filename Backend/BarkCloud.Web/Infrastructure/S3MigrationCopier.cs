@@ -205,12 +205,9 @@ public sealed class S3MigrationCopier(MigrationS3ClientFactory clients)
             var targetHash = await HashObjectAsync(targetClient, target.BucketName, item.Key, copy.ContentLength, copy.ETag, partPath, false, ct);
             if (copy.ContentLength != size || !CryptographicOperations.FixedTimeEquals(sourceHash, targetHash))
                 throw new InvalidOperationException("Контрольная сумма или размер копии не совпали с источником.");
-            foreach (var key in response.Metadata.Keys)
-                if (response.Metadata[key] != copy.Metadata[key])
-                    throw new InvalidOperationException("Метаданные копии не совпали с источником.");
-            foreach (var key in ObjectHeaders)
-                if (!string.IsNullOrEmpty(response.Headers[key]) && response.Headers[key] != copy.Headers[key])
-                    throw new InvalidOperationException("Заголовки копии не совпали с источником.");
+            var difference = MetadataDifference(response.Metadata, response.Headers, copy.Metadata, copy.Headers);
+            if (difference is not null)
+                throw new InvalidOperationException(difference == "metadata" ? "Метаданные копии не совпали с источником." : "Заголовки копии не совпали с источником.");
             // ListObjects preserves subsecond timestamps which Last-Modified HTTP headers lose.
             return new(item.Key, size, response.ETag ?? "", item.LastModified ?? response.LastModified, Convert.ToHexString(sourceHash),
                 MetadataHash(response.Metadata, response.Headers));
@@ -230,16 +227,17 @@ public sealed class S3MigrationCopier(MigrationS3ClientFactory clients)
         }
     }
 
-    public async Task<MigrationObject?> VerifyExistingAsync(IAmazonS3 sourceClient, MigrationConnection source,
+    public async Task<MigrationExistingCheck> VerifyExistingAsync(IAmazonS3 sourceClient, MigrationConnection source,
         IAmazonS3 targetClient, MigrationConnection target, MigrationObject item, string directory,
         Action<MigrationProgress> progress, CancellationToken ct)
     {
         GetObjectMetadataResponse existing;
         try { existing = await targetClient.GetObjectMetadataAsync(target.BucketName, item.Key, ct); }
-        catch (AmazonS3Exception e) when (e.StatusCode == HttpStatusCode.NotFound) { return null; }
+        catch (AmazonS3Exception e) when (e.StatusCode == HttpStatusCode.NotFound) { return new(null, "missing"); }
         var original = await SourceMetadataAsync(sourceClient, source.BucketName, item, ct);
-        if (original.ContentLength != existing.ContentLength || MetadataHash(original.Metadata, original.Headers) != MetadataHash(existing.Metadata, existing.Headers))
-            return null;
+        if (original.ContentLength != existing.ContentLength) return new(null, "size");
+        var difference = MetadataDifference(original.Metadata, original.Headers, existing.Metadata, existing.Headers);
+        if (difference is not null) return new(null, difference);
         Directory.CreateDirectory(directory);
         var partPath = Path.Combine(directory, "verify-" + Guid.NewGuid().ToString("N"));
         progress(new(0, "checking-existing", original.Metadata["original-filename"]));
@@ -247,9 +245,9 @@ public sealed class S3MigrationCopier(MigrationS3ClientFactory clients)
         {
             var sourceHash = await HashObjectAsync(sourceClient, source.BucketName, item.Key, original.ContentLength, original.ETag, partPath, true, ct);
             var targetHash = await HashObjectAsync(targetClient, target.BucketName, item.Key, existing.ContentLength, existing.ETag, partPath, false, ct);
-            if (!CryptographicOperations.FixedTimeEquals(sourceHash, targetHash)) return null;
-            return new(item.Key, original.ContentLength, original.ETag ?? "", item.LastModified ?? original.LastModified,
-                Convert.ToHexString(sourceHash), MetadataHash(original.Metadata, original.Headers));
+            if (!CryptographicOperations.FixedTimeEquals(sourceHash, targetHash)) return new(null, "content");
+            return new(new(item.Key, original.ContentLength, original.ETag ?? "", item.LastModified ?? original.LastModified,
+                Convert.ToHexString(sourceHash), MetadataHash(original.Metadata, original.Headers)), null);
         }
         finally { File.Delete(partPath); }
     }
@@ -257,9 +255,21 @@ public sealed class S3MigrationCopier(MigrationS3ClientFactory clients)
     public static string MetadataHash(MetadataCollection metadata, HeadersCollection headers) => Convert.ToHexString(
         SHA256.HashData(System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(new
         {
-            Metadata = metadata.Keys.Order(StringComparer.Ordinal).Select(key => new[] { key, metadata[key] }),
+            Metadata = metadata.Keys.Select(key => new[] { key.ToLowerInvariant(), metadata[key] }).OrderBy(pair => pair[0], StringComparer.Ordinal),
             Headers = ObjectHeaders.Where(key => !string.IsNullOrEmpty(headers[key])).Select(key => new[] { key, headers[key] })
         })));
+
+    private static string? MetadataDifference(MetadataCollection original, HeadersCollection originalHeaders,
+        MetadataCollection copy, HeadersCollection copyHeaders)
+    {
+        // Use the same contract as read-back verification: required source fields must survive,
+        // while HTTP metadata names ignore case and destination defaults may add absent fields.
+        foreach (var key in original.Keys)
+            if (original[key] != copy[key]) return "metadata";
+        foreach (var key in ObjectHeaders)
+            if (!string.IsNullOrEmpty(originalHeaders[key]) && originalHeaders[key] != copyHeaders[key]) return "header:" + key;
+        return null;
+    }
 
     private static async Task AbortPendingAsync(IAmazonS3 client, string bucket, string key, string uploadId, CancellationToken ct)
     {

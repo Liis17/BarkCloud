@@ -14,6 +14,30 @@ public sealed class S3MigrationCopierTests
     private static readonly MigrationConnection Target = new("https://target.example", "target-access", "target-secret", "to");
 
     [Theory]
+    [InlineData("size")]
+    [InlineData("metadata")]
+    [InlineData("header:Content-Type")]
+    [InlineData("content")]
+    public async Task ExistingCopy_StillRejectsActualDifferencesAndReportsReasonWithoutMetadataValues(string reason)
+    {
+        var source = new MigrationS3Fake(true); var target = new MigrationS3Fake();
+        source.Put("same-id", [1, 2], new() { ["Custom"] = "Value" });
+        target.Put("same-id", reason == "size" ? [1] : reason == "content" ? [3, 4] : [1, 2],
+            new() { ["custom"] = reason == "metadata" ? "value" : "Value" },
+            new() { ["Content-Type"] = reason == "header:Content-Type" ? "video/mp4" : "application/octet-stream" });
+        var directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+        try
+        {
+            var check = await new S3MigrationCopier(new MigrationFakeClients(source, target)).VerifyExistingAsync(source.Client.Object, Source,
+                target.Client.Object, Target, new("same-id", 2, "", null), directory, _ => {}, default);
+            check.Verified.Should().BeNull(); check.CopyReason.Should().Be(reason);
+            target.Written.Should().BeEmpty(); source.Written.Should().BeEmpty();
+            target.Client.Verify(x => x.GetObjectMetadataAsync("to", "same-id", It.IsAny<CancellationToken>()), Times.Once);
+        }
+        finally { if (Directory.Exists(directory)) Directory.Delete(directory, true); }
+    }
+
+    [Theory]
     [InlineData(true)]
     [InlineData(false)]
     public async Task Copy_RetriesS3RequestTimeoutOrHttpClientTimeoutWithoutRestartingTheObject(bool s3Timeout)

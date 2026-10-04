@@ -12,6 +12,7 @@ export interface MigrationJob {
   totalBytes: string; copiedBytes: string; currentBytes: string; totalFiles: number; copiedFiles: number;
   currentKey: string | null; currentName: string | null; error: string | null; activeUploads: number;
   canCancel: boolean; canRetry: boolean; canApply: boolean; createdAt: string;
+  skippedFiles?: number; uploadedFiles?: number; currentReason?: string | null;
 }
 export interface MigrationCutover {
   id: string; state: string; source: MigrationSource; destination: MigrationLocation;

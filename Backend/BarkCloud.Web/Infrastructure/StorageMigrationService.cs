@@ -284,9 +284,10 @@ public sealed class StorageMigrationService(IStorageMigrationControl control, Mi
         {
             if (index++ < job.ProcessedObjects) continue;
             ct.ThrowIfCancellationRequested();
-            job.Update(() => { job.CurrentKey = item.Key; job.CurrentName = null; job.CurrentBytes = 0; job.Phase = final ? "final-copying" : "copying"; });
+            job.Update(() => { job.CurrentKey = item.Key; job.CurrentName = null; job.CurrentReason = item.CopyReason; job.CurrentBytes = 0; job.Phase = final ? "final-copying" : "copying"; });
             while (old is not null && CompareKeys(old.Key, item.Key) < 0) old = await ReadObjectAsync(previous!, ct);
             MigrationObject result;
+            var uploaded = false;
             if (!final && item.Sha256 is not null) result = item;
             else if (old is not null && old.Key == item.Key && await UnchangedAsync(source, job.Source.BucketName, old, item, ct)) result = old;
             else
@@ -294,6 +295,7 @@ public sealed class StorageMigrationService(IStorageMigrationControl control, Mi
                 try
                 {
                     result = await CopyCurrentAsync(source, target, job, item, final, ct);
+                    uploaded = true;
                 }
                 catch (MigrationSourceMissingException) when (!final)
                 {
@@ -309,12 +311,13 @@ public sealed class StorageMigrationService(IStorageMigrationControl control, Mi
                 job.ConfirmedManifestLength = output.Position;
                 job.ProcessedObjects++;
                 if (final || item.Sha256 is null) { job.CopiedFiles++; job.CopiedBytes += result.Size; job.TotalBytes += result.Size - item.Size; }
+                if (uploaded) job.UploadedFiles++;
                 job.CurrentBytes = 0;
             });
         }
         job.Update(() =>
         {
-            job.CurrentKey = null; job.CurrentName = null; job.CurrentBytes = 0;
+            job.CurrentKey = null; job.CurrentName = null; job.CurrentReason = null; job.CurrentBytes = 0;
             if (!final)
             {
                 job.State = "copied"; job.Phase = "copied";
@@ -336,15 +339,16 @@ public sealed class StorageMigrationService(IStorageMigrationControl control, Mi
         {
             if (index++ < job.ScannedObjects) continue;
             var item = listed;
-            job.Update(() => { job.Phase = "checking-existing"; job.CurrentKey = item.Key; job.CurrentName = null; job.CurrentBytes = 0; });
+            job.Update(() => { job.Phase = "checking-existing"; job.CurrentKey = item.Key; job.CurrentName = null; job.CurrentReason = null; job.CurrentBytes = 0; });
             MigrationObject? verified = null;
             var missing = false;
             for (var attempt = 0; ; attempt++)
             {
                 try
                 {
-                    verified = await copier.VerifyExistingAsync(source, job.SourceConnection, target, job.Destination, item, job.Directory,
+                    var check = await copier.VerifyExistingAsync(source, job.SourceConnection, target, job.Destination, item, job.Directory,
                         progress => job.Update(() => job.CurrentName = progress.FileName), ct);
+                    verified = check.Verified; item = item with { CopyReason = check.CopyReason };
                     break;
                 }
                 catch (AmazonS3Exception e) when (e.StatusCode == HttpStatusCode.PreconditionFailed && attempt < 3)
@@ -363,7 +367,7 @@ public sealed class StorageMigrationService(IStorageMigrationControl control, Mi
                 else
                 {
                     job.TotalBytes += (verified ?? item).Size - listed.Size;
-                    if (verified is not null) { job.CopiedFiles++; job.CopiedBytes += verified.Size; }
+                    if (verified is not null) { job.CopiedFiles++; job.CopiedBytes += verified.Size; job.SkippedFiles++; }
                 }
             });
         }
@@ -386,6 +390,7 @@ public sealed class StorageMigrationService(IStorageMigrationControl control, Mi
                 try { current = await source.GetObjectMetadataAsync(job.Source.BucketName, item.Key, ct); }
                 catch (AmazonS3Exception missing) when (missing.StatusCode == HttpStatusCode.NotFound) { throw new MigrationSourceMissingException(); }
                 item = new(item.Key, current.ContentLength, current.ETag ?? "", current.LastModified);
+                job.Update(() => job.CurrentReason = "source-changed");
             }
         }
     }

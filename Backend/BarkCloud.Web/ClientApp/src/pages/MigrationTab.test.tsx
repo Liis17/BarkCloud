@@ -27,6 +27,18 @@ async function fill() {
 
 describe('Миграция S3', () => {
   it.each([
+    ['missing', 'Такого S3-ключа нет в назначении'],
+    ['metadata', 'Объект уже есть, но метаданные отличаются'],
+    ['header:Content-Type', 'Объект уже есть, но отличается заголовок Content-Type'],
+    ['content', 'Объект уже есть, но SHA-256 содержимого отличается'],
+  ])('показывает причину передачи %s и отделяет готовые копии от новых загрузок', async (currentReason, message) => {
+    mockMigration([{ ...job, currentReason, skippedFiles: 3, uploadedFiles: 1 }]); render(<MigrationTab onExpired={() => {}} />);
+    expect(await screen.findByText(message)).toBeTruthy();
+    expect(screen.getByText('Без повторной загрузки: 3 · Успешных загрузок с проверкой: 1')).toBeTruthy();
+    expect(screen.getByText('Проверка загруженной копии')).toBeTruthy();
+  });
+
+  it.each([
     ['checking-existing', 'Проверка существующих копий'],
     ['reading', 'Чтение части из источника'],
     ['final-reading', 'Чтение части для досинхронизации'],
