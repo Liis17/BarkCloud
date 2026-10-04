@@ -41,7 +41,7 @@ public sealed class StorageMigrationService(IStorageMigrationControl control, Mi
         if (SameLocation(source.Connection, target))
             throw new InvalidOperationException("Нельзя копировать бакет в самого себя.");
         if (profiles.Any(x => SameLocation(MigrationConnection.FromProfile(x), target)))
-            throw new InvalidOperationException("Назначение уже используется профилем BarkCloud. Выберите отдельный пустой бакет.");
+            throw new InvalidOperationException("Назначение уже используется профилем BarkCloud. Выберите отдельный бакет.");
         lock (_commands)
         {
             if (_jobs.Values.Any(x => SameLocation(x.Destination, target) && x.State is not ("cancelled" or "completed")))
@@ -248,7 +248,7 @@ public sealed class StorageMigrationService(IStorageMigrationControl control, Mi
                 if ((await control.GetCutoversAsync(ct)).Any(x => x.State != "applied"))
                     throw new InvalidOperationException("Сначала завершите или отмените незавершённое переключение.");
                 if (SameLocation(job.SourceConnection, job.Destination)) throw new InvalidOperationException("Нельзя копировать бакет в самого себя.");
-                await S3MigrationCopier.EnsureEmptyAsync(target, job.Destination.BucketName, ct);
+                await S3MigrationCopier.EnsureBucketAsync(target, job.Destination.BucketName, ct);
             }
             job.Update(() => { job.Phase = final ? "final-counting" : "counting"; job.TotalBytes = 0; job.TotalFiles = 0; job.CurrentKey = null; job.CurrentName = null; });
             await using (var writer = new StreamWriter(inventory, false, Encoding.UTF8))
@@ -266,6 +266,12 @@ public sealed class StorageMigrationService(IStorageMigrationControl control, Mi
             }
             job.Update(() => { if (final) job.FinalInventoryComplete = true; else job.InventoryComplete = true; });
         }
+        if (!final)
+        {
+            var inspected = Path.Combine(job.Directory, "inspected.ndjson");
+            if (!job.ExistingScanComplete) await InspectExistingAsync(source, target, job, inventory, inspected, ct);
+            inventory = inspected;
+        }
         await using var output = new FileStream(confirmed, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.Read);
         output.SetLength(job.ConfirmedManifestLength);
         output.Position = output.Length;
@@ -281,7 +287,8 @@ public sealed class StorageMigrationService(IStorageMigrationControl control, Mi
             job.Update(() => { job.CurrentKey = item.Key; job.CurrentName = null; job.CurrentBytes = 0; job.Phase = final ? "final-copying" : "copying"; });
             while (old is not null && CompareKeys(old.Key, item.Key) < 0) old = await ReadObjectAsync(previous!, ct);
             MigrationObject result;
-            if (old is not null && old.Key == item.Key && await UnchangedAsync(source, job.Source.BucketName, old, item, ct)) result = old;
+            if (!final && item.Sha256 is not null) result = item;
+            else if (old is not null && old.Key == item.Key && await UnchangedAsync(source, job.Source.BucketName, old, item, ct)) result = old;
             else
             {
                 try
@@ -300,8 +307,9 @@ public sealed class StorageMigrationService(IStorageMigrationControl control, Mi
             job.Update(() =>
             {
                 job.ConfirmedManifestLength = output.Position;
-                job.ProcessedObjects++; job.CopiedFiles++; job.CopiedBytes += result.Size;
-                job.TotalBytes += result.Size - item.Size; job.CurrentBytes = 0;
+                job.ProcessedObjects++;
+                if (final || item.Sha256 is null) { job.CopiedFiles++; job.CopiedBytes += result.Size; job.TotalBytes += result.Size - item.Size; }
+                job.CurrentBytes = 0;
             });
         }
         job.Update(() =>
@@ -314,6 +322,52 @@ public sealed class StorageMigrationService(IStorageMigrationControl control, Mi
                 job.BaseTotalBytes = job.TotalBytes; job.BaseTotalFiles = job.TotalFiles;
             }
         });
+    }
+
+    private async Task InspectExistingAsync(IAmazonS3 source, IAmazonS3 target, StorageMigrationJob job,
+        string inventory, string inspected, CancellationToken ct)
+    {
+        await using var output = new FileStream(inspected, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.Read);
+        output.SetLength(job.InspectedManifestLength); output.Position = output.Length;
+        using var saved = new StreamWriter(output, new UTF8Encoding(false), leaveOpen: true);
+        using var reader = new StreamReader(inventory, Encoding.UTF8);
+        long index = 0;
+        while (await ReadObjectAsync(reader, ct) is { } listed)
+        {
+            if (index++ < job.ScannedObjects) continue;
+            var item = listed;
+            job.Update(() => { job.Phase = "checking-existing"; job.CurrentKey = item.Key; job.CurrentName = null; job.CurrentBytes = 0; });
+            MigrationObject? verified = null;
+            var missing = false;
+            for (var attempt = 0; ; attempt++)
+            {
+                try
+                {
+                    verified = await copier.VerifyExistingAsync(source, job.SourceConnection, target, job.Destination, item, job.Directory,
+                        progress => job.Update(() => job.CurrentName = progress.FileName), ct);
+                    break;
+                }
+                catch (AmazonS3Exception e) when (e.StatusCode == HttpStatusCode.PreconditionFailed && attempt < 3)
+                {
+                    try { var current = await source.GetObjectMetadataAsync(job.Source.BucketName, item.Key, ct); item = new(item.Key, current.ContentLength, current.ETag ?? "", current.LastModified); }
+                    catch (AmazonS3Exception e2) when (e2.StatusCode == HttpStatusCode.NotFound) { missing = true; break; }
+                }
+                catch (MigrationSourceMissingException) { missing = true; break; }
+            }
+            if (!missing) await saved.WriteLineAsync(JsonSerializer.Serialize(verified ?? item).AsMemory(), ct);
+            await saved.FlushAsync(ct);
+            job.Update(() =>
+            {
+                job.InspectedManifestLength = output.Position; job.ScannedObjects++;
+                if (missing) { job.TotalFiles--; job.TotalBytes -= listed.Size; }
+                else
+                {
+                    job.TotalBytes += (verified ?? item).Size - listed.Size;
+                    if (verified is not null) { job.CopiedFiles++; job.CopiedBytes += verified.Size; }
+                }
+            });
+        }
+        job.Update(() => job.ExistingScanComplete = true);
     }
 
     private async Task<MigrationObject> CopyCurrentAsync(IAmazonS3 source, IAmazonS3 target, StorageMigrationJob job,
@@ -429,7 +483,9 @@ public sealed class StorageMigrationService(IStorageMigrationControl control, Mi
     private void Fail(StorageMigrationJob job, Exception error)
     {
         job.Update(() => { job.State = "failed"; job.Error = SafeError(error); job.CurrentBytes = 0; });
-        logger.LogWarning("Миграция {MigrationId} остановлена на этапе {Phase}", job.Id, job.Phase);
+        var s3 = error as AmazonS3Exception;
+        logger.LogWarning("Миграция {MigrationId} остановлена на этапе {Phase}: {ExceptionType}, HTTP {HttpStatus}, S3 {S3ErrorCode}",
+            job.Id, job.Phase, error.GetType().Name, s3 is null ? null : (int?)s3.StatusCode, SafeS3Code(s3));
     }
 
     private static async Task<MigrationObject?> ReadObjectAsync(StreamReader reader, CancellationToken ct)
@@ -470,18 +526,34 @@ public sealed class StorageMigrationService(IStorageMigrationControl control, Mi
             && SameLocation(S3Endpoint.Normalize(x.ServiceUrl, x.IsR2), x.BucketName, b.TargetServiceUrl, b.TargetBucketName)
             && x.Region == b.TargetRegion && (!x.HasForcePathStyle || x.ForcePathStyle) == b.TargetForcePathStyle && x.IsR2 == b.TargetIsR2));
 
-    public static string SafeError(Exception e) => e switch
+    private static string? SafeS3Code(AmazonS3Exception? e) => e?.ErrorCode switch
     {
-        AmazonS3Exception s3 when s3.StatusCode == HttpStatusCode.Forbidden => "S3 отказал в доступе. Проверьте credentials и права чтения, записи и удаления.",
-        AmazonS3Exception s3 when s3.StatusCode == HttpStatusCode.NotFound => "Бакет или объект не найден на S3.",
-        MigrationSourceMissingException => "Объект источника исчез во время финальной сверки. Конфигурация не изменена.",
-        AmazonS3Exception s3 when s3.StatusCode == HttpStatusCode.PreconditionFailed => "Объект источника изменился во время копирования. Повторите передачу.",
-        AmazonS3Exception => "Ошибка S3 или сети. Проверьте доступность хранилища и продолжите задачу.",
-        OperationCanceledException => "Операция прервана или превышено время ожидания. Можно повторить.",
-        RpcException => "Сервис недоступен или отклонил переключение. Проверьте подключения и раздел «Обслуживание».",
-        InvalidOperationException => e.Message,
-        _ => "Не удалось завершить операцию. Проверьте доступность сервисов и продолжите задачу."
+        "AccessDenied" or "InvalidAccessKeyId" or "SignatureDoesNotMatch" or "ExpiredToken" or "InvalidToken"
+            or "AuthorizationHeaderMalformed" or "NoSuchBucket" or "NoSuchKey" or "NoSuchUpload" or "PreconditionFailed"
+            or "RequestTimeout" or "RequestTimeoutException" or "SlowDown" or "ServiceUnavailable" or "InternalError"
+            or "InvalidPart" or "InvalidPartOrder" or "EntityTooSmall" => e.ErrorCode,
+        _ => null
     };
+
+    public static string SafeError(Exception e)
+    {
+        var message = e switch
+        {
+            AmazonS3Exception s3 when s3.StatusCode == HttpStatusCode.Forbidden => "S3 отказал в доступе. Проверьте credentials и права чтения, записи и удаления.",
+            AmazonS3Exception s3 when s3.StatusCode == HttpStatusCode.NotFound => "Бакет или объект не найден на S3.",
+            MigrationSourceMissingException => "Объект источника исчез во время финальной сверки. Конфигурация не изменена.",
+            AmazonS3Exception s3 when s3.StatusCode == HttpStatusCode.PreconditionFailed => "Объект источника изменился во время копирования. Повторите передачу.",
+            AmazonS3Exception => "Ошибка S3 или сети. Проверьте доступность хранилища и продолжите задачу.",
+            TimeoutException or OperationCanceledException => "S3 не ответил вовремя или операция прервана. Продолжение повторит незавершённый объект.",
+            IOException or HttpRequestException => "Соединение с S3 оборвалось. Продолжите задачу: подтверждённые файлы сохранятся.",
+            RpcException => "Сервис недоступен или отклонил переключение. Проверьте подключения и раздел «Обслуживание».",
+            InvalidOperationException => e.Message,
+            _ => "Не удалось завершить операцию. Проверьте доступность сервисов и продолжите задачу."
+        };
+        if (e is not AmazonS3Exception error) return message;
+        var code = SafeS3Code(error);
+        return message + (error.StatusCode != 0 ? $" HTTP {(int)error.StatusCode}." : "") + (code is null ? "" : $" S3: {code}.");
+    }
 
     public override void Dispose()
     {

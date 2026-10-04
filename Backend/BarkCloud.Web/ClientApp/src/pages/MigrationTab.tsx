@@ -85,7 +85,7 @@ export default function MigrationTab({ active = true, onExpired }: { active?: bo
       </article>
       <div className="migration-arrow" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M 4 12 H 20 M 13 5 L 20 12 L 13 19" /></svg></div>
       <article className="migration-connection-card" aria-label="Целевое хранилище">
-        <div className="migration-card-title"><span className="migration-step">2</span><div><h3>Назначение</h3><small>Отдельный пустой бакет на другом S3</small></div></div>
+        <div className="migration-card-title"><span className="migration-step">2</span><div><h3>Назначение</h3><small>Отдельный бакет на другом S3</small></div></div>
         <fieldset className="migration-fields" disabled={busy || running}><legend className="sr-only">Подключение назначения</legend>
           <label className="migration-field"><span>Endpoint</span><input aria-label="Endpoint назначения" inputMode="url" value={target.serviceUrl} placeholder="https://s3.example.com"
             aria-invalid={endpointError} aria-describedby={endpointHintId} onChange={e => edit('serviceUrl', e.target.value)}
@@ -114,6 +114,6 @@ export default function MigrationTab({ active = true, onExpired }: { active?: bo
     {status.cutovers.some(cutover => !status.jobs.some(job => job.id === cutover.id)) && <div className="migration-progress-card"><strong>В Files сохранено незавершённое переключение.</strong><p>Откройте S3-профили в настройках сервера, чтобы безопасно отменить его или повторить перезапуск Files.</p><a className="btn primary" href="/settings#server-settings">Открыть S3-профили</a></div>}
     {status.loading && <Loading label="Получаем состояние миграции…" />}
     {status.jobs.map(job => <MigrationProgress key={job.id} job={job} onRefresh={status.refresh} onExpired={onExpired} applyLink />)}
-    <p className="migration-note">Переносятся текущие объекты. История версий, политики, ACL и lifecycle бакета не копируются. Задача продолжится при закрытии страницы, но не восстанавливается после перезапуска Web.</p>
+    <p className="migration-note">Сначала проверяются уже существующие копии: совпавшие по содержимому и метаданным файлы не загружаются повторно, остальные копируются с заменой. История версий, политики, ACL и lifecycle бакета не копируются. Закрытие страницы не останавливает перенос. После перезапуска Web запустите новую задачу с тем же назначением — проверенные копии останутся.</p>
   </div>;
 }

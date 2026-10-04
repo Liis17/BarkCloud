@@ -46,6 +46,9 @@ internal sealed class StorageMigrationJob(MigrationSource source, MigrationConne
     public string Phase { get; set; } = "counting";
     public string Operation { get; set; } = "copy";
     public bool InventoryComplete { get; set; }
+    public bool ExistingScanComplete { get; set; }
+    public long ScannedObjects { get; set; }
+    public long InspectedManifestLength { get; set; }
     public bool FinalInventoryComplete { get; set; }
     public long ProcessedObjects { get; set; }
     public long ConfirmedManifestLength { get; set; }
