@@ -1,3 +1,6 @@
+using Amazon.S3;
+using Amazon.S3.Model;
+
 using BarkCloud.Files.Domain;
 using BarkCloud.Files.Exceptions;
 using BarkCloud.Files.Features.DownloadFile;
@@ -29,6 +32,54 @@ public class DownloadFileCommandHandlerTests
     private DownloadFileCommandHandler CreateSut() => new(
         _files.Object, _s3.Object, _bucketRegistry.Object, _temp.Object,
         NullLogger<DownloadFileCommandHandler>.Instance);
+
+    [Fact]
+    public async Task Handle_TempVideoAfterRelocation_ReadsRangeWithOriginalIdThroughInactiveProfile()
+    {
+        var configuration = TestConfiguration.With(
+            ("StorageProfiles:videos-v1:Role", "videos"), ("StorageProfiles:videos-v1:Version", "1"),
+            ("StorageProfiles:videos-v1:ServiceUrl", "https://destination.example"),
+            ("StorageProfiles:videos-v1:BucketName", "cloud-video"),
+            ("StorageProfiles:videos-v1:AccessKey", "target-key"), ("StorageProfiles:videos-v1:SecretKey", "target-secret"),
+            ("StorageProfiles:videos-v2:Role", "videos"), ("StorageProfiles:videos-v2:Version", "2"),
+            ("StorageProfiles:videos-v2:ServiceUrl", "https://destination.example"),
+            ("StorageProfiles:videos-v2:BucketName", "cloud-video"),
+            ("StorageProfiles:videos-v2:AccessKey", "target-key"), ("StorageProfiles:videos-v2:SecretKey", "target-secret"),
+            ("StorageProfiles:videos-v2:IsActive", "true"));
+        var profiles = new Mock<S3BucketRegistry>(configuration) { CallBase = true };
+        using var registry = profiles.Object;
+        var client = new Mock<IAmazonS3>(MockBehavior.Strict);
+        profiles.Setup(x => x.GetClientForProfile("videos-v1")).Returns(client.Object);
+        var tempId = Guid.NewGuid(); var originalId = Guid.NewGuid();
+        _files.Setup(x => x.GetFile(tempId)).ReturnsAsync((UploadFileEntity?)null);
+        _temp.Setup(x => x.GetTempFile(tempId)).ReturnsAsync(new TempFile { Id = tempId, OriginalFileId = originalId });
+        _files.Setup(x => x.GetFile(originalId)).ReturnsAsync(new UploadFileEntity
+        {
+            Id = originalId, StorageProfileId = "videos-v1", Type = UploadFileType.CloudFile,
+            MediaKind = MediaKind.Video, Filename = "video.mp4", Size = 2,
+            Etag = "old-source-etag", UploadedAt = DateTime.UtcNow
+        });
+        client.Setup(x => x.GetObjectAsync(It.Is<GetObjectRequest>(r =>
+            r.BucketName == "cloud-video" && r.Key == originalId.ToString()
+            && r.ByteRange.Start == 0 && r.ByteRange.End == 1 && string.IsNullOrEmpty(r.EtagToMatch)),
+            It.IsAny<CancellationToken>())).ReturnsAsync(new GetObjectResponse
+            { ResponseStream = new MemoryStream([1, 2]), ContentLength = 2, ETag = "new-destination-etag" });
+        var handler = new DownloadFileCommandHandler(_files.Object, new S3Uploader(registry), registry, _temp.Object,
+            NullLogger<DownloadFileCommandHandler>.Instance);
+
+        var result = await handler.Handle(new DownloadFileCommand { FileId = tempId, RangeStart = 0 }, default);
+
+        await using var stream = result.FileStream;
+        using var contents = new MemoryStream();
+        await stream.CopyToAsync(contents);
+        contents.ToArray().Should().Equal(1, 2);
+        result.IsPartial.Should().BeTrue(); result.ContentLength.Should().Be(2);
+        result.ContentType.Should().Be("video/mp4");
+        registry.GetProfile("videos-v1").IsActive.Should().BeFalse();
+        registry.GetProfile("videos-v1").ServiceUrl.Should().Be("https://destination.example");
+        profiles.Verify(x => x.GetClientForProfile("videos-v1"), Times.Once);
+        profiles.Verify(x => x.GetClientForProfile("videos-v2"), Times.Never);
+    }
 
     [Fact]
     public async Task Handle_FileNotFoundAndNoTemp_Throws()
