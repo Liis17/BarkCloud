@@ -20,7 +20,7 @@ import java.util.concurrent.ConcurrentHashMap
  * Управляет gRPC-каналами ко всем сервисам. На каждый адрес — один кэшированный
  * канал (OkHttp-транспорт + интерсепторы [AuthInterceptor] и [ClientMetadataInterceptor]),
  * поверх которого создаются типизированные стабы. FilesApi / CloudApi / AlbumApi
- * живут на одном адресе (:7025) и делят канал.
+ * живут на одном адресе (:8005) и делят канал.
  */
 class GrpcManager(
     private val globalParam: GlobalParam,

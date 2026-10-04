@@ -24,22 +24,22 @@ android {
         buildConfigField(
             "String",
             "IDENTITY_API_ADDRESS",
-            "\"https://cloud.barkfluff.com:7020\""
+            "\"https://cloud.barkfluff.com:8000\""
         )
         buildConfigField(
             "String",
             "USERS_API_ADDRESS",
-            "\"https://cloud.barkfluff.com:7021\""
+            "\"https://cloud.barkfluff.com:8001\""
         )
         buildConfigField(
             "String",
             "FILES_API_ADDRESS",
-            "\"https://cloud.barkfluff.com:7025\""
+            "\"https://cloud.barkfluff.com:8005\""
         )
         buildConfigField(
             "String",
             "FILES_WEB_BASE",
-            "\"https://cloud.barkfluff.com:7025/web\""
+            "\"https://cloud.barkfluff.com:8005/web\""
         )
         // Data plane Upload 2.0: nginx маршрутизирует /file-upload/ с 443 напрямую в Files.
         buildConfigField(

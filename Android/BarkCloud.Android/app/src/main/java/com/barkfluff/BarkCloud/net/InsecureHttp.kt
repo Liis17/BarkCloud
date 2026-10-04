@@ -7,7 +7,7 @@ import javax.net.ssl.HostnameVerifier
 /**
  * OkHttp-клиент, доверяющий самоподписанному сертификату сервера. Используется для
  * multipart-загрузки/скачивания оригиналов файлов ([FileTransferService]) и как
- * call-factory для сетевого слоя Coil (превью с :7025).
+ * call-factory для сетевого слоя Coil (превью с :8005).
  */
 object InsecureHttp {
 

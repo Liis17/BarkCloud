@@ -4,8 +4,8 @@ import android.net.Uri
 
 /**
  * Конфигурация эндпоинтов файлового сервиса. nginx терминирует TLS и маршрутизирует
- * gRPC по портам (Identity :7020, Users :7021, Files :7025). HTTP-раздача файлов —
- * `:7025/web/{upload|download}/{id}`. Адрес и порты переопределяются на экране
+ * gRPC по портам (Identity :8000, Users :8001, Files :8005). HTTP-раздача файлов —
+ * `:8005/web/{upload|download}/{id}`. Адрес и порты переопределяются на экране
  * входа — см. [ServerSettings].
  */
 object GrpcEndpoint {

@@ -7,7 +7,7 @@ Parent: [[modules/android-app]] · Сервер: [[modules/upload-2]] · iOS-р�
 Все Android-загрузки `CLOUD_FILE` переведены с legacy multipart `/upload/{id}` на
 возобновляемые Upload 2.0-сессии (сервер — [[modules/upload-2]]). Control plane —
 gRPC `FilesApi`, data plane — `PUT /file-upload/{session}/parts/{n}` напрямую в
-Files через nginx **:443** (`BuildConfig.FILES_UPLOAD_BASE`, не :7025). **Аватар
+Files через nginx **:443** (`BuildConfig.FILES_UPLOAD_BASE`, не :8005). **Аватар
 остался на legacy V1** (`UserRepository.setAvatar` → `GetUploadUrl(USER_AVATAR)` →
 multipart POST → `SetProfilePicture`) — паритет с iOS.
 
