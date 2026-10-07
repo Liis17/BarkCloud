@@ -1,4 +1,6 @@
 import React from 'react';
+import { useTextFileViewer } from '../hooks/useTextFileViewer';
+import { getTextFileKind, textContentUrl } from '../lib/textFiles';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import { PublicShareHeader, PublicShareShell, PublicStatus } from '../components/public/PublicShareShell';
@@ -25,6 +27,7 @@ export function PublicViewPage() {
   const { token } = useParams<{ token: string }>();
   const navigate = useNavigate();
   const [state, setState] = React.useState<'loading' | 'notfound' | ShareInfo>('loading');
+  const { openTextFile, textViewer } = useTextFileViewer();
   const headInfo = typeof state === 'object' ? state : null;
   const headTitle = headInfo ? headInfo.name : state === 'notfound' ? 'Ссылка недоступна' : 'Публичный файл';
   const headIconUrl = headInfo?.previewUrl || null;
@@ -71,6 +74,7 @@ export function PublicViewPage() {
   const isVideo = info.mediaKind === 'video';
   const file = describePublicFile(info.name, info.mediaKind);
   const downloadHref = info.downloadPath || `/s/${token}`;
+  const isText = !!getTextFileKind(info.name);
   return (
     <PublicShareShell>
       <PublicShareHeader
@@ -95,7 +99,14 @@ export function PublicViewPage() {
         </a>
       </PublicShareHeader>
 
-      {isVideo || isPhoto ? (
+      {isText ? (
+        <section className="public-nopreview">
+          <button className="btn primary" onClick={() => openTextFile({ name: info.name, size: info.fileSize,
+            contentUrl: textContentUrl({ kind: 'public', token: token! }), onDownload: () => { window.location.href = downloadHref; } })}>
+            <Icon.eye size={20} /> Открыть файл
+          </button>
+        </section>
+      ) : isVideo || isPhoto ? (
         <section className="public-stage">
           <div className={'public-stage-media' + (isVideo ? ' is-video' : '')}>
             {isVideo && info.downloadUrl ? (
@@ -133,6 +144,7 @@ export function PublicViewPage() {
         </section>
       )}
       {toastNode}
+      {textViewer}
     </PublicShareShell>
   );
 }

@@ -1,4 +1,6 @@
 import React from 'react';
+import { useTextFileViewer } from '../../hooks/useTextFileViewer';
+import { textContentUrl } from '../../lib/textFiles';
 import { Modal } from './Modal';
 import { Icon } from '../Icon';
 import { Loading } from './EmptyState';
@@ -31,6 +33,7 @@ export function SharedFolderModal({ rootDirId, rootName, onClose }: { rootDirId:
   const [data, setData] = React.useState<Listing | null>(null);
   const [error, setError] = React.useState(false);
   const [viewer, setViewer] = React.useState<PubFile | null>(null);
+  const { openTextFile, textViewer } = useTextFileViewer();
 
   const here = stack[stack.length - 1];
 
@@ -47,6 +50,7 @@ export function SharedFolderModal({ rootDirId, rootName, onClose }: { rootDirId:
   }, [here.id]);
 
   function openFile(f: PubFile) {
+    if (openTextFile({ name: f.name, size: f.fileSize, contentUrl: textContentUrl({ kind: 'shared', fileId: f.fileId }), onDownload: () => { if (f.downloadUrl) window.open(f.downloadUrl, '_blank'); } })) return;
     if (f.mediaKind === 'photo' || f.mediaKind === 'video') setViewer(f);
     else if (f.downloadUrl) window.open(f.downloadUrl, '_blank');
   }
@@ -133,6 +137,7 @@ export function SharedFolderModal({ rootDirId, rootName, onClose }: { rootDirId:
           </div>
         </div>
       )}
+      {textViewer}
     </Modal>
   );
 }

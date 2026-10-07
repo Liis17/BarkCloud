@@ -1,0 +1,49 @@
+.modal.text-file-modal { max-width: 1200px; height: 88vh; min-width: 0; }
+.text-file-modal .modal-head h3 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.text-file-modal .modal-body { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
+.text-file-modal .modal-actions { padding-top: 12px; padding-bottom: 16px; }
+.text-file-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 4px 0 12px; }
+.text-file-size { color: var(--md-on-surface-variant); font-size: 12px; }
+.text-file-tabs { display: flex; }
+.text-file-toolbar .btn[aria-pressed=true] { background: var(--md-secondary-container); color: var(--md-on-secondary-container); }
+.text-file-encoding { display: flex; align-items: center; gap: 8px; margin-left: auto; font-size: 12px; color: var(--md-on-surface-variant); }
+.text-file-encoding select { color: var(--md-on-surface); background: var(--md-surface-container); border: 1px solid var(--md-outline-variant); border-radius: 8px; padding: 8px; }
+.text-file-content { flex: 1; min-height: 0; overflow: auto; border: 1px solid var(--md-outline-variant); border-radius: 12px; background: var(--md-surface-container-low); }
+.text-file-status { padding: 32px 20px; text-align: center; color: var(--md-on-surface-variant); }
+.text-file-error { color: var(--md-error); overflow-wrap: anywhere; padding: 8px 0; }
+.text-file-source { height: 100%; }
+.text-file-source .cm-editor { height: 100%; color: var(--md-on-surface); background: transparent; }
+.text-file-source .cm-scroller { overflow: auto; font: 13px/1.6 'Roboto Mono', monospace; }
+.text-file-source .cm-gutters { background: var(--md-surface-container); color: var(--md-on-surface-variant); border-color: var(--md-outline-variant); }
+.text-file-source .cm-focused { outline: 2px solid var(--md-primary); outline-offset: -2px; }
+.text-file-source .cm-content { padding: 12px 0; }
+.text-file-source .cm-selectionBackground { background: var(--md-secondary-container) !important; }
+.text-file-markdown { padding: 20px 28px; overflow-wrap: anywhere; color: var(--md-on-surface); line-height: 1.65; }
+.text-file-markdown > :first-child { margin-top: 0; }
+.text-file-markdown p, .text-file-markdown ul, .text-file-markdown ol, .text-file-markdown blockquote, .text-file-markdown pre, .text-file-markdown table { margin: 0 0 16px; }
+.text-file-markdown ul, .text-file-markdown ol { padding-left: 28px; }
+.text-file-markdown h1, .text-file-markdown h2, .text-file-markdown h3, .text-file-markdown h4, .text-file-markdown h5, .text-file-markdown h6 { margin: 24px 0 12px; line-height: 1.3; }
+.text-file-markdown h1 { font-size: 28px; }.text-file-markdown h2 { font-size: 24px; }.text-file-markdown h3 { font-size: 20px; }
+.text-file-markdown a { color: var(--md-primary); text-decoration: underline; }
+.text-file-markdown img { max-width: 100%; height: auto; border-radius: 8px; }
+.text-file-markdown blockquote { border-left: 3px solid var(--md-outline); padding-left: 16px; color: var(--md-on-surface-variant); }
+.text-file-markdown pre { overflow: auto; padding: 16px; border-radius: 8px; background: var(--md-surface-container); }
+.text-file-markdown code { font: 13px/1.6 'Roboto Mono', monospace; }
+.text-file-markdown :not(pre) > code { padding: 2px 5px; border-radius: 4px; background: var(--md-surface-container); }
+.text-file-markdown table { display: block; overflow-x: auto; border-collapse: collapse; }
+.text-file-markdown th, .text-file-markdown td { border: 1px solid var(--md-outline-variant); padding: 8px 12px; }
+.text-file-markdown th { background: var(--md-surface-container); }
+.text-file-markdown hr { border: 0; border-top: 1px solid var(--md-outline-variant); margin: 24px 0; }
+.text-file-markdown .katex-display { overflow-x: auto; overflow-y: hidden; padding: 8px 0; }
+.text-file-markdown .hljs-keyword, .text-file-markdown .hljs-selector-tag, .text-file-markdown .hljs-title { color: var(--md-primary); }
+.text-file-markdown .hljs-string, .text-file-markdown .hljs-number, .text-file-markdown .hljs-literal { color: var(--md-tertiary); }
+.text-file-markdown .hljs-comment { color: var(--md-on-surface-variant); font-style: italic; }
+.text-file-diagram { margin-bottom: 16px; overflow: auto; }
+.text-file-diagram svg { max-width: 100%; height: auto; }
+@media (max-width: 600px) {
+  .text-file-modal .modal-head { padding: 16px 12px 8px; }
+  .text-file-modal .modal-body { padding: 4px 12px 8px; }
+  .text-file-modal .modal-actions { padding: 8px 12px 12px; }
+  .text-file-encoding { margin-left: 0; }
+  .text-file-markdown { padding: 16px; }
+}

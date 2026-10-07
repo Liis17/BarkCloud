@@ -1,9 +1,10 @@
 import React from 'react';
+import { useTextSearchOpen } from '../../hooks/useTextSearchOpen';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Icon } from '../Icon';
 import { UploadIndicator } from '../upload/UploadIndicator';
 import { apiGet } from '../../lib/api';
-import { openSearchHit, searchHitIconName, SECTION_LABEL, type SearchHit, type SearchResponse } from '../../lib/search';
+import { searchHitIconName, SECTION_LABEL, type SearchHit, type SearchResponse } from '../../lib/search';
 import type { PageHeader } from '../../hooks/usePageHeader';
 
 const LISTBOX_ID = 'global-search-results';
@@ -11,6 +12,7 @@ const LISTBOX_ID = 'global-search-results';
 /** Глобальный поиск. Запросы отменяются, чтобы устаревшая подсказка не перезаписала новую. */
 export function Topbar({ kicker, title, actions }: PageHeader) {
   const navigate = useNavigate();
+  const { openSearchResult, textViewer } = useTextSearchOpen();
   const location = useLocation();
   const [q, setQ] = React.useState('');
   const [data, setData] = React.useState<SearchResponse | null>(null);
@@ -67,7 +69,7 @@ export function Topbar({ kicker, title, actions }: PageHeader) {
 
   function choose(hit: SearchHit) {
     setOpen(false);
-    openSearchHit(hit, navigate);
+    openSearchResult(hit);
   }
 
   function onKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
@@ -175,6 +177,7 @@ export function Topbar({ kicker, title, actions }: PageHeader) {
           <span className="dot-badge" />
         </button>
       </div>
+      {textViewer}
     </header>
   );
 }

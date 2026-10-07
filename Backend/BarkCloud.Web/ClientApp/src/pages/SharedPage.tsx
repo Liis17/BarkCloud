@@ -4,6 +4,8 @@ import { Icon } from '../components/Icon';
 import { EmptyState, Loading } from '../components/ui/EmptyState';
 import { SharedFolderModal } from '../components/ui/SharedFolderModal';
 import { useToast } from '../hooks/useToast';
+import { useTextFileViewer } from '../hooks/useTextFileViewer';
+import { getTextFileKind, textContentUrl } from '../lib/textFiles';
 import { useConfirm } from '../hooks/useDialog';
 import { usePageHeader } from '../hooks/usePageHeader';
 import { apiGet, apiPost } from '../lib/api';
@@ -25,6 +27,7 @@ interface SharedOwner {
 interface SharedFile {
   id: string;
   name: string;
+  size?: number;
   previews?: { url: string }[];
 }
 interface SharedItem {
@@ -140,7 +143,7 @@ function LinkCard({ link, onCopy, onRevoke }: { link: ShareLink; onCopy: (l: Sha
   );
 }
 
-function SharedCard({ item, onDownload, opened }: { item: SharedItem; onDownload: (it: SharedItem) => void; opened?: boolean }) {
+function SharedCard({ item, onDownload, onOpen, opened }: { item: SharedItem; onDownload: (it: SharedItem) => void; onOpen: (it: SharedItem) => void; opened?: boolean }) {
   const preview = item.file.previews && item.file.previews[0];
   return (
     <div id={opened ? `search-shared-grant-${item.grantId}` : undefined} className={'link-card' + (opened ? ' search-open-card' : '')}>
@@ -163,6 +166,7 @@ function SharedCard({ item, onDownload, opened }: { item: SharedItem; onDownload
         </div>
       </div>
       <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        {getTextFileKind(item.file.name) && <button className="btn text" onClick={() => onOpen(item)}><Icon.eye size={16} /> Открыть</button>}
         <button className="btn text" onClick={() => onDownload(item)}>
           <Icon.download size={16} /> Скачать
         </button>
@@ -310,6 +314,7 @@ export function SharedPage() {
   const [sharedCursor, setSharedCursor] = React.useState<Cursor>(null);
   const [moreBusy, setMoreBusy] = React.useState(false);
   const [toastNode, toast] = useToast();
+  const { openTextFile, textViewer } = useTextFileViewer();
   const [confirmNode, confirm] = useConfirm();
 
   const loadPublic = React.useCallback(() => {
@@ -506,6 +511,9 @@ export function SharedPage() {
       toast((e as Error).message, 'err');
     }
   }
+  function openSharedText(item: SharedItem) {
+    openTextFile({ name: item.file.name, size: item.file.size, contentUrl: textContentUrl({ kind: 'shared', fileId: item.file.id }), onDownload: () => download(item) });
+  }
 
   const tabTitle = tab === 'ishared' ? 'Я поделился' : tab === 'mine' ? 'Мне доступны' : 'Мои публичные';
 
@@ -527,6 +535,7 @@ export function SharedPage() {
   return (
     <>
       {toastNode}
+      {textViewer}
       {confirmNode}
 
       <div className="sh-tabs">
@@ -668,7 +677,7 @@ export function SharedPage() {
                   </div>
                 </div>
                 {shared.map((it) => (
-                  <SharedCard key={it.grantId} item={it} onDownload={download} opened={it.grantId === openGrantId} />
+                  <SharedCard key={it.grantId} item={it} onDownload={download} onOpen={openSharedText} opened={it.grantId === openGrantId} />
                 ))}
               </>
             )}

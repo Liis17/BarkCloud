@@ -87,6 +87,7 @@ builder.Services.AddGrpcClient<TorrentApi.TorrentApiClient>(o => o.Address = new
 
 // HttpClient для прокси-загрузки байтов в Files (на внутренний HTTP1-эндпоинт).
 builder.Services.AddHttpClient("files-upload");
+builder.Services.AddSingleton<TextPreviewProxy>();
 // HttpClient для прокси-скачивания файлов торрентов с диска (Range).
 builder.Services.AddHttpClient("torrent");
 // Реестр версий читается без авторизации; короткий in-memory cache снижает число запросов
@@ -171,6 +172,7 @@ app.UseStaticFiles();
 
 app.MapWebEndpoints();
 app.MapCloudApiEndpoints();
+app.MapTextPreviewEndpoints();
 app.MapSearchEndpoints();
 app.MapTorrentApiEndpoints();
 app.MapSystemEndpoints();

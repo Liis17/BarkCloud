@@ -9,6 +9,8 @@ import { DynamicFolderFormModal } from './DynamicFolderFormModal';
 import { useMediaActions } from '../../hooks/useMediaActions';
 import { useSelection } from '../../hooks/useSelection';
 import { useConfirm } from '../../hooks/useDialog';
+import { useTextFileViewer } from '../../hooks/useTextFileViewer';
+import { textContentUrl } from '../../lib/textFiles';
 import { apiGet, apiPost, deleteEntriesBatch, deleteMediaBatch } from '../../lib/api';
 import { GRID_SIZES, kindRu, fmtFull, plural } from '../../lib/format';
 import { useDocumentHead } from '../../hooks/useDocumentHead';
@@ -28,6 +30,7 @@ interface Props {
 export function DynamicFolderDetail({ folder, onBack, onChanged, toast, albums, reloadAlbums }: Props) {
   const [items, setItems] = React.useState<MediaItem[] | null>(null);
   const [lightbox, setLightbox] = React.useState<number | null>(null);
+  const { openTextFile, textViewer } = useTextFileViewer();
   const [editing, setEditing] = React.useState(false);
   const [bulkConfirm, setBulkConfirm] = React.useState(false);
   const [confirmNode, confirm] = useConfirm();
@@ -85,6 +88,7 @@ export function DynamicFolderDetail({ folder, onBack, onChanged, toast, albums, 
     }
   }
   function openItem(m: MediaItem) {
+    if (openTextFile({ name: m.name, size: m.size, contentUrl: textContentUrl({ kind: 'owned', fileId: m.id }), onDownload: () => download(m.id) })) return;
     if (m.kind === 'photo' || m.kind === 'video') setLightbox(media.findIndex((x) => x.id === m.id));
     else download(m.id);
   }
@@ -165,8 +169,9 @@ export function DynamicFolderDetail({ folder, onBack, onChanged, toast, albums, 
     return (
       <div
         key={m.id}
+        tabIndex={-1}
         className={'df-list-row' + (checked ? ' checked' : '')}
-        onClick={(e) => clickItem(m, e.shiftKey)}
+        onClick={(e) => { e.currentTarget.focus(); clickItem(m, e.shiftKey); }}
         onContextMenu={(e) => actions.openMenu(e, m)}
       >
         <button
@@ -195,8 +200,9 @@ export function DynamicFolderDetail({ folder, onBack, onChanged, toast, albums, 
     return (
       <div
         key={m.id}
+        tabIndex={-1}
         className={'photo' + (extraClass ? ' ' + extraClass : '') + (checked ? ' checked' : '')}
-        onClick={(e) => clickItem(m, e.shiftKey)}
+        onClick={(e) => { e.currentTarget.focus(); clickItem(m, e.shiftKey); }}
         onContextMenu={(e) => actions.openMenu(e, m)}
       >
         <MediaThumb media={m} sizes={GRID_SIZES} colorPlaceholder={folder.viewMode !== 1} />
@@ -311,6 +317,7 @@ export function DynamicFolderDetail({ folder, onBack, onChanged, toast, albums, 
         />
       )}
       {lightbox !== null && <Lightbox items={media} index={lightbox} actions={actions.api} onClose={() => setLightbox(null)} />}
+      {textViewer}
       {actions.overlay}
       {confirmNode}
     </div>

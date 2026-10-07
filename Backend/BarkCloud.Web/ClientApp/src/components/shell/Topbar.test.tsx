@@ -9,6 +9,7 @@ const hit = (id: string, previewUrl = '') => ({
   favorite: false, matchField: 'name', matchValue: id, createdAt: null, size: 0,
 });
 const jsonResponse = (body: unknown) => ({ ok: true, text: async () => JSON.stringify(body) });
+vi.mock('../text/TextSource', () => ({ default: ({ text }: { text: string }) => <pre aria-label="Содержимое файла">{text}</pre> }));
 
 function Location() {
   const location = useLocation();
@@ -25,6 +26,25 @@ afterEach(() => {
 });
 
 describe('Topbar global search', () => {
+  it('открывает текстовый результат прямо в модалке', async () => {
+    vi.useFakeTimers();
+    const textHit = { ...hit('text-1'), kind: 'file', title: 'notes.txt' };
+    const fetchMock = vi.fn((url: string) => Promise.resolve(url.includes('/text?')
+      ? { ok: true, arrayBuffer: async () => new TextEncoder().encode('text').buffer }
+      : jsonResponse({ query: 'notes', sections: [{ key: 'files', items: [textHit], unavailable: false }] })));
+    vi.stubGlobal('fetch', fetchMock);
+    renderTopbar();
+    const input = screen.getByRole('combobox');
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: 'notes' } });
+    await act(async () => { await vi.advanceTimersByTimeAsync(250); });
+    vi.useRealTimers();
+    fireEvent.click(screen.getByRole('option', { name: 'notes.txt' }));
+    expect(await screen.findByLabelText('Содержимое файла')).toHaveProperty('textContent', 'text');
+    expect(screen.getByRole('dialog', { name: 'notes.txt' })).toBeTruthy();
+    expect(screen.getByTestId('location').textContent).toBe('/photos');
+    expect(fetchMock.mock.calls.map(([url]) => url)).toContain('/api/files/text?id=text-1');
+  });
   it('ждёт 250 мс и отменяет устаревшую подсказку', async () => {
     vi.useFakeTimers();
     const pending = new Promise<never>(() => {});
