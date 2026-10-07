@@ -1,0 +1,5 @@
+F17 Web files-upload TimeoutSeconds=100
+F17 Torrent files-upload TimeoutSeconds=100
+F18 limit=2; waitSeconds=1270; healthyProcessedWithin1500ms=False
+F17 omitted-token browserCancelled=True; postCompleted=False; upstreamCancelled=False
+F17 default timeout elapsedSeconds=100,0; innerException=TimeoutException
