@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Сброс пароля 3</title>
+<script src="./vendor/react.js"></script>
+<script src="./vendor/react-dom.js"></script>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,wght@8..144,400..800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#415F91}a:hover{color:#284777}
+input::placeholder{color:#43474E}
+input:focus{outline:none}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #F9F9FF; font-family: 'Roboto Flex', system-ui, sans-serif; color: #191C20; display: flex; flex-direction: column; overflow: hidden">
+  <div style="height: 236px; flex-shrink: 0; background: #E9DDFF; border-radius: 0 0 40px 40px; position: relative; overflow: hidden; padding: 8px 24px 0; box-sizing: border-box">
+    <a href="Reset-2.dc.html" aria-label="Назад" style="width: 48px; height: 48px; margin: 8px 0 0 -12px; border-radius: 24px; display: flex; align-items: center; justify-content: center; color: #4D3D75">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"></path></svg>
+    </a>
+    <div style="position: absolute; left: 24px; bottom: 30px">
+      <div style="font-size: 14px; line-height: 20px; font-weight: 500; color: #4D3D75; margin-bottom: 4px">Шаг 3 из 3</div>
+      <h1 style="margin: 0; font-size: 34px; line-height: 40px; font-weight: 700; color: #22005D">Новый<br>пароль</h1>
+    </div>
+    <div style="position: absolute; right: 22px; top: 50px; width: 130px; height: 130px; display: flex; align-items: center; justify-content: center">
+      <svg width="130" height="130" viewBox="0 0 100 100" style="position: absolute; inset: 0"><polygon points="50.0,10.0 62.6,19.5 78.3,21.7 80.5,37.4 90.0,50.0 80.5,62.6 78.3,78.3 62.6,80.5 50.0,90.0 37.4,80.5 21.7,78.3 19.5,62.6 10.0,50.0 19.5,37.4 21.7,21.7 37.4,19.5" fill="#65558F" stroke="#65558F" stroke-width="12" stroke-linejoin="round"></polygon></svg>
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="#FFFFFF" style="position: relative"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"></path></svg>
+    </div>
+  </div>
+
+  <div style="flex-grow: 1; padding: 28px 24px 24px; display: flex; flex-direction: column">
+    <div style="position: relative">
+      <label for="newPass" style="position: absolute; left: 12px; top: -8px; padding: 0 4px; background: #F9F9FF; font-size: 12px; line-height: 16px; letter-spacing: 0.4px; color: #415F91">Новый пароль</label>
+      <div style="height: 56px; box-sizing: border-box; border: 2px solid #415F91; border-radius: 16px; display: flex; align-items: center; padding: 0 4px 0 16px">
+        <input id="newPass" type="password" autocomplete="new-password" placeholder="Минимум 8 символов" style="flex-grow: 1; min-width: 0; border: none; background: transparent; font: inherit; font-size: 16px; letter-spacing: 0.5px; color: #191C20">
+        <button type="button" aria-label="Показать пароль" style="width: 48px; height: 48px; border: none; border-radius: 24px; background: transparent; color: #43474E; display: flex; align-items: center; justify-content: center">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"></path></svg>
+        </button>
+      </div>
+    </div>
+    <div style="display: flex; gap: 4px; padding: 10px 4px 0">
+      <div style="flex: 1; height: 4px; border-radius: 2px; background: #415F91"></div>
+      <div style="flex: 1; height: 4px; border-radius: 2px; background: #415F91"></div>
+      <div style="flex: 1; height: 4px; border-radius: 2px; background: #415F91"></div>
+      <div style="flex: 1; height: 4px; border-radius: 2px; background: #DCE3EE"></div>
+    </div>
+    <div style="font-size: 12px; line-height: 16px; letter-spacing: 0.4px; color: #43474E; padding: 6px 16px 0">Надёжность: хороший</div>
+
+    <div style="position: relative; margin-top: 22px">
+      <label for="newPass2" style="position: absolute; left: 12px; top: -8px; padding: 0 4px; background: #F9F9FF; font-size: 12px; line-height: 16px; letter-spacing: 0.4px; color: #43474E">Повторите пароль</label>
+      <div style="height: 56px; box-sizing: border-box; border: 1px solid #73777F; border-radius: 16px; display: flex; align-items: center; padding: 0 5px 0 17px">
+        <input id="newPass2" type="password" autocomplete="new-password" placeholder="Ещё раз" style="flex-grow: 1; min-width: 0; border: none; background: transparent; font: inherit; font-size: 16px; letter-spacing: 0.5px; color: #191C20">
+        <button type="button" aria-label="Показать пароль" style="width: 48px; height: 48px; border: none; border-radius: 24px; background: transparent; color: #43474E; display: flex; align-items: center; justify-content: center">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"></path></svg>
+        </button>
+      </div>
+    </div>
+
+    <label style="display: flex; align-items: flex-start; gap: 12px; padding: 16px 16px 16px 8px; margin-top: 24px; border-radius: 20px; background: #EDEDF4">
+      <span style="width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: -8px">
+        <input type="checkbox" checked="" style="width: 18px; height: 18px; accent-color: #415F91; margin: 0">
+      </span>
+      <span>
+        <span style="display: block; font-size: 16px; line-height: 24px; font-weight: 500">Выйти на всех устройствах</span>
+        <span style="display: block; font-size: 14px; line-height: 20px; color: #43474E">Завершить сеансы на других телефонах и компьютерах. Там нужно будет войти заново.</span>
+      </span>
+    </label>
+
+    <div style="flex-grow: 1"></div>
+
+    <div style="display: flex; align-items: center; justify-content: space-between">
+      <a href="Reset-2.dc.html" style="height: 48px; padding: 0 16px; margin-left: -16px; border-radius: 24px; font-size: 14px; font-weight: 500; letter-spacing: 0.1px; text-decoration: none; display: flex; align-items: center">Назад</a>
+      <a href="Login-F.dc.html" style="height: 56px; padding: 0 20px 0 24px; border-radius: 28px; background: #415F91; color: #FFFFFF; font-size: 16px; font-weight: 500; letter-spacing: 0.15px; text-decoration: none; display: flex; align-items: center; gap: 8px">
+        Сохранить
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"></path></svg>
+      </a>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

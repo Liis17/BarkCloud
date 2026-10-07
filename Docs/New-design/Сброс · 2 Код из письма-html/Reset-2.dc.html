@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Сброс пароля 2</title>
+<script src="./vendor/react.js"></script>
+<script src="./vendor/react-dom.js"></script>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,wght@8..144,400..800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#415F91}a:hover{color:#284777}
+input::placeholder{color:#C3C6CF}
+input:focus{outline:none}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #F9F9FF; font-family: 'Roboto Flex', system-ui, sans-serif; color: #191C20; display: flex; flex-direction: column; overflow: hidden">
+  <div style="height: 236px; flex-shrink: 0; background: #E9DDFF; border-radius: 0 0 40px 40px; position: relative; overflow: hidden; padding: 8px 24px 0; box-sizing: border-box">
+    <a href="Reset-1.dc.html" aria-label="Назад" style="width: 48px; height: 48px; margin: 8px 0 0 -12px; border-radius: 24px; display: flex; align-items: center; justify-content: center; color: #4D3D75">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"></path></svg>
+    </a>
+    <div style="position: absolute; left: 24px; bottom: 30px">
+      <div style="font-size: 14px; line-height: 20px; font-weight: 500; color: #4D3D75; margin-bottom: 4px">Шаг 2 из 3</div>
+      <h1 style="margin: 0; font-size: 34px; line-height: 40px; font-weight: 700; color: #22005D">Проверьте<br>почту</h1>
+    </div>
+    <div style="position: absolute; right: 22px; top: 50px; width: 130px; height: 130px; display: flex; align-items: center; justify-content: center">
+      <svg width="130" height="130" viewBox="0 0 100 100" style="position: absolute; inset: 0"><polygon points="50.0,10.0 59.1,16.2 70.0,15.4 74.7,25.3 84.6,30.0 83.8,40.9 90.0,50.0 83.8,59.1 84.6,70.0 74.7,74.7 70.0,84.6 59.1,83.8 50.0,90.0 40.9,83.8 30.0,84.6 25.3,74.7 15.4,70.0 16.2,59.1 10.0,50.0 16.2,40.9 15.4,30.0 25.3,25.3 30.0,15.4 40.9,16.2" fill="#65558F" stroke="#65558F" stroke-width="10" stroke-linejoin="round"></polygon></svg>
+      <svg width="50" height="50" viewBox="0 0 24 24" fill="#FFFFFF" style="position: relative"><path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"></path></svg>
+    </div>
+  </div>
+
+  <div style="flex-grow: 1; padding: 28px 24px 24px; display: flex; flex-direction: column">
+    <p style="margin: 0 0 28px; font-size: 16px; line-height: 24px; letter-spacing: 0.5px; color: #43474E">Мы отправили 6-значный код на <b style="color: #191C20; font-weight: 600">iv***@example.com</b>. Введите его ниже или перейдите по ссылке из письма.</p>
+
+    <div role="group" aria-label="Код из письма" style="display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px">
+      <input aria-label="Цифра 1" inputmode="numeric" maxlength="1" placeholder="4" style="height: 60px; box-sizing: border-box; width: 100%; border: 1px solid #73777F; border-radius: 14px; background: transparent; text-align: center; font: inherit; font-size: 24px; font-weight: 600; color: #191C20">
+      <input aria-label="Цифра 2" inputmode="numeric" maxlength="1" placeholder="8" style="height: 60px; box-sizing: border-box; width: 100%; border: 1px solid #73777F; border-radius: 14px; background: transparent; text-align: center; font: inherit; font-size: 24px; font-weight: 600; color: #191C20">
+      <input aria-label="Цифра 3" inputmode="numeric" maxlength="1" placeholder="1" style="height: 60px; box-sizing: border-box; width: 100%; border: 1px solid #73777F; border-radius: 14px; background: transparent; text-align: center; font: inherit; font-size: 24px; font-weight: 600; color: #191C20">
+      <input aria-label="Цифра 4" inputmode="numeric" maxlength="1" style="height: 60px; box-sizing: border-box; width: 100%; border: 2px solid #415F91; border-radius: 14px; background: #EEF3FE; text-align: center; font: inherit; font-size: 24px; font-weight: 600; color: #191C20">
+      <input aria-label="Цифра 5" inputmode="numeric" maxlength="1" style="height: 60px; box-sizing: border-box; width: 100%; border: 1px solid #73777F; border-radius: 14px; background: transparent; text-align: center; font: inherit; font-size: 24px; font-weight: 600; color: #191C20">
+      <input aria-label="Цифра 6" inputmode="numeric" maxlength="1" style="height: 60px; box-sizing: border-box; width: 100%; border: 1px solid #73777F; border-radius: 14px; background: transparent; text-align: center; font: inherit; font-size: 24px; font-weight: 600; color: #191C20">
+    </div>
+
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 16px">
+      <span style="font-size: 14px; line-height: 20px; color: #43474E">Отправить снова через 0:45</span>
+      <button type="button" disabled="" style="height: 40px; padding: 0 12px; margin-right: -12px; border: none; border-radius: 20px; background: transparent; font: inherit; font-size: 14px; font-weight: 500; color: #8E9199">Отправить</button>
+    </div>
+
+    
+    
+
+    <div style="flex-grow: 1"></div>
+
+    <div style="display: flex; align-items: center; justify-content: space-between">
+      <a href="Reset-1.dc.html" style="height: 48px; padding: 0 16px; margin-left: -16px; border-radius: 24px; font-size: 14px; font-weight: 500; letter-spacing: 0.1px; text-decoration: none; display: flex; align-items: center">Назад</a>
+      <a href="Reset-3.dc.html" style="height: 56px; padding: 0 20px 0 24px; border-radius: 28px; background: #415F91; color: #FFFFFF; font-size: 16px; font-weight: 500; letter-spacing: 0.15px; text-decoration: none; display: flex; align-items: center; gap: 8px">
+        Подтвердить
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z"></path></svg>
+      </a>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>
