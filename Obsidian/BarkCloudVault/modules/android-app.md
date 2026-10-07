@@ -1,12 +1,20 @@
 # Android — App
 
-Parent: [[index]] · Upload 2.0: [[modules/android-upload2]] · See also: [[modules/shared-proto]] · [[api/identity-api]] · [[modules/backend-grpcserver]] · [[modules/ios-app]]
+Parent: [[index]] · Авторизация: [[modules/android-auth]] · Upload 2.0: [[modules/android-upload2]] · See also: [[modules/shared-proto]] · [[api/identity-api]] · [[modules/backend-grpcserver]] · [[modules/ios-app]]
 
 ## Назначение
 
-Нативный Android-клиент BarkCloud (Kotlin, Jetpack Compose, **Material 3 Expressive**). Достигнут функциональный паритет с [[modules/ios-app]]: вход+OTP, 5 табов как в iOS (**Галерея / Файлы / Альбомы(по умолчанию) / Корзина / Настройки**), облачные медиа с пагинацией, альбомы (CRUD), облачный файл-браузер (CRUD/перемещение/загрузка), умные разделы (`DynamicFolderApi`), Shared Files Hub (публичные ссылки/исходящие/входящие гранты), App Lock (биометрия/PIN на вход) и Vault (приватная папка), управляемый кеш оригиналов, foreground upload queue с Android 16 `Notification.ProgressStyle`, автозагрузка медиатеки через WorkManager, очистка локальных копий, Storage widget, deep links, системный share target, корзина, профиль/аватар/приватность/устройства, избранное. gRPC-связь со всеми микросервисами (Identity :8000, Users :8001, Files/Cloud/Album/DynamicFolder :8005) + HTTP-слой для upload/download/превью по self-signed TLS.
+Нативный Android-клиент BarkCloud (Kotlin, Jetpack Compose, **Material 3 Expressive**). Достигнут функциональный паритет с [[modules/ios-app]]: первый запуск, вход+OTP, регистрация и сброс пароля, 5 табов как в iOS (**Галерея / Файлы / Альбомы(по умолчанию) / Корзина / Настройки**), облачные медиа с пагинацией, альбомы (CRUD), облачный файл-браузер (CRUD/перемещение/загрузка), умные разделы (`DynamicFolderApi`), Shared Files Hub (публичные ссылки/исходящие/входящие гранты), App Lock (биометрия/PIN на вход) и Vault (приватная папка), управляемый кеш оригиналов, foreground upload queue с Android 16 `Notification.ProgressStyle`, автозагрузка медиатеки через WorkManager, очистка локальных копий, Storage widget, deep links, системный share target, корзина, профиль/аватар/приватность/устройства, избранное. gRPC-связь со всеми микросервисами (Identity :8000, Users :8001, Files/Cloud/Album/DynamicFolder :8005) + HTTP-слой для upload/download/превью с проверкой TLS и отдельным разрешением самоподписанных сертификатов выбранного сервера.
 
 ## Реализованный функционал (паритет с iOS)
+
+### Обновление: первый запуск и авторизация (2026-10-07)
+
+14 шаблонов `Docs/New-design` перенесены в Compose: три приветствия, отдельный сервер, пароль/ключ доступа, четыре шага регистрации и завершение, три шага сброса; дополнительно оформлена 2FA. Новые компоненты используют роли M3, системную светлую/тёмную тему, Dynamic Color на Android 12+ и фирменную схему Android 11. Декор — Canvas/`graphics-shapes`, морфинг и движение через `graphicsLayer`; формы прокручиваются с IME и увеличенным шрифтом, ограничены 480 dp. Подробные контракты, восстановление pending-регистрации, TLS и результаты проверок: [[modules/android-auth]].
+
+Проверка сохранённой сессии выявила гонку deep link с установкой вложенного графа `Scaffold`; переход теперь ждёт первую запись back stack.
+
+Нативный Credential Manager пока не подключён: вкладка ключа доступа объясняет доступность и возвращает к паролю. Backend-контракты не менялись.
 
 ### Обновление: Material 3 Expressive — визуальный слой (2026-10-03)
 
@@ -19,7 +27,7 @@ Parent: [[index]] · Upload 2.0: [[modules/android-upload2]] · See also: [[modu
 - **Система**: splash screen (`core-splashscreen` 1.2.0, `Theme.BarkCloud.Splash`, фон #FFF8F5) на MainActivity; `android:enableOnBackInvokedCallback=true` (predictive back); scrim-оверлеи переведены с хардкода `Color.Black` на роль `colorScheme.scrim`.
 - **Мелочи**: захардкоженные строки UploadSettings/Settings вынесены в `strings.xml`; `contentDescription` для select-режима галереи, play-кнопок вьюеров, back-стрелок; шаблонные purple/teal цвета удалены из `colors.xml`. Лаунчер-иконка — осознанно оставлена системной заглушкой (бренд-иконки нет).
 
-Не сделано (нет в alpha18 / вне скоупа): Flexible-топбары, SplitButton, ButtonGroup, карусели, MaterialShapes-морфинг (`graphics-shapes` подключена, не используется), material3-adaptive (NavigationSuiteScape, List-Detail), Material Symbols, бренд-иконка.
+Не сделано (нет в alpha18 / вне скоупа): Flexible-топбары, SplitButton, ButtonGroup, карусели, material3-adaptive (NavigationSuiteScape, List-Detail), Material Symbols, бренд-иконка.
 
 ### Обновление: сессия, очередь и автозагрузка
 
@@ -43,7 +51,7 @@ Parent: [[index]] · Upload 2.0: [[modules/android-upload2]] · See also: [[modu
 - **Vault** (`ui/vault/` + `data/vault/`): приватная папка — **чисто клиент-локальная** (сервер не знает о «приватности», это ссылки на обычные облачные файлы), зеркалит iOS-архитектуру. `VaultStore` хранит JSON-список `VaultItem` (file_id+превью+isVideo) в обычном `SharedPreferences` (без Keystore-шифрования — защита от чужого взгляда, не от компрометации устройства). `VaultScreen` (роут `settings/vault`) — грид по образцу `FavoritesScreen`, per-session biometric-гейт через общий `BiometricGate` (релок на `ON_STOP` жизненного цикла экрана, без grace-period, в отличие от App Lock). Точка входа «Добавить в vault» — контекстное меню `MediaGridScreen` (единственная в этой итерации). `VaultStore.removeAll()` подключен к `SessionManager.resetLocalState()` — вайпается при логауте.
 - **BiometricGate** (`data/BiometricGate.kt`) — общая обёртка над `androidx.biometric.BiometricPrompt` (`BIOMETRIC_STRONG or DEVICE_CREDENTIAL`, допускает device PIN/паттерн как фолбэк) для App Lock и Vault.
 
-⚠️ Не проверено в рантайме на устройстве (forward-совместимость material3-alpha с Compose из BOM; реальное поведение self-signed превью/upload). Ниже — описание исходного каркаса (вход + локальный браузер), частично устарело.
+Первый запуск/auth проверены инструментально на Android 11/16 и входом на production с разрешённым тестовым аккаунтом (см. [[modules/android-auth]]). Реальное поведение self-signed превью/upload и остальных основных сценариев требует отдельной проверки. Ниже — описание исходного каркаса (вход + локальный браузер), частично устарело.
 
 ## Расположение
 
@@ -57,8 +65,12 @@ app/src/main/java/com/barkfluff/BarkCloud/
 ├── MainActivity.kt           — edge-to-edge, setContent { BarkCloudTheme { RootNavGraph() } }
 ├── ShareActivity.kt          — системный target «Поделиться» → staging URI в upload queue
 ├── data/
-│   ├── GlobalParam.kt        — EncryptedSharedPreferences: access/refresh токены + сроки, hasValidRefreshToken, clearSession
+│   ├── GlobalParam.kt        — TokenStore (AES-GCM/Keystore), sessionActive, сроки access/refresh токенов
 │   ├── AuthRepository.kt     — IdentityApi.Auth → AuthResult (Success/OtpRequired/InvalidCredentials/OtherError)
+│   ├── AuthFlowRepository.kt — регистрация, pending password, сброс, ошибки/retry-after
+│   ├── PendingRegistrationStore.kt — отдельный AES-GCM/Keystore refresh, привязанный к серверу
+│   ├── OnboardingStore.kt    — флаг завершения трёх страниц приветствия
+│   ├── NotificationPermissionRequests.kt — запрос разрешения от действия загрузки
 │   ├── AppLockStore.kt       — Keystore-хранилище PIN-хэша (PBKDF2+AES-256-GCM)
 │   ├── AppLockManager.kt     — ProcessLifecycleOwner-наблюдатель, 30s grace-period, shouldShowLock: StateFlow
 │   ├── BiometricGate.kt      — обёртка над BiometricPrompt (App Lock + Vault)
@@ -81,15 +93,19 @@ app/src/main/java/com/barkfluff/BarkCloud/
 │       ├── UploadWorker.kt       — foreground dataSync upload queue processor
 │       └── UploadNotification.kt — progress notification; Android 16+ ProgressStyle
 ├── grpc/
-│   ├── GrpcManager.kt         — lazy identity-канал (OkHttp), TLS с доверием самоподписанному серту
+│   ├── GrpcManager.kt         — каналы всех сервисов (OkHttp), TLS-политика выбранного сервера
 │   ├── AuthInterceptor.kt     — заголовок x-auth-token (динамически, без base64)
 │   ├── ClientMetadataInterceptor.kt — x-device-id/name, x-os-name, x-app-name/version, x-ip-address (base64 NO_WRAP)
-│   ├── GrpcError.kt           — StatusRuntimeException.errorCode() из трейлера x-error-code
-│   ├── ServerSettings.kt      — runtime-адрес/порты сервера (override с логина, дефолты BuildConfig)
+│   ├── GrpcError.kt           — GUID из x-error-code, нормализация checked/runtime gRPC ошибок
+│   ├── ServerSettings.kt      — ServerConfig, валидация, миграция TLS, сохранение после проверки
+│   ├── ServerConnectionProbe.kt — параллельный публичный reflection ListServices, deadline 5 s
 │   └── AuthErrorCodes.kt      — GUID-коды OTP_REQUIRED / INVALID_CREDENTIALS
 ├── ui/
-│   ├── navigation/RootNavGraph.kt — гейт login ↔ main по hasValidRefreshToken() + оверлей AppLockScreen (Box поверх NavHost); при `!sessionActive` на login не навигирует (иначе `launchSingleTop` пересоздаёт LoginScreen и ломает ввод в поля)
-│   ├── login/                 — LoginScreen, LoginUiState, LoginViewModel (логин/пароль + OTP)
+│   ├── navigation/RootNavGraph.kt — welcome/server/login/register/reset/main, App Lock и deep links
+│   ├── login/                 — пароль/подготовленный ключ доступа, OTP, rate-limit и resend
+│   ├── onboarding/            — WelcomeScreen (3 страницы, без пропуска)
+│   ├── server/                — ServerScreen + ServerViewModel, три сервиса и TLS-политика
+│   ├── auth/                  — Registration/Reset ViewModel, экраны, общие поля и Canvas-декор
 │   ├── main/                  — MainScreen (Scaffold + вложенный NavHost), MainDestination (5 табов), MainBottomBar
 │   ├── applock/                — AppLockScreen (биометрия+PIN keypad), PinDots/PinKeypad (internal, переиспользуются в settings)
 │   ├── vault/                  — VaultScreen + VaultViewModel (грид, per-session biometric-гейт)
@@ -109,9 +125,10 @@ app/src/main/proto/            — синхронизируется из Shared/
 
 Зависимости создаются вручную в `onCreate` (без Hilt/Koin), доступны через `applicationContext as BarkCloudApplication`:
 
-- `globalParam: GlobalParam` — хранилище токенов на `EncryptedSharedPreferences` (AES256).
+- `globalParam: GlobalParam` — единый TokenStore blob (AES-GCM/Android Keystore) и состояние сессии; старые EncryptedSharedPreferences мигрируются.
 - `grpcManager: GrpcManager` — каналы/стабы gRPC; в конструктор передаётся `ClientMetadataInterceptor.create(this)`.
 - `authRepository: AuthRepository` — авторизация.
+- `authFlowRepository: AuthFlowRepository` — регистрация, зашифрованный pending refresh и сброс пароля.
 - `localFileRepository: LocalFileRepository` — доступ к локальной ФС.
 
 Класс также реализует `SingletonImageLoader.Factory` — настраивает Coil 3 с `VideoFrameDecoder` (превью видео) и crossfade. В `onTerminate` вызывает `grpcManager.shutdown()`.
@@ -171,7 +188,7 @@ work и обновляет progress notification через `UploadNotification`
 `albumId`, и после получения `fileId` worker вызывает `AlbumRepository.addItems`. Worker использует
 `ForegroundInfo(..., ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)` и требует
 permissions `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_DATA_SYNC`, `POST_NOTIFICATIONS`.
-`MainActivity` запрашивает `POST_NOTIFICATIONS` на Android 13+.
+`MainActivity` и `ShareActivity` запрашивают `POST_NOTIFICATIONS` на Android 13+ по событию первого действия загрузки или включения автозагрузки; на запуске запроса нет.
 
 ## Очистка локальных копий
 
@@ -212,7 +229,7 @@ notification.
 - `x-auth-token` — JWT, **без** base64. Добавляет `AuthInterceptor` динамически на каждый запрос.
 - `x-device-id`, `x-device-name`, `x-os-name`, `x-app-name`, `x-app-version`, `x-ip-address` — статичны (считаются один раз), base64 `NO_WRAP` (перенос строки сломал бы `Convert.FromBase64String` на сервере). Добавляет `ClientMetadataInterceptor`.
 
-Оба цепляются в `GrpcManager.identityStub()`. Адрес — runtime из `ServerSettings` (`grpc/ServerSettings.kt`): по умолчанию дефолты сборки из `BuildConfig` (`https://cloud.barkfluff.com:8000` и т.д.: Identity 8000, Users 8001, Files 8005), но переопределяется на экране входа — раскрывающаяся «Настройки сервера» (адрес + порты Identity/Users/Files, сохранение в SharedPreferences `barkcloud_server` при submit; хост можно вводить с `http://`/`https://`, без scheme — https). Все адреса (`GrpcManager`, `GrpcEndpoint.filesWebBase/fileUploadBase`, `SharedModels.filesWebHost`) читаются из `ServerSettings` (object с `init(context)` в `Application.onCreate`). TLS терминируется на nginx ([[structure/infrastructure]]), сертификат самоподписанный → клиент доверяет всем (trust-all `X509TrustManager`). Паритет с iOS, где те же заголовки разнесены по 5 интерсепторам ([[modules/ios-app]]).
+Оба цепляются в `GrpcManager.identityStub()`. Публичные signup/reset/username стабы получают `ClientMetadataInterceptor`, установка первого пароля — явно переданный pending access-token. Адреса читаются из `ServerSettings`: Identity 8000, Users 8001, Files 8005. Отдельный экран сервера сохраняет конфигурацию только после успешного reflection всех трёх API. По умолчанию TLS строгий; `allowSelfSigned` разрешает исключение цепочки только для выбранного хоста с сохранённой проверкой имени. HTTP/Coil/загрузки/workers используют общий `Call.Factory`, клиентская генерация пересоздаётся при смене конфигурации. Подробнее: [[modules/android-auth]].
 
 Коды ошибок-GUID (`AuthErrorCodes`) приходят в трейлере `x-error-code`; `AuthRepository` транслирует их в `AuthResult`.
 
@@ -225,7 +242,7 @@ notification.
 | `compileSdk` / `targetSdk` | 36 |
 | `versionCode` / `versionName` | 1 / 1.0 |
 | Java / jvmTarget | 11 |
-| `BuildConfig.IDENTITY_API_ADDRESS` | `https://cloud.barkfluff.com:8000` (дефолт `ServerSettings`, переопределяется на логине) |
+| `BuildConfig.IDENTITY_API_ADDRESS` | `https://cloud.barkfluff.com:8000` (дефолт `ServerSettings`, переопределяется на экране сервера) |
 
 Plugins: `android.application`, `kotlin.android`, `kotlin.compose`, `protobuf` (через version catalog `libs`).
 

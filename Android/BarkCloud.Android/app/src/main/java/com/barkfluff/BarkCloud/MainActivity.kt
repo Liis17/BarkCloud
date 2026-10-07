@@ -11,6 +11,11 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import androidx.lifecycle.Lifecycle
+import kotlinx.coroutines.launch
+import com.barkfluff.BarkCloud.data.NotificationPermissionRequests
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -28,7 +33,11 @@ class MainActivity : ComponentActivity() {
         installSplashScreen()
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
-        requestNotificationPermissionIfNeeded()
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                NotificationPermissionRequests.events.collect { requestNotificationPermissionIfNeeded() }
+            }
+        }
         deepLink = intent?.data
         setContent {
             BarkCloudTheme {

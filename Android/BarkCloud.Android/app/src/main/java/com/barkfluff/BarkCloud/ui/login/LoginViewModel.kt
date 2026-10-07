@@ -7,7 +7,7 @@ import androidx.lifecycle.viewmodel.CreationExtras
 import com.barkfluff.BarkCloud.BarkCloudApplication
 import com.barkfluff.BarkCloud.data.AuthRepository
 import com.barkfluff.BarkCloud.data.AuthResult
-import com.barkfluff.BarkCloud.grpc.ServerSettings
+import com.barkfluff.BarkCloud.data.verificationDigits
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -20,76 +20,50 @@ class LoginViewModel(
     private val authRepository: AuthRepository,
 ) : ViewModel() {
 
-    private val _state = MutableStateFlow(initialState())
+    private val _state = MutableStateFlow(LoginUiState())
     val state: StateFlow<LoginUiState> = _state.asStateFlow()
 
     private val _events = Channel<LoginEvent>(Channel.BUFFERED)
     val events = _events.receiveAsFlow()
 
     fun onLoginChange(value: String) {
-        _state.update { it.copy(login = value, credentialsError = null) }
+        _state.update { if (it.isLoading) it else it.copy(login = value, credentialsError = null, snackbarMessage = null) }
     }
 
     fun onPasswordChange(value: String) {
-        _state.update { it.copy(password = value, credentialsError = null) }
-    }
-
-    fun onPasswordVisibilityToggle() {
-        _state.update { it.copy(passwordVisible = !it.passwordVisible) }
+        _state.update { if (it.isLoading) it else it.copy(password = value, credentialsError = null, snackbarMessage = null) }
     }
 
     fun onOtpChange(value: String) {
-        val sanitized = value.filter { it.isDigit() }.take(LoginUiState.OTP_LENGTH)
-        _state.update { it.copy(otp = sanitized) }
-        if (sanitized.length == LoginUiState.OTP_LENGTH) {
-            submit()
-        }
+        val sanitized = verificationDigits(value)
+        _state.update { if (it.isLoading) it else it.copy(otp = sanitized, credentialsError = null, snackbarMessage = null) }
     }
 
-    fun onComingSoon() {
-        _state.update { it.copy(snackbarMessage = COMING_SOON) }
+    fun backFromOtp() {
+        if (!_state.value.isLoading) _state.update { it.copy(otpRequired = false, otp = "", credentialsError = null, snackbarMessage = null) }
     }
 
-    fun onServerHostChange(value: String) {
-        _state.update { it.copy(serverHost = value) }
+    fun submit() = performSubmit()
+
+    fun resendOtp() {
+        val current = state.value
+        if (current.otpRequired && current.resendAtMillis <= System.currentTimeMillis()) performSubmit(resend = true)
     }
 
-    fun onServerIdentityPortChange(value: String) {
-        _state.update { it.copy(serverIdentityPort = sanitizePort(value)) }
-    }
-
-    fun onServerUsersPortChange(value: String) {
-        _state.update { it.copy(serverUsersPort = sanitizePort(value)) }
-    }
-
-    fun onServerFilesPortChange(value: String) {
-        _state.update { it.copy(serverFilesPort = sanitizePort(value)) }
-    }
-
-    fun snackbarShown() {
-        _state.update { it.copy(snackbarMessage = null) }
-    }
-
-    fun submit() {
+    private fun performSubmit(resend: Boolean = false) {
         val current = _state.value
-        if (!current.canSubmit) return
-        ServerSettings.save(
-            host = current.serverHost,
-            identityPort = current.serverIdentityPort,
-            usersPort = current.serverUsersPort,
-            filesPort = current.serverFilesPort,
-        )
+        if (!(if (resend) current.copy(otpRequired = false).canSubmit else current.canSubmit) || current.retryAtMillis > System.currentTimeMillis()) return
         _state.update { it.copy(isLoading = true, credentialsError = null) }
 
         viewModelScope.launch {
             val result = authRepository.auth(
                 login = current.login.trim(),
                 password = current.password,
-                otpCode = current.otp.takeIf { current.otpRequired },
+                otpCode = current.otp.takeIf { current.otpRequired && !resend },
             )
             when (result) {
                 AuthResult.Success -> {
-                    _state.update { it.copy(isLoading = false) }
+                    _state.update { it.copy(isLoading = false, password = "", otp = "") }
                     _events.send(LoginEvent.NavigateToMain)
                 }
                 AuthResult.OtpRequired -> {
@@ -98,6 +72,7 @@ class LoginViewModel(
                             isLoading = false,
                             otpRequired = true,
                             otp = "",
+                            resendAtMillis = System.currentTimeMillis() + 60_000,
                         )
                     }
                 }
@@ -114,6 +89,7 @@ class LoginViewModel(
                         it.copy(
                             isLoading = false,
                             snackbarMessage = result.message.ifBlank { NETWORK_ERROR },
+                            retryAtMillis = result.retryAfterSeconds?.let { System.currentTimeMillis() + it * 1000L } ?: 0L,
                         )
                     }
                 }
@@ -121,22 +97,11 @@ class LoginViewModel(
         }
     }
 
-    private fun initialState(): LoginUiState = LoginUiState(
-        serverHost = ServerSettings.host,
-        serverIdentityPort = ServerSettings.identityPort.toString(),
-        serverUsersPort = ServerSettings.usersPort.toString(),
-        serverFilesPort = ServerSettings.filesPort.toString(),
-    )
-
-    private fun sanitizePort(value: String): String =
-        value.filter { it.isDigit() }.take(LoginUiState.PORT_MAX_LENGTH)
-
     sealed class LoginEvent {
         data object NavigateToMain : LoginEvent()
     }
 
     companion object {
-        private const val COMING_SOON = "Скоро"
         private const val INVALID_CREDENTIALS = "Неверный логин или пароль"
         private const val NETWORK_ERROR = "Не удалось связаться с сервером"
 

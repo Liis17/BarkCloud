@@ -39,16 +39,6 @@ class LoginViewModelTest {
     }
 
     @Test
-    fun `onPasswordVisibilityToggle flips flag`() {
-        val sut = createSut()
-        assertFalse(sut.state.value.passwordVisible)
-
-        sut.onPasswordVisibilityToggle()
-
-        assertTrue(sut.state.value.passwordVisible)
-    }
-
-    @Test
     fun `onOtpChange filters non-digits and truncates to length`() {
         coEvery { authRepository.auth(any(), any(), any()) } returns AuthResult.Success
         val sut = createSut()
@@ -83,6 +73,7 @@ class LoginViewModelTest {
             assertEquals(LoginViewModel.LoginEvent.NavigateToMain, awaitItem())
         }
         assertFalse(sut.state.value.isLoading)
+        assertEquals("", sut.state.value.password)
     }
 
     @Test
@@ -152,4 +143,21 @@ class LoginViewModelTest {
 
         assertEquals("john", captured.captured)
     }
+    @Test fun `code waits for explicit submit and prevents duplicate request`() = runTest {
+        coEvery { authRepository.auth(any(), any(), any()) } returnsMany listOf(AuthResult.OtpRequired, AuthResult.Success)
+        val sut = createSut(); sut.onLoginChange("john"); sut.onPasswordChange("pwd")
+        sut.submit(); advanceUntilIdle(); sut.onOtpChange("123456"); advanceUntilIdle()
+        coVerify(exactly = 1) { authRepository.auth(any(), any(), any()) }
+        assertTrue(sut.state.value.otpRequired)
+        sut.submit(); sut.submit(); advanceUntilIdle()
+        coVerify(exactly = 2) { authRepository.auth(any(), any(), any()) }
+        assertEquals("", sut.state.value.password); assertEquals("", sut.state.value.otp)
+    }
+    @Test fun `login sends existing password without imposing new password restrictions`() = runTest {
+        coEvery { authRepository.auth("john", "        ", null) } returns AuthResult.Success
+        val sut = createSut(); sut.onLoginChange("john"); sut.onPasswordChange("        ")
+        sut.submit(); advanceUntilIdle()
+        coVerify { authRepository.auth("john", "        ", null) }
+    }
+
 }

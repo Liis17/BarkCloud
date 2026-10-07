@@ -3,97 +3,104 @@ package com.barkfluff.BarkCloud.grpc
 import android.content.Context
 import android.content.SharedPreferences
 import com.barkfluff.BarkCloud.BuildConfig
+import java.net.URI
 
-/**
- * Рантайм-адреса сервера. По умолчанию собираются из зашитых при сборке адресов
- * (`BuildConfig.*`), но переопределяются на экране входа — поля адреса сервера и
- * портов. Object, а не DI-класс: адреса читаются из мест без зависимостей
- * ([GrpcEndpoint], `SharedModels`, gRPC-стабы [GrpcManager], workers).
- */
+/** One selected server; its TLS policy is part of the configuration identity. */
+data class ServerConfig(
+    val host: String,
+    val identityPort: Int = 8000,
+    val usersPort: Int = 8001,
+    val filesPort: Int = 8005,
+    val allowSelfSigned: Boolean = false,
+) {
+    val uri: URI get() = URI(host)
+    val hostname: String get() = uri.host.removeSurrounding("[", "]")
+    val usesTls: Boolean get() = uri.scheme == "https"
+    fun address(port: Int? = null): String = URI(
+        uri.scheme, null, hostname, port ?: -1, null, null, null,
+    ).toASCIIString()
+    val key: String get() = "$host|$identityPort|$usersPort|$filesPort|$allowSelfSigned"
+}
+
+data class ServerValidation(val config: ServerConfig? = null, val error: String? = null)
+
+fun validateServerConfig(
+    host: String,
+    identityPort: String,
+    usersPort: String,
+    filesPort: String,
+    allowSelfSigned: Boolean,
+): ServerValidation {
+    val raw = host.trim()
+    if (raw.isEmpty()) return ServerValidation(error = "Введите адрес сервера")
+    val uri = runCatching { URI(if ("://" in raw) raw else "https://$raw") }.getOrNull()
+    if (uri == null || uri.scheme !in setOf("http", "https") || uri.host.isNullOrBlank() ||
+        uri.userInfo != null || uri.port != -1 || uri.rawQuery != null || uri.rawFragment != null ||
+        (!uri.path.isNullOrEmpty() && uri.path != "/")
+    ) return ServerValidation(error = "Укажите домен или IP без порта и пути. Порты задаются ниже.")
+    val ports = listOf(identityPort, usersPort, filesPort).map { it.trim().toIntOrNull() }
+    if (ports.any { it == null || it !in 1..65535 }) {
+        return ServerValidation(error = "Каждый порт должен быть числом от 1 до 65535")
+    }
+    val normalized = URI(uri.scheme, null, uri.host.lowercase().removeSurrounding("[", "]"), -1, null, null, null).toASCIIString()
+    return ServerValidation(ServerConfig(normalized, ports[0]!!, ports[1]!!, ports[2]!!, allowSelfSigned && uri.scheme == "https"))
+}
+
 object ServerSettings {
-
     private const val PREFS_NAME = "barkcloud_server"
-    private const val KEY_HOST = "host"
-    private const val KEY_IDENTITY_PORT = "identity_port"
-    private const val KEY_USERS_PORT = "users_port"
-    private const val KEY_FILES_PORT = "files_port"
-
     private var prefs: SharedPreferences? = null
 
-    /** Вызвать один раз из `Application.onCreate` до первого обращения к адресам. */
     fun init(context: Context) {
-        if (prefs == null) {
-            prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        if (prefs != null) return
+        val saved = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        if (!saved.contains("allow_self_signed")) {
+            val legacy = saved.all.isNotEmpty() ||
+                context.getSharedPreferences("barkcloud_token_store", Context.MODE_PRIVATE).contains("payload") ||
+                context.getSharedPreferences("barkcloud_secure_prefs", Context.MODE_PRIVATE).all.isNotEmpty()
+            saved.edit().putBoolean("allow_self_signed", legacy).apply()
         }
+        prefs = saved
     }
 
-    /** Хост сервера: `host`, `http://host` или `https://host` (без scheme — https). */
-    val host: String
-        get() = prefs()?.getString(KEY_HOST, null)?.takeIf { it.isNotBlank() } ?: defaultHost
-
-    val identityPort: Int
-        get() = port(KEY_IDENTITY_PORT, defaultIdentityPort)
-
-    val usersPort: Int
-        get() = port(KEY_USERS_PORT, defaultUsersPort)
-
-    val filesPort: Int
-        get() = port(KEY_FILES_PORT, defaultFilesPort)
-
-    val identityAddress: String get() = address(identityPort)
-    val usersAddress: String get() = address(usersPort)
-    val filesAddress: String get() = address(filesPort)
-
-    /** База HTTP-раздачи файлов (`/web/download/{id}`, `/web/upload/{id}`). */
-    val filesWebBase: String get() = "${address(filesPort)}/web"
-
-    /** База data plane Upload 2.0 (`/file-upload/{session}/parts/{n}`) — порт nginx. */
-    val fileUploadBase: String get() = address(null)
-
-    /** Хост без порта: публичные ссылки `/s|f|al/{token}` рендерит веб-клиент на 443. */
-    val webHostBase: String get() = address(null)
-
-    /**
-     * Сохраняет значения из формы настроек сервера. Пустой/невалидный порт —
-     * возврат к дефолту сборки.
-     */
-    fun save(host: String, identityPort: String, usersPort: String, filesPort: String) {
-        val trimmed = host.trim()
-        if (trimmed.isBlank()) edit { it.remove(KEY_HOST) } else edit { it.putString(KEY_HOST, trimmed) }
-        putPort(KEY_IDENTITY_PORT, identityPort)
-        putPort(KEY_USERS_PORT, usersPort)
-        putPort(KEY_FILES_PORT, filesPort)
+    val hasConfiguredServer: Boolean get() = prefs?.let {
+        it.getBoolean("configured", false) || it.contains("host") || it.contains("identity_port")
+    } ?: false
+    val defaults: ServerConfig get() = ServerConfig(
+        host = "https://${URI(BuildConfig.IDENTITY_API_ADDRESS).host}",
+        identityPort = URI(BuildConfig.IDENTITY_API_ADDRESS).port.takeIf { it > 0 } ?: 443,
+        usersPort = URI(BuildConfig.USERS_API_ADDRESS).port.takeIf { it > 0 } ?: 443,
+        filesPort = URI(BuildConfig.FILES_API_ADDRESS).port.takeIf { it > 0 } ?: 443,
+    )
+    val config: ServerConfig get() {
+        val d = defaults
+        val raw = prefs?.getString("host", null)?.takeIf { it.isNotBlank() } ?: d.host
+        return validateServerConfig(
+            raw,
+            (prefs?.getInt("identity_port", d.identityPort) ?: d.identityPort).toString(),
+            (prefs?.getInt("users_port", d.usersPort) ?: d.usersPort).toString(),
+            (prefs?.getInt("files_port", d.filesPort) ?: d.filesPort).toString(),
+            prefs?.getBoolean("allow_self_signed", false) ?: false,
+        ).config ?: d
     }
+    val host: String get() = config.host
+    val identityPort: Int get() = config.identityPort
+    val usersPort: Int get() = config.usersPort
+    val filesPort: Int get() = config.filesPort
+    val identityAddress: String get() = config.address(config.identityPort)
+    val usersAddress: String get() = config.address(config.usersPort)
+    val filesAddress: String get() = config.address(config.filesPort)
+    val filesWebBase: String get() = "$filesAddress/web"
+    val fileUploadBase: String get() = config.address()
+    val webHostBase: String get() = config.address()
 
-    private fun address(port: Int?): String {
-        val raw = host
-        val scheme = if (raw.startsWith("http://")) "http" else "https"
-        val hostOnly = raw.removePrefix("https://").removePrefix("http://").trimEnd('/')
-        return if (port != null) "$scheme://$hostOnly:$port" else "$scheme://$hostOnly"
+    fun save(config: ServerConfig) {
+        checkNotNull(prefs).edit()
+            .putString("host", config.host)
+            .putInt("identity_port", config.identityPort)
+            .putInt("users_port", config.usersPort)
+            .putInt("files_port", config.filesPort)
+            .putBoolean("allow_self_signed", config.allowSelfSigned)
+            .putBoolean("configured", true)
+            .apply()
     }
-
-    private fun port(key: String, default: Int): Int =
-        prefs()?.getInt(key, 0)?.takeIf { it > 0 } ?: default
-
-    private fun putPort(key: String, value: String) {
-        val port = value.trim().toIntOrNull()?.takeIf { it in 1..65535 }
-        if (port != null) edit { it.putInt(key, port) } else edit { it.remove(key) }
-    }
-
-    private fun prefs(): SharedPreferences? = prefs
-
-    private fun edit(block: (SharedPreferences.Editor) -> Unit) {
-        prefs()?.edit()?.also(block)?.apply()
-    }
-
-    private val defaultHost: String = BuildConfig.IDENTITY_API_ADDRESS
-        .substringAfter("://")
-        .substringBefore(":")
-
-    private val defaultIdentityPort: Int = defaultPort(BuildConfig.IDENTITY_API_ADDRESS)
-    private val defaultUsersPort: Int = defaultPort(BuildConfig.USERS_API_ADDRESS)
-    private val defaultFilesPort: Int = defaultPort(BuildConfig.FILES_API_ADDRESS)
-
-    private fun defaultPort(address: String): Int =
-        address.substringAfterLast(":").toIntOrNull() ?: 443
 }

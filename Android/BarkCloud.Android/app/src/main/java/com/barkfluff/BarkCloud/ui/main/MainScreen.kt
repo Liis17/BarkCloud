@@ -48,6 +48,7 @@ import com.barkfluff.BarkCloud.ui.upload.GlobalUploadBanner
 import com.barkfluff.BarkCloud.ui.upload.UploadQueueScreen
 import com.barkfluff.BarkCloud.ui.upload.UploadQueueViewModel
 import com.barkfluff.BarkCloud.ui.vault.VaultScreen
+import kotlinx.coroutines.flow.first
 
 /**
  * Главный экран с нижней навигацией из 5 вкладок (как в iOS). Каждая вкладка — свой
@@ -75,6 +76,8 @@ fun MainScreen(
             "vault" -> "settings/vault"
             else -> return@LaunchedEffect
         }
+        // Scaffold installs its NavHost during subcomposition, after this effect can start.
+        navController.currentBackStackEntryFlow.first()
         navController.navigate(route) {
             launchSingleTop = true
             restoreState = true

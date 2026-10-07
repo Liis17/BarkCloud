@@ -15,6 +15,7 @@ import io.grpc.ClientInterceptors
 import io.grpc.ManagedChannel
 import io.grpc.okhttp.OkHttpChannelBuilder
 import java.util.concurrent.ConcurrentHashMap
+import java.net.URI
 
 /**
  * Управляет gRPC-каналами ко всем сервисам. На каждый адрес — один кэшированный
@@ -62,18 +63,26 @@ class GrpcManager(
     suspend fun validAccessToken(): String? = tokenRefresher.validAccessToken()
 
     private fun channelFor(address: String): Channel =
-        interceptedChannels.computeIfAbsent(address) {
-            val managed = createChannel(it)
+        interceptedChannels.computeIfAbsent("${ServerSettings.config.key}|$address") {
+            val managed = createChannel(address, ServerSettings.config.allowSelfSigned)
             managedChannels[it] = managed
             ClientInterceptors.intercept(managed, AuthInterceptor { tokenRefresher.validAccessToken() }, metadataInterceptor)
         }
 
-    private fun publicIdentityStub(): IdentityApiGrpcKt.IdentityApiCoroutineStub =
+    fun publicIdentityStub(): IdentityApiGrpcKt.IdentityApiCoroutineStub =
         IdentityApiGrpcKt.IdentityApiCoroutineStub(publicChannelFor(ServerSettings.identityAddress))
 
+    fun publicUsersStub(): UsersApiGrpcKt.UsersApiCoroutineStub =
+        UsersApiGrpcKt.UsersApiCoroutineStub(publicChannelFor(ServerSettings.usersAddress))
+
+    fun registrationIdentityStub(accessToken: String): IdentityApiGrpcKt.IdentityApiCoroutineStub =
+        IdentityApiGrpcKt.IdentityApiCoroutineStub(ClientInterceptors.intercept(
+            publicChannelFor(ServerSettings.identityAddress), AuthInterceptor { accessToken },
+        ))
+
     private fun publicChannelFor(address: String): Channel =
-        publicChannels.computeIfAbsent(address) {
-            val managed = createChannel(it)
+        publicChannels.computeIfAbsent("${ServerSettings.config.key}|$address") {
+            val managed = createChannel(address, ServerSettings.config.allowSelfSigned)
             managedChannels["public:$it"] = managed
             ClientInterceptors.intercept(managed, metadataInterceptor)
         }
@@ -85,19 +94,14 @@ class GrpcManager(
         publicChannels.clear()
     }
 
-    private fun createChannel(address: String): ManagedChannel {
+    private fun createChannel(address: String, allowSelfSigned: Boolean): ManagedChannel {
         val url = ensureScheme(address)
         val useTls = url.startsWith("https://")
-        val hostPort = url.removePrefix("http://").removePrefix("https://")
-        val parts = hostPort.split(":")
-        val host = parts[0]
-        val port = parts.getOrNull(1)?.toIntOrNull() ?: if (useTls) 443 else 80
-
-        val builder = OkHttpChannelBuilder.forAddress(host, port)
-        if (useTls) {
-            // Сервер использует самоподписанный сертификат — доверяем всем.
+        val uri = URI(url)
+        val builder = OkHttpChannelBuilder.forAddress(uri.host.removeSurrounding("[", "]"), uri.port.takeIf { it > 0 } ?: if (useTls) 443 else 80)
+        if (useTls && allowSelfSigned) {
             builder.sslSocketFactory(InsecureTls.socketFactory())
-        } else {
+        } else if (!useTls) {
             builder.usePlaintext()
         }
         return builder.build()

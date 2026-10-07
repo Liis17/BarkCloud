@@ -6,7 +6,9 @@ import barkcloud.identity.IdentityApiOuterClass.LogoutRequest
 import com.barkfluff.BarkCloud.grpc.AuthErrorCodes
 import com.barkfluff.BarkCloud.grpc.GrpcManager
 import com.barkfluff.BarkCloud.grpc.errorCode
-import io.grpc.StatusRuntimeException
+import com.barkfluff.BarkCloud.grpc.grpcFailureOrNull
+import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -14,7 +16,7 @@ sealed class AuthResult {
     data object Success : AuthResult()
     data object OtpRequired : AuthResult()
     data object InvalidCredentials : AuthResult()
-    data class OtherError(val message: String) : AuthResult()
+    data class OtherError(val message: String, val retryAfterSeconds: Int? = null) : AuthResult()
 }
 
 class AuthRepository(
@@ -29,17 +31,19 @@ class AuthRepository(
     ): AuthResult = withContext(Dispatchers.IO) {
         val request = buildAuthRequest(login, password, otpCode)
         try {
-            val response: AuthResponse = grpcManager.identityStub().auth(request)
+            val response: AuthResponse = grpcManager.identityStub().withDeadlineAfter(15, TimeUnit.SECONDS).auth(request)
             persist(response)
             AuthResult.Success
-        } catch (e: StatusRuntimeException) {
-            when (e.errorCode()) {
-                AuthErrorCodes.OTP_REQUIRED -> AuthResult.OtpRequired
-                AuthErrorCodes.INVALID_CREDENTIALS -> AuthResult.InvalidCredentials
-                else -> AuthResult.OtherError(e.status.description ?: e.message ?: "gRPC error")
-            }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
-            AuthResult.OtherError(e.message ?: e::class.java.simpleName)
+            val failure = e.grpcFailureOrNull()
+            if (failure == null) AuthResult.OtherError(e.message ?: e::class.java.simpleName)
+            else when (failure.errorCode()) {
+                AuthErrorCodes.OTP_REQUIRED -> AuthResult.OtpRequired
+                AuthErrorCodes.INVALID_CREDENTIALS, "A4DAB334-1067-4838-A782-C4257DC838F7" -> AuthResult.InvalidCredentials
+                else -> failure.toAuthFlowException().let { AuthResult.OtherError(it.message, it.retryAfterSeconds) }
+            }
         }
     }
 

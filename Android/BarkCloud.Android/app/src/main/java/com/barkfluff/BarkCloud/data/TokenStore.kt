@@ -50,10 +50,10 @@ class TokenStore(context: Context) {
             .toString()
             .encodeToByteArray()
         val encrypted = encryption.doFinal(plain)
-        prefs.edit()
+        check(prefs.edit()
             .putString(KEY_IV, Base64.encodeToString(encryption.iv, Base64.NO_WRAP))
             .putString(KEY_PAYLOAD, Base64.encodeToString(encrypted, Base64.NO_WRAP))
-            .apply()
+            .commit()) { "Не удалось сохранить сессию" }
     }
 
     fun clear() {

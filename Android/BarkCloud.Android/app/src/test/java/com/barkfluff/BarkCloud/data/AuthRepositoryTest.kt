@@ -28,6 +28,8 @@ class AuthRepositoryTest {
     private val globalParam = mockk<GlobalParam>(relaxed = true)
     private val repository = AuthRepository(grpcManager, globalParam)
 
+    init { every { stub.withDeadlineAfter(any(), any()) } returns stub }
+
     private val authError = "21BFB9B5-C377-45D1-9B15-6B7F3432B397"
     private val otpError = "C1576884-12D8-4722-A7EE-9F9789AD1265"
 
@@ -150,4 +152,13 @@ class AuthRepositoryTest {
 
         coVerify { stub.logout(any<LogoutRequest>(), any()) }
     }
+    @Test fun `coroutine checked status preserves invalid credentials trailer`() = runTest {
+        coEvery { stub.auth(any(), any()) } throws Status.FAILED_PRECONDITION.asException(trailerWith(authError))
+        assertEquals(AuthResult.InvalidCredentials, repository.auth("john", "pwd"))
+    }
+    @Test fun `missing user is shown as invalid credentials`() = runTest {
+        coEvery { stub.auth(any(), any()) } throws Status.FAILED_PRECONDITION.asException(trailerWith("A4DAB334-1067-4838-A782-C4257DC838F7"))
+        assertEquals(AuthResult.InvalidCredentials, repository.auth("missing", "pwd"))
+    }
+
 }

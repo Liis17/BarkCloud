@@ -16,6 +16,8 @@ import coil3.video.VideoFrameDecoder
 import com.barkfluff.BarkCloud.data.AppLockManager
 import com.barkfluff.BarkCloud.data.AppLockStore
 import com.barkfluff.BarkCloud.data.AuthRepository
+import com.barkfluff.BarkCloud.data.AuthFlowRepository
+import com.barkfluff.BarkCloud.data.PendingRegistrationStore
 import com.barkfluff.BarkCloud.data.GlobalParam
 import com.barkfluff.BarkCloud.data.SessionManager
 import com.barkfluff.BarkCloud.data.cache.FileCacheService
@@ -57,6 +59,9 @@ class BarkCloudApplication : Application(), SingletonImageLoader.Factory {
         private set
 
     lateinit var authRepository: AuthRepository
+        private set
+
+    lateinit var authFlowRepository: AuthFlowRepository
         private set
 
     lateinit var localFileRepository: LocalFileRepository
@@ -110,6 +115,7 @@ class BarkCloudApplication : Application(), SingletonImageLoader.Factory {
         globalParam = GlobalParam(this)
         grpcManager = GrpcManager(globalParam, ClientMetadataInterceptor.create(this))
         authRepository = AuthRepository(grpcManager, globalParam)
+        authFlowRepository = AuthFlowRepository(grpcManager, globalParam, PendingRegistrationStore(this))
         localFileRepository = LocalFileRepository()
         fileTransfer = FileTransferService(this, grpcManager, globalParam, InsecureHttp.client)
         cloudRepository = CloudRepository(grpcManager, fileTransfer)
@@ -139,8 +145,7 @@ class BarkCloudApplication : Application(), SingletonImageLoader.Factory {
     override fun newImageLoader(context: PlatformContext): ImageLoader =
         ImageLoader.Builder(context)
             .components {
-                // Превью облака отдаются по self-signed TLS — тянем их через тот же
-                // доверяющий клиент, что и upload/download.
+                // Превью используют ту же выбранную TLS-политику, что и upload/download.
                 add(OkHttpNetworkFetcherFactory(callFactory = { InsecureHttp.client }))
                 add(VideoFrameDecoder.Factory())
             }

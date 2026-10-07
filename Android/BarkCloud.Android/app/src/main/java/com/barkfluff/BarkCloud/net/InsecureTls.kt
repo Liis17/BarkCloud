@@ -7,10 +7,8 @@ import javax.net.ssl.TrustManager
 import javax.net.ssl.X509TrustManager
 
 /**
- * Сервер BarkCloud за nginx использует самоподписанный TLS-сертификат. Здесь общий
- * «доверяй всем» TrustManager и фабрика сокетов — их разделяют gRPC-каналы
- * ([com.barkfluff.BarkCloud.grpc.GrpcManager]) и HTTP-клиент для upload/download и
- * превью ([InsecureHttp]).
+ * Certificate-chain exception used only after the caller selects allowSelfSigned for its host.
+ * Both transports retain their default hostname verifier; external HTTP hosts use strict TLS.
  */
 object InsecureTls {
 

@@ -27,6 +27,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.barkfluff.BarkCloud.BarkCloudApplication
 import com.barkfluff.BarkCloud.R
+import com.barkfluff.BarkCloud.data.NotificationPermissionRequests
 import com.barkfluff.BarkCloud.data.gallery.AutoUploadNetworkPolicy
 import com.barkfluff.BarkCloud.data.gallery.AutoUploadScheduler
 import com.barkfluff.BarkCloud.data.gallery.AutoUploadSettings
@@ -49,6 +50,7 @@ fun UploadSettingsScreen(onNavigateUp: () -> Unit) {
                 AutoUploadScheduler.disable(context)
                 app.uploadQueue.pauseBackup()
             } else {
+                NotificationPermissionRequests.request()
                 app.uploadQueue.resumeBackup()
                 AutoUploadScheduler.apply(context, policy)
             }
