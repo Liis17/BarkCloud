@@ -1,0 +1,12 @@
+Checked HEAD: d6563a2
+Date: 2026-10-07
+Stock Torrent.Tests: 26 passed, 0 failed, 0 skipped
+
+Residual probe (SQLite relational provider; engine Pause/Start protected hooks):
+F21 failed flush: DB=100/200, baseline=10/20, monitor=10/20
+F21 retry: DB=105/207, expected=115/227, lost=10/20
+F22 Pause->Resume engine, delayed Pause commit: DB.Paused=True, successful engine action Paused=False
+F22 Pause DB failure: DB.Paused=False, successful engine action Paused=True
+3 residual defect probes reproduced; production code unchanged.
+
+Exit code: 0 (this probe asserts old defect presence, not correctness)

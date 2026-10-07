@@ -1,0 +1,9 @@
+HEAD: d6563a2
+PostgreSQL: 18.6, C.UTF-8
+.NET SDK: 10.0.203
+Files current: {'total': '564', 'executed': '564', 'passed': '564', 'failed': '0', 'error': '0', 'timeout': '0', 'aborted': '0', 'inconclusive': '0', 'passedButRunAborted': '0', 'notRunnable': '0', 'notExecuted': '0', 'disconnected': '0', 'warning': '0', 'completed': '0', 'inProgress': '0', 'pending': '0'}
+Residuals: F13 failed, F15 failed, F20 failed (3 total, 3 failed, 0 skipped)
+Portable source project verified separately: 3 total, 3 failed, same defects.
+Original full Files TRX: /tmp/barkcloud-files-recheck.cqwEo7/results/files-current.trx
+Original full Files build/test log: /tmp/barkcloud-files-recheck.cqwEo7/files-current.log
+No production or tracked tests changed.

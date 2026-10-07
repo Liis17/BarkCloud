@@ -1,0 +1,150 @@
+  Determining projects to restore...
+  Restored /Users/liis/Projects/BarkCloud/Shared/BarkCloud.Shared.Identity/BarkCloud.Shared.Identity.csproj (in 34 ms).
+  Restored /Users/liis/Projects/BarkCloud/Shared/BarkCloud.Proto/BarkCloud.Proto.csproj (in 34 ms).
+  Restored /Users/liis/Projects/BarkCloud/Shared/BarkCloud.Shared.Queue/BarkCloud.Shared.Queue.csproj (in 37 ms).
+  Restored /Users/liis/Projects/BarkCloud/Shared/BarkCloud.Shared.Auth/BarkCloud.Shared.Auth.csproj (in 85 ms).
+  Restored /Users/liis/Projects/BarkCloud/Shared/BarkCloud.Shared.Exceptions/BarkCloud.Shared.Exceptions.csproj (in 85 ms).
+  Restored /Users/liis/Projects/BarkCloud/Backend/BarkCloud.GrpcServer/BarkCloud.GrpcServer.csproj (in 116 ms).
+  Restored /Users/liis/Projects/BarkCloud/Docs/audit/backend-recheck-2026-10-07/evidence/files/Recheck.csproj (in 133 ms).
+  Restored /Users/liis/Projects/BarkCloud/Backend/BarkCloud.Files/BarkCloud.Files.csproj (in 136 ms).
+  BarkCloud.Shared.Auth -> <repro>/portable-artifacts/bin/BarkCloud.Shared.Auth/debug/BarkCloud.Shared.Auth.dll
+/Users/liis/Projects/BarkCloud/Shared/BarkCloud.Shared.Exceptions/Interceptors/ExceptionClientInterceptor.cs(42,54): warning CS8604: Возможно, аргумент-ссылка, допускающий значение NULL, для параметра "errorCode" в "BaseGrpcException? ExceptionClientInterceptor.FindExceptionByErrorCode(string errorCode)". [/Users/liis/Projects/BarkCloud/Shared/BarkCloud.Shared.Exceptions/BarkCloud.Shared.Exceptions.csproj]
+/Users/liis/Projects/BarkCloud/Shared/BarkCloud.Shared.Exceptions/Interceptors/ExceptionClientInterceptor.cs(11,43): warning CS8618: поле "CachedExceptions", не допускающий значения NULL, должен содержать значение, отличное от NULL, при выходе из конструктора. Рассмотрите возможность добавления модификатора "required" или объявления значения поле, допускающего значение NULL. [/Users/liis/Projects/BarkCloud/Shared/BarkCloud.Shared.Exceptions/BarkCloud.Shared.Exceptions.csproj]
+  BarkCloud.Shared.Identity -> <repro>/portable-artifacts/bin/BarkCloud.Shared.Identity/debug/BarkCloud.Shared.Identity.dll
+  BarkCloud.Shared.Exceptions -> <repro>/portable-artifacts/bin/BarkCloud.Shared.Exceptions/debug/BarkCloud.Shared.Exceptions.dll
+  BarkCloud.Proto -> <repro>/portable-artifacts/bin/BarkCloud.Proto/debug/BarkCloud.Proto.dll
+/Users/liis/Projects/BarkCloud/Shared/BarkCloud.Shared.Queue/Users/UserChangedAvatar.cs(7,19): warning CS8618: свойство "ProfilePictureUrl", не допускающий значения NULL, должен содержать значение, отличное от NULL, при выходе из конструктора. Рассмотрите возможность добавления модификатора "required" или объявления значения свойство, допускающего значение NULL. [/Users/liis/Projects/BarkCloud/Shared/BarkCloud.Shared.Queue/BarkCloud.Shared.Queue.csproj]
+/Users/liis/Projects/BarkCloud/Shared/BarkCloud.Shared.Queue/Users/UserChangedAvatar.cs(9,19): warning CS8618: свойство "ProfilePictureUrlPreview", не допускающий значения NULL, должен содержать значение, отличное от NULL, при выходе из конструктора. Рассмотрите возможность добавления модификатора "required" или объявления значения свойство, допускающего значение NULL. [/Users/liis/Projects/BarkCloud/Shared/BarkCloud.Shared.Queue/BarkCloud.Shared.Queue.csproj]
+/Users/liis/Projects/BarkCloud/Shared/BarkCloud.Shared.Queue/Users/UserChangedBio.cs(7,23): warning CS8618: свойство "NewBio", не допускающий значения NULL, должен содержать значение, отличное от NULL, при выходе из конструктора. Рассмотрите возможность добавления модификатора "required" или объявления значения свойство, допускающего значение NULL. [/Users/liis/Projects/BarkCloud/Shared/BarkCloud.Shared.Queue/BarkCloud.Shared.Queue.csproj]
+/Users/liis/Projects/BarkCloud/Shared/BarkCloud.Shared.Queue/Notifications/EmailNotification.cs(7,19): warning CS8618: свойство "Title", не допускающий значения NULL, должен содержать значение, отличное от NULL, при выходе из конструктора. Рассмотрите возможность добавления модификатора "required" или объявления значения свойство, допускающего значение NULL. [/Users/liis/Projects/BarkCloud/Shared/BarkCloud.Shared.Queue/BarkCloud.Shared.Queue.csproj]
+/Users/liis/Projects/BarkCloud/Shared/BarkCloud.Shared.Queue/Notifications/EmailNotification.cs(9,19): warning CS8618: свойство "Address", не допускающий значения NULL, должен содержать значение, отличное от NULL, при выходе из конструктора. Рассмотрите возможность добавления модификатора "required" или объявления значения свойство, допускающего значение NULL. [/Users/liis/Projects/BarkCloud/Shared/BarkCloud.Shared.Queue/BarkCloud.Shared.Queue.csproj]
+/Users/liis/Projects/BarkCloud/Shared/BarkCloud.Shared.Queue/Users/UserChangedUsername.cs(7,19): warning CS8618: свойство "NewUsername", не допускающий значения NULL, должен содержать значение, отличное от NULL, при выходе из конструктора. Рассмотрите возможность добавления модификатора "required" или объявления значения свойство, допускающего значение NULL. [/Users/liis/Projects/BarkCloud/Shared/BarkCloud.Shared.Queue/BarkCloud.Shared.Queue.csproj]
+/Users/liis/Projects/BarkCloud/Shared/BarkCloud.Shared.Queue/Users/UserChangedName.cs(7,19): warning CS8618: свойство "NewFirstName", не допускающий значения NULL, должен содержать значение, отличное от NULL, при выходе из конструктора. Рассмотрите возможность добавления модификатора "required" или объявления значения свойство, допускающего значение NULL. [/Users/liis/Projects/BarkCloud/Shared/BarkCloud.Shared.Queue/BarkCloud.Shared.Queue.csproj]
+/Users/liis/Projects/BarkCloud/Shared/BarkCloud.Shared.Queue/Users/UserChangedName.cs(9,19): warning CS8618: свойство "NewLastName", не допускающий значения NULL, должен содержать значение, отличное от NULL, при выходе из конструктора. Рассмотрите возможность добавления модификатора "required" или объявления значения свойство, допускающего значение NULL. [/Users/liis/Projects/BarkCloud/Shared/BarkCloud.Shared.Queue/BarkCloud.Shared.Queue.csproj]
+/Users/liis/Projects/BarkCloud/Shared/BarkCloud.Shared.Queue/Notifications/Notification.cs(17,39): warning CS8618: свойство "Payload", не допускающий значения NULL, должен содержать значение, отличное от NULL, при выходе из конструктора. Рассмотрите возможность добавления модификатора "required" или объявления значения свойство, допускающего значение NULL. [/Users/liis/Projects/BarkCloud/Shared/BarkCloud.Shared.Queue/BarkCloud.Shared.Queue.csproj]
+  BarkCloud.Shared.Queue -> <repro>/portable-artifacts/bin/BarkCloud.Shared.Queue/debug/BarkCloud.Shared.Queue.dll
+/Users/liis/Projects/BarkCloud/Backend/BarkCloud.GrpcServer/Settings/TlsSettings.cs(5,19): warning CS8618: свойство "Filename", не допускающий значения NULL, должен содержать значение, отличное от NULL, при выходе из конструктора. Рассмотрите возможность добавления модификатора "required" или объявления значения свойство, допускающего значение NULL. [/Users/liis/Projects/BarkCloud/Backend/BarkCloud.GrpcServer/BarkCloud.GrpcServer.csproj]
+/Users/liis/Projects/BarkCloud/Backend/BarkCloud.GrpcServer/Settings/TlsSettings.cs(7,19): warning CS8618: свойство "Password", не допускающий значения NULL, должен содержать значение, отличное от NULL, при выходе из конструктора. Рассмотрите возможность добавления модификатора "required" или объявления значения свойство, допускающего значение NULL. [/Users/liis/Projects/BarkCloud/Backend/BarkCloud.GrpcServer/BarkCloud.GrpcServer.csproj]
+/Users/liis/Projects/BarkCloud/Backend/BarkCloud.GrpcServer/WebApplicationBuilderExtensions.cs(136,53): warning CS8620: Аргумент типа "Dictionary<string, string>" запрещено использовать для параметра "initialData" типа "IEnumerable<KeyValuePair<string, string?>>" в "IConfigurationBuilder MemoryConfigurationBuilderExtensions.AddInMemoryCollection(IConfigurationBuilder configurationBuilder, IEnumerable<KeyValuePair<string, string?>>? initialData)" из-за различий в отношении допустимости значений NULL для ссылочных типов. [/Users/liis/Projects/BarkCloud/Backend/BarkCloud.GrpcServer/BarkCloud.GrpcServer.csproj]
+  BarkCloud.GrpcServer -> <repro>/portable-artifacts/bin/BarkCloud.GrpcServer/debug/BarkCloud.GrpcServer.dll
+../../Shared/BarkCloud.Proto/users_api.proto(6,1): warning : warning: Import shared.proto is unused. [/Users/liis/Projects/BarkCloud/Backend/BarkCloud.Files/BarkCloud.Files.csproj]
+/Users/liis/Projects/BarkCloud/Backend/BarkCloud.Files/Features/DownloadFile/DownloadFileCommand.cs(17,19): warning CS8618: свойство "FileStream", не допускающий значения NULL, должен содержать значение, отличное от NULL, при выходе из конструктора. Рассмотрите возможность добавления модификатора "required" или объявления значения свойство, допускающего значение NULL. [/Users/liis/Projects/BarkCloud/Backend/BarkCloud.Files/BarkCloud.Files.csproj]
+/Users/liis/Projects/BarkCloud/Backend/BarkCloud.Files/Features/DownloadFile/DownloadFileCommand.cs(18,19): warning CS8618: свойство "FileName", не допускающий значения NULL, должен содержать значение, отличное от NULL, при выходе из конструктора. Рассмотрите возможность добавления модификатора "required" или объявления значения свойство, допускающего значение NULL. [/Users/liis/Projects/BarkCloud/Backend/BarkCloud.Files/BarkCloud.Files.csproj]
+/Users/liis/Projects/BarkCloud/Backend/BarkCloud.Files/Features/DownloadFile/DownloadFileCommand.cs(19,19): warning CS8618: свойство "ContentType", не допускающий значения NULL, должен содержать значение, отличное от NULL, при выходе из конструктора. Рассмотрите возможность добавления модификатора "required" или объявления значения свойство, допускающего значение NULL. [/Users/liis/Projects/BarkCloud/Backend/BarkCloud.Files/BarkCloud.Files.csproj]
+/Users/liis/Projects/BarkCloud/Backend/BarkCloud.Files/Features/UploadFile/UploadFileCommand.cs(9,19): warning CS8618: свойство "FileStream", не допускающий значения NULL, должен содержать значение, отличное от NULL, при выходе из конструктора. Рассмотрите возможность добавления модификатора "required" или объявления значения свойство, допускающего значение NULL. [/Users/liis/Projects/BarkCloud/Backend/BarkCloud.Files/BarkCloud.Files.csproj]
+/Users/liis/Projects/BarkCloud/Backend/BarkCloud.Files/Features/UploadFile/UploadFileCommand.cs(11,19): warning CS8618: свойство "FileName", не допускающий значения NULL, должен содержать значение, отличное от NULL, при выходе из конструктора. Рассмотрите возможность добавления модификатора "required" или объявления значения свойство, допускающего значение NULL. [/Users/liis/Projects/BarkCloud/Backend/BarkCloud.Files/BarkCloud.Files.csproj]
+/Users/liis/Projects/BarkCloud/Backend/BarkCloud.Files/Features/GetTempDownloadUrl/GetTempDownloadUrlCommand.cs(9,23): warning CS8618: свойство "FileIds", не допускающий значения NULL, должен содержать значение, отличное от NULL, при выходе из конструктора. Рассмотрите возможность добавления модификатора "required" или объявления значения свойство, допускающего значение NULL. [/Users/liis/Projects/BarkCloud/Backend/BarkCloud.Files/BarkCloud.Files.csproj]
+/Users/liis/Projects/BarkCloud/Backend/BarkCloud.Files/Features/GetFilesData/GetFilesDataCommand.cs(9,23): warning CS8618: свойство "FileIds", не допускающий значения NULL, должен содержать значение, отличное от NULL, при выходе из конструктора. Рассмотрите возможность добавления модификатора "required" или объявления значения свойство, допускающего значение NULL. [/Users/liis/Projects/BarkCloud/Backend/BarkCloud.Files/BarkCloud.Files.csproj]
+/Users/liis/Projects/BarkCloud/Backend/BarkCloud.Files/Program.cs(76,37): warning CS8604: Возможно, аргумент-ссылка, допускающий значение NULL, для параметра "uriString" в "Uri.Uri(string uriString)". [/Users/liis/Projects/BarkCloud/Backend/BarkCloud.Files/BarkCloud.Files.csproj]
+/Users/liis/Projects/BarkCloud/Backend/BarkCloud.Files/Program.cs(77,84): warning CS8604: Возможно, аргумент-ссылка, допускающий значение NULL, для параметра "token" в "JwtClientInterceptor.JwtClientInterceptor(string token)". [/Users/liis/Projects/BarkCloud/Backend/BarkCloud.Files/BarkCloud.Files.csproj]
+/Users/liis/Projects/BarkCloud/Backend/BarkCloud.Files/Program.cs(163,32): warning CS8604: Возможно, аргумент-ссылка, допускающий значение NULL, для параметра "username" в "void IRabbitMqHostConfigurator.Username(string username)". [/Users/liis/Projects/BarkCloud/Backend/BarkCloud.Files/BarkCloud.Files.csproj]
+/Users/liis/Projects/BarkCloud/Backend/BarkCloud.Files/Program.cs(164,32): warning CS8604: Возможно, аргумент-ссылка, допускающий значение NULL, для параметра "password" в "void IRabbitMqHostConfigurator.Password(string password)". [/Users/liis/Projects/BarkCloud/Backend/BarkCloud.Files/BarkCloud.Files.csproj]
+/Users/liis/Projects/BarkCloud/Backend/BarkCloud.Files/Services/LegacyJpegViewBackfillService.cs(142,26): warning CS8604: Возможно, аргумент-ссылка, допускающий значение NULL, для параметра "fileName" в "string FileExtensions.GetContentType(string fileName)". [/Users/liis/Projects/BarkCloud/Backend/BarkCloud.Files/BarkCloud.Files.csproj]
+/Users/liis/Projects/BarkCloud/Backend/BarkCloud.Files/Services/LegacyPreviewBackfillService.cs(144,26): warning CS8604: Возможно, аргумент-ссылка, допускающий значение NULL, для параметра "fileName" в "string FileExtensions.GetContentType(string fileName)". [/Users/liis/Projects/BarkCloud/Backend/BarkCloud.Files/BarkCloud.Files.csproj]
+/Users/liis/Projects/BarkCloud/Backend/BarkCloud.Files/Persistence/TempFilesStorage.cs(74,65): warning CS8604: Возможно, аргумент-ссылка, допускающий значение NULL, для параметра "s" в "int int.Parse(string s)". [/Users/liis/Projects/BarkCloud/Backend/BarkCloud.Files/BarkCloud.Files.csproj]
+  BarkCloud.Files -> <repro>/portable-artifacts/bin/BarkCloud.Files/debug/BarkCloud.Files.dll
+/usr/local/share/dotnet/sdk/10.0.203/Microsoft.Common.CurrentVersion.targets(2451,5): warning MSB3277: Found conflicts between different versions of "Microsoft.EntityFrameworkCore.Relational" that could not be resolved. [/Users/liis/Projects/BarkCloud/Docs/audit/backend-recheck-2026-10-07/evidence/files/Recheck.csproj]
+/usr/local/share/dotnet/sdk/10.0.203/Microsoft.Common.CurrentVersion.targets(2451,5): warning MSB3277: There was a conflict between "Microsoft.EntityFrameworkCore.Relational, Version=10.0.4.0, Culture=neutral, PublicKeyToken=adb9793829ddae60" and "Microsoft.EntityFrameworkCore.Relational, Version=10.0.8.0, Culture=neutral, PublicKeyToken=adb9793829ddae60". [/Users/liis/Projects/BarkCloud/Docs/audit/backend-recheck-2026-10-07/evidence/files/Recheck.csproj]
+/usr/local/share/dotnet/sdk/10.0.203/Microsoft.Common.CurrentVersion.targets(2451,5): warning MSB3277:     "Microsoft.EntityFrameworkCore.Relational, Version=10.0.4.0, Culture=neutral, PublicKeyToken=adb9793829ddae60" was chosen because it was primary and "Microsoft.EntityFrameworkCore.Relational, Version=10.0.8.0, Culture=neutral, PublicKeyToken=adb9793829ddae60" was not. [/Users/liis/Projects/BarkCloud/Docs/audit/backend-recheck-2026-10-07/evidence/files/Recheck.csproj]
+/usr/local/share/dotnet/sdk/10.0.203/Microsoft.Common.CurrentVersion.targets(2451,5): warning MSB3277:     References which depend on "Microsoft.EntityFrameworkCore.Relational, Version=10.0.4.0, Culture=neutral, PublicKeyToken=adb9793829ddae60" [/Users/liis/.nuget/packages/microsoft.entityframeworkcore.relational/10.0.4/lib/net10.0/Microsoft.EntityFrameworkCore.Relational.dll]. [/Users/liis/Projects/BarkCloud/Docs/audit/backend-recheck-2026-10-07/evidence/files/Recheck.csproj]
+/usr/local/share/dotnet/sdk/10.0.203/Microsoft.Common.CurrentVersion.targets(2451,5): warning MSB3277:         /Users/liis/.nuget/packages/microsoft.entityframeworkcore.relational/10.0.4/lib/net10.0/Microsoft.EntityFrameworkCore.Relational.dll [/Users/liis/Projects/BarkCloud/Docs/audit/backend-recheck-2026-10-07/evidence/files/Recheck.csproj]
+/usr/local/share/dotnet/sdk/10.0.203/Microsoft.Common.CurrentVersion.targets(2451,5): warning MSB3277:           Project file item includes which caused reference "/Users/liis/.nuget/packages/microsoft.entityframeworkcore.relational/10.0.4/lib/net10.0/Microsoft.EntityFrameworkCore.Relational.dll". [/Users/liis/Projects/BarkCloud/Docs/audit/backend-recheck-2026-10-07/evidence/files/Recheck.csproj]
+/usr/local/share/dotnet/sdk/10.0.203/Microsoft.Common.CurrentVersion.targets(2451,5): warning MSB3277:             /Users/liis/.nuget/packages/microsoft.entityframeworkcore.relational/10.0.4/lib/net10.0/Microsoft.EntityFrameworkCore.Relational.dll [/Users/liis/Projects/BarkCloud/Docs/audit/backend-recheck-2026-10-07/evidence/files/Recheck.csproj]
+/usr/local/share/dotnet/sdk/10.0.203/Microsoft.Common.CurrentVersion.targets(2451,5): warning MSB3277:     References which depend on or have been unified to "Microsoft.EntityFrameworkCore.Relational, Version=10.0.8.0, Culture=neutral, PublicKeyToken=adb9793829ddae60" []. [/Users/liis/Projects/BarkCloud/Docs/audit/backend-recheck-2026-10-07/evidence/files/Recheck.csproj]
+/usr/local/share/dotnet/sdk/10.0.203/Microsoft.Common.CurrentVersion.targets(2451,5): warning MSB3277:         <repro>/portable-artifacts/bin/BarkCloud.Files/debug/BarkCloud.Files.dll [/Users/liis/Projects/BarkCloud/Docs/audit/backend-recheck-2026-10-07/evidence/files/Recheck.csproj]
+/usr/local/share/dotnet/sdk/10.0.203/Microsoft.Common.CurrentVersion.targets(2451,5): warning MSB3277:           Project file item includes which caused reference "<repro>/portable-artifacts/bin/BarkCloud.Files/debug/BarkCloud.Files.dll". [/Users/liis/Projects/BarkCloud/Docs/audit/backend-recheck-2026-10-07/evidence/files/Recheck.csproj]
+/usr/local/share/dotnet/sdk/10.0.203/Microsoft.Common.CurrentVersion.targets(2451,5): warning MSB3277:             <repro>/portable-artifacts/bin/BarkCloud.Files/debug/BarkCloud.Files.dll [/Users/liis/Projects/BarkCloud/Docs/audit/backend-recheck-2026-10-07/evidence/files/Recheck.csproj]
+  Recheck -> <repro>/portable-artifacts/bin/Recheck/debug/Recheck.dll
+Test run for <repro>/portable-artifacts/bin/Recheck/debug/Recheck.dll (.NETCoreApp,Version=v10.0)
+Общее количество тестовых файлов (1), соответствующих указанному шаблону.
+<repro>/portable-artifacts/bin/Recheck/debug/Recheck.dll
+[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v3.1.5+1b188a7b0a (64-bit .NET 10.0.10)
+[xUnit.net 00:00:00.04]   Discovering: Recheck
+[xUnit.net 00:00:00.06]   Discovered:  Recheck
+[xUnit.net 00:00:00.06]   Starting:    Recheck
+[xUnit.net 00:00:01.59]     ResidualFilesTests.F13_RenameMustNotResurrectEntryAfterDeleteDirectory [FAIL]
+[xUnit.net 00:00:01.59]       Rename resurrected a live entry referring to a deleted directory.
+[xUnit.net 00:00:01.59]       Stack Trace:
+[xUnit.net 00:00:01.60]         /Users/liis/Projects/BarkCloud/Docs/audit/backend-recheck-2026-10-07/evidence/files/ResidualFilesTests.cs(56,0): at ResidualFilesTests.F13_RenameMustNotResurrectEntryAfterDeleteDirectory()
+[xUnit.net 00:00:01.60]         /Users/liis/Projects/BarkCloud/Docs/audit/backend-recheck-2026-10-07/evidence/files/ResidualFilesTests.cs(56,0): at ResidualFilesTests.F13_RenameMustNotResurrectEntryAfterDeleteDirectory()
+[xUnit.net 00:00:01.60]         /Users/liis/Projects/BarkCloud/Docs/audit/backend-recheck-2026-10-07/evidence/files/ResidualFilesTests.cs(56,0): at ResidualFilesTests.F13_RenameMustNotResurrectEntryAfterDeleteDirectory()
+[xUnit.net 00:00:01.60]         /Users/liis/Projects/BarkCloud/Docs/audit/backend-recheck-2026-10-07/evidence/files/ResidualFilesTests.cs(56,0): at ResidualFilesTests.F13_RenameMustNotResurrectEntryAfterDeleteDirectory()
+[xUnit.net 00:00:01.60]         --- End of stack trace from previous location ---
+[xUnit.net 00:00:01.60]       Output:
+[xUnit.net 00:00:01.60]         {"directoryExists":false,"IsDeleted":false,"Name":"renamed","DirectoryId":"bd99f407-1629-42ea-8b07-64d0f0f6bdff","DeletedAt":null,"PurgeAt":null}
+[xUnit.net 00:00:02.00]     ResidualFilesTests.F20_SearchEveryReturnedFolderMustHaveMatchingField [FAIL]
+[xUnit.net 00:00:02.00]       Assert.Equal() Failure: Strings differ
+[xUnit.net 00:00:02.00]                  ↓ (pos 0)
+[xUnit.net 00:00:02.00]       Expected: "name"
+[xUnit.net 00:00:02.00]       Actual:   ""
+[xUnit.net 00:00:02.00]       Stack Trace:
+[xUnit.net 00:00:02.00]         /Users/liis/Projects/BarkCloud/Docs/audit/backend-recheck-2026-10-07/evidence/files/ResidualFilesTests.cs(120,0): at ResidualFilesTests.F20_SearchEveryReturnedFolderMustHaveMatchingField()
+[xUnit.net 00:00:02.00]         /Users/liis/Projects/BarkCloud/Docs/audit/backend-recheck-2026-10-07/evidence/files/ResidualFilesTests.cs(121,0): at ResidualFilesTests.F20_SearchEveryReturnedFolderMustHaveMatchingField()
+[xUnit.net 00:00:02.00]         /Users/liis/Projects/BarkCloud/Docs/audit/backend-recheck-2026-10-07/evidence/files/ResidualFilesTests.cs(121,0): at ResidualFilesTests.F20_SearchEveryReturnedFolderMustHaveMatchingField()
+[xUnit.net 00:00:02.00]         /Users/liis/Projects/BarkCloud/Docs/audit/backend-recheck-2026-10-07/evidence/files/ResidualFilesTests.cs(121,0): at ResidualFilesTests.F20_SearchEveryReturnedFolderMustHaveMatchingField()
+[xUnit.net 00:00:02.00]         /Users/liis/Projects/BarkCloud/Docs/audit/backend-recheck-2026-10-07/evidence/files/ResidualFilesTests.cs(121,0): at ResidualFilesTests.F20_SearchEveryReturnedFolderMustHaveMatchingField()
+[xUnit.net 00:00:02.00]         --- End of stack trace from previous location ---
+[xUnit.net 00:00:02.00]       Output:
+[xUnit.net 00:00:02.00]         {"query":"quarterly report finances","Title":"report","MatchField":"","MatchValue":"","sqlSimilarity":1,"csharpSimilarity":0.36363636363636365}
+[xUnit.net 00:00:02.31]     ResidualFilesTests.F15_AttachMustNotSucceedAfterOriginalWasPurged [FAIL]
+[xUnit.net 00:00:02.31]       Attach succeeded with a live entry referencing a missing original.
+[xUnit.net 00:00:02.31]       Stack Trace:
+[xUnit.net 00:00:02.31]         /Users/liis/Projects/BarkCloud/Docs/audit/backend-recheck-2026-10-07/evidence/files/ResidualFilesTests.cs(98,0): at ResidualFilesTests.F15_AttachMustNotSucceedAfterOriginalWasPurged()
+[xUnit.net 00:00:02.31]         /Users/liis/Projects/BarkCloud/Docs/audit/backend-recheck-2026-10-07/evidence/files/ResidualFilesTests.cs(98,0): at ResidualFilesTests.F15_AttachMustNotSucceedAfterOriginalWasPurged()
+[xUnit.net 00:00:02.31]         /Users/liis/Projects/BarkCloud/Docs/audit/backend-recheck-2026-10-07/evidence/files/ResidualFilesTests.cs(98,0): at ResidualFilesTests.F15_AttachMustNotSucceedAfterOriginalWasPurged()
+[xUnit.net 00:00:02.31]         /Users/liis/Projects/BarkCloud/Docs/audit/backend-recheck-2026-10-07/evidence/files/ResidualFilesTests.cs(98,0): at ResidualFilesTests.F15_AttachMustNotSucceedAfterOriginalWasPurged()
+[xUnit.net 00:00:02.31]         --- End of stack trace from previous location ---
+[xUnit.net 00:00:02.31]       Output:
+[xUnit.net 00:00:02.31]         {"Entries":1,"Blobs":1,"deletedKeys":["0dd41e1d-e754-4610-b388-0dff7cc1ee56"]}
+[xUnit.net 00:00:02.31]         {"attachSucceeded":true,"blobExists":false,"liveEntries":1}
+[xUnit.net 00:00:02.31]   Finished:    Recheck
+  Не пройден ResidualFilesTests.F13_RenameMustNotResurrectEntryAfterDeleteDirectory [1 s]
+  Сообщение об ошибке:
+   Rename resurrected a live entry referring to a deleted directory.
+  Трассировка стека:
+     at ResidualFilesTests.F13_RenameMustNotResurrectEntryAfterDeleteDirectory() in /Users/liis/Projects/BarkCloud/Docs/audit/backend-recheck-2026-10-07/evidence/files/ResidualFilesTests.cs:line 56
+   at ResidualFilesTests.F13_RenameMustNotResurrectEntryAfterDeleteDirectory() in /Users/liis/Projects/BarkCloud/Docs/audit/backend-recheck-2026-10-07/evidence/files/ResidualFilesTests.cs:line 56
+   at ResidualFilesTests.F13_RenameMustNotResurrectEntryAfterDeleteDirectory() in /Users/liis/Projects/BarkCloud/Docs/audit/backend-recheck-2026-10-07/evidence/files/ResidualFilesTests.cs:line 56
+   at ResidualFilesTests.F13_RenameMustNotResurrectEntryAfterDeleteDirectory() in /Users/liis/Projects/BarkCloud/Docs/audit/backend-recheck-2026-10-07/evidence/files/ResidualFilesTests.cs:line 56
+--- End of stack trace from previous location ---
+  Стандартные выходные сообщения:
+ {"directoryExists":false,"IsDeleted":false,"Name":"renamed","DirectoryId":"bd99f407-1629-42ea-8b07-64d0f0f6bdff","DeletedAt":null,"PurgeAt":null}
+
+
+  Не пройден ResidualFilesTests.F20_SearchEveryReturnedFolderMustHaveMatchingField [413 ms]
+  Сообщение об ошибке:
+   Assert.Equal() Failure: Strings differ
+           ↓ (pos 0)
+Expected: "name"
+Actual:   ""
+  Трассировка стека:
+     at ResidualFilesTests.F20_SearchEveryReturnedFolderMustHaveMatchingField() in /Users/liis/Projects/BarkCloud/Docs/audit/backend-recheck-2026-10-07/evidence/files/ResidualFilesTests.cs:line 120
+   at ResidualFilesTests.F20_SearchEveryReturnedFolderMustHaveMatchingField() in /Users/liis/Projects/BarkCloud/Docs/audit/backend-recheck-2026-10-07/evidence/files/ResidualFilesTests.cs:line 121
+   at ResidualFilesTests.F20_SearchEveryReturnedFolderMustHaveMatchingField() in /Users/liis/Projects/BarkCloud/Docs/audit/backend-recheck-2026-10-07/evidence/files/ResidualFilesTests.cs:line 121
+   at ResidualFilesTests.F20_SearchEveryReturnedFolderMustHaveMatchingField() in /Users/liis/Projects/BarkCloud/Docs/audit/backend-recheck-2026-10-07/evidence/files/ResidualFilesTests.cs:line 121
+   at ResidualFilesTests.F20_SearchEveryReturnedFolderMustHaveMatchingField() in /Users/liis/Projects/BarkCloud/Docs/audit/backend-recheck-2026-10-07/evidence/files/ResidualFilesTests.cs:line 121
+--- End of stack trace from previous location ---
+  Стандартные выходные сообщения:
+ {"query":"quarterly report finances","Title":"report","MatchField":"","MatchValue":"","sqlSimilarity":1,"csharpSimilarity":0.36363636363636365}
+
+
+  Не пройден ResidualFilesTests.F15_AttachMustNotSucceedAfterOriginalWasPurged [305 ms]
+  Сообщение об ошибке:
+   Attach succeeded with a live entry referencing a missing original.
+  Трассировка стека:
+     at ResidualFilesTests.F15_AttachMustNotSucceedAfterOriginalWasPurged() in /Users/liis/Projects/BarkCloud/Docs/audit/backend-recheck-2026-10-07/evidence/files/ResidualFilesTests.cs:line 98
+   at ResidualFilesTests.F15_AttachMustNotSucceedAfterOriginalWasPurged() in /Users/liis/Projects/BarkCloud/Docs/audit/backend-recheck-2026-10-07/evidence/files/ResidualFilesTests.cs:line 98
+   at ResidualFilesTests.F15_AttachMustNotSucceedAfterOriginalWasPurged() in /Users/liis/Projects/BarkCloud/Docs/audit/backend-recheck-2026-10-07/evidence/files/ResidualFilesTests.cs:line 98
+   at ResidualFilesTests.F15_AttachMustNotSucceedAfterOriginalWasPurged() in /Users/liis/Projects/BarkCloud/Docs/audit/backend-recheck-2026-10-07/evidence/files/ResidualFilesTests.cs:line 98
+--- End of stack trace from previous location ---
+  Стандартные выходные сообщения:
+ {"Entries":1,"Blobs":1,"deletedKeys":["0dd41e1d-e754-4610-b388-0dff7cc1ee56"]}
+ {"attachSucceeded":true,"blobExists":false,"liveEntries":1}
+
+
+
+Сбой тестового запуска.
+Всего тестов: 3
+     Не пройдено: 3
+ Общее время: 2,6075 Секунды
+Файл результатов: <repro>/portable-results/files-residuals-portable.trx

@@ -1,0 +1,8 @@
+F23 bytes=15: startupAccepted=False; signing=InvalidOperationException; IDX10720=False
+F23 bytes=16: startupAccepted=True; signing=ArgumentOutOfRangeException; IDX10720=True
+F23 bytes=31: startupAccepted=True; signing=ArgumentOutOfRangeException; IDX10720=True
+F23 bytes=32: startupAccepted=True; signAndValidate=success
+F19 RegisterDevice: deadlinePresent=False; rpcTokenCanCancel=False; IssueAsyncCompleteAfterCallerCancel=False
+F19 RegisterDevice: IssueAsync completed only after manual RPC release
+F19 Outbox PostgreSQL: handlerSuccess=true; newPasswordCommitted=True; PendingNotifications=0; enqueueFailed=1
+All diagnostic observations reproduced

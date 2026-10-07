@@ -1,0 +1,130 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="26df2f3e-ad1e-4b8c-889e-494d206ac49f" name="@MacBook-Air-Li-is 2026-10-07 01:52:14" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2026-10-07T01:52:14.2879600+04:00" queuing="2026-10-07T01:52:14.2879600+04:00" start="2026-10-07T01:52:11.6768220+04:00" finish="2026-10-07T01:52:14.2911240+04:00" />
+  <TestSettings name="default" id="5b791973-9ca1-47ff-b6b2-0269c48368fb">
+    <Deployment runDeploymentRoot="_MacBook-Air-Li-is_2026-10-07_01_52_14" />
+  </TestSettings>
+  <Results>
+    <UnitTestResult executionId="21107413-d1fd-47f2-b03a-2c419c496342" testId="7b96c2cb-b72a-f485-0e00-4b8fac5a23c1" testName="ResidualFilesTests.F20_SearchEveryReturnedFolderMustHaveMatchingField" computerName="MacBook-Air-Li-is" duration="00:00:00.4134466" startTime="2026-10-07T01:52:13.5374840+04:00" endTime="2026-10-07T01:52:13.9374810+04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="21107413-d1fd-47f2-b03a-2c419c496342">
+      <Output>
+        <StdOut>{"query":"quarterly report finances","Title":"report","MatchField":"","MatchValue":"","sqlSimilarity":1,"csharpSimilarity":0.36363636363636365}</StdOut>
+        <ErrorInfo>
+          <Message>Assert.Equal() Failure: Strings differ
+           ↓ (pos 0)
+Expected: "name"
+Actual:   ""</Message>
+          <StackTrace>   at ResidualFilesTests.F20_SearchEveryReturnedFolderMustHaveMatchingField() in /Users/liis/Projects/BarkCloud/Docs/audit/backend-recheck-2026-10-07/evidence/files/ResidualFilesTests.cs:line 120
+   at ResidualFilesTests.F20_SearchEveryReturnedFolderMustHaveMatchingField() in /Users/liis/Projects/BarkCloud/Docs/audit/backend-recheck-2026-10-07/evidence/files/ResidualFilesTests.cs:line 121
+   at ResidualFilesTests.F20_SearchEveryReturnedFolderMustHaveMatchingField() in /Users/liis/Projects/BarkCloud/Docs/audit/backend-recheck-2026-10-07/evidence/files/ResidualFilesTests.cs:line 121
+   at ResidualFilesTests.F20_SearchEveryReturnedFolderMustHaveMatchingField() in /Users/liis/Projects/BarkCloud/Docs/audit/backend-recheck-2026-10-07/evidence/files/ResidualFilesTests.cs:line 121
+   at ResidualFilesTests.F20_SearchEveryReturnedFolderMustHaveMatchingField() in /Users/liis/Projects/BarkCloud/Docs/audit/backend-recheck-2026-10-07/evidence/files/ResidualFilesTests.cs:line 121
+--- End of stack trace from previous location ---</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="fdfac228-0e67-4f12-80dc-206e32852e7b" testId="8fa6fa04-c337-d56c-fb4e-672733fc1812" testName="ResidualFilesTests.F13_RenameMustNotResurrectEntryAfterDeleteDirectory" computerName="MacBook-Air-Li-is" duration="00:00:01.5094643" startTime="2026-10-07T01:52:12.0047800+04:00" endTime="2026-10-07T01:52:13.5232830+04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="fdfac228-0e67-4f12-80dc-206e32852e7b">
+      <Output>
+        <StdOut>{"directoryExists":false,"IsDeleted":false,"Name":"renamed","DirectoryId":"bd99f407-1629-42ea-8b07-64d0f0f6bdff","DeletedAt":null,"PurgeAt":null}</StdOut>
+        <ErrorInfo>
+          <Message>Rename resurrected a live entry referring to a deleted directory.</Message>
+          <StackTrace>   at ResidualFilesTests.F13_RenameMustNotResurrectEntryAfterDeleteDirectory() in /Users/liis/Projects/BarkCloud/Docs/audit/backend-recheck-2026-10-07/evidence/files/ResidualFilesTests.cs:line 56
+   at ResidualFilesTests.F13_RenameMustNotResurrectEntryAfterDeleteDirectory() in /Users/liis/Projects/BarkCloud/Docs/audit/backend-recheck-2026-10-07/evidence/files/ResidualFilesTests.cs:line 56
+   at ResidualFilesTests.F13_RenameMustNotResurrectEntryAfterDeleteDirectory() in /Users/liis/Projects/BarkCloud/Docs/audit/backend-recheck-2026-10-07/evidence/files/ResidualFilesTests.cs:line 56
+   at ResidualFilesTests.F13_RenameMustNotResurrectEntryAfterDeleteDirectory() in /Users/liis/Projects/BarkCloud/Docs/audit/backend-recheck-2026-10-07/evidence/files/ResidualFilesTests.cs:line 56
+--- End of stack trace from previous location ---</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="74b50600-ff73-4f96-b4f2-6f0a9b6d1703" testId="16ec7649-a800-2d81-3f4a-2cd1fafc86d8" testName="ResidualFilesTests.F15_AttachMustNotSucceedAfterOriginalWasPurged" computerName="MacBook-Air-Li-is" duration="00:00:00.3056787" startTime="2026-10-07T01:52:13.9388180+04:00" endTime="2026-10-07T01:52:14.2433950+04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="74b50600-ff73-4f96-b4f2-6f0a9b6d1703">
+      <Output>
+        <StdOut>{"Entries":1,"Blobs":1,"deletedKeys":["0dd41e1d-e754-4610-b388-0dff7cc1ee56"]}
+{"attachSucceeded":true,"blobExists":false,"liveEntries":1}</StdOut>
+        <ErrorInfo>
+          <Message>Attach succeeded with a live entry referencing a missing original.</Message>
+          <StackTrace>   at ResidualFilesTests.F15_AttachMustNotSucceedAfterOriginalWasPurged() in /Users/liis/Projects/BarkCloud/Docs/audit/backend-recheck-2026-10-07/evidence/files/ResidualFilesTests.cs:line 98
+   at ResidualFilesTests.F15_AttachMustNotSucceedAfterOriginalWasPurged() in /Users/liis/Projects/BarkCloud/Docs/audit/backend-recheck-2026-10-07/evidence/files/ResidualFilesTests.cs:line 98
+   at ResidualFilesTests.F15_AttachMustNotSucceedAfterOriginalWasPurged() in /Users/liis/Projects/BarkCloud/Docs/audit/backend-recheck-2026-10-07/evidence/files/ResidualFilesTests.cs:line 98
+   at ResidualFilesTests.F15_AttachMustNotSucceedAfterOriginalWasPurged() in /Users/liis/Projects/BarkCloud/Docs/audit/backend-recheck-2026-10-07/evidence/files/ResidualFilesTests.cs:line 98
+--- End of stack trace from previous location ---</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+  </Results>
+  <TestDefinitions>
+    <UnitTest name="ResidualFilesTests.F20_SearchEveryReturnedFolderMustHaveMatchingField" storage="/tmp/barkcloud-files-recheck.cqweo7/portable-artifacts/bin/recheck/debug/recheck.dll" id="7b96c2cb-b72a-f485-0e00-4b8fac5a23c1">
+      <Execution id="21107413-d1fd-47f2-b03a-2c419c496342" />
+      <TestMethod codeBase="&lt;repro&gt;/portable-artifacts/bin/Recheck/debug/Recheck.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="ResidualFilesTests" name="F20_SearchEveryReturnedFolderMustHaveMatchingField" />
+    </UnitTest>
+    <UnitTest name="ResidualFilesTests.F15_AttachMustNotSucceedAfterOriginalWasPurged" storage="/tmp/barkcloud-files-recheck.cqweo7/portable-artifacts/bin/recheck/debug/recheck.dll" id="16ec7649-a800-2d81-3f4a-2cd1fafc86d8">
+      <Execution id="74b50600-ff73-4f96-b4f2-6f0a9b6d1703" />
+      <TestMethod codeBase="&lt;repro&gt;/portable-artifacts/bin/Recheck/debug/Recheck.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="ResidualFilesTests" name="F15_AttachMustNotSucceedAfterOriginalWasPurged" />
+    </UnitTest>
+    <UnitTest name="ResidualFilesTests.F13_RenameMustNotResurrectEntryAfterDeleteDirectory" storage="/tmp/barkcloud-files-recheck.cqweo7/portable-artifacts/bin/recheck/debug/recheck.dll" id="8fa6fa04-c337-d56c-fb4e-672733fc1812">
+      <Execution id="fdfac228-0e67-4f12-80dc-206e32852e7b" />
+      <TestMethod codeBase="&lt;repro&gt;/portable-artifacts/bin/Recheck/debug/Recheck.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="ResidualFilesTests" name="F13_RenameMustNotResurrectEntryAfterDeleteDirectory" />
+    </UnitTest>
+  </TestDefinitions>
+  <TestEntries>
+    <TestEntry testId="7b96c2cb-b72a-f485-0e00-4b8fac5a23c1" executionId="21107413-d1fd-47f2-b03a-2c419c496342" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="8fa6fa04-c337-d56c-fb4e-672733fc1812" executionId="fdfac228-0e67-4f12-80dc-206e32852e7b" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="16ec7649-a800-2d81-3f4a-2cd1fafc86d8" executionId="74b50600-ff73-4f96-b4f2-6f0a9b6d1703" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+  </TestEntries>
+  <TestLists>
+    <TestList name="Список результатов" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestList name="Все загруженные результаты" id="19431567-8539-422a-85d7-44ee4e166bda" />
+  </TestLists>
+  <ResultSummary outcome="Failed">
+    <Counters total="3" executed="3" passed="0" failed="3" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+    <Output>
+      <StdOut>[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v3.1.5+1b188a7b0a (64-bit .NET 10.0.10)
+[xUnit.net 00:00:00.04]   Discovering: Recheck
+[xUnit.net 00:00:00.06]   Discovered:  Recheck
+[xUnit.net 00:00:00.06]   Starting:    Recheck
+[xUnit.net 00:00:01.59]       Rename resurrected a live entry referring to a deleted directory.
+[xUnit.net 00:00:01.59]       Stack Trace:
+[xUnit.net 00:00:01.60]         /Users/liis/Projects/BarkCloud/Docs/audit/backend-recheck-2026-10-07/evidence/files/ResidualFilesTests.cs(56,0): at ResidualFilesTests.F13_RenameMustNotResurrectEntryAfterDeleteDirectory()
+[xUnit.net 00:00:01.60]         /Users/liis/Projects/BarkCloud/Docs/audit/backend-recheck-2026-10-07/evidence/files/ResidualFilesTests.cs(56,0): at ResidualFilesTests.F13_RenameMustNotResurrectEntryAfterDeleteDirectory()
+[xUnit.net 00:00:01.60]         /Users/liis/Projects/BarkCloud/Docs/audit/backend-recheck-2026-10-07/evidence/files/ResidualFilesTests.cs(56,0): at ResidualFilesTests.F13_RenameMustNotResurrectEntryAfterDeleteDirectory()
+[xUnit.net 00:00:01.60]         /Users/liis/Projects/BarkCloud/Docs/audit/backend-recheck-2026-10-07/evidence/files/ResidualFilesTests.cs(56,0): at ResidualFilesTests.F13_RenameMustNotResurrectEntryAfterDeleteDirectory()
+[xUnit.net 00:00:01.60]         --- End of stack trace from previous location ---
+[xUnit.net 00:00:01.60]       Output:
+[xUnit.net 00:00:01.60]         {"directoryExists":false,"IsDeleted":false,"Name":"renamed","DirectoryId":"bd99f407-1629-42ea-8b07-64d0f0f6bdff","DeletedAt":null,"PurgeAt":null}
+[xUnit.net 00:00:02.00]       Assert.Equal() Failure: Strings differ
+[xUnit.net 00:00:02.00]                  ↓ (pos 0)
+[xUnit.net 00:00:02.00]       Expected: "name"
+[xUnit.net 00:00:02.00]       Actual:   ""
+[xUnit.net 00:00:02.00]       Stack Trace:
+[xUnit.net 00:00:02.00]         /Users/liis/Projects/BarkCloud/Docs/audit/backend-recheck-2026-10-07/evidence/files/ResidualFilesTests.cs(120,0): at ResidualFilesTests.F20_SearchEveryReturnedFolderMustHaveMatchingField()
+[xUnit.net 00:00:02.00]         /Users/liis/Projects/BarkCloud/Docs/audit/backend-recheck-2026-10-07/evidence/files/ResidualFilesTests.cs(121,0): at ResidualFilesTests.F20_SearchEveryReturnedFolderMustHaveMatchingField()
+[xUnit.net 00:00:02.00]         /Users/liis/Projects/BarkCloud/Docs/audit/backend-recheck-2026-10-07/evidence/files/ResidualFilesTests.cs(121,0): at ResidualFilesTests.F20_SearchEveryReturnedFolderMustHaveMatchingField()
+[xUnit.net 00:00:02.00]         /Users/liis/Projects/BarkCloud/Docs/audit/backend-recheck-2026-10-07/evidence/files/ResidualFilesTests.cs(121,0): at ResidualFilesTests.F20_SearchEveryReturnedFolderMustHaveMatchingField()
+[xUnit.net 00:00:02.00]         /Users/liis/Projects/BarkCloud/Docs/audit/backend-recheck-2026-10-07/evidence/files/ResidualFilesTests.cs(121,0): at ResidualFilesTests.F20_SearchEveryReturnedFolderMustHaveMatchingField()
+[xUnit.net 00:00:02.00]         --- End of stack trace from previous location ---
+[xUnit.net 00:00:02.00]       Output:
+[xUnit.net 00:00:02.00]         {"query":"quarterly report finances","Title":"report","MatchField":"","MatchValue":"","sqlSimilarity":1,"csharpSimilarity":0.36363636363636365}
+[xUnit.net 00:00:02.31]       Attach succeeded with a live entry referencing a missing original.
+[xUnit.net 00:00:02.31]       Stack Trace:
+[xUnit.net 00:00:02.31]         /Users/liis/Projects/BarkCloud/Docs/audit/backend-recheck-2026-10-07/evidence/files/ResidualFilesTests.cs(98,0): at ResidualFilesTests.F15_AttachMustNotSucceedAfterOriginalWasPurged()
+[xUnit.net 00:00:02.31]         /Users/liis/Projects/BarkCloud/Docs/audit/backend-recheck-2026-10-07/evidence/files/ResidualFilesTests.cs(98,0): at ResidualFilesTests.F15_AttachMustNotSucceedAfterOriginalWasPurged()
+[xUnit.net 00:00:02.31]         /Users/liis/Projects/BarkCloud/Docs/audit/backend-recheck-2026-10-07/evidence/files/ResidualFilesTests.cs(98,0): at ResidualFilesTests.F15_AttachMustNotSucceedAfterOriginalWasPurged()
+[xUnit.net 00:00:02.31]         /Users/liis/Projects/BarkCloud/Docs/audit/backend-recheck-2026-10-07/evidence/files/ResidualFilesTests.cs(98,0): at ResidualFilesTests.F15_AttachMustNotSucceedAfterOriginalWasPurged()
+[xUnit.net 00:00:02.31]         --- End of stack trace from previous location ---
+[xUnit.net 00:00:02.31]       Output:
+[xUnit.net 00:00:02.31]         {"Entries":1,"Blobs":1,"deletedKeys":["0dd41e1d-e754-4610-b388-0dff7cc1ee56"]}
+[xUnit.net 00:00:02.31]         {"attachSucceeded":true,"blobExists":false,"liveEntries":1}
+[xUnit.net 00:00:02.31]   Finished:    Recheck
+</StdOut>
+    </Output>
+    <RunInfos>
+      <RunInfo computerName="MacBook-Air-Li-is" outcome="Error" timestamp="2026-10-07T01:52:13.5262550+04:00">
+        <Text>[xUnit.net 00:00:01.59]     ResidualFilesTests.F13_RenameMustNotResurrectEntryAfterDeleteDirectory [FAIL]</Text>
+      </RunInfo>
+      <RunInfo computerName="MacBook-Air-Li-is" outcome="Error" timestamp="2026-10-07T01:52:13.9382310+04:00">
+        <Text>[xUnit.net 00:00:02.00]     ResidualFilesTests.F20_SearchEveryReturnedFolderMustHaveMatchingField [FAIL]</Text>
+      </RunInfo>
+      <RunInfo computerName="MacBook-Air-Li-is" outcome="Error" timestamp="2026-10-07T01:52:14.2438030+04:00">
+        <Text>[xUnit.net 00:00:02.31]     ResidualFilesTests.F15_AttachMustNotSucceedAfterOriginalWasPurged [FAIL]</Text>
+      </RunInfo>
+    </RunInfos>
+  </ResultSummary>
+</TestRun>
