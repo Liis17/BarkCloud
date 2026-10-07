@@ -4,6 +4,8 @@ import androidx.compose.animation.AnimatedContentScope
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.ContentTransform
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.SpringSpec
 import androidx.compose.animation.core.spring
@@ -51,6 +53,13 @@ val SharedAxisXPopEnter: AnimatedContentTransitionScope<NavBackStackEntry>.() ->
 /** Shared Axis X, уход экрана при pop-back. */
 val SharedAxisXPopExit: AnimatedContentTransitionScope<NavBackStackEntry>.() -> ExitTransition = {
     slideOutHorizontally(navSpatial()) { it / 4 } + fadeOut(navEffect())
+}
+
+/** Shared Axis X for in-place auth steps, using the same navigation motion tokens. */
+fun sharedAxisXStep(forward: Boolean): ContentTransform {
+    val direction = if (forward) 1 else -1
+    return (slideInHorizontally(navSpatial()) { direction * it / 4 } + fadeIn(navEffect())) togetherWith
+        (slideOutHorizontally(navSpatial()) { -direction * it / 4 } + fadeOut(navEffect()))
 }
 
 /** Fade Through, вход — для переключения вкладок нижней навигации. */

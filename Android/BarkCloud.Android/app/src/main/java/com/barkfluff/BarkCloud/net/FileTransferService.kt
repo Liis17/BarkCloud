@@ -18,7 +18,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
-import okhttp3.OkHttpClient
+import okhttp3.Call
 import okhttp3.Request
 import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -39,7 +39,7 @@ class FileTransferService(
     private val appContext: Context,
     private val grpc: GrpcManager,
     private val globalParam: GlobalParam,
-    private val http: OkHttpClient,
+    private val http: Call.Factory,
 ) {
 
     // MARK: gRPC (FilesApi)

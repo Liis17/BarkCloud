@@ -1,6 +1,7 @@
 package com.barkfluff.BarkCloud.data.upload
 
 import android.content.Context
+import com.barkfluff.BarkCloud.data.NotificationPermissionRequests
 import androidx.work.Constraints
 import androidx.work.BackoffPolicy
 import androidx.work.ExistingWorkPolicy
@@ -14,6 +15,7 @@ object UploadScheduler {
     private const val WORK_NAME = "barkcloud_upload_queue"
 
     fun enqueue(context: Context, userInitiated: Boolean = true) {
+        if (userInitiated) NotificationPermissionRequests.request()
         val request = OneTimeWorkRequestBuilder<UploadWorker>()
             .setConstraints(
                 Constraints.Builder()

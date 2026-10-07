@@ -1,375 +1,70 @@
 package com.barkfluff.BarkCloud.ui.login
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Visibility
-import androidx.compose.material.icons.outlined.VisibilityOff
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.LocalContentColor
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.autofill.ContentType
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.barkfluff.BarkCloud.R
+import com.barkfluff.BarkCloud.ui.auth.components.*
 
 @Composable
-fun LoginScreen(
-    onAuthenticated: () -> Unit,
-    viewModel: LoginViewModel = viewModel(factory = LoginViewModel.factory()),
-) {
+fun LoginScreen(onAuthenticated: () -> Unit, server: String, onRegister: () -> Unit, onReset: () -> Unit,
+    onServer: () -> Unit, onResumeRegistration: (() -> Unit)? = null,
+    viewModel: LoginViewModel = viewModel(factory = LoginViewModel.factory())) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    val snackbarHostState = remember { SnackbarHostState() }
-
-    LaunchedEffect(viewModel) {
-        viewModel.events.collect { event ->
-            when (event) {
-                LoginViewModel.LoginEvent.NavigateToMain -> onAuthenticated()
+    var passkey by remember { mutableStateOf(false) }
+    val retry = deadlineSeconds(state.retryAtMillis)
+    LaunchedEffect(viewModel) { viewModel.events.collect { onAuthenticated() } }
+    BackHandler(state.otpRequired) { viewModel.backFromOtp() }
+    AuthScaffold(if (state.otpRequired) "Подтвердите вход" else "Вход", if (state.otpRequired) viewModel::backFromOtp else null,
+        kind = if (state.otpRequired) AuthDecorationKind.MAIL else AuthDecorationKind.PERSON, compactHeader = true,
+        actions = {
+            AuthError(state.credentialsError ?: state.snackbarMessage)
+            if (retry > 0) Text("Повторить через $retry с", style = MaterialTheme.typography.bodySmall)
+            if (!passkey || state.otpRequired) AuthPrimaryButton(if (state.otpRequired) "Войти" else "Продолжить", viewModel::submit,
+                enabled = state.canSubmit && retry == 0L, loading = state.isLoading)
+            else AuthPrimaryButton("Войти с паролем", { passkey = false })
+            if (!state.otpRequired) {
+                OutlinedButton(onRegister, Modifier.fillMaxWidth().heightIn(min = 56.dp), enabled = !state.isLoading) { Text("Создать аккаунт") }
+                if (onResumeRegistration != null) TextButton(onResumeRegistration, enabled = !state.isLoading) { Text("Завершить регистрацию") }
+                TextButton(onServer, enabled = !state.isLoading, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Сменить сервер") }
             }
-        }
-    }
-
-    LaunchedEffect(state.snackbarMessage) {
-        val message = state.snackbarMessage ?: return@LaunchedEffect
-        snackbarHostState.showSnackbar(message)
-        viewModel.snackbarShown()
-    }
-
-    Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        containerColor = MaterialTheme.colorScheme.surface,
-    ) { padding ->
-        LoginContent(
-            state = state,
-            padding = padding,
-            onLoginChange = viewModel::onLoginChange,
-            onPasswordChange = viewModel::onPasswordChange,
-            onPasswordVisibilityToggle = viewModel::onPasswordVisibilityToggle,
-            onOtpChange = viewModel::onOtpChange,
-            onSubmit = viewModel::submit,
-            onComingSoon = viewModel::onComingSoon,
-            onServerHostChange = viewModel::onServerHostChange,
-            onServerIdentityPortChange = viewModel::onServerIdentityPortChange,
-            onServerUsersPortChange = viewModel::onServerUsersPortChange,
-            onServerFilesPortChange = viewModel::onServerFilesPortChange,
-        )
-    }
-}
-
-@Composable
-private fun LoginContent(
-    state: LoginUiState,
-    padding: PaddingValues,
-    onLoginChange: (String) -> Unit,
-    onPasswordChange: (String) -> Unit,
-    onPasswordVisibilityToggle: () -> Unit,
-    onOtpChange: (String) -> Unit,
-    onSubmit: () -> Unit,
-    onComingSoon: () -> Unit,
-    onServerHostChange: (String) -> Unit,
-    onServerIdentityPortChange: (String) -> Unit,
-    onServerUsersPortChange: (String) -> Unit,
-    onServerFilesPortChange: (String) -> Unit,
-) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(padding)
-            .imePadding(),
-        contentAlignment = Alignment.Center,
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            Text(
-                text = stringResource(R.string.login_title),
-                style = MaterialTheme.typography.displaySmall,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-
-            Spacer(Modifier.heightIn(min = 8.dp))
-
-            AnimatedContent(
-                targetState = state.otpRequired,
-                transitionSpec = {
-                    val spec = spring<Float>(
-                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                        stiffness = Spring.StiffnessLow,
-                    )
-                    (fadeIn(spec) + slideInVertically(
-                        animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioMediumBouncy,
-                            stiffness = Spring.StiffnessLow,
-                        ),
-                        initialOffsetY = { it / 4 },
-                    )) togetherWith (fadeOut(spec) + slideOutVertically(
-                        animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioNoBouncy,
-                            stiffness = Spring.StiffnessLow,
-                        ),
-                        targetOffsetY = { -it / 4 },
-                    ))
-                },
-                label = "login-mode",
-            ) { otpMode ->
-                if (otpMode) {
-                    OtpField(
-                        otp = state.otp,
-                        enabled = !state.isLoading,
-                        onChange = onOtpChange,
-                    )
-                } else {
-                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        CredentialsFields(
-                            login = state.login,
-                            password = state.password,
-                            passwordVisible = state.passwordVisible,
-                            credentialsError = state.credentialsError,
-                            enabled = !state.isLoading,
-                            onLoginChange = onLoginChange,
-                            onPasswordChange = onPasswordChange,
-                            onPasswordVisibilityToggle = onPasswordVisibilityToggle,
-                            onImeSubmit = onSubmit,
-                        )
-                        ServerSettingsSection(
-                            state = state,
-                            enabled = !state.isLoading,
-                            onHostChange = onServerHostChange,
-                            onIdentityPortChange = onServerIdentityPortChange,
-                            onUsersPortChange = onServerUsersPortChange,
-                            onFilesPortChange = onServerFilesPortChange,
-                        )
+        }) {
+        if (state.otpRequired) {
+            Text("Введите код", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+            AuthInfo("Введите шестизначный код подтверждения для аккаунта ${state.login}. Используйте код из приложения или письма, согласно настройкам аккаунта.")
+            VerificationCodeField(state.otp, viewModel::onOtpChange, !state.isLoading, viewModel::submit)
+            ResendCode(maxOf(state.resendAtMillis, state.retryAtMillis), !state.isLoading, viewModel::resendOtp)
+        } else {
+            Text(server, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                listOf("Пароль", "Ключ доступа").forEachIndexed { index, label ->
+                    SegmentedButton(selected = passkey == (index == 1), onClick = { passkey = index == 1 }, enabled = !state.isLoading,
+                        shape = SegmentedButtonDefaults.itemShape(index, 2)) { Text(label) }
+                }
+            }
+            AnimatedContent(passkey, transitionSpec = { fadeIn(tween(200)) togetherWith fadeOut(tween(150)) }, label = "login method") { key ->
+                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    if (key) {
+                        Text("Вход ключом доступа", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                        AuthInfo("Нативный вход ключом доступа пока недоступен в Android-клиенте. Используйте пароль для входа в аккаунт.")
+                    } else {
+                        AuthTextField(state.login, viewModel::onLoginChange, "Почта или имя пользователя", enabled = !state.isLoading, autofillType = ContentType.Username)
+                        PasswordField(state.password, viewModel::onPasswordChange, enabled = !state.isLoading, onDone = viewModel::submit)
+                        TextButton(onReset, enabled = !state.isLoading, modifier = Modifier.heightIn(min = 48.dp)) { Text("Забыли пароль?") }
                     }
                 }
             }
-
-            Button(
-                onClick = onSubmit,
-                enabled = state.canSubmit,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 56.dp),
-                shape = MaterialTheme.shapes.large,
-            ) {
-                if (state.isLoading) {
-                    CircularProgressIndicator(
-                        color = LocalContentColor.current,
-                        strokeWidth = 2.dp,
-                        modifier = Modifier.heightIn(min = 20.dp, max = 20.dp),
-                    )
-                } else {
-                    Text(
-                        text = stringResource(R.string.login_submit),
-                        style = MaterialTheme.typography.labelLarge,
-                    )
-                }
-            }
-
-            Spacer(Modifier.heightIn(min = 8.dp))
-
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                TextButton(onClick = onComingSoon, enabled = !state.isLoading) {
-                    Text(text = stringResource(R.string.login_create_account))
-                }
-                TextButton(onClick = onComingSoon, enabled = !state.isLoading) {
-                    Text(text = stringResource(R.string.login_forgot_password))
-                }
-            }
         }
     }
-}
-
-@Composable
-private fun CredentialsFields(
-    login: String,
-    password: String,
-    passwordVisible: Boolean,
-    credentialsError: String?,
-    enabled: Boolean,
-    onLoginChange: (String) -> Unit,
-    onPasswordChange: (String) -> Unit,
-    onPasswordVisibilityToggle: () -> Unit,
-    onImeSubmit: () -> Unit,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        OutlinedTextField(
-            value = login,
-            onValueChange = onLoginChange,
-            label = { Text(stringResource(R.string.login_field_label)) },
-            singleLine = true,
-            enabled = enabled,
-            isError = credentialsError != null,
-            keyboardOptions = KeyboardOptions(
-                keyboardType = KeyboardType.Email,
-                imeAction = ImeAction.Next,
-            ),
-            shape = MaterialTheme.shapes.medium,
-            modifier = Modifier.fillMaxWidth(),
-        )
-
-        OutlinedTextField(
-            value = password,
-            onValueChange = onPasswordChange,
-            label = { Text(stringResource(R.string.login_password_label)) },
-            singleLine = true,
-            enabled = enabled,
-            isError = credentialsError != null,
-            supportingText = credentialsError?.let { { Text(it) } },
-            visualTransformation = if (passwordVisible) {
-                VisualTransformation.None
-            } else {
-                PasswordVisualTransformation()
-            },
-            trailingIcon = {
-                IconButton(onClick = onPasswordVisibilityToggle, enabled = enabled) {
-                    val icon = if (passwordVisible) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility
-                    val desc = stringResource(
-                        if (passwordVisible) R.string.login_password_hide else R.string.login_password_show
-                    )
-                    Icon(imageVector = icon, contentDescription = desc)
-                }
-            },
-            keyboardOptions = KeyboardOptions(
-                keyboardType = KeyboardType.Password,
-                imeAction = ImeAction.Done,
-            ),
-            shape = MaterialTheme.shapes.medium,
-            modifier = Modifier.fillMaxWidth(),
-        )
-    }
-}
-
-@Composable
-private fun ServerSettingsSection(
-    state: LoginUiState,
-    enabled: Boolean,
-    onHostChange: (String) -> Unit,
-    onIdentityPortChange: (String) -> Unit,
-    onUsersPortChange: (String) -> Unit,
-    onFilesPortChange: (String) -> Unit,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        OutlinedTextField(
-            value = state.serverHost,
-            onValueChange = onHostChange,
-            label = { Text(stringResource(R.string.login_server_host_label)) },
-            singleLine = true,
-            enabled = enabled,
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
-            shape = MaterialTheme.shapes.medium,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-            PortField(
-                value = state.serverIdentityPort,
-                label = stringResource(R.string.login_server_identity_port_label),
-                enabled = enabled,
-                onChange = onIdentityPortChange,
-                modifier = Modifier.weight(1f),
-            )
-            PortField(
-                value = state.serverUsersPort,
-                label = stringResource(R.string.login_server_users_port_label),
-                enabled = enabled,
-                onChange = onUsersPortChange,
-                modifier = Modifier.weight(1f),
-            )
-            PortField(
-                value = state.serverFilesPort,
-                label = stringResource(R.string.login_server_files_port_label),
-                enabled = enabled,
-                onChange = onFilesPortChange,
-                modifier = Modifier.weight(1f),
-            )
-        }
-    }
-}
-
-@Composable
-private fun PortField(
-    value: String,
-    label: String,
-    enabled: Boolean,
-    onChange: (String) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    OutlinedTextField(
-        value = value,
-        onValueChange = onChange,
-        label = { Text(label) },
-        singleLine = true,
-        enabled = enabled,
-        keyboardOptions = KeyboardOptions(
-            keyboardType = KeyboardType.Number,
-            imeAction = ImeAction.Next,
-        ),
-        shape = MaterialTheme.shapes.medium,
-        modifier = modifier,
-    )
-}
-
-@Composable
-private fun OtpField(
-    otp: String,
-    enabled: Boolean,
-    onChange: (String) -> Unit,
-) {
-    OutlinedTextField(
-        value = otp,
-        onValueChange = onChange,
-        label = { Text(stringResource(R.string.login_otp_label)) },
-        placeholder = { Text(stringResource(R.string.login_otp_hint)) },
-        singleLine = true,
-        enabled = enabled,
-        keyboardOptions = KeyboardOptions(
-            keyboardType = KeyboardType.NumberPassword,
-            imeAction = ImeAction.Done,
-        ),
-        shape = MaterialTheme.shapes.medium,
-        modifier = Modifier.fillMaxWidth(),
-    )
 }

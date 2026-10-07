@@ -1,5 +1,12 @@
 package com.barkfluff.BarkCloud
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.repeatOnLifecycle
+import com.barkfluff.BarkCloud.data.NotificationPermissionRequests
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -32,6 +39,8 @@ import com.barkfluff.BarkCloud.ui.theme.BarkCloudTheme
 import kotlinx.coroutines.launch
 
 class ShareActivity : ComponentActivity() {
+    private val notificationPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
+
     private var total by mutableIntStateOf(0)
     private var done by mutableIntStateOf(0)
     private var failed by mutableIntStateOf(0)
@@ -41,6 +50,16 @@ class ShareActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3ExpressiveApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                NotificationPermissionRequests.events.collect {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                        ContextCompat.checkSelfPermission(this@ShareActivity, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                        notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    }
+                }
+            }
+        }
         val uris = streamUris(intent)
         total = uris.size
 

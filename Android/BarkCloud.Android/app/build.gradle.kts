@@ -1,4 +1,5 @@
 import com.google.protobuf.gradle.id
+import com.google.protobuf.gradle.proto
 
 plugins {
     alias(libs.plugins.android.application)
@@ -47,6 +48,10 @@ android {
             "FILES_UPLOAD_BASE",
             "\"https://cloud.barkfluff.com\""
         )
+    }
+
+    sourceSets.getByName("main") {
+        proto { srcDir("src/main/proto-local") }
     }
 
     buildTypes {
@@ -186,4 +191,8 @@ dependencies {
     testImplementation("org.json:json:20240303")
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
+    testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
+    testImplementation("com.squareup.okhttp3:okhttp-tls:4.12.0")
 }
