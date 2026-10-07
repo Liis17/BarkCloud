@@ -4,6 +4,8 @@ import { MediaThumb } from '../components/media/MediaThumb';
 import { Lightbox } from '../components/media/Lightbox';
 import { EmptyState, Loading } from '../components/ui/EmptyState';
 import { useToast } from '../hooks/useToast';
+import { useTextFileViewer } from '../hooks/useTextFileViewer';
+import { textContentUrl } from '../lib/textFiles';
 import { useMediaActions } from '../hooks/useMediaActions';
 import { useBulkMedia } from '../hooks/useBulkMedia';
 import { usePageHeader } from '../hooks/usePageHeader';
@@ -24,8 +26,9 @@ function FavCard({ m, selecting, checked, onToggle, onOpen, onUnstar }: {
 }) {
   return (
     <div
+      tabIndex={-1}
       className={'photo' + (checked ? ' checked' : '')}
-      onClick={(e) => (e.shiftKey ? onToggle(true) : selecting ? onToggle(false) : onOpen(m))}
+      onClick={(e) => { e.currentTarget.focus(); e.shiftKey ? onToggle(true) : selecting ? onToggle(false) : onOpen(m); }}
     >
       {viewable(m) ? (
         <MediaThumb media={m} sizes={GRID_SIZES} />
@@ -61,6 +64,7 @@ function FavCard({ m, selecting, checked, onToggle, onOpen, onUnstar }: {
 export function FavoritesPage() {
   const [items, setItems] = React.useState<CardFile[] | null>(null);
   const [lightbox, setLightbox] = React.useState<CardFile | null>(null);
+  const { openTextFile, textViewer } = useTextFileViewer();
   const [albums, setAlbums] = React.useState<Album[]>([]);
   const [toastNode, toast] = useToast();
 
@@ -107,6 +111,7 @@ export function FavoritesPage() {
   }
 
   function open(m: CardFile) {
+    if (openTextFile({ name: m.name, size: m.size, contentUrl: textContentUrl({ kind: 'owned', fileId: m.id }), onDownload: () => download(m) })) return;
     if (viewable(m)) setLightbox(m);
     else download(m);
   }
@@ -188,6 +193,7 @@ export function FavoritesPage() {
       )}
 
       {lightbox && <Lightbox media={lightbox} actions={actionsCtx.api} onClose={() => setLightbox(null)} />}
+      {textViewer}
     </>
   );
 }

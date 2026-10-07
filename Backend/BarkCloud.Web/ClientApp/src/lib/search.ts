@@ -64,7 +64,8 @@ export function searchHitIconName(hit: SearchHit): string {
   }
 }
 
-export function openSearchHit(hit: SearchHit, navigate: NavigateFunction): void {
+export function openSearchHit(hit: SearchHit, navigate: NavigateFunction, openText?: (hit: SearchHit) => boolean): void {
+  if ((hit.kind === 'file' || hit.kind === 'sharedFile' || hit.kind === 'photo') && openText?.(hit)) return;
   switch (hit.kind) {
     case 'photo': navigate(`/photos?open=${encodeURIComponent(hit.fileId)}`); break;
     case 'video': navigate(`/videos?open=${encodeURIComponent(hit.fileId)}`); break;

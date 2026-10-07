@@ -1,4 +1,6 @@
 import React from 'react';
+import { useTextFileViewer } from '../hooks/useTextFileViewer';
+import { textContentUrl } from '../lib/textFiles';
 import { useParams } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import { PublicShareHeader, PublicShareShell, PublicStatus } from '../components/public/PublicShareShell';
@@ -38,6 +40,7 @@ export function PublicFolderPage() {
   const [data, setData] = React.useState<Listing | null>(null);
   const [state, setState] = React.useState<'loading' | 'notfound' | 'ok'>('loading');
   const [viewer, setViewer] = React.useState<PubFile | null>(null);
+  const { openTextFile, textViewer } = useTextFileViewer();
 
   const here = stack[stack.length - 1];
   const folderTitle = data?.currentName || here.name || data?.folderName || 'Публичная папка';
@@ -72,6 +75,7 @@ export function PublicFolderPage() {
   }, [token, here.id]);
 
   function openFile(f: PubFile) {
+    if (openTextFile({ name: f.name, size: f.fileSize, contentUrl: textContentUrl({ kind: 'publicFolder', token: token!, dir: here.id, fileId: f.fileId }), onDownload: () => { if (f.downloadUrl) window.location.href = f.downloadUrl; } })) return;
     if (isPublicMedia(f.mediaKind)) setViewer(f);
     else if (f.downloadUrl) window.location.href = f.downloadUrl;
   }
@@ -146,6 +150,7 @@ export function PublicFolderPage() {
       )}
 
       {viewer && <PublicViewer file={viewer} onClose={() => setViewer(null)} />}
+      {textViewer}
     </PublicShareShell>
   );
 }

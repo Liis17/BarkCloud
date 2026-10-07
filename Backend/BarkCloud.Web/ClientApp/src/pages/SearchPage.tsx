@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTextSearchOpen } from '../hooks/useTextSearchOpen';
 import { MediaThumb } from '../components/media/MediaThumb';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Icon } from '../components/Icon';
@@ -7,7 +8,7 @@ import { usePageHeader } from '../hooks/usePageHeader';
 import { useSearchHitMenu } from '../hooks/useSearchHitMenu';
 import { useToast } from '../hooks/useToast';
 import { apiGet } from '../lib/api';
-import { isGridSection, matchLabel, openSearchHit, searchHitIconName, SECTION_LABEL, type SearchHit, type SearchResponse, type SearchSection, type SearchSectionKey } from '../lib/search';
+import { isGridSection, matchLabel, searchHitIconName, SECTION_LABEL, type SearchHit, type SearchResponse, type SearchSection, type SearchSectionKey } from '../lib/search';
 
 const ORDER: SearchSectionKey[] = ['photos', 'videos', 'files', 'tracks', 'albums', 'playlists', 'folders', 'shared', 'trash', 'torrents'];
 
@@ -20,6 +21,7 @@ const sameHit = (a: SearchHit, b: SearchHit) => a.kind === b.kind && a.id === b.
 export function SearchPage() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { openSearchResult, textViewer } = useTextSearchOpen();
   const q = new URLSearchParams(location.search).get('q')?.trim() || '';
   const [sections, setSections] = React.useState<SectionState[] | null>(null);
   const [error, setError] = React.useState<string | null>(null);
@@ -104,9 +106,9 @@ export function SearchPage() {
             {section.unavailable ? (
               <div className="search-section-unavailable">Раздел временно недоступен. Остальные результаты поиска показаны.</div>
             ) : isGridSection(section.key) ? (
-              <div className="search-result-grid">{section.items.map((hit) => <GridHit key={`${hit.kind}:${hit.id}`} hit={hit} onOpen={() => openSearchHit(hit, navigate)} onMenu={openMenu} />)}</div>
+              <div className="search-result-grid">{section.items.map((hit) => <GridHit key={`${hit.kind}:${hit.id}`} hit={hit} onOpen={() => openSearchResult(hit)} onMenu={openMenu} />)}</div>
             ) : (
-              <div className="search-result-list">{section.items.map((hit) => <ListHit key={`${hit.kind}:${hit.id}`} hit={hit} onOpen={() => openSearchHit(hit, navigate)} onMenu={openMenu} />)}</div>
+              <div className="search-result-list">{section.items.map((hit) => <ListHit key={`${hit.kind}:${hit.id}`} hit={hit} onOpen={() => openSearchResult(hit)} onMenu={openMenu} />)}</div>
             )}
             {section.error && <div className="search-section-error">{section.error}</div>}
             {section.hasMore && !section.unavailable && <button className="btn outlined search-more" onClick={() => loadMore(section)} disabled={section.loadingMore}>{section.loadingMore ? 'Загружаем…' : 'Показать ещё'}</button>}
@@ -115,6 +117,7 @@ export function SearchPage() {
       </div>
       {overlay}
       {toastNode}
+      {textViewer}
     </>
   );
 }

@@ -13,6 +13,8 @@ import { FileDropOverlay } from '../components/ui/FileDropOverlay';
 import { useContextMenu, type ContextItem } from '../components/ui/ContextMenu';
 import { SelectionBar } from '../components/ui/SelectionBar';
 import { useToast } from '../hooks/useToast';
+import { useTextFileViewer } from '../hooks/useTextFileViewer';
+import { getTextFileKind, textContentUrl } from '../lib/textFiles';
 import { useAlbumMembership } from '../hooks/useAlbumMembership';
 import { useFileDrop, type FileDropHandlers, type FileDropTarget } from '../hooks/useFileDrop';
 import { useSelection } from '../hooks/useSelection';
@@ -45,16 +47,6 @@ function directoryCursorOf(listing: Listing): DirectoryCursor | null {
   return listing.nextCursorName && listing.nextCursorId
     ? { name: listing.nextCursorName, id: listing.nextCursorId }
     : null;
-}
-
-// Расширения, которые браузер показывает как текст — их открываем во вкладке (inline-прокси), не скачиваем.
-const TEXT_EXTS = new Set([
-  'txt', 'md', 'markdown', 'log', 'csv', 'tsv', 'json', 'xml', 'yaml', 'yml', 'ini', 'conf', 'cfg', 'env',
-  'html', 'htm', 'css', 'js', 'jsx', 'ts', 'tsx', 'cs', 'py', 'java', 'go', 'rs', 'rb', 'php',
-  'c', 'cpp', 'h', 'hpp', 'sh', 'bat', 'ps1', 'sql', 'svg',
-]);
-function isTextFile(m: CardFile | null | undefined): boolean {
-  return !!m && TEXT_EXTS.has((m.ext || '').toLowerCase());
 }
 
 type RenameTarget = { isDir: boolean; target: DirInfo | Entry };
@@ -109,17 +101,18 @@ function FileRow({ entry, selected, bulkChecked, onBulkToggle, onSelect, onOpen,
   onRename: (e: Entry) => void;
   onDelete: (e: Entry) => void;
   onDownload: (e: Entry) => void;
-  onMenu: (e: React.MouseEvent, entry: Entry) => void;
+  onMenu: (e: React.MouseEvent<HTMLTableRowElement>, entry: Entry) => void;
 }) {
   const m = entry.media;
   const isMedia = m?.kind === 'photo' || m?.kind === 'video';
   const hasPreview = (m?.previews || []).length > 0;
   return (
     <tr
+      tabIndex={-1}
       className={(selected ? 'selected' : '') + (bulkChecked ? ' checked' : '')}
       onClick={(e) => (e.shiftKey ? onBulkToggle(entry, true) : onSelect(entry))}
-      onDoubleClick={() => onOpen(entry)}
-      onContextMenu={(e) => onMenu(e, entry)}
+      onDoubleClick={(e) => { e.currentTarget.focus(); onOpen(entry); }}
+      onContextMenu={(e) => { e.currentTarget.focus(); onMenu(e, entry); }}
     >
       <td className="selcell" onClick={(e) => e.stopPropagation()}>
         <input
@@ -161,7 +154,7 @@ function FileRow({ entry, selected, bulkChecked, onBulkToggle, onSelect, onOpen,
 
 function Inspector({ entry, onOpen, onRename, onDelete, onDownload }: {
   entry: Entry | null;
-  onOpen: (m: CardFile) => void;
+  onOpen: (e: Entry) => void;
   onRename: (e: Entry) => void;
   onDelete: (e: Entry) => void;
   onDownload: (e: Entry) => void;
@@ -196,8 +189,8 @@ function Inspector({ entry, onOpen, onRename, onDelete, onDownload }: {
         <button className="btn primary" onClick={() => onDownload(entry)}>
           <Icon.download size={16} /> Скачать
         </button>
-        {isMedia && m && (
-          <button className="btn outlined" onClick={() => onOpen(m)}>
+        {((isMedia && m) || getTextFileKind(entry.name)) && (
+          <button className="btn outlined" onClick={() => onOpen(entry)}>
             <Icon.eye size={16} /> Открыть
           </button>
         )}
@@ -257,6 +250,7 @@ export function FilesPage() {
   const [listing, setListing] = React.useState<Listing | null>(null);
   const [sel, setSel] = React.useState<Entry | null>(null);
   const [lightbox, setLightbox] = React.useState<CardFile | null>(null);
+  const { openTextFile, textViewer } = useTextFileViewer();
   const [creating, setCreating] = React.useState(false);
   const [renaming, setRenaming] = React.useState<RenameTarget | null>(null);
   const [name, setName] = React.useState('');
@@ -488,12 +482,12 @@ export function FilesPage() {
       toast((e as Error).message, 'err');
     }
   }
-  // Двойной клик: фото/видео — в просмотрщике, аудио — в миниплеере, текст — inline, прочее — скачать.
+  // Двойной клик: текст — в модалке, фото/видео — в Lightbox, аудио — в миниплеере.
   async function openEntry(entry: Entry) {
     const m = entry.media;
+    if (openTextFile({ name: entry.name, size: m?.size, contentUrl: textContentUrl({ kind: 'owned', fileId: entry.fileId }), onDownload: () => download(entry) })) return;
     if (m && (m.kind === 'photo' || m.kind === 'video')) setLightbox(m);
     else if (m?.kind === 'audio') await playAudioEntry(entry);
-    else if (isTextFile(m)) window.open('/api/files/view?id=' + encodeURIComponent(entry.fileId), '_blank');
     else download(entry);
   }
 
@@ -560,13 +554,14 @@ export function FilesPage() {
     }
   }
 
-  function fileMenu(entry: Entry): ContextItem[] {
+  function fileMenu(entry: Entry, opener: HTMLElement): ContextItem[] {
     const m = entry.media;
     const isMedia = m?.kind === 'photo' || m?.kind === 'video';
     const inAlbums = membership.of(entry.fileId);
     const available = albums.filter((a) => !inAlbums.has(a.id));
     const present = albums.filter((a) => inAlbums.has(a.id));
     const out: ContextItem[] = [
+      ...(getTextFileKind(entry.name) ? [{ label: 'Открыть', icon: 'eye' as const, onClick: () => { opener.focus(); openEntry(entry); } }] : []),
       { label: 'Скачать', icon: 'download', onClick: () => download(entry) },
       { label: 'Копировать ссылку', icon: 'link', onClick: () => copyLink(entry.fileId) },
       { label: 'Создать публичную ссылку', icon: 'share', onClick: () => createShare(entry.fileId, entry.name, toast) },
@@ -841,7 +836,7 @@ export function FilesPage() {
                       onDownload={download}
                       onRename={(t) => startRename(t, false)}
                       onDelete={(t) => requestDelete(t, false)}
-                      onMenu={(ev, t) => openAt(ev, fileMenu(t))}
+                      onMenu={(ev, t) => openAt(ev, fileMenu(t, ev.currentTarget))}
                     />
                   ))}
                 </tbody>
@@ -869,7 +864,7 @@ export function FilesPage() {
         </div>
 
         <aside className="files-inspector">
-          <Inspector entry={sel} onOpen={setLightbox} onDownload={download} onRename={(t) => startRename(t, false)} onDelete={(t) => requestDelete(t, false)} />
+          <Inspector entry={sel} onOpen={openEntry} onDownload={download} onRename={(t) => startRename(t, false)} onDelete={(t) => requestDelete(t, false)} />
         </aside>
       </div>
 
@@ -968,6 +963,7 @@ export function FilesPage() {
       {menu}
 
       {lightbox && <Lightbox media={lightbox} onClose={() => setLightbox(null)} />}
+      {textViewer}
     </>
   );
 }

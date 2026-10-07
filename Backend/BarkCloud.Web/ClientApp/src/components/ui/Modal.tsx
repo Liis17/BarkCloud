@@ -7,10 +7,11 @@ interface ModalProps {
   onClose?: () => void;
   actions?: React.ReactNode;
   wide?: boolean;
+  className?: string;
 }
 
 /** Модальное окно (Esc / клик по фону — закрыть). */
-export function Modal({ title, children, onClose, actions, wide }: ModalProps) {
+export function Modal({ title, children, onClose, actions, wide, className }: ModalProps) {
   const titleId = React.useId();
   const dialog = React.useRef<HTMLDivElement>(null);
   React.useEffect(() => {
@@ -21,7 +22,9 @@ export function Modal({ title, children, onClose, actions, wide }: ModalProps) {
   }, []);
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose && onClose();
+      const dialogs = document.querySelectorAll('[role="dialog"][aria-modal="true"]');
+      if (dialogs[dialogs.length - 1] !== dialog.current) return;
+      if (e.key === 'Escape') { e.preventDefault(); onClose && onClose(); }
       if (e.key === 'Tab' && dialog.current) {
         const items = Array.from(dialog.current.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href], [tabindex="0"]'));
         if (!items.length) { e.preventDefault(); return; }
@@ -34,7 +37,7 @@ export function Modal({ title, children, onClose, actions, wide }: ModalProps) {
   }, [onClose]);
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <div ref={dialog} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} className={'modal' + (wide ? ' wide' : '')} onClick={(e) => e.stopPropagation()}>
+      <div ref={dialog} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} className={'modal' + (wide ? ' wide' : '') + (className ? ' ' + className : '')} onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
           <h3 id={titleId}>{title}</h3>
           <button className="icon-btn" onClick={onClose} disabled={!onClose} title="Закрыть" aria-label="Закрыть">
