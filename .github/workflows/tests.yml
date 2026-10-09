@@ -33,7 +33,7 @@ jobs:
       shared: ${{ steps.filter.outputs.shared }}
       android: ${{ steps.filter.outputs.android }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - uses: dorny/paths-filter@v4
@@ -45,26 +45,32 @@ jobs:
               - 'Tests/BarkCloud.TestKit/**'
             configuration:
               - 'Backend/BarkCloud.Configuration/**'
+              - 'Backend/BarkCloud.GrpcServer/**'
               - 'Tests/Backend/BarkCloud.Configuration.Tests/**'
             files:
               - 'Backend/BarkCloud.Files/**'
+              - 'Backend/BarkCloud.GrpcServer/**'
               - 'Tests/Backend/BarkCloud.Files.Tests/**'
             grpcserver:
               - 'Backend/BarkCloud.GrpcServer/**'
               - 'Tests/Backend/BarkCloud.GrpcServer.Tests/**'
             identity:
               - 'Backend/BarkCloud.Identity/**'
+              - 'Backend/BarkCloud.GrpcServer/**'
               - 'Tests/Backend/BarkCloud.Identity.Tests/**'
               - 'Tests/Backend/BarkCloud.Identity.IntegrationTests/**'
             notification:
               - 'Backend/BarkCloud.Notification/**'
+              - 'Backend/BarkCloud.GrpcServer/**'
               - 'Tests/Backend/BarkCloud.Notification.Tests/**'
             users:
               - 'Backend/BarkCloud.Users/**'
+              - 'Backend/BarkCloud.GrpcServer/**'
               - 'Tests/Backend/BarkCloud.Users.Tests/**'
               - 'Tests/Backend/BarkCloud.Users.IntegrationTests/**'
             web:
               - 'Backend/BarkCloud.Web/**'
+              - 'Backend/BarkCloud.GrpcServer/**'
               - 'Tests/Backend/BarkCloud.Web.Tests/**'
             android:
               - 'Android/**'
@@ -78,12 +84,15 @@ jobs:
     if: ${{ needs.changes.outputs.configuration == 'true' || needs.changes.outputs.shared == 'true' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
       - name: "Test"
         run: dotnet test Tests/Backend/BarkCloud.Configuration.Tests/BarkCloud.Configuration.Tests.csproj -c Release --logger "trx;LogFileName=configuration.trx" --results-directory TestResults
       - name: "Upload test results"
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-results-configuration
           path: TestResults/**
@@ -110,12 +119,15 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
       - name: "Test"
         run: dotnet test Tests/Backend/BarkCloud.Files.Tests/BarkCloud.Files.Tests.csproj -c Release --logger "trx;LogFileName=files.trx" --results-directory TestResults
       - name: "Upload test results"
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-results-files
           path: TestResults/**
@@ -126,12 +138,15 @@ jobs:
     if: ${{ needs.changes.outputs.grpcserver == 'true' || needs.changes.outputs.shared == 'true' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
       - name: "Test"
         run: dotnet test Tests/Backend/BarkCloud.GrpcServer.Tests/BarkCloud.GrpcServer.Tests.csproj -c Release --logger "trx;LogFileName=grpcserver.trx" --results-directory TestResults
       - name: "Upload test results"
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-results-grpcserver
           path: TestResults/**
@@ -142,12 +157,15 @@ jobs:
     if: ${{ needs.changes.outputs.identity == 'true' || needs.changes.outputs.shared == 'true' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
       - name: "Test"
         run: dotnet test Tests/Backend/BarkCloud.Identity.Tests/BarkCloud.Identity.Tests.csproj -c Release --logger "trx;LogFileName=identity.trx" --results-directory TestResults
       - name: "Upload test results"
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-results-identity
           path: TestResults/**
@@ -174,15 +192,15 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '10.0.x'
       - name: "Test"
         run: dotnet test Tests/Backend/BarkCloud.Identity.IntegrationTests/BarkCloud.Identity.IntegrationTests.csproj -c Release --logger "trx;LogFileName=identity-integration.trx" --results-directory TestResults
       - name: "Upload test results"
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-results-identity-integration
           path: TestResults/**
@@ -193,12 +211,15 @@ jobs:
     if: ${{ needs.changes.outputs.notification == 'true' || needs.changes.outputs.shared == 'true' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
       - name: "Test"
         run: dotnet test Tests/Backend/BarkCloud.Notification.Tests/BarkCloud.Notification.Tests.csproj -c Release --logger "trx;LogFileName=notification.trx" --results-directory TestResults
       - name: "Upload test results"
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-results-notification
           path: TestResults/**
@@ -225,12 +246,15 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
       - name: "Test"
         run: dotnet test Tests/Backend/BarkCloud.Users.Tests/BarkCloud.Users.Tests.csproj -c Release --logger "trx;LogFileName=users.trx" --results-directory TestResults
       - name: "Upload test results"
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-results-users
           path: TestResults/**
@@ -270,15 +294,15 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '10.0.x'
       - name: "Test"
         run: dotnet test Tests/Backend/BarkCloud.Users.IntegrationTests/BarkCloud.Users.IntegrationTests.csproj -c Release --logger "trx;LogFileName=users-integration.trx" --results-directory TestResults
       - name: "Upload test results"
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-results-users-integration
           path: TestResults/**
@@ -289,12 +313,15 @@ jobs:
     if: ${{ needs.changes.outputs.web == 'true' || needs.changes.outputs.shared == 'true' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
       - name: "Test"
         run: dotnet test Tests/Backend/BarkCloud.Web.Tests/BarkCloud.Web.Tests.csproj -c Release --logger "trx;LogFileName=web.trx" --results-directory TestResults
       - name: "Upload test results"
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-results-web
           path: TestResults/**
@@ -308,7 +335,10 @@ jobs:
     if: ${{ needs.changes.outputs.shared == 'true' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
       - name: "Test"
         run: |
           for proj in Tests/Shared/*/*.csproj; do
@@ -318,7 +348,7 @@ jobs:
           done
       - name: "Upload test results"
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-results-shared
           path: TestResults/**
@@ -333,16 +363,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: "Checkout"
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: "Setup JDK 17"
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '17'
 
       - name: "Setup Gradle"
-        uses: gradle/actions/setup-gradle@v3
+        uses: gradle/actions/setup-gradle@v5
 
       - name: "Run unit tests"
         working-directory: Android/BarkCloud.Android
@@ -350,7 +380,7 @@ jobs:
 
       - name: "Upload reports"
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: android-test-reports
           path: Android/BarkCloud.Android/app/build/reports/tests/
