@@ -72,9 +72,47 @@ public class AuthAtomicityTests
         (await observer.PendingNotifications.AnyAsync()).Should().BeFalse();
     }
 
-    private static AuthCommandHandler CreateHandler(IdentityContext context)
+    [Fact]
+    public async Task Auth_WrongPasswordNotificationInsertFailure_KeepsInvalidPasswordResultAndCounter()
     {
+        await using var database = await PostgresIdentityDatabase.CreateAsync();
+        await using (var setup = database.CreateContext())
+        {
+            await new PasswordsStorage(setup).UpdateUserPasswordHash(42, PasswordHasher.HashPassword("password"));
+            await setup.Database.ExecuteSqlRawAsync("""
+                CREATE FUNCTION reject_notification_insert() RETURNS trigger LANGUAGE plpgsql AS $$
+                BEGIN RAISE EXCEPTION 'notification insert failed'; END $$;
+                CREATE TRIGGER reject_notification_insert BEFORE INSERT ON "PendingNotifications"
+                FOR EACH ROW EXECUTE FUNCTION reject_notification_insert();
+                """);
+        }
+
+        await using var context = database.CreateContext();
         var metrics = new MetricsCollector();
+        var handler = CreateHandler(context, metrics);
+        await FluentActions.Awaiting(() => handler.Handle(
+                new AuthCommand { Username = "user", Password = "wrong" }, default))
+            .Should().ThrowAsync<BarkCloud.Shared.Exceptions.Identity.InvalidLoginOrPasswordException>();
+        metrics.SnapshotAndReset().Should().ContainKey("notification_outbox_enqueue_failed");
+
+        await using (var observer = database.CreateContext())
+        {
+            (await observer.AuthAttemptCounters.AsNoTracking().SingleAsync(x => x.Key == "login:42")).Count.Should().Be(1);
+            (await observer.PendingNotifications.AsNoTracking().AnyAsync()).Should().BeFalse();
+            await observer.Database.ExecuteSqlRawAsync(
+                "DROP TRIGGER reject_notification_insert ON \"PendingNotifications\"; DROP FUNCTION reject_notification_insert();");
+        }
+
+        await context.SaveChangesAsync();
+
+        await using var afterSave = database.CreateContext();
+        (await afterSave.PendingNotifications.AsNoTracking().AnyAsync()).Should().BeFalse();
+        (await afterSave.AuthAttemptCounters.AsNoTracking().SingleAsync(x => x.Key == "login:42")).Count.Should().Be(1);
+    }
+
+    private static AuthCommandHandler CreateHandler(IdentityContext context, MetricsCollector? metrics = null)
+    {
+        metrics ??= new MetricsCollector();
         var requestContext = new RequestContext
         {
             SourceIp = "203.0.113.5", IpAddress = "198.51.100.5", DeviceId = "device-1",
@@ -86,7 +124,10 @@ public class AuthAtomicityTests
             Issuer = "bark", Audience = "bark", ExpiryMinutes = 60
         };
         var refreshTokens = new RefreshTokensStorage(context, jwtSettings);
-        var outbox = new NotificationOutbox(context, new ConfigurationBuilder().Build(), metrics,
+        var outbox = new NotificationOutbox(context, new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Features:EmailEnabled"] = "true"
+        }).Build(), metrics,
             NullLogger<NotificationOutbox>.Instance);
         var createToken = new CreateTokenCommandHandler(refreshTokens, new JwtService(jwtSettings), metrics,
             NullLogger<CreateTokenCommandHandler>.Instance);

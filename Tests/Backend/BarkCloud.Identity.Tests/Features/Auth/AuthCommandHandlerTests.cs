@@ -496,7 +496,8 @@ public class AuthCommandHandlerTests : IDisposable
 
         await act.Should().ThrowAsync<InvalidLoginOrPasswordException>();
         _outbox.Verify(o => o.EnqueueAsync(
-            It.IsAny<long>(), It.IsAny<NotificationType>(), It.IsAny<string>(), It.IsAny<Dictionary<string, string>>()), Times.Never);
+            It.IsAny<long>(), It.IsAny<NotificationType>(), It.IsAny<string>(), It.IsAny<Dictionary<string, string>>(),
+            It.IsAny<CancellationToken>()), Times.Never);
         _usersClient.Verify(
             c => c.GetUserContactsAsync(It.IsAny<GetUserContactsRequest>(), null, null, default), Times.Never);
         _location.Verify(c => c.GetLocation(It.IsAny<string>()), Times.Never);

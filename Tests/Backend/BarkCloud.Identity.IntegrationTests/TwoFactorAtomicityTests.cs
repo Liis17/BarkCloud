@@ -1,3 +1,4 @@
+using System.Data.Common;
 using System.Security.Claims;
 
 using BarkCloud.GrpcServer.Metrics;
@@ -10,6 +11,7 @@ using BarkCloud.Identity.Persistence.Contexts;
 using BarkCloud.Identity.Persistence.Services;
 using BarkCloud.Identity.Services;
 using BarkCloud.Proto.Identity;
+using BarkCloud.Shared.Exceptions.Identity;
 using BarkCloud.Shared.Identity;
 using BarkCloud.Shared.Queue.Notifications;
 
@@ -28,6 +30,70 @@ namespace BarkCloud.Identity.IntegrationTests;
 
 public class TwoFactorAtomicityTests
 {
+    [Fact]
+    public async Task ConfirmAuthenticator_Success_ActivatesPendingSecretAndEnqueuesNotification()
+    {
+        await using var database = await PostgresIdentityDatabase.CreateAsync();
+        var key = KeyGeneration.GenerateRandomKey(20);
+        var pendingSecret = Base32Encoding.ToString(key);
+        await Seed(database, new AuthUserProperty
+        {
+            UserId = 42, SelectedOtpType = OtpType.Authenticator, OtpEnabled = false,
+            OtpSecret = "old-secret", PendingOtpSecret = pendingSecret,
+            PendingOtpSecretExpiresAt = DateTime.UtcNow.AddMinutes(5)
+        });
+
+        await using var context = database.CreateContext();
+        await CreateConfirmHandler(context, new MetricsCollector()).Handle(
+            new ConfirmOtpVerificationCommand { OtpCode = new Totp(key).ComputeTotp() }, default);
+
+        await using var observer = database.CreateContext();
+        var properties = await observer.AuthUserProperties.AsNoTracking().SingleAsync(x => x.UserId == 42);
+        properties.OtpSecret.Should().Be(pendingSecret);
+        properties.OtpEnabled.Should().BeTrue();
+        properties.PendingOtpSecret.Should().BeNull();
+        properties.PendingOtpSecretExpiresAt.Should().BeNull();
+        var notification = await observer.PendingNotifications.AsNoTracking().SingleAsync();
+        notification.UserId.Should().Be(42);
+        notification.Type.Should().Be(NotificationType.TwoFactorMethodChanged);
+        notification.Title.Should().Be("Изменен метод двухфакторной аутентификации");
+    }
+
+    [Fact]
+    public async Task ConfirmAuthenticator_PendingSecretReplacedBeforeActivation_LeavesConcurrentChangeAndNoPartialState()
+    {
+        await using var database = await PostgresIdentityDatabase.CreateAsync();
+        var key = KeyGeneration.GenerateRandomKey(20);
+        var pendingSecret = Base32Encoding.ToString(key);
+        const string concurrentSecret = "concurrently-issued-secret";
+        var concurrentExpiryValue = DateTime.UtcNow.AddMinutes(10);
+        var concurrentExpiry = new DateTime(concurrentExpiryValue.Ticks - concurrentExpiryValue.Ticks % 10,
+            DateTimeKind.Utc);
+        await Seed(database, new AuthUserProperty
+        {
+            UserId = 42, SelectedOtpType = OtpType.Authenticator, OtpEnabled = false,
+            OtpSecret = "old-secret", PendingOtpSecret = pendingSecret,
+            PendingOtpSecretExpiresAt = DateTime.UtcNow.AddMinutes(5)
+        });
+
+        var replacement = new ReplacePendingOtpSecretBeforeActivation(database, concurrentSecret, concurrentExpiry);
+        await using var context = database.CreateContext(replacement);
+        var handler = CreateConfirmHandler(context, new MetricsCollector());
+        await FluentActions.Awaiting(() => handler.Handle(
+                new ConfirmOtpVerificationCommand { OtpCode = new Totp(key).ComputeTotp() }, default))
+            .Should().ThrowAsync<NotValidOtpCodeException>();
+        replacement.SecretReplaced.Should().BeTrue();
+        await context.SaveChangesAsync();
+
+        await using var observer = database.CreateContext();
+        var properties = await observer.AuthUserProperties.AsNoTracking().SingleAsync(x => x.UserId == 42);
+        properties.OtpSecret.Should().Be("old-secret");
+        properties.OtpEnabled.Should().BeFalse();
+        properties.PendingOtpSecret.Should().Be(concurrentSecret);
+        properties.PendingOtpSecretExpiresAt.Should().Be(concurrentExpiry);
+        (await observer.PendingNotifications.AnyAsync()).Should().BeFalse();
+    }
+
     [Fact]
     public async Task ConfirmAuthenticator_WhenNotificationInsertFails_RestoresPendingSecret()
     {
@@ -302,6 +368,31 @@ public class TwoFactorAtomicityTests
             }
 
             return ValueTask.FromResult(result);
+        }
+    }
+
+    private sealed class ReplacePendingOtpSecretBeforeActivation(
+        PostgresIdentityDatabase database, string replacementSecret, DateTime replacementExpiresAt) : DbCommandInterceptor
+    {
+        public bool SecretReplaced { get; private set; }
+
+        public override async ValueTask<InterceptionResult<int>> NonQueryExecutingAsync(DbCommand command,
+            CommandEventData eventData, InterceptionResult<int> result, CancellationToken cancellationToken = default)
+        {
+            if (!SecretReplaced
+                && command.CommandText.Contains("UPDATE \"AuthUserProperties\"", StringComparison.Ordinal)
+                && command.CommandText.Contains("\"OtpSecret\"", StringComparison.Ordinal)
+                && command.CommandText.Contains("\"PendingOtpSecret\"", StringComparison.Ordinal))
+            {
+                await using var concurrent = database.CreateContext();
+                await concurrent.AuthUserProperties.Where(x => x.UserId == 42)
+                    .ExecuteUpdateAsync(s => s
+                        .SetProperty(x => x.PendingOtpSecret, replacementSecret)
+                        .SetProperty(x => x.PendingOtpSecretExpiresAt, replacementExpiresAt), cancellationToken);
+                SecretReplaced = true;
+            }
+
+            return result;
         }
     }
 }
