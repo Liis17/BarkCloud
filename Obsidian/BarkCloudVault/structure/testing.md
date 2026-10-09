@@ -122,7 +122,7 @@ dotnet test Tests/Backend/BarkCloud.Users.Tests/BarkCloud.Users.Tests.csproj -c 
 dotnet test Tests/Backend/BarkCloud.Users.Tests/BarkCloud.Users.Tests.csproj -c Release --filter 'Category=PostgreSQL'
 ```
 
-Сервис `postgres:18` с healthcheck `pg_isready` и переменная подключения включены для Users в `tests.yml` (`test-users`), `tests-backend-manual.yml` (элемент matrix `users`) и `backend-service-ci.yml` (тестовый job сборки Users). Для остальных сервисов PostgreSQL не запускается.
+Сервис `postgres:18` с healthcheck `pg_isready` и переменная подключения включены для Users в `tests.yml` (`test-users`) и `backend-service-ci.yml` (тестовый job сборки Users). Для остальных сервисов PostgreSQL не запускается.
 
 ## Интеграционные тесты уникальности логинов (F04)
 
@@ -154,31 +154,33 @@ dotnet test Tests/Backend/BarkCloud.Identity.IntegrationTests/BarkCloud.Identity
 
 Workflow `.github/workflows/tests.yml` — гранулярный запуск по изменённым путям через `dorny/paths-filter@v4` для pull request и ручных прогонов:
 - **`changes`** — джоба-диспетчер на `ubuntu-latest`: определяет изменённые части (per-микросервис, `shared`, `android`) и выдаёт outputs. Изменения в `Shared/**` или `Tests/BarkCloud.TestKit/**` триггерят все backend-тесты (микросервисы зависят от Shared/Proto).
-- **`test-<сервис>`** (configuration/files/grpcserver/identity/notification/users/web) — `runs-on: ubuntu-latest`, каждая гоняет только свой `.Tests`-проект; `if`: изменена своя папка **или** `shared`.
+- **`test-<сервис>`** (configuration/files/grpcserver/identity/notification/users/web) — `runs-on: ubuntu-latest`, каждая гоняет только свой `.Tests`-проект; `if`: изменена своя папка (для сервисов — ещё и `Backend/BarkCloud.GrpcServer/**`, общий хост всех сервисов) **или** `shared`. SDK ставится явно через `actions/setup-dotnet` (`10.0.x`) во всех .NET-джобах.
 - **`test-shared`** — все `Shared.*.Tests` одним прогоном на `ubuntu-latest` при изменении `Shared/**`.
 - **`android-tests`** — `runs-on: ubuntu-latest`, `./gradlew :app:testDebugUnitTest`, только при изменениях в `Android/**`.
 - **`ios-tests`** — будет добавлен в этапе P3 (требует macOS-раннера).
 
 Backend deploy-воркфлоу `build-backend-*.yml` вызывают общий reusable workflow `.github/workflows/backend-service-ci.yml`:
-- **`changes`** — проверяет runtime-изменения (`Backend/BarkCloud.<Service>/**`, `Shared/**`, `Backend/rebuild.trigger`) и test-only изменения (`Tests/Backend/BarkCloud.<Service>.Tests/**`, `Tests/BarkCloud.TestKit/**`).
-- **`check-dotnet`** — проверяет .NET 10.0 SDK на `ubuntu-latest`.
+- **`changes`** — проверяет runtime-изменения (input `runtime-paths` — тот же список, что `on.push.paths` вызывающего воркфлоу, без тестов; из него шаг собирает фильтр для `dorny/paths-filter`) и test-only изменения (`Tests/Backend/BarkCloud.<Service>.Tests/**`, `Tests/BarkCloud.TestKit/**`).
 - **`test`** — сначала запускает тесты конкретного сервиса. При падении отправляет Telegram-сообщение с inline-кнопкой на текущий GitHub Actions run, а сборка не стартует.
-- **`build`** — запускается только после успешных тестов и только при runtime-изменениях или ручном запуске. Публикует Docker-образ и отправляет Telegram-сообщение об успехе или провале с кнопкой на GitHub Actions run.
+- **`build`** — ставит SDK через `actions/setup-dotnet`, собирает `dotnet publish` и образ по `Dockerfile.slim` (у всех сервисов, включая Torrent). Запускается только после успешных тестов и только при runtime-изменениях или ручном запуске. Публикует Docker-образ и отправляет Telegram-сообщение об успехе или провале с кнопкой на GitHub Actions run.
+  - Сборка и отправка разделены: образ собирается с `load: true`, затем пауза `push-delay` секунд, затем `docker push` каждого тега. Вход в реестр, `docker push` и запрос тегов в `docker-version` повторяются до 3 раз с интервалом 15 с.
+  - `push-delay` задаёт каждый `build-backend-*.yml` по порядку файлов: configuration 15, files 30, identity 45, notification 60, torrent 75, users 90, web 105. Так одновременно запущенные сборки не пушат в реестр (за Cloudflare) разом. Новый сервис получает следующее значение (+15).
 
-`tests-backend-manual.yml` запускает backend matrix-тесты и `Shared.*.Tests` вручную на `ubuntu-latest`.
+Docker-теги считает локальная экшн `.github/actions/docker-version`: следующий patch-SemVer по тегам реестра (первая сборка — `1.0.0`) для репозитория с суффиксом ветки (`dev` → `-dev`, `nightly` → `-nightly`, `master` — без суффикса). Пушатся три тега: `<version>`, `latest` и `<sha>` (коммит). Реестр опрашивается с проверкой TLS-сертификата. Telegram-уведомление об успехе показывает SemVer-тег.
 
-Docker-теги считает локальная экшн `.github/actions/docker-version`: следующий patch-SemVer по тегам реестра (первая сборка — `1.0.0`) для репозитория с суффиксом ветки (`dev` → `-dev`, `nightly` → `-nightly`, `master` — без суффикса). Пушатся три тега: `<version>`, `latest` и `<sha>` (коммит). Telegram-уведомление об успехе показывает SemVer-тег. Например, `barkcloud-files-dev:1.2.3` в `dev` и `barkcloud-files:1.2.3` в `master`.
+Уведомления шлёт `.github/scripts/send-telegram.sh`: сначала с `parse_mode=Markdown`; если Telegram отклонил разметку (например, `_` в имени ветки или автора), тот же текст уходит без разметки. Если не ушло и так — `::warning::` в логе, джоба не падает. Например, `barkcloud-files-dev:1.2.3` в `dev` и `barkcloud-files:1.2.3` в `master`.
 
 Drive (`Drive/*`, WPF/Windows, тестов нет) в CI не собирается — только локально. Backend-воркфлоу `build-backend-*.yml` выполняются на GitHub-hosted runner `ubuntu-latest`.
 
 Триггеры:
 - `tests.yml`: pull_request в `dev`/`master`, workflow_dispatch.
-- `build-backend-*.yml`: push в `dev`/`master` по путям конкретного сервиса, `Shared/**`, его тестам, `Tests/BarkCloud.TestKit/**`, `Backend/rebuild.trigger`; также workflow_dispatch.
+- `build-backend-*.yml`: push в `dev`/`nightly`/`master` по путям конкретного сервиса, `Backend/BarkCloud.GrpcServer/**`, `Shared/BarkCloud.Shared.*/**`, нужным proto, его тестам, `Tests/BarkCloud.TestKit/**`, `Backend/rebuild.trigger`; также workflow_dispatch. Права — только `contents: read`.
 
-Гранулярность proto (deploy-воркфлоу): чтобы правка одного `.proto` не пересобирала весь бэкенд, в `paths` каждого `build-backend-*.yml` весь `Shared/BarkCloud.Proto/**` исключён из общего `Shared/**` (`!Shared/BarkCloud.Proto/**`) и точечно возвращён только нужный контракт — по принципу «сервис-владелец» (тот, у кого `GrpcServices="Server"`):
+Гранулярность proto (deploy-воркфлоу): чтобы правка одного `.proto` не пересобирала весь бэкенд, в `paths` каждого `build-backend-*.yml` вместо `Shared/**` перечислены `Shared/BarkCloud.Shared.*/**` и точечно нужные контракты (без отрицаний — тот же список годится и для `runtime-paths`) — по принципу «сервис-владелец» (тот, у кого `GrpcServices="Server"`):
 - `configuration_api.proto` → Configuration; `files_api.proto` → Files; `identity_api.proto` → Identity; `users_api.proto` → Users.
 - `shared.proto` владельца не имеет (общие типы, `GrpcServices="None"`) → триггерит всех потребителей: Files, Identity, Users, Web.
-- Notification proto не использует — для него возвращать нечего.
+- `configuration_api.proto` и `session_revocation_api.proto` компилируются в `BarkCloud.GrpcServer` (`GrpcServices="Both"`) → триггерят все сервисы.
+- Files ещё ссылается на `BarkCloud.Proto.csproj` — он в списке Files.
 - Клиентские зависимости (`GrpcServices="Client"`) сборку НЕ триггерят: например правка `files_api.proto` не пересоберёт Users/Web, хотя они его клиенты. Компромисс: их сгенерированные стабы останутся со старым контрактом до их же следующей пересборки. `tests.yml` это не затрагивает — там `Shared/**` по-прежнему гоняет все backend-тесты.
 
 ## F10: отзыв сессий
