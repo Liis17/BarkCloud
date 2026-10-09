@@ -106,22 +106,11 @@ jobs:
     runs-on: ubuntu-latest
     env:
       BARKCLOUD_TEST_POSTGRES: Host=127.0.0.1;Port=5432;Database=postgres;Username=postgres;Password=postgres
-    services:
-      postgres:
-        image: postgres:18
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: postgres
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres -d postgres"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
     steps:
       - uses: actions/checkout@v7
+      - uses: ./.github/actions/test-containers
+        with:
+          postgres: 'true'
       - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '10.0.x'
@@ -184,22 +173,11 @@ jobs:
     runs-on: ubuntu-latest
     env:
       BARKCLOUD_TEST_POSTGRES: Host=127.0.0.1;Port=5432;Database=postgres;Username=postgres;Password=postgres
-    services:
-      postgres:
-        image: postgres:18
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: postgres
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres -d postgres"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
     steps:
       - uses: actions/checkout@v7
+      - uses: ./.github/actions/test-containers
+        with:
+          postgres: 'true'
       - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '10.0.x'
@@ -238,22 +216,11 @@ jobs:
     runs-on: ubuntu-latest
     env:
       BARKCLOUD_TEST_POSTGRES: Host=127.0.0.1;Port=5432;Database=postgres;Username=postgres;Password=postgres
-    services:
-      postgres:
-        image: postgres:18
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: postgres
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres -d postgres"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
     steps:
       - uses: actions/checkout@v7
+      - uses: ./.github/actions/test-containers
+        with:
+          postgres: 'true'
       - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '10.0.x'
@@ -274,34 +241,12 @@ jobs:
     env:
       BARKCLOUD_TEST_POSTGRES: Host=127.0.0.1;Port=5432;Database=postgres;Username=postgres;Password=postgres
       BARKCLOUD_TEST_RABBITMQ: rabbitmq://integration:integration@127.0.0.1:5672/
-    services:
-      postgres:
-        image: postgres:18
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: postgres
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres -d postgres"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
-      rabbitmq:
-        image: rabbitmq:4.1
-        env:
-          RABBITMQ_DEFAULT_USER: integration
-          RABBITMQ_DEFAULT_PASS: integration
-        ports:
-          - 5672:5672
-        options: >-
-          --health-cmd "rabbitmq-diagnostics -q ping"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
     steps:
       - uses: actions/checkout@v7
+      - uses: ./.github/actions/test-containers
+        with:
+          postgres: 'true'
+          rabbitmq: 'true'
       - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '10.0.x'
