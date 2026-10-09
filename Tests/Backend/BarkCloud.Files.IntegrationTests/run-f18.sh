@@ -10,6 +10,18 @@ cleanup() {
   exit "$status"
 }
 trap cleanup EXIT
+# Docker Hub периодически отдаёт таймауты и toomanyrequests: повторяем загрузку образов.
+pull_attempts=5
+pull_attempt=1
+until "${f18_compose[@]}" pull; do
+  if [ "$pull_attempt" -ge "$pull_attempts" ]; then
+    echo "Не удалось загрузить образы за $pull_attempts попыток" >&2
+    exit 1
+  fi
+  echo "Повтор загрузки образов через $((pull_attempt * 20)) с ($pull_attempt/$pull_attempts)"
+  sleep $((pull_attempt * 20))
+  pull_attempt=$((pull_attempt + 1))
+done
 "${f18_compose[@]}" up -d --wait
 export BARKCLOUD_TEST_POSTGRES='Host=127.0.0.1;Port=55418;Database=postgres;Username=postgres;Password=postgres'
 export BARKCLOUD_TEST_RABBITMQ='rabbitmq://integration:integration@127.0.0.1:56718/'

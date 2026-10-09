@@ -1,0 +1,20 @@
+name: "BarkCloud test containers"
+description: "Поднимает PostgreSQL и RabbitMQ для тестов с повтором docker pull"
+inputs:
+  postgres:
+    description: "Запустить postgres:18 на 127.0.0.1:5432"
+    required: false
+    default: "false"
+  rabbitmq:
+    description: "Запустить rabbitmq:4.1 на 127.0.0.1:5672"
+    required: false
+    default: "false"
+runs:
+  using: composite
+  steps:
+    - name: "Запуск контейнеров"
+      shell: bash
+      env:
+        START_POSTGRES: ${{ inputs.postgres }}
+        START_RABBITMQ: ${{ inputs.rabbitmq }}
+      run: bash "${{ github.workspace }}/.github/scripts/start-test-containers.sh"
