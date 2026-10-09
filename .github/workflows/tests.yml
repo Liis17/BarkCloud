@@ -51,6 +51,8 @@ jobs:
               - 'Backend/BarkCloud.Files/**'
               - 'Backend/BarkCloud.GrpcServer/**'
               - 'Tests/Backend/BarkCloud.Files.Tests/**'
+              - 'Tests/Backend/BarkCloud.Files.IntegrationTests/**'
+              - '.github/workflows/files-upload-integration.yml'
             grpcserver:
               - 'Backend/BarkCloud.GrpcServer/**'
               - 'Tests/Backend/BarkCloud.GrpcServer.Tests/**'
@@ -131,6 +133,11 @@ jobs:
         with:
           name: test-results-files
           path: TestResults/**
+
+  test-files-upload-integration:
+    needs: changes
+    if: ${{ needs.changes.outputs.files == 'true' || needs.changes.outputs.shared == 'true' }}
+    uses: ./.github/workflows/files-upload-integration.yml
 
   test-grpcserver:
     name: "GrpcServer"

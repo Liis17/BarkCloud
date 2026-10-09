@@ -9,8 +9,8 @@ public partial class AddUploadScheduler : Migration
         // Quartz.NET v3.15.0 database/tables/tables_postgres.sql, creation only.
         // https://github.com/quartznet/quartznet/blob/v3.15.0/database/tables/tables_postgres.sql
         migrationBuilder.Sql("""
-            CREATE SCHEMA files_quartz;
-            CREATE TABLE files_quartz.qrtz_job_details
+            CREATE SCHEMA IF NOT EXISTS files_quartz;
+            CREATE TABLE IF NOT EXISTS files_quartz.qrtz_job_details
               (
                 sched_name TEXT NOT NULL,
                 job_name TEXT NOT NULL,
@@ -24,8 +24,8 @@ public partial class AddUploadScheduler : Migration
                 job_data BYTEA NULL,
                 PRIMARY KEY (sched_name, job_name, job_group)
             );
-            
-            CREATE TABLE files_quartz.qrtz_triggers
+
+            CREATE TABLE IF NOT EXISTS files_quartz.qrtz_triggers
               (
                 sched_name TEXT NOT NULL,
                 trigger_name TEXT NOT NULL,
@@ -47,8 +47,8 @@ public partial class AddUploadScheduler : Migration
                 FOREIGN KEY (sched_name, job_name, job_group)
                   REFERENCES files_quartz.qrtz_job_details (sched_name, job_name, job_group)
             );
-            
-            CREATE TABLE files_quartz.qrtz_simple_triggers
+
+            CREATE TABLE IF NOT EXISTS files_quartz.qrtz_simple_triggers
               (
                 sched_name TEXT NOT NULL,
                 trigger_name TEXT NOT NULL,
@@ -61,8 +61,8 @@ public partial class AddUploadScheduler : Migration
                   REFERENCES files_quartz.qrtz_triggers (sched_name, trigger_name, trigger_group)
                   ON DELETE CASCADE
             );
-            
-            CREATE TABLE files_quartz.qrtz_simprop_triggers
+
+            CREATE TABLE IF NOT EXISTS files_quartz.qrtz_simprop_triggers
               (
                 sched_name TEXT NOT NULL,
                 trigger_name TEXT NOT NULL,
@@ -84,8 +84,8 @@ public partial class AddUploadScheduler : Migration
                   REFERENCES files_quartz.qrtz_triggers (sched_name, trigger_name, trigger_group)
                   ON DELETE CASCADE
             );
-            
-            CREATE TABLE files_quartz.qrtz_cron_triggers
+
+            CREATE TABLE IF NOT EXISTS files_quartz.qrtz_cron_triggers
               (
                 sched_name TEXT NOT NULL,
                 trigger_name TEXT NOT NULL,
@@ -97,8 +97,8 @@ public partial class AddUploadScheduler : Migration
                   REFERENCES files_quartz.qrtz_triggers (sched_name, trigger_name, trigger_group)
                   ON DELETE CASCADE
             );
-            
-            CREATE TABLE files_quartz.qrtz_blob_triggers
+
+            CREATE TABLE IF NOT EXISTS files_quartz.qrtz_blob_triggers
               (
                 sched_name TEXT NOT NULL,
                 trigger_name TEXT NOT NULL,
@@ -109,23 +109,23 @@ public partial class AddUploadScheduler : Migration
                   REFERENCES files_quartz.qrtz_triggers (sched_name, trigger_name, trigger_group)
                   ON DELETE CASCADE
             );
-            
-            CREATE TABLE files_quartz.qrtz_calendars
+
+            CREATE TABLE IF NOT EXISTS files_quartz.qrtz_calendars
               (
                 sched_name TEXT NOT NULL,
                 calendar_name TEXT NOT NULL,
                 calendar BYTEA NOT NULL,
                 PRIMARY KEY (sched_name, calendar_name)
             );
-            
-            CREATE TABLE files_quartz.qrtz_paused_trigger_grps
+
+            CREATE TABLE IF NOT EXISTS files_quartz.qrtz_paused_trigger_grps
               (
                 sched_name TEXT NOT NULL,
                 trigger_group TEXT NOT NULL,
                 PRIMARY KEY (sched_name, trigger_group)
             );
-            
-            CREATE TABLE files_quartz.qrtz_fired_triggers
+
+            CREATE TABLE IF NOT EXISTS files_quartz.qrtz_fired_triggers
               (
                 sched_name TEXT NOT NULL,
                 entry_id TEXT NOT NULL,
@@ -142,8 +142,8 @@ public partial class AddUploadScheduler : Migration
                 requests_recovery BOOL NULL,
                 PRIMARY KEY (sched_name, entry_id)
             );
-            
-            CREATE TABLE files_quartz.qrtz_scheduler_state
+
+            CREATE TABLE IF NOT EXISTS files_quartz.qrtz_scheduler_state
               (
                 sched_name TEXT NOT NULL,
                 instance_name TEXT NOT NULL,
@@ -151,25 +151,25 @@ public partial class AddUploadScheduler : Migration
                 checkin_interval BIGINT NOT NULL,
                 PRIMARY KEY (sched_name, instance_name)
             );
-            
-            CREATE TABLE files_quartz.qrtz_locks
+
+            CREATE TABLE IF NOT EXISTS files_quartz.qrtz_locks
               (
                 sched_name TEXT NOT NULL,
                 lock_name TEXT NOT NULL,
                 PRIMARY KEY (sched_name, lock_name)
             );
-            
-            CREATE INDEX idx_qrtz_j_req_recovery ON files_quartz.qrtz_job_details (requests_recovery);
-            CREATE INDEX idx_qrtz_t_next_fire_time ON files_quartz.qrtz_triggers (next_fire_time);
-            CREATE INDEX idx_qrtz_t_state ON files_quartz.qrtz_triggers (trigger_state);
-            CREATE INDEX idx_qrtz_t_nft_st ON files_quartz.qrtz_triggers (next_fire_time, trigger_state);
-            CREATE INDEX idx_qrtz_ft_trig_name ON files_quartz.qrtz_fired_triggers (trigger_name);
-            CREATE INDEX idx_qrtz_ft_trig_group ON files_quartz.qrtz_fired_triggers (trigger_group);
-            CREATE INDEX idx_qrtz_ft_trig_nm_gp ON files_quartz.qrtz_fired_triggers (sched_name, trigger_name, trigger_group);
-            CREATE INDEX idx_qrtz_ft_trig_inst_name ON files_quartz.qrtz_fired_triggers (instance_name);
-            CREATE INDEX idx_qrtz_ft_job_name ON files_quartz.qrtz_fired_triggers (job_name);
-            CREATE INDEX idx_qrtz_ft_job_group ON files_quartz.qrtz_fired_triggers (job_group);
-            CREATE INDEX idx_qrtz_ft_job_req_recovery ON files_quartz.qrtz_fired_triggers (requests_recovery);
+
+            CREATE INDEX IF NOT EXISTS idx_qrtz_j_req_recovery ON files_quartz.qrtz_job_details (requests_recovery);
+            CREATE INDEX IF NOT EXISTS idx_qrtz_t_next_fire_time ON files_quartz.qrtz_triggers (next_fire_time);
+            CREATE INDEX IF NOT EXISTS idx_qrtz_t_state ON files_quartz.qrtz_triggers (trigger_state);
+            CREATE INDEX IF NOT EXISTS idx_qrtz_t_nft_st ON files_quartz.qrtz_triggers (next_fire_time, trigger_state);
+            CREATE INDEX IF NOT EXISTS idx_qrtz_ft_trig_name ON files_quartz.qrtz_fired_triggers (trigger_name);
+            CREATE INDEX IF NOT EXISTS idx_qrtz_ft_trig_group ON files_quartz.qrtz_fired_triggers (trigger_group);
+            CREATE INDEX IF NOT EXISTS idx_qrtz_ft_trig_nm_gp ON files_quartz.qrtz_fired_triggers (sched_name, trigger_name, trigger_group);
+            CREATE INDEX IF NOT EXISTS idx_qrtz_ft_trig_inst_name ON files_quartz.qrtz_fired_triggers (instance_name);
+            CREATE INDEX IF NOT EXISTS idx_qrtz_ft_job_name ON files_quartz.qrtz_fired_triggers (job_name);
+            CREATE INDEX IF NOT EXISTS idx_qrtz_ft_job_group ON files_quartz.qrtz_fired_triggers (job_group);
+            CREATE INDEX IF NOT EXISTS idx_qrtz_ft_job_req_recovery ON files_quartz.qrtz_fired_triggers (requests_recovery);
             """);
     }
 

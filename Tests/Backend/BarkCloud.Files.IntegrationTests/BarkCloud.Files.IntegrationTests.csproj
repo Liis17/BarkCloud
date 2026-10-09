@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.8" />
+    <ProjectReference Include="../../../Backend/BarkCloud.Files/BarkCloud.Files.csproj" />
+  </ItemGroup>
+</Project>
