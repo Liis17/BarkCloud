@@ -8,6 +8,8 @@ Parent: [[index]] · See also: [[structure/testing]] · [[modules/backend-identi
 
 **Обновление 2026-10-08:** F15 исправлен в рабочем дереве master: общий owner/tree lock для Attach/purge/DeleteUserMedia, FK Restrict и очистка старых битых записей. Полный Files с параллельными изменениями F13 — 619/619, без пропусков; диагностический F15 также проходит. Подробности — [[modules/files-original-lifetime]]. Числа и доказательства ревизии 2026-10-07 ниже относятся к исходному срезу.
 
+**Обновление 2026-10-09:** F17 исправлен: legacy Web-загрузка получила отдельный клиент `files-legacy-upload`, Torrent-импорт — явный срок `files-upload`; в обоих 2 ч, как у `proxy_read_timeout 7200s` nginx. Общий Web-клиент `files-upload` для прокси скачивания не менялся. `RequestAborted` проходит через форму, gRPC, POST и чтение ответа. Проверки: `LegacyUploadEndpointsTests`, `TorrentImportServiceTests`; настоящая multipart-передача дольше 100 с — с `BARKCLOUD_LONG_UPLOAD_TEST=1`. См. [[modules/backend-web]], [[modules/backend-torrent]].
+
 ## Закрыто после прежнего отчёта
 
 **F02:** коммит `568e42b` задаёт MaxSessionId каждому отзываемому устройству. Штатный PostgreSQL regression `ResetPassword_StaleRefreshReadBeforeReset_IssuedAccessIsRevoked` прошёл: read старого refresh другого устройства до reset, подпись после commit в следующую секунду, загрузка feed → старый JWT отклонён, новый работает. Повторно исправлять не требуется. Синхронизация отзывов между сервисами остаётся асинхронной; это отдельная граница гарантии, не прежний F02.
@@ -15,7 +17,6 @@ Parent: [[index]] · See also: [[structure/testing]] · [[modules/backend-identi
 ## Оставшиеся этапы
 
 - **F13 · P1:** rename без LockTree и полный Update(entity) возвращают IsDeleted=false/старый DirectoryId после удаления папки. Новое PostgreSQL-воспроизведение подтвердило. Нужны согласованная граница rename/move/delete и узкая запись полей; одиночный DeleteFileEntry также не участвует в tree-lock.
-- **F17 · P2:** Web/Torrent files-upload сохраняют Timeout 100 с; legacy Web не передаёт RequestAborted. HttpClient probe подтвердил настройки, timeout и непереданную отмену. Приёмка — настоящая длинная передача и остановка upstream.
 - **F18 · P2:** два in-memory retry удерживают оба consumer-слота на 1270 с ожиданий. MassTransit 8.5.2 in-memory probe с текущими интервалами подтвердил блокировку третьего исправного сообщения. Нужна настроенная повторная доставка на реальном RabbitMQ с освобождением слотов.
 - **F19 · P2:** (A) изменение и INSERT PendingNotification раздельны; реальный SetPassword на PostgreSQL с отказом INSERT дал сохранённый пароль и 0 событий. Нужна атомарность локальных изменений и намерения уведомления. (B) SessionIssuer передаёт RegisterDevice без deadline/token; отменённый caller остаётся pending в управляемом gRPC-воспроизведении. Нужны конечный срок и отмена без долгой SQL-транзакции на RPC.
 - **F20 · P2:** SQL word_similarity и C# Dice/Match расходятся. Новый полный PostgreSQL Search возвращает report по quarterly report finances с пустыми MatchField/Value. Нужно согласовать отбор/ранг/поле/нормализацию, сохранив SQL LIMIT и курсор.
