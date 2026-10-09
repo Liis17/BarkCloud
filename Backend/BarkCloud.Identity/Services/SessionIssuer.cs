@@ -32,6 +32,8 @@ public class SessionIssuer(
 {
     private const int ExpDaysRefreshToken = 9999;
 
+    public static readonly TimeSpan DeviceRegistrationTimeout = TimeSpan.FromSeconds(10);
+
     /// <summary>Вход пользователя: устройство берётся из заголовков запроса.</summary>
     public virtual async Task<AuthResponse> IssueAsync(long userId, CancellationToken cancellationToken)
     {
@@ -65,10 +67,11 @@ public class SessionIssuer(
         var accessTokenResponse = await mediator.Send(new CreateTokenCommand { RefreshToken = refreshTokenString }, cancellationToken);
 
         var locationInfo = await locationClient.GetLocationString(device.IpAddress);
+        cancellationToken.ThrowIfCancellationRequested();
 
         try
         {
-            await usersClient.RegisterDeviceAsync(new RegisterDeviceRequest
+            using var call = usersClient.RegisterDeviceAsync(new RegisterDeviceRequest
             {
                 DeviceId = device.DeviceId,
                 UserId = userId,
@@ -76,13 +79,20 @@ public class SessionIssuer(
                 AppName = device.AppName,
                 OperationSystem = device.OperationSystem ?? string.Empty,
                 Location = locationInfo
-            });
+            }, deadline: DateTime.UtcNow + DeviceRegistrationTimeout, cancellationToken: cancellationToken);
+            await call.ResponseAsync.WaitAsync(DeviceRegistrationTimeout, cancellationToken);
+        }
+        catch (Exception) when (cancellationToken.IsCancellationRequested)
+        {
+            throw new OperationCanceledException(cancellationToken);
         }
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Не удалось зарегистрировать устройство {DeviceId} для пользователя {UserId}",
                 device.DeviceId, userId);
         }
+
+        cancellationToken.ThrowIfCancellationRequested();
 
         // Геолокация уже определена для устройства — передаём её письму, чтобы воркер не ходил в ip-api второй раз.
         await notificationOutbox.EnqueueAsync(
