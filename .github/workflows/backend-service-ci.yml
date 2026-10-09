@@ -126,22 +126,14 @@ jobs:
     runs-on: ubuntu-latest
     env:
       BARKCLOUD_TEST_POSTGRES: ${{ (inputs.service-key == 'users' || inputs.service-key == 'files') && 'Host=127.0.0.1;Port=5432;Database=postgres;Username=postgres;Password=postgres' || '' }}
-    services:
-      postgres:
-        image: ${{ (inputs.service-key == 'users' || inputs.service-key == 'files') && 'postgres:18' || '' }}
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: postgres
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres -d postgres"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
     steps:
       - uses: actions/checkout@v7
+
+      - name: "PostgreSQL для тестов"
+        if: ${{ inputs.service-key == 'users' || inputs.service-key == 'files' }}
+        uses: ./.github/actions/test-containers
+        with:
+          postgres: 'true'
 
       - uses: actions/setup-dotnet@v6
         with:
@@ -246,8 +238,7 @@ jobs:
         if: ${{ inputs.push-delay > 0 }}
         run: sleep ${{ inputs.push-delay }}
 
-      # Отправка идёт через buildx, а не `docker push`: демон Docker получает от реестра 401,
-      # хотя buildkit с теми же учётными данными проходит
+      # Публикация выполняется командой `docker buildx build --push`.
       - name: "Push Docker image"
         env:
           TAGS: ${{ steps.docker-version.outputs.tags }}
