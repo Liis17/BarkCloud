@@ -14,6 +14,11 @@ namespace BarkCloud.Torrent.Infrastructure;
 /// </summary>
 public class TorrentImportService
 {
+    public const string HttpClientName = "files-upload";
+
+    // = nginx proxy_read_timeout 7200s окна Web → Torrent ImportToCloud: дольше ответ до браузера не дойдёт.
+    public static readonly TimeSpan TransferTimeout = TimeSpan.FromHours(2);
+
     private readonly FilesApi.FilesApiClient _files;
     private readonly CloudApi.CloudApiClient _cloud;
     private readonly IHttpClientFactory _httpFactory;
@@ -36,6 +41,13 @@ public class TorrentImportService
 
     public record ImportedFile(string FileId, string Name);
 
+    /// <summary>Клиент передачи байтов в Files: срок 2 ч вместо 100 с по умолчанию.</summary>
+    public static IServiceCollection AddFilesUploadClient(IServiceCollection services)
+    {
+        services.AddHttpClient(HttpClientName, c => c.Timeout = TransferTimeout);
+        return services;
+    }
+
     /// <summary>Импортирует один завершённый файл торрента в облако.</summary>
     public async Task<ImportedFile?> ImportFileAsync(
         ITorrentManagerFile file, string directoryId, string userToken, CancellationToken ct)
@@ -56,7 +68,7 @@ public class TorrentImportService
 
         // 2. Заливаем байты на внутренний HTTP1-эндпоинт Files (минуя nginx).
         var http1Base = ResolveFilesHttp1Base();
-        var client = _httpFactory.CreateClient("files-upload");
+        var client = _httpFactory.CreateClient(HttpClientName);
 
         await using var fileStream = File.OpenRead(fullPath);
         using var content = new MultipartFormDataContent();
