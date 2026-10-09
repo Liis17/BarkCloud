@@ -29,7 +29,7 @@ public sealed class UploadRedeliveryTests(ITestOutputHelper output) : IAsyncLife
     public async Task InitializeAsync()
     {
         await _database.InitializeAsync();
-        await using var connection = await new ConnectionFactory { Uri = UploadTestHost.RabbitAddress }.CreateConnectionAsync();
+        await using var connection = await RabbitMqClientFactory.FromMassTransitAddress(UploadTestHost.RabbitAddress).CreateConnectionAsync();
         output.WriteLine("RabbitMQ actual version: {0}", Encoding.UTF8.GetString((byte[])connection.ServerProperties!["version"]!));
         await using var channel = await connection.CreateChannelAsync();
         foreach (var queue in new[] { "process-uploaded-file", "process-uploaded-file_error", "files-upload-scheduler", "files-upload-scheduler_error" })
@@ -260,7 +260,7 @@ public sealed class UploadRedeliveryTests(ITestOutputHelper output) : IAsyncLife
         _probe.Deliveries[pipelineFailure].Should().Equal(0, 1, 2, 3, 4);
         _probe.Deliveries[unhandled].Should().Equal(0, 1, 2, 3, 4);
         _probe.Faults.Should().ContainSingle(f => f.Message.SessionId == unhandled);
-        await using var connection = await new ConnectionFactory { Uri = UploadTestHost.RabbitAddress }.CreateConnectionAsync();
+        await using var connection = await RabbitMqClientFactory.FromMassTransitAddress(UploadTestHost.RabbitAddress).CreateConnectionAsync();
         await using var channel = await connection.CreateChannelAsync();
         BasicGetResult? error = null;
         await WaitUntilAsync(async () =>

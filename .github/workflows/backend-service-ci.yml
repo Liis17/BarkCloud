@@ -246,8 +246,7 @@ jobs:
         if: ${{ inputs.push-delay > 0 }}
         run: sleep ${{ inputs.push-delay }}
 
-      # Отправка идёт через buildx, а не `docker push`: демон Docker получает от реестра 401,
-      # хотя buildkit с теми же учётными данными проходит
+      # Публикация выполняется командой `docker buildx build --push`.
       - name: "Push Docker image"
         env:
           TAGS: ${{ steps.docker-version.outputs.tags }}
