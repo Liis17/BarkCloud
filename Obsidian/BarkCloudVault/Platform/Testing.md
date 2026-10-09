@@ -41,3 +41,42 @@ Parent: [[Architecture]] · See also: [[Web/WebApp]] · [[Backend/Files]] · [[B
 ## Ограничения и важные детали
 
 PostgreSQL-сценарии зависят от отдельной тестовой базы и настройки `BARKCLOUD_TEST_POSTGRES`. В локальном запуске следует передавать строку подключения только к тестовому PostgreSQL; workflow предоставляет её через сервисный контейнер.
+
+## Files: durable upload redelivery
+
+Проект `Tests/Backend/BarkCloud.Files.IntegrationTests/` использует production endpoint,
+consumer, processor и artifact cleaner с настоящими PostgreSQL 18/RabbitMQ; подменены
+тяжёлый pipeline и физическое удаление блобов. `docker-compose.yml` хранит PostgreSQL
+и RabbitMQ в постоянных volumes. Стенд изолирован: тесты удаляют очереди Files и
+перезапускают RabbitMQ, поэтому рабочая инфраструктура непригодна.
+
+```bash
+bash Tests/Backend/BarkCloud.Files.IntegrationTests/run-f18.sh
+BARKCLOUD_F18_PRODUCTION=1 bash Tests/Backend/BarkCloud.Files.IntegrationTests/run-f18.sh \
+  --filter FullyQualifiedName~Exhaustion_WithUnchangedProductionIntervals
+```
+
+Быстрые сценарии покрывают освобождение двух слотов (здоровое сообщение ≤5 секунд,
+до первого production-повтора), рестарты Files и RabbitMQ с сохранёнными данными,
+просроченный таймер, сохранение redelivery count, recovery-trigger при окончательной
+ошибке отправки, Ready/NoOp до и после рестарта, cancellation, integrity failure,
+пять pipeline-ошибок и пять необработанных исключений с `_error`/Fault.
+
+Транспорт может ждать reconnect; для final-error пути тест выключает брокер и
+прерывает заблокированный job через `IScheduler.Interrupt`. Проверяет сохранение
+payload/headers нового durable trigger до восстановления и доставку после рестарта
+host. Это отдельная проверка от обычного восстановления соединения при рестарте брокера.
+
+В тестовом host только быстрый сценарий исчерпания задаёт интервалы 300 мс.
+Приёмочная проверка использует исходные 10 секунд, 1, 5 и 15 минут, занимает около
+21 минуты 10 секунд плюс обработка; фактическая версия `rabbitmq:latest` печатается
+в выводе runner и TRX. CI запускает быстрый прогон через
+`.github/workflows/files-upload-integration.yml`, вызываемый PR workflow и Files CI/CD;
+последний ждёт успешной интеграционной проверки перед публикацией. Ручной запуск
+workflow с `production-intervals` включает полный приёмочный сценарий.
+
+`run-f18.sh` требует Docker Compose и .NET 10, останавливает контейнеры после тестов
+и сохраняет volumes. Подробности и прямой запуск через `BARKCLOUD_TEST_POSTGRES`,
+`BARKCLOUD_TEST_RABBITMQ`, `BARKCLOUD_TEST_RABBITMQ_CONTAINER` — в README проекта.
+Unit-проверка listener (`BarkCloud.Files.Tests/Scheduling/`) подтверждает копирование
+payload/headers, задержку 30 секунд и отсутствие нового trigger при успехе/immediate refire.

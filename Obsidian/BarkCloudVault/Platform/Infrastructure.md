@@ -37,3 +37,38 @@ Parent: [[Architecture]] · See also: [[Tools/Builder]] · [[Web/SystemUpdates]]
 - `cloud-nginx` не включён в базовый compose. Файл nginx предназначен для внешнего reverse proxy; генератор может добавить nginx в создаваемый compose, см. [[Tools/Builder]].
 - Внутренние порты сервисов не опубликованы секцией `ports` базового compose. Прокси/внешняя инфраструктура отвечает за публикацию портов.
 - Почта передаётся в Configuration переменными `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_SENDER_EMAIL` и `EMAIL_SENDER_PASSWORD`; отправку выполняет Notification.
+
+## Files upload scheduler: внедрение и откат
+
+Scheduler работает внутри Files: MassTransit.Quartz 8.5.2 + Quartz 3.15.0,
+PostgreSQL store в `FilesDb`, отдельная схема `files_quartz`. Durable очередь
+`files-upload-scheduler` принимает команды расписания. Плагин брокера и дополнительный
+контейнер scheduler не требуются. Основной compose продолжает использовать
+`rabbitmq:latest` и постоянные данные PostgreSQL/RabbitMQ; версию брокера нужно
+зафиксировать в результатах приёмочного прогона. Обновление/downgrade брокера не входит
+в изменение механизма повторов. Publisher confirms MassTransit RabbitMQ остаются включены.
+
+Внедрение: применить `20261009000000_AddUploadScheduler` → перезапустить Files →
+smoke-проверить доставку `ProcessUploadedFile` и переход тестовой сессии в `Ready`.
+Обычный старт Files сам применяет миграцию до старта scheduler.
+Миграция создаёт Quartz-таблицы без DROP/очистки данных.
+
+Контроль:
+
+- `process-uploaded-file_error` — исчерпание необработанных исключений; сессия может
+  остаться `Processing`, автоматического Fault-consumer нет.
+- `files-upload-scheduler_error` — ошибки команд расписания; проверять сообщения
+  вручную и устранять причину перед повторной доставкой.
+- Ошибки `ScheduledMessageJob` и `ScheduledMessageRecoveryListener` в логах Files;
+  предупреждение о сохранённом recovery-trigger содержит destination и trigger key.
+- `files_quartz.qrtz_triggers` и `files_quartz.qrtz_fired_triggers` — ожидающие/активные
+  доставки; `qrtz_scheduler_state` — состояние кластерных экземпляров scheduler.
+  Проверять застрявшие trigger, ошибки PostgreSQL и backlog очередей.
+
+При откате сохранять scheduler с новой интеграцией работающим до завершения ожидающих
+доставок. Остановка всех таких экземпляров прекращает выдачу таймеров. Таблицы и
+очереди не удалять: `Down` миграции сохраняет scheduler-данные. Приложение с прежними
+локальными retry не исполняет сохранённые Quartz-таймеры самостоятельно.
+
+Команды Docker-стенда и приёмки — [[Platform/Testing]] и
+`Tests/Backend/BarkCloud.Files.IntegrationTests/README.md`.
