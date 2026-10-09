@@ -36,4 +36,21 @@ public class ConfirmUserCommandHandlerTests
 
         _usersStorage.Verify(s => s.ChangeDraftStatus(42, false), Times.Once);
     }
+
+    [Fact]
+    public async Task Handle_AlreadyConfirmedUserCanBeConfirmedAgain()
+    {
+        _usersStorage.Setup(s => s.GetById(42))
+            .ReturnsAsync(new User { Id = 42, Username = "u", IsDraft = false });
+        _usersStorage.Setup(s => s.ChangeDraftStatus(42, false)).Returns(Task.CompletedTask);
+
+        var handler = CreateSut();
+        var command = new ConfirmUserCommand { UserId = 42 };
+
+        await handler.Handle(command, default);
+        await handler.Handle(command, default);
+
+        _usersStorage.Verify(s => s.GetById(42), Times.Exactly(2));
+        _usersStorage.Verify(s => s.ChangeDraftStatus(42, false), Times.Exactly(2));
+    }
 }
