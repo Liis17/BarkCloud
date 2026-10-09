@@ -17,6 +17,12 @@ public class DeleteUserMediaCommandHandlerTests
     private const long OwnerId = 42;
     private readonly Mock<ICloudHierarchyStorage> _hierarchy = new();
     private readonly Mock<IUploadedFilesStorage> _files = new();
+    private readonly Mock<ICloudTreeLock> _treeLock = new();
+
+    public DeleteUserMediaCommandHandlerTests()
+    {
+        _hierarchy.Setup(s => s.LockTree(OwnerId, It.IsAny<CancellationToken>())).ReturnsAsync(_treeLock.Object);
+    }
 
     private DeleteUserMediaCommandHandler CreateSut() => new(
         _hierarchy.Object, _files.Object,

@@ -251,6 +251,7 @@ public sealed class CloudTreeWriterRacePostgresTests
     private static async Task Seed(PostgresFilesDatabase database, params object[] entities)
     {
         await using var context = database.CreateContext();
+        CloudFileEntryFixtures.AddOriginals(context, entities.OfType<CloudFileEntry>());
         context.AddRange(entities);
         await context.SaveChangesAsync();
     }

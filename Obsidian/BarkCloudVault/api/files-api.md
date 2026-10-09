@@ -51,8 +51,8 @@ Package: `barkcloud.files`
 | `ListDirectory(ListDirectoryRequest) → DirectoryListing` | Страница листинга (`subdirs`, ready `files`); `directory_id` пуст = корень владельца. Только метаданные |
 | `ListDirectoryDetailed(ListDirectoryRequest) → DirectoryListingDetailed` | Та же страница, что у `ListDirectory`, но каждый ready-файл содержит полный `UploadFileInfo`; processing placeholders скрыты |
 | `AttachFile(AttachFileRequest) → CloudEmpty` | Привязать только ready `UploadFile`; `upload_session_id/is_upload_retry` коррелируют V2 retry для логов/метрики, processing даёт `FileNotReadyException`, replay уже привязанного — `FileAlreadyAttachedException` |
-| `RenameFileEntry(RenameFileEntryRequest) → CloudEmpty` | Переименовать запись (не меняет `UploadFile.Filename`) |
-| `MoveFileEntry(MoveFileEntryRequest) → CloudEmpty` | Переместить запись (`new_directory_id` пуст = корень) |
+| `RenameFileEntry(RenameFileEntryRequest) → CloudEmpty` | Переименовать живую запись (не меняет `UploadFile.Filename`; корзина → `FileEntryNotFound`) |
+| `MoveFileEntry(MoveFileEntryRequest) → CloudEmpty` | Переместить живую запись (`new_directory_id` пуст = корень; корзина → `FileEntryNotFound`) |
 | `DeleteFileEntry(DeleteFileEntryRequest) → CloudEmpty` | Удалить запись в корзину (`UploadFile`/`Uploaders` не трогает; blob удаляется только при очистке корзины) |
 | `DeleteFileEntries(DeleteFileEntriesRequest) → DeleteFileEntriesResponse` | Массово переместить записи в корзину; чужие/несуществующие/уже удалённые id пропускаются, ответ содержит `deleted_count` |
 | `ListUserImages(ListUserImagesRequest) → ListUserImagesResponse` | **[DEPRECATED]** Все изображения пользователя; используйте `ListUserMedia(PHOTO)`. Исключает превью-блобы |

@@ -46,6 +46,17 @@ Tests/
 
 SQLite-тесты (`Configuration.Tests`, `Files.Tests`, `Identity.Tests`) закреплены на `SQLitePCLRaw.bundle_e_sqlite3 2.1.12`: `Microsoft.EntityFrameworkCore.Sqlite 10.0.x` тянет `2.1.11` с нативным SQLite 3.49.1 (CVE-2025-6965, `NU1903`), а в `2.1.12` — SQLite 3.53.3. Пин стоит прямой ссылкой в каждом из трёх проектов (не в `Tests/Directory.Build.props` — SQLite нужен не всем); убрать, когда EF Core сам перейдёт на `>= 2.1.12`. См. [[modules/backend-audit]] (Q02).
 
+## Files: PostgreSQL-регрессии F15
+
+`AttachPurgeConcurrencyPostgresTests` проверяет 19 сценариев конкурентного Attach/purge, restore, DeleteUserMedia, владельцев, батчей, отмены, отказа S3 и orphan cleanup. `CloudFileOriginalMigrationPostgresTests` проверяет очистку существующих сирот, сохранение корректных данных, FK Restrict и `Up → Down → Up` (3 сценария). Используются существующие `PostgresFilesDatabase` и реальные миграции, независимые контексты, барьеры EF и наблюдение `pg_locks`/`pg_blocking_pids`.
+
+Нужен `BARKCLOUD_TEST_POSTGRES` с правом создания/удаления временных БД. Полный Files-набор на рабочем дереве с F13/F15: 619 прошли, 0 ошибок, 0 пропусков (2026-10-08, PostgreSQL 18.6, `C.UTF-8`). S3 — mock; физический MinIO не проверялся. Фикстуры создают настоящие оригиналы и не отключают FK. Подробнее — [[modules/files-original-lifetime]].
+
+```sh
+dotnet test Tests/Backend/BarkCloud.Files.Tests/BarkCloud.Files.Tests.csproj
+dotnet test Docs/audit/backend-recheck-2026-10-07/evidence/files/Recheck.csproj --filter FullyQualifiedName~F15
+```
+
 ## Стратегия мокирования
 
 - **Storage классы Backend** (`*Storage.cs` в `Persistence/Services/`) — переведены на интерфейсы `I*Storage` (Files: `IAlbumStorage`/`IShareStorage`/`IFavoriteFilesStorage`/`ICloudHierarchyStorage`/`IUploadedFilesStorage`/`IFileHashesStorage`; `IConfigurationStorage`), хендлеры инжектят интерфейс и мокаются Moq.

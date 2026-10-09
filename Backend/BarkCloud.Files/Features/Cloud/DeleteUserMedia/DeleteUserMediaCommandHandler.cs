@@ -51,6 +51,8 @@ public class DeleteUserMediaCommandHandler : IRequestHandler<DeleteUserMediaComm
     {
         var ownerId = _userContext.UserId;
 
+        await using var treeLock = await _cloudHierarchy.LockTree(ownerId, cancellationToken);
+
         var file = await _uploadedFiles.GetFile(request.FileId);
         if (file is null)
             throw new FileNotFoundException();
@@ -72,6 +74,7 @@ public class DeleteUserMediaCommandHandler : IRequestHandler<DeleteUserMediaComm
             }
 
             await _cloudHierarchy.SaveChangesAsync(cancellationToken);
+            await treeLock.CommitAsync(cancellationToken);
 
             _logger.LogInformation(
                 "DeleteUserMedia: {Count} записей файла {FileId} (Owner: {OwnerId}) перемещены в корзину",
@@ -111,6 +114,7 @@ public class DeleteUserMediaCommandHandler : IRequestHandler<DeleteUserMediaComm
             };
 
             await _cloudHierarchy.AddFileEntry(entry, cancellationToken);
+            await treeLock.CommitAsync(cancellationToken);
 
             _logger.LogInformation(
                 "DeleteUserMedia: для файла {FileId} (Owner: {OwnerId}) создана запись корзины {EntryId}",

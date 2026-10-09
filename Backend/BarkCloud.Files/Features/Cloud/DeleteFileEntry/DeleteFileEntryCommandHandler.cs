@@ -7,6 +7,8 @@ using BarkCloud.Shared.Exceptions.Files;
 
 using MediatR;
 
+using Microsoft.EntityFrameworkCore;
+
 namespace BarkCloud.Files.Features.Cloud.DeleteFileEntry;
 
 /// <summary>
@@ -38,6 +40,8 @@ public class DeleteFileEntryCommandHandler : IRequestHandler<DeleteFileEntryComm
     {
         var ownerId = _userContext.UserId;
 
+        await using var treeLock = await _storage.LockTree(ownerId, cancellationToken);
+
         var entry = await _storage.GetFileEntry(request.EntryId, cancellationToken);
         if (entry is null || entry.IsDeleted)
             throw new FileEntryNotFoundException();
@@ -49,7 +53,16 @@ public class DeleteFileEntryCommandHandler : IRequestHandler<DeleteFileEntryComm
         entry.DeletedAt = now;
         entry.PurgeAt = now + TrashPurgeService.Retention;
 
-        await _storage.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _storage.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            throw new FileEntryNotFoundException();
+        }
+
+        await treeLock.CommitAsync(cancellationToken);
 
         _logger.LogInformation(
             "Запись {EntryId} (FileId: {FileId}, Owner: {OwnerId}) перемещена в корзину, PurgeAt={PurgeAt}",

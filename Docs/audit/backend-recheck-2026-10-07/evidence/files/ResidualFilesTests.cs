@@ -73,29 +73,52 @@ public sealed class ResidualFilesTests(ITestOutputHelper output)
             .Handle(new AttachFileCommand { FileId = file.Id, Name = "new-live-entry" }, default);
         await pause.Reached.WaitAsync(Safety);
         var deletedKeys = new List<string>();
+        await using var purgeContext = db.CreateContext();
+        await purgeContext.Database.OpenConnectionAsync();
+        var registry = new Mock<S3BucketRegistry>(TestConfiguration.Empty()) { CallBase = false };
+        registry.Setup(r => r.ResolveReadProfileId(It.IsAny<UploadFile>())).Returns("test-storage");
+        var s3 = new Mock<S3Uploader>(registry.Object) { CallBase = false };
+        s3.Setup(s => s.DeleteAsync(It.IsAny<string>(), It.IsAny<string>()))
+            .Callback<string, string>((_, key) => deletedKeys.Add(key)).Returns(Task.CompletedTask);
+        var hashes = new Mock<IFileHashesStorage>();
+        hashes.Setup(h => h.DeleteHashByFileId(It.IsAny<Guid>(), It.IsAny<CancellationToken>())).ReturnsAsync(0);
+        var purge = new TrashPurgeService(purgeContext, s3.Object, registry.Object, hashes.Object, NullLogger<TrashPurgeService>.Instance);
+        var snapshot = await purgeContext.CloudFileEntries.AsNoTracking().Where(e => e.Id == entry.Id).ToListAsync();
+        var purgeTask = purge.PurgeEntriesAsync(snapshot, default);
+        var waited = false;
         try
         {
-            await using var purgeContext = db.CreateContext();
-            var registry = new Mock<S3BucketRegistry>(TestConfiguration.Empty()) { CallBase = false };
-            registry.Setup(r => r.ResolveReadProfileId(It.IsAny<UploadFile>())).Returns("test-storage");
-            var s3 = new Mock<S3Uploader>(registry.Object) { CallBase = false };
-            s3.Setup(s => s.DeleteAsync(It.IsAny<string>(), It.IsAny<string>()))
-                .Callback<string, string>((_, key) => deletedKeys.Add(key)).Returns(Task.CompletedTask);
-            var hashes = new Mock<IFileHashesStorage>();
-            hashes.Setup(h => h.DeleteHashByFileId(It.IsAny<Guid>(), It.IsAny<CancellationToken>())).ReturnsAsync(0);
-            var purge = new TrashPurgeService(purgeContext, s3.Object, registry.Object, hashes.Object, NullLogger<TrashPurgeService>.Instance);
-            var snapshot = await purgeContext.CloudFileEntries.AsNoTracking().Where(e => e.Id == entry.Id).ToListAsync();
-            var result = await purge.PurgeEntriesAsync(snapshot, default).WaitAsync(Safety);
-            output.WriteLine(JsonSerializer.Serialize(new { result.Entries, result.Blobs, deletedKeys }));
+            using var timeout = new CancellationTokenSource(Safety);
+            await using var connection = await db.DataSource.OpenConnectionAsync(timeout.Token);
+            await using var command = new NpgsqlCommand(
+                "SELECT EXISTS (SELECT 1 FROM pg_locks WHERE pid = $1 AND locktype = 'advisory' AND NOT granted)", connection);
+            command.Parameters.AddWithValue(((NpgsqlConnection)purgeContext.Database.GetDbConnection()).ProcessID);
+            while (!purgeTask.IsCompleted)
+            {
+                if (await command.ExecuteScalarAsync(timeout.Token) is true)
+                {
+                    waited = true;
+                    break;
+                }
+                await Task.Delay(10, timeout.Token);
+            }
         }
-        finally { pause.Release(); }
-        await attach.WaitAsync(Safety);
+        finally
+        {
+            pause.Release();
+            await Task.WhenAll(attach, purgeTask).WaitAsync(Safety);
+        }
+        var result = await purgeTask;
+        output.WriteLine(JsonSerializer.Serialize(new { result.Entries, result.Blobs, deletedKeys, waited }));
         await using var verify = db.CreateContext();
         var blobExists = await verify.UploadedFiles.AnyAsync(f => f.Id == file.Id);
         var liveEntries = await verify.CloudFileEntries.CountAsync(e => e.FileId == file.Id && !e.IsDeleted);
         output.WriteLine(JsonSerializer.Serialize(new { attachSucceeded = true, blobExists, liveEntries }));
-        Assert.Contains(file.Id.ToString(), deletedKeys);
-        Assert.True(blobExists || liveEntries == 0, "Attach succeeded with a live entry referencing a missing original.");
+        Assert.True(blobExists, "Attach succeeded with a live entry referencing a missing original.");
+        Assert.Equal(1, liveEntries);
+        Assert.True(waited, "Purge must wait for Attach to commit.");
+        Assert.DoesNotContain(file.Id.ToString(), deletedKeys);
+        Assert.Equal(0, result.Blobs);
     }
 
     [Fact]

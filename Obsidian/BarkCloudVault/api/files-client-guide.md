@@ -153,6 +153,8 @@ CLOUD_FILE = 2;   // обычный файл пользовательского 
 | `DeleteFileEntry` | `{ entry_id }` | `CloudEmpty` (сам файл не удаляется из облака сразу) |
 | `GetPath` | `{ directory_id }` **или** `{ entry_id }` (oneof) | `PathResponse { segments[PathSegment{id,name}], full_path }` |
 
+`RenameFileEntry` и `MoveFileEntry` работают только с живыми записями. Запись в корзине или физически удалённая запись даёт `FileEntryNotFound`, в том числе при запросе прежнего имени/расположения. Для записи корзины сначала выполните `RestoreFromTrash`.
+
 Типы:
 - `DirectoryInfo { id, parent_id, name, created_at, updated_at }`
 - `FileEntryInfo { id, directory_id, file_id, name, created_at }` — `id` это ID **записи** (entry), `file_id` — ID блоба.

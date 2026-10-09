@@ -40,6 +40,7 @@ public sealed class CloudDirectoryMigrationPostgresTests
             Name = "file.txt", CreatedAt = DateTime.UtcNow
         };
         context.CloudDirectories.AddRange(root, photos, child);
+        CloudFileEntryFixtures.AddOriginals(context, [entry]);
         context.CloudFileEntries.Add(entry);
         context.FolderShareLinks.Add(new FolderShareLink
         {
@@ -118,6 +119,7 @@ public sealed class CloudDirectoryMigrationPostgresTests
             CreatedAt = DateTime.UtcNow
         };
         context.CloudDirectories.AddRange(first, second, child);
+        CloudFileEntryFixtures.AddOriginals(context, [entry]);
         context.CloudFileEntries.Add(entry);
         context.FolderShareLinks.Add(share);
         context.DirectoryGrants.Add(grant);

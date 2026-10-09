@@ -7,6 +7,8 @@ using BarkCloud.Shared.Exceptions.Files;
 
 using MediatR;
 
+using Microsoft.EntityFrameworkCore;
+
 namespace BarkCloud.Files.Features.Cloud.RenameFileEntry;
 
 public class RenameFileEntryCommandHandler : IRequestHandler<RenameFileEntryCommand, CloudEmpty>
@@ -35,11 +37,16 @@ public class RenameFileEntryCommandHandler : IRequestHandler<RenameFileEntryComm
         if (string.IsNullOrWhiteSpace(newName))
             throw new DirectoryNameConflictException();
 
+        // Чтение записи и проверка имени должны видеть результат предыдущего удаления/переноса.
+        await using var treeLock = await _storage.LockTree(ownerId, cancellationToken);
+
         var entry = await _storage.GetFileEntry(request.EntryId, cancellationToken);
         if (entry is null)
             throw new FileEntryNotFoundException();
         if (entry.OwnerId != ownerId)
             throw new CloudAccessDeniedException();
+        if (entry.IsDeleted)
+            throw new FileEntryNotFoundException();
 
         if (entry.Name == newName)
             return new CloudEmpty();
@@ -49,7 +56,16 @@ public class RenameFileEntryCommandHandler : IRequestHandler<RenameFileEntryComm
 
         var oldName = entry.Name;
         entry.Name = newName;
-        await _storage.UpdateFileEntry(entry, cancellationToken);
+        try
+        {
+            await _storage.UpdateFileEntry(entry, cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            throw new FileEntryNotFoundException();
+        }
+
+        await treeLock.CommitAsync(cancellationToken);
 
         _logger.LogInformation("Переименована запись {EntryId} в {NewName}", entry.Id, newName);
 

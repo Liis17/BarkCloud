@@ -251,8 +251,12 @@ public sealed class CloudDirectoryUniquenessPostgresTests
         await using var database = await PostgresFilesDatabase.CreateAsync();
         await using var context = database.CreateContext();
         var storage = new CloudHierarchyStorage(context);
-        await storage.AddFileEntry(Entry(CloudHierarchyStorage.RootDirectoryId, "same.txt"));
-        context.CloudFileEntries.Add(Entry(CloudHierarchyStorage.RootDirectoryId, "same.txt"));
+        var first = Entry(CloudHierarchyStorage.RootDirectoryId, "same.txt");
+        CloudFileEntryFixtures.AddOriginals(context, [first]);
+        await storage.AddFileEntry(first);
+        var second = Entry(CloudHierarchyStorage.RootDirectoryId, "same.txt");
+        CloudFileEntryFixtures.AddOriginals(context, [second]);
+        context.CloudFileEntries.Add(second);
 
         var ensure = () => storage.EnsureSystemDirectory(OwnerId, CloudDirectorySystemKind.Photos, "Фото");
         var error = await ensure.Should().ThrowAsync<DbUpdateException>();
@@ -342,7 +346,9 @@ public sealed class CloudDirectoryUniquenessPostgresTests
         await using var scope = transaction ? await context.Database.BeginTransactionAsync() : null;
         var storage = new CloudHierarchyStorage(context);
         var id = await storage.EnsureSystemDirectory(OwnerId, CloudDirectorySystemKind.Photos, name);
-        await storage.AddFileEntry(Entry(id, $"{Guid.NewGuid():N}.txt"));
+        var entry = Entry(id, $"{Guid.NewGuid():N}.txt");
+        CloudFileEntryFixtures.AddOriginals(context, [entry]);
+        await storage.AddFileEntry(entry);
         if (scope is not null)
             await scope.CommitAsync();
         return id;
