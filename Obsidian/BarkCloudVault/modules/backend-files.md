@@ -15,6 +15,10 @@ Parent: [[index]] · See also: [[api/files-api]] · [[modules/upload-2]] · [[mo
 
 `Backend/BarkCloud.Files/`
 
+## Жизнь оригинала и облачные ссылки
+
+[[modules/files-original-lifetime]] — исправление F15: общая граница Attach/purge/DeleteUserMedia на owner/tree locks, стабильный порядок батчей, FK `CloudFileEntry → UploadFile` с `Restrict`, очистка старых битых записей и повтор удаления после ошибки S3. gRPC-контракты сохранены.
+
 ## Upload 2.0
 
 Web использует server-owned `UploadSession` и состояния `uploading → processing → ready | failed`; байты частей идут прямо в Files/S3, а enrichment выполняет RabbitMQ consumer через MassTransit Bus Outbox. Квота резервируется до multipart, resume сверяется с S3 `ListParts`, незавершённый `UploadFile` скрыт общим ready-предикатом (`UploadedAt` + `Etag`). Подробный протокол, recovery и карта файлов — [[modules/upload-2]].

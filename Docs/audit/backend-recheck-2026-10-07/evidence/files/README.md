@@ -6,6 +6,10 @@
 - [files-residuals.xml](files-residuals.xml) (TRX), [repro.txt](repro.txt): **3 failed / 3 total**, проверки ожидаемого корректного поведения воспроизводят F13/F15/F20. Ожидается exit code 1 до исправления.
 - [ResidualFilesTests.cs](ResidualFilesTests.cs), [Recheck.csproj](Recheck.csproj): переносимый исходник дополнительных проверок. ProjectReference/Compile используют пути относительно репозитория; строки подключения в файлах отсутствуют.
 
+## Обновление F15, 2026-10-08
+
+F15 исправлен. Его диагностический исходник адаптирован к общей границе: purge ждёт Attach, ожидание подтверждается `pg_locks`, затем барьер отпускается. Результат: `Entries=1`, `Blobs=0`, `deletedKeys=[]`, `waited=true`, `attachSucceeded=true`, `blobExists=true`, `liveEntries=1`; F15 проходит. Полный штатный Files-набор на рабочем дереве с F13/F15 — **619 passed, 0 failed, 0 skipped**. Проверено на PostgreSQL 18.6, `C.UTF-8`; S3 mock. Сохранённые результаты аудита 2026-10-07 ниже остаются историческими. Подробности — [F15.md](../../F15.md).
+
 ## Повторный запуск
 
 Запусти отдельный тестовый PostgreSQL и задай `BARKCLOUD_TEST_POSTGRES` через своё окружение. Учётная запись должна создавать и удалять временные БД. Приложение/очередь/S3 запускать не требуется.

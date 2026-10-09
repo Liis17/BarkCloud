@@ -64,18 +64,25 @@ public class TrashPurgeService : ITrashPurgeService
         if (entries.Count == 0)
             return default;
 
-        var entryIds = entries.Select(e => e.Id).ToList();
+        var entryIds = entries.Select(e => e.Id).Distinct().ToList();
         List<CloudFileEntry> purged;
         List<(long OwnerId, Guid FileId)> pairs;
 
         await using (var transaction = await _context.Database.BeginTransactionAsync(cancellationToken))
         {
+            // Та же граница, что у Attach/restore: чтение ссылок и освобождение владельца
+            // не могут вклиниться между проверкой оригинала и созданием новой записи.
+            await _context.LockCloudTreesAsync(entries.Select(e => e.OwnerId), cancellationToken);
+
             // 1. Gate: удаляем только то, что всё ещё в корзине (и, для воркера, всё ещё просрочено).
             //    Конкурирующее восстановление либо выполнилось раньше (условие не совпадёт), либо
             //    дождётся коммита и получит «записи нет».
             var gate = _context.CloudFileEntries.Where(e => entryIds.Contains(e.Id) && e.IsDeleted);
             if (expiredAt is { } cutoff)
                 gate = gate.Where(e => e.PurgeAt != null && e.PurgeAt <= cutoff);
+            var candidates = await gate.AsNoTracking().ToListAsync(cancellationToken);
+            if (candidates.Count == 0)
+                return default;
             await gate.ExecuteDeleteAsync(cancellationToken);
 
             // Реально удалены те записи, которых после gate больше нет в БД; оставшиеся
@@ -86,11 +93,14 @@ public class TrashPurgeService : ITrashPurgeService
                     .Select(e => e.Id)
                     .ToListAsync(cancellationToken))
                 .ToHashSet();
-            purged = entries.Where(e => !survivors.Contains(e.Id)).ToList();
+            purged = candidates.Where(e => !survivors.Contains(e.Id)).ToList();
             if (purged.Count == 0)
                 return default;
 
-            pairs = purged.Select(e => (e.OwnerId, e.FileId)).Distinct().ToList();
+            // UPDATE Uploaders тоже занимает строки: одинаковый порядок нужен даже у батчей
+            // разных владельцев, использующих одни и те же оригиналы.
+            pairs = purged.Select(e => (e.OwnerId, e.FileId)).Distinct()
+                .OrderBy(p => p.FileId).ThenBy(p => p.OwnerId).ToList();
 
             // 2. Снимаем владельца с блоба и чистим привязки (альбомы, избранное, публичные ссылки,
             //    гранты доступа) только у пар, у которых не осталось ни одной записи (любого
@@ -224,7 +234,8 @@ public class TrashPurgeService : ITrashPurgeService
         await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
 
         var claimed = await _context.UploadedFiles
-            .Where(f => f.Id == orphan.Id && f.Uploaders.Count == 0)
+            .Where(f => f.Id == orphan.Id && f.Uploaders.Count == 0
+                && !_context.CloudFileEntries.Any(e => e.FileId == f.Id))
             .ExecuteDeleteAsync(cancellationToken);
         if (claimed == 0)
             return false;

@@ -134,6 +134,7 @@ public sealed class GrantStorageTests : IDisposable
 
     private async Task Seed(params object[] entities)
     {
+        CloudFileEntryFixtures.AddOriginals(_database.Context, entities.OfType<CloudFileEntry>());
         _database.Context.AddRange(entities);
         await _database.Context.SaveChangesAsync();
     }

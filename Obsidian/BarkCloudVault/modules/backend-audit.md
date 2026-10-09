@@ -6,6 +6,8 @@ Parent: [[index]] · See also: [[structure/testing]] · [[modules/backend-identi
 
 **Текущий проверенный срез: `d6563a2160ca8e3b870c32871883aa6fa188b923`**, ветка master. **F02 закрыт; осталось 11 пунктов: 1 P1, 9 P2, 1 P3.** Текущий вывод заменяет прежние пометки по этим остаткам; история реализаций ниже сохранена отдельно.
 
+**Обновление 2026-10-08:** F15 исправлен в рабочем дереве master: общий owner/tree lock для Attach/purge/DeleteUserMedia, FK Restrict и очистка старых битых записей. Полный Files с параллельными изменениями F13 — 619/619, без пропусков; диагностический F15 также проходит. Подробности — [[modules/files-original-lifetime]]. Числа и доказательства ревизии 2026-10-07 ниже относятся к исходному срезу.
+
 ## Закрыто после прежнего отчёта
 
 **F02:** коммит `568e42b` задаёт MaxSessionId каждому отзываемому устройству. Штатный PostgreSQL regression `ResetPassword_StaleRefreshReadBeforeReset_IssuedAccessIsRevoked` прошёл: read старого refresh другого устройства до reset, подпись после commit в следующую секунду, загрузка feed → старый JWT отклонён, новый работает. Повторно исправлять не требуется. Синхронизация отзывов между сервисами остаётся асинхронной; это отдельная граница гарантии, не прежний F02.
@@ -13,7 +15,6 @@ Parent: [[index]] · See also: [[structure/testing]] · [[modules/backend-identi
 ## Оставшиеся этапы
 
 - **F13 · P1:** rename без LockTree и полный Update(entity) возвращают IsDeleted=false/старый DirectoryId после удаления папки. Новое PostgreSQL-воспроизведение подтвердило. Нужны согласованная граница rename/move/delete и узкая запись полей; одиночный DeleteFileEntry также не участвует в tree-lock.
-- **F15 · P2:** Attach не согласован с purge оригинала. PostgreSQL: Attach успешен, живая запись есть, UploadFile отсутствует; S3 Delete подтверждён mock. Нужно согласовать обе стороны до проверки последней ссылки и удаления блоба, учитывая общих владельцев и orphan cleanup.
 - **F17 · P2:** Web/Torrent files-upload сохраняют Timeout 100 с; legacy Web не передаёт RequestAborted. HttpClient probe подтвердил настройки, timeout и непереданную отмену. Приёмка — настоящая длинная передача и остановка upstream.
 - **F18 · P2:** два in-memory retry удерживают оба consumer-слота на 1270 с ожиданий. MassTransit 8.5.2 in-memory probe с текущими интервалами подтвердил блокировку третьего исправного сообщения. Нужна настроенная повторная доставка на реальном RabbitMQ с освобождением слотов.
 - **F19 · P2:** (A) изменение и INSERT PendingNotification раздельны; реальный SetPassword на PostgreSQL с отказом INSERT дал сохранённый пароль и 0 событий. Нужна атомарность локальных изменений и намерения уведомления. (B) SessionIssuer передаёт RegisterDevice без deadline/token; отменённый caller остаётся pending в управляемом gRPC-воспроизведении. Нужны конечный срок и отмена без долгой SQL-транзакции на RPC.

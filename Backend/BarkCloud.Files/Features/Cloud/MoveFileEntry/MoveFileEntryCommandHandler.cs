@@ -7,6 +7,8 @@ using BarkCloud.Shared.Exceptions.Files;
 
 using MediatR;
 
+using Microsoft.EntityFrameworkCore;
+
 using DirectoryNotFoundException = BarkCloud.Shared.Exceptions.Files.DirectoryNotFoundException;
 
 namespace BarkCloud.Files.Features.Cloud.MoveFileEntry;
@@ -43,6 +45,8 @@ public class MoveFileEntryCommandHandler : IRequestHandler<MoveFileEntryCommand,
             throw new FileEntryNotFoundException();
         if (entry.OwnerId != ownerId)
             throw new CloudAccessDeniedException();
+        if (entry.IsDeleted)
+            throw new FileEntryNotFoundException();
 
         Guid newStorageDirectoryId;
         if (request.NewDirectoryId.HasValue)
@@ -67,7 +71,15 @@ public class MoveFileEntryCommandHandler : IRequestHandler<MoveFileEntryCommand,
 
         var oldDirectoryId = entry.DirectoryId;
         entry.DirectoryId = newStorageDirectoryId;
-        await _storage.UpdateFileEntry(entry, cancellationToken);
+        try
+        {
+            await _storage.UpdateFileEntry(entry, cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            throw new FileEntryNotFoundException();
+        }
+
         await treeLock.CommitAsync(cancellationToken);
 
         _logger.LogInformation(

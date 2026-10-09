@@ -61,6 +61,7 @@ public sealed class FilePlaceholderPostgresTests
         await context.SaveChangesAsync();
         (await context.FilePlaceholders.CountAsync()).Should().Be(1, "корзина сохраняет цвета");
 
+        await context.CloudFileEntries.Where(e => e.FileId == file.Id).ExecuteDeleteAsync();
         await context.UploadedFiles.Where(f => f.Id == file.Id).ExecuteDeleteAsync();
         (await context.FilePlaceholders.CountAsync()).Should().Be(0);
     }

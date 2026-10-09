@@ -18,6 +18,7 @@ public sealed class CloudHierarchyStorageTests : IDisposable
         var deleted = Entry("deleted.txt", Guid.NewGuid(), isDeleted: true);
         var anotherOwner = Entry("other-owner.txt", Guid.NewGuid(), ownerId: 99);
 
+        CloudFileEntryFixtures.AddOriginals(_database.Context, [first, second, third, deleted, anotherOwner]);
         _database.Context.CloudFileEntries.AddRange(first, second, third, deleted, anotherOwner);
         await _database.Context.SaveChangesAsync();
 

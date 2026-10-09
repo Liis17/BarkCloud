@@ -203,6 +203,8 @@ namespace BarkCloud.Files.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("FileId");
+
                     b.HasIndex("PurgeAt")
                         .HasFilter("\"IsDeleted\" = true");
 
@@ -1285,6 +1287,15 @@ namespace BarkCloud.Files.Persistence.Migrations
                     b.HasIndex("Created");
 
                     b.ToTable("OutboxState");
+                });
+
+            modelBuilder.Entity("BarkCloud.Files.Domain.CloudFileEntry", b =>
+                {
+                    b.HasOne("BarkCloud.Files.Domain.UploadFile", null)
+                        .WithMany()
+                        .HasForeignKey("FileId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("BarkCloud.Files.Domain.FilePlaceholder", b =>

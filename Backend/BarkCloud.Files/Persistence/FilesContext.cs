@@ -137,6 +137,9 @@ public class FilesContext : DbContext
 
         modelBuilder.Entity<CloudFileEntry>(b =>
         {
+            b.HasOne<UploadFile>().WithMany().HasForeignKey(x => x.FileId)
+                .OnDelete(DeleteBehavior.Restrict);
+            b.HasIndex(x => x.FileId);
             // Уникальность имени файла-записи в рамках одной директории владельца.
             // Частичный индекс: записи в корзине (IsDeleted) исключаются, чтобы не блокировать
             // повторную загрузку файла с тем же именем.

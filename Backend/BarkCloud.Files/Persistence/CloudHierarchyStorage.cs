@@ -44,13 +44,7 @@ public class CloudHierarchyStorage : ICloudHierarchyStorage
         var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
         try
         {
-            if (_context.Database.ProviderName?.Contains("Npgsql", StringComparison.Ordinal) == true)
-            {
-                var key = $"cloud-tree:{ownerId}";
-                await _context.Database.ExecuteSqlInterpolatedAsync(
-                    $"SELECT pg_advisory_xact_lock(hashtextextended({key}, 0))",
-                    cancellationToken);
-            }
+            await _context.LockCloudTreesAsync([ownerId], cancellationToken);
         }
         catch
         {
@@ -329,7 +323,6 @@ public class CloudHierarchyStorage : ICloudHierarchyStorage
 
     public async Task UpdateFileEntry(CloudFileEntry entry, CancellationToken cancellationToken = default)
     {
-        _context.CloudFileEntries.Update(entry);
         await _context.SaveChangesAsync(cancellationToken);
     }
 
