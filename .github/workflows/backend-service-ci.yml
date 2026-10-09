@@ -9,7 +9,9 @@ on:
       service-key:
         required: true
         type: string
-      service-path:
+      # Пути, правка которых пересобирает образ: по одному glob на строку.
+      # Совпадают с on.push.paths вызывающего воркфлоу за вычетом тестов
+      runtime-paths:
         required: true
         type: string
       test-path:
@@ -37,6 +39,12 @@ on:
         required: false
         type: boolean
         default: false
+      # Пауза (сек) между сборкой и отправкой образа: у каждого сервиса своя,
+      # чтобы одновременно запущенные сборки не пушили в реестр разом
+      push-delay:
+        required: false
+        type: number
+        default: 0
     secrets:
       TELEGRAM_BOT_TOKEN:
         required: true
@@ -49,7 +57,6 @@ on:
 
 permissions:
   contents: read
-  actions: write
 
 concurrency:
   group: barkcloud-image-${{ inputs.image-name }}-${{ github.ref_name }}
@@ -65,21 +72,32 @@ jobs:
       should_test: ${{ steps.decide.outputs.should_test }}
       should_build: ${{ steps.decide.outputs.should_build }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+
+      - name: "Фильтры путей"
+        id: paths
+        env:
+          RUNTIME_PATHS: ${{ inputs.runtime-paths }}
+          TEST_PATH: ${{ inputs.test-path }}
+        run: |
+          {
+            echo 'filters<<EOF'
+            echo 'runtime:'
+            while IFS= read -r path; do
+              if [ -n "$path" ]; then echo "  - '$path'"; fi
+            done <<< "$RUNTIME_PATHS"
+            echo 'tests:'
+            if [ -n "$TEST_PATH" ]; then echo "  - '$TEST_PATH/**'"; fi
+            echo "  - 'Tests/BarkCloud.TestKit/**'"
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
 
       - uses: dorny/paths-filter@v4
         id: filter
         with:
-          filters: |
-            runtime:
-              - '${{ inputs.service-path }}/**'
-              - 'Shared/**'
-              - 'Backend/rebuild.trigger'
-            tests:
-              - '${{ inputs.test-path }}/**'
-              - 'Tests/BarkCloud.TestKit/**'
+          filters: ${{ steps.paths.outputs.filters }}
 
       - name: "Решение о запуске"
         id: decide
@@ -101,45 +119,10 @@ jobs:
           echo "should_test=${should_test}" >> "$GITHUB_OUTPUT"
           echo "should_build=${should_build}" >> "$GITHUB_OUTPUT"
 
-  check_dotnet:
-    name: "Проверка .NET 10.0 SDK"
-    needs: changes
-    if: ${{ needs.changes.outputs.should_test == 'true' }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: "Проверка наличия .NET 10.0 SDK"
-        id: check
-        run: |
-          if ! dotnet --list-sdks 2>/dev/null | grep -q "^10\."; then
-            echo "missing=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "missing=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: "Уведомление: .NET 10.0 SDK не установлен"
-        if: ${{ steps.check.outputs.missing == 'true' }}
-        env:
-          TG_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TG_CHAT: ${{ secrets.TELEGRAM_CHANNEL_ID }}
-          TG_ACTION_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          TG_MESSAGE: |
-            ❌ *Сборка невозможна: .NET 10.0 SDK не установлен на раннере*
-
-            🐳 *${{ inputs.service-name }}*
-            📌 Ветка: `${{ github.ref_name }}`
-            👤 Автор: *${{ github.actor }}*
-        run: |
-          bash .github/scripts/send-telegram.sh
-          exit 1
-
   test:
     name: "Тесты ${{ inputs.service-name }}"
-    needs:
-      - changes
-      - check_dotnet
-    if: ${{ needs.changes.outputs.should_test == 'true' && needs.check_dotnet.result == 'success' }}
+    needs: changes
+    if: ${{ needs.changes.outputs.should_test == 'true' }}
     runs-on: ubuntu-latest
     env:
       BARKCLOUD_TEST_POSTGRES: ${{ (inputs.service-key == 'users' || inputs.service-key == 'files') && 'Host=127.0.0.1;Port=5432;Database=postgres;Username=postgres;Password=postgres' || '' }}
@@ -158,7 +141,11 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
 
       - name: "Test"
         id: test
@@ -166,7 +153,7 @@ jobs:
 
       - name: "Upload test results"
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-results-${{ inputs.service-key }}
           path: TestResults/**
@@ -194,11 +181,15 @@ jobs:
     if: ${{ !cancelled() && needs.changes.result == 'success' && needs.changes.outputs.should_build == 'true' && needs.test.result != 'failure' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
 
       - name: "Установка Node.js 22"
         if: ${{ inputs.web-client-directory != '' }}
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 22
 
@@ -218,14 +209,20 @@ jobs:
           mkdir -p ./publish/logs
 
       - name: "Login to Private Registry"
-        uses: docker/login-action@v2
-        with:
-          registry: docker.barkfluff.com
-          username: ${{ secrets.REGISTRY_USERNAME }}
-          password: ${{ secrets.REGISTRY_PASSWORD }}
+        env:
+          REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+          REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+        run: |
+          attempt=1
+          until printf '%s' "$REGISTRY_PASSWORD" | docker login docker.barkfluff.com -u "$REGISTRY_USERNAME" --password-stdin; do
+            [ "$attempt" -gt 3 ] && exit 1
+            echo "Повтор входа в реестр через 15 с ($attempt/3)"
+            sleep 15
+            attempt=$((attempt + 1))
+          done
 
       - name: "Set up Docker Buildx"
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v4
 
       - name: "Вычисление SemVer Docker-образа"
         id: docker-version
@@ -236,13 +233,35 @@ jobs:
           username: ${{ secrets.REGISTRY_USERNAME }}
           password: ${{ secrets.REGISTRY_PASSWORD }}
 
-      - name: "Build and Push Docker image"
-        uses: docker/build-push-action@v4
+      - name: "Build Docker image"
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: ./${{ inputs.dockerfile }}
-          push: true
+          load: true
           tags: ${{ steps.docker-version.outputs.tags }}
+
+      - name: "Пауза перед отправкой (${{ inputs.push-delay }} с)"
+        if: ${{ inputs.push-delay > 0 }}
+        run: sleep ${{ inputs.push-delay }}
+
+      - name: "Push Docker image"
+        env:
+          TAGS: ${{ steps.docker-version.outputs.tags }}
+        run: |
+          for tag in ${TAGS//,/ }; do
+            attempt=1
+            until docker push "$tag"; do
+              [ "$attempt" -gt 3 ] && exit 1
+              echo "Повтор отправки $tag через 15 с ($attempt/3)"
+              sleep 15
+              attempt=$((attempt + 1))
+            done
+          done
+
+      - name: "Logout from Private Registry"
+        if: always()
+        run: docker logout docker.barkfluff.com || true
 
       - name: "Уведомление: сборка готова"
         if: success()

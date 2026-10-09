@@ -6,19 +6,22 @@ on:
       - dev
       - nightly
       - master
+    # Proto-контракты — не весь BarkCloud.Proto, а только свои + компилируемые в GrpcServer
+    # (configuration_api, session_revocation_api) → правка одного .proto не пересобирает весь бэкенд.
+    # Те же пути без тестов передаются ниже в runtime-paths — меняй оба списка вместе.
     paths:
       - 'Backend/BarkCloud.Notification/**'
-      - 'Shared/**'
-      # proto: Notification его не использует — исключаем весь BarkCloud.Proto
-      - '!Shared/BarkCloud.Proto/**'
+      - 'Backend/BarkCloud.GrpcServer/**'
+      - 'Shared/BarkCloud.Shared.*/**'
+      - 'Shared/BarkCloud.Proto/configuration_api.proto'
+      - 'Shared/BarkCloud.Proto/session_revocation_api.proto'
+      - 'Backend/rebuild.trigger'
       - 'Tests/Backend/BarkCloud.Notification.Tests/**'
       - 'Tests/BarkCloud.TestKit/**'
-      - 'Backend/rebuild.trigger'
   workflow_dispatch:
 
 permissions:
   contents: read
-  actions: write
 
 jobs:
   ci:
@@ -26,11 +29,18 @@ jobs:
     with:
       service-name: BarkCloud.Notification
       service-key: notification
-      service-path: Backend/BarkCloud.Notification
+      runtime-paths: |
+        Backend/BarkCloud.Notification/**
+        Backend/BarkCloud.GrpcServer/**
+        Shared/BarkCloud.Shared.*/**
+        Shared/BarkCloud.Proto/configuration_api.proto
+        Shared/BarkCloud.Proto/session_revocation_api.proto
+        Backend/rebuild.trigger
       test-path: Tests/Backend/BarkCloud.Notification.Tests
       project-path: Backend/BarkCloud.Notification/BarkCloud.Notification.csproj
       test-project-path: Tests/Backend/BarkCloud.Notification.Tests/BarkCloud.Notification.Tests.csproj
       dockerfile: Backend/BarkCloud.Notification/Dockerfile.slim
       image-name: barkcloud-notification
       force-run: ${{ github.event_name == 'workflow_dispatch' }}
+      push-delay: 60
     secrets: inherit
