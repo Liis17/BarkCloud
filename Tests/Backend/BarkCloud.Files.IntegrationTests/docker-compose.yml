@@ -1,0 +1,33 @@
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "127.0.0.1:55418:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+  rabbitmq:
+    # Match the production compose policy and record the actual version in test output.
+    image: rabbitmq:latest
+    environment:
+      RABBITMQ_DEFAULT_USER: integration
+      RABBITMQ_DEFAULT_PASS: integration
+    ports:
+      - "127.0.0.1:56718:5672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+volumes:
+  postgres-data:
+  rabbitmq-data:

@@ -23,6 +23,7 @@
   <Folder Name="/Tests/Backend/">
     <Project Path="Tests/Backend/BarkCloud.Configuration.Tests/BarkCloud.Configuration.Tests.csproj" />
     <Project Path="Tests/Backend/BarkCloud.Files.Tests/BarkCloud.Files.Tests.csproj" />
+    <Project Path="Tests/Backend/BarkCloud.Files.IntegrationTests/BarkCloud.Files.IntegrationTests.csproj" />
     <Project Path="Tests/Backend/BarkCloud.GrpcServer.Tests/BarkCloud.GrpcServer.Tests.csproj" />
     <Project Path="Tests/Backend/BarkCloud.Identity.Tests/BarkCloud.Identity.Tests.csproj" />
     <Project Path="Tests/Backend/BarkCloud.Identity.IntegrationTests/BarkCloud.Identity.IntegrationTests.csproj" />
