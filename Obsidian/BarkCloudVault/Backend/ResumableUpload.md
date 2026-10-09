@@ -42,3 +42,32 @@ Web предоставляет соответствующие маршруты: 
 ## Зависимости и взаимодействия
 
 `UploadSessionCoordinator` использует `IMultipartUploadStore`, `StorageQuotaService`, `S3BucketRegistry` и состояние из PostgreSQL. Завершение сессии публикует `ProcessUploadedFile` через MassTransit; `UploadSessionProcessor` вызывает файловый pipeline, после чего обновляет статус и готовность `UploadFile`.
+
+## Повторы и конечные исходы обработки
+
+Контракт `ProcessUploadedFile(Guid SessionId)` остаётся в
+`Shared/BarkCloud.Shared.Queue/Files/ProcessUploadedFile.cs`. Complete публикует его
+через EF bus outbox вместе с переходом сессии в `Processing`. Обработка S3/ffmpeg не
+удерживает EF-транзакцию; короткая транзакция фиксирует готовность после pipeline.
+
+Общий endpoint `UploadProcessingQueue.ConfigureUploadProcessing` сохраняет
+`ConcurrentMessageLimit = 2`. Локальных in-memory retry нет. Четыре scheduled redelivery
+через Quartz выполняются с интервалами **10 секунд, 1, 5 и 15 минут**: первая обработка
+и четыре повторные доставки дают максимум пять попыток. Ожидание хранится в PostgreSQL
+`FilesDb.files_quartz`, consumer-слоты освобождаются. Расписание и номер redelivery
+сохраняются при рестартах Files/RabbitMQ с сохранёнными данными. Отдельные транспортные
+повторы отправки через 30 секунд не меняют номер redelivery или `ProcessingAttempts`.
+
+`UploadSessionProcessor` завершает integrity failure сразу как `Failed` с
+`integrity_mismatch`. Постоянная ошибка pipeline на пятой processing-попытке даёт
+`Failed`, `processing_retries_exhausted`, освобождение резерва и cleanup. Возвращённый
+`UploadProcessingOutcome.Failed` успешно завершает Consume и не вызывает redelivery.
+Повторная доставка готовой сессии даёт `Ready → NoOp`, без повторного pipeline и записи
+успеха. Cancellation по токену consumer пробрасывается без фиксации незавершённой
+processing-попытки; пауза миграции хранилища не увеличивает `ProcessingAttempts`.
+
+Необработанное исключение после четырёх redelivery уходит в стандартную очередь
+`process-uploaded-file_error` и публикует `Fault<ProcessUploadedFile>`. Дополнительного
+Fault-consumer нет; сессия может оставаться `Processing` до ручного разбирательства.
+Интерфейсы эксплуатации дополнены таблицами Quartz и
+`files-upload-scheduler_error`. См. [[Platform/Infrastructure]] и [[Platform/Testing]].
