@@ -11,6 +11,7 @@ using BarkCloud.Identity.Settings;
 using BarkCloud.Proto.Identity;
 using BarkCloud.Proto.Users;
 using BarkCloud.Shared.Exceptions.Identity;
+using BarkCloud.Shared.Queue.Notifications;
 using BarkCloud.Shared.Identity;
 
 using MassTransit;
@@ -45,6 +46,8 @@ public class ResetPasswordTests
         await FluentActions.Awaiting(() => CreateHandler(context).Handle(Command(reset.Id), cancellation.Token))
             .Should().ThrowAsync<OperationCanceledException>();
 
+        await context.SaveChangesAsync();
+
         await using var reader = database.CreateContext();
         (await new ResetPasswordsStorage(reader).GetResetPassword(reset.Id))!.IsApproved.Should().BeFalse();
         PasswordHasher.VerifyPassword("old-password", await new PasswordsStorage(reader).GetUserPasswordHash(42))
@@ -52,6 +55,7 @@ public class ResetPasswordTests
         (await new RefreshTokensStorage(reader, new JwtSettings()).GetRefreshTokens(42)).Select(x => x.Value)
             .Should().BeEquivalentTo("old-current", "old-other");
         (await reader.RevokedSessions.AnyAsync()).Should().BeFalse();
+        (await reader.PendingNotifications.AnyAsync()).Should().BeFalse();
     }
 
     [Fact]
@@ -96,23 +100,15 @@ public class ResetPasswordTests
         await using var beforeReset = database.CreateContext();
         var oldIds = (await new RefreshTokensStorage(beforeReset, new JwtSettings()).GetRefreshTokens(42))
             .ToDictionary(x => x.Value, x => x.Id);
-        var committedBeforeNotification = false;
-        var handler = CreateHandler(context, async () =>
-        {
-            await using var observer = database.CreateContext();
-            committedBeforeNotification = (await new ResetPasswordsStorage(observer).GetResetPassword(reset.Id))!.IsApproved;
-            throw new InvalidOperationException("notification unavailable");
-        });
+        var response = await CreateHandler(context).Handle(Command(reset.Id, revoke), default);
 
-        var response = await handler.Handle(Command(reset.Id, revoke), default);
-
-        committedBeforeNotification.Should().BeTrue();
         await using var reader = database.CreateContext();
         PasswordHasher.VerifyPassword("new-password", await new PasswordsStorage(reader).GetUserPasswordHash(42))
             .Should().BeTrue();
         var tokens = await new RefreshTokensStorage(reader, new JwtSettings()).GetRefreshTokens(42);
         tokens.Should().Contain(t => t.Value == response.RefreshToken.Value && t.DeviceId == "current");
         tokens.Count.Should().Be(revoke ? 1 : 3);
+        (await reader.PendingNotifications.SingleAsync()).Type.Should().Be(NotificationType.PasswordChanged);
         var revoked = await reader.RevokedSessions.ToListAsync();
         if (revoke)
         {
@@ -285,8 +281,7 @@ public class ResetPasswordTests
         ResetId = resetId, OtpCode = "123456", NewPassword = "new-password", RevokeOtherSessions = revoke
     };
 
-    internal static ConfirmResetPasswordCommandHandler CreateHandler(IdentityContext context, Func<Task>? notify = null,
-        JwtService? jwt = null)
+    internal static ConfirmResetPasswordCommandHandler CreateHandler(IdentityContext context, JwtService? jwt = null)
     {
         var metrics = new MetricsCollector();
         var refreshTokens = new RefreshTokensStorage(context, new JwtSettings { ExpiryMinutes = 60 });
@@ -307,11 +302,12 @@ public class ResetPasswordTests
             mediator.Setup(m => m.Send(It.IsAny<CreateTokenCommand>(), It.IsAny<CancellationToken>()))
                 .Returns((CreateTokenCommand command, CancellationToken token) => createToken.Handle(command, token));
         }
-        var notifier = new Mock<PasswordChangedNotifier>(Mock.Of<INotificationOutbox>(), request);
-        notifier.Setup(n => n.NotifyAsync(It.IsAny<long>())).Returns(() => notify?.Invoke() ?? Task.CompletedTask);
+        var outbox = new NotificationOutbox(context, new ConfigurationBuilder().Build(), metrics,
+            NullLogger<NotificationOutbox>.Instance);
+        var notifier = new PasswordChangedNotifier(outbox, request);
         return new ConfirmResetPasswordCommandHandler(new ResetPasswordsStorage(context), new AuthPropertiesStorage(context),
             new PasswordsStorage(context), refreshTokens,
-            mediator.Object, notifier.Object, request, metrics,
+            mediator.Object, notifier, request, metrics,
             new AuthRateLimiter(new AttemptCountersStorage(context), request, NullLogger<AuthRateLimiter>.Instance),
             NullLogger<ConfirmResetPasswordCommandHandler>.Instance, context);
     }

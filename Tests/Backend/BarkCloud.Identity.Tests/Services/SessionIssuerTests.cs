@@ -81,8 +81,8 @@ public class SessionIssuerTests
     {
         string? deviceId = null;
         _refreshTokens
-            .Setup(s => s.CreateNewRefreshToken(It.IsAny<string>(), 7, It.IsAny<string>(), It.IsAny<int>()))
-            .Callback<string, long, string, int>((_, _, device, _) => deviceId = device);
+            .Setup(s => s.CreateNewRefreshToken(It.IsAny<string>(), 7, It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .Callback<string, long, string, int, CancellationToken>((_, _, device, _, _) => deviceId = device);
 
         await CreateSut(Context(deviceId: null)).IssueAsync(7, default);
 

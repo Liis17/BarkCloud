@@ -35,13 +35,16 @@ public class CreateTokenCommandHandler(IRefreshTokensStorage refreshTokensStorag
 
         var token = jwtService.GenerateUserToken(accessToken.UserId, accessToken.DeviceId, accessToken.Id);
 
-        metrics.Increment("tokens_refreshed");
+        if (!request.DeferSuccessTelemetry)
+        {
+            metrics.Increment("tokens_refreshed");
 
-        logger.LogInformation(
-            "Access token успешно обновлен для пользователя {UserId}, устройство: {DeviceId}",
-            accessToken.UserId,
-            accessToken.DeviceId
-        );
+            logger.LogInformation(
+                "Access token успешно обновлен для пользователя {UserId}, устройство: {DeviceId}",
+                accessToken.UserId,
+                accessToken.DeviceId
+            );
+        }
 
         return new CreateTokenResponse { AccessToken = token, };
     }
