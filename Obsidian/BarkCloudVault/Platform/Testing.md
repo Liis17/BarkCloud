@@ -30,6 +30,7 @@ Parent: [[Architecture]] · See also: [[Web/WebApp]] · [[Backend/Files]] · [[B
 
 - Workflow `tests.yml` запускается для pull request в `dev`, `nightly` и `master`, а также вручную. Изменения в Shared запускают backend-проекты; тесты сервисов выбираются по путям их кода и тестов.
 - В CI Files и Users получают PostgreSQL 18 и `BARKCLOUD_TEST_POSTGRES`. Интеграционный workflow Users также запускает RabbitMQ и передаёт `BARKCLOUD_TEST_RABBITMQ`.
+- PostgreSQL и RabbitMQ в CI запускает composite action `.github/actions/test-containers` (скрипт `.github/scripts/start-test-containers.sh`: `postgres:18`, `rabbitmq:4.1`), а не `services:` — так `docker pull` повторяется до 5 раз с паузой 20 с × номер попытки: Docker Hub отдаёт таймауты и `toomanyrequests`. Образов `postgres`/`rabbitmq` в `docker.barkfluff.com` нет, поэтому логин `REGISTRY_*` для них не помогает.
 - Тесты сервиса запускаются и при изменении `Backend/BarkCloud.GrpcServer/**` — это общий хост всех сервисов. SDK во всех .NET-джобах ставится через `actions/setup-dotnet`.
 - Сборка backend-образа в `backend-service-ci.yml` зависит от успешного test job. Входы `runtime-paths` (тот же список путей, что `on.push.paths` вызывающего `build-backend-*.yml`) и `push-delay` определяют реакцию на изменения и паузу перед `docker buildx build --push`.
 - Образ собирается без отправки (слои остаются в кэше buildkit-билдера джобы), затем после паузы `push-delay` workflow запускает `docker buildx build --push` для всех тегов. Вход в реестр, команда отправки и опрос тегов повторяются до 3 раз через 15 с; конфигурация описывает попытки, а результат конкретной публикации виден в run workflow. `push-delay` растёт на 15 с по порядку файлов `build-backend-*.yml` (configuration 15 … web 105), чтобы одновременные сборки не пушили в реестр разом; новому сервису — следующее значение.
@@ -40,7 +41,7 @@ Parent: [[Architecture]] · See also: [[Web/WebApp]] · [[Backend/Files]] · [[B
 
 ## Ограничения и важные детали
 
-PostgreSQL-сценарии зависят от отдельной тестовой базы и настройки `BARKCLOUD_TEST_POSTGRES`. В локальном запуске следует передавать строку подключения только к тестовому PostgreSQL; workflow предоставляет её через сервисный контейнер.
+PostgreSQL-сценарии зависят от отдельной тестовой базы и настройки `BARKCLOUD_TEST_POSTGRES`. В локальном запуске следует передавать строку подключения только к тестовому PostgreSQL; workflow предоставляет её через контейнер `test-postgres`.
 
 ## Files: durable upload redelivery
 
@@ -75,7 +76,7 @@ host. Это отдельная проверка от обычного восс�
 последний ждёт успешной интеграционной проверки перед публикацией. Ручной запуск
 workflow с `production-intervals` включает полный приёмочный сценарий.
 
-`run-f18.sh` требует Docker Compose и .NET 10. Для проверки версии RabbitMQ он запускает
+`run-f18.sh` требует Docker Compose и .NET 10. Перед `up --wait` он повторяет `docker compose pull` до 5 раз. Для проверки версии RabbitMQ он запускает
 `rabbitmqctl version` через `docker compose exec -T --user rabbitmq`; root entrypoint образа
 сохраняется для штатной настройки прав. Healthcheck вызывает `rabbitmq-diagnostics -q ping`
 от пользователя `rabbitmq` через `gosu`. EXIT trap установлен до `up --wait`: при любом
