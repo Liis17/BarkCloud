@@ -130,16 +130,28 @@ public class AuthCommandHandler(UsersServerApi.UsersServerApiClient usersClient,
             }
 
             // Письмо уходит через outbox: ни Users, ни геолокация не задерживают отказ и не меняют его результат.
-            await notificationOutbox.EnqueueAsync(
-                user.User.Id,
-                NotificationType.FailedLogin,
-                "Неуспешная попытка входа в аккаунт",
-                NotificationPayload.Device(requestContext));
+            try
+            {
+                var notificationEnqueued = await notificationOutbox.EnqueueAsync(
+                    user.User.Id,
+                    NotificationType.FailedLogin,
+                    "Неуспешная попытка входа в аккаунт",
+                    NotificationPayload.Device(requestContext));
+                if (notificationEnqueued)
+                {
+                    metrics.Increment("notification_outbox_enqueued");
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Не удалось поставить в outbox уведомление о неудачном входе для пользователя {UserId}",
+                    user.User.Id);
+            }
 
             throw new InvalidLoginOrPasswordException();
         }
 
-        var optOptions = await authPropertiesStorage.GetUserAuthProperties(user.User.Id);
+        var optOptions = await authPropertiesStorage.GetUserAuthProperties(user.User.Id, cancellationToken);
 
         if (optOptions != null && (optOptions.EmailOtpEnabled || optOptions.OtpEnabled) && string.IsNullOrEmpty(request.OtpCode))
         {
@@ -158,7 +170,8 @@ public class AuthCommandHandler(UsersServerApi.UsersServerApiClient usersClient,
                 var code = CodeGenerator.GenerateDigitalCode(6);
 
                 // false — прежний код выдан совсем недавно и остаётся в силе: письмо не отправляем.
-                if (await authPropertiesStorage.TryIssueEmailAuthCode(userContactInfo.User.Id, EmailAuthCodePurpose.Login, code))
+                if (await authPropertiesStorage.TryIssueEmailAuthCode(userContactInfo.User.Id, EmailAuthCodePurpose.Login, code,
+                        cancellationToken))
                 {
                     // Получаем данные о местоположении IP-адреса
                     var locationInfo = await locationClient.GetLocationString(requestContext.IpAddress);
@@ -222,15 +235,16 @@ public class AuthCommandHandler(UsersServerApi.UsersServerApiClient usersClient,
                 throw new NotValidOtpCodeException();
             }
 
-            metrics.Increment("otp_authenticator_verified");
-            logger.LogDebug("TOTP код успешно проверен для пользователя {UserId}", user.User.Id);
         }
 
+        ValidatedEmailAuthCode? validatedEmailCode = null;
         if (optOptions is { OtpEnabled: false, EmailOtpEnabled: true })
         {
             logger.LogDebug("Проверка Email OTP кода для пользователя {UserId}", user.User.Id);
 
-            if (!await authPropertiesStorage.TryConsumeEmailAuthCode(user.User.Id, EmailAuthCodePurpose.Login, request.OtpCode))
+            validatedEmailCode = await authPropertiesStorage.TryValidateAndReserveEmailAuthCode(
+                user.User.Id, EmailAuthCodePurpose.Login, request.OtpCode, cancellationToken);
+            if (validatedEmailCode is null)
             {
                 metrics.Increment("auth_login_failed");
                 metrics.Increment("otp_email_failed");
@@ -242,11 +256,30 @@ public class AuthCommandHandler(UsersServerApi.UsersServerApiClient usersClient,
                 throw new NotValidOtpCodeException();
             }
 
+        }
+
+        var response = await sessionIssuer.IssueAsync(user.User.Id, cancellationToken, async transactionToken =>
+        {
+            if (validatedEmailCode is not null
+                && !await authPropertiesStorage.TryConsumeValidatedEmailAuthCode(validatedEmailCode, transactionToken))
+            {
+                throw new NotValidOtpCodeException();
+            }
+
+            await rateLimiter.ResetAsync(AuthLimits.LoginByAccount, accountKey, transactionToken);
+        });
+
+        if (optOptions is { OtpEnabled: true })
+        {
+            metrics.Increment("otp_authenticator_verified");
+            logger.LogDebug("TOTP код успешно проверен для пользователя {UserId}", user.User.Id);
+        }
+
+        if (validatedEmailCode is not null)
+        {
             metrics.Increment("otp_email_verified");
             logger.LogDebug("Email OTP код успешно проверен для пользователя {UserId}", user.User.Id);
         }
-
-        await rateLimiter.ResetAsync(AuthLimits.LoginByAccount, accountKey);
 
         logger.LogInformation(
             "Успешная аутентификация пользователя {UserId} ({Login}) с устройства {DeviceName}, IP: {IpAddress}",
@@ -256,6 +289,6 @@ public class AuthCommandHandler(UsersServerApi.UsersServerApiClient usersClient,
             requestContext.IpAddress
         );
 
-        return await sessionIssuer.IssueAsync(user.User.Id, cancellationToken);
+        return response;
     }
 }

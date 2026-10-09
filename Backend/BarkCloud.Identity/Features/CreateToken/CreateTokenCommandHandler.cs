@@ -16,7 +16,7 @@ public class CreateTokenCommandHandler(IRefreshTokensStorage refreshTokensStorag
     {
         logger.LogDebug("Запрос на обновление токена");
 
-        var accessToken = await refreshTokensStorage.FindRefreshToken(request.RefreshToken);
+        var accessToken = await refreshTokensStorage.FindRefreshToken(request.RefreshToken, cancellationToken);
 
         if (accessToken == null
             || accessToken.ExpiresAt < DateTime.UtcNow

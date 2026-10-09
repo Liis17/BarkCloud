@@ -86,6 +86,13 @@ public class OutboxAtomicityTests
         await using (var setup = database.CreateContext())
         {
             await new PasswordsStorage(setup).UpdateUserPasswordHash(42, PasswordHasher.HashPassword("old-password"));
+            setup.AuthUserProperties.Add(new AuthUserProperty
+            {
+                UserId = 42,
+                ReauthPasswordAttempts = 1,
+                ReauthPasswordWindowEndsAt = DateTime.UtcNow.AddMinutes(15)
+            });
+            await setup.SaveChangesAsync();
         }
 
         await using var context = database.CreateContext();
@@ -194,6 +201,13 @@ public class OutboxAtomicityTests
         await using (var setup = database.CreateContext())
         {
             await new PasswordsStorage(setup).UpdateUserPasswordHash(42, PasswordHasher.HashPassword("old-password"));
+            setup.AuthUserProperties.Add(new AuthUserProperty
+            {
+                UserId = 42,
+                ReauthPasswordAttempts = 1,
+                ReauthPasswordWindowEndsAt = DateTime.UtcNow.AddMinutes(15)
+            });
+            await setup.SaveChangesAsync();
         }
 
         using var cancellation = new CancellationTokenSource();

@@ -5,11 +5,13 @@ using BarkCloud.GrpcServer.Metrics;
 using BarkCloud.GrpcServer.Tracker;
 using BarkCloud.Identity.Features.CreateToken;
 using BarkCloud.Identity.Infrastructure;
+using BarkCloud.Identity.Persistence.Contexts;
 using BarkCloud.Identity.Persistence.Services;
 using BarkCloud.Identity.Services;
 using BarkCloud.Proto.Identity;
 using BarkCloud.Proto.Users;
 using BarkCloud.Shared.Queue.Notifications;
+using BarkCloud.Identity.Tests._Helpers;
 using BarkCloud.TestKit;
 
 using Grpc.Core;
@@ -20,7 +22,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace BarkCloud.Identity.Tests.Services;
 
-public class SessionIssuerTests
+public class SessionIssuerTests : IDisposable
 {
     private readonly Mock<UsersServerApi.UsersServerApiClient> _users = new();
     private readonly Mock<IMediator> _mediator = new();
@@ -28,6 +30,9 @@ public class SessionIssuerTests
     private readonly Mock<IRefreshTokensStorage> _refreshTokens = new();
     private readonly Mock<LocationClient> _location;
     private readonly MetricsCollector _metrics = new();
+    private readonly SqliteIdentityContext _database = new();
+
+    public void Dispose() => _database.Dispose();
 
     public SessionIssuerTests()
     {
@@ -51,7 +56,7 @@ public class SessionIssuerTests
 
     private SessionIssuer CreateSut(RequestContext? context = null, LocationClient? location = null) => new(
         _users.Object, _mediator.Object, _outbox.Object, _refreshTokens.Object,
-        context ?? Context(), location ?? _location.Object, _metrics, NullLogger<SessionIssuer>.Instance);
+        _database.Context, context ?? Context(), location ?? _location.Object, _metrics, NullLogger<SessionIssuer>.Instance);
 
     [Fact]
     public async Task IssueAsync_FromRequest_CreatesTokensRegistersDeviceAndEnqueuesLoginMail()

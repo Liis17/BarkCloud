@@ -32,7 +32,7 @@ public class CompleteWebAuthnAssertionCommandHandler(
             throw new WebAuthnChallengeExpiredException();
         }
 
-        var challenge = await webAuthnStorage.GetChallenge(challengeId);
+        var challenge = await webAuthnStorage.GetChallenge(challengeId, cancellationToken);
 
         if (challenge is null || challenge.Type != WebAuthnChallengeType.Assertion)
         {
@@ -63,7 +63,7 @@ public class CompleteWebAuthnAssertionCommandHandler(
         }
 
         // Passwordless: пользователь определяется самим ключом (challenge не привязан к userId).
-        var credential = await webAuthnStorage.GetCredentialByCredentialId(assertion.RawId);
+        var credential = await webAuthnStorage.GetCredentialByCredentialId(assertion.RawId, cancellationToken);
         if (credential is null)
         {
             throw new WebAuthnVerificationFailedException();
@@ -80,13 +80,13 @@ public class CompleteWebAuthnAssertionCommandHandler(
                 StoredSignatureCounter = (uint)credential.SignatureCounter,
                 IsUserHandleOwnerOfCredentialIdCallback = async (args, ct) =>
                 {
-                    var ownerUserId = await webAuthnStorage.GetUserIdByUserHandle(args.UserHandle);
+                    var ownerUserId = await webAuthnStorage.GetUserIdByUserHandle(args.UserHandle, ct);
                     if (ownerUserId is null)
                     {
                         return false;
                     }
 
-                    var owned = await webAuthnStorage.GetCredentialByCredentialId(args.CredentialId);
+                    var owned = await webAuthnStorage.GetCredentialByCredentialId(args.CredentialId, ct);
                     return owned is not null && owned.UserId == ownerUserId;
                 }
             }, cancellationToken);
@@ -97,13 +97,23 @@ public class CompleteWebAuthnAssertionCommandHandler(
             throw new WebAuthnVerificationFailedException();
         }
 
-        await webAuthnStorage.UpdateCounter(credential.Id, result.SignCount);
-        await webAuthnStorage.DeleteChallenge(challengeId);
+        var response = await sessionIssuer.IssueAsync(credential.UserId, cancellationToken, async transactionToken =>
+        {
+            if (!await webAuthnStorage.TryConsumeAssertionChallenge(challengeId, challenge.ExpiresAt, transactionToken))
+            {
+                throw new WebAuthnChallengeExpiredException();
+            }
+
+            if (!await webAuthnStorage.TryUpdateCounter(credential.Id, credential.SignatureCounter,
+                    result.SignCount, transactionToken))
+            {
+                throw new WebAuthnVerificationFailedException();
+            }
+        });
 
         metrics.Increment("webauthn_login_success");
-
         logger.LogInformation("Успешный вход по ключу для пользователя {UserId}", credential.UserId);
 
-        return await sessionIssuer.IssueAsync(credential.UserId, cancellationToken);
+        return response;
     }
 }

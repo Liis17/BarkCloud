@@ -9,11 +9,11 @@ namespace BarkCloud.Identity.Persistence.Services;
 
 public class RefreshTokensStorage(IdentityContext context, JwtSettings jwtSettings) : IRefreshTokensStorage
 {
-    public async Task<RefreshToken?> FindRefreshToken(string refreshToken)
+    public async Task<RefreshToken?> FindRefreshToken(string refreshToken, CancellationToken cancellationToken = default)
     {
         var refreshTokenEntity = await context.RefreshTokens
             .AsNoTracking()
-            .FirstOrDefaultAsync(x => x.Value == refreshToken);
+            .FirstOrDefaultAsync(x => x.Value == refreshToken, cancellationToken);
 
         return refreshTokenEntity;
     }
@@ -46,16 +46,16 @@ public class RefreshTokensStorage(IdentityContext context, JwtSettings jwtSettin
     /// Удаляет все refresh токены для устройства. Не выбрасывает исключение если токенов нет.
     /// Используется при логине для очистки старых токенов перед созданием нового.
     /// </summary>
-    public async Task DeleteRefreshTokensByDeviceIdSafe(string deviceId, long userId)
+    public async Task DeleteRefreshTokensByDeviceIdSafe(string deviceId, long userId, CancellationToken cancellationToken = default)
     {
         var refreshTokens = await context.RefreshTokens
             .Where(x => x.DeviceId == deviceId && x.UserId == userId)
-            .ToListAsync();
+            .ToListAsync(cancellationToken);
 
         if (refreshTokens.Count > 0)
         {
             context.RefreshTokens.RemoveRange(refreshTokens);
-            await context.SaveChangesAsync();
+            await context.SaveChangesAsync(cancellationToken);
         }
     }
 
