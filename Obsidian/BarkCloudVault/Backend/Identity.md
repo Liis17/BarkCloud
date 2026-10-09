@@ -12,6 +12,7 @@ Parent: [[Index]] · See also: [[Backend/SessionRevocation]], [[Backend/Identity
 |---|---|---|
 | `Backend/BarkCloud.Identity/Host/IdentityApiService.cs` | `IdentityApiService` | Пользовательские RPC |
 | `Backend/BarkCloud.Identity/Persistence/Contexts/IdentityContext.cs` | `IdentityContext` | Таблицы аутентификации, токенов и уведомлений |
+| `Backend/BarkCloud.Identity/Persistence/Services/ConfirmationCodesStorage.cs` | `ConfirmationCodesStorage` | Резервирование попытки и условное погашение кода регистрации |
 | `Backend/BarkCloud.Identity/Host/IdentityServerApiService.cs` | `IdentityServerApiService` | Служебные RPC |
 | `Backend/BarkCloud.Identity/Services/JwtService.cs` | `JwtService` | Выпуск access и service JWT |
 | `Backend/BarkCloud.Identity/Services/SessionIssuer.cs` | `SessionIssuer` | Создание сессии и регистрация устройства |
@@ -34,9 +35,11 @@ Parent: [[Index]] · See also: [[Backend/SessionRevocation]], [[Backend/Identity
 
 - `IdentityContext` хранит пароли, свойства аутентификации, коды подтверждения, запросы сброса, refresh-токены, WebAuthn-ключи/challenge'и, счётчики попыток, отзывы сессий и `PendingNotifications`. Rate-limit счётчики для IP/аккаунта и уведомлений сохраняются в `AuthAttemptCounters`.
 - Новые пароли хешируются BCrypt с work factor 12; при проверке также поддерживаются сохранённые legacy SHA-256 хеши.
-- `Auth` и assertion WebAuthn используют `SessionIssuer`: на устройстве заменяется прежний refresh, создаётся новый refresh-токен, а `CreateToken` выпускает access JWT. Access содержит user, device и session claims; `x-session-id` равен ID строки refresh-токена.
-- Сессия регистрирует устройство через `UsersServerApi`. Ошибка регистрации устройства логируется, но не прерывает выдачу токенов.
-- В транзакции подтверждения сброса расходуется reset, сохраняется новый пароль и выдаётся текущему устройству новая сессия; при `revoke_other_sessions=true` также отзываются прежние refresh. Детали транзакции и удаления аккаунта — в [[Backend/AccountDeletionOutbox]].
+- `Auth` и assertion WebAuthn используют общий transactional core `SessionIssuer`: до транзакции получается геолокация, затем callback локальной проверки (если задан), замена refresh на устройстве и создание нового refresh, выпуск access JWT с отложенной успешной telemetry и вставка `SuccessfulLogin` фиксируются одним коммитом. Assertion сначала проверяет криптографическую подпись вне транзакции, а challenge и счётчик credential условно погашаются/обновляются в ней. Access содержит user, device и session claims; `x-session-id` равен ID строки refresh-токена.
+- `Auth` резервирует попытки email-кода до входа, а затем потребляет ту же issuance (purpose, code, `IssuedAt`, expiry) внутри транзакции входа. Для WebAuthn callback использует условное удаление assertion challenge по ID/type/expiry и CAS по предыдущему счётчику; отсутствие challenge или изменённый/удалённый credential откатывает всю локальную сессию.
+- Сессия регистрирует устройство через `UsersServerApi` после локального коммита. Сохраняется существующее best-effort поведение; deadline/cancellation семантика этого RPC этой работой не меняется.
+- Смена пароля, принудительная смена, подтверждённый reset, вход и включение/выключение 2FA фиксируют соответствующую локальную мутацию, токены/отзывы сессий и outbox-событие одной транзакцией. TOTP проверяется до транзакции; email-коды заранее проверяются и резервируются по immutable issuance, а внутри транзакции условно потребляется та же issuance. Метрики успешной операции и соответствующие логи выполняются после коммита. Первоначальная установка пароля по-прежнему не отправляет письмо.
+- `ConfirmAccount` вызывает `Users.ConfirmUser` до локальной транзакции; Users handler идемпотентно снимает `IsDraft`. После RPC Identity условно удаляет ожидаемую действующую Registration issuance, создаёт refresh и `SuccessfulRegistration` в одном локальном коммите. При локальном rollback код остаётся доступен для повтора, и клиент повторно вызывает Users до истечения кода/лимита попыток. Это не distributed transaction: Users может уже считать аккаунт подтверждённым, а фоновой компенсации или recovery worker нет.
 - Успешные входы и уведомления о смене пароля/метода 2FA ставятся в локальную очередь доставки; см. [[Backend/IdentityNotificationOutbox]].
 - `RegistrationPolicy` читает `Features:RegistrationEnabled` через Configuration при регистрации и использует последнее известное значение, если вызов недоступен.
 

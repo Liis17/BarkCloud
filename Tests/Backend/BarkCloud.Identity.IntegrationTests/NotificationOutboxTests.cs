@@ -34,7 +34,7 @@ namespace BarkCloud.Identity.IntegrationTests;
 public class NotificationOutboxTests
 {
     [Fact]
-    public async Task TwoWorkersOnSharedRows_EachNotificationIsDeliveredExactlyOnce()
+    public async Task TwoWorkersOnSharedRows_CompetingLeaseDoesNotDuplicateBatchDelivery()
     {
         const int total = 60;
         await using var database = await PostgresIdentityDatabase.CreateAsync();
@@ -52,7 +52,7 @@ public class NotificationOutboxTests
         using var first = Host(database, published);
         using var second = Host(database, published);
 
-        // Воркеры гонятся за одними и теми же строками: захват через условный UPDATE не должен дать дублей.
+        // В этой параллельной партии условный захват не даёт двум воркерам отправить одну строку.
         await Task.WhenAll(Drain(first.Worker), Drain(second.Worker));
 
         published.Should().HaveCount(total);
@@ -122,6 +122,63 @@ public class NotificationOutboxTests
         await host.Worker.ProcessBatchAsync(default);
 
         published.Should().ContainSingle();
+        await using var after = database.CreateContext();
+        (await after.PendingNotifications.AnyAsync()).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task PersistedNotification_IsDeliveredByWorkerCreatedAfterRestart()
+    {
+        await using var database = await PostgresIdentityDatabase.CreateAsync();
+        await using (var context = database.CreateContext())
+        {
+            context.PendingNotifications.Add(Row(new Dictionary<string, string> { ["n"] = "persisted" }));
+            await context.SaveChangesAsync();
+        }
+
+        var published = new ConcurrentBag<string>();
+        using (Host(database, published))
+        {
+            // Событие сохранено, старый host завершился до получения строки.
+        }
+
+        using var restarted = Host(database, published);
+        (await restarted.Worker.ProcessBatchAsync(default)).Should().Be(1);
+
+        published.Should().ContainSingle().Which.Should().Be("persisted");
+        await using var reader = database.CreateContext();
+        (await reader.PendingNotifications.AnyAsync()).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task PublishFailure_KeepsRowForRetryAndFreshWorkerDeliversIt()
+    {
+        await using var database = await PostgresIdentityDatabase.CreateAsync();
+        await using (var context = database.CreateContext())
+        {
+            context.PendingNotifications.Add(Row(new Dictionary<string, string> { ["n"] = "retry" }));
+            await context.SaveChangesAsync();
+        }
+
+        var published = new ConcurrentBag<string>();
+        using (var failingHost = Host(database, published, publisherAvailable: false))
+        {
+            (await failingHost.Worker.ProcessBatchAsync(default)).Should().Be(1);
+        }
+
+        await using (var reader = database.CreateContext())
+        {
+            var pending = await reader.PendingNotifications.SingleAsync();
+            pending.Attempts.Should().Be(1);
+            pending.NextAttemptAt.Should().BeAfter(DateTime.UtcNow);
+            pending.CreatedAt.Should().BeAfter(DateTime.UtcNow.AddHours(-24));
+            await reader.PendingNotifications.ExecuteUpdateAsync(
+                s => s.SetProperty(x => x.NextAttemptAt, DateTime.UtcNow.AddSeconds(-1)));
+        }
+
+        using var restarted = Host(database, published);
+        (await restarted.Worker.ProcessBatchAsync(default)).Should().Be(1);
+        published.Should().ContainSingle().Which.Should().Be("retry");
         await using var after = database.CreateContext();
         (await after.PendingNotifications.AnyAsync()).Should().BeFalse();
     }
@@ -232,16 +289,19 @@ public class NotificationOutboxTests
         NextAttemptAt = DateTime.UtcNow.AddSeconds(-1)
     };
 
-    private static WorkerHost Host(PostgresIdentityDatabase database, ConcurrentBag<string> published, bool usersAvailable = true)
-        => new(database, published, usersAvailable);
+    private static WorkerHost Host(PostgresIdentityDatabase database, ConcurrentBag<string> published,
+        bool usersAvailable = true, bool publisherAvailable = true)
+        => new(database, published, usersAvailable, publisherAvailable);
 
     private sealed class WorkerHost : IDisposable
     {
         private readonly ServiceProvider _services;
 
-        public WorkerHost(PostgresIdentityDatabase database, ConcurrentBag<string> published, bool usersAvailable)
+        public WorkerHost(PostgresIdentityDatabase database, ConcurrentBag<string> published,
+            bool usersAvailable, bool publisherAvailable)
         {
             UsersAvailable = usersAvailable;
+            PublisherAvailable = publisherAvailable;
 
             var users = new Mock<UsersServerApi.UsersServerApiClient>();
             users.Setup(c => c.GetUserContactsAsync(It.IsAny<GetUserContactsRequest>(), It.IsAny<Metadata>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
@@ -256,7 +316,12 @@ public class NotificationOutboxTests
             var sender = new Mock<NotificationQueueSender>(Mock.Of<IPublishEndpoint>(),
                 new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build());
             sender.Setup(s => s.SendNotification(It.IsAny<Notification>()))
-                .Callback<Notification>(n => published.Add(n.Payload.GetValueOrDefault("n") ?? Guid.NewGuid().ToString()))
+                .Callback<Notification>(n =>
+                {
+                    if (!PublisherAvailable)
+                        throw new InvalidOperationException("publisher down");
+                    published.Add(n.Payload.GetValueOrDefault("n") ?? Guid.NewGuid().ToString());
+                })
                 .Returns(Task.CompletedTask);
 
             var location = new Mock<LocationClient>(new HttpClient(), new MetricsCollector(), NullLogger<LocationClient>.Instance);
@@ -273,6 +338,8 @@ public class NotificationOutboxTests
         }
 
         public bool UsersAvailable { get; set; }
+
+        public bool PublisherAvailable { get; set; }
 
         public NotificationOutboxWorker Worker { get; }
 
