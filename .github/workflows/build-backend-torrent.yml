@@ -6,11 +6,15 @@ on:
       - dev
       - nightly
       - master
+    # Proto-контракты — не весь BarkCloud.Proto, а только свои + компилируемые в GrpcServer
+    # (configuration_api, session_revocation_api) → правка одного .proto не пересобирает весь бэкенд.
+    # Те же пути без тестов передаются ниже в runtime-paths — меняй оба списка вместе.
     paths:
       - 'Backend/BarkCloud.Torrent/**'
-      - 'Shared/**'
-      # proto-контракты: только свои (torrent_api + files_api для импорта в облако + shared), а не весь BarkCloud.Proto
-      - '!Shared/BarkCloud.Proto/**'
+      - 'Backend/BarkCloud.GrpcServer/**'
+      - 'Shared/BarkCloud.Shared.*/**'
+      - 'Shared/BarkCloud.Proto/configuration_api.proto'
+      - 'Shared/BarkCloud.Proto/session_revocation_api.proto'
       - 'Shared/BarkCloud.Proto/torrent_api.proto'
       - 'Shared/BarkCloud.Proto/files_api.proto'
       - 'Shared/BarkCloud.Proto/shared.proto'
@@ -19,7 +23,6 @@ on:
 
 permissions:
   contents: read
-  actions: write
 
 jobs:
   ci:
@@ -27,9 +30,19 @@ jobs:
     with:
       service-name: BarkCloud.Torrent
       service-key: torrent
-      service-path: Backend/BarkCloud.Torrent
+      runtime-paths: |
+        Backend/BarkCloud.Torrent/**
+        Backend/BarkCloud.GrpcServer/**
+        Shared/BarkCloud.Shared.*/**
+        Shared/BarkCloud.Proto/configuration_api.proto
+        Shared/BarkCloud.Proto/session_revocation_api.proto
+        Shared/BarkCloud.Proto/torrent_api.proto
+        Shared/BarkCloud.Proto/files_api.proto
+        Shared/BarkCloud.Proto/shared.proto
+        Backend/rebuild.trigger
       project-path: Backend/BarkCloud.Torrent/BarkCloud.Torrent.csproj
-      dockerfile: Backend/BarkCloud.Torrent/Dockerfile
+      dockerfile: Backend/BarkCloud.Torrent/Dockerfile.slim
       image-name: barkcloud-torrent
       force-run: ${{ github.event_name == 'workflow_dispatch' }}
+      push-delay: 75
     secrets: inherit

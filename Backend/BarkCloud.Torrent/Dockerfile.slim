@@ -1,0 +1,8 @@
+FROM mcr.microsoft.com/dotnet/aspnet:10.0-noble
+WORKDIR /app
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libgssapi-krb5-2 \
+    && rm -rf /var/lib/apt/lists/*
+COPY --chown=1654:1654 publish/ .
+USER $APP_UID
+ENTRYPOINT ["dotnet", "BarkCloud.Torrent.dll"]
