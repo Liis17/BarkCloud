@@ -6,20 +6,22 @@ on:
       - dev
       - nightly
       - master
+    # Proto-контракты — не весь BarkCloud.Proto, а только свои + компилируемые в GrpcServer
+    # (configuration_api, session_revocation_api) → правка одного .proto не пересобирает весь бэкенд.
+    # Те же пути без тестов передаются ниже в runtime-paths — меняй оба списка вместе.
     paths:
       - 'Backend/BarkCloud.Configuration/**'
-      - 'Shared/**'
-      # proto-контракты: только свой, а не весь BarkCloud.Proto → не пересобирать весь бэкенд
-      - '!Shared/BarkCloud.Proto/**'
+      - 'Backend/BarkCloud.GrpcServer/**'
+      - 'Shared/BarkCloud.Shared.*/**'
       - 'Shared/BarkCloud.Proto/configuration_api.proto'
+      - 'Shared/BarkCloud.Proto/session_revocation_api.proto'
+      - 'Backend/rebuild.trigger'
       - 'Tests/Backend/BarkCloud.Configuration.Tests/**'
       - 'Tests/BarkCloud.TestKit/**'
-      - 'Backend/rebuild.trigger'
   workflow_dispatch:
 
 permissions:
   contents: read
-  actions: write
 
 jobs:
   ci:
@@ -27,11 +29,18 @@ jobs:
     with:
       service-name: BarkCloud.Configuration
       service-key: configuration
-      service-path: Backend/BarkCloud.Configuration
+      runtime-paths: |
+        Backend/BarkCloud.Configuration/**
+        Backend/BarkCloud.GrpcServer/**
+        Shared/BarkCloud.Shared.*/**
+        Shared/BarkCloud.Proto/configuration_api.proto
+        Shared/BarkCloud.Proto/session_revocation_api.proto
+        Backend/rebuild.trigger
       test-path: Tests/Backend/BarkCloud.Configuration.Tests
       project-path: Backend/BarkCloud.Configuration/BarkCloud.Configuration.csproj
       test-project-path: Tests/Backend/BarkCloud.Configuration.Tests/BarkCloud.Configuration.Tests.csproj
       dockerfile: Backend/BarkCloud.Configuration/Dockerfile.slim
       image-name: barkcloud-configuration
       force-run: ${{ github.event_name == 'workflow_dispatch' }}
+      push-delay: 15
     secrets: inherit
