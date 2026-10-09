@@ -58,7 +58,7 @@ public class IdentityApiService : BarkCloud.Proto.Identity.IdentityApi.IdentityA
             Password = request.Password,
         };
 
-        return await _mediator.Send(command);
+        return await _mediator.Send(command, context.CancellationToken);
     }
 
     public override async Task<CreateTokenResponse> CreateToken(CreateTokenRequest request, ServerCallContext context)
@@ -248,7 +248,7 @@ public class IdentityApiService : BarkCloud.Proto.Identity.IdentityApi.IdentityA
         {
             ChallengeId = request.ChallengeId,
             AssertionJson = request.AssertionJson
-        });
+        }, context.CancellationToken);
     }
 
     [Authorize(Policy = nameof(TokenType.User))]

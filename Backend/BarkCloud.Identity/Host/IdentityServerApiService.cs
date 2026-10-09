@@ -92,7 +92,7 @@ public class IdentityServerApiService : IdentityServerApi.IdentityServerApiBase
             IpAddress = request.IpAddress
         };
 
-        return _mediator.Send(command);
+        return _mediator.Send(command, context.CancellationToken);
     }
 
     public override Task<ForceSetPasswordServerResponse> ForceSetPasswordServer(
