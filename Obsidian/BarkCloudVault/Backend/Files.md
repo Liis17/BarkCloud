@@ -49,7 +49,7 @@ See also: [[Backend/FilesCloud]] · [[Backend/ResumableUpload]] · [[Backend/Ori
 
 - EF Core и PostgreSQL хранят записи файлов, хеши, метаданные, загрузочные сессии и производные объекты.
 - `S3BucketRegistry` выбирает профиль для каждого объекта; `UploadFile.StorageProfileId` нужен для последующего чтения и удаления.
-- После загрузки `ProcessUploadedFileConsumer` запускает извлечение метаданных и создание производных объектов через MassTransit/RabbitMQ.
+- После загрузки `ProcessUploadedFileConsumer` запускает извлечение метаданных и создание производных объектов через MassTransit/RabbitMQ. `Scheduling/UploadProcessingQueue.cs` задаёт два слота `process-uploaded-file` и scheduled redelivery через persistent Quartz/PostgreSQL; ожидание повторов освобождает слоты. Подробности исходов и расписания — [[Backend/ResumableUpload]].
 - Изображения обрабатываются ImageSharp; видео анализируются и обрабатываются через FFMpegCore/ffmpeg.
 - Конфигурация профилей S3 поступает из Configuration; Web использует Files API и HTTP upload-маршрут.
 
@@ -61,3 +61,27 @@ See also: [[Backend/FilesCloud]] · [[Backend/ResumableUpload]] · [[Backend/Ori
 - Для облачных изображений pipeline создаёт отдельный JPEG-вариант просмотра (`JpegView`) и связывает его как превью с `TargetWidth=0`. Оригинал сохраняется отдельно; обычные превью хранятся как самостоятельные `UploadFile`.
 - `UploadFileInfo` передаёт обычные превью в `previews`; `preview_url` помечено устаревшим. Поля `jpeg_view_file_id`/`jpeg_view_url` описывают отдельный JPEG-вариант. Цвета превью — [[Backend/ImagePlaceholders]].
 - Срок жизни записей и оригиналов, включая корзину и окончательное удаление, описан в [[Backend/OriginalLifetime]].
+
+## Scheduler обработки загрузок
+
+`Backend/BarkCloud.Files/Scheduling/UploadProcessingQueue.cs` регистрирует Quartz 3.15.0
+и MassTransit.Quartz 8.5.2. Очередь `files-upload-scheduler` durable, без auto-delete;
+плагин RabbitMQ и отдельный scheduler-контейнер не нужны. `AddQuartzConsumers` управляет
+запуском после готовности bus и остановкой Quartz. Миграции `FilesContext` выполняются
+в `Program.cs` до запуска hosted services.
+
+Хранилище — существующий `FilesDb`, схема `files_quartz`, префикс `files_quartz.qrtz_`,
+стабильное имя `BarkCloud.Files.UploadScheduler`, instance ID `AUTO`, clustering,
+System.Text.Json serializer. Миграция
+`Persistence/Migrations/20261009000000_AddUploadScheduler.cs` создаёт таблицы по Quartz
+3.15.0 без очистки; `Down` сохраняет таблицы и pending-доставки, повторное применение
+также сохраняет данные.
+
+`ScheduledMessageRecoveryListener` после окончательной ошибки штатного
+`ScheduledMessageJob` сохраняет новый trigger через 30 секунд. Копирует весь
+`MergedJobDataMap`: payload, destination, headers (включая номер redelivery), transport
+properties и идентификаторы. Транспортные повторы не вызывают processor и не увеличивают
+`ProcessingAttempts`. Misfire исполняется сразу после восстановления scheduler.
+Ожидание reconnect RabbitMQ может удерживать job scheduler, но не consumer-слоты.
+
+Эксплуатация и откат — [[Platform/Infrastructure]], проверки — [[Platform/Testing]].
