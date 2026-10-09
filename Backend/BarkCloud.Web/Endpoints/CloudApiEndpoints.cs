@@ -1291,7 +1291,9 @@ public static class CloudApiEndpoints
         api.MapPost("/files/upload", async (HttpContext http, AuthGateway auth, FilesApi.FilesApiClient files, IHttpClientFactory httpFactory, IConfiguration config) =>
             await Guarded(http, auth, async (user, _) =>
             {
-                var form = await http.Request.ReadFormAsync();
+                // Отмена браузера останавливает и чтение формы, и upstream-передачу в Files.
+                var ct = http.RequestAborted;
+                var form = await http.Request.ReadFormAsync(ct);
                 var file = form.Files["file"];
                 if (file is null || file.Length == 0)
                     return Results.BadRequest(new { error = "Файл не выбран или пустой." });
@@ -1302,7 +1304,7 @@ public static class CloudApiEndpoints
                     config.Value("App:AppName", "BarkCloud Web"),
                     config.Value("App:Version", AppVersion.Current));
                 var uploadToken = BrowserContext.UserTokenWithDevice(user.AccessToken, device);
-                var upload = await files.GetUploadUrlAsync(new GetUploadUrlRequest { FileType = UploadFileType.CloudFile }, uploadToken);
+                var upload = await files.GetUploadUrlAsync(new GetUploadUrlRequest { FileType = UploadFileType.CloudFile }, uploadToken, cancellationToken: ct);
 
                 var http1Base = config["FilesService:Http1Base"];
                 var uploadUrl = string.IsNullOrEmpty(http1Base) ? upload.Url : $"{http1Base}/upload/{upload.FileId}";
@@ -1313,9 +1315,9 @@ public static class CloudApiEndpoints
                     string.IsNullOrEmpty(file.ContentType) ? "application/octet-stream" : file.ContentType);
                 content.Add(part, "file", file.FileName);
 
-                var client = httpFactory.CreateClient("files-upload");
-                using var resp = await client.PostAsync(uploadUrl, content);
-                var responseBody = await resp.Content.ReadAsStringAsync();
+                var client = httpFactory.CreateClient(LegacyUploadTransfer.ClientName);
+                using var resp = await client.PostAsync(uploadUrl, content, ct);
+                var responseBody = await resp.Content.ReadAsStringAsync(ct);
 
                 if (!resp.IsSuccessStatusCode)
                     return Results.Json(new { error = responseBody }, Json, statusCode: (int)resp.StatusCode);
