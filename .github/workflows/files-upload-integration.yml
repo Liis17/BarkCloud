@@ -29,7 +29,9 @@ jobs:
         run: bash Tests/Backend/BarkCloud.Files.IntegrationTests/run-f18.sh
       - name: "Container diagnostics"
         if: always()
-        run: docker compose -p barkcloud-f18 -f Tests/Backend/BarkCloud.Files.IntegrationTests/docker-compose.yml logs --no-color
+        run: |
+          docker compose -p barkcloud-f18 -f Tests/Backend/BarkCloud.Files.IntegrationTests/docker-compose.yml logs --no-color || true
+          docker compose -p barkcloud-f18 -f Tests/Backend/BarkCloud.Files.IntegrationTests/docker-compose.yml ps --all || true
       - uses: actions/upload-artifact@v7
         if: always()
         with:

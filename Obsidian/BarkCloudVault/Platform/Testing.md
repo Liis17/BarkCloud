@@ -31,8 +31,8 @@ Parent: [[Architecture]] · See also: [[Web/WebApp]] · [[Backend/Files]] · [[B
 - Workflow `tests.yml` запускается для pull request в `dev`, `nightly` и `master`, а также вручную. Изменения в Shared запускают backend-проекты; тесты сервисов выбираются по путям их кода и тестов.
 - В CI Files и Users получают PostgreSQL 18 и `BARKCLOUD_TEST_POSTGRES`. Интеграционный workflow Users также запускает RabbitMQ и передаёт `BARKCLOUD_TEST_RABBITMQ`.
 - Тесты сервиса запускаются и при изменении `Backend/BarkCloud.GrpcServer/**` — это общий хост всех сервисов. SDK во всех .NET-джобах ставится через `actions/setup-dotnet`.
-- Сборка backend-образа в `backend-service-ci.yml` зависит от успешного test job. Входы `runtime-paths` (тот же список путей, что `on.push.paths` вызывающего `build-backend-*.yml`) и `push-delay` определяют реакцию на изменения и паузу перед `docker push`.
-- Образ собирается без отправки (слои остаются в кэше buildkit-билдера джобы), затем после паузы `push-delay` `docker buildx build --push` пересобирает из кэша и отправляет все теги. Именно buildx, а не `docker push`: демон Docker получал от реестра `401`, хотя buildkit с теми же учётными данными проходит. Вход в реестр, отправка и опрос тегов повторяются до 3 раз через 15 с. `push-delay` растёт на 15 с по порядку файлов `build-backend-*.yml` (configuration 15 … web 105), чтобы одновременные сборки не пушили в реестр разом; новому сервису — следующее значение.
+- Сборка backend-образа в `backend-service-ci.yml` зависит от успешного test job. Входы `runtime-paths` (тот же список путей, что `on.push.paths` вызывающего `build-backend-*.yml`) и `push-delay` определяют реакцию на изменения и паузу перед `docker buildx build --push`.
+- Образ собирается без отправки (слои остаются в кэше buildkit-билдера джобы), затем после паузы `push-delay` workflow запускает `docker buildx build --push` для всех тегов. Вход в реестр, команда отправки и опрос тегов повторяются до 3 раз через 15 с; конфигурация описывает попытки, а результат конкретной публикации виден в run workflow. `push-delay` растёт на 15 с по порядку файлов `build-backend-*.yml` (configuration 15 … web 105), чтобы одновременные сборки не пушили в реестр разом; новому сервису — следующее значение.
 - `paths` в `build-backend-*.yml` перечисляют `Shared/BarkCloud.Shared.*/**` и только нужные `.proto` по принципу сервиса-владельца; `configuration_api.proto` и `session_revocation_api.proto` компилируются в `BarkCloud.GrpcServer` и затрагивают все сервисы.
 - Telegram-уведомление шлёт `.github/scripts/send-telegram.sh`: при отказе Markdown повторяет текст без разметки, при неудаче пишет `::warning::` и не валит джобу.
 - Для Web CI выполняет `npm ci` и `npm run build` перед `dotnet publish`. Скрипт `npm test` существует, но в текущих workflows вызова Vitest нет.
@@ -75,8 +75,16 @@ host. Это отдельная проверка от обычного восс�
 последний ждёт успешной интеграционной проверки перед публикацией. Ручной запуск
 workflow с `production-intervals` включает полный приёмочный сценарий.
 
-`run-f18.sh` требует Docker Compose и .NET 10, останавливает контейнеры после тестов
-и сохраняет volumes. Подробности и прямой запуск через `BARKCLOUD_TEST_POSTGRES`,
+`run-f18.sh` требует Docker Compose и .NET 10. Для проверки версии RabbitMQ он запускает
+`rabbitmqctl version` через `docker compose exec -T --user rabbitmq`; root entrypoint образа
+сохраняется для штатной настройки прав. Healthcheck вызывает `rabbitmq-diagnostics -q ping`
+от пользователя `rabbitmq` через `gosu`. EXIT trap установлен до `up --wait`: при любом
+исходе runner останавливает контейнеры, сохраняет volumes и возвращает исходный код
+завершения даже если `stop` завершился ошибкой. Files integration workflow в `always()`
+выводит `docker compose logs --no-color` и `docker compose ps --all`, затем сохраняет TRX
+artifact. Подробности и прямой запуск через `BARKCLOUD_TEST_POSTGRES`,
 `BARKCLOUD_TEST_RABBITMQ`, `BARKCLOUD_TEST_RABBITMQ_CONTAINER` — в README проекта.
+`BARKCLOUD_TEST_RABBITMQ` — URI `rabbitmq://...` для MassTransit; raw RabbitMQ.Client
+использует адрес с изменённой на `amqp` схемой, сохраняя endpoint, credentials и vhost.
 Unit-проверка listener (`BarkCloud.Files.Tests/Scheduling/`) подтверждает копирование
 payload/headers, задержку 30 секунд и отсутствие нового trigger при успехе/immediate refire.

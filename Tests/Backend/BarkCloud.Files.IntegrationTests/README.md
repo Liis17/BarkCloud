@@ -29,18 +29,28 @@ BARKCLOUD_F18_PRODUCTION=1 bash Tests/Backend/BarkCloud.Files.IntegrationTests/r
 Время ожиданий — 21 минута 10 секунд плюс обработка. Версия RabbitMQ (`rabbitmq:latest`,
 как в production compose) печатается runner и сохраняется в выводе/TRX. Этот прогон
 доступен вручную в `.github/workflows/files-upload-integration.yml` через
-`production-intervals`. PR CI и Files CI/CD запускают быстрые сценарии; публикация
-образа Files зависит от успешной интеграционной проверки.
+`production-intervals`. PR CI и Files CI/CD запускают быстрые сценарии; job публикации
+образа Files зависит от успешной интеграционной проверки. Фактический результат отправки
+образа определяется шагом `docker buildx build --push` в workflow.
 
 Runner использует порты `55418` и `56718` и compose project `barkcloud-f18` (можно
 переименовать через `BARKCLOUD_F18_PROJECT`). Одновременно запускать только один стенд.
-После завершения контейнеры останавливаются; volumes сохраняются для диагностики.
-Следующий запуск поднимает тот же стенд. Исходные данные приложения tests не используют.
+Проверка версии RabbitMQ выполняется через `docker compose exec -T --user rabbitmq`;
+entrypoint контейнера по-прежнему запускается от root для штатной настройки прав.
+Healthcheck запускает `rabbitmq-diagnostics -q ping` от пользователя `rabbitmq` через
+`gosu`. Cleanup trap устанавливается до `up --wait`, останавливает контейнеры при любом
+исходе и сохраняет volumes; ошибка команды `stop` не заменяет исходный код завершения
+runner. Следующий запуск поднимает тот же стенд. Тесты не используют данные приложения.
+
+Files integration workflow в шаге `always()` выводит `docker compose logs --no-color` и
+`docker compose ps --all`, а TRX-файлы загружает как artifact также при ошибке.
 
 Для внешнего изолированного стенда можно запускать `dotnet test` напрямую, задав
 `BARKCLOUD_TEST_POSTGRES`, `BARKCLOUD_TEST_RABBITMQ` и `BARKCLOUD_TEST_RABBITMQ_CONTAINER`.
-Тестовый PostgreSQL-пользователь должен иметь право `CREATE DATABASE`; Docker должен
-управлять указанным тестовым контейнером RabbitMQ.
+`BARKCLOUD_TEST_RABBITMQ` задаётся в формате MassTransit `rabbitmq://...`: MassTransit
+использует исходный URI, а подключения через RabbitMQ.Client получают URI с заменённой
+на `amqp` схемой из того же адреса. Тестовый PostgreSQL-пользователь должен иметь право
+`CREATE DATABASE`; Docker должен управлять указанным тестовым контейнером RabbitMQ.
 
 ## Что проверяется
 
