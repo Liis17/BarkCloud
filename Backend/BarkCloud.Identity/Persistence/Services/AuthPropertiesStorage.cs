@@ -82,7 +82,7 @@ public class AuthPropertiesStorage : IAuthPropertiesStorage
     /// параллельный перебор не превысит лимит). Не более <see cref="ReauthPasswordMaxAttempts"/> попыток за окно
     /// <see cref="ReauthPasswordWindow"/>, которое открывается первой попыткой. Возвращает false, если лимит окна исчерпан.
     /// </summary>
-    public async Task<bool> TryReserveReauthPasswordAttempt(long userId)
+    public async Task<bool> TryReserveReauthPasswordAttempt(long userId, CancellationToken cancellationToken = default)
     {
         var now = DateTime.UtcNow;
         DateTime? newWindowEndsAt = now + ReauthPasswordWindow;
@@ -100,7 +100,7 @@ public class AuthPropertiesStorage : IAuthPropertiesStorage
                 .SetProperty(x => x.ReauthPasswordWindowEndsAt,
                     x => x.ReauthPasswordWindowEndsAt == null || x.ReauthPasswordWindowEndsAt <= now
                         ? newWindowEndsAt
-                        : x.ReauthPasswordWindowEndsAt));
+                        : x.ReauthPasswordWindowEndsAt), cancellationToken);
 
         if (reserved == 1)
         {
@@ -108,7 +108,7 @@ public class AuthPropertiesStorage : IAuthPropertiesStorage
         }
 
         // Строка есть, но лимит окна исчерпан.
-        if (await _context.AuthUserProperties.AnyAsync(x => x.UserId == userId))
+        if (await _context.AuthUserProperties.AnyAsync(x => x.UserId == userId, cancellationToken))
         {
             return false;
         }
@@ -119,25 +119,25 @@ public class AuthPropertiesStorage : IAuthPropertiesStorage
             UserId = userId,
             ReauthPasswordAttempts = 1,
             ReauthPasswordWindowEndsAt = newWindowEndsAt
-        });
-        await _context.SaveChangesAsync();
+        }, cancellationToken);
+        await _context.SaveChangesAsync(cancellationToken);
 
         return true;
     }
 
     /// <summary>Сбрасывает счётчик попыток после успешной проверки пароля.</summary>
-    public async Task ResetReauthPasswordAttempts(long userId)
+    public async Task ResetReauthPasswordAttempts(long userId, CancellationToken cancellationToken = default)
     {
         await _context.AuthUserProperties
             .Where(x => x.UserId == userId)
             .ExecuteUpdateAsync(s => s
                 .SetProperty(x => x.ReauthPasswordAttempts, 0)
-                .SetProperty(x => x.ReauthPasswordWindowEndsAt, (DateTime?)null));
+                .SetProperty(x => x.ReauthPasswordWindowEndsAt, (DateTime?)null), cancellationToken);
     }
 
-    public async Task<string?> GetOtpSecretKey(long userId)
+    public async Task<string?> GetOtpSecretKey(long userId, CancellationToken cancellationToken = default)
     {
-        var props = await _context.AuthUserProperties.FirstOrDefaultAsync(x => x.UserId == userId);
+        var props = await _context.AuthUserProperties.FirstOrDefaultAsync(x => x.UserId == userId, cancellationToken);
 
         if (props is null)
         {

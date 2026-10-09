@@ -92,4 +92,21 @@ public class CreateTokenCommandHandlerTests
             .Should().Contain(c => c.Type == IdentityClaims.SessionId && c.Value == "17");
         _metrics.SnapshotAndReset().Should().ContainKey("tokens_refreshed");
     }
+
+    [Fact]
+    public async Task Handle_DeferredSuccessTelemetry_DoesNotCountTokenRefreshBeforeOwnerCommit()
+    {
+        _refreshTokens.Setup(s => s.FindRefreshToken("t")).ReturnsAsync(new RefreshToken
+        {
+            Id = 17,
+            UserId = 42,
+            DeviceId = "device-1",
+            Value = "t",
+            ExpiresAt = DateTime.UtcNow.AddHours(1)
+        });
+
+        await CreateSut().Handle(new CreateTokenCommand { RefreshToken = "t", DeferSuccessTelemetry = true }, default);
+
+        _metrics.SnapshotAndReset().Should().NotContainKey("tokens_refreshed");
+    }
 }

@@ -1,21 +1,33 @@
+using BarkCloud.GrpcServer.Metrics;
 using BarkCloud.Identity.Features.ForceSetPasswordServer;
+using BarkCloud.Identity.Persistence.Contexts;
 using BarkCloud.Identity.Persistence.Services;
 using BarkCloud.Identity.Services;
+using BarkCloud.Identity.Tests._Helpers;
 using BarkCloud.Shared.Queue.Notifications;
 
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace BarkCloud.Identity.Tests.Features.ForceSetPasswordServer;
 
-public class ForceSetPasswordServerCommandHandlerTests
+public class ForceSetPasswordServerCommandHandlerTests : IDisposable
 {
     private readonly Mock<IPasswordsStorage> _passwords = new();
     private readonly Mock<INotificationOutbox> _outbox = new();
+    private readonly SqliteIdentityContext _database = new();
+
+    public ForceSetPasswordServerCommandHandlerTests()
+        => _outbox.Setup(o => o.EnqueueAsync(It.IsAny<long>(), It.IsAny<NotificationType>(), It.IsAny<string>(),
+            It.IsAny<Dictionary<string, string>>(), It.IsAny<CancellationToken>())).ReturnsAsync(true);
+
+    public void Dispose() => _database.Dispose();
 
     private ForceSetPasswordServerCommandHandler CreateSut() => new(
         _passwords.Object,
         _outbox.Object,
-        NullLogger<ForceSetPasswordServerCommandHandler>.Instance);
+        NullLogger<ForceSetPasswordServerCommandHandler>.Instance,
+        _database.Context,
+        new MetricsCollector());
 
     [Fact]
     public async Task Handle_UpdatesHashAndQueuesAdminChangeMail()

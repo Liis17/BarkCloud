@@ -148,7 +148,7 @@ public class NotificationOutboxTests
                 UserContextFor(42), new PasswordsStorage(context), new AuthPropertiesStorage(context),
                 new RefreshTokensStorage(context, new JwtSettings { ExpiryMinutes = 60 }),
                 new PasswordChangedNotifier(outbox, new RequestContext { DeviceName = "Phone", IpAddress = "1.1.1.1" }),
-                metrics, NullLogger<SetPasswordCommandHandler>.Instance);
+                metrics, NullLogger<SetPasswordCommandHandler>.Instance, context);
 
             await handler.Handle(new SetPasswordCommand { OldPassword = "old-password", NewPassword = "new-password" }, default);
         }

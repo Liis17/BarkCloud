@@ -18,7 +18,8 @@ public class RefreshTokensStorage(IdentityContext context, JwtSettings jwtSettin
         return refreshTokenEntity;
     }
 
-    public async Task<RefreshToken?> CreateNewRefreshToken(string refreshToken, long userId, string deviceId, int expiresDays)
+    public async Task<RefreshToken?> CreateNewRefreshToken(string refreshToken, long userId, string deviceId, int expiresDays,
+        CancellationToken cancellationToken = default)
     {
         var refreshTokenEntity = new RefreshToken()
         {
@@ -29,9 +30,9 @@ public class RefreshTokensStorage(IdentityContext context, JwtSettings jwtSettin
             Value = refreshToken
         };
 
-        var token = await context.RefreshTokens.AddAsync(refreshTokenEntity);
+        var token = await context.RefreshTokens.AddAsync(refreshTokenEntity, cancellationToken);
 
-        await context.SaveChangesAsync();
+        await context.SaveChangesAsync(cancellationToken);
 
         return token.Entity;
     }
