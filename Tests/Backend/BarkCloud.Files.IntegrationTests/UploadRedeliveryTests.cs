@@ -34,6 +34,8 @@ public sealed class UploadRedeliveryTests(ITestOutputHelper output) : IAsyncLife
         await using var channel = await connection.CreateChannelAsync();
         foreach (var queue in new[] { "process-uploaded-file", "process-uploaded-file_error", "files-upload-scheduler", "files-upload-scheduler_error" })
             await channel.QueueDeleteAsync(queue);
+        // Fault publication precedes error transport; keep polling a declared queue.
+        await channel.QueueDeclareAsync("process-uploaded-file_error", durable: true, exclusive: false, autoDelete: false);
     }
 
     public Task DisposeAsync() => _database.DisposeAsync().AsTask();
@@ -242,8 +244,12 @@ public sealed class UploadRedeliveryTests(ITestOutputHelper output) : IAsyncLife
         var started = Stopwatch.GetTimestamp();
         await host.SendAsync(pipelineFailure);
         await host.SendAsync(unhandled);
-        await WaitUntilAsync(async () => (await _database.ReadAsync(pipelineFailure)).Status == UploadSessionStatus.Failed
-            && _probe.Faults.Any(f => f.Message.SessionId == unhandled), timeout);
+        await WaitUntilAsync(async () =>
+        {
+            var stored = await _database.ReadAsync(pipelineFailure);
+            return stored.Status == UploadSessionStatus.Failed && !stored.CleanupPending
+                && _probe.Faults.Any(f => f.Message.SessionId == unhandled);
+        }, timeout);
         output.WriteLine("Complete retry chain elapsed: {0}", Stopwatch.GetElapsedTime(started));
         var failed = await _database.ReadAsync(pipelineFailure);
         failed.ProcessingAttempts.Should().Be(5);
@@ -256,7 +262,12 @@ public sealed class UploadRedeliveryTests(ITestOutputHelper output) : IAsyncLife
         _probe.Faults.Should().ContainSingle(f => f.Message.SessionId == unhandled);
         await using var connection = await new ConnectionFactory { Uri = UploadTestHost.RabbitAddress }.CreateConnectionAsync();
         await using var channel = await connection.CreateChannelAsync();
-        var error = await channel.BasicGetAsync("process-uploaded-file_error", true);
+        BasicGetResult? error = null;
+        await WaitUntilAsync(async () =>
+        {
+            error = await channel.BasicGetAsync("process-uploaded-file_error", true);
+            return error is not null;
+        });
         error.Should().NotBeNull();
         Encoding.UTF8.GetString(error!.Body.Span).Should().Contain(unhandled.ToString());
         (await channel.QueueDeclarePassiveAsync("process-uploaded-file_error")).MessageCount.Should().Be(0);
