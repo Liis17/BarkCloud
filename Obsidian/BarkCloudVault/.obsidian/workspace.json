@@ -13,7 +13,7 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "index.md",
+                "file": "Index.md",
                 "mode": "preview"
               }
             }
@@ -43,5 +43,5 @@
     "collapsed": true
   },
   "active": "editor",
-  "lastOpenFiles": ["index.md"]
+  "lastOpenFiles": ["Index.md"]
 }

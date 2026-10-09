@@ -63,7 +63,7 @@ public class Program
         var filesAddress = builder.Configuration["FilesService:Host"];
         builder.Services.AddGrpcClient<FilesApi.FilesApiClient>(o => o.Address = new Uri(filesAddress!));
         builder.Services.AddGrpcClient<CloudApi.CloudApiClient>(o => o.Address = new Uri(filesAddress!));
-        builder.Services.AddHttpClient("files-upload");
+        TorrentImportService.AddFilesUploadClient(builder.Services);
 
         builder.Services.AddHostedService<TorrentStartupService>();
         builder.Services.AddHostedService<TorrentPersistenceService>();
