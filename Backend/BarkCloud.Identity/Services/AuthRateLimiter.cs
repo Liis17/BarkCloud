@@ -45,7 +45,8 @@ public class AuthRateLimiter(IAttemptCountersStorage storage, RequestContext req
         }
     }
 
-    public Task ResetAsync(AuthLimits.Policy policy, string subject) => storage.Reset(Key(policy, subject));
+    public Task ResetAsync(AuthLimits.Policy policy, string subject, CancellationToken cancellationToken = default) =>
+        storage.Reset(Key(policy, subject), cancellationToken);
 
     private static string Key(AuthLimits.Policy policy, string subject) => $"{policy.Scope}:{subject}";
 }
