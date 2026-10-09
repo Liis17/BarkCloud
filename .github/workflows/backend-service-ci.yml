@@ -233,30 +233,34 @@ jobs:
           username: ${{ secrets.REGISTRY_USERNAME }}
           password: ${{ secrets.REGISTRY_PASSWORD }}
 
+      # Сборка без отправки: слои остаются в кэше buildkit-билдера этой джобы,
+      # поэтому отправка ниже пересобирает всё из кэша и только пушит
       - name: "Build Docker image"
         uses: docker/build-push-action@v7
         with:
           context: .
           file: ./${{ inputs.dockerfile }}
-          load: true
           tags: ${{ steps.docker-version.outputs.tags }}
 
       - name: "Пауза перед отправкой (${{ inputs.push-delay }} с)"
         if: ${{ inputs.push-delay > 0 }}
         run: sleep ${{ inputs.push-delay }}
 
+      # Отправка идёт через buildx, а не `docker push`: демон Docker получает от реестра 401,
+      # хотя buildkit с теми же учётными данными проходит
       - name: "Push Docker image"
         env:
           TAGS: ${{ steps.docker-version.outputs.tags }}
+          DOCKERFILE: ${{ inputs.dockerfile }}
         run: |
-          for tag in ${TAGS//,/ }; do
-            attempt=1
-            until docker push "$tag"; do
-              [ "$attempt" -gt 3 ] && exit 1
-              echo "Повтор отправки $tag через 15 с ($attempt/3)"
-              sleep 15
-              attempt=$((attempt + 1))
-            done
+          tag_args=()
+          for tag in ${TAGS//,/ }; do tag_args+=(-t "$tag"); done
+          attempt=1
+          until docker buildx build --push -f "./$DOCKERFILE" "${tag_args[@]}" .; do
+            [ "$attempt" -gt 3 ] && exit 1
+            echo "Повтор отправки через 15 с ($attempt/3)"
+            sleep 15
+            attempt=$((attempt + 1))
           done
 
       - name: "Logout from Private Registry"
