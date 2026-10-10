@@ -214,13 +214,12 @@ public partial class UnifiedSearchService
 
     /// <summary>Данные хита, найденного в БД: порядок выдачи известен сразу, <see cref="Build"/> вызывается только для хитов страницы.</summary>
     private sealed record PendingHit(
-        SearchHitKind Kind, string Id, int Rank, double Similarity, DateTime SortAt, Guid? FileId, Func<FileEnrichment, SearchHit> Build);
+        SearchHitKind Kind, string Id, int Rank, double Similarity, DateTime SortAt, Guid? FileId, string MatchField, string MatchValue,
+        Func<FileEnrichment, SearchHit> Build);
 
     /// <summary>Связанные данные файлов страницы (не каталога).</summary>
     private sealed record FileEnrichment(
         Dictionary<Guid, FileMetadata> Metadata,
-        Dictionary<Guid, FileSearchAlias> Aliases,
-        Dictionary<Guid, List<FileTag>> Tags,
         HashSet<Guid> FavoriteIds,
         Dictionary<Guid, List<FilePreview>> Previews,
         Dictionary<Guid, FilePlaceholder> Placeholders,
@@ -228,18 +227,11 @@ public partial class UnifiedSearchService
 
     private async Task<FileEnrichment> LoadEnrichment(ICollection<Guid> fileIds, CancellationToken cancellationToken)
     {
-        var ownerId = _userContext.UserId;
         var ids = fileIds.ToList();
         var metadata = ids.Count == 0 ? new Dictionary<Guid, FileMetadata>() : await _context.FileMetadata.AsNoTracking()
             .Where(x => ids.Contains(x.FileId))
             .ToDictionaryAsync(x => x.FileId, cancellationToken);
-        var aliases = ids.Count == 0 ? new Dictionary<Guid, FileSearchAlias>() : await _context.FileSearchAliases.AsNoTracking()
-            .Where(x => x.OwnerId == ownerId && ids.Contains(x.FileId))
-            .ToDictionaryAsync(x => x.FileId, cancellationToken);
-        var tags = ids.Count == 0 ? new Dictionary<Guid, List<FileTag>>() : await _context.FileTags.AsNoTracking()
-            .Where(x => x.OwnerId == ownerId && ids.Contains(x.FileId))
-            .GroupBy(x => x.FileId)
-            .ToDictionaryAsync(x => x.Key, x => x.OrderBy(t => t.Value).ToList(), cancellationToken);
+        var ownerId = _userContext.UserId;
         var favoriteIds = ids.Count == 0 ? new HashSet<Guid>() : (await _context.FavoriteFiles.AsNoTracking()
             .Where(x => x.OwnerId == ownerId && ids.Contains(x.FileId))
             .Select(x => x.FileId)
@@ -253,64 +245,43 @@ public partial class UnifiedSearchService
             .Where(x => ids.Contains(x.FileId))
             .ToDictionaryAsync(x => x.FileId, cancellationToken);
 
-        return new FileEnrichment(metadata, aliases, tags, favoriteIds, previews, placeholders, FileUrlHelper.GetPublicBaseUrl(_configuration, _runSettings));
+        return new FileEnrichment(metadata, favoriteIds, previews, placeholders, FileUrlHelper.GetPublicBaseUrl(_configuration, _runSettings));
     }
 
     private static SearchHit BuildHit(PendingHit pending, FileEnrichment data)
     {
         var hit = pending.Build(data);
+        hit.MatchField = pending.MatchField;
+        hit.MatchValue = pending.MatchValue;
         if (pending.FileId is { } fileId && hit.MediaKind is ProtoMediaKind.Photo or ProtoMediaKind.Video
             && data.Placeholders.TryGetValue(fileId, out var placeholder))
             hit.Placeholder = placeholder.ToGrpc();
         return hit;
     }
 
-    private static SearchHit OwnedFileHit(UploadFile file, CloudFileEntry? entry, bool trash, SearchHitKind kind, string query, FileEnrichment data)
+    private static SearchHit OwnedFileHit(UploadFile file, CloudFileEntry? entry, bool trash, SearchHitKind kind, FileEnrichment data)
     {
         var title = entry?.Name ?? file.Filename ?? "Файл";
         data.Metadata.TryGetValue(file.Id, out var meta);
-        data.Aliases.TryGetValue(file.Id, out var alias);
-        data.Tags.TryGetValue(file.Id, out var tags);
         var subtitle = file.MediaKind == DomainMediaKind.Audio
             ? string.Join(" · ", new[] { meta?.AudioArtist, meta?.AudioAlbum }.Where(x => !string.IsNullOrWhiteSpace(x)))
             : trash ? "В корзине" : FileSubtitle(file.MediaKind, meta);
         var id = trash ? entry!.Id.ToString() : (entry?.Id.ToString() ?? file.Id.ToString());
-        var fields = new List<(string Field, string? Value)>
-        {
-            ("name", title),
-            ("alias", alias?.Value),
-        };
-        fields.AddRange((tags ?? []).Select(t => ("tag", (string?)t.Value)));
-        if (file.MediaKind == DomainMediaKind.Audio)
-        {
-            fields.Add(("title", meta?.AudioTitle));
-            fields.Add(("artist", meta?.AudioArtist));
-            fields.Add(("album", meta?.AudioAlbum));
-        }
-        if (file.MediaKind == DomainMediaKind.Document)
-        {
-            fields.Add(("documentTitle", meta?.DocumentTitle));
-            fields.Add(("documentAuthor", meta?.DocumentAuthor));
-            fields.Add(("documentSubject", meta?.DocumentSubject));
-        }
-
         return CreateHit(kind, id, title, subtitle, file.Id, data.FavoriteIds.Contains(file.Id), entry?.Id.ToString() ?? string.Empty,
-            trash ? entry!.DeletedAt ?? entry.CreatedAt : file.CreatedAt, query, fields, file.MediaKind, file.Size, PreviewUrl(data, file.Id));
+            trash ? entry!.DeletedAt ?? entry.CreatedAt : file.CreatedAt, file.MediaKind, file.Size, PreviewUrl(data, file.Id));
     }
 
     /// <summary>Хит без данных файла (альбом, плейлист, папка, shared); порядок задан рангом из БД.</summary>
     private static PendingHit SimpleHit(
         SearchHitKind kind, string id, int rank, double similarity, DateTime sortAt, string title, string? subtitle, Guid? targetId,
-        string query, params (string Field, string? Value)[] fields)
-        => new(kind, id, rank, similarity, sortAt, null,
-            _ => CreateHit(kind, id, title, subtitle, targetId, false, string.Empty, sortAt, query, fields, DomainMediaKind.Other, 0, string.Empty));
+        string matchField, string matchValue)
+        => new(kind, id, rank, similarity, sortAt, null, matchField, matchValue,
+            _ => CreateHit(kind, id, title, subtitle, targetId, false, string.Empty, sortAt, DomainMediaKind.Other, 0, string.Empty));
 
     private static SearchHit CreateHit(
         SearchHitKind kind, string id, string title, string? subtitle, Guid? fileId, bool favorite, string entryId, DateTime sortAt,
-        string query, IEnumerable<(string Field, string? Value)> fields, DomainMediaKind mediaKind, long size, string previewUrl)
+        DomainMediaKind mediaKind, long size, string previewUrl)
     {
-        // Ранг и порядок уже определены БД; метка совпадения нужна только для подсветки в карточке.
-        var match = Match(query, fields);
         return new SearchHit
         {
             Kind = kind,
@@ -322,8 +293,8 @@ public partial class UnifiedSearchService
             PreviewUrl = previewUrl,
             MediaKind = (ProtoMediaKind)(int)mediaKind,
             Favorite = favorite,
-            MatchField = match?.Field ?? string.Empty,
-            MatchValue = match?.Value ?? string.Empty,
+            MatchField = string.Empty,
+            MatchValue = string.Empty,
             CreatedAt = Timestamp.FromDateTime(DateTime.SpecifyKind(sortAt, DateTimeKind.Utc)),
             Size = size
         };
@@ -337,58 +308,6 @@ public partial class UnifiedSearchService
         DomainMediaKind.Other => "Файл",
         _ => string.Empty
     };
-
-    private static SearchMatch? Match(string query, IEnumerable<(string Field, string? Value)> fields)
-    {
-        if (query.Length == 0)
-            return new SearchMatch(string.Empty, string.Empty, 0, 0);
-
-        SearchMatch? best = null;
-        foreach (var (field, raw) in fields)
-        {
-            if (string.IsNullOrWhiteSpace(raw))
-                continue;
-            var value = SearchText.Normalize(raw);
-            var (rank, similarity) = value == query ? (4, 1d)
-                : value.StartsWith(query, StringComparison.Ordinal) ? (3, 1d)
-                : value.Contains(query, StringComparison.Ordinal) ? (2, 1d)
-                : query.Length >= 4 ? (1, WordSimilarity(query, value)) : (0, 0d);
-            if (rank == 1 && similarity < .45d)
-                continue;
-            if (rank == 0)
-                continue;
-            var candidate = new SearchMatch(field, raw!, rank, similarity);
-            if (best is null || candidate.Rank > best.Rank || candidate.Rank == best.Rank && candidate.Similarity > best.Similarity)
-                best = candidate;
-        }
-        return best;
-    }
-
-    private static double WordSimilarity(string query, string value)
-        => value.Split(' ', StringSplitOptions.RemoveEmptyEntries)
-            .Append(value)
-            .Select(part => TrigramSimilarity(query, part))
-            .DefaultIfEmpty(0)
-            .Max();
-
-    private static double TrigramSimilarity(string left, string right)
-    {
-        var a = Trigrams(left);
-        var b = Trigrams(right);
-        if (a.Count == 0 || b.Count == 0)
-            return 0;
-        return 2d * a.Intersect(b, StringComparer.Ordinal).Count() / (a.Count + b.Count);
-    }
-
-    private static HashSet<string> Trigrams(string value)
-    {
-        var padded = $"  {value} ";
-        var result = new HashSet<string>(StringComparer.Ordinal);
-        for (var i = 0; i <= padded.Length - 3; i++)
-            result.Add(padded.Substring(i, 3));
-        return result;
-    }
-
 
     private static string PreviewUrl(FileEnrichment data, Guid fileId)
     {
@@ -420,6 +339,4 @@ public partial class UnifiedSearchService
         new() { Section = SearchSection.Shared, Limit = 20 },
         new() { Section = SearchSection.Trash, Limit = 20 },
     ];
-
-    private sealed record SearchMatch(string Field, string Value, int Rank, double Similarity);
 }
