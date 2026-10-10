@@ -1120,7 +1120,7 @@ body:has(.mini-player) .toast-stack { bottom: 128px; }
   position: absolute;
   top: 56px;
   right: 28px;
-  width: 400px;
+  width: min(400px, calc(100vw - 56px));
   max-height: 480px;
   background: var(--md-surface-container-low);
   border: 1px solid var(--md-outline-variant);
@@ -1186,9 +1186,14 @@ body:has(.mini-player) .toast-stack { bottom: 128px; }
 }
 
 .upload-popup-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
   padding: 8px 12px;
   border-top: 1px solid var(--md-outline-variant);
 }
+.upload-popup-foot .icon-btn:disabled { opacity: .35; cursor: default; }
+.upload-popup-foot .icon-btn:disabled:hover { background: transparent; }
 
 .upload-task {
   display: flex;
