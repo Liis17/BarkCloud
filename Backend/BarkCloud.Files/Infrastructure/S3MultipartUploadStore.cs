@@ -4,6 +4,10 @@ using System.Globalization;
 using Amazon.S3;
 using Amazon.S3.Model;
 
+using BarkCloud.Shared.Exceptions.Files;
+
+using Microsoft.AspNetCore.WebUtilities;
+
 namespace BarkCloud.Files.Infrastructure;
 
 public sealed class S3MultipartUploadStore : IMultipartUploadStore
@@ -53,6 +57,19 @@ public sealed class S3MultipartUploadStore : IMultipartUploadStore
     {
         await using var lease = _migrationGate is null ? null : await _migrationGate.EnterAsync(storageProfileId, false, cancellationToken);
         var profile = _registry.GetProfile(storageProfileId);
+        // Signed UploadPart requests require a seekable stream in the AWS SDK.
+        // Buffer only this part, spilling to disk rather than keeping large parts in memory.
+        await using var bufferedBody = !body.CanSeek && !profile.IsR2
+            ? new FileBufferingReadStream(body, 64 * 1024, size, Path.GetTempPath)
+            : null;
+        if (bufferedBody is not null)
+        {
+            await bufferedBody.CopyToAsync(Stream.Null, cancellationToken);
+            if (bufferedBody.Length != size)
+                throw new UploadPartInvalidException();
+            bufferedBody.Position = 0;
+        }
+
         var response = await _registry.GetClientForProfile(storageProfileId)
             .UploadPartAsync(new UploadPartRequest
             {
@@ -62,7 +79,7 @@ public sealed class S3MultipartUploadStore : IMultipartUploadStore
                 PartNumber = partNumber,
                 PartSize = size,
                 DisablePayloadSigning = profile.IsR2,
-                InputStream = body,
+                InputStream = bufferedBody ?? body,
                 DisableDefaultChecksumValidation = profile.IsR2,
                 UseChunkEncoding = !profile.IsR2
             }, cancellationToken);
