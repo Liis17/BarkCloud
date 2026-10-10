@@ -6,6 +6,7 @@ using BarkCloud.Proto.Files;
 using DokanNet;
 
 using Google.Protobuf.WellKnownTypes;
+using Grpc.Core;
 
 using FileAccess = DokanNet.FileAccess; // в IDokanOperations access — это DokanNet.FileAccess
 
@@ -37,6 +38,8 @@ internal sealed class WriteSession : IDisposable
 // Read-write проекция облака BarkCloud на файловую систему Dokany.
 internal sealed class BarkCloudFileSystem : IDokanOperations
 {
+    internal const NtStatus UnexpectedNetworkError = (NtStatus)0xC00000C4L;
+
     private const FileAccess WriteBits =
         FileAccess.WriteData | FileAccess.AppendData | FileAccess.GenericWrite | FileAccess.GenericAll;
 
@@ -57,6 +60,20 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
     }
 
     public NtStatus CreateFile(string fileName, FileAccess access, FileShare share, FileMode mode,
+        FileOptions options, FileAttributes attributes, IDokanFileInfo info)
+    {
+        try
+        {
+            return CreateFileCore(fileName, access, share, mode, options, attributes, info);
+        }
+        catch (Exception ex)
+        {
+            EngineLog.Error($"CreateFile(\"{fileName}\")", ex);
+            return ToStatus(ex);
+        }
+    }
+
+    private NtStatus CreateFileCore(string fileName, FileAccess access, FileShare share, FileMode mode,
         FileOptions options, FileAttributes attributes, IDokanFileInfo info)
     {
         var node = SafeResolve(fileName);
@@ -82,7 +99,7 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
                 catch (Exception ex)
                 {
                     EngineLog.Error($"CreateDirectory(\"{fileName}\")", ex);
-                    return DokanResult.Error;
+                    return ToStatus(ex);
                 }
             }
 
@@ -116,7 +133,7 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
             catch (Exception ex)
             {
                 EngineLog.Error($"OpenForWrite(\"{fileName}\")", ex);
-                return DokanResult.Error;
+                return ToStatus(ex);
             }
         }
 
@@ -126,16 +143,8 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
             var parent = _gateway.ResolveParentDirectory(fileName);
             if (parent is null)
                 return DokanResult.PathNotFound;
-            try
-            {
-                info.Context = OpenNew(parent.Value.DirectoryId, parent.Value.Name);
-                return DokanResult.Success;
-            }
-            catch (Exception ex)
-            {
-                EngineLog.Error($"CreateFile(\"{fileName}\")", ex);
-                return DokanResult.Error;
-            }
+            info.Context = OpenNew(parent.Value.DirectoryId, parent.Value.Name);
+            return DokanResult.Success;
         }
 
         return DokanResult.FileNotFound;
@@ -170,123 +179,148 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
     public NtStatus ReadFile(string fileName, byte[] buffer, out int bytesRead, long offset, IDokanFileInfo info)
     {
         bytesRead = 0;
-
-        if (info.Context is WriteSession ws)
-        {
-            lock (ws.Sync)
-            {
-                if (offset >= ws.Stream.Length)
-                    return DokanResult.Success;
-                ws.Stream.Position = offset;
-                bytesRead = ws.Stream.Read(buffer, 0, buffer.Length);
-            }
-            return DokanResult.Success;
-        }
-
-        var node = SafeResolve(fileName);
-        if (node is null || node.IsDirectory)
-            return DokanResult.FileNotFound;
-
         try
         {
+            if (info.Context is WriteSession ws)
+            {
+                lock (ws.Sync)
+                {
+                    if (offset >= ws.Stream.Length)
+                        return DokanResult.Success;
+                    ws.Stream.Position = offset;
+                    bytesRead = ws.Stream.Read(buffer, 0, buffer.Length);
+                }
+                return DokanResult.Success;
+            }
+
+            var node = SafeResolve(fileName);
+            if (node is null || node.IsDirectory)
+                return DokanResult.FileNotFound;
+
             bytesRead = _gateway.Read(node.FileId, node.Length, buffer, offset);
             return DokanResult.Success;
         }
         catch (Exception ex)
         {
             EngineLog.Error($"ReadFile(\"{fileName}\")", ex);
-            return DokanResult.Error;
+            return ToStatus(ex);
         }
     }
 
     public NtStatus WriteFile(string fileName, byte[] buffer, out int bytesWritten, long offset, IDokanFileInfo info)
     {
         bytesWritten = 0;
-        if (info.Context is not WriteSession ws)
-            return DokanResult.AccessDenied;
-
-        lock (ws.Sync)
+        try
         {
-            ws.Stream.Position = info.WriteToEndOfFile ? ws.Stream.Length : offset;
-            ws.Stream.Write(buffer, 0, buffer.Length);
-            ws.Modified = true;
+            if (info.Context is not WriteSession ws)
+                return DokanResult.AccessDenied;
+
+            lock (ws.Sync)
+            {
+                ws.Stream.Position = info.WriteToEndOfFile ? ws.Stream.Length : offset;
+                ws.Stream.Write(buffer, 0, buffer.Length);
+                ws.Modified = true;
+            }
+            bytesWritten = buffer.Length;
+            return DokanResult.Success;
         }
-        bytesWritten = buffer.Length;
-        return DokanResult.Success;
+        catch (Exception ex)
+        {
+            EngineLog.Error($"WriteFile(\"{fileName}\")", ex);
+            return ToStatus(ex);
+        }
     }
 
     public NtStatus FlushFileBuffers(string fileName, IDokanFileInfo info)
     {
-        if (info.Context is WriteSession ws)
-            lock (ws.Sync) ws.Stream.Flush();
-        return DokanResult.Success;
+        try
+        {
+            if (info.Context is WriteSession ws)
+                lock (ws.Sync) ws.Stream.Flush();
+            return DokanResult.Success;
+        }
+        catch (Exception ex)
+        {
+            EngineLog.Error($"FlushFileBuffers(\"{fileName}\")", ex);
+            return ToStatus(ex);
+        }
     }
 
     public NtStatus GetFileInformation(string fileName, out FileInformation fileInfo, IDokanFileInfo info)
     {
-        if (info.Context is WriteSession ws)
+        fileInfo = default;
+        try
         {
-            long length;
-            lock (ws.Sync) length = ws.Stream.Length;
-            fileInfo = new FileInformation { FileName = ws.Name, Attributes = FileAttributes.Normal, Length = length };
+            if (info.Context is WriteSession ws)
+            {
+                long length;
+                lock (ws.Sync) length = ws.Stream.Length;
+                fileInfo = new FileInformation { FileName = ws.Name, Attributes = FileAttributes.Normal, Length = length };
+                return DokanResult.Success;
+            }
+
+            var node = SafeResolve(fileName);
+            if (node is null)
+                return DokanResult.FileNotFound;
+
+            fileInfo = new FileInformation
+            {
+                FileName = node.Name,
+                Attributes = node.IsDirectory ? FileAttributes.Directory : FileAttributes.Normal,
+                Length = node.Length,
+                CreationTime = node.Created,
+                LastWriteTime = node.Updated,
+                LastAccessTime = node.Updated,
+            };
             return DokanResult.Success;
         }
-
-        fileInfo = default;
-        var node = SafeResolve(fileName);
-        if (node is null)
-            return DokanResult.FileNotFound;
-
-        fileInfo = new FileInformation
+        catch (Exception ex)
         {
-            FileName = node.Name,
-            Attributes = node.IsDirectory ? FileAttributes.Directory : FileAttributes.Normal,
-            Length = node.Length,
-            CreationTime = node.Created,
-            LastWriteTime = node.Updated,
-            LastAccessTime = node.Updated,
-        };
-        return DokanResult.Success;
+            EngineLog.Error($"GetFileInformation(\"{fileName}\")", ex);
+            return ToStatus(ex);
+        }
     }
 
     public NtStatus FindFiles(string fileName, out IList<FileInformation> files, IDokanFileInfo info)
     {
         files = new List<FileInformation>();
-        var node = SafeResolve(fileName);
-        if (node is null || !node.IsDirectory)
-            return DokanResult.FileNotFound;
+        try
+        {
+            var node = SafeResolve(fileName);
+            if (node is null || !node.IsDirectory)
+                return DokanResult.FileNotFound;
 
-        DirectoryListingDetailed listing;
-        try { listing = _gateway.ListDirectory(node.DirectoryId); }
+            var listing = _gateway.ListDirectory(node.DirectoryId);
+            foreach (var d in listing.Subdirs)
+                files.Add(new FileInformation
+                {
+                    FileName = d.Name,
+                    Attributes = FileAttributes.Directory,
+                    CreationTime = ToDate(d.CreatedAt),
+                    LastWriteTime = ToDate(d.UpdatedAt),
+                    LastAccessTime = ToDate(d.UpdatedAt),
+                    Length = 0,
+                });
+
+            foreach (var f in listing.Files)
+                files.Add(new FileInformation
+                {
+                    FileName = f.Entry.Name,
+                    Attributes = FileAttributes.Normal,
+                    CreationTime = ToDate(f.Entry.CreatedAt),
+                    LastWriteTime = ToDate(f.File.UploadedAt),
+                    LastAccessTime = ToDate(f.File.UploadedAt),
+                    Length = f.File.FileSize,
+                });
+
+            return DokanResult.Success;
+        }
         catch (Exception ex)
         {
             EngineLog.Error($"FindFiles(\"{fileName}\")", ex);
-            return DokanResult.Error;
+            files = new List<FileInformation>();
+            return ToStatus(ex);
         }
-
-        foreach (var d in listing.Subdirs)
-            files.Add(new FileInformation
-            {
-                FileName = d.Name,
-                Attributes = FileAttributes.Directory,
-                CreationTime = ToDate(d.CreatedAt),
-                LastWriteTime = ToDate(d.UpdatedAt),
-                LastAccessTime = ToDate(d.UpdatedAt),
-                Length = 0,
-            });
-
-        foreach (var f in listing.Files)
-            files.Add(new FileInformation
-            {
-                FileName = f.Entry.Name,
-                Attributes = FileAttributes.Normal,
-                CreationTime = ToDate(f.Entry.CreatedAt),
-                LastWriteTime = ToDate(f.File.UploadedAt),
-                LastAccessTime = ToDate(f.File.UploadedAt),
-                Length = f.File.FileSize,
-            });
-
-        return DokanResult.Success;
     }
 
     public NtStatus FindFilesWithPattern(string fileName, string searchPattern,
@@ -298,25 +332,54 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
 
     public NtStatus SetEndOfFile(string fileName, long length, IDokanFileInfo info)
     {
-        if (info.Context is not WriteSession ws)
-            return DokanResult.AccessDenied;
-        lock (ws.Sync) { ws.Stream.SetLength(length); ws.Modified = true; }
-        return DokanResult.Success;
+        try
+        {
+            if (info.Context is not WriteSession ws)
+                return DokanResult.AccessDenied;
+            lock (ws.Sync) { ws.Stream.SetLength(length); ws.Modified = true; }
+            return DokanResult.Success;
+        }
+        catch (Exception ex)
+        {
+            EngineLog.Error($"SetEndOfFile(\"{fileName}\")", ex);
+            return ToStatus(ex);
+        }
     }
 
     public NtStatus SetAllocationSize(string fileName, long length, IDokanFileInfo info)
     {
-        if (info.Context is not WriteSession ws)
-            return DokanResult.AccessDenied;
-        lock (ws.Sync)
+        try
         {
-            if (length < ws.Stream.Length)
-                ws.Stream.SetLength(length);
+            if (info.Context is not WriteSession ws)
+                return DokanResult.AccessDenied;
+            lock (ws.Sync)
+            {
+                if (length < ws.Stream.Length)
+                    ws.Stream.SetLength(length);
+            }
+            return DokanResult.Success;
         }
-        return DokanResult.Success;
+        catch (Exception ex)
+        {
+            EngineLog.Error($"SetAllocationSize(\"{fileName}\")", ex);
+            return ToStatus(ex);
+        }
     }
 
     public NtStatus MoveFile(string oldName, string newName, bool replace, IDokanFileInfo info)
+    {
+        try
+        {
+            return MoveFileCore(oldName, newName, replace, info);
+        }
+        catch (Exception ex)
+        {
+            EngineLog.Error($"MoveFile(\"{oldName}\" → \"{newName}\")", ex);
+            return ToStatus(ex);
+        }
+    }
+
+    private NtStatus MoveFileCore(string oldName, string newName, bool replace, IDokanFileInfo info)
     {
         var node = SafeResolve(oldName);
         if (node is null)
@@ -330,47 +393,43 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
         var parentChanged = !string.Equals(from.Value.DirectoryId, to.Value.DirectoryId, StringComparison.Ordinal);
         var nameChanged = !string.Equals(from.Value.Name, to.Value.Name, StringComparison.Ordinal);
 
-        try
+        if (node.IsDirectory)
         {
-            if (node.IsDirectory)
-            {
-                if (parentChanged) _gateway.MoveDirectory(node.DirectoryId, to.Value.DirectoryId);
-                if (nameChanged) _gateway.RenameDirectory(node.DirectoryId, to.Value.Name);
-            }
-            else
-            {
-                if (parentChanged) _gateway.MoveFileEntry(node.EntryId, to.Value.DirectoryId);
-                if (nameChanged) _gateway.RenameFileEntry(node.EntryId, to.Value.Name);
-            }
+            if (parentChanged) _gateway.MoveDirectory(node.DirectoryId, to.Value.DirectoryId);
+            if (nameChanged) _gateway.RenameDirectory(node.DirectoryId, to.Value.Name);
+        }
+        else
+        {
+            if (parentChanged) _gateway.MoveFileEntry(node.EntryId, to.Value.DirectoryId);
+            if (nameChanged) _gateway.RenameFileEntry(node.EntryId, to.Value.Name);
+        }
 
-            _gateway.InvalidateListing(from.Value.DirectoryId);
-            _gateway.InvalidateListing(to.Value.DirectoryId);
-            return DokanResult.Success;
-        }
-        catch (Exception ex)
-        {
-            EngineLog.Error($"MoveFile(\"{oldName}\" → \"{newName}\")", ex);
-            return DokanResult.Error;
-        }
+        _gateway.InvalidateListing(from.Value.DirectoryId);
+        _gateway.InvalidateListing(to.Value.DirectoryId);
+        return DokanResult.Success;
     }
 
     public NtStatus DeleteFile(string fileName, IDokanFileInfo info) => DokanResult.Success;
 
     public NtStatus DeleteDirectory(string fileName, IDokanFileInfo info)
     {
-        var node = SafeResolve(fileName);
-        if (node is null || !node.IsDirectory)
-            return DokanResult.Success;
-
         try
         {
+            var node = SafeResolve(fileName);
+            if (node is null || !node.IsDirectory)
+                return DokanResult.Success;
+
             var listing = _gateway.ListDirectory(node.DirectoryId);
             if (listing.Subdirs.Count > 0 || listing.Files.Count > 0)
                 return DokanResult.DirectoryNotEmpty;
-        }
-        catch { /* при ошибке листинга разрешаем — сервер удаляет рекурсивно */ }
 
-        return DokanResult.Success;
+            return DokanResult.Success;
+        }
+        catch (Exception ex)
+        {
+            EngineLog.Error($"DeleteDirectory(\"{fileName}\")", ex);
+            return ToStatus(ex);
+        }
     }
 
     public NtStatus GetDiskFreeSpace(out long freeBytesAvailable, out long totalNumberOfBytes,
@@ -389,7 +448,11 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
             totalNumberOfFreeBytes = free;
             return DokanResult.Success;
         }
-        catch { return DokanResult.Error; }
+        catch (Exception ex)
+        {
+            EngineLog.Error("GetDiskFreeSpace", ex);
+            return ToStatus(ex);
+        }
     }
 
     public NtStatus GetVolumeInformation(out string volumeLabel, out FileSystemFeatures features,
@@ -509,11 +572,33 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
             _gateway.InvalidateListing(parent.Value.DirectoryId);
     }
 
-    private ResolvedNode? SafeResolve(string path)
+    internal static NtStatus ToStatus(Exception exception)
     {
-        try { return _gateway.Resolve(path); }
-        catch { return null; }
+        if (exception is RpcException rpc)
+        {
+            if (ServerErrors.HasCode(rpc, ServerErrors.FileEntryNotFound))
+                return DokanResult.FileNotFound;
+            if (ServerErrors.HasCode(rpc, ServerErrors.DirectoryNotFound))
+                return DokanResult.PathNotFound;
+            if (ServerErrors.HasCode(rpc, ServerErrors.DirectoryNameConflict))
+                return DokanResult.FileExists;
+            if (rpc.StatusCode == StatusCode.PermissionDenied
+                || ServerErrors.HasCode(rpc, ServerErrors.CloudAccessDenied)
+                || ServerErrors.HasCode(rpc, ServerErrors.CircularMove))
+                return DokanResult.AccessDenied;
+        }
+
+        if (exception is IOException io)
+        {
+            var hresult = unchecked((uint)io.HResult);
+            if (hresult is 0x80070070 or 0x80070027)
+                return DokanResult.DiskFull;
+        }
+
+        return UnexpectedNetworkError;
     }
+
+    private ResolvedNode? SafeResolve(string path) => _gateway.Resolve(path);
 
     private static DateTime? ToDate(Timestamp? t) => t?.ToDateTime();
 }

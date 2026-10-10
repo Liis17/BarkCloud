@@ -29,7 +29,7 @@ internal sealed class FakeCallInvoker : CallInvoker
     public static RpcException BusinessError(string code)
     {
         var trailers = new Metadata { { "x-error-code", code } };
-        return new RpcException(new Status(StatusCode.FailedPrecondition, code), trailers);
+        return new RpcException(new Status(StatusCode.FailedPrecondition, "Операция отклонена сервером"), trailers);
     }
 
     public override TResponse BlockingUnaryCall<TRequest, TResponse>(
