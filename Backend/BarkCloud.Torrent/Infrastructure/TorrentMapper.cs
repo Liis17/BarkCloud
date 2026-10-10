@@ -44,8 +44,9 @@ public static class TorrentMapper
             info.Leechers = m.Peers.Leechs;
 
             // Живой трафик: накопленная база в DB + дельта текущей сессии, ещё не сброшенная.
-            var downDelta = Math.Max(0, m.Monitor.DataBytesReceived - managed.LastSessionDownloaded);
-            var upDelta = Math.Max(0, m.Monitor.DataBytesSent - managed.LastSessionUploaded);
+            var (baseDown, baseUp) = managed.BaselineFor(entity.Downloaded, entity.Uploaded);
+            var downDelta = Math.Max(0, m.Monitor.DataBytesReceived - baseDown);
+            var upDelta = Math.Max(0, m.Monitor.DataBytesSent - baseUp);
             info.Downloaded = entity.Downloaded + downDelta;
             info.Uploaded = entity.Uploaded + upDelta;
             info.Ratio = info.Downloaded > 0 ? (double)info.Uploaded / info.Downloaded : 0;
