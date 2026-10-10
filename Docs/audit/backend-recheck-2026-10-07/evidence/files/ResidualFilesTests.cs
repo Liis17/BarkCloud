@@ -1,4 +1,3 @@
-using System.Reflection;
 using System.Text.Json;
 using BarkCloud.Files.Domain;
 using BarkCloud.Files.Features.Cloud.AttachFile;
@@ -137,9 +136,7 @@ public sealed class ResidualFilesTests(ITestOutputHelper output)
         await using var connection = await db.DataSource.OpenConnectionAsync();
         await using var command = new NpgsqlCommand("SELECT word_similarity('report', 'quarterly report finances')", connection);
         var sqlSimilarity = await command.ExecuteScalarAsync();
-        var method = typeof(UnifiedSearchService).GetMethod("WordSimilarity", BindingFlags.Static | BindingFlags.NonPublic)!;
-        var csharpSimilarity = (double)method.Invoke(null, new object[] { query, "report" })!;
-        output.WriteLine(JsonSerializer.Serialize(new { query, hit.Title, hit.MatchField, hit.MatchValue, sqlSimilarity, csharpSimilarity }));
+        output.WriteLine(JsonSerializer.Serialize(new { query, hit.Title, hit.MatchField, hit.MatchValue, sqlSimilarity }));
         Assert.Equal("name", hit.MatchField);
         Assert.Equal("report", hit.MatchValue);
     }

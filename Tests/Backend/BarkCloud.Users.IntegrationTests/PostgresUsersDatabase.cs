@@ -67,8 +67,10 @@ public sealed class PostgresUsersDatabase : IAsyncDisposable
     public UsersContext CreateContext(params IInterceptor[] interceptors) => new(
         new DbContextOptionsBuilder<UsersContext>().UseNpgsql(_dataSource).AddInterceptors(interceptors).Options);
 
-    public string ConnectionString => new NpgsqlConnectionStringBuilder(_dataSource.ConnectionString)
+    // NpgsqlDataSource.ConnectionString omits the password by default.
+    public string ConnectionString => new NpgsqlConnectionStringBuilder(_adminConnectionString)
     {
+        Database = _databaseName,
         Pooling = false
     }.ConnectionString;
 

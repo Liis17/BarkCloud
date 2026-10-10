@@ -13,6 +13,7 @@ using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 using Quartz;
 
@@ -139,6 +140,8 @@ internal sealed class UploadTestHost : IAsyncDisposable
     public Task<IScheduler> SchedulerAsync() => _host.Services.GetRequiredService<ISchedulerFactory>().GetScheduler();
     public async Task StartAsync()
     {
+        // Quartz's global provider can still reference a disposed previous host.
+        Quartz.Logging.LogContext.SetCurrentLogProvider(_host.Services.GetRequiredService<ILoggerFactory>());
         _observer = Bus.ConnectConsumeObserver(_probe);
         await _host.StartAsync();
     }
