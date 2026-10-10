@@ -136,8 +136,7 @@ public class JwtServiceTests
     // F23: ключ проверки в остальных сервисах (AddXAuth) обязан совпадать с ключом подписи Identity,
     // в том числе при не-ASCII секрете (раньше проверка шла по ASCII и ключи расходились).
     [Theory]
-    [InlineData("supersecretkey_at_least_32_chars_long_for_hs256!!")]
-    [InlineData("СекретныйКлючДляПодписиТокеновЮникод")]
+    [MemberData(nameof(ValidSecrets))]
     public void GeneratedTokens_AreAcceptedByXAuthValidation(string secret)
     {
         var settings = BuildSettings();
@@ -162,6 +161,55 @@ public class JwtServiceTests
         userToken.Should().NotThrow();
         serverToken.Should().NotThrow();
     }
+
+    public static TheoryData<string> ValidSecrets => new()
+    {
+        { "supersecretkey_at_least_32_chars_long_for_hs256!!" },
+        { "СекретныйКлючДляПодписиТокеновЮникод" },
+        { new string('a', 32) },
+        { new string('ж', 16) }
+    };
+
+    [Theory]
+    [MemberData(nameof(InvalidSecrets))]
+    public void AddXAuth_AndTokenGeneration_RejectInvalidSecrets(string? secret)
+    {
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["JwtSettings:SecretKey"] = secret,
+            ["JwtSettings:Issuer"] = "bark-issuer",
+            ["JwtSettings:Audience"] = "bark-audience"
+        }).Build();
+        var services = new ServiceCollection();
+
+        var addXAuth = () => services.AddXAuth(configuration);
+        var addXAuthMessage = addXAuth.Should().Throw<InvalidOperationException>().Which.Message;
+        addXAuthMessage.Should().Contain("JwtSettings:SecretKey");
+
+        var settings = BuildSettings();
+        settings.SecretKey = secret!;
+        var sut = new JwtService(settings);
+
+        var userMessage = Record.Exception(() => sut.GenerateUserToken(42, "device-abc", 7))
+            .Should().BeOfType<InvalidOperationException>().Which.Message;
+        var serverMessage = Record.Exception(() => sut.GenerateServerToken(ServiceId.Files))
+            .Should().BeOfType<InvalidOperationException>().Which.Message;
+
+        if (!string.IsNullOrEmpty(secret))
+        {
+            addXAuthMessage.Should().NotContain(secret);
+            userMessage.Should().NotContain(secret);
+            serverMessage.Should().NotContain(secret);
+        }
+    }
+
+    public static TheoryData<string?> InvalidSecrets => new()
+    {
+        { null },
+        { string.Empty },
+        { new string('a', 31) },
+        { new string('ж', 15) }
+    };
 
     [Fact]
     public void GenerateUserToken_ValidationWithWrongKey_IsRejected()
