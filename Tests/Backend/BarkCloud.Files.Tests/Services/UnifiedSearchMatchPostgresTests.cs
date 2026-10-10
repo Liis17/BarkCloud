@@ -173,7 +173,7 @@ public sealed class UnifiedSearchMatchPostgresTests(ITestOutputHelper output)
         var rankEntry = NewEntry(rankFile, "repot");
         var tieEntry = NewEntry(tieFile, "report");
         var unicodeEntry = NewEntry(unicodeFile, "unrelated");
-        var similarityEntry = NewEntry(similarityFile, "unrelated");
+        var similarityEntry = NewEntry(similarityFile, "repro");
         var album = NewAlbum("report", "report", Owner);
 
         await Seed(db,
@@ -184,7 +184,6 @@ public sealed class UnifiedSearchMatchPostgresTests(ITestOutputHelper output)
             new FileTag { OwnerId = Owner, FileId = tieFile.Id, Value = "report", NormalizedValue = "report", CreatedAt = DateTime.UtcNow },
             new FileTag { OwnerId = Owner, FileId = unicodeFile.Id, Value = "report\uE000", NormalizedValue = "report\uE000", CreatedAt = DateTime.UtcNow },
             new FileTag { OwnerId = Owner, FileId = unicodeFile.Id, Value = "report😀", NormalizedValue = "report😀", CreatedAt = DateTime.UtcNow },
-            new FileTag { OwnerId = Owner, FileId = similarityFile.Id, Value = "repro", NormalizedValue = "repro", CreatedAt = DateTime.UtcNow },
             new FileTag { OwnerId = Owner, FileId = similarityFile.Id, Value = "repot", NormalizedValue = "repot", CreatedAt = DateTime.UtcNow });
 
         var report = await Search(db, SearchSection.Photos, "report");
@@ -196,6 +195,9 @@ public sealed class UnifiedSearchMatchPostgresTests(ITestOutputHelper output)
 
         var reproScore = await WordSimilarity(db, "repro", "report");
         var repotScore = await WordSimilarity(db, "repot", "report");
+        Assert.Equal(1, await SearchRank(db, "repro", "report"));
+        Assert.Equal(1, await SearchRank(db, "repot", "report"));
+        Assert.True(reproScore >= .45f, $"Expected SQL similarity for the name to meet the rank-1 threshold: {reproScore}");
         Assert.True(repotScore > reproScore, $"Expected SQL similarity {repotScore} > {reproScore}");
     }
 
@@ -239,11 +241,14 @@ public sealed class UnifiedSearchMatchPostgresTests(ITestOutputHelper output)
         await using var db = await PostgresFilesDatabase.CreateAsync();
         var filenameOnlyFile = NewFile(MediaKind.Photo, "report-only-filename.jpg");
         var trashFile = NewFile(MediaKind.Photo, "trash.jpg");
-        var oldEntry = NewEntry(trashFile, "old report entry", deleted: true);
-        var latestEntry = NewEntry(trashFile, "latest report entry", deleted: true);
+        var oldEntry = NewEntry(trashFile, "a old report entry", deleted: true);
+        var latestEntry = NewEntry(trashFile, "z latest report entry", deleted: true);
         oldEntry.DeletedAt = DateTime.UtcNow.AddMinutes(-2);
         latestEntry.DeletedAt = DateTime.UtcNow.AddMinutes(-1);
         await Seed(db, filenameOnlyFile, trashFile, oldEntry, latestEntry);
+
+        Assert.Equal(2, await SearchRank(db, oldEntry.Name, "report"));
+        Assert.Equal(2, await SearchRank(db, latestEntry.Name, "report"));
 
         var photos = await Search(db, SearchSection.Photos, "report");
         AssertMatch(photos.Hits.Single(hit => hit.FileId == filenameOnlyFile.Id.ToString()), "name", filenameOnlyFile.Filename!);
@@ -524,6 +529,23 @@ public sealed class UnifiedSearchMatchPostgresTests(ITestOutputHelper output)
         command.Parameters.AddWithValue(value);
         command.Parameters.AddWithValue(query);
         return (float)(await command.ExecuteScalarAsync())!;
+    }
+
+    private static async Task<int> SearchRank(PostgresFilesDatabase db, string value, string query)
+    {
+        await using var connection = await db.DataSource.OpenConnectionAsync();
+        await using var command = new NpgsqlCommand("""
+            SELECT CASE
+                WHEN lower($1) = $2 THEN 4
+                WHEN $1 ILIKE ($2 || '%') THEN 3
+                WHEN $1 ILIKE ('%' || $2 || '%') THEN 2
+                WHEN char_length($2) >= 4 AND word_similarity($1, $2) >= 0.45 THEN 1
+                ELSE 0
+            END
+            """, connection);
+        command.Parameters.AddWithValue(value);
+        command.Parameters.AddWithValue(query);
+        return (int)(await command.ExecuteScalarAsync())!;
     }
 
     private static async Task<bool> ILike(PostgresFilesDatabase db, string value, string pattern)
