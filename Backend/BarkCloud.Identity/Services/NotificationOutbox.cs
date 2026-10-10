@@ -18,12 +18,13 @@ public class NotificationOutbox(
 {
     private readonly bool _emailEnabled = configuration.EmailEnabled();
 
-    public async Task EnqueueAsync(long userId, NotificationType type, string title, Dictionary<string, string> payload)
+    public async Task<bool> EnqueueAsync(long userId, NotificationType type, string title, Dictionary<string, string> payload,
+        CancellationToken cancellationToken = default)
     {
         // Режим без почты: строки не копим (как NotificationQueueSender, который глушит публикацию).
         if (!_emailEnabled)
         {
-            return;
+            return false;
         }
 
         var now = DateTime.UtcNow;
@@ -33,30 +34,25 @@ public class NotificationOutbox(
             UserId = userId,
             Type = type,
             Title = title,
-            PayloadJson = JsonSerializer.Serialize(payload),
+            PayloadJson = string.Empty,
             CreatedAt = now,
             NextAttemptAt = now
         };
 
         try
         {
+            notification.PayloadJson = JsonSerializer.Serialize(payload);
             context.PendingNotifications.Add(notification);
-
-            // Основное изменение уже зафиксировано: отмена запроса клиентом не должна терять письмо.
-            await context.SaveChangesAsync(CancellationToken.None);
-
-            metrics.Increment("notification_outbox_enqueued");
+            await context.SaveChangesAsync(cancellationToken);
+            return true;
         }
         catch (Exception ex)
         {
             metrics.Increment("notification_outbox_enqueue_failed");
             logger.LogWarning(ex,
                 "Не удалось поставить уведомление {Type} для пользователя {UserId} в очередь доставки", type, userId);
-        }
-        finally
-        {
-            // Неудавшаяся вставка не должна повторяться следующим SaveChanges этого же scope.
             context.Entry(notification).State = EntityState.Detached;
+            throw;
         }
     }
 }

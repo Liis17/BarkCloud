@@ -2,6 +2,7 @@ using BarkCloud.GrpcServer.Metrics;
 using BarkCloud.GrpcServer.Tracker;
 using BarkCloud.Identity.Features.CreateToken;
 using BarkCloud.Identity.Infrastructure;
+using BarkCloud.Identity.Persistence.Contexts;
 using BarkCloud.Identity.Persistence.Services;
 using BarkCloud.Proto.Identity;
 using BarkCloud.Proto.Users;
@@ -19,12 +20,13 @@ public record SessionDevice(string DeviceId, string? DeviceName, string? Operati
 // Выпуск сессии (refresh + access) для уже аутентифицированного пользователя:
 // создаёт токены, регистрирует устройство, ставит в очередь уведомление о входе. Общий хвост входа —
 // им пользуются вход паролем (AuthCommandHandler), вход по ключу (WebAuthn) и серверное создание сессии.
-// Уведомление идёт через outbox и не может сорвать выдачу: к этому моменту токены уже созданы.
+// Локальные изменения и событие outbox фиксируются одной транзакцией.
 public class SessionIssuer(
     UsersServerApi.UsersServerApiClient usersClient,
     IMediator mediator,
     INotificationOutbox notificationOutbox,
     IRefreshTokensStorage refreshTokensStorage,
+    IdentityContext context,
     RequestContext requestContext,
     LocationClient locationClient,
     MetricsCollector metrics,
@@ -35,7 +37,8 @@ public class SessionIssuer(
     public static readonly TimeSpan DeviceRegistrationTimeout = TimeSpan.FromSeconds(10);
 
     /// <summary>Вход пользователя: устройство берётся из заголовков запроса.</summary>
-    public virtual async Task<AuthResponse> IssueAsync(long userId, CancellationToken cancellationToken)
+    public virtual async Task<AuthResponse> IssueAsync(long userId, CancellationToken cancellationToken,
+        Func<CancellationToken, Task>? completeAuthentication = null)
     {
         // Если DeviceId не передан, генерируем временный.
         var deviceId = string.IsNullOrEmpty(requestContext.DeviceId)
@@ -49,7 +52,7 @@ public class SessionIssuer(
             $"{requestContext.AppName} v.{requestContext.AppVersion}",
             requestContext.IpAddress);
 
-        var response = await IssueAsync(userId, device, cancellationToken);
+        var response = await IssueAsyncCore(userId, device, cancellationToken, completeAuthentication);
 
         metrics.Increment("auth_login_success");
 
@@ -59,14 +62,65 @@ public class SessionIssuer(
     /// <summary>Сессия для явно заданного устройства (серверное создание сессии).</summary>
     public virtual async Task<AuthResponse> IssueAsync(long userId, SessionDevice device, CancellationToken cancellationToken)
     {
-        await refreshTokensStorage.DeleteRefreshTokensByDeviceIdSafe(device.DeviceId, userId);
-
-        var refreshTokenString = RefreshTokenGenerator.GenerateRefreshToken();
-        await refreshTokensStorage.CreateNewRefreshToken(refreshTokenString, userId, device.DeviceId, ExpDaysRefreshToken);
-
-        var accessTokenResponse = await mediator.Send(new CreateTokenCommand { RefreshToken = refreshTokenString }, cancellationToken);
-
         var locationInfo = await locationClient.GetLocationString(device.IpAddress);
+        return await IssueAsyncCore(userId, device, cancellationToken, null, locationInfo);
+    }
+
+    private async Task<AuthResponse> IssueAsyncCore(long userId, SessionDevice device, CancellationToken cancellationToken,
+        Func<CancellationToken, Task>? completeAuthentication, string? knownLocation = null)
+    {
+        var locationInfo = knownLocation ?? await locationClient.GetLocationString(device.IpAddress);
+        var refreshTokenString = RefreshTokenGenerator.GenerateRefreshToken();
+        CreateTokenResponse accessTokenResponse;
+        var notificationEnqueued = false;
+
+        try
+        {
+            await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
+            try
+            {
+                if (completeAuthentication is not null)
+                {
+                    await completeAuthentication(cancellationToken);
+                }
+
+                await refreshTokensStorage.DeleteRefreshTokensByDeviceIdSafe(device.DeviceId, userId, cancellationToken);
+                await refreshTokensStorage.CreateNewRefreshToken(refreshTokenString, userId, device.DeviceId,
+                    ExpDaysRefreshToken, cancellationToken);
+                accessTokenResponse = await mediator.Send(new CreateTokenCommand
+                {
+                    RefreshToken = refreshTokenString,
+                    DeferSuccessTelemetry = true
+                }, cancellationToken);
+
+                notificationEnqueued = await notificationOutbox.EnqueueAsync(
+                    userId,
+                    NotificationType.SuccessfulLogin,
+                    "Успешный вход в аккаунт",
+                    NotificationPayload.Device(device.IpAddress, device.DeviceName, device.OperationSystem, device.AppName, locationInfo),
+                    cancellationToken);
+
+                await transaction.CommitAsync(cancellationToken);
+            }
+            catch
+            {
+                try { await transaction.RollbackAsync(CancellationToken.None); } catch { }
+                throw;
+            }
+        }
+        catch
+        {
+            context.ChangeTracker.Clear();
+            throw;
+        }
+
+        if (notificationEnqueued)
+        {
+            metrics.Increment("notification_outbox_enqueued");
+        }
+
+        metrics.Increment("tokens_refreshed");
+
         cancellationToken.ThrowIfCancellationRequested();
 
         try
@@ -93,13 +147,6 @@ public class SessionIssuer(
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-
-        // Геолокация уже определена для устройства — передаём её письму, чтобы воркер не ходил в ip-api второй раз.
-        await notificationOutbox.EnqueueAsync(
-            userId,
-            NotificationType.SuccessfulLogin,
-            "Успешный вход в аккаунт",
-            NotificationPayload.Device(device.IpAddress, device.DeviceName, device.OperationSystem, device.AppName, locationInfo));
 
         metrics.Increment("sessions_created");
 

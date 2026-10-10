@@ -5,11 +5,13 @@ using BarkCloud.GrpcServer.Metrics;
 using BarkCloud.GrpcServer.Tracker;
 using BarkCloud.Identity.Features.CreateToken;
 using BarkCloud.Identity.Infrastructure;
+using BarkCloud.Identity.Persistence.Contexts;
 using BarkCloud.Identity.Persistence.Services;
 using BarkCloud.Identity.Services;
 using BarkCloud.Proto.Identity;
 using BarkCloud.Proto.Users;
 using BarkCloud.Shared.Queue.Notifications;
+using BarkCloud.Identity.Tests._Helpers;
 using BarkCloud.TestKit;
 
 using Grpc.Core;
@@ -20,7 +22,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace BarkCloud.Identity.Tests.Services;
 
-public class SessionIssuerTests
+public class SessionIssuerTests : IDisposable
 {
     private readonly Mock<UsersServerApi.UsersServerApiClient> _users = new();
     private readonly Mock<IMediator> _mediator = new();
@@ -28,6 +30,9 @@ public class SessionIssuerTests
     private readonly Mock<IRefreshTokensStorage> _refreshTokens = new();
     private readonly Mock<LocationClient> _location;
     private readonly MetricsCollector _metrics = new();
+    private readonly SqliteIdentityContext _database = new();
+
+    public void Dispose() => _database.Dispose();
 
     public SessionIssuerTests()
     {
@@ -52,7 +57,7 @@ public class SessionIssuerTests
 
     private SessionIssuer CreateSut(RequestContext? context = null, LocationClient? location = null) => new(
         _users.Object, _mediator.Object, _outbox.Object, _refreshTokens.Object,
-        context ?? Context(), location ?? _location.Object, _metrics, NullLogger<SessionIssuer>.Instance);
+        _database.Context, context ?? Context(), location ?? _location.Object, _metrics, NullLogger<SessionIssuer>.Instance);
 
     [Fact]
     public async Task IssueAsync_FromRequest_CreatesTokensRegistersDeviceAndEnqueuesLoginMail()
@@ -82,8 +87,8 @@ public class SessionIssuerTests
     {
         string? deviceId = null;
         _refreshTokens
-            .Setup(s => s.CreateNewRefreshToken(It.IsAny<string>(), 7, It.IsAny<string>(), It.IsAny<int>()))
-            .Callback<string, long, string, int>((_, _, device, _) => deviceId = device);
+            .Setup(s => s.CreateNewRefreshToken(It.IsAny<string>(), 7, It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .Callback<string, long, string, int, CancellationToken>((_, _, device, _, _) => deviceId = device);
 
         await CreateSut(Context(deviceId: null)).IssueAsync(7, default);
 
@@ -125,8 +130,8 @@ public class SessionIssuerTests
         string? storedRefreshToken = null;
         string? commandRefreshToken = null;
         _refreshTokens
-            .Setup(s => s.CreateNewRefreshToken(It.IsAny<string>(), 7, It.IsAny<string>(), It.IsAny<int>()))
-            .Callback<string, long, string, int>((token, _, _, _) => storedRefreshToken = token);
+            .Setup(s => s.CreateNewRefreshToken(It.IsAny<string>(), 7, It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .Callback<string, long, string, int, CancellationToken>((token, _, _, _, _) => storedRefreshToken = token);
         _mediator
             .Setup(m => m.Send(It.IsAny<CreateTokenCommand>(), It.IsAny<CancellationToken>()))
             .Returns((CreateTokenCommand command, CancellationToken _) =>
@@ -154,9 +159,11 @@ public class SessionIssuerTests
             storedRefreshToken.Should().Be(commandRefreshToken);
             storedRefreshToken.Should().NotBeNullOrWhiteSpace();
             _refreshTokens.Verify(s => s.CreateNewRefreshToken(
-                storedRefreshToken!, 7, It.IsAny<string>(), It.IsAny<int>()), Times.Once);
+                storedRefreshToken!, 7, It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
+            // Письмо фиксируется в outbox вместе с сессией до регистрации устройства.
             _outbox.Verify(o => o.EnqueueAsync(
-                It.IsAny<long>(), It.IsAny<NotificationType>(), It.IsAny<string>(), It.IsAny<Dictionary<string, string>>()), Times.Never);
+                7, NotificationType.SuccessfulLogin, It.IsAny<string>(), It.IsAny<Dictionary<string, string>>(),
+                It.IsAny<CancellationToken>()), Times.Once);
             var metrics = _metrics.SnapshotAndReset();
             metrics.Should().NotContainKey("sessions_created");
             metrics.Should().NotContainKey("auth_login_success");
@@ -184,8 +191,8 @@ public class SessionIssuerTests
         string? storedRefreshToken = null;
         string? commandRefreshToken = null;
         _refreshTokens
-            .Setup(s => s.CreateNewRefreshToken(It.IsAny<string>(), 7, It.IsAny<string>(), It.IsAny<int>()))
-            .Callback<string, long, string, int>((token, _, _, _) => storedRefreshToken = token);
+            .Setup(s => s.CreateNewRefreshToken(It.IsAny<string>(), 7, It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .Callback<string, long, string, int, CancellationToken>((token, _, _, _, _) => storedRefreshToken = token);
         _mediator
             .Setup(m => m.Send(It.IsAny<CreateTokenCommand>(), It.IsAny<CancellationToken>()))
             .Returns((CreateTokenCommand command, CancellationToken _) =>
@@ -266,8 +273,8 @@ public class SessionIssuerTests
         string? storedRefreshToken = null;
         string? commandRefreshToken = null;
         _refreshTokens
-            .Setup(s => s.CreateNewRefreshToken(It.IsAny<string>(), 7, It.IsAny<string>(), It.IsAny<int>()))
-            .Callback<string, long, string, int>((token, _, _, _) => storedRefreshToken = token);
+            .Setup(s => s.CreateNewRefreshToken(It.IsAny<string>(), 7, It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .Callback<string, long, string, int, CancellationToken>((token, _, _, _, _) => storedRefreshToken = token);
         _mediator
             .Setup(m => m.Send(It.IsAny<CreateTokenCommand>(), It.IsAny<CancellationToken>()))
             .Returns((CreateTokenCommand command, CancellationToken _) =>
@@ -313,7 +320,7 @@ public class SessionIssuerTests
     [InlineData(RegistrationCompletion.CancelledRpcException, false)]
     [InlineData(RegistrationCompletion.Success, false)]
     [InlineData(RegistrationCompletion.Unavailable, false)]
-    public async Task IssueAsync_CallerCancelledDuringRegistrationStopsBeforeOutbox(
+    public async Task IssueAsync_CallerCancelledDuringRegistrationStopsBeforeSessionMetrics(
         RegistrationCompletion completion, bool fromRequest)
     {
         using var cts = new CancellationTokenSource();
@@ -341,7 +348,8 @@ public class SessionIssuerTests
         registration.CancellationToken.Should().Be(cts.Token);
         registration.DisposeCount.Should().Be(1);
         _outbox.Verify(o => o.EnqueueAsync(
-            It.IsAny<long>(), It.IsAny<NotificationType>(), It.IsAny<string>(), It.IsAny<Dictionary<string, string>>()), Times.Never);
+            7, NotificationType.SuccessfulLogin, It.IsAny<string>(), It.IsAny<Dictionary<string, string>>(),
+            It.IsAny<CancellationToken>()), Times.Once);
         var metrics = _metrics.SnapshotAndReset();
         metrics.Should().NotContainKey("sessions_created");
         metrics.Should().NotContainKey("auth_login_success");
@@ -365,9 +373,11 @@ public class SessionIssuerTests
         exception.Which.CancellationToken.Should().Be(cts.Token);
         _users.Verify(c => c.RegisterDeviceAsync(
             It.IsAny<RegisterDeviceRequest>(), It.IsAny<Metadata?>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()), Times.Never);
-        _refreshTokens.Verify(s => s.CreateNewRefreshToken(It.IsAny<string>(), 7, "device-1", It.IsAny<int>()), Times.Once);
+        _refreshTokens.Verify(s => s.CreateNewRefreshToken(
+            It.IsAny<string>(), It.IsAny<long>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
         _outbox.Verify(o => o.EnqueueAsync(
-            It.IsAny<long>(), It.IsAny<NotificationType>(), It.IsAny<string>(), It.IsAny<Dictionary<string, string>>()), Times.Never);
+            It.IsAny<long>(), It.IsAny<NotificationType>(), It.IsAny<string>(), It.IsAny<Dictionary<string, string>>(),
+            It.IsAny<CancellationToken>()), Times.Never);
         var metrics = _metrics.SnapshotAndReset();
         metrics.Should().NotContainKey("sessions_created");
         metrics.Should().NotContainKey("auth_login_success");

@@ -7,5 +7,5 @@ public readonly record struct AttemptReservation(bool Allowed, TimeSpan RetryAft
 public interface IAttemptCountersStorage
 {
     Task<AttemptReservation> TryReserve(string key, int maxAttempts, TimeSpan window);
-    Task Reset(string key);
+    Task Reset(string key, CancellationToken cancellationToken = default);
 }

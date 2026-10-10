@@ -70,8 +70,8 @@ public class AttemptCountersStorage(IdentityContext context) : IAttemptCountersS
         }
     }
 
-    public async Task Reset(string key)
+    public async Task Reset(string key, CancellationToken cancellationToken = default)
     {
-        await context.AuthAttemptCounters.Where(x => x.Key == key).ExecuteDeleteAsync();
+        await context.AuthAttemptCounters.Where(x => x.Key == key).ExecuteDeleteAsync(cancellationToken);
     }
 }

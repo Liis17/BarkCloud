@@ -31,8 +31,10 @@ public class NotificationOutboxTests : IDisposable
     [Fact]
     public async Task EnqueueAsync_StoresDueRowWithPayload()
     {
-        await CreateSut().EnqueueAsync(
+        var enqueued = await CreateSut().EnqueueAsync(
             42, NotificationType.PasswordChanged, "Пароль успешно изменен", new Dictionary<string, string> { ["ip"] = "1.1.1.1" });
+
+        enqueued.Should().BeTrue();
 
         await using var reader = _database.CreateAdditionalContext();
         var row = await reader.PendingNotifications.SingleAsync();
@@ -44,28 +46,29 @@ public class NotificationOutboxTests : IDisposable
         row.Attempts.Should().Be(0);
         row.NextAttemptAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(5));
         row.LockToken.Should().BeNull();
-        _metrics.SnapshotAndReset().Should().ContainKey("notification_outbox_enqueued");
+        _metrics.SnapshotAndReset().Should().NotContainKey("notification_outbox_enqueued");
     }
 
     [Fact]
     public async Task EnqueueAsync_EmailDisabled_StoresNothing()
     {
-        await CreateSut(emailEnabled: false).EnqueueAsync(
+        var enqueued = await CreateSut(emailEnabled: false).EnqueueAsync(
             42, NotificationType.PasswordChanged, "t", new Dictionary<string, string>());
 
+        enqueued.Should().BeFalse();
         await using var reader = _database.CreateAdditionalContext();
         (await reader.PendingNotifications.AnyAsync()).Should().BeFalse();
     }
 
     [Fact]
-    public async Task EnqueueAsync_SaveFails_DoesNotThrowAndDetachesEntity()
+    public async Task EnqueueAsync_SaveFails_ThrowsAndDetachesEntity()
     {
         await _database.Context.Database.ExecuteSqlRawAsync("DROP TABLE PendingNotifications");
 
         var act = () => CreateSut().EnqueueAsync(
             42, NotificationType.PasswordChanged, "t", new Dictionary<string, string>());
 
-        await act.Should().NotThrowAsync();
+        await act.Should().ThrowAsync<DbUpdateException>();
         _database.Context.ChangeTracker.Entries().Should().BeEmpty();
         _metrics.SnapshotAndReset().Should().ContainKey("notification_outbox_enqueue_failed");
     }

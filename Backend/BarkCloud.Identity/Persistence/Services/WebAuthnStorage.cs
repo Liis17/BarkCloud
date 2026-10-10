@@ -23,25 +23,22 @@ public class WebAuthnStorage : IWebAuthnStorage
     public Task<List<WebAuthnCredential>> GetCredentialsByUserId(long userId)
         => _context.WebAuthnCredentials.Where(x => x.UserId == userId).ToListAsync();
 
-    public Task<WebAuthnCredential?> GetCredentialByCredentialId(byte[] credentialId)
-        => _context.WebAuthnCredentials.FirstOrDefaultAsync(x => x.CredentialId == credentialId);
+    public Task<WebAuthnCredential?> GetCredentialByCredentialId(byte[] credentialId, CancellationToken cancellationToken = default)
+        => _context.WebAuthnCredentials.FirstOrDefaultAsync(x => x.CredentialId == credentialId, cancellationToken);
 
     public async Task<bool> IsCredentialIdUnique(byte[] credentialId)
         => !await _context.WebAuthnCredentials.AnyAsync(x => x.CredentialId == credentialId);
 
-    public async Task UpdateCounter(long id, long counter)
+    public async Task<bool> TryUpdateCounter(long id, long expectedCounter, long verifiedCounter,
+        CancellationToken cancellationToken = default)
     {
-        var credential = await _context.WebAuthnCredentials.FirstOrDefaultAsync(x => x.Id == id);
+        var updated = await _context.WebAuthnCredentials
+            .Where(x => x.Id == id && x.SignatureCounter == expectedCounter)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(x => x.SignatureCounter, verifiedCounter)
+                .SetProperty(x => x.LastUsedAt, DateTime.UtcNow), cancellationToken);
 
-        if (credential is null)
-        {
-            return;
-        }
-
-        credential.SignatureCounter = counter;
-        credential.LastUsedAt = DateTime.UtcNow;
-
-        await _context.SaveChangesAsync();
+        return updated == 1;
     }
 
     public async Task<bool> RemoveCredential(long userId, long id)
@@ -80,10 +77,10 @@ public class WebAuthnStorage : IWebAuthnStorage
         return props.WebAuthnUserHandle!;
     }
 
-    public async Task<long?> GetUserIdByUserHandle(byte[] userHandle)
+    public async Task<long?> GetUserIdByUserHandle(byte[] userHandle, CancellationToken cancellationToken = default)
     {
         var props = await _context.AuthUserProperties
-            .FirstOrDefaultAsync(x => x.WebAuthnUserHandle == userHandle);
+            .FirstOrDefaultAsync(x => x.WebAuthnUserHandle == userHandle, cancellationToken);
 
         return props?.UserId;
     }
@@ -94,8 +91,22 @@ public class WebAuthnStorage : IWebAuthnStorage
         await _context.SaveChangesAsync();
     }
 
-    public Task<WebAuthnChallenge?> GetChallenge(Guid id)
-        => _context.WebAuthnChallenges.FirstOrDefaultAsync(x => x.Id == id);
+    public Task<WebAuthnChallenge?> GetChallenge(Guid id, CancellationToken cancellationToken = default)
+        => _context.WebAuthnChallenges.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+
+    public async Task<bool> TryConsumeAssertionChallenge(Guid id, DateTime expectedExpiresAt,
+        CancellationToken cancellationToken = default)
+    {
+        var now = DateTime.UtcNow;
+        var deleted = await _context.WebAuthnChallenges
+            .Where(x => x.Id == id
+                        && x.Type == WebAuthnChallengeType.Assertion
+                        && x.ExpiresAt == expectedExpiresAt
+                        && x.ExpiresAt > now)
+            .ExecuteDeleteAsync(cancellationToken);
+
+        return deleted == 1;
+    }
 
     public async Task DeleteChallenge(Guid id)
     {

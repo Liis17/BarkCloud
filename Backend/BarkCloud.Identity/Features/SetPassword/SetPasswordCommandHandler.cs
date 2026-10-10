@@ -3,6 +3,7 @@ namespace BarkCloud.Identity.Features.SetPassword;
 
 using BarkCloud.GrpcServer.Metrics;
 using BarkCloud.Shared.Exceptions.Identity;
+using BarkCloud.Identity.Persistence.Contexts;
 
 using GrpcServer.XAuth;
 
@@ -23,10 +24,11 @@ public class SetPasswordCommandHandler : IRequestHandler<SetPasswordCommand>
     private readonly PasswordChangedNotifier _passwordChangedNotifier;
     private readonly MetricsCollector _metrics;
     private readonly ILogger<SetPasswordCommandHandler> _logger;
+    private readonly IdentityContext _context;
 
     public SetPasswordCommandHandler(UserContext userContext, IPasswordsStorage passwordsStorage,
         IAuthPropertiesStorage authPropertiesStorage, IRefreshTokensStorage refreshTokensStorage, PasswordChangedNotifier passwordChangedNotifier,
-        MetricsCollector metrics, ILogger<SetPasswordCommandHandler> logger)
+        MetricsCollector metrics, ILogger<SetPasswordCommandHandler> logger, IdentityContext context)
     {
         _userContext = userContext;
         _passwordsStorage = passwordsStorage;
@@ -35,6 +37,7 @@ public class SetPasswordCommandHandler : IRequestHandler<SetPasswordCommand>
         _passwordChangedNotifier = passwordChangedNotifier;
         _metrics = metrics;
         _logger = logger;
+        _context = context;
     }
 
     public async Task Handle(SetPasswordCommand request, CancellationToken cancellationToken)
@@ -44,7 +47,7 @@ public class SetPasswordCommandHandler : IRequestHandler<SetPasswordCommand>
             _userContext.UserId
         );
 
-        var currentHash = await _passwordsStorage.GetUserPasswordHash(_userContext.UserId);
+        var currentHash = await _passwordsStorage.GetUserPasswordHash(_userContext.UserId, cancellationToken);
         if (currentHash != null)
         {
             if (string.IsNullOrEmpty(request.OldPassword))
@@ -54,7 +57,7 @@ public class SetPasswordCommandHandler : IRequestHandler<SetPasswordCommand>
             }
 
             // Старый пароль под токеном — тот же счётчик, что у повторной аутентификации 2FA: попытка занимается до bcrypt.
-            if (!await _authPropertiesStorage.TryReserveReauthPasswordAttempt(_userContext.UserId))
+            if (!await _authPropertiesStorage.TryReserveReauthPasswordAttempt(_userContext.UserId, cancellationToken))
             {
                 _metrics.Increment("password_change_failed_attempts_exceeded");
                 throw new PasswordAttemptsExceededException();
@@ -66,7 +69,7 @@ public class SetPasswordCommandHandler : IRequestHandler<SetPasswordCommand>
                 throw new InvalidOldPasswordException();
             }
 
-            await _authPropertiesStorage.ResetReauthPasswordAttempts(_userContext.UserId);
+            await _authPropertiesStorage.ResetReauthPasswordAttempts(_userContext.UserId, cancellationToken);
 
             // Старый пароль уже проверен, поэтому достаточно сравнить строки — второй bcrypt не нужен.
             if (string.Equals(request.NewPassword, request.OldPassword, StringComparison.Ordinal))
@@ -80,21 +83,46 @@ public class SetPasswordCommandHandler : IRequestHandler<SetPasswordCommand>
 
         _logger.LogDebug("Обновление хэша пароля в БД для пользователя {UserId}", _userContext.UserId);
 
-        var isNewUser = await _passwordsStorage.UpdateUserPasswordHash(_userContext.UserId, passwordHash);
+        bool isNewUser;
+        var notificationEnqueued = false;
+        try
+        {
+            await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+            try
+            {
+                isNewUser = await _passwordsStorage.UpdateUserPasswordHash(_userContext.UserId, passwordHash, cancellationToken);
+
+                if (!isNewUser)
+                {
+                    notificationEnqueued = await _passwordChangedNotifier.NotifyAsync(_userContext.UserId, cancellationToken);
+                }
+
+                await transaction.CommitAsync(cancellationToken);
+            }
+            catch
+            {
+                try { await transaction.RollbackAsync(CancellationToken.None); } catch { }
+                throw;
+            }
+        }
+        catch
+        {
+            _context.ChangeTracker.Clear();
+            throw;
+        }
 
         _metrics.Increment("password_changes");
         if (isNewUser)
         {
             _metrics.Increment("password_changes_initial");
         }
-
-        if (!isNewUser)
+        if (notificationEnqueued)
         {
-            await _passwordChangedNotifier.NotifyAsync(_userContext.UserId);
+            _metrics.Increment("notification_outbox_enqueued");
         }
 
         _logger.LogInformation(
-            "Пароль успешно изменен для пользователя {UserId}. Уведомление поставлено в очередь",
+            "Пароль успешно изменен для пользователя {UserId}",
             _userContext.UserId
         );
     }
