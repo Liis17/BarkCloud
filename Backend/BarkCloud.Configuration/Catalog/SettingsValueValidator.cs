@@ -13,7 +13,7 @@ public static class SettingsValueValidator
             return string.Empty;
 
         if (entry.StorageKey == JwtSecret.ConfigKey)
-            JwtSecret.GetKeyBytes(normalized, JwtSecret.RecommendedMinBytes);
+            JwtSecret.GetKeyBytes(normalized);
 
         return entry.ValueKind switch
         {
