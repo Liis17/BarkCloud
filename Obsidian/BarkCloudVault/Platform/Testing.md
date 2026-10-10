@@ -45,11 +45,7 @@ PostgreSQL-сценарии зависят от отдельной тестов�
 
 ## Files: durable upload redelivery
 
-Проект `Tests/Backend/BarkCloud.Files.IntegrationTests/` использует production endpoint,
-consumer, processor и artifact cleaner с настоящими PostgreSQL 18/RabbitMQ; подменены
-тяжёлый pipeline и физическое удаление блобов. `docker-compose.yml` хранит PostgreSQL
-и RabbitMQ в постоянных volumes. Стенд изолирован: тесты удаляют очереди Files и
-перезапускают RabbitMQ, поэтому рабочая инфраструктура непригодна.
+Источники: Tests/Backend/BarkCloud.Files.IntegrationTests/UploadRedeliveryTests.cs, UploadTestHost.cs, docker-compose.yml и run-f18.sh; реализация: Backend/BarkCloud.Files/Scheduling/UploadProcessingQueue.cs и ScheduledMessageRecoveryListener.cs. Стенд использует PostgreSQL 18 и RabbitMQ с постоянными volumes, удаляет очереди Files и перезапускает broker, поэтому требует изолированных PostgreSQL и RabbitMQ.
 
 ```bash
 bash Tests/Backend/BarkCloud.Files.IntegrationTests/run-f18.sh
@@ -57,41 +53,31 @@ BARKCLOUD_F18_PRODUCTION=1 bash Tests/Backend/BarkCloud.Files.IntegrationTests/r
   --filter FullyQualifiedName~Exhaustion_WithUnchangedProductionIntervals
 ```
 
-Быстрые сценарии покрывают освобождение двух слотов (здоровое сообщение ≤5 секунд,
-до первого production-повтора), рестарты Files и RabbitMQ с сохранёнными данными,
-просроченный таймер, сохранение redelivery count, recovery-trigger при окончательной
-ошибке отправки, Ready/NoOp до и после рестарта, cancellation, integrity failure,
-пять pipeline-ошибок и пять необработанных исключений с `_error`/Fault.
+Быстрый вариант исчерпания использует четыре интервала по 300 мс. ProductionFact Exhaustion_WithUnchangedProductionIntervals использует исходные интервалы 10 секунд, 1, 5 и 15 минут; полный сценарий требует около 21 минуты 10 секунд плюс обработка. TwoFailures_ReleaseBothSlotsBeforeFirstProductionRedelivery оставляет исходные интервалы и проверяет assertion здоровой сессии не позднее 5 секунд, до первого retry через 10 секунд.
 
-Транспорт может ждать reconnect; для final-error пути тест выключает брокер и
-прерывает заблокированный job через `IScheduler.Interrupt`. Проверяет сохранение
-payload/headers нового durable trigger до восстановления и доставку после рестарта
-host. Это отдельная проверка от обычного восстановления соединения при рестарте брокера.
+Интеграционные тесты используют production endpoint, consumer, UploadSessionProcessor, UploadArtifactCleaner, PostgreSQL и RabbitMQ. ProbePipeline подменяет S3/ffmpeg обработку, а физическая очистка orphan blobs подменена. Одновременно работает один UploadTestHost; рестарты выполняются последовательно. Ключевые сценарии — освобождение слотов, исчерпание обеих цепочек, restart Files с overdue trigger, restart того же RabbitMQ container, сохранение recovery trigger при final send failure, Ready replay, graceful cancellation и integrity failure. Успешный restart подтверждает только исследованный сценарий с тем же сохранённым scheduler/broker state.
 
-В тестовом host только быстрый сценарий исчерпания задаёт интервалы 300 мс.
-Приёмочная проверка использует исходные 10 секунд, 1, 5 и 15 минут, занимает около
-21 минуты 10 секунд плюс обработка; фактическая версия `rabbitmq:latest` печатается
-в выводе runner и TRX. CI запускает быстрый прогон через
-`.github/workflows/files-upload-integration.yml`, вызываемый PR workflow и Files CI/CD;
-последний ждёт успешной интеграционной проверки перед публикацией. Ручной запуск
-workflow с `production-intervals` включает полный приёмочный сценарий.
+UploadTestHost напрямую отправляет ProcessUploadedFile через send endpoint и не регистрирует EF bus outbox. Поэтому suite не проверяет CompleteUploadSession вместе с bus outbox и полной композицией Program.cs. Дополнительный end-to-end тест должен проверять restart и at-least-once delivery с идемпотентным итогом, не обещая exactly-once.
 
-`run-f18.sh` требует Docker Compose и .NET 10. Перед `up --wait` он повторяет `docker compose pull` до 5 раз. Для проверки версии RabbitMQ он запускает
-`rabbitmqctl version` через `docker compose exec -T --user rabbitmq`; root entrypoint образа
-сохраняется для штатной настройки прав. Healthcheck вызывает `rabbitmq-diagnostics -q ping`
-от пользователя `rabbitmq` через `gosu`. EXIT trap установлен до `up --wait`: при любом
-исходе runner останавливает контейнеры, сохраняет volumes и возвращает исходный код
-завершения даже если `stop` завершился ошибкой. Files integration workflow в `always()`
-выводит `docker compose logs --no-color` и `docker compose ps --all`, затем сохраняет TRX
-artifact. Подробности и прямой запуск через `BARKCLOUD_TEST_POSTGRES`,
-`BARKCLOUD_TEST_RABBITMQ`, `BARKCLOUD_TEST_RABBITMQ_CONTAINER` — в README проекта.
-`BARKCLOUD_TEST_RABBITMQ` — URI `rabbitmq://...` для MassTransit; raw RabbitMQ.Client
-использует адрес с изменённой на `amqp` схемой, сохраняя endpoint, credentials и vhost.
-Unit-проверка listener (`BarkCloud.Files.Tests/Scheduling/`) подтверждает копирование
-payload/headers, задержку 30 секунд и отсутствие нового trigger при успехе/immediate refire.
+В тестовом host ConsumerStopTimeout равен 1 секунде, StopTimeout — 15 секундам; production Program.cs явно не задаёт эти параметры. CancellationDuringShutdown проверяет graceful cancellation, а TerminalSendFailureWhileRabbitDown прерывает выполняющийся Quartz job через IScheduler.Interrupt; это не hard-kill процесса. Тестовая fixture для необработанного исключения начинается в Uploading и не подтверждает terminal lifecycle multipart-сессии, уже сохранённой в Processing.
 
-`UploadTestHost` привязывает контексты логирования MassTransit и Quartz к `ILoggerFactory`
-нового host до разрешения bus/scheduler. Контексты предыдущего остановленного host
-иначе могут ссылаться на закрытую фабрику. Регрессионный `UploadTestHostTests` создаёт
-два host последовательно и моделирует закрытый Quartz logging provider, не запуская
-сетевые соединения; он и `RabbitMqClientConnectionFactoryTests` выполняются без Docker.
+Границы scheduler retry и recovery описаны в [[Backend/Files#границы восстановления scheduler]].
+`ScheduledMessageRecoveryListenerTests` проверяет копирование payload/headers, trigger
+через 30 секунд после final send failure и отсутствие нового trigger при успехе или
+immediate refire. Тест использует mock `IScheduler`, а не PostgreSQL Quartz store.
+
+Покрытие не проверяет PostgreSQL outage при записи schedule или recovery trigger, hard-kill Files, параллельную доставку одной SessionId, force-recreate RabbitMQ с постоянным volume, misfire старше 60 секунд или полный Program/outbox путь. Restart RabbitMQ выполняется stop/start того же container; rabbitmq:latest и volume не задают проверенную стабильную hostname/node identity. RabbitMQ использует hostname в node name и по умолчанию в имени каталога данных, поэтому recreate с изменившимся hostname нужно проверять отдельно, включая миграцию существующих данных ([RabbitMQ Clustering Guide](https://www.rabbitmq.com/docs/clustering)). Image digest и production RabbitMQ version этим стендом не устанавливаются.
+
+`run-f18.sh` требует Docker Compose и .NET 10. Перед `up --wait` скрипт повторяет `docker compose pull` до пяти попыток. Версия `rabbitmq:latest` читается командой `docker compose exec -T --user rabbitmq rabbitmq rabbitmqctl version`; root entrypoint образа сохраняется для штатной настройки прав. Healthcheck запускает `rabbitmq-diagnostics -q ping` от пользователя `rabbitmq` через `gosu`. EXIT trap установлен до `up --wait`, сохраняет volumes и возвращает исходный код завершения, даже если `stop` завершился ошибкой. Фактическая версия RabbitMQ печатается runner-командой и acceptance test в TRX. Тест использует `BARKCLOUD_TEST_POSTGRES`, `BARKCLOUD_TEST_RABBITMQ` и `BARKCLOUD_TEST_RABBITMQ_CONTAINER`; `BARKCLOUD_TEST_RABBITMQ` — URI `rabbitmq://...` для MassTransit, а raw RabbitMQ.Client преобразует схему в `amqp`, сохраняя endpoint, credentials и vhost. Инструкции по прямому запуску приведены в `Tests/Backend/BarkCloud.Files.IntegrationTests/README.md`.
+
+`.github/workflows/files-upload-integration.yml` вызывается PR workflow
+`.github/workflows/tests.yml` и Files CI/CD workflow
+`.github/workflows/build-backend-files.yml`; CI использует быстрый вариант по умолчанию,
+а Files CI/CD ждёт успешной интеграционной проверки перед публикацией. Интеграционный
+workflow всегда выводит `docker compose logs --no-color` и `docker compose ps --all`,
+затем сохраняет TRX artifact. Для ручного запуска полного production-сценария workflow
+поддерживает `workflow_dispatch` с `production-intervals=true`. Перед запуском проверь,
+что remote `master` соответствует целевому SHA. Команда запуска:
+`gh workflow run files-upload-integration.yml --ref master -f production-intervals=true`.
+
+`UploadTestHost` связывает контексты логирования MassTransit и Quartz с `ILoggerFactory` нового host до разрешения bus и scheduler; иначе глобальный контекст остановленного host может ссылаться на закрытую фабрику. Регрессионный `UploadTestHostTests` последовательно создаёт два host и моделирует закрытый Quartz logging provider без сетевых соединений. Один host regression test и два URI-теста `RabbitMqClientConnectionFactoryTests` — всего три проверки — запускаются без Docker.
