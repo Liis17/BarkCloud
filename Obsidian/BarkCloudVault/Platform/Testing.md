@@ -89,3 +89,9 @@ artifact. Подробности и прямой запуск через `BARKCL
 использует адрес с изменённой на `amqp` схемой, сохраняя endpoint, credentials и vhost.
 Unit-проверка listener (`BarkCloud.Files.Tests/Scheduling/`) подтверждает копирование
 payload/headers, задержку 30 секунд и отсутствие нового trigger при успехе/immediate refire.
+
+`UploadTestHost` привязывает контексты логирования MassTransit и Quartz к `ILoggerFactory`
+нового host до разрешения bus/scheduler. Контексты предыдущего остановленного host
+иначе могут ссылаться на закрытую фабрику. Регрессионный `UploadTestHostTests` создаёт
+два host последовательно и моделирует закрытый Quartz logging provider, не запуская
+сетевые соединения; он и `RabbitMqClientConnectionFactoryTests` выполняются без Docker.
