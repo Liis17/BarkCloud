@@ -23,6 +23,9 @@ public class TorrentEngineService : IAsyncDisposable
 
     public sealed class ManagedTorrent
     {
+        // Итог flush, коммит которого не подтверждён: значения строки после коммита и снимок счётчиков.
+        public sealed record TrafficCheckpoint(long Downloaded, long Uploaded, long SessionDownloaded, long SessionUploaded);
+
         public required Guid Id { get; init; }
         public required TorrentManager Manager { get; init; }
         public int Seeds;
@@ -30,6 +33,17 @@ public class TorrentEngineService : IAsyncDisposable
         // Для накопления суммарного трафика поверх сессионных счётчиков движка (переживают рестарт в БД).
         public long LastSessionDownloaded;
         public long LastSessionUploaded;
+        public TrafficCheckpoint? PendingFlush;
+
+        /// <summary>Baseline для строки: использует снимок неподтверждённого flush, если строка уже содержит его итог.</summary>
+        public (long Downloaded, long Uploaded) BaselineFor(long storedDownloaded, long storedUploaded)
+        {
+            var pending = PendingFlush;
+            return pending != null && pending.Downloaded == storedDownloaded && pending.Uploaded == storedUploaded
+                ? (pending.SessionDownloaded, pending.SessionUploaded)
+                : (LastSessionDownloaded, LastSessionUploaded);
+        }
+
         // Сериализует Pause/Resume/Remove одного торрента.
         internal readonly SemaphoreSlim Gate = new(1, 1);
     }
