@@ -17,6 +17,9 @@ See also: [[Backend/FilesCloud]] · [[Backend/ResumableUpload]] · [[Backend/Ori
 | `Backend/BarkCloud.Files/Features/UploadFile/UploadFileCommandHandler.cs` | обработка загрузки | оригинал, хеш, метаданные и превью |
 | `Backend/BarkCloud.Files/Domain/UploadFile.cs` | `UploadFile` | запись блоба и профиль хранения |
 | `Backend/BarkCloud.Files/Persistence/FilesContext.cs` | EF-модель | таблицы и ограничения |
+| `Backend/BarkCloud.Files/Services/SearchRanking.cs` | `SearchTerms`, `SearchQueryExtensions`, `SearchCursor` | SQL-правило ранга, набор кандидатов и курсор поиска |
+| `Backend/BarkCloud.Files/Services/UnifiedSearchService.cs` | `UnifiedSearchService` | вход поиска, пагинация секций и построение карточек |
+| `Backend/BarkCloud.Files/Services/UnifiedSearchService.Sources.cs` | источники секций | SQL-выборки файлов, альбомов, плейлистов, папок и shared-объектов |
 | `Backend/BarkCloud.Files/Services/PreviewPersistenceService.cs` | сохранение превью | отдельные блобы и связи превью |
 | `Backend/BarkCloud.Files/Infrastructure/S3Uploader.cs` | `S3Uploader` | чтение, запись и удаление объектов |
 | `Shared/BarkCloud.Proto/files_api.proto` | Files-сервисы | публичные контракты |
@@ -44,6 +47,14 @@ See also: [[Backend/FilesCloud]] · [[Backend/ResumableUpload]] · [[Backend/Ori
 | `GET /download/{fileId}` | Выдача файла; поддерживается один явный byte-range |
 
 `GetUploadUrl` создаёт запись `UploadFile` и возвращает URL собственного HTTP-маршрута Files. Это не presigned URL S3.
+
+### Поиск
+
+`Backend/BarkCloud.Files/Services/SearchRanking.cs` задаёт общее правило PostgreSQL для отбора, ранга и сходства поля: 4 — точное совпадение, 3 — префикс, 2 — подстрока, 1 — `word_similarity(value, query) >= 0.45` для запроса от четырёх символов. Для рангов 2–4 сходство равно 1. Запрос нормализуется через NFKC, обрезку краёв, схлопывание пробелов и invariant lowercase. Алиасы и теги сравниваются по сохранённому `NormalizedValue`; имена и метаданные — в исходном виде средствами PostgreSQL (`lower`, `ILIKE`, `pg_trgm`). Сырые колонки не нормализуются в SQL.
+
+`Backend/BarkCloud.Files/Services/UnifiedSearchService.Sources.cs` собирает отдельного SQL-кандидата для каждого поля, сводит ранг и сходство по максимуму и после ограничения страницы выбирает подпись среди кандидатов с теми же значениями ранга и сходства. `Backend/BarkCloud.Files/Services/UnifiedSearchService.cs` выполняет общий запрос секций и передаёт выбранные подписи в карточки. Приоритет полей: файлы — имя, алиас, тег, аудиозаголовок, исполнитель, альбом, название документа, автор, тема; альбомы и плейлисты — имя, описание. При ничьей побеждает меньшее значение `Order`, затем значение по `COLLATE "C"` (байтовый порядок UTF-8 в PostgreSQL). `match_value` для алиаса и тега сохраняет исходный регистр и пробелы.
+
+Папки, пользовательские умные папки и shared-объекты имеют одно поле `name`. Системные умные папки ранжируются SQL-выражениями `SearchTerms` по массиву системных имён и участвуют в общей сортировке курсора. Формат курсора и ограничение чтения `limit + 1` не меняются; `ResolveHit` без поискового запроса возвращает пустые `match_field` и `match_value`. Подробности клиентского контракта — [[Api/FilesClientGuide#поиск]].
 
 ## Зависимости и взаимодействия
 
