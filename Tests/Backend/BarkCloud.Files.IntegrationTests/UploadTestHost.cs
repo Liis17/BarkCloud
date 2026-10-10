@@ -13,6 +13,7 @@ using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 using Quartz;
 
@@ -131,6 +132,10 @@ internal sealed class UploadTestHost : IAsyncDisposable
             });
         });
         _host = builder.Build();
+        // Rebind before resolving bus/Quartz services: the previous test host disposed its factory.
+        var loggerFactory = _host.Services.GetRequiredService<ILoggerFactory>();
+        MassTransit.LogContext.ConfigureCurrentLogContext(loggerFactory);
+        Quartz.Logging.LogContext.SetCurrentLogProvider(loggerFactory);
     }
 
     public static Uri RabbitAddress => new(Environment.GetEnvironmentVariable("BARKCLOUD_TEST_RABBITMQ")
