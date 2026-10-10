@@ -244,7 +244,8 @@ public sealed class CloudGatewayTests
         var exception = Assert.Throws<RpcException>(() => client.MoveDirectory(
             new MoveDirectoryRequest { DirectoryId = parent, NewParentId = child }));
 
-        exception.Status.Detail.Should().Be("F2B82A3C-1D2E-4B0E-9A19-2D90F8B7C001");
+        exception.Status.Detail.Should().Be("Операция отклонена сервером");
+        exception.Trailers.GetValue("x-error-code").Should().Be("F2B82A3C-1D2E-4B0E-9A19-2D90F8B7C001");
     }
 
     [Fact]
