@@ -12,6 +12,10 @@ public interface ITorrentStore
 
     Task<TorrentEntity?> Get(Guid id, long userId);
 
+    Task<bool?> GetPaused(Guid id, long userId, CancellationToken ct = default);
+
+    Task<bool> SetPaused(Guid id, long userId, bool paused, CancellationToken ct = default);
+
     Task<bool> ExistsByInfoHash(long userId, string infoHash);
 
     Task Add(TorrentEntity entity);

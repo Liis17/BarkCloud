@@ -1,6 +1,8 @@
 using BarkCloud.Proto.Torrent;
 using BarkCloud.Torrent.Persistence;
 
+using Microsoft.EntityFrameworkCore;
+
 namespace BarkCloud.Torrent.Infrastructure;
 
 /// <summary>
@@ -35,6 +37,15 @@ public class TorrentPersistenceService : BackgroundService
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "Ошибка при сохранении статистики торрентов");
+            }
+
+            try
+            {
+                await _engine.ReconcilePausedAsync(ReadPausedAsync, stoppingToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Ошибка при согласовании состояния Paused");
             }
 
             // Диагностический лог раз в 30 с (каждые 6 тиков по 5 с).
@@ -112,5 +123,15 @@ public class TorrentPersistenceService : BackgroundService
         }
 
         await context.SaveChangesAsync(ct);
+    }
+
+    private async Task<bool?> ReadPausedAsync(Guid id, CancellationToken ct)
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<TorrentContext>();
+        return await context.Torrents.AsNoTracking()
+            .Where(t => t.Id == id)
+            .Select(t => (bool?)t.Paused)
+            .FirstOrDefaultAsync(ct);
     }
 }
