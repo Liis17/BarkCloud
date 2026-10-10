@@ -2,6 +2,7 @@ using System.IO.Pipes;
 using System.Text.Json;
 
 using BarkCloud.Drive.Contracts;
+using BarkCloud.Drive.Contracts.Localization;
 using BarkCloud.Drive.Engine;
 
 using StreamJsonRpc;
@@ -32,19 +33,37 @@ tokens = new TokenManager(connection.Identity, new TokenStore());
 await tokens.TryRestoreAsync();
 
 var settings = new EngineSettingsStore();
-var profile = new UserProfile(connection.Users);
+var serverKey = EngineServerKey.FromConfig(config);
+var profile = new UserProfile(connection.Users, userId => settings.SetLastUserId(serverKey, userId));
 var gateway = new CloudGateway(connection.Cloud, connection.Files, connection.Http, $"{filesAddress}/web",
     () => tokens?.CurrentToken, settings.GetCacheDir());
-var fs = new BarkCloudFileSystem(gateway);
+var outbox = new UploadOutbox(DriveStoragePaths.OutboxDirectory);
+var fs = new BarkCloudFileSystem(gateway, outbox: outbox, serverKey: serverKey,
+    ownerUserId: () => profile.UserId ?? settings.GetLastUserId(serverKey));
+await using var outboxWorker = new UploadOutboxWorker(outbox,
+    () => (serverKey, profile.UserId),
+    fs.ProcessOutboxEntryAsync,
+    completed: fs.CompleteOutboxEntry,
+    failed: (entry, ex) => fs.SetLastSyncError(Loc.T("Eng_SyncFailedFmt", entry.Name, ex.Message)),
+    deferDataDeletion: fs.DeferOutboxDataDeletion);
+fs.OutboxAdded = outboxWorker.Trigger;
+fs.SyncError = fs.SetLastSyncError;
 using var mount = new MountManager();
 using var lifetime = new CancellationTokenSource();
 
-var engine = new DriveEngine(tokens, gateway, mount, fs, lifetime, settings, profile, config.Host);
+var engine = new DriveEngine(tokens, gateway, mount, fs, lifetime, settings, profile, outboxWorker,
+    serverKey, config.Host);
 
 // Автомонтаж на старте: при автозапуске движка (без UI) поднимаем последний диск,
 // если сессия восстановлена и буква запомнена. UI при своём старте увидит Mounted и не дублирует.
 if (tokens.IsAuthenticated)
 {
+    await profile.EnsureLoadedAsync();
+    if (profile.UserId is { } ownerUserId)
+        fs.AdoptOutboxForSession(ownerUserId);
+    outboxWorker.Start();
+    outboxWorker.Trigger();
+
     var (letter, label) = settings.GetLastMount();
     if (!string.IsNullOrEmpty(letter))
     {

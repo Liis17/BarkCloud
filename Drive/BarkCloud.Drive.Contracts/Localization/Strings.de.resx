@@ -296,6 +296,15 @@
   <data name="Settings_Cache" xml:space="preserve">
     <value>Cache-Ordner</value>
   </data>
+  <data name="Settings_Outbox" xml:space="preserve">
+    <value>Nicht gesendete Dateien</value>
+  </data>
+  <data name="Settings_OpenOutbox" xml:space="preserve">
+    <value>Ordner mit nicht gesendeten Dateien öffnen</value>
+  </data>
+  <data name="Settings_OutboxOpenFailedFmt" xml:space="preserve">
+    <value>Der Ordner mit nicht gesendeten Dateien konnte nicht geöffnet werden: {0}</value>
+  </data>
   <data name="Settings_Autostart" xml:space="preserve">
     <value>Autostart (bei Windows-Anmeldung)</value>
   </data>
@@ -392,8 +401,53 @@
   <data name="Eng_EmptyCachePath" xml:space="preserve">
     <value>Leerer Cache-Ordnerpfad</value>
   </data>
+  <data name="Eng_EmptyFileNotSupported" xml:space="preserve">
+    <value>Der Server unterstützt keine leeren Dateien; die vorherige Version blieb erhalten.</value>
+  </data>
   <data name="Eng_SyncFailedFmt" xml:space="preserve">
     <value>„{0}“ konnte nicht in die Cloud gespeichert werden: {1}</value>
+  </data>
+  <data name="Eng_AttachedFileNotListedFmt" xml:space="preserve">
+    <value>Nach dem Verknüpfen wurde „{0}“ nicht in der aktuellen Verzeichnisliste gefunden.</value>
+  </data>
+  <data name="Eng_DeleteFailedFmt" xml:space="preserve">
+    <value>Cloud-Eintrag „{0}“ konnte nach {1} Versuchen nicht gelöscht werden.</value>
+  </data>
+  <data name="Eng_OutboxMoveFailedFmt" xml:space="preserve">
+    <value>„{0}“ konnte nicht in den Outbox-Ordner verschoben werden.</value>
+  </data>
+  <data name="Eng_OutboxRollbackFailedFmt" xml:space="preserve">
+    <value>„{0}“ konnte nicht aus dem Outbox-Ordner zurückverschoben werden.</value>
+  </data>
+  <data name="Eng_OutboxManifestReadFailedFmt" xml:space="preserve">
+    <value>Outbox-Manifest „{0}“ konnte nicht gelesen werden.</value>
+  </data>
+  <data name="Eng_OutboxOrphanFileFmt" xml:space="preserve">
+    <value>Outbox-Datei ohne Manifest bleibt unverändert: {0}</value>
+  </data>
+  <data name="Eng_OutboxSaveError" xml:space="preserve">
+    <value>Outbox-Fehler konnte nicht gespeichert werden.</value>
+  </data>
+  <data name="Eng_OutboxCallbackError" xml:space="preserve">
+    <value>Outbox-Callback fehlgeschlagen.</value>
+  </data>
+  <data name="Eng_OutboxDataDeleteFailedFmt" xml:space="preserve">
+    <value>Outbox-Daten für „{0}“ konnten nicht gelöscht werden; das Manifest wurde bereits entfernt.</value>
+  </data>
+  <data name="Eng_OutboxRetryFmt" xml:space="preserve">
+    <value>„{0}“ wird erneut gesendet.</value>
+  </data>
+  <data name="Eng_OutboxPassError" xml:space="preserve">
+    <value>Outbox-Durchlauf fehlgeschlagen.</value>
+  </data>
+  <data name="Eng_OutboxRegisterFailedFmt" xml:space="preserve">
+    <value>„{0}“ konnte nicht aus der Outbox registriert werden.</value>
+  </data>
+  <data name="Eng_OutboxTriggerFailed" xml:space="preserve">
+    <value>Outbox-Worker konnte nicht gestartet werden.</value>
+  </data>
+  <data name="Eng_OutboxTransferFailedFmt" xml:space="preserve">
+    <value>„{0}“ konnte nicht in die Outbox übertragen werden.</value>
   </data>
   <data name="Launcher_ConnectFailed" xml:space="preserve">
     <value>Verbindung zum Dienst fehlgeschlagen</value>
@@ -401,4 +455,6 @@
   <data name="Launcher_EngineNotFoundFmt" xml:space="preserve">
     <value>Dienst nicht gefunden: {0}</value>
   </data>
+  <data name="Eng_AttachedFileRetryFmt" xml:space="preserve"><value>Der bestätigte Eintrag „{0}“ fehlt im Ordner; die gespeicherten Daten werden erneut verknüpft.</value></data>
+  <data name="Eng_OutboxAdoptedFmt" xml:space="preserve"><value>Die ausstehende Datei „{0}“ ohne Besitzer wurde Benutzer {1} zugeordnet.</value></data>
 </root>

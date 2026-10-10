@@ -10,6 +10,7 @@ internal sealed class EngineSettingsStore
     private readonly string _file;
     private readonly string _defaultCacheDir;
     private readonly Stored _data;
+    private readonly object _ownerLock = new();
 
     public EngineSettingsStore(string? dir = null)
     {
@@ -34,6 +35,30 @@ internal sealed class EngineSettingsStore
     }
 
     public (string? Letter, string? Label) GetLastMount() => (_data.LastDriveLetter, _data.LastVolumeLabel);
+
+    public string? GetLastUserId(string serverKey)
+    {
+        lock (_ownerLock)
+            return _data.LastUserIds.GetValueOrDefault(serverKey);
+    }
+
+    public void SetLastUserId(string serverKey, string userId)
+    {
+        lock (_ownerLock)
+        {
+            _data.LastUserIds[serverKey] = userId;
+            Save();
+        }
+    }
+
+    public void ClearLastUserId(string serverKey)
+    {
+        lock (_ownerLock)
+        {
+            _data.LastUserIds.Remove(serverKey);
+            Save();
+        }
+    }
 
     public void SetLastMount(string? letter, string? label)
     {
@@ -74,5 +99,6 @@ internal sealed class EngineSettingsStore
         public string? CacheDir { get; set; }
         public string? LastDriveLetter { get; set; }
         public string? LastVolumeLabel { get; set; }
+        public Dictionary<string, string> LastUserIds { get; set; } = new(StringComparer.Ordinal);
     }
 }

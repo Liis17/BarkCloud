@@ -4,6 +4,7 @@ using System.Net.Http.Headers;
 using System.Text.Json;
 using System.Threading;
 
+using BarkCloud.Drive.Contracts.Localization;
 using BarkCloud.Proto.Files;
 
 using Google.Protobuf.WellKnownTypes;
@@ -67,6 +68,8 @@ internal sealed class CloudGateway : IDisposable
     private readonly ConcurrentDictionary<string, byte> _delTombstones = new();
     private readonly ConcurrentDictionary<string, int> _delAttempts = new();
     private readonly ITimer _delTimer;
+
+    public Action<string>? SyncError { get; set; }
 
     public CloudGateway(CloudApi.CloudApiClient cloud, FilesApi.FilesApiClient files, HttpClient http,
         string filesWebBase, Func<string?> tokenProvider, string cacheDir, TimeProvider? time = null)
@@ -147,6 +150,13 @@ internal sealed class CloudGateway : IDisposable
         }
 
         return HidePending(listing);
+    }
+
+    public FileEntryDetailed? FindFileEntryByFileId(string directoryId, string fileId)
+    {
+        InvalidateListing(directoryId);
+        return ListDirectory(directoryId).Files.FirstOrDefault(file =>
+            string.Equals(file.File.Id, fileId, StringComparison.Ordinal));
     }
 
     // Убирает из листинга записи, удаление которых ещё буферизовано (тумбстоны), не трогая кэш.
@@ -416,7 +426,7 @@ internal sealed class CloudGateway : IDisposable
     }
 
     // Заливает локальный файл (multipart-поле "file" + x-auth-token, как iOS).
-    // Возвращает эффективный fileId из ответа (после серверной дедупликации).
+    // Возвращает fileId из ответа; сервер не выполняет дедупликацию содержимого.
     public async Task<string> UploadAsync(string uploadUrl, string fileName, string localPath)
     {
         using var content = new MultipartFormDataContent();
@@ -472,6 +482,14 @@ internal sealed class CloudGateway : IDisposable
 
     public void DeleteFileEntry(string entryId)
         => _cloud.DeleteFileEntry(new DeleteFileEntryRequest { EntryId = entryId });
+
+    public void RestoreFromTrash(string entryId, string directoryId)
+    {
+        _cloud.RestoreFromTrash(new RestoreFromTrashRequest { EntryId = entryId });
+        InvalidateListing(directoryId);
+        if (directoryId.Length > 0)
+            InvalidateListing("");
+    }
 
     // Буферизованное удаление файла: запись прячется из листингов сразу, а на сервер уходит
     // пачкой через DeleteFileEntries — по таймеру (1 c тишины) либо по достижении порога в 100.
@@ -604,6 +622,8 @@ internal sealed class CloudGateway : IDisposable
     private void DropOne((string EntryId, string DirId) item, int attempts)
     {
         EngineLog.Info($"Удаление записи {item.EntryId} не выполнено (попыток: {attempts}) — файл возвращён в листинг");
+        try { SyncError?.Invoke(Loc.T("Eng_DeleteFailedFmt", item.EntryId, attempts)); }
+        catch (Exception ex) { EngineLog.Error("Обновление ошибки синхронизации удаления", ex); }
         InvalidateListing(item.DirId);
         _delTombstones.TryRemove(item.EntryId, out _);
         _delAttempts.TryRemove(item.EntryId, out _);

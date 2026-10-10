@@ -133,6 +133,30 @@ public sealed class CloudGatewayTests
     }
 
     [Fact]
+    public void Exhausted_buffered_delete_attempts_report_sync_error()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        var file = cloud.AddFile("", "pending-delete.txt");
+        var time = new FakeTimeProvider();
+        using var gateway = cloud.CreateGateway(temp.Path("cache"), time);
+        var errors = new List<string>();
+        gateway.SyncError = errors.Add;
+        for (var i = 0; i < 3; i++)
+            cloud.Invoker.FailNext(FakeCloudMethods.DeleteFileEntries,
+                new RpcException(new Status(StatusCode.Unavailable, "offline")));
+        gateway.QueueDeleteFileEntry(file.EntryId, "");
+
+        time.Advance(TimeSpan.FromSeconds(1));
+        time.Advance(TimeSpan.FromSeconds(1));
+        time.Advance(TimeSpan.FromSeconds(1));
+
+        cloud.Invoker.Calls.Count(call => call.MethodFullName == FakeCloudMethods.DeleteFileEntries).Should().Be(3);
+        errors.Should().ContainSingle().Which.Should().Contain(file.EntryId);
+        gateway.ListDirectory("").Files.Should().ContainSingle(item => item.Entry.Id == file.EntryId);
+    }
+
+    [Fact]
     public void Resolve_returns_root_directories_and_null_for_missing_paths()
     {
         using var temp = new TestDirectory();

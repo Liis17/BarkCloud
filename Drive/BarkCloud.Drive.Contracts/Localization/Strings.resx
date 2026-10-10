@@ -296,6 +296,15 @@
   <data name="Settings_Cache" xml:space="preserve">
     <value>Папка кэша</value>
   </data>
+  <data name="Settings_Outbox" xml:space="preserve">
+    <value>Неотправленные файлы</value>
+  </data>
+  <data name="Settings_OpenOutbox" xml:space="preserve">
+    <value>Открыть папку неотправленных</value>
+  </data>
+  <data name="Settings_OutboxOpenFailedFmt" xml:space="preserve">
+    <value>Не удалось открыть папку неотправленных: {0}</value>
+  </data>
   <data name="Settings_Autostart" xml:space="preserve">
     <value>Автозагрузка (при входе в Windows)</value>
   </data>
@@ -392,8 +401,53 @@
   <data name="Eng_EmptyCachePath" xml:space="preserve">
     <value>Пустой путь к папке кэша</value>
   </data>
+  <data name="Eng_EmptyFileNotSupported" xml:space="preserve">
+    <value>Сервер не поддерживает пустые файлы; сохранена прежняя версия.</value>
+  </data>
   <data name="Eng_SyncFailedFmt" xml:space="preserve">
     <value>Не удалось сохранить «{0}» в облако: {1}</value>
+  </data>
+  <data name="Eng_AttachedFileNotListedFmt" xml:space="preserve">
+    <value>После привязки файл «{0}» не найден в свежем листинге каталога.</value>
+  </data>
+  <data name="Eng_DeleteFailedFmt" xml:space="preserve">
+    <value>Не удалось удалить запись «{0}» из облака после {1} попыток.</value>
+  </data>
+  <data name="Eng_OutboxMoveFailedFmt" xml:space="preserve">
+    <value>Не удалось перенести файл «{0}» в outbox.</value>
+  </data>
+  <data name="Eng_OutboxRollbackFailedFmt" xml:space="preserve">
+    <value>Не удалось вернуть файл «{0}» из outbox.</value>
+  </data>
+  <data name="Eng_OutboxManifestReadFailedFmt" xml:space="preserve">
+    <value>Не удалось прочитать манифест outbox «{0}».</value>
+  </data>
+  <data name="Eng_OutboxOrphanFileFmt" xml:space="preserve">
+    <value>Файл outbox без манифеста оставлен без изменений: {0}</value>
+  </data>
+  <data name="Eng_OutboxSaveError" xml:space="preserve">
+    <value>Не удалось сохранить ошибку outbox.</value>
+  </data>
+  <data name="Eng_OutboxCallbackError" xml:space="preserve">
+    <value>Ошибка обработчика outbox.</value>
+  </data>
+  <data name="Eng_OutboxDataDeleteFailedFmt" xml:space="preserve">
+    <value>Не удалось удалить данные outbox для «{0}»; манифест уже удалён.</value>
+  </data>
+  <data name="Eng_OutboxRetryFmt" xml:space="preserve">
+    <value>Повтор отправки «{0}».</value>
+  </data>
+  <data name="Eng_OutboxPassError" xml:space="preserve">
+    <value>Ошибка обхода outbox.</value>
+  </data>
+  <data name="Eng_OutboxRegisterFailedFmt" xml:space="preserve">
+    <value>Не удалось зарегистрировать «{0}» из outbox.</value>
+  </data>
+  <data name="Eng_OutboxTriggerFailed" xml:space="preserve">
+    <value>Не удалось запустить worker outbox.</value>
+  </data>
+  <data name="Eng_OutboxTransferFailedFmt" xml:space="preserve">
+    <value>Не удалось передать «{0}» в outbox.</value>
   </data>
   <data name="Launcher_ConnectFailed" xml:space="preserve">
     <value>не удалось подключиться к движку</value>
@@ -401,4 +455,6 @@
   <data name="Launcher_EngineNotFoundFmt" xml:space="preserve">
     <value>не найден движок: {0}</value>
   </data>
+  <data name="Eng_AttachedFileRetryFmt" xml:space="preserve"><value>Подтверждённая запись «{0}» отсутствует в каталоге; повторная привязка сохранённых данных.</value></data>
+  <data name="Eng_OutboxAdoptedFmt" xml:space="preserve"><value>Неотправленный файл «{0}» без владельца привязан к пользователю {1}.</value></data>
 </root>
