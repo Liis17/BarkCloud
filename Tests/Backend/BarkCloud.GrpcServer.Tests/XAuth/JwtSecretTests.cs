@@ -22,6 +22,7 @@ public class JwtSecretTests
         var bytes = JwtSecret.GetKeyBytes(secret);
 
         bytes.Should().Equal(Encoding.UTF8.GetBytes(secret));
+        bytes.Should().HaveCount(40);
         bytes.Should().NotEqual(Encoding.ASCII.GetBytes(secret));
     }
 
@@ -32,35 +33,38 @@ public class JwtSecretTests
     {
         var act = () => JwtSecret.GetKeyBytes(secret);
 
-        act.Should().Throw<InvalidOperationException>().WithMessage("*JwtSettings:SecretKey не задан*");
+        var message = act.Should().Throw<InvalidOperationException>().Which.Message;
+        message.Should().Contain("JwtSettings:SecretKey не задан").And.Contain("32");
     }
 
     [Fact]
-    public void GetKeyBytes_ShorterThanStartupMinimum_ThrowsWithoutLeakingSecret()
+    public void GetKeyBytes_ShorterThanMinimum_ThrowsWithoutLeakingSecret()
     {
         const string secret = "short-secret";
 
         var act = () => JwtSecret.GetKeyBytes(secret);
 
         var message = act.Should().Throw<InvalidOperationException>().Which.Message;
-        message.Should().Contain("12").And.Contain("16").And.NotContain(secret);
+        message.Should().Contain("12").And.Contain("32").And.NotContain(secret);
     }
 
     [Theory]
-    [InlineData(8, 16, true)]    // 16 байт — нижний предел старта
-    [InlineData(7, 16, false)]   // 14 байт
-    [InlineData(10, 16, true)]   // 20 байт проходит старт...
-    [InlineData(10, 32, false)]  // ...но не рекомендованный минимум при записи
-    [InlineData(16, 32, true)]   // 32 байта — рекомендованный минимум
-    public void GetKeyBytes_ThresholdIsCountedInBytesNotCharacters(int cyrillicChars, int minBytes, bool accepted)
+    [MemberData(nameof(ThresholdCases))]
+    public void GetKeyBytes_ThresholdIsCountedInBytesNotCharacters(string secret, bool accepted)
     {
-        var secret = new string('ж', cyrillicChars);
-
-        var act = () => JwtSecret.GetKeyBytes(secret, minBytes);
+        var act = () => JwtSecret.GetKeyBytes(secret);
 
         if (accepted)
             act.Should().NotThrow();
         else
             act.Should().Throw<InvalidOperationException>();
     }
+
+    public static TheoryData<string, bool> ThresholdCases => new()
+    {
+        { new string('a', 31), false },
+        { new string('a', 32), true },
+        { new string('ж', 15), false },
+        { new string('ж', 16), true }
+    };
 }
