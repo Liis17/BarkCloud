@@ -45,7 +45,7 @@ HTTP `GET /download/{torrentId}?file={index}` проверяет владель�
 
 - EF Core/PostgreSQL хранят пользовательские торренты и файлы. MonoTorrent engine живёт в процессе; директория загрузки разделена по `userId`.
 - При запуске торренты перечитываются из БД, добавляются в engine и получают сохранённые приоритеты. Fast-resume данные хранятся в cache directory.
-- `TorrentPersistenceService` сохраняет прогресс и накопительные значения переданного/полученного трафика каждые 5 секунд.
+- `TorrentPersistenceService` сохраняет прогресс и накопительные значения переданного/полученного трафика каждые 5 секунд; baseline сессионных счётчиков сдвигается только после успешного `SaveChanges` до снятого снимка.
 - Импорт вызывает Files `GetUploadUrl`, отправляет файл на внутренний HTTP `POST /upload/{uploadId}`, затем вызывает `CloudApi.AttachFile`, передавая JWT пользователя.
 - MassTransit `UserDeleted` удаляет торренты пользователя из engine, его директорию загрузки и строки БД.
 - `StreamProgress` проверяет отзыв сессии во время открытого потока; синхронизация отзывов приходит из Identity — [[Backend/SessionRevocation]].
@@ -59,3 +59,4 @@ HTTP `GET /download/{torrentId}?file={index}` проверяет владель�
 - Импорт передаёт байты через HTTP-клиент `TorrentImportService.HttpClientName`, зарегистрированный `AddFilesUploadClient` со сроком `TransferTimeout` = 2 ч (равен `proxy_read_timeout 7200s` nginx). Отмена приходит только через `CancellationToken` gRPC-вызова `ImportToCloud`; Web (`Endpoints/TorrentApiEndpoints.cs`) отмену браузера в вызов не передаёт, поэтому после закрытия вкладки импорт продолжается.
 - Приоритет proto явно преобразуется в MonoTorrent enum, потому что числовые значения этих enum различаются. Изменения приоритетов сохраняются для восстановления после рестарта.
 - Pause, resume и remove сначала выполняются в engine и лишь затем отражаются в БД. Ошибка engine не оставляет БД в состоянии, будто операция уже выполнена.
+- Для неподтверждённого коммита `ManagedTorrent.PendingFlush` сверяется со свежими `Downloaded`/`Uploaded` через `BaselineFor`; тот же baseline использует `TorrentMapper`. Трафик, появившийся во время сохранения, попадёт в следующий тик. Сброс MonoTorrent Monitor при Stop не обрабатывается: несохранённый до сброса трафик может потеряться.
