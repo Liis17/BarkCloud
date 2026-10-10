@@ -3,6 +3,7 @@ using BarkCloud.GrpcServer.Tracker;
 using BarkCloud.Identity.Domain;
 using BarkCloud.Identity.Features.Auth;
 using BarkCloud.Identity.Infrastructure;
+using BarkCloud.Identity.Persistence.Contexts;
 using BarkCloud.Identity.Persistence.Services;
 using BarkCloud.Identity.Services;
 using BarkCloud.Proto.Identity;
@@ -10,6 +11,7 @@ using BarkCloud.Proto.Users;
 using BarkCloud.Shared.Exceptions.Identity;
 using BarkCloud.Shared.Queue.Notifications;
 using BarkCloud.TestKit;
+using BarkCloud.Identity.Tests._Helpers;
 
 using MassTransit;
 
@@ -18,7 +20,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace BarkCloud.Identity.Tests.Features.Auth;
 
-public class AuthCommandHandlerTests
+public class AuthCommandHandlerTests : IDisposable
 {
     private static readonly string PasswordHash = BCrypt.Net.BCrypt.HashPassword("p");
 
@@ -32,6 +34,9 @@ public class AuthCommandHandlerTests
     private readonly Mock<IAuthRateLimiter> _rateLimiter = new();
     private readonly MetricsCollector _metrics = new();
     private readonly ILogger<AuthCommandHandler> _logger = NullLogger<AuthCommandHandler>.Instance;
+    private readonly SqliteIdentityContext _database = new();
+
+    public void Dispose() => _database.Dispose();
 
     public AuthCommandHandlerTests()
     {
@@ -46,13 +51,21 @@ public class AuthCommandHandlerTests
 
         _sessions = new Mock<SessionIssuer>(
             Mock.Of<UsersServerApi.UsersServerApiClient>(), Mock.Of<MediatR.IMediator>(), _outbox.Object,
-            Mock.Of<Identity.Persistence.Services.IRefreshTokensStorage>(), new RequestContext(), _location.Object,
+            Mock.Of<Identity.Persistence.Services.IRefreshTokensStorage>(), _database.Context, new RequestContext(), _location.Object,
             _metrics, NullLogger<SessionIssuer>.Instance);
-        _sessions.Setup(s => s.IssueAsync(It.IsAny<long>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new AuthResponse
+        _sessions.Setup(s => s.IssueAsync(It.IsAny<long>(), It.IsAny<CancellationToken>(), It.IsAny<Func<CancellationToken, Task>?>()))
+            .Returns(async (long _, CancellationToken token, Func<CancellationToken, Task>? completeAuthentication) =>
             {
-                AccessToken = new Token { Value = "access" },
-                RefreshToken = new Token { Value = "refresh" }
+                if (completeAuthentication is not null)
+                {
+                    await completeAuthentication(token);
+                }
+
+                return new AuthResponse
+                {
+                    AccessToken = new Token { Value = "access" },
+                    RefreshToken = new Token { Value = "refresh" }
+                };
             });
 
         // По умолчанию лимиты не сработали; отдельные тесты переопределяют нужную политику.
@@ -229,30 +242,36 @@ public class AuthCommandHandlerTests
     {
         SetupUser(1, new AuthUserProperty { UserId = 1, EmailOtpEnabled = true });
         _authProps
-            .Setup(s => s.TryConsumeEmailAuthCode(1, EmailAuthCodePurpose.Login, "123456"))
-            .ReturnsAsync(false);
+            .Setup(s => s.TryValidateAndReserveEmailAuthCode(1, EmailAuthCodePurpose.Login, "123456", It.IsAny<CancellationToken>()))
+            .ReturnsAsync((ValidatedEmailAuthCode?)null);
 
         var act = () => CreateSut().Handle(
             new AuthCommand { Username = "u", Password = "p", OtpCode = "123456" }, default);
 
         await act.Should().ThrowAsync<NotValidOtpCodeException>();
-        _sessions.Verify(s => s.IssueAsync(It.IsAny<long>(), It.IsAny<CancellationToken>()), Times.Never);
+        _sessions.Verify(s => s.IssueAsync(It.IsAny<long>(), It.IsAny<CancellationToken>(), It.IsAny<Func<CancellationToken, Task>?>()), Times.Never);
     }
 
     [Fact]
     public async Task Handle_EmailOtpValidCode_ConsumesCodeAndIssuesTokens()
     {
         SetupUser(1, new AuthUserProperty { UserId = 1, EmailOtpEnabled = true });
+        var validatedCode = new ValidatedEmailAuthCode(1, EmailAuthCodePurpose.Login, "123456",
+            DateTime.UtcNow, DateTime.UtcNow.AddMinutes(5));
         _authProps
-            .Setup(s => s.TryConsumeEmailAuthCode(1, EmailAuthCodePurpose.Login, "123456"))
+            .Setup(s => s.TryValidateAndReserveEmailAuthCode(1, EmailAuthCodePurpose.Login, "123456", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(validatedCode);
+        _authProps.Setup(s => s.TryConsumeValidatedEmailAuthCode(validatedCode, It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
 
         var response = await CreateSut().Handle(
             new AuthCommand { Username = "u", Password = "p", OtpCode = "123456" }, default);
 
         response.AccessToken.Value.Should().Be("access");
-        _authProps.Verify(s => s.TryConsumeEmailAuthCode(1, EmailAuthCodePurpose.Login, "123456"), Times.Once);
-        _sessions.Verify(s => s.IssueAsync(1, It.IsAny<CancellationToken>()), Times.Once);
+        _authProps.Verify(s => s.TryValidateAndReserveEmailAuthCode(
+            1, EmailAuthCodePurpose.Login, "123456", It.IsAny<CancellationToken>()), Times.Once);
+        _authProps.Verify(s => s.TryConsumeValidatedEmailAuthCode(validatedCode, It.IsAny<CancellationToken>()), Times.Once);
+        _sessions.Verify(s => s.IssueAsync(1, It.IsAny<CancellationToken>(), It.IsAny<Func<CancellationToken, Task>?>()), Times.Once);
     }
 
     /// <summary>Пользователь с паролем "p" и всем необходимым для успешного входа.</summary>
@@ -308,7 +327,7 @@ public class AuthCommandHandlerTests
 
         response.AccessToken.Value.Should().Be("access");
         response.RefreshToken.Value.Should().Be("refresh");
-        _sessions.Verify(s => s.IssueAsync(42, cts.Token), Times.Once);
+        _sessions.Verify(s => s.IssueAsync(42, cts.Token, It.IsAny<Func<CancellationToken, Task>?>()), Times.Once);
     }
 
     [Fact]
@@ -328,7 +347,7 @@ public class AuthCommandHandlerTests
     public async Task Handle_SessionIssuerFails_PropagatesException()
     {
         SetupUser(42, null);
-        _sessions.Setup(s => s.IssueAsync(It.IsAny<long>(), It.IsAny<CancellationToken>()))
+        _sessions.Setup(s => s.IssueAsync(It.IsAny<long>(), It.IsAny<CancellationToken>(), It.IsAny<Func<CancellationToken, Task>?>()))
             .ThrowsAsync(new InvalidOperationException("db down"));
 
         var act = () => CreateSut().Handle(new AuthCommand { Username = "u", Password = "p" }, default);
@@ -427,6 +446,9 @@ public class AuthCommandHandlerTests
     public async Task Handle_WrongPassword_SendsFailedLoginMailWhenNotLimited()
     {
         SetupUser(1, null);
+        _outbox.Setup(o => o.EnqueueAsync(1, NotificationType.FailedLogin, It.IsAny<string>(),
+                It.IsAny<Dictionary<string, string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
 
         var act = () => CreateSut().Handle(new AuthCommand { Username = "u", Password = "wrong" }, default);
 
@@ -434,6 +456,20 @@ public class AuthCommandHandlerTests
         _outbox.Verify(o => o.EnqueueAsync(
             1, NotificationType.FailedLogin, "Неуспешная попытка входа в аккаунт",
             It.Is<Dictionary<string, string>>(p => p["devicename"] == "Pixel" && p["os"] == "Android 14")), Times.Once);
+        _metrics.SnapshotAndReset().Should().ContainKey("notification_outbox_enqueued");
+    }
+
+    [Fact]
+    public async Task Handle_WrongPassword_OutboxInsertFailureKeepsInvalidPasswordResult()
+    {
+        SetupUser(1, null);
+        _outbox.Setup(o => o.EnqueueAsync(1, NotificationType.FailedLogin, It.IsAny<string>(),
+                It.IsAny<Dictionary<string, string>>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new Microsoft.EntityFrameworkCore.DbUpdateException("notification insert failed"));
+
+        var act = () => CreateSut().Handle(new AuthCommand { Username = "u", Password = "wrong" }, default);
+
+        await act.Should().ThrowAsync<InvalidLoginOrPasswordException>();
     }
 
     [Fact]
@@ -460,7 +496,8 @@ public class AuthCommandHandlerTests
 
         await act.Should().ThrowAsync<InvalidLoginOrPasswordException>();
         _outbox.Verify(o => o.EnqueueAsync(
-            It.IsAny<long>(), It.IsAny<NotificationType>(), It.IsAny<string>(), It.IsAny<Dictionary<string, string>>()), Times.Never);
+            It.IsAny<long>(), It.IsAny<NotificationType>(), It.IsAny<string>(), It.IsAny<Dictionary<string, string>>(),
+            It.IsAny<CancellationToken>()), Times.Never);
         _usersClient.Verify(
             c => c.GetUserContactsAsync(It.IsAny<GetUserContactsRequest>(), null, null, default), Times.Never);
         _location.Verify(c => c.GetLocation(It.IsAny<string>()), Times.Never);

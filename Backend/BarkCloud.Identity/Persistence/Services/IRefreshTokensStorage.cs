@@ -4,10 +4,11 @@ namespace BarkCloud.Identity.Persistence.Services;
 
 public interface IRefreshTokensStorage
 {
-    Task<RefreshToken?> FindRefreshToken(string refreshToken);
-    Task<RefreshToken?> CreateNewRefreshToken(string refreshToken, long userId, string deviceId, int expiresDays);
+    Task<RefreshToken?> FindRefreshToken(string refreshToken, CancellationToken cancellationToken = default);
+    Task<RefreshToken?> CreateNewRefreshToken(string refreshToken, long userId, string deviceId, int expiresDays,
+        CancellationToken cancellationToken = default);
     Task<List<RefreshToken>> GetRefreshTokens(long userId);
-    Task DeleteRefreshTokensByDeviceIdSafe(string deviceId, long userId);
+    Task DeleteRefreshTokensByDeviceIdSafe(string deviceId, long userId, CancellationToken cancellationToken = default);
     Task RevokeSession(string deviceId, long userId, CancellationToken cancellationToken = default);
     Task RevokeSessionSafe(string deviceId, long userId, CancellationToken cancellationToken = default);
     Task<int> RevokeAllSessions(long userId, string? currentDeviceId = null, CancellationToken cancellationToken = default);

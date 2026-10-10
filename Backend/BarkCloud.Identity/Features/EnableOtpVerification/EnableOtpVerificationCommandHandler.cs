@@ -86,7 +86,7 @@ public class EnableOtpVerificationCommandHandler : IRequestHandler<EnableOtpVeri
             _logger.LogDebug("Настройка Authenticator 2FA для пользователя {UserId}", _userContext.UserId);
 
             // Получаем старый метод 2FA
-            var oldOptOptions = await _authPropertiesStorage.GetUserAuthProperties(_userContext.UserId);
+            var oldOptOptions = await _authPropertiesStorage.GetUserAuthProperties(_userContext.UserId, cancellationToken);
             string oldMethod = "Отключена";
             if (oldOptOptions != null)
             {
@@ -100,7 +100,7 @@ public class EnableOtpVerificationCommandHandler : IRequestHandler<EnableOtpVeri
             // Проверки идут до любых записей: отказ не меняет ни активный, ни ожидающий секрет.
             try
             {
-                await _reauthPassword.VerifyAsync(_userContext.UserId, request.Password);
+                await _reauthPassword.VerifyAsync(_userContext.UserId, request.Password, cancellationToken);
             }
             catch (Exception ex) when (ex is InvalidPasswordException or PasswordAttemptsExceededException)
             {
@@ -144,8 +144,8 @@ public class EnableOtpVerificationCommandHandler : IRequestHandler<EnableOtpVeri
 
             // Новый секрет ждёт подтверждения кодом (Confirm) и не заменяет действующий OtpSecret.
             await _authPropertiesStorage.SetPendingOtpSecret(
-                _userContext.UserId, base32Secret, DateTime.UtcNow + PendingSecretLifetime);
-            await _authPropertiesStorage.UpdateOptType(Domain.OtpType.Authenticator, userInfo.User.Id);
+                _userContext.UserId, base32Secret, DateTime.UtcNow + PendingSecretLifetime, cancellationToken);
+            await _authPropertiesStorage.UpdateOptType(Domain.OtpType.Authenticator, userInfo.User.Id, cancellationToken);
 
             var qrGenerator = new QRCodeGenerator();
             var qrCodeData = qrGenerator.CreateQrCode(uri, QRCodeGenerator.ECCLevel.Q);
@@ -180,7 +180,7 @@ public class EnableOtpVerificationCommandHandler : IRequestHandler<EnableOtpVeri
 
             _logger.LogDebug("Настройка Email 2FA для пользователя {UserId}", _userContext.UserId);
             // Получаем старый метод 2FA
-            var oldOptOptions = await _authPropertiesStorage.GetUserAuthProperties(_userContext.UserId);
+            var oldOptOptions = await _authPropertiesStorage.GetUserAuthProperties(_userContext.UserId, cancellationToken);
             string oldMethod = "Отключена";
             if (oldOptOptions != null)
             {
@@ -195,9 +195,9 @@ public class EnableOtpVerificationCommandHandler : IRequestHandler<EnableOtpVeri
             _logger.LogDebug("Генерация кода подтверждения для Email 2FA");
 
             var issued = await _authPropertiesStorage.TryIssueEmailAuthCode(
-                userContactInfo.User.Id, Domain.EmailAuthCodePurpose.EnableEmailOtp, code);
+                userContactInfo.User.Id, Domain.EmailAuthCodePurpose.EnableEmailOtp, code, cancellationToken);
 
-            await _authPropertiesStorage.UpdateOptType(Domain.OtpType.Email, userContactInfo.User.Id);
+            await _authPropertiesStorage.UpdateOptType(Domain.OtpType.Email, userContactInfo.User.Id, cancellationToken);
 
             // issued == false — прежний код выдан совсем недавно и остаётся в силе: письмо не отправляем.
             if (issued)

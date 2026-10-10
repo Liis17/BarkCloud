@@ -40,7 +40,7 @@ public class UserDeletedConsumer(
         await passwordsStorage.DeleteByUserId(userId);
         await authPropertiesStorage.DeleteByUserId(userId);
         await resetPasswordsStorage.DeleteByUserId(userId);
-        await confirmationCodesStorage.DeleteByOwnerId(userId);
+        await confirmationCodesStorage.DeleteByOwnerId(userId, context.CancellationToken);
         await transaction.CommitAsync(context.CancellationToken);
 
         metrics.Increment("accounts_cleaned_identity");

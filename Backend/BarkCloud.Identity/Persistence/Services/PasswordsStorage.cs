@@ -14,9 +14,9 @@ public class PasswordsStorage : IPasswordsStorage
         _context = context;
     }
 
-    public async Task<bool> UpdateUserPasswordHash(long userId, string passwordHash)
+    public async Task<bool> UpdateUserPasswordHash(long userId, string passwordHash, CancellationToken cancellationToken = default)
     {
-        var userPassword = await _context.UserPasswords.FirstOrDefaultAsync(x => x.UserId == userId);
+        var userPassword = await _context.UserPasswords.FirstOrDefaultAsync(x => x.UserId == userId, cancellationToken);
 
         if (userPassword is null)
         {
@@ -24,7 +24,7 @@ public class PasswordsStorage : IPasswordsStorage
 
             _context.UserPasswords.Add(userPassword);
 
-            await _context.SaveChangesAsync();
+            await _context.SaveChangesAsync(cancellationToken);
 
             return true;
         }
@@ -34,16 +34,16 @@ public class PasswordsStorage : IPasswordsStorage
 
         _context.UserPasswords.Update(userPassword);
 
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync(cancellationToken);
 
         return false;
     }
 
-    public async Task<string?> GetUserPasswordHash(long userId)
+    public async Task<string?> GetUserPasswordHash(long userId, CancellationToken cancellationToken = default)
     {
         var userPassword = await _context.UserPasswords
             .AsNoTracking()
-            .FirstOrDefaultAsync(x => x.UserId == userId);
+            .FirstOrDefaultAsync(x => x.UserId == userId, cancellationToken);
 
         return userPassword?.PasswordHash;
     }

@@ -3,6 +3,7 @@ using BarkCloud.GrpcServer.Tracker;
 using BarkCloud.GrpcServer.XAuth;
 using BarkCloud.Identity.Domain;
 using BarkCloud.Identity.Features.DisableOtpVerification;
+using BarkCloud.Identity.Persistence.Contexts;
 using BarkCloud.Identity.Persistence.Services;
 using BarkCloud.Identity.Services;
 using BarkCloud.Identity.Tests._Helpers;
@@ -20,8 +21,9 @@ using OtpNotCreatedException = BarkCloud.Identity.Persistence.Exceptions.OtpNotC
 
 namespace BarkCloud.Identity.Tests.Features.DisableOtpVerification;
 
-public class DisableOtpVerificationCommandHandlerTests
+public class DisableOtpVerificationCommandHandlerTests : IDisposable
 {
+    private readonly SqliteIdentityContext _database = new();
     private const string Password = "correct-password";
     private static readonly string PasswordHash = PasswordHasher.HashPassword(Password);
 
@@ -44,6 +46,7 @@ public class DisableOtpVerificationCommandHandlerTests
 
     private DisableOtpVerificationCommandHandler CreateSut() => new(
         UserContextFactory.Create(42),
+        _database.Context,
         _authProps.Object,
         new ReauthPasswordVerifier(_authProps.Object, _passwords.Object),
         _outbox.Object,
@@ -51,6 +54,8 @@ public class DisableOtpVerificationCommandHandlerTests
         _metrics,
         _rateLimiter.Object,
         _logger);
+
+    public void Dispose() => _database.Dispose();
 
     [Fact]
     public async Task Handle_NoAuthProperties_Throws()

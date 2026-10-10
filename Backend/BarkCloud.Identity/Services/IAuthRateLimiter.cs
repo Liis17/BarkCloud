@@ -14,5 +14,5 @@ public interface IAuthRateLimiter
     Task EnsureTotpAttemptAsync(long userId);
 
     /// <summary>Сбрасывает счётчик субъекта (после успешного входа).</summary>
-    Task ResetAsync(AuthLimits.Policy policy, string subject);
+    Task ResetAsync(AuthLimits.Policy policy, string subject, CancellationToken cancellationToken = default);
 }
