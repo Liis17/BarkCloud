@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
 
@@ -7,7 +8,9 @@ using Amazon.S3.Model;
 
 using BarkCloud.Files.Configurations;
 using BarkCloud.Files.Infrastructure;
+using BarkCloud.Shared.Exceptions.Files;
 
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Configuration;
 
 namespace BarkCloud.Files.Tests.Infrastructure;
@@ -70,23 +73,33 @@ public class S3MultipartUploadStoreTests
             default));
     }
 
-    [Fact]
-    public async Task UploadPartAsync_ForR2_StreamsNonSeekableBody()
+    [Theory]
+    [InlineData(false, "http://s3.test", 12)]
+    [InlineData(false, "https://s3.test", 12)]
+    [InlineData(false, "http://s3.test", 128 * 1024)]
+    [InlineData(false, "https://s3.test", 128 * 1024)]
+    [InlineData(true, "https://r2.test", 12)]
+    [InlineData(true, "https://r2.test", 128 * 1024)]
+    public async Task UploadPartAsync_StreamsNonSeekableBody(bool isR2, string serviceUrl, int size)
     {
         var handler = new CapturingHttpMessageHandler();
         using var client = new AmazonS3Client(
             new BasicAWSCredentials("key", "secret"),
             new AmazonS3Config
             {
-                ServiceURL = "https://r2.test",
+                ServiceURL = serviceUrl,
                 ForcePathStyle = true,
-                AuthenticationRegion = "auto",
-                RequestChecksumCalculation = RequestChecksumCalculation.WHEN_REQUIRED,
-                ResponseChecksumValidation = ResponseChecksumValidation.WHEN_REQUIRED,
+                AuthenticationRegion = isR2 ? "auto" : "us-east-1",
+                RequestChecksumCalculation = isR2
+                    ? RequestChecksumCalculation.WHEN_REQUIRED
+                    : RequestChecksumCalculation.WHEN_SUPPORTED,
+                ResponseChecksumValidation = isR2
+                    ? ResponseChecksumValidation.WHEN_REQUIRED
+                    : ResponseChecksumValidation.WHEN_SUPPORTED,
                 HttpClientFactory = new SingleHttpClientFactory(handler)
             });
-        var sut = new S3MultipartUploadStore(Registry(client, isR2: true));
-        var bytes = Enumerable.Range(0, 12).Select(static value => (byte)value).ToArray();
+        var sut = new S3MultipartUploadStore(Registry(client, isR2));
+        var bytes = Enumerable.Range(0, size).Select(static value => (byte)value).ToArray();
         await using var body = new NonSeekableReadStream(bytes);
 
         var result = await sut.UploadPartAsync("profile", "file", "upload", 1, body, bytes.Length, default);
@@ -94,6 +107,60 @@ public class S3MultipartUploadStoreTests
         result.PartNumber.Should().Be(1);
         result.Size.Should().Be(bytes.Length);
         handler.Body.Should().Equal(bytes);
+    }
+
+    [Theory]
+    [InlineData("success")]
+    [InlineData("failure")]
+    [InlineData("cancellation")]
+    public async Task UploadPartAsync_DeletesTemporaryBufferAndLeavesBodyOpen(string outcome)
+    {
+        var client = new Mock<IAmazonS3>();
+        string? tempFileName = null;
+        Exception? error = outcome switch
+        {
+            "failure" => new IOException("S3 upload failed"),
+            "cancellation" => new OperationCanceledException(),
+            _ => null
+        };
+        client.Setup(x => x.UploadPartAsync(It.IsAny<UploadPartRequest>(), default))
+            .Callback<UploadPartRequest, CancellationToken>((request, _) =>
+            {
+                var buffer = request.InputStream.Should().BeOfType<FileBufferingReadStream>().Subject;
+                buffer.Position.Should().Be(0);
+                buffer.Length.Should().Be(128 * 1024);
+                tempFileName = buffer.TempFileName;
+                File.Exists(tempFileName).Should().BeTrue();
+            })
+            .Returns(() => error is null
+                ? Task.FromResult(new UploadPartResponse { ETag = "etag" })
+                : Task.FromException<UploadPartResponse>(error));
+        var sut = new S3MultipartUploadStore(Registry(client));
+        await using var body = new NonSeekableReadStream(new byte[128 * 1024]);
+
+        var act = () => sut.UploadPartAsync("profile", "file", "upload", 1, body, 128 * 1024, default);
+
+        if (error is null)
+            await act();
+        else
+            (await act.Should().ThrowAsync<Exception>()).Which.Should().BeSameAs(error);
+
+        tempFileName.Should().NotBeNull();
+        File.Exists(tempFileName).Should().BeFalse();
+        body.CanRead.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task UploadPartAsync_WhenNonSeekableBodyIsShort_DoesNotUploadPart()
+    {
+        var client = new Mock<IAmazonS3>();
+        var sut = new S3MultipartUploadStore(Registry(client));
+        await using var body = new NonSeekableReadStream(new byte[11]);
+
+        var act = () => sut.UploadPartAsync("profile", "file", "upload", 1, body, 12, default);
+
+        await act.Should().ThrowAsync<UploadPartInvalidException>();
+        client.Verify(x => x.UploadPartAsync(It.IsAny<UploadPartRequest>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -188,6 +255,8 @@ public class S3MultipartUploadStoreTests
             CancellationToken cancellationToken)
         {
             Body = await request.Content!.ReadAsByteArrayAsync(cancellationToken);
+            if (request.Content.Headers.ContentEncoding.Contains("aws-chunked"))
+                Body = DecodeAwsChunks(Body);
             var response = new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new ByteArrayContent([])
@@ -195,13 +264,31 @@ public class S3MultipartUploadStoreTests
             response.Headers.ETag = new EntityTagHeaderValue("\"etag\"");
             return response;
         }
+
+        private static byte[] DecodeAwsChunks(byte[] body)
+        {
+            using var decoded = new MemoryStream();
+            var offset = 0;
+            while (true)
+            {
+                var lineLength = body.AsSpan(offset).IndexOf("\r\n"u8);
+                var header = System.Text.Encoding.ASCII.GetString(body, offset, lineLength);
+                var size = int.Parse(header.Split(';')[0], NumberStyles.HexNumber, CultureInfo.InvariantCulture);
+                if (size == 0)
+                    return decoded.ToArray();
+
+                offset += lineLength + 2;
+                decoded.Write(body, offset, size);
+                offset += size + 2;
+            }
+        }
     }
 
     private sealed class NonSeekableReadStream(byte[] bytes) : Stream
     {
         private readonly MemoryStream _inner = new(bytes, writable: false);
 
-        public override bool CanRead => true;
+        public override bool CanRead => _inner.CanRead;
         public override bool CanSeek => false;
         public override bool CanWrite => false;
         public override long Length => throw new NotSupportedException();
