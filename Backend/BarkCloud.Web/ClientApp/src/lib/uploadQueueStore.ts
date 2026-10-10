@@ -3,6 +3,7 @@ export type PersistedUploadStatus =
   | 'checking'
   | 'needs_file'
   | 'uploading'
+  | 'paused'
   | 'processing'
   | 'attaching'
   | 'uploaded_not_attached'
