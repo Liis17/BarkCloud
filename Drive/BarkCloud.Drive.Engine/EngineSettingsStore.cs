@@ -11,14 +11,16 @@ internal sealed class EngineSettingsStore
     private readonly string _defaultCacheDir;
     private readonly Stored _data;
 
-    public EngineSettingsStore()
+    public EngineSettingsStore(string? dir = null)
     {
-        var dir = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "BarkCloud.Drive");
+        var hasCustomDir = dir is not null;
+        dir ??= Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "BarkCloud.Drive");
         Directory.CreateDirectory(dir);
         _file = Path.Combine(dir, "settings.json");
-        _defaultCacheDir = Path.Combine(Path.GetTempPath(), "BarkCloudDrive");
+        _defaultCacheDir = hasCustomDir
+            ? Path.Combine(dir, "cache")
+            : Path.Combine(Path.GetTempPath(), "BarkCloudDrive");
         _data = Load();
     }
 

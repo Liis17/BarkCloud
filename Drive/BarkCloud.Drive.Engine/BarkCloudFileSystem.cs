@@ -49,10 +49,10 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
     // Последняя ошибка загрузки/привязки файла в облако (из Cleanup). Не глушим — отдаём в статус.
     public string? LastSyncError { get; private set; }
 
-    public BarkCloudFileSystem(CloudGateway gateway)
+    public BarkCloudFileSystem(CloudGateway gateway, string? writeDir = null)
     {
         _gateway = gateway;
-        _writeDir = Path.Combine(Path.GetTempPath(), "BarkCloudDrive", "write");
+        _writeDir = writeDir ?? Path.Combine(Path.GetTempPath(), "BarkCloudDrive", "write");
         Directory.CreateDirectory(_writeDir);
     }
 
