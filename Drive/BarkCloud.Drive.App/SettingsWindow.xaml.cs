@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 
@@ -283,6 +285,23 @@ public partial class SettingsWindow : FluentWindow
         catch (Exception ex)
         {
             Status(Loc.T("Settings_CacheChangeFailedFmt", ex.Message));
+        }
+    }
+
+    private void OpenOutboxClick(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            Directory.CreateDirectory(DriveStoragePaths.OutboxDirectory);
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = DriveStoragePaths.OutboxDirectory,
+                UseShellExecute = true,
+            });
+        }
+        catch (Exception ex)
+        {
+            Status(Loc.T("Settings_OutboxOpenFailedFmt", ex.Message));
         }
     }
 

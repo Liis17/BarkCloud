@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
@@ -43,11 +44,17 @@ internal sealed class FakeCloud
     private readonly Dictionary<string, CloudEntry> _entries = new(StringComparer.Ordinal);
     private readonly Dictionary<string, CloudEntry> _trash = new(StringComparer.Ordinal);
     private readonly Dictionary<string, CloudBlob> _blobs = new(StringComparer.Ordinal);
+    private readonly ConcurrentQueue<string> _operations = new();
 
     public FakeCloud()
     {
         _directories.Add("", new CloudDirectory("", "", "", DateTime.UtcNow));
-        HttpHandler = new FakeHttpHandler(HandleHttpAsync);
+        HttpHandler = new FakeHttpHandler(async (request, cancellationToken) =>
+        {
+            _operations.Enqueue($"HTTP:{request.Method.Method}");
+            return await HandleHttpAsync(request, cancellationToken);
+        });
+        Invoker.OnCall = method => _operations.Enqueue($"RPC:{method}");
 
         Invoker.Handle<ListDirectoryRequest, DirectoryListingDetailed>(
             FakeCloudMethods.ListDirectoryDetailed, ListDirectoryDetailed);
@@ -77,6 +84,7 @@ internal sealed class FakeCloud
 
     public FakeCallInvoker Invoker { get; } = new();
     public FakeHttpHandler HttpHandler { get; }
+    public IReadOnlyList<string> Operations => _operations.ToArray();
 
     public CloudGateway CreateGateway(string cacheDir, TimeProvider? time = null, string? token = "test-token")
         => new(

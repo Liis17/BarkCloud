@@ -122,6 +122,13 @@
                     </StackPanel>
                 </ui:Card>
 
+                <ui:Card Margin="0,12,0,0">
+                    <StackPanel>
+                        <TextBlock Text="{loc:Tr Settings_Outbox}" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                        <ui:Button Content="{loc:Tr Settings_OpenOutbox}" Click="OpenOutboxClick"/>
+                    </StackPanel>
+                </ui:Card>
+
                 <!-- Автозагрузка -->
                 <ui:Card Margin="0,12,0,0">
                     <StackPanel>

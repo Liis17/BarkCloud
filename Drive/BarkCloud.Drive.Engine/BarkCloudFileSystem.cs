@@ -12,27 +12,61 @@ using FileAccess = DokanNet.FileAccess; // в IDokanOperations access — это
 
 namespace BarkCloud.Drive.Engine;
 
-// Запись открытого хэндла: байты буферизуются в локальную рабочую копию, а на Cleanup
-// загружаются в облако и привязываются (или заменяют существующую запись).
-internal sealed class WriteSession : IDisposable
+internal enum LocalFileKind
 {
+    Writable,
+    Placeholder,
+    Pending,
+}
+
+internal enum PersistStage
+{
+    Upload,
+    DeleteOld,
+    Attach,
+    Done,
+}
+
+internal sealed class PersistOperation
+{
+    public PersistStage Stage { get; set; } = PersistStage.Upload;
+    public string? FileId { get; set; }
+    public bool OldEntryDeleted { get; set; }
+    public bool AttachAttempted { get; set; }
+    public bool AttachCompleted { get; set; }
+    public string? SupersededFileId { get; set; }
+}
+
+// Общая локальная копия файла для всех открытых хэндлов одного пути.
+internal sealed class LocalFile
+{
+    public required string Path;
     public required string Name;
-    public required string DirectoryId;      // папка, куда привязать
+    public required string DirectoryId;
     public required string TempPath;
-    public required FileStream Stream;
-    public string? ExistingEntryId;          // != null → редактирование существующего файла
-    public string OriginalFileId = "";
+    public string? ExistingEntryId;
+    public ResolvedNode? ExistingNode;
+    public FileStream? Stream;
     public readonly object Sync = new();
+    public readonly object DataSync = new();
+    public LocalFileKind Kind;
+    public int OpenCount;
+    public int ActiveCount;
     public bool Modified;
-    public bool Persisted;
+    public bool DirtyAfterPersist;
+    public bool DeleteOnClose;
+    public bool KeepData;
+    public bool Hydrated;
+    public PersistOperation? Op;
+    public string? OutboxId;
+    public DateTime CreatedAt = DateTime.UtcNow;
+}
 
-    public bool IsNew => ExistingEntryId is null;
-
-    public void Dispose()
-    {
-        try { Stream.Dispose(); } catch { /* ignore */ }
-        try { File.Delete(TempPath); } catch { /* ignore */ }
-    }
+internal sealed class HandleContext
+{
+    public LocalFile? File;
+    public ResolvedNode? Node;
+    public bool CleanedUp;
 }
 
 // Read-write проекция облака BarkCloud на файловую систему Dokany.
@@ -45,6 +79,13 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
 
     private readonly CloudGateway _gateway;
     private readonly string _writeDir;
+    private readonly UploadOutbox? _outbox;
+    private readonly string _serverKey;
+    private readonly Func<string?> _ownerUserId;
+    private readonly object _localFilesLock = new();
+    private readonly Dictionary<string, LocalFile> _localFiles = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, LocalFile> _pendingFiles = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, LocalFile> _openOutboxFiles = new(StringComparer.Ordinal);
 
     // Метка тома (имя диска), отдаётся в GetVolumeInformation. Устанавливается перед Mount.
     public string VolumeLabel { get; set; } = "BarkCloud";
@@ -52,11 +93,157 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
     // Последняя ошибка загрузки/привязки файла в облако (из Cleanup). Не глушим — отдаём в статус.
     public string? LastSyncError { get; private set; }
 
-    public BarkCloudFileSystem(CloudGateway gateway, string? writeDir = null)
+    public BarkCloudFileSystem(CloudGateway gateway, string? writeDir = null, UploadOutbox? outbox = null,
+        string serverKey = "", Func<string?>? ownerUserId = null)
     {
         _gateway = gateway;
         _writeDir = writeDir ?? Path.Combine(Path.GetTempPath(), "BarkCloudDrive", "write");
+        _outbox = outbox;
+        _serverKey = serverKey;
+        _ownerUserId = ownerUserId ?? (() => null);
         Directory.CreateDirectory(_writeDir);
+
+        UpdateOutboxSession(_ownerUserId());
+    }
+
+    internal void UpdateOutboxSession(string? userId)
+    {
+        var entries = string.IsNullOrEmpty(userId) || _outbox is null
+            ? Array.Empty<UploadOutboxEntry>()
+            : _outbox.Entries.Where(entry => entry.ServerKey == _serverKey && entry.OwnerUserId == userId).ToArray();
+        var visibleIds = entries.Select(entry => entry.Id).ToHashSet(StringComparer.Ordinal);
+
+        lock (_localFilesLock)
+        {
+            foreach (var file in _pendingFiles.Values.ToArray())
+            {
+                if (file.OutboxId is { } id && visibleIds.Contains(id))
+                    continue;
+
+                if (file.OpenCount > 0 && file.OutboxId is { } openId)
+                {
+                    RemoveLocalFileLocked(file);
+                    _openOutboxFiles[openId] = file;
+                }
+                else
+                    RemoveLocalFileLocked(file);
+            }
+
+            foreach (var (id, file) in _openOutboxFiles.ToArray())
+                if (file.OpenCount == 0 && !visibleIds.Contains(id))
+                    _openOutboxFiles.Remove(id);
+        }
+
+        foreach (var entry in entries)
+        {
+            var currentEntry = _outbox!.Find(entry.Id);
+            if (currentEntry is null || currentEntry.ServerKey != _serverKey
+                || currentEntry.OwnerUserId != userId)
+                continue;
+
+            LocalFile? file;
+            lock (_localFilesLock)
+                file = _pendingFiles.Values.Concat(_openOutboxFiles.Values)
+                    .FirstOrDefault(candidate => candidate.OutboxId == entry.Id);
+            RegisterOutboxPending(currentEntry, file);
+        }
+    }
+
+    internal void AdoptOutboxForSession(string userId)
+    {
+        _outbox?.AdoptUnowned(_serverKey, userId);
+        UpdateOutboxSession(userId);
+    }
+
+    internal int PendingUploadCount => _outbox?.Count ?? 0;
+
+    internal Action? OutboxAdded { get; set; }
+
+    internal Action<string>? SyncError
+    {
+        set => _gateway.SyncError = value;
+    }
+
+    internal void SetLastSyncError(string message) => LastSyncError = message;
+
+    internal void RegisterOutboxPending(UploadOutboxEntry entry, LocalFile? file = null)
+    {
+        var operation = CopyOperation(entry.Op ?? new PersistOperation { Stage = entry.Stage, FileId = entry.FileId });
+        file ??= new LocalFile
+        {
+            Path = "",
+            Name = entry.Name,
+            DirectoryId = entry.DirectoryId,
+            TempPath = entry.DataPath,
+            ExistingEntryId = entry.ExistingEntryId,
+            Kind = LocalFileKind.Pending,
+            KeepData = true,
+            Hydrated = true,
+            Op = operation,
+            OutboxId = entry.Id,
+            CreatedAt = entry.CreatedAt.UtcDateTime,
+        };
+
+        lock (file.Sync)
+        {
+            file.Kind = LocalFileKind.Pending;
+            file.KeepData = true;
+            file.Modified = false;
+            file.DirtyAfterPersist = false;
+            file.TempPath = entry.DataPath;
+            file.ExistingEntryId = entry.ExistingEntryId;
+            file.Op = operation;
+            file.OutboxId = entry.Id;
+
+            lock (_localFilesLock)
+            {
+                _openOutboxFiles.Remove(entry.Id);
+                if (!string.IsNullOrEmpty(file.Path))
+                    _localFiles[file.Path] = file;
+                _pendingFiles[PendingKey(file.DirectoryId, file.Name)] = file;
+            }
+        }
+    }
+
+    internal bool DeferOutboxDataDeletion(UploadOutboxEntry entry)
+    {
+        var deferDataDeletion = false;
+        lock (_localFilesLock)
+        {
+            var files = _localFiles.Values.Concat(_pendingFiles.Values).Concat(_openOutboxFiles.Values)
+                .Where(file => file.OutboxId == entry.Id).Distinct().ToArray();
+            foreach (var file in files)
+            {
+                if (file.OpenCount > 0)
+                {
+                    file.DeleteOnClose = true;
+                    deferDataDeletion = true;
+                }
+                else
+                    RemoveLocalFileLocked(file);
+            }
+        }
+        return deferDataDeletion;
+    }
+
+    internal void CompleteOutboxEntry(UploadOutboxEntry entry)
+    {
+        lock (_localFilesLock)
+        {
+            var files = _localFiles.Values.Concat(_pendingFiles.Values).Concat(_openOutboxFiles.Values)
+                .Where(file => file.OutboxId == entry.Id).Distinct().ToArray();
+            foreach (var file in files)
+                if (file.OpenCount == 0 || !file.DeleteOnClose)
+                    RemoveLocalFileLocked(file);
+        }
+        ClearLastSyncErrorIfNoPendingUploads();
+    }
+
+    internal bool RegisterLocalFile(LocalFile file)
+    {
+        file.Path = NormalizePath(file.Path);
+        lock (_localFilesLock)
+            return _localFiles.TryAdd(file.Path, file);
     }
 
     public NtStatus CreateFile(string fileName, FileAccess access, FileShare share, FileMode mode,
@@ -76,7 +263,51 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
     private NtStatus CreateFileCore(string fileName, FileAccess access, FileShare share, FileMode mode,
         FileOptions options, FileAttributes attributes, IDokanFileInfo info)
     {
-        var node = SafeResolve(fileName);
+        var wantsWrite = mode is FileMode.CreateNew or FileMode.Create or FileMode.Truncate
+                         || (access & WriteBits) != 0;
+        ResolvedNode? node;
+
+        if (info.IsDirectory)
+        {
+            node = SafeResolve(fileName);
+        }
+        else
+        {
+            if (TryOpenRegisteredLocal(fileName, mode, wantsWrite, out var localContext, out var localStatus))
+            {
+                if (localStatus != DokanResult.Success)
+                    return localStatus;
+                info.Context = localContext;
+                return ExistingStatus(mode);
+            }
+
+            if (TryOpenPendingByPath(fileName, mode, wantsWrite, out localContext, out localStatus))
+            {
+                if (localStatus != DokanResult.Success)
+                    return localStatus;
+                info.Context = localContext;
+                return ExistingStatus(mode);
+            }
+
+            node = SafeResolve(fileName);
+
+            // Разрешение пути могло завершиться одновременно с регистрацией рабочей копии.
+            if (TryOpenRegisteredLocal(fileName, mode, wantsWrite, out localContext, out localStatus))
+            {
+                if (localStatus != DokanResult.Success)
+                    return localStatus;
+                info.Context = localContext;
+                return ExistingStatus(mode);
+            }
+
+            if (TryOpenPendingByPath(fileName, mode, wantsWrite, out localContext, out localStatus))
+            {
+                if (localStatus != DokanResult.Success)
+                    return localStatus;
+                info.Context = localContext;
+                return ExistingStatus(mode);
+            }
+        }
 
         // ───────── папки ─────────
         if (info.IsDirectory)
@@ -113,9 +344,6 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
             return DokanResult.Success;
         }
 
-        var wantsWrite = mode is FileMode.CreateNew or FileMode.Create or FileMode.Truncate or FileMode.Append
-                         || (access & WriteBits) != 0;
-
         // ───────── существующий файл ─────────
         if (node != null)
         {
@@ -123,12 +351,19 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
                 return DokanResult.FileExists;
 
             if (!wantsWrite)
-                return DokanResult.Success; // чтение — контекст не нужен
+            {
+                info.Context = new HandleContext { Node = node };
+                return ExistingStatus(mode);
+            }
 
             try
             {
-                info.Context = OpenExistingForWrite(node, truncate: mode is FileMode.Create or FileMode.Truncate);
-                return DokanResult.Success;
+                var candidate = OpenExistingForWrite(fileName, node,
+                    truncate: mode is FileMode.Create or FileMode.Truncate);
+                if (!TryOpenCandidate(candidate, mode, out var context, out var alreadyExists, out var candidateStatus))
+                    return candidateStatus;
+                info.Context = context;
+                return ExistingStatus(mode);
             }
             catch (Exception ex)
             {
@@ -143,8 +378,11 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
             var parent = _gateway.ResolveParentDirectory(fileName);
             if (parent is null)
                 return DokanResult.PathNotFound;
-            info.Context = OpenNew(parent.Value.DirectoryId, parent.Value.Name);
-            return DokanResult.Success;
+            var candidate = OpenNew(fileName, parent.Value.DirectoryId, parent.Value.Name);
+            if (!TryOpenCandidate(candidate, mode, out var context, out var alreadyExists, out var candidateStatus))
+                return candidateStatus;
+            info.Context = context;
+            return alreadyExists ? ExistingStatus(mode) : DokanResult.Success;
         }
 
         return DokanResult.FileNotFound;
@@ -154,26 +392,100 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
     {
         try
         {
-            if (info.DeletePending)
+            if (info.Context is HandleContext { File: { } file } handle)
+            {
+                var becameInactive = false;
+                var deleteNow = false;
+                var persist = false;
+
+                lock (_localFilesLock)
+                {
+                    var wasDeletePending = file.DeleteOnClose;
+                    if (info.DeletePending && file.Kind != LocalFileKind.Pending)
+                        file.DeleteOnClose = true;
+
+                    if (!handle.CleanedUp)
+                    {
+                        handle.CleanedUp = true;
+                        if (file.ActiveCount > 0)
+                            file.ActiveCount--;
+                        becameInactive = file.ActiveCount == 0;
+                    }
+
+                    deleteNow = file.Kind != LocalFileKind.Pending && file.DeleteOnClose && file.ActiveCount == 0
+                                && (becameInactive || (!wasDeletePending && info.DeletePending));
+                    persist = !file.DeleteOnClose && file.Kind != LocalFileKind.Pending && becameInactive;
+                }
+
+                if (deleteNow)
+                    DeleteLocalFile(file);
+                else if (persist)
+                {
+                    lock (file.Sync)
+                    {
+                        if (file.Modified)
+                            Persist(file);
+                    }
+                }
+            }
+            else if (info.Context is HandleContext nodeHandleContext)
+            {
+                if (!nodeHandleContext.CleanedUp)
+                {
+                    nodeHandleContext.CleanedUp = true;
+                    if (info.DeletePending)
+                    {
+                        if (nodeHandleContext.Node is { IsDirectory: false } node)
+                            _gateway.QueueDeleteFileEntry(node.EntryId, node.DirectoryId);
+                        else
+                            DeleteNode(fileName);
+                    }
+                }
+            }
+            else if (info.DeletePending && FindLocalFile(fileName)?.Kind != LocalFileKind.Pending
+                     && FindPendingFileByPath(fileName) is null)
+            {
                 DeleteNode(fileName);
-            else if (info.Context is WriteSession { Persisted: false } ws && (ws.IsNew || ws.Modified))
-                PersistSession(ws);
+            }
         }
         catch (Exception ex)
         {
             // диск не должен падать, но причину фиксируем — и не глушим: при сбое синхронизации
             // записи в облако выставляем ошибку в статус, чтобы App показал её пользователю.
+            if (info.Context is HandleContext { File: { } file })
+            {
+                lock (file.Sync)
+                    file.KeepData = true;
+            }
             EngineLog.Error($"Cleanup(\"{fileName}\")", ex);
-            if (info.Context is WriteSession)
+            if (info.Context is HandleContext { File: not null })
+            {
                 LastSyncError = Loc.T("Eng_SyncFailedFmt", Path.GetFileName(fileName), ex.Message);
+            }
         }
     }
 
     public void CloseFile(string fileName, IDokanFileInfo info)
     {
-        if (info.Context is WriteSession ws)
-            ws.Dispose();
-        info.Context = null;
+        try
+        {
+            if (info.Context is HandleContext { File: { } file })
+                CloseLocalFile(fileName, file);
+        }
+        catch (Exception ex)
+        {
+            EngineLog.Error($"CloseFile(\"{fileName}\")", ex);
+            if (info.Context is HandleContext { File: { } file })
+            {
+                lock (file.Sync)
+                    file.KeepData = true;
+                LastSyncError = Loc.T("Eng_SyncFailedFmt", Path.GetFileName(fileName), ex.Message);
+            }
+        }
+        finally
+        {
+            info.Context = null;
+        }
     }
 
     public NtStatus ReadFile(string fileName, byte[] buffer, out int bytesRead, long offset, IDokanFileInfo info)
@@ -181,19 +493,28 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
         bytesRead = 0;
         try
         {
-            if (info.Context is WriteSession ws)
+            var handle = info.Context as HandleContext;
+            var file = handle?.File;
+            if (file is null && handle?.Node is { IsDirectory: false } nodeHandle)
+                file = FindLocalFileByEntryId(nodeHandle.EntryId);
+            if (file is null && handle?.Node is null)
+                file = FindLocalFile(fileName) ?? FindPendingFileByPath(fileName);
+
+            if (file != null)
             {
-                lock (ws.Sync)
+                lock (file.DataSync)
                 {
-                    if (offset >= ws.Stream.Length)
+                    using var stream = new FileStream(file.TempPath, FileMode.Open,
+                        System.IO.FileAccess.Read, FileShare.ReadWrite);
+                    if (offset >= stream.Length)
                         return DokanResult.Success;
-                    ws.Stream.Position = offset;
-                    bytesRead = ws.Stream.Read(buffer, 0, buffer.Length);
+                    stream.Position = offset;
+                    bytesRead = stream.Read(buffer, 0, buffer.Length);
                 }
                 return DokanResult.Success;
             }
 
-            var node = SafeResolve(fileName);
+            var node = handle?.Node ?? SafeResolve(fileName);
             if (node is null || node.IsDirectory)
                 return DokanResult.FileNotFound;
 
@@ -212,14 +533,18 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
         bytesWritten = 0;
         try
         {
-            if (info.Context is not WriteSession ws)
+            if (info.Context is not HandleContext { File: { } file })
                 return DokanResult.AccessDenied;
 
-            lock (ws.Sync)
+            lock (file.Sync)
+            lock (file.DataSync)
             {
-                ws.Stream.Position = info.WriteToEndOfFile ? ws.Stream.Length : offset;
-                ws.Stream.Write(buffer, 0, buffer.Length);
-                ws.Modified = true;
+                if (file.Kind == LocalFileKind.Pending)
+                    return DokanResult.AccessDenied;
+                var stream = EnsureStreamOpen(file, writable: true);
+                stream.Position = info.WriteToEndOfFile ? stream.Length : offset;
+                stream.Write(buffer, 0, buffer.Length);
+                MarkModified(file);
             }
             bytesWritten = buffer.Length;
             return DokanResult.Success;
@@ -235,8 +560,8 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
     {
         try
         {
-            if (info.Context is WriteSession ws)
-                lock (ws.Sync) ws.Stream.Flush();
+            if (info.Context is HandleContext { File: { } file })
+                lock (file.DataSync) file.Stream?.Flush();
             return DokanResult.Success;
         }
         catch (Exception ex)
@@ -251,15 +576,19 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
         fileInfo = default;
         try
         {
-            if (info.Context is WriteSession ws)
+            var handle = info.Context as HandleContext;
+            var localFile = handle?.File;
+            if (localFile is null && handle?.Node is { IsDirectory: false } nodeHandle)
+                localFile = FindLocalFileByEntryId(nodeHandle.EntryId);
+            if (localFile is null && handle?.Node is null)
+                localFile = FindLocalFile(fileName) ?? FindPendingFileByPath(fileName);
+            if (localFile != null)
             {
-                long length;
-                lock (ws.Sync) length = ws.Stream.Length;
-                fileInfo = new FileInformation { FileName = ws.Name, Attributes = FileAttributes.Normal, Length = length };
+                fileInfo = GetLocalFileInformation(localFile);
                 return DokanResult.Success;
             }
 
-            var node = SafeResolve(fileName);
+            var node = handle?.Node ?? SafeResolve(fileName);
             if (node is null)
                 return DokanResult.FileNotFound;
 
@@ -286,12 +615,17 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
         files = new List<FileInformation>();
         try
         {
+            var registeredFiles = GetLocalFiles();
             var node = SafeResolve(fileName);
             if (node is null || !node.IsDirectory)
                 return DokanResult.FileNotFound;
 
             var listing = _gateway.ListDirectory(node.DirectoryId);
+            var localFiles = registeredFiles.Where(file => file.DirectoryId == node.DirectoryId).ToList();
+            var included = new HashSet<LocalFile>();
+            var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var d in listing.Subdirs)
+            {
                 files.Add(new FileInformation
                 {
                     FileName = d.Name,
@@ -301,8 +635,22 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
                     LastAccessTime = ToDate(d.UpdatedAt),
                     Length = 0,
                 });
+                names.Add(d.Name);
+            }
 
             foreach (var f in listing.Files)
+            {
+                var localFile = localFiles.FirstOrDefault(local =>
+                    (local.ExistingEntryId != null && local.ExistingEntryId == f.Entry.Id)
+                    || string.Equals(local.Name, f.Entry.Name, StringComparison.OrdinalIgnoreCase));
+                if (localFile != null)
+                {
+                    files.Add(GetLocalFileInformation(localFile));
+                    included.Add(localFile);
+                    names.Add(localFile.Name);
+                    continue;
+                }
+
                 files.Add(new FileInformation
                 {
                     FileName = f.Entry.Name,
@@ -312,6 +660,15 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
                     LastAccessTime = ToDate(f.File.UploadedAt),
                     Length = f.File.FileSize,
                 });
+                names.Add(f.Entry.Name);
+            }
+
+            foreach (var localFile in localFiles)
+            {
+                if (included.Contains(localFile) || !names.Add(localFile.Name))
+                    continue;
+                files.Add(GetLocalFileInformation(localFile));
+            }
 
             return DokanResult.Success;
         }
@@ -334,9 +691,16 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
     {
         try
         {
-            if (info.Context is not WriteSession ws)
+            if (info.Context is not HandleContext { File: { } file })
                 return DokanResult.AccessDenied;
-            lock (ws.Sync) { ws.Stream.SetLength(length); ws.Modified = true; }
+            lock (file.Sync)
+            lock (file.DataSync)
+            {
+                if (file.Kind == LocalFileKind.Pending)
+                    return DokanResult.AccessDenied;
+                EnsureStreamOpen(file, writable: true).SetLength(length);
+                MarkModified(file);
+            }
             return DokanResult.Success;
         }
         catch (Exception ex)
@@ -350,12 +714,19 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
     {
         try
         {
-            if (info.Context is not WriteSession ws)
+            if (info.Context is not HandleContext { File: { } file })
                 return DokanResult.AccessDenied;
-            lock (ws.Sync)
+            lock (file.Sync)
+            lock (file.DataSync)
             {
-                if (length < ws.Stream.Length)
-                    ws.Stream.SetLength(length);
+                if (file.Kind == LocalFileKind.Pending)
+                    return DokanResult.AccessDenied;
+                var stream = EnsureStreamOpen(file, writable: true);
+                if (length < stream.Length)
+                {
+                    stream.SetLength(length);
+                    MarkModified(file);
+                }
             }
             return DokanResult.Success;
         }
@@ -381,6 +752,12 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
 
     private NtStatus MoveFileCore(string oldName, string newName, bool replace, IDokanFileInfo info)
     {
+        if (FindLocalFile(oldName)?.Kind == LocalFileKind.Pending
+            || FindLocalFile(newName)?.Kind == LocalFileKind.Pending
+            || FindPendingFileByPath(oldName) is not null
+            || FindPendingFileByPath(newName) is not null)
+            return DokanResult.AccessDenied;
+
         var node = SafeResolve(oldName);
         if (node is null)
             return DokanResult.FileNotFound;
@@ -409,7 +786,21 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
         return DokanResult.Success;
     }
 
-    public NtStatus DeleteFile(string fileName, IDokanFileInfo info) => DokanResult.Success;
+    public NtStatus DeleteFile(string fileName, IDokanFileInfo info)
+    {
+        try
+        {
+            return FindLocalFile(fileName)?.Kind == LocalFileKind.Pending
+                   || FindPendingFileByPath(fileName) is not null
+                ? DokanResult.AccessDenied
+                : DokanResult.Success;
+        }
+        catch (Exception ex)
+        {
+            EngineLog.Error($"DeleteFile(\"{fileName}\")", ex);
+            return ToStatus(ex);
+        }
+    }
 
     public NtStatus DeleteDirectory(string fileName, IDokanFileInfo info)
     {
@@ -498,56 +889,871 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
 
     // ───────── внутреннее ─────────
 
-    private WriteSession OpenNew(string directoryId, string name)
+    private bool TryOpenRegisteredLocal(string path, FileMode mode, bool wantsWrite,
+        out HandleContext? context, out NtStatus status)
     {
-        var temp = Path.Combine(_writeDir, Guid.NewGuid().ToString("N"));
-        // FileShare.Read: на Cleanup аплоад открывает второй (read) хэндл к этому же файлу.
-        var stream = new FileStream(temp, FileMode.Create, System.IO.FileAccess.ReadWrite, FileShare.Read);
-        return new WriteSession { Name = name, DirectoryId = directoryId, TempPath = temp, Stream = stream };
+        context = null;
+        status = DokanResult.Success;
+        LocalFile file;
+        lock (_localFilesLock)
+        {
+            if (!_localFiles.TryGetValue(NormalizePath(path), out file!))
+                return false;
+
+            if (mode == FileMode.CreateNew)
+            {
+                status = DokanResult.FileExists;
+                return true;
+            }
+
+            if (file.Kind == LocalFileKind.Pending
+                && (wantsWrite || mode is FileMode.Create or FileMode.OpenOrCreate or FileMode.Truncate))
+            {
+                status = DokanResult.AccessDenied;
+                return true;
+            }
+
+            file.OpenCount++;
+            file.ActiveCount++;
+        }
+
+        try
+        {
+            var mutatesFile = wantsWrite || mode is FileMode.Create or FileMode.OpenOrCreate or FileMode.Truncate;
+            if (mutatesFile)
+            {
+                var pendingDenied = false;
+                var missingRegistration = false;
+                var deleteAfterRejectedOpen = false;
+                lock (file.Sync)
+                {
+                    lock (file.DataSync)
+                    {
+                        lock (_localFilesLock)
+                        {
+                            var registered = _localFiles.TryGetValue(NormalizePath(path), out var current)
+                                             && ReferenceEquals(current, file);
+                            if (file.Kind == LocalFileKind.Pending)
+                            {
+                                file.OpenCount--;
+                                file.ActiveCount--;
+                                pendingDenied = true;
+                                deleteAfterRejectedOpen = file.OpenCount == 0 && file.DeleteOnClose;
+                            }
+                            else if (!registered)
+                            {
+                                file.OpenCount--;
+                                file.ActiveCount--;
+                                missingRegistration = true;
+                                deleteAfterRejectedOpen = file.OpenCount == 0 && file.DeleteOnClose;
+                            }
+                        }
+
+                        if (!pendingDenied && !missingRegistration && wantsWrite)
+                        {
+                            var stream = EnsureStreamOpen(file, writable: true);
+                            if (mode is FileMode.Create or FileMode.Truncate)
+                            {
+                                stream.SetLength(0);
+                                MarkModified(file);
+                            }
+                        }
+                    }
+                }
+
+                if (deleteAfterRejectedOpen)
+                    DeleteClosedLocalFile(file);
+                if (pendingDenied)
+                {
+                    status = DokanResult.AccessDenied;
+                    return true;
+                }
+                if (missingRegistration)
+                    return false;
+            }
+
+            lock (_localFilesLock)
+                if (_localFiles.TryGetValue(NormalizePath(path), out var registered)
+                    && ReferenceEquals(registered, file) && file.Kind != LocalFileKind.Pending)
+                    file.DeleteOnClose = false;
+            context = new HandleContext { File = file };
+            return true;
+        }
+        catch
+        {
+            lock (_localFilesLock)
+            {
+                file.OpenCount--;
+                file.ActiveCount--;
+            }
+            throw;
+        }
     }
 
-    private WriteSession OpenExistingForWrite(ResolvedNode node, bool truncate)
+    private bool TryOpenPendingByPath(string path, FileMode mode, bool wantsWrite,
+        out HandleContext? context, out NtStatus status)
+    {
+        context = null;
+        status = DokanResult.Success;
+        lock (_localFilesLock)
+            if (_pendingFiles.Count == 0)
+                return false;
+        var parent = _gateway.ResolveParentDirectory(path);
+        if (parent is null)
+            return false;
+
+        LocalFile file;
+        lock (_localFilesLock)
+        {
+            if (!_pendingFiles.TryGetValue(PendingKey(parent.Value.DirectoryId, parent.Value.Name), out file!))
+                return false;
+
+            if (mode == FileMode.CreateNew)
+            {
+                status = DokanResult.FileExists;
+                return true;
+            }
+
+            if (wantsWrite || mode is FileMode.Create or FileMode.OpenOrCreate or FileMode.Truncate)
+            {
+                status = DokanResult.AccessDenied;
+                return true;
+            }
+
+            file.OpenCount++;
+            file.ActiveCount++;
+        }
+
+        try
+        {
+            lock (file.DataSync)
+            {
+                using var stream = new FileStream(file.TempPath, FileMode.Open,
+                    System.IO.FileAccess.Read, FileShare.ReadWrite);
+            }
+            context = new HandleContext { File = file };
+            return true;
+        }
+        catch
+        {
+            lock (_localFilesLock)
+            {
+                file.OpenCount--;
+                file.ActiveCount--;
+            }
+            throw;
+        }
+    }
+
+    private bool TryOpenCandidate(LocalFile candidate, FileMode mode, out HandleContext? context,
+        out bool alreadyExists, out NtStatus status)
+    {
+        context = null;
+        status = DokanResult.Success;
+        LocalFile file;
+        var added = false;
+        var conflict = false;
+        lock (_localFilesLock)
+        {
+            if (_localFiles.TryGetValue(candidate.Path, out file!))
+            {
+                alreadyExists = true;
+                if (file.Kind == LocalFileKind.Pending)
+                {
+                    status = mode == FileMode.CreateNew ? DokanResult.FileExists : DokanResult.AccessDenied;
+                    conflict = true;
+                }
+                else if (mode == FileMode.CreateNew)
+                {
+                    status = DokanResult.FileExists;
+                    conflict = true;
+                }
+            }
+            else
+            {
+                _localFiles.Add(candidate.Path, candidate);
+                file = candidate;
+                added = true;
+                alreadyExists = false;
+            }
+
+            if (!conflict)
+            {
+                file.OpenCount++;
+                file.ActiveCount++;
+            }
+        }
+
+        if (conflict)
+        {
+            DisposeCandidate(candidate);
+            return false;
+        }
+        if (!added)
+            DisposeCandidate(candidate);
+
+        try
+        {
+            lock (file.Sync)
+            lock (file.DataSync)
+            {
+                var stream = EnsureStreamOpen(file, writable: true);
+                if (alreadyExists && (mode is FileMode.Create or FileMode.Truncate))
+                {
+                    stream.SetLength(0);
+                    MarkModified(file);
+                }
+            }
+
+            lock (_localFilesLock)
+                file.DeleteOnClose = false;
+            context = new HandleContext { File = file };
+            return true;
+        }
+        catch
+        {
+            lock (_localFilesLock)
+            {
+                file.OpenCount--;
+                file.ActiveCount--;
+                if (added)
+                    RemoveLocalFileLocked(file);
+            }
+            if (added)
+                DisposeCandidate(candidate);
+            throw;
+        }
+    }
+
+    private LocalFile OpenNew(string path, string directoryId, string name)
     {
         var temp = Path.Combine(_writeDir, Guid.NewGuid().ToString("N"));
-        if (!truncate)
-            _gateway.DownloadToAsync(node.FileId, temp).GetAwaiter().GetResult(); // гидрация для частичных правок
-
-        var stream = new FileStream(temp, FileMode.OpenOrCreate, System.IO.FileAccess.ReadWrite, FileShare.Read);
-        return new WriteSession
+        try
         {
-            Name = node.Name,
-            DirectoryId = node.DirectoryId, // для файла — родительская папка
-            TempPath = temp,
-            Stream = stream,
-            ExistingEntryId = node.EntryId,
-            OriginalFileId = node.FileId,
-            Modified = truncate,
+            // FileShare.Read позволяет загрузке открыть рабочую копию для чтения.
+            var stream = new FileStream(temp, FileMode.Create, System.IO.FileAccess.ReadWrite, FileShare.Read);
+            return new LocalFile
+            {
+                Path = NormalizePath(path),
+                Name = name,
+                DirectoryId = directoryId,
+                TempPath = temp,
+                Stream = stream,
+                Kind = LocalFileKind.Writable,
+                Hydrated = true,
+            };
+        }
+        catch
+        {
+            TryDelete(temp);
+            throw;
+        }
+    }
+
+    private LocalFile OpenExistingForWrite(string path, ResolvedNode node, bool truncate)
+    {
+        var temp = Path.Combine(_writeDir, Guid.NewGuid().ToString("N"));
+        try
+        {
+            if (!truncate)
+                _gateway.DownloadToAsync(node.FileId, temp).GetAwaiter().GetResult(); // гидрация до включения ленивой загрузки
+
+            var stream = new FileStream(temp, FileMode.OpenOrCreate, System.IO.FileAccess.ReadWrite, FileShare.Read);
+            if (truncate)
+                stream.SetLength(0);
+            return new LocalFile
+            {
+                Path = NormalizePath(path),
+                Name = node.Name,
+                DirectoryId = node.DirectoryId,
+                TempPath = temp,
+                Stream = stream,
+                ExistingEntryId = node.EntryId,
+                ExistingNode = node,
+                Kind = LocalFileKind.Writable,
+                Modified = truncate,
+                Hydrated = true,
+            };
+        }
+        catch
+        {
+            TryDelete(temp);
+            throw;
+        }
+    }
+
+    private void Persist(LocalFile file)
+    {
+        try
+        {
+            PersistCore(file);
+        }
+        catch
+        {
+            file.KeepData = true;
+            throw;
+        }
+    }
+
+    private void PersistCore(LocalFile file)
+    {
+        var stream = EnsureStreamOpen(file, writable: true);
+        lock (file.DataSync)
+            stream.Flush();
+        if (stream.Length == 0)
+        {
+            if (file.ExistingEntryId is null && file.Op?.Stage != PersistStage.Done)
+            {
+                lock (_localFilesLock)
+                    file.Kind = LocalFileKind.Placeholder;
+                file.Modified = false;
+            }
+            else
+            {
+                LastSyncError = Loc.T("Eng_EmptyFileNotSupported");
+                file.Modified = false;
+            }
+            file.DirtyAfterPersist = false;
+            return;
+        }
+
+        var operation = file.Op;
+        if (operation is null || operation.Stage == PersistStage.Done)
+        {
+            operation = new PersistOperation();
+            file.Op = operation;
+        }
+
+        if (operation.Stage == PersistStage.Upload)
+        {
+            if (operation.FileId is null)
+            {
+                var (url, _) = _gateway.GetUploadUrl();
+                operation.FileId = _gateway.UploadAsync(url, file.Name, file.TempPath).GetAwaiter().GetResult();
+            }
+
+            operation.Stage = file.ExistingEntryId is null && operation.SupersededFileId is null
+                ? PersistStage.Attach : PersistStage.DeleteOld;
+            SaveOutboxState(file);
+        }
+
+        if (operation.Stage == PersistStage.DeleteOld)
+        {
+            if (operation.SupersededFileId is { } supersededFileId)
+            {
+                var superseded = _gateway.FindFileEntryByFileId(file.DirectoryId, supersededFileId);
+                if (superseded is not null)
+                {
+                    file.ExistingEntryId = superseded.Entry.Id;
+                    operation.OldEntryDeleted = false;
+                }
+                operation.SupersededFileId = null;
+                SaveOutboxState(file);
+            }
+
+            if (!operation.OldEntryDeleted && file.ExistingEntryId is { } oldEntryId)
+            {
+                try
+                {
+                    _gateway.DeleteFileEntry(oldEntryId);
+                }
+                catch (RpcException ex) when (ServerErrors.HasCode(ex, ServerErrors.FileEntryNotFound))
+                {
+                    file.KeepData = true;
+                    // Запись уже удалена, в том числе при потере ответа предыдущего вызова.
+                }
+
+                operation.OldEntryDeleted = true;
+                SaveOutboxState(file);
+            }
+
+            operation.Stage = PersistStage.Attach;
+            SaveOutboxState(file);
+        }
+
+        if (operation.Stage == PersistStage.Attach)
+        {
+            try
+            {
+                var attached = AttachUploadedFile(file, operation);
+                file.ExistingEntryId = attached.Entry.Id;
+                file.ExistingNode = new ResolvedNode
+                {
+                    DirectoryId = attached.Entry.DirectoryId,
+                    EntryId = attached.Entry.Id,
+                    FileId = attached.File.Id,
+                    Name = attached.Entry.Name,
+                    Length = attached.File.FileSize,
+                    Created = ToDate(attached.Entry.CreatedAt),
+                    Updated = ToDate(attached.File.UploadedAt),
+                };
+                SaveOutboxState(file);
+            }
+            catch (RpcException ex) when (IsBusinessError(ex))
+            {
+                file.KeepData = true;
+                RestoreOldEntry(file, operation, ex);
+                throw;
+            }
+        }
+
+        operation.Stage = PersistStage.Done;
+        SaveOutboxState(file);
+        _gateway.InvalidateListing(file.DirectoryId);
+        file.Modified = false;
+        file.DirtyAfterPersist = false;
+        file.KeepData = false;
+        lock (_localFilesLock)
+            if (file.Kind == LocalFileKind.Placeholder)
+                file.Kind = LocalFileKind.Writable;
+        ClearLastSyncErrorIfNoPendingUploads();
+        EngineLog.Info($"Сохранён файл «{file.Name}» (fileId={operation.FileId})");
+    }
+
+    private FileEntryDetailed AttachUploadedFile(LocalFile file, PersistOperation operation)
+    {
+        var fileId = operation.FileId!;
+        FileEntryDetailed? attached = null;
+        if (operation.AttachAttempted || operation.AttachCompleted)
+        {
+            attached = _gateway.FindFileEntryByFileId(file.DirectoryId, fileId);
+            if (attached is not null)
+                operation.AttachCompleted = true;
+        }
+
+        if (operation.AttachCompleted && attached is null)
+        {
+            EngineLog.Info(Loc.T("Eng_AttachedFileRetryFmt", file.Name));
+            operation.AttachCompleted = false;
+            SaveOutboxState(file);
+        }
+
+        if (!operation.AttachCompleted)
+        {
+            for (var attempt = 0; attempt < 2; attempt++)
+            {
+                try
+                {
+                    operation.AttachAttempted = true;
+                    SaveOutboxState(file);
+                    _gateway.AttachFile(file.DirectoryId, fileId, file.Name);
+                    operation.AttachCompleted = true;
+                }
+                catch (RpcException ex) when (ServerErrors.HasCode(ex, ServerErrors.FileAlreadyAttached))
+                {
+                    file.KeepData = true;
+                    attached = _gateway.FindFileEntryByFileId(file.DirectoryId, fileId);
+                    if (attached is not null)
+                    {
+                        operation.AttachCompleted = true;
+                        break;
+                    }
+
+                    throw;
+                }
+                catch (Exception ex) when (IsUncertainAttachResult(ex))
+                {
+                    file.KeepData = true;
+                    attached = _gateway.FindFileEntryByFileId(file.DirectoryId, fileId);
+                    if (attached is not null)
+                    {
+                        operation.AttachCompleted = true;
+                        break;
+                    }
+
+                    if (attempt == 1)
+                        throw;
+
+                    continue;
+                }
+
+                break;
+            }
+        }
+
+        attached ??= _gateway.FindFileEntryByFileId(file.DirectoryId, fileId);
+        if (attached is null)
+            throw new InvalidOperationException(Loc.T("Eng_AttachedFileNotListedFmt", file.Name));
+
+        operation.AttachCompleted = true;
+        SaveOutboxState(file);
+        return attached;
+    }
+
+    private void RestoreOldEntry(LocalFile file, PersistOperation operation, RpcException originalError)
+    {
+        if (!operation.OldEntryDeleted || file.ExistingEntryId is not { } oldEntryId)
+            return;
+
+        try
+        {
+            _gateway.RestoreFromTrash(oldEntryId, file.DirectoryId);
+            operation.OldEntryDeleted = false;
+            operation.AttachAttempted = false;
+            operation.AttachCompleted = false;
+            operation.Stage = PersistStage.DeleteOld;
+            SaveOutboxState(file);
+        }
+        catch (Exception rollbackError)
+        {
+            throw new AggregateException(originalError, rollbackError);
+        }
+    }
+
+    private static bool IsBusinessError(RpcException exception)
+        => exception.StatusCode == StatusCode.FailedPrecondition && ServerErrors.GetCode(exception) is not null;
+
+    private static bool IsUncertainAttachResult(Exception exception)
+        => exception switch
+        {
+            RpcException { StatusCode: StatusCode.Unavailable or StatusCode.DeadlineExceeded } => true,
+            TimeoutException or HttpRequestException or IOException or OperationCanceledException => true,
+            _ => false,
+        };
+
+    private void ClearLastSyncErrorIfNoPendingUploads()
+    {
+        if (_outbox is not null && _outbox.Count == 0)
+            LastSyncError = null;
+    }
+
+    private void SaveOutboxState(LocalFile file)
+    {
+        if (_outbox is null || file.OutboxId is not { } id)
+            return;
+
+        var entry = _outbox.Find(id);
+        if (entry is null)
+            return;
+
+        entry.DataPath = file.TempPath;
+        entry.ExistingEntryId = file.ExistingEntryId;
+        entry.Op = CopyOperation(file.Op ?? new PersistOperation());
+        entry.Stage = entry.Op.Stage;
+        entry.FileId = entry.Op.FileId;
+        _outbox.Save(entry);
+    }
+
+    internal async Task ProcessOutboxEntryAsync(UploadOutboxEntry entry)
+    {
+        var currentEntry = _outbox?.Find(entry.Id);
+        if (currentEntry is null)
+            return;
+        entry = currentEntry;
+
+        LocalFile? file;
+        lock (_localFilesLock)
+        {
+            file = _pendingFiles.Values.Concat(_openOutboxFiles.Values)
+                .FirstOrDefault(candidate => candidate.OutboxId == entry.Id);
+            _openOutboxFiles.Remove(entry.Id);
+        }
+
+        if (file is null)
+        {
+            RegisterOutboxPending(entry);
+            lock (_localFilesLock)
+                file = _pendingFiles.GetValueOrDefault(PendingKey(entry.DirectoryId, entry.Name));
+        }
+        else
+            RegisterOutboxPending(entry, file);
+
+        if (file is null)
+            throw new InvalidOperationException(Loc.T("Eng_OutboxRegisterFailedFmt", entry.Name));
+
+        lock (file.Sync)
+        {
+            file.TempPath = entry.DataPath;
+            file.ExistingEntryId = entry.ExistingEntryId;
+            file.Op = CopyOperation(entry.Op ?? new PersistOperation { Stage = entry.Stage, FileId = entry.FileId });
+            file.KeepData = true;
+            try
+            {
+                if (file.Op.Stage != PersistStage.Done)
+                    Persist(file);
+            }
+            finally
+            {
+                lock (file.DataSync)
+                {
+                    file.Stream?.Dispose();
+                    file.Stream = null;
+                }
+            }
+        }
+
+        await Task.CompletedTask;
+    }
+
+    internal static PersistOperation CopyOperation(PersistOperation operation) => new()
+    {
+        Stage = operation.Stage,
+        FileId = operation.FileId,
+        OldEntryDeleted = operation.OldEntryDeleted,
+        AttachAttempted = operation.AttachAttempted,
+        AttachCompleted = operation.AttachCompleted,
+        SupersededFileId = operation.SupersededFileId,
+    };
+
+    private void CloseLocalFile(string fileName, LocalFile file)
+    {
+        bool isPending;
+        bool deletePendingData;
+        lock (_localFilesLock)
+        {
+            if (file.OpenCount > 0)
+                file.OpenCount--;
+            if (file.OpenCount != 0)
+                return;
+            if (file.OutboxId is { } outboxId && _openOutboxFiles.TryGetValue(outboxId, out var openFile)
+                && ReferenceEquals(openFile, file))
+                _openOutboxFiles.Remove(outboxId);
+            isPending = file.Kind == LocalFileKind.Pending;
+            deletePendingData = isPending && file.DeleteOnClose;
+            if (deletePendingData)
+                RemoveLocalFileLocked(file);
+        }
+
+        if (isPending)
+        {
+            if (deletePendingData)
+                lock (file.DataSync)
+                    TryDelete(file.TempPath);
+            return;
+        }
+
+        lock (file.Sync)
+        {
+            bool shouldPersist;
+            lock (_localFilesLock)
+                shouldPersist = file.OpenCount == 0 && file.Modified
+                                && file.Kind != LocalFileKind.Pending
+                                && !file.DeleteOnClose && file.ActiveCount == 0;
+            if (shouldPersist)
+            {
+                try
+                {
+                    Persist(file);
+                }
+                catch (Exception ex)
+                {
+                    file.KeepData = true;
+                    EngineLog.Error($"CloseFile(\"{fileName}\")", ex);
+                    LastSyncError = Loc.T("Eng_SyncFailedFmt", Path.GetFileName(fileName), ex.Message);
+                }
+            }
+
+            var length = file.Stream?.Length ?? (File.Exists(file.TempPath) ? new FileInfo(file.TempPath).Length : 0);
+            bool keep;
+            lock (_localFilesLock)
+            {
+                if (file.OpenCount != 0)
+                    return;
+                if (file.ExistingEntryId is null && file.Op?.Stage != PersistStage.Done && length == 0
+                    && !file.DeleteOnClose && !file.KeepData)
+                    file.Kind = LocalFileKind.Placeholder;
+                keep = !file.DeleteOnClose
+                       && (file.Kind is LocalFileKind.Placeholder or LocalFileKind.Pending || file.KeepData);
+                if (!keep)
+                    RemoveLocalFileLocked(file);
+            }
+
+            lock (file.DataSync)
+            {
+                file.Stream?.Dispose();
+                file.Stream = null;
+            }
+
+            if (keep && !file.DeleteOnClose && file.Kind != LocalFileKind.Pending && file.KeepData
+                && (file.Modified || file.Op is { Stage: not PersistStage.Done }) && _outbox is not null)
+            {
+                try
+                {
+                    UploadOutboxEntry entry;
+                    lock (file.DataSync)
+                        entry = _outbox.Add(file, _serverKey, _ownerUserId());
+                    if (entry.OwnerUserId is not null)
+                        RegisterOutboxPending(entry, file);
+                    else
+                        lock (_localFilesLock)
+                            RemoveLocalFileLocked(file);
+                    try { OutboxAdded?.Invoke(); }
+                    catch (Exception callbackError) { EngineLog.Error(Loc.T("Eng_OutboxTriggerFailed"), callbackError); }
+                }
+                catch (Exception ex)
+                {
+                    file.KeepData = true;
+                    EngineLog.Error(Loc.T("Eng_OutboxTransferFailedFmt", file.Name), ex);
+                    LastSyncError = Loc.T("Eng_SyncFailedFmt", file.Name, ex.Message);
+                }
+            }
+
+            if (!keep)
+                TryDelete(file.TempPath);
+        }
+    }
+
+    private void DeleteLocalFile(LocalFile file)
+    {
+        if (file.ExistingEntryId is { } entryId)
+        {
+            try { _gateway.QueueDeleteFileEntry(entryId, file.DirectoryId); }
+            catch (Exception ex) { RecordDeleteError(file, ex); }
+        }
+
+        var operation = file.Op;
+        var fileIds = new HashSet<string>(StringComparer.Ordinal);
+        if (operation is { AttachAttempted: true, FileId: { } attemptedFileId })
+            fileIds.Add(attemptedFileId);
+        if (operation?.SupersededFileId is { } supersededFileId)
+            fileIds.Add(supersededFileId);
+
+        foreach (var fileId in fileIds)
+        {
+            try
+            {
+                var attached = _gateway.FindFileEntryByFileId(file.DirectoryId, fileId);
+                if (attached is not null)
+                    _gateway.QueueDeleteFileEntry(attached.Entry.Id, file.DirectoryId);
+            }
+            catch (Exception ex)
+            {
+                RecordDeleteError(file, ex);
+            }
+        }
+
+        lock (_localFilesLock)
+            RemoveLocalFileLocked(file);
+    }
+
+    private void RecordDeleteError(LocalFile file, Exception exception)
+    {
+        EngineLog.Error($"DeleteLocalFile(\"{file.Name}\")", exception);
+        LastSyncError = Loc.T("Eng_SyncFailedFmt", file.Name, exception.Message);
+    }
+
+    private void RemoveLocalFileLocked(LocalFile file)
+    {
+        if (_localFiles.TryGetValue(file.Path, out var registered) && ReferenceEquals(registered, file))
+            _localFiles.Remove(file.Path);
+
+        var key = PendingKey(file.DirectoryId, file.Name);
+        if (_pendingFiles.TryGetValue(key, out var pending) && ReferenceEquals(pending, file))
+            _pendingFiles.Remove(key);
+
+        if (file.OutboxId is { } id && _openOutboxFiles.TryGetValue(id, out var openFile)
+            && ReferenceEquals(openFile, file))
+            _openOutboxFiles.Remove(id);
+    }
+
+    private void DisposeCandidate(LocalFile file)
+    {
+        try { file.Stream?.Dispose(); } catch { /* ignore */ }
+        TryDelete(file.TempPath);
+    }
+
+    private void DeleteClosedLocalFile(LocalFile file)
+    {
+        lock (file.DataSync)
+        {
+            file.Stream?.Dispose();
+            file.Stream = null;
+        }
+        TryDelete(file.TempPath);
+    }
+
+    private static FileStream EnsureStreamOpen(LocalFile file, bool writable)
+    {
+        if (file.Stream is { CanRead: true } stream && (!writable || stream.CanWrite))
+            return stream;
+
+        file.Stream?.Dispose();
+        file.Stream = new FileStream(file.TempPath, FileMode.Open,
+            writable ? System.IO.FileAccess.ReadWrite : System.IO.FileAccess.Read,
+            writable ? FileShare.Read : FileShare.ReadWrite);
+        return file.Stream;
+    }
+
+    private static void MarkModified(LocalFile file)
+    {
+        file.Stream?.Flush();
+        file.Modified = true;
+        if (file.Op?.Stage == PersistStage.Done)
+            file.DirtyAfterPersist = true;
+        else if (file.Op is { FileId: not null } operation)
+        {
+            // Потерянный ответ Attach мог скрывать уже созданную запись этой версии.
+            if (operation.AttachAttempted)
+                operation.SupersededFileId = operation.FileId;
+            operation.FileId = null;
+            operation.Stage = PersistStage.Upload;
+            operation.AttachAttempted = false;
+            operation.AttachCompleted = false;
+        }
+    }
+
+    private LocalFile? FindLocalFile(string path)
+    {
+        lock (_localFilesLock)
+            return _localFiles.GetValueOrDefault(NormalizePath(path));
+    }
+
+    private LocalFile? FindPendingFileByPath(string path)
+    {
+        lock (_localFilesLock)
+            if (_pendingFiles.Count == 0)
+                return null;
+        var parent = _gateway.ResolveParentDirectory(path);
+        if (parent is null)
+            return null;
+
+        lock (_localFilesLock)
+            return _pendingFiles.GetValueOrDefault(PendingKey(parent.Value.DirectoryId, parent.Value.Name));
+    }
+
+    private LocalFile? FindLocalFileByEntryId(string entryId)
+    {
+        lock (_localFilesLock)
+            return _localFiles.Values.Concat(_pendingFiles.Values)
+                .FirstOrDefault(file => file.ExistingEntryId == entryId);
+    }
+
+    private List<LocalFile> GetLocalFiles()
+    {
+        lock (_localFilesLock)
+            return _localFiles.Values.Concat(_pendingFiles.Values).Distinct().ToList();
+    }
+
+    private static FileInformation GetLocalFileInformation(LocalFile file)
+    {
+        long length;
+        lock (file.DataSync)
+            length = File.Exists(file.TempPath) ? new FileInfo(file.TempPath).Length : 0;
+
+        var created = file.ExistingNode?.Created ?? file.CreatedAt;
+        var updated = file.ExistingNode?.Updated ?? file.CreatedAt;
+        return new FileInformation
+        {
+            FileName = file.Name,
+            Attributes = FileAttributes.Normal,
+            Length = length,
+            CreationTime = created,
+            LastWriteTime = updated,
+            LastAccessTime = updated,
         };
     }
 
-    private void PersistSession(WriteSession ws)
+    private static string NormalizePath(string path)
+        => "\\" + path.Replace('/', '\\').Trim('\\');
+
+    private static string PendingKey(string directoryId, string name) => directoryId + "\0" + name;
+
+    private static NtStatus ExistingStatus(FileMode mode)
+        => mode is FileMode.Create or FileMode.OpenOrCreate ? DokanResult.AlreadyExists : DokanResult.Success;
+
+    private static void TryDelete(string path)
     {
-        lock (ws.Sync) ws.Stream.Flush();
-
-        var (url, _) = _gateway.GetUploadUrl();
-        var fileId = _gateway.UploadAsync(url, ws.Name, ws.TempPath).GetAwaiter().GetResult();
-
-        if (ws.ExistingEntryId is null)
-        {
-            _gateway.AttachFile(ws.DirectoryId, fileId, ws.Name);
-        }
-        else if (!string.Equals(fileId, ws.OriginalFileId, StringComparison.Ordinal))
-        {
-            // содержимое изменилось → новая запись вместо старой
-            _gateway.AttachFile(ws.DirectoryId, fileId, ws.Name);
-            _gateway.DeleteFileEntry(ws.ExistingEntryId);
-        }
-        // fileId == OriginalFileId → содержимое не изменилось, ничего не делаем
-
-        _gateway.InvalidateListing(ws.DirectoryId);
-        ws.Persisted = true;
-        LastSyncError = null; // успешная синхронизация — снимаем прежнюю ошибку
-        EngineLog.Info($"Сохранён файл «{ws.Name}» (fileId={fileId})");
+        try { File.Delete(path); } catch { /* ignore */ }
     }
 
     private void DeleteNode(string fileName)

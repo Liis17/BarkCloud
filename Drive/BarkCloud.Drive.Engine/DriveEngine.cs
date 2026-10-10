@@ -16,11 +16,14 @@ public sealed class DriveEngine : IDriveEngine
     private readonly CancellationTokenSource _lifetime;
     private readonly EngineSettingsStore _settings;
     private readonly UserProfile _profile;
+    private readonly UploadOutboxWorker _outboxWorker;
+    private readonly string _serverKey;
     private readonly string _serverHost;
+    private string? _outboxOwnerUserId;
 
     internal DriveEngine(TokenManager tokens, CloudGateway gateway, MountManager mount,
         BarkCloudFileSystem fs, CancellationTokenSource lifetime, EngineSettingsStore settings,
-        UserProfile profile, string serverHost)
+        UserProfile profile, UploadOutboxWorker outboxWorker, string serverKey, string serverHost)
     {
         _tokens = tokens;
         _gateway = gateway;
@@ -29,6 +32,8 @@ public sealed class DriveEngine : IDriveEngine
         _lifetime = lifetime;
         _settings = settings;
         _profile = profile;
+        _outboxWorker = outboxWorker;
+        _serverKey = serverKey;
         _serverHost = serverHost;
     }
 
@@ -42,7 +47,12 @@ public sealed class DriveEngine : IDriveEngine
         try
         {
             await _tokens.LoginAsync(login, password, otpCode);
+            _settings.ClearLastUserId(_serverKey);
+            _profile.Clear();
+            _outboxOwnerUserId = null;
+            _fs.UpdateOutboxSession(null);
             await _profile.EnsureLoadedAsync();
+            await StartOutboxForCurrentSessionAsync(forceTrigger: true);
             return Status(Loc.T("Eng_AuthSuccess"));
         }
         catch (Exception ex)
@@ -76,7 +86,12 @@ public sealed class DriveEngine : IDriveEngine
         try
         {
             await _tokens.CompleteWebAuthnAsync(challengeId, assertionJson);
+            _settings.ClearLastUserId(_serverKey);
+            _profile.Clear();
+            _outboxOwnerUserId = null;
+            _fs.UpdateOutboxSession(null);
             await _profile.EnsureLoadedAsync();
+            await StartOutboxForCurrentSessionAsync(forceTrigger: true);
             return Status(Loc.T("Eng_AuthSuccess"));
         }
         catch (Exception ex)
@@ -98,19 +113,23 @@ public sealed class DriveEngine : IDriveEngine
         }
     }
 
-    public Task<EngineStatus> LogoutAsync()
+    public async Task<EngineStatus> LogoutAsync()
     {
         try
         {
+            await _outboxWorker.StopAsync();
             _gateway.FlushPending(); // дослать буферизованные удаления, пока токен ещё валиден
             _mount.Unmount();
             _tokens.Logout();
+            _settings.ClearLastUserId(_serverKey);
             _profile.Clear();
-            return Task.FromResult(Status(Loc.T("Eng_LoggedOut")));
+            _outboxOwnerUserId = null;
+            _fs.UpdateOutboxSession(null);
+            return Status(Loc.T("Eng_LoggedOut"));
         }
         catch (Exception ex)
         {
-            return Task.FromResult(Error(ex));
+            return Error(ex);
         }
     }
 
@@ -199,7 +218,10 @@ public sealed class DriveEngine : IDriveEngine
     public async Task<EngineStatus> GetStatusAsync()
     {
         if (_tokens.IsAuthenticated)
+        {
             await _profile.EnsureLoadedAsync();
+            await StartOutboxForCurrentSessionAsync();
+        }
         return Status(null);
     }
 
@@ -231,11 +253,25 @@ public sealed class DriveEngine : IDriveEngine
         return Task.CompletedTask;
     }
 
-    public Task ShutdownAsync()
+    public async Task ShutdownAsync()
     {
+        await _outboxWorker.StopAsync();
         _gateway.FlushPending(); // дослать буферизованные удаления до завершения процесса
         _mount.Unmount();
         _lifetime.Cancel();
+    }
+
+    private Task StartOutboxForCurrentSessionAsync(bool forceTrigger = false)
+    {
+        _outboxWorker.Start();
+        var userId = _profile.UserId;
+        if (!string.IsNullOrEmpty(userId)
+            && (forceTrigger || !string.Equals(_outboxOwnerUserId, userId, StringComparison.Ordinal)))
+        {
+            _fs.AdoptOutboxForSession(userId);
+            _outboxOwnerUserId = userId;
+            _outboxWorker.Trigger();
+        }
         return Task.CompletedTask;
     }
 
@@ -251,6 +287,7 @@ public sealed class DriveEngine : IDriveEngine
             ServerHost = _serverHost,
             VolumeLabel = _fs.VolumeLabel,
             LastSyncError = _fs.LastSyncError,
+            PendingUploads = _fs.PendingUploadCount,
         };
 
         if (_tokens.IsAuthenticated)

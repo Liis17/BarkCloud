@@ -296,6 +296,15 @@
   <data name="Settings_Cache" xml:space="preserve">
     <value>Cache folder</value>
   </data>
+  <data name="Settings_Outbox" xml:space="preserve">
+    <value>Unsent files</value>
+  </data>
+  <data name="Settings_OpenOutbox" xml:space="preserve">
+    <value>Open unsent files folder</value>
+  </data>
+  <data name="Settings_OutboxOpenFailedFmt" xml:space="preserve">
+    <value>Could not open the unsent files folder: {0}</value>
+  </data>
   <data name="Settings_Autostart" xml:space="preserve">
     <value>Autostart (at Windows sign-in)</value>
   </data>
@@ -392,8 +401,53 @@
   <data name="Eng_EmptyCachePath" xml:space="preserve">
     <value>Empty cache folder path</value>
   </data>
+  <data name="Eng_EmptyFileNotSupported" xml:space="preserve">
+    <value>The server does not support empty files; the previous version was kept.</value>
+  </data>
   <data name="Eng_SyncFailedFmt" xml:space="preserve">
     <value>Failed to save “{0}” to the cloud: {1}</value>
+  </data>
+  <data name="Eng_AttachedFileNotListedFmt" xml:space="preserve">
+    <value>After attaching, “{0}” was not found in the fresh directory listing.</value>
+  </data>
+  <data name="Eng_DeleteFailedFmt" xml:space="preserve">
+    <value>Could not delete cloud entry “{0}” after {1} attempts.</value>
+  </data>
+  <data name="Eng_OutboxMoveFailedFmt" xml:space="preserve">
+    <value>Could not move “{0}” into the outbox.</value>
+  </data>
+  <data name="Eng_OutboxRollbackFailedFmt" xml:space="preserve">
+    <value>Could not move “{0}” back out of the outbox.</value>
+  </data>
+  <data name="Eng_OutboxManifestReadFailedFmt" xml:space="preserve">
+    <value>Could not read outbox manifest “{0}”.</value>
+  </data>
+  <data name="Eng_OutboxOrphanFileFmt" xml:space="preserve">
+    <value>Left outbox file without a manifest untouched: {0}</value>
+  </data>
+  <data name="Eng_OutboxSaveError" xml:space="preserve">
+    <value>Could not save the outbox error.</value>
+  </data>
+  <data name="Eng_OutboxCallbackError" xml:space="preserve">
+    <value>Outbox callback failed.</value>
+  </data>
+  <data name="Eng_OutboxDataDeleteFailedFmt" xml:space="preserve">
+    <value>Could not delete outbox data for “{0}”; its manifest has already been removed.</value>
+  </data>
+  <data name="Eng_OutboxRetryFmt" xml:space="preserve">
+    <value>Retrying “{0}”.</value>
+  </data>
+  <data name="Eng_OutboxPassError" xml:space="preserve">
+    <value>Outbox pass failed.</value>
+  </data>
+  <data name="Eng_OutboxRegisterFailedFmt" xml:space="preserve">
+    <value>Could not register “{0}” from the outbox.</value>
+  </data>
+  <data name="Eng_OutboxTriggerFailed" xml:space="preserve">
+    <value>Could not start the outbox worker.</value>
+  </data>
+  <data name="Eng_OutboxTransferFailedFmt" xml:space="preserve">
+    <value>Could not transfer “{0}” into the outbox.</value>
   </data>
   <data name="Launcher_ConnectFailed" xml:space="preserve">
     <value>could not connect to the engine</value>
@@ -401,4 +455,6 @@
   <data name="Launcher_EngineNotFoundFmt" xml:space="preserve">
     <value>engine not found: {0}</value>
   </data>
+  <data name="Eng_AttachedFileRetryFmt" xml:space="preserve"><value>Confirmed entry “{0}” is missing from the directory; retrying attachment of saved data.</value></data>
+  <data name="Eng_OutboxAdoptedFmt" xml:space="preserve"><value>Unowned pending file “{0}” adopted by user {1}.</value></data>
 </root>

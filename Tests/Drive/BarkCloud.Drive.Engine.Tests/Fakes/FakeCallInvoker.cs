@@ -13,6 +13,7 @@ internal sealed class FakeCallInvoker : CallInvoker
     private long _order;
 
     public IReadOnlyList<FakeRpcCall> Calls => _calls.OrderBy(call => call.Order).ToArray();
+    public Action<string>? OnCall { get; set; }
 
     public void Handle<TRequest, TResponse>(string methodFullName, Func<TRequest, TResponse> handler)
         where TRequest : class
@@ -76,6 +77,7 @@ internal sealed class FakeCallInvoker : CallInvoker
     {
         var fullName = method.FullName;
         _calls.Enqueue(new FakeRpcCall(Interlocked.Increment(ref _order), fullName, request, options.Deadline));
+        OnCall?.Invoke(fullName);
 
         if (TryTake(_failures, fullName, out var failure))
             throw failure;
