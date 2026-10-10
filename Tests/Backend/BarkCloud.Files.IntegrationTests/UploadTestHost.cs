@@ -15,6 +15,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
 using Quartz;
+using Quartz.Logging;
 
 namespace BarkCloud.Files.IntegrationTests;
 
@@ -151,6 +152,12 @@ internal sealed class UploadTestHost : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         try { await _host.StopAsync(TimeSpan.FromSeconds(20)); }
-        finally { _observer?.Dispose(); _host.Dispose(); }
+        finally
+        {
+            _observer?.Dispose();
+            _host.Dispose();
+            // Quartz хранит LoggerFactory остановленного хоста в статическом LogProvider.
+            LogProvider.SetCurrentLogProvider(null);
+        }
     }
 }
