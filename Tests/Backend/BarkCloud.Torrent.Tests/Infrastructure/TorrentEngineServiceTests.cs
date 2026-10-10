@@ -25,7 +25,8 @@ public class TorrentEngineServiceTests : IAsyncLifetime
     public async Task RemoveAsync_WhenStopFails_KeepsTorrentManageableUntilRetrySucceeds()
     {
         var id = Guid.NewGuid();
-        await _harness.AddAsync(id);
+        var managed = await _harness.AddAsync(id);
+        Engine.SetState(managed.Manager, MonoTorrent.Client.TorrentState.Downloading);
         Engine.StopHook = _ => throw new IOException("stop failed");
 
         await ((Func<Task>)(() => Engine.RemoveAsync(id, deleteData: false))).Should().ThrowAsync<IOException>();
@@ -44,7 +45,8 @@ public class TorrentEngineServiceTests : IAsyncLifetime
     public async Task RemoveAsync_WhenEngineRemoveFails_KeepsTorrentManageableUntilRetrySucceeds()
     {
         var id = Guid.NewGuid();
-        await _harness.AddAsync(id);
+        var managed = await _harness.AddAsync(id);
+        Engine.SetState(managed.Manager, MonoTorrent.Client.TorrentState.Downloading);
         Engine.RemoveHook = (_, _) => throw new IOException("remove failed");
 
         await ((Func<Task>)(() => Engine.RemoveAsync(id, deleteData: false))).Should().ThrowAsync<IOException>();
@@ -63,7 +65,8 @@ public class TorrentEngineServiceTests : IAsyncLifetime
     public async Task RemoveAsync_WhenFailureComesAfterEngineUnregistered_RetryFinishesDataDeletion()
     {
         var id = Guid.NewGuid();
-        await _harness.AddAsync(id);
+        var managed = await _harness.AddAsync(id);
+        Engine.SetState(managed.Manager, MonoTorrent.Client.TorrentState.Downloading);
         // MonoTorrent снимает менеджер с движка, а потом падает на удалении файлов.
         Engine.RemoveHook = async (manager, mode) =>
         {
@@ -88,7 +91,8 @@ public class TorrentEngineServiceTests : IAsyncLifetime
     public async Task RemoveAsync_Success_RemovesFromRegistryAndEngine()
     {
         var id = Guid.NewGuid();
-        await _harness.AddAsync(id);
+        var managed = await _harness.AddAsync(id);
+        Engine.SetState(managed.Manager, MonoTorrent.Client.TorrentState.Downloading);
 
         await Engine.RemoveAsync(id, deleteData: true);
 
@@ -111,19 +115,32 @@ public class TorrentEngineServiceTests : IAsyncLifetime
     public async Task RemoveAsync_ConcurrentCallsForSameTorrent_AreSerialized()
     {
         var id = Guid.NewGuid();
-        await _harness.AddAsync(id);
+        var managed = await _harness.AddAsync(id);
+        Engine.SetState(managed.Manager, MonoTorrent.Client.TorrentState.Downloading);
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        Engine.StopHook = _ => release.Task;
+        Engine.StopHook = _ =>
+        {
+            entered.TrySetResult();
+            return release.Task;
+        };
 
         var first = Engine.RemoveAsync(id, deleteData: false);
-        var second = Engine.RemoveAsync(id, deleteData: false);
-        await Task.Delay(100);
+        var second = Task.CompletedTask;
+        try
+        {
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            second = Engine.RemoveAsync(id, deleteData: false);
 
-        // Второй вызов ждёт замок торрента и не доходит до остановки.
-        Engine.StopCalls.Should().Be(1);
-        second.IsCompleted.Should().BeFalse();
+            // Второй вызов ждёт замок торрента и не доходит до остановки.
+            Engine.StopCalls.Should().Be(1);
+            second.IsCompleted.Should().BeFalse();
+        }
+        finally
+        {
+            release.TrySetResult();
+        }
 
-        release.SetResult();
         await Task.WhenAll(first, second);
 
         Engine.RemoveCalls.Should().Be(1);
@@ -131,39 +148,42 @@ public class TorrentEngineServiceTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task PauseAsync_WhenEngineFails_ThrowsAndKeepsTorrentRegistered()
+    public async Task ApplyPausedAsync_WhenPauseFails_ThrowsAndKeepsTorrentRegistered()
     {
         var id = Guid.NewGuid();
-        await _harness.AddAsync(id);
+        var managed = await _harness.AddAsync(id);
+        Engine.SetState(managed.Manager, MonoTorrent.Client.TorrentState.Downloading);
         Engine.PauseHook = _ => throw new IOException("pause failed");
 
-        await ((Func<Task>)(() => Engine.PauseAsync(id))).Should().ThrowAsync<IOException>();
+        await ((Func<Task>)(() => Engine.ApplyPausedForTestAsync(id, paused: true))).Should().ThrowAsync<IOException>();
 
         Engine.Get(id).Should().NotBeNull();
     }
 
     [Fact]
-    public async Task ResumeAsync_WhenEngineFails_ThrowsAndKeepsTorrentRegistered()
+    public async Task ApplyPausedAsync_WhenStartFails_ThrowsAndKeepsTorrentRegistered()
     {
         var id = Guid.NewGuid();
-        await _harness.AddAsync(id);
+        var managed = await _harness.AddAsync(id);
+        Engine.SetState(managed.Manager, MonoTorrent.Client.TorrentState.Paused);
         Engine.StartHook = _ => throw new IOException("start failed");
 
-        await ((Func<Task>)(() => Engine.ResumeAsync(id))).Should().ThrowAsync<IOException>();
+        await ((Func<Task>)(() => Engine.ApplyPausedForTestAsync(id, paused: false))).Should().ThrowAsync<IOException>();
 
         Engine.Get(id).Should().NotBeNull();
     }
 
     [Fact]
-    public async Task PauseAsync_AfterFailedPause_CanBeRetried()
+    public async Task ApplyPausedAsync_AfterFailedPause_CanBeRetried()
     {
         var id = Guid.NewGuid();
-        await _harness.AddAsync(id);
+        var managed = await _harness.AddAsync(id);
+        Engine.SetState(managed.Manager, MonoTorrent.Client.TorrentState.Downloading);
         var calls = 0;
         Engine.PauseHook = _ => ++calls == 1 ? throw new IOException("pause failed") : Task.CompletedTask;
 
-        await ((Func<Task>)(() => Engine.PauseAsync(id))).Should().ThrowAsync<IOException>();
-        await Engine.PauseAsync(id);
+        await ((Func<Task>)(() => Engine.ApplyPausedForTestAsync(id, paused: true))).Should().ThrowAsync<IOException>();
+        (await Engine.ApplyPausedForTestAsync(id, paused: true)).Should().BeTrue();
 
         calls.Should().Be(2);
     }
