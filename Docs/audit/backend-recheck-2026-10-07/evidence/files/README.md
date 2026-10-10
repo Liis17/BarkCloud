@@ -1,5 +1,7 @@
 # Files: доказательства повторной проверки
 
+Исходный срез от 2026-10-07 ниже сохраняет результаты воспроизведения до исправлений.
+
 Проверка 2026-10-07 на `d6563a2`, .NET SDK 10.0.203, PostgreSQL 18.6, `C.UTF-8`. Production-код и tracked тесты не изменялись. Все SQL-тесты создают отдельные БД с актуальными миграциями через существующий `PostgresFilesDatabase` и удаляют их в конце. Изолированный локальный кластер остановлен после проверки. S3 в F15 заменён mock; физический MinIO не проверен.
 
 - [results.txt](results.txt): **564 passed, 0 failed, 0 skipped**, полный актуальный Files.
@@ -32,3 +34,7 @@ dotnet test Docs/audit/backend-recheck-2026-10-07/evidence/files/Recheck.csproj 
 | F20: Search папки report по quarterly report finances | Хит есть, MatchField/MatchValue пусты; SQL-score 1, настоящий C#-score 0.36363636363636365 |
 
 В сохранённых логах и TRX временный абсолютный путь заменён на `<repro>`. Остальные сообщения и результаты сохранены. Исходная внешняя копия и полный build/test log: `/tmp/barkcloud-files-recheck.cqwEo7/`.
+
+## Обновление F20, 2026-10-10
+
+F20 исправлен. До исправления новая регрессия завершалась `Expected: "name"; Actual: ""`; после исправления `Search_FolderMatchField_UsesSqlMatchSemantics` проходит и возвращает `match_field=name`, `match_value=report`, при SQL `word_similarity=1`. Матрица `UnifiedSearchMatchPostgresTests`: **9 passed, 0 failed, 0 skipped**. Полный Files-набор с `BARKCLOUD_TEST_POSTGRES`: **631 passed, 0 failed, 0 skipped**; portable `Recheck.csproj --filter FullyQualifiedName~F20`: **1 passed, 0 failed, 0 skipped**. PostgreSQL-тесты действительно выполнялись на одноразовом PostgreSQL 18.6.
