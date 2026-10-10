@@ -42,6 +42,16 @@ internal sealed class EngineHarness : IAsyncLifetime
         return await Engine.AddTorrentFileAsync(id ?? Guid.NewGuid(), _torrentBytes, SavePath, start: false);
     }
 
+    /// <summary>Добавляет торрент с отдельным infohash для сценариев с batch.</summary>
+    public async Task<TorrentEngineService.ManagedTorrent> AddDistinctAsync(Guid? id = null)
+    {
+        var source = Path.Combine(_root, "distinct", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(source);
+        await File.WriteAllBytesAsync(Path.Combine(source, "b.bin"), Guid.NewGuid().ToByteArray());
+        var dict = await new TorrentCreator().CreateAsync(new TorrentFileSource(source));
+        return await Engine.AddTorrentFileAsync(id ?? Guid.NewGuid(), dict.Encode(), SavePath, start: false);
+    }
+
     public async Task DisposeAsync()
     {
         await Engine.DisposeAsync();
