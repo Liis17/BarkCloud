@@ -111,8 +111,6 @@ internal sealed class SearchRow<T>
 
 internal static class SearchQueryExtensions
 {
-    private static readonly System.Reflection.MethodInfo MaxInt = typeof(Math).GetMethod(nameof(Math.Max), [typeof(int), typeof(int)])!;
-    private static readonly System.Reflection.MethodInfo MaxDouble = typeof(Math).GetMethod(nameof(Math.Max), [typeof(double), typeof(double)])!;
     private static readonly MethodInfo QueryableWhere = QueryableLambdaMethod(nameof(Queryable.Where), 1, 2);
     private static readonly MethodInfo QueryableOrderBy = QueryableLambdaMethod(nameof(Queryable.OrderBy), 2, 2);
     private static readonly MethodInfo QueryableThenBy = QueryableLambdaMethod(nameof(Queryable.ThenBy), 2, 2);
@@ -122,35 +120,29 @@ internal static class SearchQueryExtensions
     private static readonly MethodInfo CollateString = ((MethodCallExpression)((Expression<Func<string, string>>)
         (value => EF.Functions.Collate(value, "C"))).Body).Method;
 
-    /// <summary>Оставляет строки, у которых хотя бы одно поле подходит под запрос (условие, пригодное для trigram-индекса).</summary>
-    public static IQueryable<T> WhereMatchesAny<T>(this IQueryable<T> source, SearchTerms terms, params Expression<Func<T, string?>>[] fields)
+    /// <summary>Оставляет строки, у которых поле подходит под запрос (условие, пригодное для trigram-индекса).</summary>
+    public static IQueryable<T> WhereMatches<T>(this IQueryable<T> source, SearchTerms terms, Expression<Func<T, string?>> field)
     {
         if (!terms.HasQuery)
             return source;
 
         var x = Expression.Parameter(typeof(T), "x");
-        var any = fields.Select(f => Apply(terms.Match, f, x)).Aggregate(Expression.OrElse);
-        return source.Where(Expression.Lambda<Func<T, bool>>(any, x));
+        var match = Apply(terms.Match, field, x);
+        return source.Where(Expression.Lambda<Func<T, bool>>(match, x));
     }
 
-    /// <summary>
-    /// Выбирает <paramref name="item"/> вместе с рангом и сходством лучшего из <paramref name="fields"/>.
-    /// Без запроса ранг и сходство нулевые, фильтрации нет. <paramref name="prefilter"/> = false, если
-    /// условие по индексированным колонкам уже наложено отдельно (<see cref="WhereMatchesAny{T}"/>).
-    /// </summary>
+    /// <summary>Выбирает элемент вместе с рангом и сходством одного поля, рассчитанными в БД.</summary>
     public static IQueryable<Ranked<TItem>> RankedBy<T, TItem>(
-        this IQueryable<T> source, SearchTerms terms, Expression<Func<T, TItem>> item, bool prefilter,
-        params Expression<Func<T, string?>>[] fields)
+        this IQueryable<T> source, SearchTerms terms, Expression<Func<T, TItem>> item, Expression<Func<T, string?>> field)
     {
         var x = Expression.Parameter(typeof(T), "x");
         Expression rank = Expression.Constant(0);
         Expression similarity = Expression.Constant(0d);
         if (terms.HasQuery)
         {
-            if (prefilter)
-                source = source.WhereMatchesAny(terms, fields);
-            rank = fields.Select(f => Apply(terms.Rank, f, x)).Aggregate((a, b) => Expression.Call(MaxInt, a, b));
-            similarity = fields.Select(f => Apply(terms.Similarity, f, x)).Aggregate((a, b) => Expression.Call(MaxDouble, a, b));
+            source = source.WhereMatches(terms, field);
+            rank = Apply(terms.Rank, field, x);
+            similarity = Apply(terms.Similarity, field, x);
         }
 
         var init = Expression.MemberInit(
@@ -169,7 +161,7 @@ internal static class SearchQueryExtensions
         if (!terms.HasQuery)
             throw new InvalidOperationException("Кандидатов поиска нельзя строить без запроса.");
 
-        source = source.WhereMatchesAny(terms, ranked);
+        source = source.WhereMatches(terms, ranked);
         display ??= ranked;
 
         var x = Expression.Parameter(typeof(T), "x");

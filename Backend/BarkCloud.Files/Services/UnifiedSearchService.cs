@@ -227,11 +227,11 @@ public partial class UnifiedSearchService
 
     private async Task<FileEnrichment> LoadEnrichment(ICollection<Guid> fileIds, CancellationToken cancellationToken)
     {
+        var ownerId = _userContext.UserId;
         var ids = fileIds.ToList();
         var metadata = ids.Count == 0 ? new Dictionary<Guid, FileMetadata>() : await _context.FileMetadata.AsNoTracking()
             .Where(x => ids.Contains(x.FileId))
             .ToDictionaryAsync(x => x.FileId, cancellationToken);
-        var ownerId = _userContext.UserId;
         var favoriteIds = ids.Count == 0 ? new HashSet<Guid>() : (await _context.FavoriteFiles.AsNoTracking()
             .Where(x => x.OwnerId == ownerId && ids.Contains(x.FileId))
             .Select(x => x.FileId)
@@ -293,8 +293,6 @@ public partial class UnifiedSearchService
             PreviewUrl = previewUrl,
             MediaKind = (ProtoMediaKind)(int)mediaKind,
             Favorite = favorite,
-            MatchField = string.Empty,
-            MatchValue = string.Empty,
             CreatedAt = Timestamp.FromDateTime(DateTime.SpecifyKind(sortAt, DateTimeKind.Utc)),
             Size = size
         };

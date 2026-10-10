@@ -200,6 +200,59 @@ public sealed class UnifiedSearchMatchPostgresTests(ITestOutputHelper output)
     }
 
     [PostgresFact]
+    public async Task Search_TiesUseAliasAndMetadataFieldOrder()
+    {
+        await using var db = await PostgresFilesDatabase.CreateAsync();
+        var aliasTagFile = NewFile(MediaKind.Photo, "alias-tag.jpg");
+        var titleArtistTrack = NewFile(MediaKind.Audio, "title-artist.mp3");
+        var artistAlbumTrack = NewFile(MediaKind.Audio, "artist-album.mp3");
+        var titleAuthorDocument = NewFile(MediaKind.Document, "title-author.pdf");
+        var authorSubjectDocument = NewFile(MediaKind.Document, "author-subject.pdf");
+        await Seed(db,
+            aliasTagFile, titleArtistTrack, artistAlbumTrack, titleAuthorDocument, authorSubjectDocument,
+            NewEntry(aliasTagFile, "unrelated"),
+            NewEntry(titleArtistTrack, "unrelated-track-one"), NewEntry(artistAlbumTrack, "unrelated-track-two"),
+            NewEntry(titleAuthorDocument, "unrelated-document-one"), NewEntry(authorSubjectDocument, "unrelated-document-two"),
+            new FileSearchAlias { OwnerId = Owner, FileId = aliasTagFile.Id, Value = "report", NormalizedValue = "report", UpdatedAt = DateTime.UtcNow },
+            new FileTag { OwnerId = Owner, FileId = aliasTagFile.Id, Value = "report", NormalizedValue = "report", CreatedAt = DateTime.UtcNow },
+            new FileMetadata { FileId = titleArtistTrack.Id, AudioTitle = "report", AudioArtist = "report", CreatedAt = DateTime.UtcNow },
+            new FileMetadata { FileId = artistAlbumTrack.Id, AudioArtist = "report", AudioAlbum = "report", CreatedAt = DateTime.UtcNow },
+            new FileMetadata { FileId = titleAuthorDocument.Id, DocumentTitle = "report", DocumentAuthor = "report", CreatedAt = DateTime.UtcNow },
+            new FileMetadata { FileId = authorSubjectDocument.Id, DocumentAuthor = "report", DocumentSubject = "report", CreatedAt = DateTime.UtcNow });
+
+        Assert.Equal(1f, await WordSimilarity(db, "report", "report"));
+        var photos = await Search(db, SearchSection.Photos, "report");
+        AssertMatch(photos.Hits.Single(hit => hit.FileId == aliasTagFile.Id.ToString()), "alias", "report");
+
+        var tracks = await Search(db, SearchSection.Tracks, "report");
+        AssertMatch(tracks.Hits.Single(hit => hit.FileId == titleArtistTrack.Id.ToString()), "title", "report");
+        AssertMatch(tracks.Hits.Single(hit => hit.FileId == artistAlbumTrack.Id.ToString()), "artist", "report");
+
+        var documents = await Search(db, SearchSection.Files, "report");
+        AssertMatch(documents.Hits.Single(hit => hit.FileId == titleAuthorDocument.Id.ToString()), "documentTitle", "report");
+        AssertMatch(documents.Hits.Single(hit => hit.FileId == authorSubjectDocument.Id.ToString()), "documentAuthor", "report");
+    }
+
+    [PostgresFact]
+    public async Task Search_UsesFilenameFallbackAndLatestTrashEntryForMatchValue()
+    {
+        await using var db = await PostgresFilesDatabase.CreateAsync();
+        var filenameOnlyFile = NewFile(MediaKind.Photo, "report-only-filename.jpg");
+        var trashFile = NewFile(MediaKind.Photo, "trash.jpg");
+        var oldEntry = NewEntry(trashFile, "old report entry", deleted: true);
+        var latestEntry = NewEntry(trashFile, "latest report entry", deleted: true);
+        oldEntry.DeletedAt = DateTime.UtcNow.AddMinutes(-2);
+        latestEntry.DeletedAt = DateTime.UtcNow.AddMinutes(-1);
+        await Seed(db, filenameOnlyFile, trashFile, oldEntry, latestEntry);
+
+        var photos = await Search(db, SearchSection.Photos, "report");
+        AssertMatch(photos.Hits.Single(hit => hit.FileId == filenameOnlyFile.Id.ToString()), "name", filenameOnlyFile.Filename!);
+
+        var trash = await Search(db, SearchSection.Trash, "report");
+        AssertMatch(trash.Hits.Single(hit => hit.FileId == trashFile.Id.ToString()), "name", latestEntry.Name);
+    }
+
+    [PostgresFact]
     public async Task Search_UnicodeAndNormalizedMetadataKeepSqlBehavior()
     {
         await using var db = await PostgresFilesDatabase.CreateAsync();
@@ -270,21 +323,29 @@ public sealed class UnifiedSearchMatchPostgresTests(ITestOutputHelper output)
     {
         await using var db = await PostgresFilesDatabase.CreateAsync();
         const string systemName = "Недавние документы";
-        const string query = "недавние документы";
+        const string query = "недавние документы quarterly report finances";
         var first = NewFolder(systemName + " alpha", Owner);
         var second = NewFolder(systemName + " beta", Owner);
         var dynamic = NewDynamicFolder(systemName + " custom", Owner);
-        await Seed(db, first, second, dynamic);
+        var report = NewFolder("report", Owner);
+        await Seed(db, first, second, dynamic, report);
 
         Assert.Equal(1f, await WordSimilarity(db, systemName, query));
+        Assert.NotEqual(systemName, query);
+        Assert.False(await ILike(db, systemName, query + "%"));
+        Assert.False(await ILike(db, systemName, "%" + query + "%"));
+        // Точное совпадение, префикс и подстрока не подходят; SQL word_similarity даёт ранг 1.
         var all = await Search(db, SearchSection.Folders, query, 50);
         var systemHit = Assert.Single(all.Hits, hit => hit.Id == SystemDynamicFolders.KeyRecentDocs);
+        Assert.Equal(SearchHitKind.DynamicFolder, systemHit.Kind);
         AssertMatch(systemHit, "name", systemName);
+        AssertMatch(Assert.Single(all.Hits, hit => hit.Id == report.Id.ToString()), "name", "report");
         foreach (var pageSize in new[] { 1, 2, 3 })
         {
             var traversed = await Traverse(db, SearchSection.Folders, query, pageSize);
             Assert.Equal(all.Hits.Select(hit => (hit.Kind, hit.Id, hit.MatchField, hit.MatchValue)),
                 traversed.Select(hit => (hit.Kind, hit.Id, hit.MatchField, hit.MatchValue)));
+            Assert.Equal(traversed.Count, traversed.Select(hit => (hit.Kind, hit.Id)).Distinct().Count());
         }
     }
 
