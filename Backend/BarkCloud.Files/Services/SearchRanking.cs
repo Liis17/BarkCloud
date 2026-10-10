@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Linq.Expressions;
+using System.Reflection;
 using System.Text;
 
 using Grpc.Core;
@@ -10,7 +11,7 @@ namespace BarkCloud.Files.Services;
 
 /// <summary>
 /// Нормализованный запрос и SQL-выражения ранжирования одного поля. Правила совпадают с
-/// <c>UnifiedSearchService.Match</c>: 4 — полное совпадение, 3 — префикс, 2 — подстрока, 1 — опечатка
+/// правилами поиска: 4 — полное совпадение, 3 — префикс, 2 — подстрока, 1 — опечатка
 /// (запрос от 4 символов и word_similarity ≥ 0.45). Сходство равно 1 для рангов 2–4, иначе word_similarity.
 /// </summary>
 internal sealed class SearchTerms
@@ -74,6 +75,22 @@ internal sealed class Ranked<T>
     public double Sim { get; set; }
 }
 
+/// <summary>Одно совпавшее поле источника, включая SQL-оценку и отображаемое значение.</summary>
+internal sealed class SearchCandidate<TKey>
+{
+    public TKey Key { get; set; } = default!;
+
+    public int Rank { get; set; }
+
+    public double Sim { get; set; }
+
+    public int Order { get; set; }
+
+    public string Field { get; set; } = string.Empty;
+
+    public string? Value { get; set; }
+}
+
 /// <summary>Строка секции в порядке выдачи: ранг↓, сходство↓, время↓, id↓.</summary>
 internal sealed class SearchRow<T>
 {
@@ -86,12 +103,24 @@ internal sealed class SearchRow<T>
     public DateTime SortAt { get; set; }
 
     public Guid Id { get; set; }
+
+    public string MatchField { get; set; } = string.Empty;
+
+    public string MatchValue { get; set; } = string.Empty;
 }
 
 internal static class SearchQueryExtensions
 {
     private static readonly System.Reflection.MethodInfo MaxInt = typeof(Math).GetMethod(nameof(Math.Max), [typeof(int), typeof(int)])!;
     private static readonly System.Reflection.MethodInfo MaxDouble = typeof(Math).GetMethod(nameof(Math.Max), [typeof(double), typeof(double)])!;
+    private static readonly MethodInfo QueryableWhere = QueryableLambdaMethod(nameof(Queryable.Where), 1, 2);
+    private static readonly MethodInfo QueryableOrderBy = QueryableLambdaMethod(nameof(Queryable.OrderBy), 2, 2);
+    private static readonly MethodInfo QueryableThenBy = QueryableLambdaMethod(nameof(Queryable.ThenBy), 2, 2);
+    private static readonly MethodInfo QueryableSelect = QueryableLambdaMethod(nameof(Queryable.Select), 2, 2);
+    private static readonly MethodInfo QueryableFirstOrDefault = typeof(Queryable).GetMethods()
+        .Single(m => m.Name == nameof(Queryable.FirstOrDefault) && m.IsGenericMethodDefinition && m.GetGenericArguments().Length == 1 && m.GetParameters().Length == 1);
+    private static readonly MethodInfo CollateString = ((MethodCallExpression)((Expression<Func<string, string>>)
+        (value => EF.Functions.Collate(value, "C"))).Body).Method;
 
     /// <summary>Оставляет строки, у которых хотя бы одно поле подходит под запрос (условие, пригодное для trigram-индекса).</summary>
     public static IQueryable<T> WhereMatchesAny<T>(this IQueryable<T> source, SearchTerms terms, params Expression<Func<T, string?>>[] fields)
@@ -132,6 +161,57 @@ internal static class SearchQueryExtensions
         return source.Select(Expression.Lambda<Func<T, Ranked<TItem>>>(init, x));
     }
 
+    /// <summary>Создаёт строку-кандидат для одного поля, используя одно правило SQL для отбора и ранга.</summary>
+    public static IQueryable<SearchCandidate<TKey>> CandidatesBy<T, TKey>(
+        this IQueryable<T> source, SearchTerms terms, Expression<Func<T, TKey>> key, string field, int order,
+        Expression<Func<T, string?>> ranked, Expression<Func<T, string?>>? display = null)
+    {
+        if (!terms.HasQuery)
+            throw new InvalidOperationException("Кандидатов поиска нельзя строить без запроса.");
+
+        source = source.WhereMatchesAny(terms, ranked);
+        display ??= ranked;
+
+        var x = Expression.Parameter(typeof(T), "x");
+        var init = Expression.MemberInit(
+            Expression.New(typeof(SearchCandidate<TKey>)),
+            Expression.Bind(typeof(SearchCandidate<TKey>).GetProperty(nameof(SearchCandidate<TKey>.Key))!, Apply(key, x)),
+            Expression.Bind(typeof(SearchCandidate<TKey>).GetProperty(nameof(SearchCandidate<TKey>.Rank))!, Apply(terms.Rank, ranked, x)),
+            Expression.Bind(typeof(SearchCandidate<TKey>).GetProperty(nameof(SearchCandidate<TKey>.Sim))!, Apply(terms.Similarity, ranked, x)),
+            Expression.Bind(typeof(SearchCandidate<TKey>).GetProperty(nameof(SearchCandidate<TKey>.Order))!, Expression.Constant(order)),
+            Expression.Bind(typeof(SearchCandidate<TKey>).GetProperty(nameof(SearchCandidate<TKey>.Field))!, Expression.Constant(field)),
+            Expression.Bind(typeof(SearchCandidate<TKey>).GetProperty(nameof(SearchCandidate<TKey>.Value))!, Apply(display, x)));
+        return source.Select(Expression.Lambda<Func<T, SearchCandidate<TKey>>>(init, x));
+    }
+
+    /// <summary>Сворачивает кандидатов по ключу, сохраняя текущую семантику максимума ранга и сходства.</summary>
+    public static IQueryable<Ranked<TKey>> BestMatches<TKey>(this IQueryable<SearchCandidate<TKey>> candidates)
+        => candidates.GroupBy(candidate => candidate.Key)
+            .Select(group => new Ranked<TKey>
+            {
+                Item = group.Key,
+                Rank = group.Max(candidate => candidate.Rank),
+                Sim = group.Max(candidate => candidate.Sim)
+            });
+
+    /// <summary>Выбирает подпись страницы из тех же кандидатов после курсора, порядка и LIMIT.</summary>
+    public static IQueryable<SearchRow<T>> WithMatchCandidates<T, TKey>(
+        this IQueryable<SearchRow<T>> rows, IQueryable<SearchCandidate<TKey>> candidates, Expression<Func<SearchRow<T>, TKey>> key)
+    {
+        var row = Expression.Parameter(typeof(SearchRow<T>), "row");
+        var keyBody = Replace(key.Body, key.Parameters[0], row);
+        var init = Expression.MemberInit(
+            Expression.New(typeof(SearchRow<T>)),
+            Expression.Bind(typeof(SearchRow<T>).GetProperty(nameof(SearchRow<T>.Item))!, Expression.Property(row, nameof(SearchRow<T>.Item))),
+            Expression.Bind(typeof(SearchRow<T>).GetProperty(nameof(SearchRow<T>.Rank))!, Expression.Property(row, nameof(SearchRow<T>.Rank))),
+            Expression.Bind(typeof(SearchRow<T>).GetProperty(nameof(SearchRow<T>.Sim))!, Expression.Property(row, nameof(SearchRow<T>.Sim))),
+            Expression.Bind(typeof(SearchRow<T>).GetProperty(nameof(SearchRow<T>.SortAt))!, Expression.Property(row, nameof(SearchRow<T>.SortAt))),
+            Expression.Bind(typeof(SearchRow<T>).GetProperty(nameof(SearchRow<T>.Id))!, Expression.Property(row, nameof(SearchRow<T>.Id))),
+            Expression.Bind(typeof(SearchRow<T>).GetProperty(nameof(SearchRow<T>.MatchField))!, FirstMatchValue<TKey, T>(candidates, row, keyBody, nameof(SearchCandidate<TKey>.Field))),
+            Expression.Bind(typeof(SearchRow<T>).GetProperty(nameof(SearchRow<T>.MatchValue))!, FirstMatchValue<TKey, T>(candidates, row, keyBody, nameof(SearchCandidate<TKey>.Value))));
+        return rows.Select(Expression.Lambda<Func<SearchRow<T>, SearchRow<T>>>(init, row));
+    }
+
     /// <summary>Строки после курсора (в порядке ранг↓, сходство↓, время↓, id↓).</summary>
     public static IQueryable<SearchRow<T>> After<T>(this IQueryable<SearchRow<T>> rows, SearchCursor? cursor)
     {
@@ -161,6 +241,40 @@ internal static class SearchQueryExtensions
 
     private static Expression Apply<TResult, T>(Expression<Func<string?, TResult>> leaf, Expression<Func<T, string?>> field, ParameterExpression x)
         => Replace(leaf.Body, leaf.Parameters[0], Replace(field.Body, field.Parameters[0], x));
+
+    private static Expression Apply<T, TValue>(Expression<Func<T, TValue>> selector, ParameterExpression x)
+        => Replace(selector.Body, selector.Parameters[0], x);
+
+    private static Expression FirstMatchValue<TKey, T>(IQueryable<SearchCandidate<TKey>> candidates, ParameterExpression row,
+        Expression key, string propertyName)
+    {
+        var candidate = Expression.Parameter(typeof(SearchCandidate<TKey>), "candidate");
+        var predicate = Expression.AndAlso(
+            Expression.AndAlso(
+                Expression.Equal(Expression.Property(candidate, nameof(SearchCandidate<TKey>.Key)), key),
+                Expression.Equal(Expression.Property(candidate, nameof(SearchCandidate<TKey>.Rank)), Expression.Property(row, nameof(SearchRow<T>.Rank)))),
+            Expression.Equal(Expression.Property(candidate, nameof(SearchCandidate<TKey>.Sim)), Expression.Property(row, nameof(SearchRow<T>.Sim))));
+        var filtered = Expression.Call(QueryableWhere.MakeGenericMethod(typeof(SearchCandidate<TKey>)), candidates.Expression,
+            Expression.Lambda(predicate, candidate));
+        var order = Expression.Lambda(Expression.Property(candidate, nameof(SearchCandidate<TKey>.Order)), candidate);
+        var ordered = Expression.Call(QueryableOrderBy.MakeGenericMethod(typeof(SearchCandidate<TKey>), typeof(int)), filtered, order);
+        var display = Expression.Property(candidate, nameof(SearchCandidate<TKey>.Value));
+        var collated = Expression.Call(CollateString, Expression.Constant(EF.Functions), display, Expression.Constant("C"));
+        var tieBreak = Expression.Lambda(collated, candidate);
+        var orderedByValue = Expression.Call(QueryableThenBy.MakeGenericMethod(typeof(SearchCandidate<TKey>), typeof(string)), ordered, tieBreak);
+        var value = Expression.Lambda(Expression.Property(candidate, propertyName), candidate);
+        var selected = Expression.Call(QueryableSelect.MakeGenericMethod(typeof(SearchCandidate<TKey>), typeof(string)), orderedByValue, value);
+        var first = Expression.Call(QueryableFirstOrDefault.MakeGenericMethod(typeof(string)), selected);
+        return Expression.Coalesce(first, Expression.Constant(string.Empty));
+    }
+
+    private static MethodInfo QueryableLambdaMethod(string name, int genericArgumentCount, int parameterCount)
+        => typeof(Queryable).GetMethods()
+            .Single(method => method.Name == name
+                              && method.IsGenericMethodDefinition
+                              && method.GetGenericArguments().Length == genericArgumentCount
+                              && method.GetParameters().Length == parameterCount
+                              && method.GetParameters()[1].ParameterType.GetGenericArguments()[0].GetGenericArguments().Length == 2);
 
     private static Expression Replace(Expression body, ParameterExpression from, Expression to)
         => new ParameterReplacer(from, to).Visit(body);
