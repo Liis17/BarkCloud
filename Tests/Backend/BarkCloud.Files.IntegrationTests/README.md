@@ -78,3 +78,13 @@ Files integration workflow в шаге `always()` выводит `docker compose
 
 Без Docker интеграционные сценарии не выполняются. Сборка проекта подтверждает
 компиляцию, но не заменяет приёмочный прогон с настоящими сервисами.
+
+Проверки разбора RabbitMQ URI и повторного создания тестового host не требуют внешних
+сервисов. `UploadTestHost` привязывает контексты логирования MassTransit и Quartz к
+`ILoggerFactory` нового host до создания bus/scheduler, чтобы после остановки предыдущего
+host не использовать закрытую фабрику. Эти проверки можно запустить отдельно:
+
+```bash
+dotnet test Tests/Backend/BarkCloud.Files.IntegrationTests/BarkCloud.Files.IntegrationTests.csproj \
+  -c Release --filter 'FullyQualifiedName~UploadTestHostTests|FullyQualifiedName~RabbitMqClientConnectionFactoryTests'
+```
