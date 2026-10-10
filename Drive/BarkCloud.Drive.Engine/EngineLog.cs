@@ -10,15 +10,17 @@ namespace BarkCloud.Drive.Engine;
 internal static class EngineLog
 {
     private static readonly object Gate = new();
-    private static readonly string LogFile;
+    private static string? _logFile;
+    private static bool _directoryReady;
 
-    static EngineLog()
+    internal static void Configure(string dir)
     {
-        var dir = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "BarkCloud.Drive");
-        Directory.CreateDirectory(dir);
-        LogFile = Path.Combine(dir, "engine.log");
+        lock (Gate)
+        {
+            Directory.CreateDirectory(dir);
+            _logFile = Path.Combine(dir, "engine.log");
+            _directoryReady = true;
+        }
     }
 
     public static void Info(string message) => Write("INFO", message);
@@ -38,7 +40,18 @@ internal static class EngineLog
         try
         {
             lock (Gate)
-                File.AppendAllText(LogFile, line + Environment.NewLine);
+            {
+                var logFile = _logFile ?? Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "BarkCloud.Drive", "engine.log");
+                if (!_directoryReady)
+                {
+                    Directory.CreateDirectory(Path.GetDirectoryName(logFile)!);
+                    _directoryReady = true;
+                }
+
+                File.AppendAllText(logFile, line + Environment.NewLine);
+            }
         }
         catch
         {

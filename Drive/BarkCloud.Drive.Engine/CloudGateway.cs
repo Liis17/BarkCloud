@@ -37,6 +37,7 @@ internal sealed class CloudGateway : IDisposable
     private string _cacheDir;
     private readonly string _filesWebBase;
     private readonly Func<string?> _tokenProvider;
+    private readonly TimeProvider _time;
 
     private readonly ConcurrentDictionary<string, (DateTime At, DirectoryListingDetailed Listing)> _listCache = new();
     private readonly ConcurrentDictionary<string, int> _listGen = new(); // «поколение» инвалидации на папку — защита от записи устаревшего ответа
@@ -65,10 +66,10 @@ internal sealed class CloudGateway : IDisposable
     private readonly List<(string EntryId, string DirId)> _delPending = new();
     private readonly ConcurrentDictionary<string, byte> _delTombstones = new();
     private readonly ConcurrentDictionary<string, int> _delAttempts = new();
-    private readonly Timer _delTimer;
+    private readonly ITimer _delTimer;
 
     public CloudGateway(CloudApi.CloudApiClient cloud, FilesApi.FilesApiClient files, HttpClient http,
-        string filesWebBase, Func<string?> tokenProvider, string cacheDir)
+        string filesWebBase, Func<string?> tokenProvider, string cacheDir, TimeProvider? time = null)
     {
         _cloud = cloud;
         _files = files;
@@ -76,8 +77,10 @@ internal sealed class CloudGateway : IDisposable
         _filesWebBase = filesWebBase.TrimEnd('/');
         _tokenProvider = tokenProvider;
         _cacheDir = cacheDir;
+        _time = time ?? TimeProvider.System;
         Directory.CreateDirectory(_cacheDir);
-        _delTimer = new Timer(_ => DrainTimer(), null, Timeout.Infinite, Timeout.Infinite);
+        _delTimer = _time.CreateTimer(
+            _ => DrainTimer(), null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
     }
 
     // Сменить папку кэша на лету: новые чтения пойдут в неё. Уже скачанные файлы
@@ -93,18 +96,18 @@ internal sealed class CloudGateway : IDisposable
     {
         lock (_storageLock)
         {
-            if (_storage is { } s && DateTime.UtcNow - s.At < StorageTtl)
+            if (_storage is { } s && _time.GetUtcNow().UtcDateTime - s.At < StorageTtl)
                 return s.Info;
 
             var info = _files.GetUserStorageInfo(new GetUserStorageInfoRequest());
-            _storage = (DateTime.UtcNow, info);
+            _storage = (_time.GetUtcNow().UtcDateTime, info);
             return info;
         }
     }
 
     public DirectoryListingDetailed ListDirectory(string dirId)
     {
-        if (_listCache.TryGetValue(dirId, out var c) && DateTime.UtcNow - c.At < ListTtl)
+        if (_listCache.TryGetValue(dirId, out var c) && _time.GetUtcNow().UtcDateTime - c.At < ListTtl)
             return HidePending(c.Listing);
 
         _listGen.TryGetValue(dirId, out var gen);
@@ -140,7 +143,7 @@ internal sealed class CloudGateway : IDisposable
         {
             _listGen.TryGetValue(dirId, out var genAfter);
             if (gen == genAfter)
-                _listCache[dirId] = (DateTime.UtcNow, listing);
+                _listCache[dirId] = (_time.GetUtcNow().UtcDateTime, listing);
         }
 
         return HidePending(listing);
@@ -348,14 +351,14 @@ internal sealed class CloudGateway : IDisposable
 
     private async Task<string> GetTempUrlAsync(string fileId)
     {
-        if (_tempUrls.TryGetValue(fileId, out var c) && DateTime.UtcNow - c.At < UrlTtl)
+        if (_tempUrls.TryGetValue(fileId, out var c) && _time.GetUtcNow().UtcDateTime - c.At < UrlTtl)
             return c.Url;
 
         var resp = await _files.GetTempDownloadUrlAsync(new GetTempDownloadUrlRequest { FileIds = { fileId } });
         var raw = resp.FileUrls.FirstOrDefault()?.Url
                   ?? throw new InvalidOperationException($"Сервер не вернул download URL для {fileId}");
         var url = NormalizeDownloadUrl(raw);
-        _tempUrls[fileId] = (DateTime.UtcNow, url);
+        _tempUrls[fileId] = (_time.GetUtcNow().UtcDateTime, url);
         return url;
     }
 
@@ -527,7 +530,7 @@ internal sealed class CloudGateway : IDisposable
     {
         var copy = new List<(string EntryId, string DirId)>(_delPending);
         _delPending.Clear();
-        _delTimer.Change(Timeout.Infinite, Timeout.Infinite);
+        _delTimer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
         return copy;
     }
 
@@ -544,7 +547,7 @@ internal sealed class CloudGateway : IDisposable
 
             try
             {
-                _cloud.DeleteFileEntries(request, deadline: DateTime.UtcNow.Add(DeleteDeadline));
+                _cloud.DeleteFileEntries(request, deadline: _time.GetUtcNow().UtcDateTime.Add(DeleteDeadline));
             }
             catch (Exception ex)
             {

@@ -10,11 +10,10 @@ internal sealed class TokenStore
 {
     private readonly string _file;
 
-    public TokenStore()
+    public TokenStore(string? dir = null)
     {
-        var dir = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "BarkCloud.Drive");
+        dir ??= Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "BarkCloud.Drive");
         Directory.CreateDirectory(dir);
         _file = Path.Combine(dir, "refresh.bin");
     }

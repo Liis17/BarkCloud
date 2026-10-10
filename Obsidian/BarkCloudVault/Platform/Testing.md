@@ -4,7 +4,7 @@ Parent: [[Architecture]] · See also: [[Web/WebApp]] · [[Backend/Files]] · [[B
 
 ## Назначение
 
-Автоматические проверки сгруппированы по backend-сервисам и общим библиотекам; часть проверок использует настоящие PostgreSQL или RabbitMQ. GitHub Actions выбирает наборы по изменённым путям и запускает сборку образа после успешных тестов сервиса.
+Автоматические проверки сгруппированы по backend-сервисам, общим библиотекам и Windows Drive; часть проверок использует настоящие PostgreSQL или RabbitMQ. GitHub Actions выбирает наборы по изменённым путям и запускает сборку образа после успешных тестов сервиса.
 
 ## Источники
 
@@ -12,6 +12,7 @@ Parent: [[Architecture]] · See also: [[Web/WebApp]] · [[Backend/Files]] · [[B
 |---|---|---|
 | `Tests/Directory.Build.props` | общие test properties | .NET 10, xUnit, Moq и FluentAssertions |
 | `Tests/BarkCloud.TestKit/` | общие test helpers | gRPC-контекст, вызовы и логгер для тестов |
+| `Tests/Drive/BarkCloud.Drive.Engine.Tests/` | тесты Windows Drive | Изоляция путей, фейки gRPC/HTTP/Dokany и страховочные тесты CloudGateway |
 | `.github/workflows/tests.yml` | path filters, test jobs | Выбор тестов на PR и ручном запуске |
 | `.github/workflows/backend-service-ci.yml` | test/build jobs | Тесты сервиса перед сборкой и публикацией образа |
 | `Backend/BarkCloud.Web/ClientApp/package.json` | npm scripts | Vitest-команда клиентских тестов и сборка SPA |
@@ -23,6 +24,7 @@ Parent: [[Architecture]] · See also: [[Web/WebApp]] · [[Backend/Files]] · [[B
 | `Tests/Backend/BarkCloud.*.Tests` | Тесты backend и инфраструктуры по сервисам |
 | `Tests/Backend/BarkCloud.Identity.IntegrationTests`, `Tests/Backend/BarkCloud.Users.IntegrationTests` | Отдельные интеграционные проекты |
 | `Tests/Shared/*` | Тесты общих библиотек |
+| `Tests/Drive/BarkCloud.Drive.Engine.Tests` | Только Windows (`net10.0-windows`); unit-тесты работают без Dokany. Категория `WindowsIpc` предназначена для тестов named pipe |
 | `npm test` в `Backend/BarkCloud.Web/ClientApp` | Запускает Vitest |
 | `dotnet test <project.csproj> -c Release` | Запуск указанного .NET test-проекта |
 
