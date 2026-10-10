@@ -2,6 +2,7 @@ using BarkCloud.GrpcServer.Metrics;
 using BarkCloud.GrpcServer.Tracker;
 using BarkCloud.Identity.Features.CreateSessionForUserServer;
 using BarkCloud.Identity.Infrastructure;
+using BarkCloud.Identity.Tests._Helpers;
 using BarkCloud.Identity.Persistence.Services;
 using BarkCloud.Identity.Services;
 using BarkCloud.Proto.Identity;
@@ -15,16 +16,19 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace BarkCloud.Identity.Tests.Features.CreateSessionForUserServer;
 
-public class CreateSessionForUserServerCommandHandlerTests
+public class CreateSessionForUserServerCommandHandlerTests : IDisposable
 {
     private readonly Mock<SessionIssuer> _sessions;
     private readonly MetricsCollector _metrics = new();
+    private readonly SqliteIdentityContext _database = new();
+
+    public void Dispose() => _database.Dispose();
 
     public CreateSessionForUserServerCommandHandlerTests()
     {
         _sessions = new Mock<SessionIssuer>(
             Mock.Of<UsersServerApi.UsersServerApiClient>(), Mock.Of<IMediator>(), Mock.Of<INotificationOutbox>(),
-            Mock.Of<IRefreshTokensStorage>(), new RequestContext(),
+            Mock.Of<IRefreshTokensStorage>(), _database.Context, new RequestContext(),
             new Mock<LocationClient>(new HttpClient(), new MetricsCollector(), NullLogger<LocationClient>.Instance).Object,
             _metrics, NullLogger<SessionIssuer>.Instance);
         _sessions

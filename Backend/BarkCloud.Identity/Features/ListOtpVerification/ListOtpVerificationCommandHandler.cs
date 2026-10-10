@@ -25,7 +25,7 @@ public class ListOtpVerificationCommandHandler : IRequestHandler<ListOtpVerifica
     {
         _logger.LogDebug("Получение статуса 2FA для пользователя {UserId}", _userContext.UserId);
 
-        var otpAuth = await _authPropertiesStorage.GetUserAuthProperties(_userContext.UserId);
+        var otpAuth = await _authPropertiesStorage.GetUserAuthProperties(_userContext.UserId, cancellationToken);
 
         if (otpAuth is null)
         {

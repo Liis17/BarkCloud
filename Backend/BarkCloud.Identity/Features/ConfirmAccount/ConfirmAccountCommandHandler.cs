@@ -2,6 +2,7 @@ using BarkCloud.GrpcServer.Metrics;
 using BarkCloud.GrpcServer.Tracker;
 using BarkCloud.Identity.Domain;
 using BarkCloud.Identity.Infrastructure;
+using BarkCloud.Identity.Persistence.Contexts;
 using BarkCloud.Identity.Persistence.Services;
 using BarkCloud.Identity.Services;
 using BarkCloud.Proto.Identity;
@@ -18,7 +19,7 @@ using MediatR;
 namespace BarkCloud.Identity.Features.ConfirmAccount;
 
 public class ConfirmAccountCommandHandler(IConfirmationCodesStorage confirmationCodesStorage,
-    UsersServerApi.UsersServerApiClient usersClient, IRefreshTokensStorage refreshTokensStorage, RequestContext requestContext,
+    UsersServerApi.UsersServerApiClient usersClient, IRefreshTokensStorage refreshTokensStorage, IdentityContext context, RequestContext requestContext,
     INotificationOutbox notificationOutbox, MetricsCollector metrics,
     IRegistrationPolicy registrationPolicy, IAuthRateLimiter rateLimiter,
     ILogger<ConfirmAccountCommandHandler> logger)
@@ -47,7 +48,7 @@ public class ConfirmAccountCommandHandler(IConfirmationCodesStorage confirmation
 
         logger.LogDebug("Получение кода подтверждения {CodeId}", codeId);
 
-        var code = await confirmationCodesStorage.GetCode(codeId);
+        var code = await confirmationCodesStorage.GetCode(codeId, cancellationToken);
 
         if (code is null)
         {
@@ -83,7 +84,7 @@ public class ConfirmAccountCommandHandler(IConfirmationCodesStorage confirmation
         }
 
         // Попытка по коду занимается до сравнения (параллельный перебор не превысит лимит) и не зависит от адреса источника.
-        if (!await confirmationCodesStorage.TryReserveAttempt(codeId, AuthLimits.ChallengeMaxAttempts))
+        if (!await confirmationCodesStorage.TryReserveAttempt(codeId, AuthLimits.ChallengeMaxAttempts, cancellationToken))
         {
             metrics.Increment("account_confirmation_failed");
             metrics.Increment("account_confirmation_failed_attempts_exceeded");
@@ -109,26 +110,59 @@ public class ConfirmAccountCommandHandler(IConfirmationCodesStorage confirmation
 
         var confirmRequest = new ConfirmUserRequest { UserId = code.OwnerId!.Value };
 
-        await usersClient.ConfirmUserAsync(confirmRequest);
+        await usersClient.ConfirmUserAsync(confirmRequest, cancellationToken: cancellationToken);
 
-        // Удаляем использованный код, чтобы предотвратить повторное использование.
-        await confirmationCodesStorage.DeleteCode(codeId);
-
-        logger.LogDebug("Генерация refresh token для пользователя {UserId}", code.OwnerId!.Value);
-
+        // Users подтверждает аккаунт вне локального коммита. Повтор RPC безопасен: после сбоя клиента
+        // действующий код позволит повторить попытку и получить локальную сессию.
         var refreshTokenString = RefreshTokenGenerator.GenerateRefreshToken();
+        var notificationEnqueued = false;
 
-        await refreshTokensStorage.CreateNewRefreshToken(refreshTokenString, code.OwnerId!.Value, requestContext.DeviceId ?? requestContext.DeviceName, ExpDaysRefreshToken);
+        try
+        {
+            await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
+            try
+            {
+                if (!await confirmationCodesStorage.TryConsumeRegistrationCode(
+                        codeId, code.OwnerId!.Value, code.Value, code.Expires,
+                        AuthLimits.ChallengeMaxAttempts, cancellationToken))
+                {
+                    metrics.Increment("account_confirmation_failed");
+                    metrics.Increment("account_confirmation_failed_incorrect");
+                    throw new ConfirmationCodeIncorrectException();
+                }
 
-        // Аккаунт уже подтверждён, код погашен и сессия создана: письмо — через outbox, его сбой не должен ломать ответ.
-        await notificationOutbox.EnqueueAsync(
-            code.OwnerId!.Value,
-            NotificationType.SuccessfulRegistration,
-            "Успешная регистрация",
-            NotificationPayload.Device(requestContext));
+                logger.LogDebug("Генерация refresh token для пользователя {UserId}", code.OwnerId.Value);
+
+                await refreshTokensStorage.CreateNewRefreshToken(refreshTokenString, code.OwnerId.Value,
+                    requestContext.DeviceId ?? requestContext.DeviceName, ExpDaysRefreshToken, cancellationToken);
+
+                notificationEnqueued = await notificationOutbox.EnqueueAsync(
+                    code.OwnerId.Value,
+                    NotificationType.SuccessfulRegistration,
+                    "Успешная регистрация",
+                    NotificationPayload.Device(requestContext),
+                    cancellationToken);
+
+                await transaction.CommitAsync(cancellationToken);
+            }
+            catch
+            {
+                try { await transaction.RollbackAsync(CancellationToken.None); } catch { }
+                throw;
+            }
+        }
+        catch
+        {
+            context.ChangeTracker.Clear();
+            throw;
+        }
 
         metrics.Increment("accounts_confirmed");
         metrics.Increment("sessions_created");
+        if (notificationEnqueued)
+        {
+            metrics.Increment("notification_outbox_enqueued");
+        }
 
         logger.LogInformation(
             "Аккаунт успешно подтвержден. UserId: {UserId}, Устройство: {DeviceName}",

@@ -281,21 +281,114 @@ public class TorrentApiService : TorrentApi.TorrentApiBase
 
     public override async Task<TorrentEmpty> PauseTorrent(TorrentIdRequest request, ServerCallContext context)
     {
-        var entity = await RequireOwned(request.Id);
-        // Сначала движок: при его сбое флаг в БД не меняется и вызов можно повторить.
-        await _engine.PauseAsync(entity.Id);
-        entity.Paused = true;
-        await _store.SaveChanges();
-        return new TorrentEmpty();
+        return await SetPaused(request.Id, paused: true, context.CancellationToken);
     }
 
     public override async Task<TorrentEmpty> ResumeTorrent(TorrentIdRequest request, ServerCallContext context)
     {
-        var entity = await RequireOwned(request.Id);
-        await _engine.ResumeAsync(entity.Id);
-        entity.Paused = false;
-        await _store.SaveChanges();
+        return await SetPaused(request.Id, paused: false, context.CancellationToken);
+    }
+
+    private async Task<TorrentEmpty> SetPaused(string id, bool paused, CancellationToken ct)
+    {
+        if (!Guid.TryParse(id, out var torrentId))
+            throw new RpcException(new Status(StatusCode.InvalidArgument, "Некорректный id"));
+
+        if (await _store.GetPaused(torrentId, UserId, ct) == null)
+            throw new RpcException(new Status(StatusCode.NotFound, "Торрент не найден"));
+
+        var rowMissing = false;
+        var removing = false;
+        var ran = await _engine.RunExclusiveAsync(torrentId, async managed =>
+        {
+            if (managed.Removing)
+            {
+                removing = true;
+                return;
+            }
+
+            var persisted = await _store.GetPaused(torrentId, UserId, ct);
+            if (persisted == null)
+            {
+                rowMissing = true;
+                _engine.ClearPausedReconcilePending(managed);
+                return;
+            }
+
+            ct.ThrowIfCancellationRequested();
+            try
+            {
+                await _engine.ApplyPausedAsync(managed, paused);
+            }
+            catch
+            {
+                await _engine.RestorePausedAsync(
+                    managed,
+                    token => ReadPausedInNewScopeAsync(torrentId, token),
+                    CancellationToken.None);
+                throw;
+            }
+
+            try
+            {
+                if (!await _store.SetPaused(torrentId, UserId, paused, CancellationToken.None))
+                {
+                    rowMissing = true;
+                    _engine.ClearPausedReconcilePending(managed);
+                    return;
+                }
+            }
+            catch
+            {
+                try
+                {
+                    var current = await ReadPausedInNewScopeAsync(torrentId, CancellationToken.None);
+                    if (current == null)
+                    {
+                        rowMissing = true;
+                        _engine.ClearPausedReconcilePending(managed);
+                        return;
+                    }
+
+                    if (current.Value == paused)
+                    {
+                        _engine.ClearPausedReconcilePending(managed);
+                        return;
+                    }
+
+                    await _engine.ApplyPausedAsync(managed, current.Value);
+                    _engine.ClearPausedReconcilePending(managed);
+                }
+                catch (Exception reconcileError)
+                {
+                    _engine.MarkPausedReconcilePending(managed, reconcileError);
+                }
+
+                throw;
+            }
+
+            _engine.ClearPausedReconcilePending(managed);
+        }, ct);
+
+        if (rowMissing)
+            throw new RpcException(new Status(StatusCode.NotFound, "Торрент не найден"));
+
+        if (!ran || removing)
+        {
+            if (await _store.GetPaused(torrentId, UserId, ct) == null)
+                throw new RpcException(new Status(StatusCode.NotFound, "Торрент не найден"));
+
+            throw new RpcException(new Status(StatusCode.FailedPrecondition, "Торрент не активен"));
+        }
+
         return new TorrentEmpty();
+    }
+
+    private async Task<bool?> ReadPausedInNewScopeAsync(Guid id, CancellationToken ct)
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var store = scope.ServiceProvider.GetRequiredService<ITorrentStore>();
+        return await store.GetPaused(id, UserId, ct);
     }
 
     public override async Task<TorrentEmpty> RemoveTorrent(RemoveTorrentRequest request, ServerCallContext context)

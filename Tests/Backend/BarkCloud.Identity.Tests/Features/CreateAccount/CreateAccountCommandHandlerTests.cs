@@ -135,7 +135,7 @@ public class CreateAccountCommandHandlerTests
 
         await act.Should().ThrowAsync<RegistrationDisabledException>();
         _usersClient.Verify(c => c.AddDraftUserAsync(It.IsAny<AddDraftUserRequest>(), null, null, default), Times.Never);
-        _codes.Verify(s => s.AddCode(It.IsAny<ConfirmationCode>()), Times.Never);
+        _codes.Verify(s => s.AddCode(It.IsAny<ConfirmationCode>(), It.IsAny<CancellationToken>()), Times.Never);
         _notifications.Verify(n => n.SendNotification(It.IsAny<Notification>()), Times.Never);
     }
     [Fact]
@@ -146,8 +146,8 @@ public class CreateAccountCommandHandlerTests
             .Setup(c => c.AddDraftUserAsync(It.IsAny<AddDraftUserRequest>(), null, null, default))
             .Returns(GrpcCallHelpers.AsyncUnary(new AddDraftUserResponse { UserId = 7 }));
         _codes
-            .Setup(s => s.AddCode(It.IsAny<ConfirmationCode>()))
-            .ReturnsAsync((ConfirmationCode c) => { c.Id = codeId; return c; });
+            .Setup(s => s.AddCode(It.IsAny<ConfirmationCode>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((ConfirmationCode c, CancellationToken _) => { c.Id = codeId; return c; });
 
         var response = await CreateSut().Handle(ValidCommand(), default);
 
@@ -167,8 +167,8 @@ public class CreateAccountCommandHandlerTests
             .Setup(c => c.OverrideDraftUserAsync(It.IsAny<AddDraftUserRequest>(), null, null, default))
             .Returns(GrpcCallHelpers.AsyncUnary(new AddDraftUserResponse { UserId = 11 }));
         _codes
-            .Setup(s => s.AddCode(It.IsAny<ConfirmationCode>()))
-            .ReturnsAsync((ConfirmationCode c) => { c.Id = Guid.NewGuid(); return c; });
+            .Setup(s => s.AddCode(It.IsAny<ConfirmationCode>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((ConfirmationCode c, CancellationToken _) => { c.Id = Guid.NewGuid(); return c; });
 
         await CreateSut().Handle(ValidCommand(), default);
 
@@ -193,7 +193,7 @@ public class CreateAccountCommandHandlerTests
         response.CodeId.Should().BeNullOrEmpty();
         _usersClient.Verify(c => c.ConfirmUserAsync(It.Is<ConfirmUserRequest>(r => r.UserId == 7), null, null, default), Times.Once);
         _refreshTokens.Verify(s => s.CreateNewRefreshToken(It.IsAny<string>(), 7, It.IsAny<string>(), It.IsAny<int>()), Times.Once);
-        _codes.Verify(s => s.AddCode(It.IsAny<ConfirmationCode>()), Times.Never);
+        _codes.Verify(s => s.AddCode(It.IsAny<ConfirmationCode>(), It.IsAny<CancellationToken>()), Times.Never);
         _notifications.Verify(n => n.SendNotification(It.IsAny<Notification>()), Times.Never);
         var snap = _metrics.SnapshotAndReset();
         snap.Should().ContainKey("accounts_confirmed");
@@ -206,8 +206,8 @@ public class CreateAccountCommandHandlerTests
             .Setup(c => c.AddDraftUserAsync(It.IsAny<AddDraftUserRequest>(), null, null, default))
             .Returns(GrpcCallHelpers.AsyncUnary(new AddDraftUserResponse { UserId = 7 }));
         _codes
-            .Setup(s => s.AddCode(It.IsAny<ConfirmationCode>()))
-            .ReturnsAsync((ConfirmationCode c) => { c.Id = Guid.NewGuid(); return c; });
+            .Setup(s => s.AddCode(It.IsAny<ConfirmationCode>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((ConfirmationCode c, CancellationToken _) => { c.Id = Guid.NewGuid(); return c; });
     }
 
     [Fact]
@@ -233,7 +233,7 @@ public class CreateAccountCommandHandlerTests
         var act = () => CreateSut().Handle(ValidCommand(), default);
 
         await act.Should().ThrowAsync<TooManyRequestsException>();
-        _codes.Verify(s => s.AddCode(It.IsAny<ConfirmationCode>()), Times.Never);
+        _codes.Verify(s => s.AddCode(It.IsAny<ConfirmationCode>(), It.IsAny<CancellationToken>()), Times.Never);
         _notifications.Verify(n => n.SendNotification(It.IsAny<Notification>()), Times.Never);
     }
 

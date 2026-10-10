@@ -3,6 +3,7 @@ using BarkCloud.GrpcServer.Tracker;
 using BarkCloud.GrpcServer.XAuth;
 using BarkCloud.Identity.Domain;
 using BarkCloud.Identity.Features.ConfirmOtpVerification;
+using BarkCloud.Identity.Persistence.Contexts;
 using BarkCloud.Identity.Persistence.Services;
 using BarkCloud.Identity.Services;
 using BarkCloud.Identity.Tests._Helpers;
@@ -20,8 +21,9 @@ using OtpType = BarkCloud.Identity.Domain.OtpType;
 
 namespace BarkCloud.Identity.Tests.Features.ConfirmOtpVerification;
 
-public class ConfirmOtpVerificationCommandHandlerTests
+public class ConfirmOtpVerificationCommandHandlerTests : IDisposable
 {
+    private readonly SqliteIdentityContext _database = new();
     private readonly Mock<IAuthPropertiesStorage> _authProps = new();
     private readonly Mock<INotificationOutbox> _outbox = new();
     private readonly Mock<IAuthRateLimiter> _rateLimiter = new();
@@ -31,12 +33,15 @@ public class ConfirmOtpVerificationCommandHandlerTests
 
     private ConfirmOtpVerificationCommandHandler CreateSut() => new(
         UserContextFactory.Create(42),
+        _database.Context,
         _authProps.Object,
         _outbox.Object,
         new RequestContext { DeviceName = "Pixel", OperationSystem = "Android", IpAddress = "1.1.1.1" },
         _metrics,
         _rateLimiter.Object,
         _logger);
+
+    public void Dispose() => _database.Dispose();
 
     [Fact]
     public async Task Handle_PersistenceOtpNotCreated_ThrowsDomainOtpNotCreated()
@@ -46,10 +51,12 @@ public class ConfirmOtpVerificationCommandHandlerTests
             UserId = 42,
             SelectedOtpType = OtpType.Email
         });
-        _authProps
-            .Setup(s => s.TryConsumeEmailAuthCode(42, EmailAuthCodePurpose.EnableEmailOtp, "654321"))
-            .ReturnsAsync(true);
-        _authProps.Setup(s => s.EnableEmailOtp(42)).ThrowsAsync(new PersistenceOtpNotCreatedException());
+        var validatedCode = new ValidatedEmailAuthCode(42, EmailAuthCodePurpose.EnableEmailOtp, "654321",
+            DateTime.UtcNow, DateTime.UtcNow.AddMinutes(5));
+        _authProps.Setup(s => s.TryValidateAndReserveEmailAuthCode(
+            42, EmailAuthCodePurpose.EnableEmailOtp, "654321", It.IsAny<CancellationToken>())).ReturnsAsync(validatedCode);
+        _authProps.Setup(s => s.TryConsumeValidatedEmailAuthCode(validatedCode, It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        _authProps.Setup(s => s.EnableEmailOtp(42, It.IsAny<CancellationToken>())).ThrowsAsync(new PersistenceOtpNotCreatedException());
 
         var act = () => CreateSut().Handle(new ConfirmOtpVerificationCommand { OtpCode = "654321" }, default);
 
@@ -187,8 +194,9 @@ public class ConfirmOtpVerificationCommandHandlerTests
             SelectedOtpType = OtpType.Email
         });
         _authProps
-            .Setup(s => s.TryConsumeEmailAuthCode(42, EmailAuthCodePurpose.EnableEmailOtp, "999999"))
-            .ReturnsAsync(false);
+            .Setup(s => s.TryValidateAndReserveEmailAuthCode(
+                42, EmailAuthCodePurpose.EnableEmailOtp, "999999", It.IsAny<CancellationToken>()))
+            .ReturnsAsync((ValidatedEmailAuthCode?)null);
 
         var act = () => CreateSut().Handle(new ConfirmOtpVerificationCommand { OtpCode = "999999" }, default);
 
@@ -204,13 +212,15 @@ public class ConfirmOtpVerificationCommandHandlerTests
             UserId = 42,
             SelectedOtpType = OtpType.Email
         });
-        _authProps
-            .Setup(s => s.TryConsumeEmailAuthCode(42, EmailAuthCodePurpose.EnableEmailOtp, "654321"))
-            .ReturnsAsync(true);
+        var validatedCode = new ValidatedEmailAuthCode(42, EmailAuthCodePurpose.EnableEmailOtp, "654321",
+            DateTime.UtcNow, DateTime.UtcNow.AddMinutes(5));
+        _authProps.Setup(s => s.TryValidateAndReserveEmailAuthCode(
+            42, EmailAuthCodePurpose.EnableEmailOtp, "654321", It.IsAny<CancellationToken>())).ReturnsAsync(validatedCode);
+        _authProps.Setup(s => s.TryConsumeValidatedEmailAuthCode(validatedCode, It.IsAny<CancellationToken>())).ReturnsAsync(true);
 
         await CreateSut().Handle(new ConfirmOtpVerificationCommand { OtpCode = "654321" }, default);
 
-        _authProps.Verify(s => s.EnableEmailOtp(42), Times.Once);
+        _authProps.Verify(s => s.EnableEmailOtp(42, It.IsAny<CancellationToken>()), Times.Once);
         _metrics.SnapshotAndReset().Should().ContainKey("otp_enabled_email");
     }
 
@@ -222,9 +232,11 @@ public class ConfirmOtpVerificationCommandHandlerTests
             UserId = 42,
             SelectedOtpType = OtpType.Email
         });
-        _authProps
-            .Setup(s => s.TryConsumeEmailAuthCode(42, EmailAuthCodePurpose.EnableEmailOtp, "654321"))
-            .ReturnsAsync(true);
+        var validatedCode = new ValidatedEmailAuthCode(42, EmailAuthCodePurpose.EnableEmailOtp, "654321",
+            DateTime.UtcNow, DateTime.UtcNow.AddMinutes(5));
+        _authProps.Setup(s => s.TryValidateAndReserveEmailAuthCode(
+            42, EmailAuthCodePurpose.EnableEmailOtp, "654321", It.IsAny<CancellationToken>())).ReturnsAsync(validatedCode);
+        _authProps.Setup(s => s.TryConsumeValidatedEmailAuthCode(validatedCode, It.IsAny<CancellationToken>())).ReturnsAsync(true);
 
         await CreateSut().Handle(new ConfirmOtpVerificationCommand { OtpCode = "654321" }, default);
 

@@ -41,6 +41,17 @@ public class TorrentStore : ITorrentStore
         _context.Torrents.Include(t => t.Files)
             .FirstOrDefaultAsync(t => t.Id == id && t.UserId == userId);
 
+    public Task<bool?> GetPaused(Guid id, long userId, CancellationToken ct = default) =>
+        _context.Torrents.AsNoTracking()
+            .Where(t => t.Id == id && t.UserId == userId)
+            .Select(t => (bool?)t.Paused)
+            .FirstOrDefaultAsync(ct);
+
+    public async Task<bool> SetPaused(Guid id, long userId, bool paused, CancellationToken ct = default) =>
+        await _context.Torrents
+            .Where(t => t.Id == id && t.UserId == userId)
+            .ExecuteUpdateAsync(update => update.SetProperty(t => t.Paused, paused), ct) > 0;
+
     public Task<bool> ExistsByInfoHash(long userId, string infoHash) =>
         _context.Torrents.AnyAsync(t => t.UserId == userId && t.InfoHash == infoHash);
 

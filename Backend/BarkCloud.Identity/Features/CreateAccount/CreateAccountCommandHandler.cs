@@ -143,7 +143,7 @@ public class CreateAccountCommandHandler(UsersServerApi.UsersServerApiClient use
             Value = code
         };
 
-        confirmationCode = await confirationCodesStorage.AddCode(confirmationCode);
+        confirmationCode = await confirationCodesStorage.AddCode(confirmationCode, cancellationToken);
 
         var locationInfo = await locationClient.GetLocationString(requestContext.IpAddress);
 

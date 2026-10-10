@@ -16,6 +16,7 @@ See also: [[Backend/ResumableUpload]] · [[Backend/FilesCloud]] · [[Backend/Dyn
 | `Backend/BarkCloud.Files/Host/FilesController.cs` | upload/download routes | HTTP-контракт передачи байтов |
 | `Backend/BarkCloud.Files/Features/Cloud/AttachFile/AttachFileCommandHandler.cs` | `AttachFile` | требования к привязке в облако |
 | `Backend/BarkCloud.Files/Host/CloudApiService.cs` | `CloudApiService` | дерево и галерея |
+| `Backend/BarkCloud.Files/Services/UnifiedSearchService.cs` | `UnifiedSearchService` | единый поиск и разрешение хита |
 
 ## Публичные контракты
 
@@ -53,6 +54,14 @@ See also: [[Backend/ResumableUpload]] · [[Backend/FilesCloud]] · [[Backend/Dyn
 - `file_id` обозначает загруженный блоб; `entry_id` — запись этого блоба в дереве. Для переименования, перемещения и удаления записи используйте `entry_id`; для `AttachFile` — `file_id`.
 - `AttachFile` вызывайте только после статуса `READY`. Параметр `route_by_media_kind=true` позволяет серверу выбрать системную папку по типу файла.
 - Фото и видео добавляются в альбомы через `AlbumApi.AddItemsToAlbum`; страница альбома использует `ListAlbums` и `ListAlbumItems`. Курсор альбомов — пара `(cursor_updated_at, cursor_album_id)`, элементов — `(cursor_added_at, cursor_file_id)`.
+
+### Поиск
+
+`SearchApi.Search` возвращает секции с рангом, сходством и курсором, рассчитанными PostgreSQL. `match_field` называет поле, определившее совпадение (`name`, `alias`, `tag`, `title`, `artist`, `album`, `documentTitle`, `documentAuthor`, `documentSubject` или `description`); `match_value` содержит отображаемое исходное значение. У системных и пользовательских умных папок, папок и shared-объектов поле называется `name`. Для алиаса и тега `match_value` сохраняет исходный регистр и пробелы.
+
+Поиск учитывает длинный текст целиком: например, короткое значение поля `report` может совпасть с запросом `quarterly report finances`. Порог опечаток — `word_similarity >= 0.45`, и триграммы используются только при длине нормализованного запроса от четырёх символов. Запрос нормализуется в NFKC, lowercase и схлопывается по пробелам; алиасы и теги сравниваются с сохранённой нормализованной формой, а имена и метаданные — в исходной форме средствами PostgreSQL. Поэтому визуально эквивалентные Unicode-строки в сырых именах могут вести себя по правилам `lower`/`ILIKE`/`pg_trgm`.
+
+При нескольких совпавших полях сначала учитываются ранг и сходство, затем приоритет поля, после него — `COLLATE "C"` PostgreSQL. Для `ResolveHit` без поискового запроса `match_field` и `match_value` пусты.
 
 ## Ограничения и важные детали
 

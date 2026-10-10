@@ -11,7 +11,7 @@ public class ReauthPasswordVerifier(IAuthPropertiesStorage authPropertiesStorage
 {
     /// <exception cref="InvalidPasswordException">Пароль пуст, не совпал или у аккаунта нет хеша пароля.</exception>
     /// <exception cref="PasswordAttemptsExceededException">Исчерпан лимит попыток в текущем окне.</exception>
-    public async Task VerifyAsync(long userId, string? password)
+    public async Task VerifyAsync(long userId, string? password, CancellationToken cancellationToken = default)
     {
         // Пустой пароль не расходует попытку и не запускает bcrypt: подобрать им ничего нельзя.
         if (string.IsNullOrEmpty(password))
@@ -19,18 +19,18 @@ public class ReauthPasswordVerifier(IAuthPropertiesStorage authPropertiesStorage
             throw new InvalidPasswordException();
         }
 
-        if (!await authPropertiesStorage.TryReserveReauthPasswordAttempt(userId))
+        if (!await authPropertiesStorage.TryReserveReauthPasswordAttempt(userId, cancellationToken))
         {
             throw new PasswordAttemptsExceededException();
         }
 
-        var passwordHash = await passwordsStorage.GetUserPasswordHash(userId);
+        var passwordHash = await passwordsStorage.GetUserPasswordHash(userId, cancellationToken);
 
         if (!PasswordHasher.VerifyPassword(password, passwordHash))
         {
             throw new InvalidPasswordException();
         }
 
-        await authPropertiesStorage.ResetReauthPasswordAttempts(userId);
+        await authPropertiesStorage.ResetReauthPasswordAttempts(userId, cancellationToken);
     }
 }

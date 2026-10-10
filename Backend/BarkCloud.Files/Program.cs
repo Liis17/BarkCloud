@@ -4,6 +4,7 @@ using BarkCloud.Files.Host;
 using BarkCloud.Files.Infrastructure;
 using BarkCloud.Files.Persistence;
 using BarkCloud.Files.Services;
+using BarkCloud.Files.Scheduling;
 using BarkCloud.GrpcServer;
 using BarkCloud.GrpcServer.Tracker;
 using BarkCloud.GrpcServer.XAuth;
@@ -145,6 +146,8 @@ public class Program
         builder.Services.AddDbContext<FilesContext>(options =>
             options.UseNpgsql(builder.Configuration["FilesDb"]));
 
+        builder.Services.AddUploadScheduler(builder.Configuration["FilesDb"]!);
+
         builder.Services.AddMassTransit(x =>
         {
             x.AddEntityFrameworkOutbox<FilesContext>(o =>
@@ -152,6 +155,9 @@ public class Program
                 o.UsePostgres();
                 o.UseBusOutbox();
             });
+
+            x.AddMessageScheduler(UploadProcessingQueue.SchedulerAddress);
+            x.AddQuartzConsumers(o => o.QueueName = UploadProcessingQueue.SchedulerQueueName);
 
             x.AddConsumer<UserDeletedConsumer>();
             x.AddConsumer<ProcessUploadedFileConsumer>();
@@ -169,18 +175,8 @@ public class Program
                     e.ConfigureConsumer<UserDeletedConsumer>(context);
                 });
 
-                cfg.ReceiveEndpoint("process-uploaded-file", e =>
-                {
-                    // Bus outbox covers Complete + publish. Processing itself must not hold an EF
-                    // transaction during S3 download/ffmpeg; the session state makes redelivery idempotent.
-                    e.ConcurrentMessageLimit = 2;
-                    e.UseMessageRetry(r => r.Intervals(
-                        TimeSpan.FromSeconds(10),
-                        TimeSpan.FromMinutes(1),
-                        TimeSpan.FromMinutes(5),
-                        TimeSpan.FromMinutes(15)));
-                    e.ConfigureConsumer<ProcessUploadedFileConsumer>(context);
-                });
+                cfg.ConfigureUploadScheduler(context);
+                cfg.ReceiveEndpoint("process-uploaded-file", e => e.ConfigureUploadProcessing(context));
             });
         });
 

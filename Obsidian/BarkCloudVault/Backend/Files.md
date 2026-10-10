@@ -17,6 +17,9 @@ See also: [[Backend/FilesCloud]] · [[Backend/ResumableUpload]] · [[Backend/Ori
 | `Backend/BarkCloud.Files/Features/UploadFile/UploadFileCommandHandler.cs` | обработка загрузки | оригинал, хеш, метаданные и превью |
 | `Backend/BarkCloud.Files/Domain/UploadFile.cs` | `UploadFile` | запись блоба и профиль хранения |
 | `Backend/BarkCloud.Files/Persistence/FilesContext.cs` | EF-модель | таблицы и ограничения |
+| `Backend/BarkCloud.Files/Services/SearchRanking.cs` | `SearchTerms`, `SearchQueryExtensions`, `SearchCursor` | SQL-правило ранга, набор кандидатов и курсор поиска |
+| `Backend/BarkCloud.Files/Services/UnifiedSearchService.cs` | `UnifiedSearchService` | вход поиска, пагинация секций и построение карточек |
+| `Backend/BarkCloud.Files/Services/UnifiedSearchService.Sources.cs` | источники секций | SQL-выборки файлов, альбомов, плейлистов, папок и shared-объектов |
 | `Backend/BarkCloud.Files/Services/PreviewPersistenceService.cs` | сохранение превью | отдельные блобы и связи превью |
 | `Backend/BarkCloud.Files/Infrastructure/S3Uploader.cs` | `S3Uploader` | чтение, запись и удаление объектов |
 | `Shared/BarkCloud.Proto/files_api.proto` | Files-сервисы | публичные контракты |
@@ -45,11 +48,19 @@ See also: [[Backend/FilesCloud]] · [[Backend/ResumableUpload]] · [[Backend/Ori
 
 `GetUploadUrl` создаёт запись `UploadFile` и возвращает URL собственного HTTP-маршрута Files. Это не presigned URL S3.
 
+### Поиск
+
+`Backend/BarkCloud.Files/Services/SearchRanking.cs` задаёт общее правило PostgreSQL для отбора, ранга и сходства поля: 4 — точное совпадение, 3 — префикс, 2 — подстрока, 1 — `word_similarity(value, query) >= 0.45` для запроса от четырёх символов. Для рангов 2–4 сходство равно 1. Запрос нормализуется через NFKC, обрезку краёв, схлопывание пробелов и invariant lowercase. Алиасы и теги сравниваются по сохранённому `NormalizedValue`; имена и метаданные — в исходном виде средствами PostgreSQL (`lower`, `ILIKE`, `pg_trgm`). Сырые колонки не нормализуются в SQL.
+
+`Backend/BarkCloud.Files/Services/UnifiedSearchService.Sources.cs` собирает отдельного SQL-кандидата для каждого поля, сводит ранг и сходство по максимуму и после ограничения страницы выбирает подпись среди кандидатов с теми же значениями ранга и сходства. `Backend/BarkCloud.Files/Services/UnifiedSearchService.cs` выполняет общий запрос секций и передаёт выбранные подписи в карточки. Приоритет полей: файлы — имя, алиас, тег, аудиозаголовок, исполнитель, альбом, название документа, автор, тема; альбомы и плейлисты — имя, описание. При ничьей побеждает меньшее значение `Order`, затем значение по `COLLATE "C"` (байтовый порядок UTF-8 в PostgreSQL). `match_value` для алиаса и тега сохраняет исходный регистр и пробелы.
+
+Папки, пользовательские умные папки и shared-объекты имеют одно поле `name`. Системные умные папки ранжируются SQL-выражениями `SearchTerms` по массиву системных имён и участвуют в общей сортировке курсора. Формат курсора и ограничение чтения `limit + 1` не меняются; `ResolveHit` без поискового запроса возвращает пустые `match_field` и `match_value`. Подробности клиентского контракта — [[Api/FilesClientGuide#поиск]].
+
 ## Зависимости и взаимодействия
 
 - EF Core и PostgreSQL хранят записи файлов, хеши, метаданные, загрузочные сессии и производные объекты.
 - `S3BucketRegistry` выбирает профиль для каждого объекта; `UploadFile.StorageProfileId` нужен для последующего чтения и удаления.
-- После загрузки `ProcessUploadedFileConsumer` запускает извлечение метаданных и создание производных объектов через MassTransit/RabbitMQ.
+- После загрузки `ProcessUploadedFileConsumer` запускает извлечение метаданных и создание производных объектов через MassTransit/RabbitMQ. `Scheduling/UploadProcessingQueue.cs` задаёт два слота `process-uploaded-file` и scheduled redelivery через persistent Quartz/PostgreSQL; ожидание повторов освобождает слоты. Подробности исходов и расписания — [[Backend/ResumableUpload]].
 - Изображения обрабатываются ImageSharp; видео анализируются и обрабатываются через FFMpegCore/ffmpeg.
 - Конфигурация профилей S3 поступает из Configuration; Web использует Files API и HTTP upload-маршрут.
 
@@ -61,3 +72,27 @@ See also: [[Backend/FilesCloud]] · [[Backend/ResumableUpload]] · [[Backend/Ori
 - Для облачных изображений pipeline создаёт отдельный JPEG-вариант просмотра (`JpegView`) и связывает его как превью с `TargetWidth=0`. Оригинал сохраняется отдельно; обычные превью хранятся как самостоятельные `UploadFile`.
 - `UploadFileInfo` передаёт обычные превью в `previews`; `preview_url` помечено устаревшим. Поля `jpeg_view_file_id`/`jpeg_view_url` описывают отдельный JPEG-вариант. Цвета превью — [[Backend/ImagePlaceholders]].
 - Срок жизни записей и оригиналов, включая корзину и окончательное удаление, описан в [[Backend/OriginalLifetime]].
+
+## Scheduler обработки загрузок
+
+`Backend/BarkCloud.Files/Scheduling/UploadProcessingQueue.cs` регистрирует Quartz 3.15.0
+и MassTransit.Quartz 8.5.2. Очередь `files-upload-scheduler` durable, без auto-delete;
+плагин RabbitMQ и отдельный scheduler-контейнер не нужны. `AddQuartzConsumers` управляет
+запуском после готовности bus и остановкой Quartz. Миграции `FilesContext` выполняются
+в `Program.cs` до запуска hosted services.
+
+Хранилище — существующий `FilesDb`, схема `files_quartz`, префикс `files_quartz.qrtz_`,
+стабильное имя `BarkCloud.Files.UploadScheduler`, instance ID `AUTO`, clustering,
+System.Text.Json serializer. Миграция
+`Persistence/Migrations/20261009000000_AddUploadScheduler.cs` создаёт таблицы по Quartz
+3.15.0 без очистки; `Down` сохраняет таблицы и pending-доставки, повторное применение
+также сохраняет данные.
+
+`ScheduledMessageRecoveryListener` после окончательной ошибки штатного
+`ScheduledMessageJob` сохраняет новый trigger через 30 секунд. Копирует весь
+`MergedJobDataMap`: payload, destination, headers (включая номер redelivery), transport
+properties и идентификаторы. Транспортные повторы не вызывают processor и не увеличивают
+`ProcessingAttempts`. Misfire исполняется сразу после восстановления scheduler.
+Ожидание reconnect RabbitMQ может удерживать job scheduler, но не consumer-слоты.
+
+Эксплуатация и откат — [[Platform/Infrastructure]], проверки — [[Platform/Testing]].

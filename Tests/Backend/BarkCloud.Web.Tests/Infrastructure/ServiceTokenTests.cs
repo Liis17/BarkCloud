@@ -21,8 +21,7 @@ public class ServiceTokenTests
         .Build();
 
     [Theory]
-    [InlineData("test-secret-key-at-least-32-bytes-long!!")]
-    [InlineData("СекретныйКлючДляПодписиТокеновЮникод")]
+    [MemberData(nameof(ValidSecrets))]
     public void Generate_TokenIsValidatedByUtf8Key(string secret)
     {
         var token = ServiceToken.Generate(Config(secret));
@@ -42,15 +41,33 @@ public class ServiceTokenTests
             .Contain(c => c.Type == IdentityClaims.TokenType && c.Value == nameof(TokenType.Service));
     }
 
-    [Fact]
-    public void Generate_EmptySecret_ReturnsEmptyToken()
-        => ServiceToken.Generate(Config(null)).Should().BeEmpty();
-
-    [Fact]
-    public void Generate_UnusableSecret_ThrowsConfigurationError()
+    public static TheoryData<string> ValidSecrets => new()
     {
-        var act = () => ServiceToken.Generate(Config("short"));
+        { "test-secret-key-at-least-32-bytes-long!!" },
+        { "СекретныйКлючДляПодписиТокеновЮникод" },
+        { new string('a', 32) },
+        { new string('ж', 16) }
+    };
 
-        act.Should().Throw<InvalidOperationException>().WithMessage("*JwtSettings:SecretKey*");
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    public void Generate_EmptySecret_ReturnsEmptyToken(string? secret)
+        => ServiceToken.Generate(Config(secret)).Should().BeEmpty();
+
+    [Theory]
+    [MemberData(nameof(UnusableSecrets))]
+    public void Generate_UnusableSecret_ThrowsConfigurationErrorWithoutLeakingSecret(string secret)
+    {
+        var act = () => ServiceToken.Generate(Config(secret));
+
+        var message = act.Should().Throw<InvalidOperationException>().Which.Message;
+        message.Should().Contain("JwtSettings:SecretKey").And.NotContain(secret);
     }
+
+    public static TheoryData<string> UnusableSecrets => new()
+    {
+        { new string('a', 31) },
+        { new string('ж', 15) }
+    };
 }

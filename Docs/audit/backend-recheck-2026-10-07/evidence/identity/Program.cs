@@ -44,14 +44,23 @@ foreach (var size in new[] { 15, 16, 31, 32 })
     }
 }
 
+await using var db = await PostgresIdentityDatabase.CreateAsync();
+await using var sessionContext = db.CreateContext();
 var users = new Mock<UsersServerApi.UsersServerApiClient>();
 var mediator = new Mock<IMediator>();
-var outboxMock = new Mock<INotificationOutbox>();
-var tokensMock = new Mock<IRefreshTokensStorage>();
 var location = new Mock<LocationClient>(new HttpClient(), new MetricsCollector(), NullLogger<LocationClient>.Instance);
 location.Setup(x => x.GetLocation(It.IsAny<string>())).ReturnsAsync((IpLocation?)null);
+var sessionMetrics = new MetricsCollector();
+var sessionJwtSettings = new JwtSettings
+{
+    SecretKey = "audit-session-signing-key-with-at-least-32-bytes",
+    Issuer = "audit", Audience = "audit", ExpiryMinutes = 10
+};
+var sessionRefreshTokens = new RefreshTokensStorage(sessionContext, sessionJwtSettings);
+var tokenHandler = new CreateTokenCommandHandler(sessionRefreshTokens, new JwtService(sessionJwtSettings), sessionMetrics,
+    NullLogger<CreateTokenCommandHandler>.Instance);
 mediator.Setup(x => x.Send(It.IsAny<CreateTokenCommand>(), It.IsAny<CancellationToken>()))
-    .ReturnsAsync(new CreateTokenResponse { AccessToken = new Token { Value = "audit-access" } });
+    .Returns((CreateTokenCommand command, CancellationToken ct) => tokenHandler.Handle(command, ct));
 var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 var rpcResponse = new TaskCompletionSource<RegisterDeviceResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
 DateTime? deadline = null;
@@ -59,9 +68,14 @@ CancellationToken rpcToken = default;
 users.Setup(x => x.RegisterDeviceAsync(It.IsAny<RegisterDeviceRequest>(), It.IsAny<Metadata>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
     .Callback<RegisterDeviceRequest, Metadata, DateTime?, CancellationToken>((_, _, d, ct) => { deadline = d; rpcToken = ct; entered.TrySetResult(); })
     .Returns(new AsyncUnaryCall<RegisterDeviceResponse>(rpcResponse.Task, Task.FromResult(new Metadata()), () => Status.DefaultSuccess, () => new Metadata(), () => { }));
-var issuer = new SessionIssuer(users.Object, mediator.Object, outboxMock.Object, tokensMock.Object,
+var sessionConfiguration = new ConfigurationBuilder()
+    .AddInMemoryCollection(new Dictionary<string, string?> { ["Features:EmailEnabled"] = "false" })
+    .Build();
+var issuer = new SessionIssuer(users.Object, mediator.Object,
+    new NotificationOutbox(sessionContext, sessionConfiguration, sessionMetrics, NullLogger<NotificationOutbox>.Instance),
+    sessionRefreshTokens, sessionContext,
     new RequestContext { DeviceId = "audit-device", AppName = "audit", AppVersion = "1" }, location.Object,
-    new MetricsCollector(), NullLogger<SessionIssuer>.Instance);
+    sessionMetrics, NullLogger<SessionIssuer>.Instance);
 using var cancellation = new CancellationTokenSource();
 var issuance = issuer.IssueAsync(42, cancellation.Token);
 await entered.Task.WaitAsync(TimeSpan.FromSeconds(2));
@@ -73,7 +87,6 @@ rpcResponse.SetResult(new RegisterDeviceResponse());
 await issuance.WaitAsync(TimeSpan.FromSeconds(2));
 Console.WriteLine("F19 RegisterDevice: IssueAsync completed only after manual RPC release");
 
-await using var db = await PostgresIdentityDatabase.CreateAsync();
 await using (var setup = db.CreateContext())
 {
     await new PasswordsStorage(setup).UpdateUserPasswordHash(42, PasswordHasher.HashPassword("audit-old"));
@@ -90,13 +103,23 @@ await using (var context = db.CreateContext())
     var outbox = new NotificationOutbox(context, new ConfigurationBuilder().Build(), metrics, NullLogger<NotificationOutbox>.Instance);
     var handler = new SetPasswordCommandHandler(UserContextFactory.Create(42), new PasswordsStorage(context), new AuthPropertiesStorage(context),
         new RefreshTokensStorage(context, new JwtSettings { ExpiryMinutes = 60 }), new PasswordChangedNotifier(outbox, new RequestContext()),
-        metrics, NullLogger<SetPasswordCommandHandler>.Instance);
-    await handler.Handle(new SetPasswordCommand { OldPassword = "audit-old", NewPassword = "audit-new" }, default);
+        metrics, NullLogger<SetPasswordCommandHandler>.Instance, context);
+    var enqueueFailurePropagated = false;
+    try
+    {
+        await handler.Handle(new SetPasswordCommand { OldPassword = "audit-old", NewPassword = "audit-new" }, default);
+    }
+    catch (DbUpdateException)
+    {
+        enqueueFailurePropagated = true;
+    }
+    await context.SaveChangesAsync();
     await using var reader = db.CreateContext();
-    var newPasswordCommitted = PasswordHasher.VerifyPassword("audit-new", await new PasswordsStorage(reader).GetUserPasswordHash(42));
+    var oldPasswordPreserved = PasswordHasher.VerifyPassword("audit-old", await new PasswordsStorage(reader).GetUserPasswordHash(42));
     var count = await reader.PendingNotifications.CountAsync();
     var failures = metrics.SnapshotAndReset().GetValueOrDefault("notification_outbox_enqueue_failed");
-    Console.WriteLine($"F19 Outbox PostgreSQL: handlerSuccess=true; newPasswordCommitted={newPasswordCommitted}; PendingNotifications={count}; enqueueFailed={failures}");
-    if (!newPasswordCommitted || count != 0 || failures != 1) throw new Exception("Expected outbox loss repro changed");
+    Console.WriteLine($"F19-A Outbox PostgreSQL: enqueueFailurePropagated={enqueueFailurePropagated}; oldPasswordPreserved={oldPasswordPreserved}; PendingNotifications={count}; enqueueFailed={failures}");
+    if (!enqueueFailurePropagated || !oldPasswordPreserved || count != 0 || failures != 1)
+        throw new Exception("Expected atomic rollback on outbox insert failure");
 }
-Console.WriteLine("All diagnostic observations reproduced");
+Console.WriteLine("F19-A atomic rollback verified; F19-B and F23 diagnostics remain independent observations");

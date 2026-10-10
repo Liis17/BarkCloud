@@ -1,6 +1,7 @@
 using BarkCloud.GrpcServer.Metrics;
 using BarkCloud.GrpcServer.Tracker;
 using BarkCloud.GrpcServer.XAuth;
+using BarkCloud.Identity.Persistence.Contexts;
 using BarkCloud.Identity.Persistence.Services;
 using BarkCloud.Identity.Services;
 using BarkCloud.Proto.Identity;
@@ -19,6 +20,7 @@ namespace BarkCloud.Identity.Features.DisableOtpVerification;
 public class DisableOtpVerificationCommandHandler : IRequestHandler<DisableOtpVerificationCommand, DisableOtpVerificationResponse>
 {
     private readonly UserContext _userContext;
+    private readonly IdentityContext _context;
     private readonly IAuthPropertiesStorage _authPropertiesStorage;
     private readonly ReauthPasswordVerifier _reauthPassword;
     private readonly INotificationOutbox _notificationOutbox;
@@ -27,11 +29,12 @@ public class DisableOtpVerificationCommandHandler : IRequestHandler<DisableOtpVe
     private readonly IAuthRateLimiter _rateLimiter;
     private readonly ILogger<DisableOtpVerificationCommandHandler> _logger;
 
-    public DisableOtpVerificationCommandHandler(UserContext userContext, IAuthPropertiesStorage authPropertiesStorage,
+    public DisableOtpVerificationCommandHandler(UserContext userContext, IdentityContext context, IAuthPropertiesStorage authPropertiesStorage,
         ReauthPasswordVerifier reauthPassword, INotificationOutbox notificationOutbox, RequestContext requestContext,
         MetricsCollector metrics, IAuthRateLimiter rateLimiter, ILogger<DisableOtpVerificationCommandHandler> logger)
     {
         _userContext = userContext;
+        _context = context;
         _authPropertiesStorage = authPropertiesStorage;
         _reauthPassword = reauthPassword;
         _notificationOutbox = notificationOutbox;
@@ -49,7 +52,7 @@ public class DisableOtpVerificationCommandHandler : IRequestHandler<DisableOtpVe
             request.OptType
         );
 
-        var otpConfigs = await _authPropertiesStorage.GetUserAuthProperties(_userContext.UserId);
+        var otpConfigs = await _authPropertiesStorage.GetUserAuthProperties(_userContext.UserId, cancellationToken);
 
         if (otpConfigs is null)
         {
@@ -61,6 +64,8 @@ public class DisableOtpVerificationCommandHandler : IRequestHandler<DisableOtpVe
         }
 
         string oldMethod = "Неизвестно";
+        var disableAuthenticator = false;
+        var disableEmail = false;
         if (request.OptType == OtpTypeId.Authenticator)
         {
             if (!otpConfigs.OtpEnabled)
@@ -96,8 +101,7 @@ public class DisableOtpVerificationCommandHandler : IRequestHandler<DisableOtpVe
 
             _logger.LogDebug("Отключение Authenticator 2FA для пользователя {UserId}", _userContext.UserId);
 
-            await _authPropertiesStorage.DisableOtp(_userContext.UserId);
-            _metrics.Increment("otp_disabled_authenticator");
+            disableAuthenticator = true;
         }
 
         if (request.OptType == OtpTypeId.Email)
@@ -105,7 +109,7 @@ public class DisableOtpVerificationCommandHandler : IRequestHandler<DisableOtpVe
             // Повторная аутентификация владельца: сессии недостаточно, чтобы снять email-2FA.
             try
             {
-                await _reauthPassword.VerifyAsync(_userContext.UserId, request.Password);
+                await _reauthPassword.VerifyAsync(_userContext.UserId, request.Password, cancellationToken);
             }
             catch (Exception ex) when (ex is InvalidPasswordException or PasswordAttemptsExceededException)
             {
@@ -121,20 +125,62 @@ public class DisableOtpVerificationCommandHandler : IRequestHandler<DisableOtpVe
             _logger.LogDebug("Отключение Email 2FA для пользователя {UserId}", _userContext.UserId);
 
             oldMethod = "Email";
-            await _authPropertiesStorage.DisableEmailOtp(_userContext.UserId);
-            _metrics.Increment("otp_disabled_email");
+            disableEmail = true;
         }
 
-        // Уведомление об отключении 2FA — через outbox: 2FA уже отключена, сбой Users/почты не должен превращаться в ошибку.
         var payload = NotificationPayload.Device(_requestContext);
         payload["old_method"] = oldMethod;
         payload["new_method"] = "Отключена";
+        var notificationEnqueued = false;
 
-        await _notificationOutbox.EnqueueAsync(
-            _userContext.UserId,
-            NotificationType.TwoFactorMethodChanged,
-            "Изменен метод двухфакторной аутентификации",
-            payload);
+        try
+        {
+            await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+            try
+            {
+                if (disableAuthenticator)
+                {
+                    await _authPropertiesStorage.DisableOtp(_userContext.UserId, cancellationToken);
+                }
+                else if (disableEmail)
+                {
+                    await _authPropertiesStorage.DisableEmailOtp(_userContext.UserId, cancellationToken);
+                }
+
+                notificationEnqueued = await _notificationOutbox.EnqueueAsync(
+                    _userContext.UserId,
+                    NotificationType.TwoFactorMethodChanged,
+                    "Изменен метод двухфакторной аутентификации",
+                    payload,
+                    cancellationToken);
+
+                await transaction.CommitAsync(cancellationToken);
+            }
+            catch
+            {
+                try { await transaction.RollbackAsync(CancellationToken.None); } catch { }
+                throw;
+            }
+        }
+        catch
+        {
+            _context.ChangeTracker.Clear();
+            throw;
+        }
+
+        if (notificationEnqueued)
+        {
+            _metrics.Increment("notification_outbox_enqueued");
+        }
+
+        if (disableAuthenticator)
+        {
+            _metrics.Increment("otp_disabled_authenticator");
+        }
+        else if (disableEmail)
+        {
+            _metrics.Increment("otp_disabled_email");
+        }
 
         _logger.LogInformation(
             "2FA успешно отключена для пользователя {UserId}. Метод: {OldMethod}",

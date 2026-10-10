@@ -48,7 +48,7 @@ BarkCloud — самохостируемое облако файлов и мед
 
 ### Межсервисные события
 
-События между сервисами идут через RabbitMQ (MassTransit). Users и Files публикуют их через EF Core outbox MassTransit, Identity ставит письма в собственный outbox с фоновым воркером доставки; отзыв сессий реплики забирают служебным gRPC-фидом. См. [[Backend/AccountDeletionOutbox]], [[Backend/IdentityNotificationOutbox]], [[Backend/SessionRevocation]].
+События между сервисами идут через RabbitMQ (MassTransit). Users и Files публикуют их через EF Core outbox MassTransit, Identity фиксирует письмо в собственном outbox в той же локальной транзакции, что и бизнес-операцию, затем фоновый воркер доставляет его; отзыв сессий реплики забирают служебным gRPC-фидом. Подтверждение регистрации остаётся межсервисной последовательностью: Users подтверждает аккаунт до локального коммита Identity, а повтор клиентского запроса восстанавливает локальную сессию при доступном коде. См. [[Backend/AccountDeletionOutbox]], [[Backend/IdentityNotificationOutbox]], [[Backend/SessionRevocation]].
 
 ## Соглашения
 

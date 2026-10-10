@@ -8,9 +8,9 @@ namespace BarkCloud.Identity.Persistence.Services;
 
 public class ResetPasswordsStorage(IdentityContext context) : IResetPasswordsStorage
 {
-    public async Task<ResetPassword?> GetResetPassword(Guid resetId)
+    public async Task<ResetPassword?> GetResetPassword(Guid resetId, CancellationToken cancellationToken = default)
     {
-        return await context.ResetPasswords.FirstOrDefaultAsync(x => x.Id == resetId);
+        return await context.ResetPasswords.FirstOrDefaultAsync(x => x.Id == resetId, cancellationToken);
     }
 
     public async Task<ResetPassword> AddResetPassword(ResetPassword resetPassword)
@@ -27,11 +27,11 @@ public class ResetPasswordsStorage(IdentityContext context) : IResetPasswordsSto
     /// уже был использован (в т.ч. параллельным подтверждением) — успех получает только один вызов.
     /// </summary>
     /// <param name="resetId">Идентификатор запроса сброса</param>
-    public async Task<bool> TryApprove(Guid resetId)
+    public async Task<bool> TryApprove(Guid resetId, CancellationToken cancellationToken = default)
     {
         var updated = await context.ResetPasswords
             .Where(x => x.Id == resetId && !x.IsApproved)
-            .ExecuteUpdateAsync(s => s.SetProperty(x => x.IsApproved, true));
+            .ExecuteUpdateAsync(s => s.SetProperty(x => x.IsApproved, true), cancellationToken);
 
         return updated == 1;
     }
@@ -40,13 +40,13 @@ public class ResetPasswordsStorage(IdentityContext context) : IResetPasswordsSto
     /// Атомарно занимает одну попытку ввода кода (до сравнения — параллельный перебор не превысит лимит).
     /// Возвращает false, если запрос уже использован, истёк или попытки исчерпаны.
     /// </summary>
-    public async Task<bool> TryReserveOtpAttempt(Guid resetId, int maxAttempts)
+    public async Task<bool> TryReserveOtpAttempt(Guid resetId, int maxAttempts, CancellationToken cancellationToken = default)
     {
         var now = DateTime.UtcNow;
 
         var reserved = await context.ResetPasswords
             .Where(x => x.Id == resetId && !x.IsApproved && x.ExpiresAt > now && x.OtpAttempts < maxAttempts)
-            .ExecuteUpdateAsync(s => s.SetProperty(x => x.OtpAttempts, x => x.OtpAttempts + 1));
+            .ExecuteUpdateAsync(s => s.SetProperty(x => x.OtpAttempts, x => x.OtpAttempts + 1), cancellationToken);
 
         return reserved == 1;
     }

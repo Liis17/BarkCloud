@@ -11,25 +11,25 @@ public static class JwtSecret
 {
     public const string ConfigKey = "JwtSettings:SecretKey";
 
-    /// <summary>Жёсткий предел HS256 в IdentityModel: ниже 128 бит токены не подписываются и не проверяются.</summary>
-    public const int MinStartupBytes = 16;
-
-    /// <summary>Рекомендация RFC 7518 §3.2 (размер ключа не меньше хеша, 256 бит) — для новых значений в Configuration.</summary>
-    public const int RecommendedMinBytes = 32;
+    /// <summary>
+    /// Минимум HS256: signer IdentityModel отклоняет ключ короче 256 бит (<c>IDX10720</c>),
+    /// что совпадает с RFC 7518 §3.2. Он общий для запуска, подписи, проверки и сохранения в Configuration.
+    /// </summary>
+    public const int MinKeyBytes = 32;
 
     /// <summary>
-    /// Возвращает UTF-8 байты секрета. Пустой секрет или короче <paramref name="minBytes"/> байт —
+    /// Возвращает UTF-8 байты секрета. Пустой секрет или короче <see cref="MinKeyBytes"/> байт —
     /// <see cref="InvalidOperationException"/> с понятным сообщением (без значения секрета).
     /// </summary>
-    public static byte[] GetKeyBytes(string? secret, int minBytes = MinStartupBytes)
+    public static byte[] GetKeyBytes(string? secret)
     {
         if (string.IsNullOrEmpty(secret))
-            throw new InvalidOperationException($"{ConfigKey} не задан. Задайте секрет JWT длиной не менее {minBytes} байт (UTF-8).");
+            throw new InvalidOperationException($"{ConfigKey} не задан. Задайте секрет JWT длиной не менее {MinKeyBytes} байт (UTF-8).");
 
         var bytes = Encoding.UTF8.GetBytes(secret);
-        if (bytes.Length < minBytes)
+        if (bytes.Length < MinKeyBytes)
             throw new InvalidOperationException(
-                $"{ConfigKey} слишком короткий: {bytes.Length} байт (UTF-8), требуется не менее {minBytes}. " +
+                $"{ConfigKey} слишком короткий: {bytes.Length} байт (UTF-8), требуется не менее {MinKeyBytes}. " +
                 "Кириллица и другие не-ASCII символы занимают больше одного байта.");
 
         return bytes;

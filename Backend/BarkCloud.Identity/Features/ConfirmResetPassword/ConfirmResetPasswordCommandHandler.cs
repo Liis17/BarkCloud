@@ -83,7 +83,7 @@ namespace BarkCloud.Identity.Features.ConfirmResetPassword
 
             await _rateLimiter.EnsureSourceAsync(AuthLimits.ConfirmResetPasswordByIp);
 
-            var resetPasswordInfo = await _resetPasswordsStorage.GetResetPassword(request.ResetId);
+            var resetPasswordInfo = await _resetPasswordsStorage.GetResetPassword(request.ResetId, cancellationToken);
 
             if (resetPasswordInfo is null)
             {
@@ -126,7 +126,7 @@ namespace BarkCloud.Identity.Features.ConfirmResetPassword
 
             // Попытка по этому запросу занимается до сравнения кода (параллельный перебор не превысит лимит)
             // и не зависит от адреса источника: исчерпав попытки, код надо запрашивать заново.
-            if (!await _resetPasswordsStorage.TryReserveOtpAttempt(request.ResetId, AuthLimits.ChallengeMaxAttempts))
+            if (!await _resetPasswordsStorage.TryReserveOtpAttempt(request.ResetId, AuthLimits.ChallengeMaxAttempts, cancellationToken))
             {
                 _metrics.Increment("password_reset_confirmation_failed");
                 _metrics.Increment("password_reset_confirmation_failed_attempts_exceeded");
@@ -140,7 +140,7 @@ namespace BarkCloud.Identity.Features.ConfirmResetPassword
 
             if (resetPasswordInfo.OtpType == OtpType.Authenticator)
             {
-                var otpSecret = await _authPropertiesStorage.GetOtpSecretKey(resetPasswordInfo.UserId);
+                var otpSecret = await _authPropertiesStorage.GetOtpSecretKey(resetPasswordInfo.UserId, cancellationToken);
 
                 var totp = new Totp(Base32Encoding.ToBytes(otpSecret));
 
@@ -184,7 +184,7 @@ namespace BarkCloud.Identity.Features.ConfirmResetPassword
 
             // Новый пароль не должен совпадать с текущим. Проверяем ДО захвата reset —
             // иначе пользователь не сможет повторить с тем же кодом и другим паролем.
-            var currentHash = await _passwordsStorage.GetUserPasswordHash(resetPasswordInfo.UserId);
+            var currentHash = await _passwordsStorage.GetUserPasswordHash(resetPasswordInfo.UserId, cancellationToken);
             if (PasswordHasher.VerifyPassword(request.NewPassword, currentHash))
             {
                 _metrics.Increment("password_reset_confirmation_failed");
@@ -198,35 +198,56 @@ namespace BarkCloud.Identity.Features.ConfirmResetPassword
                 : requestContext.DeviceId;
             var refreshTokenString = RefreshTokenGenerator.GenerateRefreshToken();
             CreateTokenResponse accessTokenResponse;
+            var notificationEnqueued = false;
 
-            await using (var transaction = await _context.Database.BeginTransactionAsync(cancellationToken))
+            try
             {
-                // Захват reset и все изменения сессий/пароля фиксируются одним коммитом.
-                if (!await _resetPasswordsStorage.TryApprove(request.ResetId))
+                await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+                try
                 {
-                    _metrics.Increment("password_reset_confirmation_failed");
-                    _metrics.Increment("password_reset_confirmation_failed_already_used");
-                    _logger.LogWarning(
-                        "Reset ID {ResetId} уже был использован для пользователя {UserId}",
-                        request.ResetId,
-                        resetPasswordInfo.UserId
-                    );
-                    throw new ResetIdHasIsApprovedException();
-                }
+                    // Захват reset, изменения сессий/пароля и уведомление фиксируются одним коммитом.
+                    if (!await _resetPasswordsStorage.TryApprove(request.ResetId, cancellationToken))
+                    {
+                        _metrics.Increment("password_reset_confirmation_failed");
+                        _metrics.Increment("password_reset_confirmation_failed_already_used");
+                        _logger.LogWarning(
+                            "Reset ID {ResetId} уже был использован для пользователя {UserId}",
+                            request.ResetId,
+                            resetPasswordInfo.UserId
+                        );
+                        throw new ResetIdHasIsApprovedException();
+                    }
 
-                if (request.RevokeOtherSessions)
+                    if (request.RevokeOtherSessions)
+                    {
+                        _logger.LogDebug("Отзыв прежних сессий пользователя {UserId}", resetPasswordInfo.UserId);
+                        await refreshTokensStorage.RevokeAllSessions(resetPasswordInfo.UserId, deviceId, cancellationToken);
+                    }
+
+                    _logger.LogDebug("Установка нового хеша пароля для пользователя {UserId}", resetPasswordInfo.UserId);
+                    await _passwordsStorage.UpdateUserPasswordHash(resetPasswordInfo.UserId, newPasswordHash, cancellationToken);
+
+                    _logger.LogDebug("Генерация refresh token для пользователя {UserId}", resetPasswordInfo.UserId);
+                    await refreshTokensStorage.CreateNewRefreshToken(refreshTokenString, resetPasswordInfo.UserId, deviceId,
+                        ExpDaysRefreshToken, cancellationToken);
+                    accessTokenResponse = await _mediator.Send(new CreateTokenCommand
+                    {
+                        RefreshToken = refreshTokenString,
+                        DeferSuccessTelemetry = true
+                    }, cancellationToken);
+                    notificationEnqueued = await _passwordChangedNotifier.NotifyAsync(resetPasswordInfo.UserId, cancellationToken);
+                    await transaction.CommitAsync(cancellationToken);
+                }
+                catch
                 {
-                    _logger.LogDebug("Отзыв прежних сессий пользователя {UserId}", resetPasswordInfo.UserId);
-                    await refreshTokensStorage.RevokeAllSessions(resetPasswordInfo.UserId, deviceId, cancellationToken);
+                    try { await transaction.RollbackAsync(CancellationToken.None); } catch { }
+                    throw;
                 }
-
-                _logger.LogDebug("Установка нового хеша пароля для пользователя {UserId}", resetPasswordInfo.UserId);
-                await _passwordsStorage.UpdateUserPasswordHash(resetPasswordInfo.UserId, newPasswordHash);
-
-                _logger.LogDebug("Генерация refresh token для пользователя {UserId}", resetPasswordInfo.UserId);
-                await refreshTokensStorage.CreateNewRefreshToken(refreshTokenString, resetPasswordInfo.UserId, deviceId, ExpDaysRefreshToken);
-                accessTokenResponse = await _mediator.Send(new CreateTokenCommand { RefreshToken = refreshTokenString }, cancellationToken);
-                await transaction.CommitAsync(cancellationToken);
+            }
+            catch
+            {
+                _context.ChangeTracker.Clear();
+                throw;
             }
 
             if (request.RevokeOtherSessions)
@@ -234,18 +255,14 @@ namespace BarkCloud.Identity.Features.ConfirmResetPassword
                 _metrics.Increment("sessions_revoked");
             }
 
-            try
+            if (notificationEnqueued)
             {
-                await _passwordChangedNotifier.NotifyAsync(resetPasswordInfo.UserId);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex,
-                    "Не удалось отправить уведомление о смене пароля пользователю {UserId}", resetPasswordInfo.UserId);
+                _metrics.Increment("notification_outbox_enqueued");
             }
 
             _metrics.Increment("password_resets_confirmed");
             _metrics.Increment("sessions_created");
+            _metrics.Increment("tokens_refreshed");
 
             _logger.LogInformation(
                 "Сброс пароля успешно подтвержден для пользователя {UserId}, устройство: {DeviceName}",
