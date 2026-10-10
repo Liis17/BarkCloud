@@ -27,6 +27,12 @@ public class AuthPropertiesStorageEmailCodeTests : IDisposable
         return await ctx.AuthUserProperties.AsNoTracking().SingleAsync(x => x.UserId == UserId);
     }
 
+    private async Task<bool> Consume(EmailAuthCodePurpose purpose, string? code)
+    {
+        var validated = await _sut.TryValidateAndReserveEmailAuthCode(UserId, purpose, code);
+        return validated is not null && await _sut.TryConsumeValidatedEmailAuthCode(validated);
+    }
+
     private async Task Mutate(Action<AuthUserProperty> change)
     {
         using var ctx = _db.CreateAdditionalContext();
@@ -53,8 +59,8 @@ public class AuthPropertiesStorageEmailCodeTests : IDisposable
     {
         await _sut.TryIssueEmailAuthCode(UserId, EmailAuthCodePurpose.Login, Code);
 
-        (await _sut.TryConsumeEmailAuthCode(UserId, EmailAuthCodePurpose.Login, Code)).Should().BeTrue();
-        (await _sut.TryConsumeEmailAuthCode(UserId, EmailAuthCodePurpose.Login, Code)).Should().BeFalse();
+        (await Consume(EmailAuthCodePurpose.Login, Code)).Should().BeTrue();
+        (await Consume(EmailAuthCodePurpose.Login, Code)).Should().BeFalse();
 
         var props = await Reload();
         props.LastEmailAuthCode.Should().BeNull();
@@ -67,7 +73,7 @@ public class AuthPropertiesStorageEmailCodeTests : IDisposable
         await _sut.TryIssueEmailAuthCode(UserId, EmailAuthCodePurpose.Login, Code);
         await Mutate(p => p.EmailAuthCodeExpiresAt = DateTime.UtcNow.AddMinutes(-1));
 
-        (await _sut.TryConsumeEmailAuthCode(UserId, EmailAuthCodePurpose.Login, Code)).Should().BeFalse();
+        (await Consume(EmailAuthCodePurpose.Login, Code)).Should().BeFalse();
     }
 
     [Fact]
@@ -75,10 +81,10 @@ public class AuthPropertiesStorageEmailCodeTests : IDisposable
     {
         await _sut.TryIssueEmailAuthCode(UserId, EmailAuthCodePurpose.Login, Code);
 
-        (await _sut.TryConsumeEmailAuthCode(UserId, EmailAuthCodePurpose.EnableEmailOtp, Code)).Should().BeFalse();
+        (await Consume(EmailAuthCodePurpose.EnableEmailOtp, Code)).Should().BeFalse();
 
         // Код входа по-прежнему пригоден для входа.
-        (await _sut.TryConsumeEmailAuthCode(UserId, EmailAuthCodePurpose.Login, Code)).Should().BeTrue();
+        (await Consume(EmailAuthCodePurpose.Login, Code)).Should().BeTrue();
     }
 
     [Fact]
@@ -86,8 +92,8 @@ public class AuthPropertiesStorageEmailCodeTests : IDisposable
     {
         await _sut.TryIssueEmailAuthCode(UserId, EmailAuthCodePurpose.Login, Code);
 
-        (await _sut.TryConsumeEmailAuthCode(UserId, EmailAuthCodePurpose.Login, "000000")).Should().BeFalse();
-        (await _sut.TryConsumeEmailAuthCode(UserId, EmailAuthCodePurpose.Login, null)).Should().BeFalse();
+        (await Consume(EmailAuthCodePurpose.Login, "000000")).Should().BeFalse();
+        (await Consume(EmailAuthCodePurpose.Login, null)).Should().BeFalse();
     }
 
     [Fact]
@@ -97,10 +103,10 @@ public class AuthPropertiesStorageEmailCodeTests : IDisposable
 
         for (var i = 0; i < 5; i++)
         {
-            (await _sut.TryConsumeEmailAuthCode(UserId, EmailAuthCodePurpose.Login, "000000")).Should().BeFalse();
+            (await Consume(EmailAuthCodePurpose.Login, "000000")).Should().BeFalse();
         }
 
-        (await _sut.TryConsumeEmailAuthCode(UserId, EmailAuthCodePurpose.Login, Code)).Should().BeFalse();
+        (await Consume(EmailAuthCodePurpose.Login, Code)).Should().BeFalse();
     }
 
     [Fact]
@@ -110,10 +116,49 @@ public class AuthPropertiesStorageEmailCodeTests : IDisposable
 
         for (var i = 0; i < 4; i++)
         {
-            await _sut.TryConsumeEmailAuthCode(UserId, EmailAuthCodePurpose.Login, "000000");
+            await Consume(EmailAuthCodePurpose.Login, "000000");
         }
 
-        (await _sut.TryConsumeEmailAuthCode(UserId, EmailAuthCodePurpose.Login, Code)).Should().BeTrue();
+        (await Consume(EmailAuthCodePurpose.Login, Code)).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Consume_LastReservedAttempt_CanConsumeValidatedCode()
+    {
+        await _sut.TryIssueEmailAuthCode(UserId, EmailAuthCodePurpose.Login, Code);
+
+        for (var i = 0; i < 4; i++)
+        {
+            (await _sut.TryValidateAndReserveEmailAuthCode(UserId, EmailAuthCodePurpose.Login, "000000"))
+                .Should().BeNull();
+        }
+
+        var validated = await _sut.TryValidateAndReserveEmailAuthCode(UserId, EmailAuthCodePurpose.Login, Code);
+
+        validated.Should().NotBeNull();
+        (await Reload()).EmailAuthCodeAttempts.Should().Be(5);
+        (await _sut.TryConsumeValidatedEmailAuthCode(validated!)).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Consume_ReissuedCodeDoesNotConsumePreviouslyValidatedIssuance()
+    {
+        await _sut.TryIssueEmailAuthCode(UserId, EmailAuthCodePurpose.Login, Code);
+        var validated = await _sut.TryValidateAndReserveEmailAuthCode(UserId, EmailAuthCodePurpose.Login, Code);
+        validated.Should().NotBeNull();
+
+        await Mutate(p =>
+        {
+            p.LastEmailAuthCode = "654321";
+            p.EmailAuthCodeIssuedAt = DateTime.UtcNow.AddSeconds(1);
+            p.EmailAuthCodeExpiresAt = DateTime.UtcNow.AddMinutes(6);
+            p.EmailAuthCodeAttempts = 0;
+        });
+
+        (await _sut.TryConsumeValidatedEmailAuthCode(validated!)).Should().BeFalse();
+        var properties = await Reload();
+        properties.LastEmailAuthCode.Should().Be("654321");
+        properties.EmailAuthCodeAttempts.Should().Be(0);
     }
 
     [Fact]
@@ -123,7 +168,7 @@ public class AuthPropertiesStorageEmailCodeTests : IDisposable
         _db.Context.AuthUserProperties.Add(new AuthUserProperty { UserId = UserId, LastEmailAuthCode = Code });
         await _db.Context.SaveChangesAsync();
 
-        (await _sut.TryConsumeEmailAuthCode(UserId, EmailAuthCodePurpose.Login, Code)).Should().BeFalse();
+        (await Consume(EmailAuthCodePurpose.Login, Code)).Should().BeFalse();
     }
 
     [Fact]
@@ -141,7 +186,7 @@ public class AuthPropertiesStorageEmailCodeTests : IDisposable
     public async Task Issue_AfterCooldown_ReplacesCodeAndResetsAttempts()
     {
         await _sut.TryIssueEmailAuthCode(UserId, EmailAuthCodePurpose.Login, Code);
-        await _sut.TryConsumeEmailAuthCode(UserId, EmailAuthCodePurpose.Login, "000000");
+        await Consume(EmailAuthCodePurpose.Login, "000000");
         await Mutate(p => p.EmailAuthCodeIssuedAt = DateTime.UtcNow.AddSeconds(-61));
 
         var issued = await _sut.TryIssueEmailAuthCode(UserId, EmailAuthCodePurpose.Login, "654321");
@@ -150,7 +195,7 @@ public class AuthPropertiesStorageEmailCodeTests : IDisposable
         var props = await Reload();
         props.LastEmailAuthCode.Should().Be("654321");
         props.EmailAuthCodeAttempts.Should().Be(0);
-        (await _sut.TryConsumeEmailAuthCode(UserId, EmailAuthCodePurpose.Login, Code)).Should().BeFalse();
+        (await Consume(EmailAuthCodePurpose.Login, Code)).Should().BeFalse();
     }
 
     [Fact]
@@ -161,8 +206,8 @@ public class AuthPropertiesStorageEmailCodeTests : IDisposable
         var issued = await _sut.TryIssueEmailAuthCode(UserId, EmailAuthCodePurpose.EnableEmailOtp, "654321");
 
         issued.Should().BeTrue();
-        (await _sut.TryConsumeEmailAuthCode(UserId, EmailAuthCodePurpose.Login, Code)).Should().BeFalse();
-        (await _sut.TryConsumeEmailAuthCode(UserId, EmailAuthCodePurpose.EnableEmailOtp, "654321")).Should().BeTrue();
+        (await Consume(EmailAuthCodePurpose.Login, Code)).Should().BeFalse();
+        (await Consume(EmailAuthCodePurpose.EnableEmailOtp, "654321")).Should().BeTrue();
     }
 
     [Fact]
@@ -185,8 +230,9 @@ public class AuthPropertiesStorageEmailCodeTests : IDisposable
         var attempts = Enumerable.Range(0, 8).Select(_ => Task.Run(async () =>
         {
             using var ctx = _db.CreateAdditionalContext();
-            return await new AuthPropertiesStorage(ctx)
-                .TryConsumeEmailAuthCode(UserId, EmailAuthCodePurpose.Login, Code);
+            var storage = new AuthPropertiesStorage(ctx);
+            var validated = await storage.TryValidateAndReserveEmailAuthCode(UserId, EmailAuthCodePurpose.Login, Code);
+            return validated is not null && await storage.TryConsumeValidatedEmailAuthCode(validated);
         }));
 
         var results = await Task.WhenAll(attempts);

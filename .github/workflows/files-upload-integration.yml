@@ -1,0 +1,39 @@
+name: "Files — durable upload redelivery"
+on:
+  workflow_call:
+    inputs:
+      production-intervals:
+        type: boolean
+        required: false
+        default: false
+  workflow_dispatch:
+    inputs:
+      production-intervals:
+        description: 'Run the complete production retry chain (about 21m10s)'
+        type: boolean
+        default: false
+permissions:
+  contents: read
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      BARKCLOUD_F18_PRODUCTION: ${{ inputs.production-intervals && '1' || '0' }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+      - name: "PostgreSQL/RabbitMQ scenarios with persisted volumes"
+        run: bash Tests/Backend/BarkCloud.Files.IntegrationTests/run-f18.sh
+      - name: "Container diagnostics"
+        if: always()
+        run: |
+          docker compose -p barkcloud-f18 -f Tests/Backend/BarkCloud.Files.IntegrationTests/docker-compose.yml logs --no-color || true
+          docker compose -p barkcloud-f18 -f Tests/Backend/BarkCloud.Files.IntegrationTests/docker-compose.yml ps --all || true
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: files-upload-integration
+          path: Tests/Backend/BarkCloud.Files.IntegrationTests/TestResults/**

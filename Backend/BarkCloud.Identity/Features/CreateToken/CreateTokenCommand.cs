@@ -7,4 +7,6 @@ namespace BarkCloud.Identity.Features.CreateToken;
 public class CreateTokenCommand : IRequest<CreateTokenResponse>
 {
     public string RefreshToken { get; set; }
+
+    public bool DeferSuccessTelemetry { get; set; }
 }
