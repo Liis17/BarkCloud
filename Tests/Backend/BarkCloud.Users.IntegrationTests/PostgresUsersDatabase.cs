@@ -13,18 +13,23 @@ public sealed class PostgresUsersDatabase : IAsyncDisposable
 {
     private readonly string _adminConnectionString;
     private readonly string _databaseName;
+    private readonly string _connectionString;
     private readonly NpgsqlDataSource _dataSource;
 
     private PostgresUsersDatabase(string adminConnectionString, string databaseName)
     {
         _adminConnectionString = adminConnectionString;
         _databaseName = databaseName;
-        _dataSource = NpgsqlDataSource.Create(new NpgsqlConnectionStringBuilder(adminConnectionString)
+        var builder = new NpgsqlConnectionStringBuilder(adminConnectionString)
         {
             Database = databaseName,
             Pooling = true,
             MaxPoolSize = 10,
-        }.ConnectionString);
+        };
+        _dataSource = NpgsqlDataSource.Create(builder.ConnectionString);
+        // NpgsqlDataSource.ConnectionString отдаёт строку без пароля, поэтому сохраняем исходную.
+        builder.Pooling = false;
+        _connectionString = builder.ConnectionString;
     }
 
     public static async Task<PostgresUsersDatabase> CreateAsync(string? targetMigration = null)
@@ -67,10 +72,7 @@ public sealed class PostgresUsersDatabase : IAsyncDisposable
     public UsersContext CreateContext(params IInterceptor[] interceptors) => new(
         new DbContextOptionsBuilder<UsersContext>().UseNpgsql(_dataSource).AddInterceptors(interceptors).Options);
 
-    public string ConnectionString => new NpgsqlConnectionStringBuilder(_dataSource.ConnectionString)
-    {
-        Pooling = false
-    }.ConnectionString;
+    public string ConnectionString => _connectionString;
 
     public async ValueTask DisposeAsync()
     {
