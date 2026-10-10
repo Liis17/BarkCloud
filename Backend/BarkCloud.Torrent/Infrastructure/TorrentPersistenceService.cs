@@ -6,8 +6,9 @@ using Microsoft.EntityFrameworkCore;
 namespace BarkCloud.Torrent.Infrastructure;
 
 /// <summary>
-/// Раз в 5 c переносит живую статистику движка в БД (трафик — накопительно, поверх сессионных
-/// счётчиков, чтобы «скачано/отдано» и ratio переживали рестарт), а также обновляет счётчики пиров.
+/// Раз в 5 с переносит живую статистику движка в БД (трафик — накопительно поверх сессионных счётчиков,
+/// чтобы «скачано/отдано» и ratio переживали рестарт), а также обновляет счётчики пиров.
+/// Baseline сессионных счётчиков сдвигается до снятого снимка только после успешного SaveChanges.
 /// </summary>
 public class TorrentPersistenceService : BackgroundService
 {
@@ -80,7 +81,7 @@ public class TorrentPersistenceService : BackgroundService
         }
     }
 
-    private async Task FlushAsync(CancellationToken ct)
+    public async Task FlushAsync(CancellationToken ct)
     {
         var managedList = _engine.All.ToList();
         if (managedList.Count == 0)
@@ -88,6 +89,9 @@ public class TorrentPersistenceService : BackgroundService
 
         using var scope = _scopeFactory.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<TorrentContext>();
+        var checkpoints = new List<(TorrentEngineService.ManagedTorrent Managed,
+            TorrentEngineService.ManagedTorrent.TrafficCheckpoint Checkpoint,
+            long BaseDownloaded, long BaseUploaded)>();
 
         foreach (var managed in managedList)
         {
@@ -102,12 +106,10 @@ public class TorrentPersistenceService : BackgroundService
             managed.Leechers = m.Peers.Leechs;
 
             // Накопительный трафик: приращение сессионного счётчика движка.
-            var sessionDown = m.Monitor.DataBytesReceived;
-            var sessionUp = m.Monitor.DataBytesSent;
-            entity.Downloaded += Math.Max(0, sessionDown - managed.LastSessionDownloaded);
-            entity.Uploaded += Math.Max(0, sessionUp - managed.LastSessionUploaded);
-            managed.LastSessionDownloaded = sessionDown;
-            managed.LastSessionUploaded = sessionUp;
+            var (baseDown, baseUp) = managed.BaselineFor(entity.Downloaded, entity.Uploaded);
+            var (sessionDown, sessionUp) = ReadTraffic(managed);
+            entity.Downloaded += Math.Max(0, sessionDown - baseDown);
+            entity.Uploaded += Math.Max(0, sessionUp - baseUp);
 
             entity.Progress = m.Progress / 100.0;
             entity.Status = (int)TorrentMapper.MapStatus(m.State, m.Complete, entity.Paused);
@@ -120,9 +122,33 @@ public class TorrentPersistenceService : BackgroundService
 
             if (m.Complete && entity.CompletedAt == null)
                 entity.CompletedAt = DateTime.UtcNow;
+
+            checkpoints.Add((managed,
+                new TorrentEngineService.ManagedTorrent.TrafficCheckpoint(
+                    entity.Downloaded, entity.Uploaded, sessionDown, sessionUp),
+                baseDown, baseUp));
+        }
+
+        // Не меняем состояние движка, пока все счётчики batch не прочитаны: поздняя ошибка чтения
+        // не должна затереть checkpoint предыдущего неподтверждённого flush.
+        foreach (var (managed, checkpoint, baseDown, baseUp) in checkpoints)
+        {
+            managed.LastSessionDownloaded = baseDown;
+            managed.LastSessionUploaded = baseUp;
+            managed.PendingFlush = checkpoint.SessionDownloaded == baseDown && checkpoint.SessionUploaded == baseUp
+                ? null
+                : checkpoint;
         }
 
         await context.SaveChangesAsync(ct);
+
+        // Снимок фиксируется как baseline только после подтверждённого сохранения.
+        foreach (var (managed, checkpoint, _, _) in checkpoints)
+        {
+            managed.LastSessionDownloaded = checkpoint.SessionDownloaded;
+            managed.LastSessionUploaded = checkpoint.SessionUploaded;
+            managed.PendingFlush = null;
+        }
     }
 
     private async Task<bool?> ReadPausedAsync(Guid id, CancellationToken ct)
@@ -134,4 +160,7 @@ public class TorrentPersistenceService : BackgroundService
             .Select(t => (bool?)t.Paused)
             .FirstOrDefaultAsync(ct);
     }
+
+    protected virtual (long Received, long Sent) ReadTraffic(TorrentEngineService.ManagedTorrent managed)
+        => (managed.Manager.Monitor.DataBytesReceived, managed.Manager.Monitor.DataBytesSent);
 }
