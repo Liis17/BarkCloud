@@ -37,4 +37,6 @@ dotnet test Docs/audit/backend-recheck-2026-10-07/evidence/files/Recheck.csproj 
 
 ## Обновление F20, 2026-10-10
 
-F20 исправлен. До исправления новая регрессия завершалась `Expected: "name"; Actual: ""`; после исправления `Search_FolderMatchField_UsesSqlMatchSemantics` проходит и возвращает `match_field=name`, `match_value=report`, при SQL `word_similarity=1`. Матрица `UnifiedSearchMatchPostgresTests`: **9 passed, 0 failed, 0 skipped**. Полный Files-набор с `BARKCLOUD_TEST_POSTGRES`: **631 passed, 0 failed, 0 skipped**; portable `Recheck.csproj --filter FullyQualifiedName~F20`: **1 passed, 0 failed, 0 skipped**. PostgreSQL-тесты действительно выполнялись на одноразовом PostgreSQL 18.6.
+F20 исправлен. До исправления новая регрессия завершалась `Expected: "name"; Actual: ""`; после исправления `Search_FolderMatchField_UsesSqlMatchSemantics` проходит и возвращает `match_field=name`, `match_value=report`, при SQL `word_similarity=1`. Матрица `UnifiedSearchMatchPostgresTests`: **11 passed, 0 failed, 0 skipped**. Полный Files-набор с `BARKCLOUD_TEST_POSTGRES`: **633 passed, 0 failed, 0 skipped**; portable `Recheck.csproj --filter FullyQualifiedName~F20`: **1 passed, 0 failed, 0 skipped**. PostgreSQL-тесты действительно выполнялись на одноразовом PostgreSQL 18.6.
+
+Проверка SQL через `ToQueryString()` показывает, что подпись выбирается коррелированными подзапросами после внутреннего `LIMIT`; каталог целиком не материализуется. Замеры `EXPLAIN (ANALYZE, BUFFERS)` для bulk-каталога не выполнялись, поэтому временные показатели не приводятся.

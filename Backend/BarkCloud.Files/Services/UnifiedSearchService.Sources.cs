@@ -302,7 +302,7 @@ public partial class UnifiedSearchService
         if (query.Wants(SearchHitKind.Folder) && !query.NothingToFind)
         {
             var rows = _context.CloudDirectories.AsNoTracking().Where(x => x.OwnerId == ownerId)
-                .RankedBy(query.Terms, d => d, true, d => d.Name)
+                .RankedBy(query.Terms, d => d, d => d.Name)
                 .Select(r => new SearchRow<CloudDirectory>
                 {
                     Item = r.Item,
@@ -326,7 +326,7 @@ public partial class UnifiedSearchService
             if (!query.NothingToFind)
             {
                 var rows = _context.DynamicFolders.AsNoTracking().Where(x => x.OwnerId == ownerId)
-                    .RankedBy(query.Terms, f => f, true, f => f.Name)
+                    .RankedBy(query.Terms, f => f, f => f.Name)
                     .Select(r => new SearchRow<DynamicFolder>
                     {
                         Item = r.Item,
@@ -350,7 +350,7 @@ public partial class UnifiedSearchService
             {
                 var names = folders.Select(folder => folder.Name).ToArray();
                 var ranked = await _context.Database.SqlQuery<string>($"SELECT unnest({names}) AS \"Value\"")
-                    .RankedBy(query.Terms, name => name, true, name => name)
+                    .RankedBy(query.Terms, name => name, name => name)
                     .ToListAsync(cancellationToken);
                 var foldersByName = folders.ToDictionary(folder => folder.Name, StringComparer.Ordinal);
                 foreach (var rank in ranked)
@@ -391,7 +391,7 @@ public partial class UnifiedSearchService
                         join file in _context.UploadedFiles.AsNoTracking().WhereReady() on grant.FileId equals file.Id
                         where grant.RecipientId == recipientId
                         select new SharedFileRow { Grant = grant, File = file })
-                .RankedBy(terms, r => r, true, r => r.File.Filename)
+                .RankedBy(terms, r => r, r => r.File.Filename)
                 .Select(r => new SearchRow<SharedFileRow>
                 {
                     Item = r.Item,
@@ -416,7 +416,7 @@ public partial class UnifiedSearchService
                         join dir in _context.CloudDirectories.AsNoTracking() on grant.DirectoryId equals dir.Id
                         where grant.RecipientId == recipientId
                         select new SharedFolderRow { Grant = grant, Directory = dir })
-                .RankedBy(terms, r => r, true, r => r.Directory.Name)
+                .RankedBy(terms, r => r, r => r.Directory.Name)
                 .Select(r => new SearchRow<SharedFolderRow>
                 {
                     Item = r.Item,
@@ -441,7 +441,7 @@ public partial class UnifiedSearchService
                         join playlist in _context.MusicPlaylists.AsNoTracking() on grant.PlaylistId equals playlist.Id
                         where grant.RecipientId == recipientId
                         select new SharedPlaylistRow { Grant = grant, Playlist = playlist })
-                .RankedBy(terms, r => r, true, r => r.Playlist.Name)
+                .RankedBy(terms, r => r, r => r.Playlist.Name)
                 .Select(r => new SearchRow<SharedPlaylistRow>
                 {
                     Item = r.Item,
