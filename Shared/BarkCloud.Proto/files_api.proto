@@ -1244,7 +1244,9 @@ message SearchHit {
   string preview_url = 7;
   MediaKind media_kind = 8;
   bool favorite = 9;
+  // Поле, совпавшее с поисковым запросом; при ResolveHit без запроса пустое.
   string match_field = 10;
+  // Отображаемое значение совпавшего поля.
   string match_value = 11;
   google.protobuf.Timestamp created_at = 12;
   int64 size = 13;
