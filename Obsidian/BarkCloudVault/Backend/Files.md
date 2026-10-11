@@ -88,11 +88,60 @@ System.Text.Json serializer. Миграция
 3.15.0 без очистки; `Down` сохраняет таблицы и pending-доставки, повторное применение
 также сохраняет данные.
 
-`ScheduledMessageRecoveryListener` после окончательной ошибки штатного
-`ScheduledMessageJob` сохраняет новый trigger через 30 секунд. Копирует весь
-`MergedJobDataMap`: payload, destination, headers (включая номер redelivery), transport
-properties и идентификаторы. Транспортные повторы не вызывают processor и не увеличивают
-`ProcessingAttempts`. Misfire исполняется сразу после восстановления scheduler.
-Ожидание reconnect RabbitMQ может удерживать job scheduler, но не consumer-слоты.
+`ScheduledMessageRecoveryListener.JobWasExecuted` обрабатывает окончательную ошибку
+штатного `ScheduledMessageJob`: сохраняет trigger через 30 секунд и копирует весь
+`MergedJobDataMap`, включая payload, destination, headers, transport properties и
+идентификаторы. Misfire исполняется сразу после восстановления scheduler. Этот транспортный
+повтор не вызывает processor и не увеличивает `ProcessingAttempts`.
+
+В пути `process-uploaded-file` MassTransit `RedeliveryRetryFilter.Send` сначала
+ожидает `MessageRedeliveryContext.ScheduleRedelivery`, затем вызывает `NotifyConsumed`.
+Quartz `ScheduleMessageRedeliveryContext.ScheduleRedelivery` возвращает `ScheduleSend`.
+Фильтр вызывает `NotifyConsumed` только после `await ScheduleRedelivery`; завершение и
+ACK исходной delivery поэтому ожидают завершения отправки команды расписания, а обработка
+занимает один consumer slot до этого. Publisher confirms MassTransit RabbitMQ
+настроены ([[Platform/Infrastructure]]); подтверждение команды брокером не означает, что
+Quartz consumer уже сохранил job в PostgreSQL. Источники MassTransit 8.5.2:
+[`RedeliveryRetryFilter.cs`](https://github.com/MassTransit/MassTransit/blob/v8.5.2/src/MassTransit/Middleware/RedeliveryRetryFilter.cs)
+и
+[`ScheduleMessageRedeliveryContext.cs`](https://github.com/MassTransit/MassTransit/blob/v8.5.2/src/MassTransit/Contexts/Context/ScheduleMessageRedeliveryContext.cs).
+После завершения отправки исходная обработка может освободить consumer slot; затем
+scheduler consumer сохраняет trigger в `files_quartz`. Ожидание интервалов 10 секунд,
+1, 5 или 15 минут происходит в Quartz и не удерживает slot.
+
+Позже `ScheduledMessageJob.Execute` отправляет сообщение в destination. Если RabbitMQ
+недоступен, send может ожидать reconnect, пока Quartz job остаётся выполняющимся; этот путь
+не занимает consumer slot `process-uploaded-file`. Тестовый комментарий описывает ожидание
+reconnect и прерывание send через `IScheduler.Interrupt`
+(`Tests/Backend/BarkCloud.Files.IntegrationTests/UploadRedeliveryTests.cs:133–134`).
+Это отдельный путь от отправки scheduler command.
+
+Для `process-uploaded-file` настроен scheduled redelivery без локального in-memory retry.
+`ConcurrentMessageLimit = 2` действует на каждый экземпляр Files, а не на весь кластер.
 
 Эксплуатация и откат — [[Platform/Infrastructure]], проверки — [[Platform/Testing]].
+
+### Границы восстановления scheduler
+
+MassTransit.Quartz 8.5.2 задаёт endpoint retry `5 × 250 мс` для команд scheduler в
+`ScheduleMessageConsumerDefinition`. `ScheduleMessageConsumer.Consume` записывает trigger
+через `IScheduler.ScheduleJob`; `EnsureJobExists` создаёт durable
+`ScheduledMessageJob` с `RequestRecovery().StoreDurably()`. В
+`ScheduledMessageJob.Execute` ограничен immediate refire. Это отдельные механизмы, и ни
+один сам по себе не гарантирует crash-safe доставку.
+
+Если запись Quartz job в PostgreSQL постоянно завершается ошибкой, scheduler command может
+попасть в `files-upload-scheduler_error`, останавливая автоматическое продвижение этой
+доставки. Publisher confirmation для `ScheduleMessage` подтверждает приём команды
+брокером, но не запись Quartz job в PostgreSQL. `5 × 250 мс` — сумма задержек retry без
+учёта длительности операций PostgreSQL, а не порог outage. Проверка отказа требует сверить
+error queue, Quartz triggers, upload queue и состояние сессии после восстановления
+PostgreSQL.
+
+Если PostgreSQL недоступен при сохранении recovery trigger в
+`ScheduledMessageRecoveryListener.JobWasExecuted`, фактическое поведение Quartz store и
+восстановления не установлено: unit-тест listener использует mock `IScheduler`. Источники:
+[`ScheduleMessageConsumerDefinition.cs`](https://github.com/MassTransit/MassTransit/blob/v8.5.2/src/Scheduling/MassTransit.QuartzIntegration/Configuration/Configuration/ScheduleMessageConsumerDefinition.cs),
+[`ScheduleMessageConsumer.cs`](https://github.com/MassTransit/MassTransit/blob/v8.5.2/src/Scheduling/MassTransit.QuartzIntegration/QuartzIntegration/ScheduleMessageConsumer.cs)
+и
+[`ScheduledMessageJob.cs`](https://github.com/MassTransit/MassTransit/blob/v8.5.2/src/Scheduling/MassTransit.QuartzIntegration/QuartzIntegration/ScheduledMessageJob.cs).

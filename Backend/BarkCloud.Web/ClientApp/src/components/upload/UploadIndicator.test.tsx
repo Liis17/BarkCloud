@@ -6,13 +6,15 @@ import { UploadManagerProvider, useUploadActions, type AttachOptions } from '../
 import { ApiError, apiPost, checkDuplicateHash, pickFiles } from '../../lib/api';
 import { hashFile } from '../../lib/fileHasher';
 import {
+  cancelUploadSession,
   completeUploadSession,
   createUploadSession,
   getUploadSession,
+  resumeUploadSession,
   uploadMissingParts,
   waitForUploadReady,
 } from '../../lib/uploadSessions';
-import { loadUploadTasks } from '../../lib/uploadQueueStore';
+import { deleteUploadTask, loadUploadTasks, saveUploadTask } from '../../lib/uploadQueueStore';
 
 vi.mock('../../lib/api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../lib/api')>()),
@@ -43,6 +45,8 @@ const pickFilesMock = vi.mocked(pickFiles);
 const hashFileMock = vi.mocked(hashFile);
 const createSessionMock = vi.mocked(createUploadSession);
 const getSessionMock = vi.mocked(getUploadSession);
+const resumeSessionMock = vi.mocked(resumeUploadSession);
+const cancelSessionMock = vi.mocked(cancelUploadSession);
 const completeSessionMock = vi.mocked(completeUploadSession);
 const uploadPartsMock = vi.mocked(uploadMissingParts);
 const waitForReadyMock = vi.mocked(waitForUploadReady);
@@ -91,6 +95,8 @@ beforeEach(() => {
   checkDuplicateMock.mockResolvedValue({ exists: false, locations: [] });
   createSessionMock.mockImplementation(async (input) => session(input.fileName, 'uploading'));
   getSessionMock.mockImplementation(async (id) => session(id.replace('session-', ''), 'processing'));
+  resumeSessionMock.mockImplementation(async (id) => session(id.replace('session-', ''), 'uploading'));
+  cancelSessionMock.mockImplementation(async (id) => ({ ...session(id.replace('session-', ''), 'uploading'), status: 'cancelled' }));
   completeSessionMock.mockImplementation(async (id) => session(id.replace('session-', ''), 'ready'));
   waitForReadyMock.mockImplementation(async (id) => session(id.replace('session-', ''), 'ready'));
   uploadPartsMock.mockImplementation(async (_file, _session, onProgress) => { onProgress?.(1); });
@@ -102,6 +108,206 @@ beforeEach(() => {
 afterEach(() => vi.clearAllMocks());
 
 describe('UploadIndicator', () => {
+  it.each([false, true])('pauses active transfers and new batches, then resumes existing sessions (StrictMode: %s)', async (strict) => {
+    uploadPartsMock.mockImplementationOnce(async (_file, _session, onProgress, signal) => {
+      onProgress?.(0.42);
+      return new Promise((_, reject) => {
+        signal?.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')), { once: true });
+      });
+    });
+    renderBatches([
+      [new File(['file'], 'first.txt')],
+      [new File(['file'], 'second.txt')],
+    ], strict);
+    fireEvent.click(screen.getByText('Добавить партию 1'));
+    fireEvent.click(await screen.findByTitle(/Загрузка/));
+    await waitFor(() => expect(uploadPartsMock).toHaveBeenCalledTimes(1));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Приостановить все загрузки' }));
+    await screen.findByText('На паузе');
+    fireEvent.click(screen.getByText('Добавить партию 2'));
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 10)); });
+
+    expect(screen.getAllByText('На паузе')).toHaveLength(2);
+    expect(hashFileMock).toHaveBeenCalledTimes(1);
+    expect(cancelSessionMock).not.toHaveBeenCalled();
+    expect(screen.queryByText('Отменено')).toBeNull();
+    expect(document.querySelector('.upload-popup-bar .bar-fill')?.getAttribute('style')).toContain('width: 21%');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Продолжить все загрузки' }));
+    await waitFor(() => expect(screen.getAllByText('Загружен')).toHaveLength(2));
+    expect(resumeSessionMock).toHaveBeenCalledWith('session-first.txt');
+    expect(createSessionMock).toHaveBeenCalledTimes(2);
+    expect(hashFileMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('clears active and waiting uploads without restoring records after a late hash result', async () => {
+    let finishHash!: (hash: string) => void;
+    hashFileMock.mockImplementation(() => new Promise((resolve) => { finishHash = resolve; }));
+    renderBatches([duplicateFiles(5)]);
+    fireEvent.click(screen.getByText('Добавить партию 1'));
+    fireEvent.click(await screen.findByTitle(/Загрузка/));
+    await waitFor(() => expect(hashFileMock).toHaveBeenCalledTimes(4));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Очистить всю очередь' }));
+    const saves = vi.mocked(saveUploadTask).mock.calls.length;
+    await act(async () => finishHash('a'.repeat(64)));
+
+    expect(screen.queryByTitle(/Загрузка/)).toBeNull();
+    expect(deleteUploadTask).toHaveBeenCalledTimes(5);
+    expect(saveUploadTask).toHaveBeenCalledTimes(saves);
+    expect(checkDuplicateMock).not.toHaveBeenCalled();
+    expect(createSessionMock).not.toHaveBeenCalled();
+    expect(hashFileMock).toHaveBeenCalledTimes(4);
+  });
+
+  it('clears completed rows while keeping active transfers', async () => {
+    uploadPartsMock.mockImplementation(async (file) => {
+      if (file.name === 'active.txt') return new Promise(() => undefined);
+    });
+    renderUploads([new File(['file'], 'done.txt'), new File(['file'], 'active.txt')]);
+    fireEvent.click(await screen.findByTitle(/Загрузка/));
+    await screen.findByText('Загружен');
+
+    const clearButton = screen.getByRole('button', { name: 'Очистить завершённые' });
+    expect(clearButton.textContent).toBe('');
+    expect(clearButton.getAttribute('title')).toBe('Очистить завершённые');
+    fireEvent.click(clearButton);
+
+    expect(screen.queryByText('done.txt')).toBeNull();
+    expect(screen.getByText('active.txt')).toBeTruthy();
+    expect(cancelSessionMock).not.toHaveBeenCalled();
+  });
+
+  it('pauses hashing and queued files without exceeding concurrency after an immediate resume', async () => {
+    hashFileMock.mockImplementation((_file, _onProgress, signal) => new Promise((_, reject) => {
+      signal?.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')), { once: true });
+    }));
+    renderBatches([duplicateFiles(6)]);
+    fireEvent.click(screen.getByText('Добавить партию 1'));
+    fireEvent.click(await screen.findByTitle(/Загрузка/));
+    await waitFor(() => expect(hashFileMock).toHaveBeenCalledTimes(4));
+    fireEvent.click(screen.getByRole('button', { name: 'Приостановить все загрузки' }));
+    expect(screen.getAllByText('На паузе')).toHaveLength(6);
+    hashFileMock.mockResolvedValue('a'.repeat(64));
+    fireEvent.click(screen.getByRole('button', { name: 'Продолжить все загрузки' }));
+
+    await waitFor(() => expect(screen.getAllByText('Загружен')).toHaveLength(6));
+    expect(createSessionMock).toHaveBeenCalledTimes(6);
+    expect(uploadPartsMock).toHaveBeenCalledTimes(6);
+  });
+
+  it('closes duplicate questions on pause and asks again after resuming', async () => {
+    checkDuplicateMock.mockResolvedValue({ exists: true, locations: [] });
+    renderBatches([duplicateFiles(2)]);
+    fireEvent.click(screen.getByText('Добавить партию 1'));
+    fireEvent.click(await screen.findByTitle(/Загрузка/));
+    await screen.findByRole('dialog');
+    fireEvent.click(screen.getByRole('button', { name: 'Приостановить все загрузки' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(screen.getAllByText('На паузе')).toHaveLength(2);
+    expect(createSessionMock).not.toHaveBeenCalled();
+    expect(document.querySelector('.upload-popup-bar .bar-fill')?.getAttribute('style')).toContain('width: 0%');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Продолжить все загрузки' }));
+    await screen.findByRole('dialog');
+    fireEvent.click(screen.getByText('Загрузить все'));
+    await waitFor(() => expect(screen.getAllByText('Загружен')).toHaveLength(2));
+  });
+
+  it('cancels a session whose create response arrives after clearing the queue', async () => {
+    let finishCreate!: (result: ReturnType<typeof session>) => void;
+    createSessionMock.mockImplementationOnce(() => new Promise((resolve) => { finishCreate = resolve; }));
+    renderUploads([new File(['file'], 'late.txt')]);
+    fireEvent.click(await screen.findByTitle(/Загрузка/));
+    await waitFor(() => expect(createSessionMock).toHaveBeenCalledTimes(1));
+    fireEvent.click(screen.getByRole('button', { name: 'Очистить всю очередь' }));
+    const saves = vi.mocked(saveUploadTask).mock.calls.length;
+    await act(async () => finishCreate(session('late.txt', 'uploading')));
+
+    expect(cancelSessionMock).toHaveBeenCalledWith('session-late.txt');
+    expect(saveUploadTask).toHaveBeenCalledTimes(saves);
+    expect(uploadPartsMock).not.toHaveBeenCalled();
+    expect(apiPostMock).not.toHaveBeenCalled();
+  });
+
+  it('removes restored processing tasks without attaching a late ready result', async () => {
+    let finishReady!: (result: ReturnType<typeof session>) => void;
+    loadTasksMock.mockResolvedValueOnce([persistedTask()]);
+    waitForReadyMock.mockImplementationOnce(() => new Promise((resolve) => { finishReady = resolve; }));
+    renderUploads([]);
+    fireEvent.click(await screen.findByTitle(/Загрузка/));
+    await waitFor(() => expect(waitForReadyMock).toHaveBeenCalledTimes(1));
+    expect((screen.getByRole('button', { name: 'Приостановить все загрузки' }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Очистить всю очередь' }));
+    await act(async () => finishReady(session('restored.txt', 'ready')));
+
+    expect(apiPostMock).not.toHaveBeenCalled();
+    expect(cancelSessionMock).not.toHaveBeenCalled();
+    expect(deleteUploadTask).toHaveBeenCalledWith('task-1');
+    expect(screen.queryByTitle(/Загрузка/)).toBeNull();
+  });
+
+  it('does not restore stored tasks when clearing before IndexedDB finishes loading', async () => {
+    let finishLoad!: (tasks: Awaited<ReturnType<typeof loadUploadTasks>>) => void;
+    loadTasksMock.mockImplementationOnce(() => new Promise((resolve) => { finishLoad = resolve; }));
+    renderBatches([duplicateFiles(1)]);
+    fireEvent.click(screen.getByText('Добавить партию 1'));
+    fireEvent.click(await screen.findByTitle(/Загрузка/));
+    fireEvent.click(screen.getByRole('button', { name: 'Очистить всю очередь' }));
+    await act(async () => finishLoad([persistedTask()]));
+
+    expect(deleteUploadTask).toHaveBeenCalledWith('task-1');
+    expect(screen.queryByTitle(/Загрузка/)).toBeNull();
+    expect(getSessionMock).not.toHaveBeenCalled();
+  });
+
+  it('requires file reselection for a paused upload after reloading', async () => {
+    loadTasksMock.mockResolvedValueOnce([persistedTask({ status: 'paused' })]);
+    renderUploads([]);
+    fireEvent.click(await screen.findByTitle('Загрузки'));
+
+    await screen.findByText('Нужен файл');
+    expect(screen.getByTitle('Выбрать файл')).toBeTruthy();
+    expect(resumeSessionMock).not.toHaveBeenCalled();
+  });
+
+  it.each([false, true])('cancels the session when clearing transfers (paused: %s)', async (paused) => {
+    uploadPartsMock.mockImplementationOnce(async (_file, _session, _onProgress, signal) => new Promise((_, reject) => {
+      signal?.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')), { once: true });
+    }));
+    renderBatches([[new File(['file'], 'cancel.txt')], [new File(['file'], 'new.txt')]]);
+    fireEvent.click(screen.getByText('Добавить партию 1'));
+    fireEvent.click(await screen.findByTitle(/Загрузка/));
+    await waitFor(() => expect(uploadPartsMock).toHaveBeenCalledTimes(1));
+    if (paused) fireEvent.click(screen.getByRole('button', { name: 'Приостановить все загрузки' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Очистить всю очередь' }));
+    await waitFor(() => expect(cancelSessionMock).toHaveBeenCalledWith('session-cancel.txt'));
+
+    fireEvent.click(screen.getByText('Добавить партию 2'));
+    fireEvent.click(await screen.findByTitle(/Загрузка/));
+    await screen.findByText('Загружен');
+    expect(screen.queryByText('cancel.txt')).toBeNull();
+    expect(completeSessionMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('clears duplicate prompts and releases workers for the next batch', async () => {
+    checkDuplicateMock.mockResolvedValue({ exists: true, locations: [] });
+    renderBatches([duplicateFiles(5), [new File(['file'], 'new.txt')]]);
+    fireEvent.click(screen.getByText('Добавить партию 1'));
+    fireEvent.click(await screen.findByTitle(/Загрузка/));
+    await screen.findByRole('dialog');
+    fireEvent.click(screen.getByRole('button', { name: 'Очистить всю очередь' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+
+    checkDuplicateMock.mockResolvedValue({ exists: false, locations: [] });
+    fireEvent.click(screen.getByText('Добавить партию 2'));
+    fireEvent.click(await screen.findByTitle(/Загрузка/));
+    await screen.findByText('Загружен');
+    expect(createSessionMock).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
   it.each([4, 7])('skips all %i duplicates after one batch decision', async (count) => {
     checkDuplicateMock.mockResolvedValue({ exists: true, locations: [] });
     renderBatches([duplicateFiles(count)]);

@@ -5,6 +5,7 @@ using BarkCloud.Identity.Features.CreateAccount;
 using BarkCloud.Identity.Infrastructure;
 using BarkCloud.Identity.Persistence.Services;
 using BarkCloud.Identity.Services;
+using BarkCloud.Identity.Tests._Helpers;
 using BarkCloud.Proto.Identity;
 using BarkCloud.Proto.Users;
 using BarkCloud.Shared.Exceptions.Identity;
@@ -20,11 +21,13 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace BarkCloud.Identity.Tests.Features.CreateAccount;
 
-public class CreateAccountCommandHandlerTests
+public class CreateAccountCommandHandlerTests : IDisposable
 {
+    private readonly SqliteIdentityContext _database = new();
     private readonly Mock<UsersServerApi.UsersServerApiClient> _usersClient = new();
     private readonly Mock<IConfirmationCodesStorage> _codes = new();
     private readonly Mock<IRefreshTokensStorage> _refreshTokens = new();
+    private readonly Mock<IPasswordsStorage> _passwords = new();
     private readonly Mock<NotificationQueueSender> _notifications;
     private readonly Mock<LocationClient> _location;
     private readonly Mock<IAuthRateLimiter> _rateLimiter = new();
@@ -63,7 +66,10 @@ public class CreateAccountCommandHandlerTests
         RequestContext? ctx = null, bool emailEnabled = true, bool registrationEnabled = true) => new(
         _usersClient.Object, _codes.Object, _notifications.Object,
         ctx ?? FullContext(), _location.Object, _metrics, _refreshTokens.Object,
-        FeatureConfig(emailEnabled), RegistrationPolicy(registrationEnabled), _rateLimiter.Object, _logger);
+        _passwords.Object, _database.Context, FeatureConfig(emailEnabled), RegistrationPolicy(registrationEnabled),
+        _rateLimiter.Object, _logger);
+
+    public void Dispose() => _database.Dispose();
 
     private static RequestContext FullContext() => new()
     {
@@ -81,6 +87,28 @@ public class CreateAccountCommandHandlerTests
         FirstName = "First",
         LastName = "Last"
     };
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("12345")]
+    public async Task Handle_WithPasswordRejectsMissingOrShortPasswordBeforeSideEffects(string? password)
+    {
+        var command = ValidCommand();
+        command.RequiresInitialPassword = true;
+        command.InitialPassword = password;
+
+        var act = () => CreateSut().Handle(command, default);
+
+        await act.Should().ThrowAsync<InvalidPasswordException>();
+        _usersClient.Verify(c => c.AddDraftUserAsync(It.IsAny<AddDraftUserRequest>(), null, null,
+            It.IsAny<CancellationToken>()), Times.Never);
+        _codes.Verify(s => s.AddCode(It.IsAny<ConfirmationCode>(), It.IsAny<CancellationToken>()), Times.Never);
+        _refreshTokens.Verify(s => s.CreateNewRefreshToken(It.IsAny<string>(), It.IsAny<long>(),
+            It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        _passwords.Verify(s => s.CreateInitialPassword(It.IsAny<long>(), It.IsAny<string>(),
+            It.IsAny<CancellationToken>()), Times.Never);
+    }
 
     [Fact]
     public async Task Handle_EmptyEmail_Throws()
@@ -158,13 +186,35 @@ public class CreateAccountCommandHandlerTests
     }
 
     [Fact]
+    public async Task Handle_EmailEnabledWithPasswordCreatesCodeWithoutPersistingPassword()
+    {
+        ArrangeDraft();
+        var command = ValidCommand();
+        command.InitialPassword = "secret1";
+        command.RequiresInitialPassword = true;
+
+        var response = await CreateSut().Handle(command, default);
+
+        response.CodeId.Should().NotBeNullOrWhiteSpace();
+        _passwords.Verify(s => s.CreateInitialPassword(It.IsAny<long>(), It.IsAny<string>(),
+            It.IsAny<CancellationToken>()), Times.Never);
+        _refreshTokens.Verify(s => s.CreateNewRefreshToken(It.IsAny<string>(), It.IsAny<long>(),
+            It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        _codes.Verify(s => s.AddCode(It.Is<ConfirmationCode>(c => c.OwnerId == 7
+            && c.Type == ConfirmationCodeType.Registration), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
     public async Task Handle_UserIsDraftException_FallsBackToOverride()
     {
         _usersClient
             .Setup(c => c.AddDraftUserAsync(It.IsAny<AddDraftUserRequest>(), null, null, default))
             .Throws(new UserIsDraftException());
         _usersClient
-            .Setup(c => c.OverrideDraftUserAsync(It.IsAny<AddDraftUserRequest>(), null, null, default))
+            .Setup(c => c.FindByLoginAsync(It.IsAny<FindByLoginRequest>(), null, null, default))
+            .Returns(GrpcCallHelpers.AsyncUnary(new FindByLoginResponse { User = new User { Id = 11 } }));
+        _usersClient
+            .Setup(c => c.OverrideDraftUserAsync(It.IsAny<AddDraftUserRequest>(), null, It.IsAny<DateTime?>(), default))
             .Returns(GrpcCallHelpers.AsyncUnary(new AddDraftUserResponse { UserId = 11 }));
         _codes
             .Setup(s => s.AddCode(It.IsAny<ConfirmationCode>(), It.IsAny<CancellationToken>()))
@@ -172,7 +222,7 @@ public class CreateAccountCommandHandlerTests
 
         await CreateSut().Handle(ValidCommand(), default);
 
-        _usersClient.Verify(c => c.OverrideDraftUserAsync(It.IsAny<AddDraftUserRequest>(), null, null, default), Times.Once);
+        _usersClient.Verify(c => c.OverrideDraftUserAsync(It.IsAny<AddDraftUserRequest>(), null, It.IsAny<DateTime?>(), default), Times.Once);
         _metrics.SnapshotAndReset().Should().ContainKey("accounts_draft_overridden");
     }
 
@@ -183,7 +233,7 @@ public class CreateAccountCommandHandlerTests
             .Setup(c => c.AddDraftUserAsync(It.IsAny<AddDraftUserRequest>(), null, null, default))
             .Returns(GrpcCallHelpers.AsyncUnary(new AddDraftUserResponse { UserId = 7 }));
         _usersClient
-            .Setup(c => c.ConfirmUserAsync(It.IsAny<ConfirmUserRequest>(), null, null, default))
+            .Setup(c => c.ConfirmUserAsync(It.IsAny<ConfirmUserRequest>(), null, It.IsAny<DateTime?>(), default))
             .Returns(GrpcCallHelpers.AsyncUnary(new ConfirmUserResponse()));
 
         var response = await CreateSut(emailEnabled: false).Handle(ValidCommand(), default);
@@ -191,7 +241,7 @@ public class CreateAccountCommandHandlerTests
         // Аккаунт подтверждён сразу, выдан refresh; код не создаётся, письмо не публикуется.
         response.RefreshToken.Value.Should().NotBeNullOrWhiteSpace();
         response.CodeId.Should().BeNullOrEmpty();
-        _usersClient.Verify(c => c.ConfirmUserAsync(It.Is<ConfirmUserRequest>(r => r.UserId == 7), null, null, default), Times.Once);
+        _usersClient.Verify(c => c.ConfirmUserAsync(It.Is<ConfirmUserRequest>(r => r.UserId == 7), null, It.IsAny<DateTime?>(), default), Times.Once);
         _refreshTokens.Verify(s => s.CreateNewRefreshToken(It.IsAny<string>(), 7, It.IsAny<string>(), It.IsAny<int>()), Times.Once);
         _codes.Verify(s => s.AddCode(It.IsAny<ConfirmationCode>(), It.IsAny<CancellationToken>()), Times.Never);
         _notifications.Verify(n => n.SendNotification(It.IsAny<Notification>()), Times.Never);
@@ -273,7 +323,7 @@ public class CreateAccountCommandHandlerTests
     {
         ArrangeDraft();
         _usersClient
-            .Setup(c => c.ConfirmUserAsync(It.IsAny<ConfirmUserRequest>(), null, null, default))
+            .Setup(c => c.ConfirmUserAsync(It.IsAny<ConfirmUserRequest>(), null, It.IsAny<DateTime?>(), default))
             .Returns(GrpcCallHelpers.AsyncUnary(new ConfirmUserResponse()));
 
         await CreateSut(emailEnabled: false).Handle(ValidCommand(), default);

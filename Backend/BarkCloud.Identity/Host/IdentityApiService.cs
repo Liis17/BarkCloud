@@ -79,13 +79,29 @@ public class IdentityApiService : BarkCloud.Proto.Identity.IdentityApi.IdentityA
 
         var command = new CreateAccountCommand
         {
-            Username = request.Username?.Trim(),
-            Email = request.Email?.Trim(),
+            Username = request.Username?.Trim() ?? string.Empty,
+            Email = request.Email?.Trim() ?? string.Empty,
             FirstName = request.FirstName?.Trim(),
             LastName = request.LastName?.Trim(),
         };
 
-        return await _mediator.Send(command);
+        return await _mediator.Send(command, context.CancellationToken);
+    }
+
+    public override Task<CreateAccountResponse> CreateAccountWithPassword(CreateAccountRequest request,
+        ServerCallContext context)
+    {
+        _metrics.Increment("account_creation_attempts");
+
+        return _mediator.Send(new CreateAccountCommand
+        {
+            Username = request.Username?.Trim() ?? string.Empty,
+            Email = request.Email?.Trim() ?? string.Empty,
+            FirstName = request.FirstName?.Trim() ?? string.Empty,
+            LastName = request.LastName?.Trim() ?? string.Empty,
+            InitialPassword = request.InitialPassword,
+            RequiresInitialPassword = true
+        }, context.CancellationToken);
     }
 
     public override Task<ConfirmAccountResponse> ConfirmAccount(ConfirmAccountRequest request, ServerCallContext context)
@@ -96,7 +112,19 @@ public class IdentityApiService : BarkCloud.Proto.Identity.IdentityApi.IdentityA
             CodeId = request.CodeId,
         };
 
-        return _mediator.Send(command);
+        return _mediator.Send(command, context.CancellationToken);
+    }
+
+    public override Task<ConfirmAccountResponse> ConfirmAccountWithPassword(ConfirmAccountRequest request,
+        ServerCallContext context)
+    {
+        return _mediator.Send(new ConfirmAccountCommand
+        {
+            Code = request.CodeValue,
+            CodeId = request.CodeId,
+            InitialPassword = request.InitialPassword,
+            RequiresInitialPassword = true
+        }, context.CancellationToken);
     }
 
     [Authorize(Policy = nameof(TokenType.User))]
