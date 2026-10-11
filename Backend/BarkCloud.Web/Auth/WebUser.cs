@@ -26,7 +26,12 @@ public enum LoginOutcome
     Error
 }
 
-public sealed record LoginResult(LoginOutcome Outcome, string? Message = null);
+public sealed record LoginResult(
+    LoginOutcome Outcome,
+    string? Message = null,
+    string? OtpMethod = null,
+    int? RetryAfterSeconds = null,
+    string? OtpMailStatus = null);
 
 public enum RegistrationOutcome
 {
@@ -37,10 +42,17 @@ public enum RegistrationOutcome
     ValidationError,
     CodeInvalid,
     CodeExpired,
+    SessionPending,
     Error
 }
 
-public sealed record RegistrationResult(RegistrationOutcome Outcome, string? Message = null, string? CodeId = null);
+public sealed record RegistrationResult(
+    RegistrationOutcome Outcome,
+    string? Message = null,
+    string? CodeId = null,
+    string? PendingRefreshToken = null,
+    string? Field = null,
+    DateTimeOffset? PendingRefreshExpiresAt = null);
 
 public enum PasswordResetOutcome
 {
@@ -49,7 +61,12 @@ public enum PasswordResetOutcome
     ValidationError,
     CodeInvalid,
     CodeExpired,
+    TooManyAttempts,
     Error
 }
 
-public sealed record PasswordResetResult(PasswordResetOutcome Outcome, string? Message = null, string? ResetId = null);
+public sealed record PasswordResetResult(
+    PasswordResetOutcome Outcome,
+    string? Message = null,
+    string? ResetId = null,
+    int? RetryAfterSeconds = null);

@@ -6,6 +6,7 @@ import react from '@vitejs/plugin-react';
 // (bark_at/bark_rt) ходили как same-origin (changeOrigin:false — сохраняем домен cookie).
 const BACKEND = 'http://localhost:5148';
 const FILES_HTTP1 = 'http://localhost:7026';
+const clientFile = (path: string) => decodeURI(new URL(path, import.meta.url).pathname);
 const backendRoutes = ['/api', '/login', '/register', '/forgot', '/logout', '/healthz', '/updating', '/restarting', '/maintenance-status', '/maintenance-wait.js'];
 
 export default defineConfig({
@@ -27,5 +28,12 @@ export default defineConfig({
     // Собранный бандл кладём в wwwroot — Microsoft.NET.Sdk.Web публикует его автоматически.
     outDir: '../wwwroot',
     emptyOutDir: true,
+    manifest: 'asset-manifest.json',
+    rollupOptions: {
+      input: {
+        app: clientFile('./index.html'),
+        auth: clientFile('./src/auth/main.tsx'),
+      },
+    },
   },
 });

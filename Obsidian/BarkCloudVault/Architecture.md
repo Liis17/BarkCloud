@@ -50,6 +50,10 @@ BarkCloud — самохостируемое облако файлов и мед
 
 События между сервисами идут через RabbitMQ (MassTransit). Users и Files публикуют их через EF Core outbox MassTransit, Identity фиксирует письмо в собственном outbox в той же локальной транзакции, что и бизнес-операцию, затем фоновый воркер доставляет его; отзыв сессий реплики забирают служебным gRPC-фидом. Подтверждение email-регистрации вызывает Users до локального коммита Identity. При первичной парольной регистрации с отключённой почтой Identity сначала фиксирует пароль и refresh, а верный пароль позволяет повторно завершить draft после сбоя Users. См. [[Backend/AccountDeletionOutbox]], [[Backend/IdentityNotificationOutbox]], [[Backend/SessionRevocation]].
 
+### Вход в Web
+
+`BarkCloud.Web` отдаёт auth React entry через отдельную HTML-оболочку; Identity остаётся источником учётных данных, 2FA-кодов и reset-кодов. Web хранит продолжение browser flow в ограниченном process-local кеше, привязанном к device cookie, и защищает формы antiforgery. Регистрация использует атомарные Identity RPC с первоначальным паролем; публичный контракт и ограничения потока описаны в [[Web/WebApp]].
+
 ## Соглашения
 
 - Backend-сервис раскладывается на `Domain/`, `Features/` (vertical slices; MediatR в Configuration, Identity, Users, Files), `Host/` (реализации gRPC), `Persistence/` (EF Core, миграции), `Services/`, `Consumers/`, `Infrastructure/`.
