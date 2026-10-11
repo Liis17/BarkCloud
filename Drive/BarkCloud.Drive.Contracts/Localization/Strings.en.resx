@@ -483,4 +483,11 @@
   <data name="Eng_OutboxAdoptedFmt" xml:space="preserve"><value>Unowned pending file “{0}” adopted by user {1}.</value></data>
   <data name="Eng_DokanKeepAliveFailed" xml:space="preserve"><value>Could not extend the Dokany operation timeout.</value></data>
   <data name="Eng_HttpTransferTimedOut" xml:space="preserve"><value>The data transfer timed out.</value></data>
+  <data name="Eng_UploadProcessingPending" xml:space="preserve"><value>The server is still processing the file; saving will continue in the queue.</value></data>
+  <data name="Eng_UploadSessionInvalidResponse" xml:space="preserve"><value>The server returned an invalid resumable upload state.</value></data>
+  <data name="Eng_UploadRestartLimit" xml:space="preserve"><value>Upload paused after three failed server sessions; try again later.</value></data>
+  <data name="Eng_UploadResumeLimitFmt" xml:space="preserve"><value>Could not resume upload after three attempts: {0}</value></data>
+  <data name="Eng_UploadSessionMissing" xml:space="preserve"><value>Upload session was not found on the server.</value></data>
+  <data name="Eng_UploadOriginMissing" xml:space="preserve"><value>The server origin for multipart upload is not configured.</value></data>
+  <data name="Eng_UploadCancelFailed" xml:space="preserve"><value>Could not cancel the superseded upload session.</value></data>
 </root>

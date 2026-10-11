@@ -25,12 +25,38 @@ internal enum PersistStage
     DeleteOld,
     Attach,
     Done,
+    Processing,
+}
+
+internal sealed class Upload2State
+{
+    public string IdempotencyKey { get; set; } = "";
+    public string Sha256 { get; set; } = "";
+    public long Size { get; set; }
+    public string ContentType { get; set; } = "application/octet-stream";
+    public string Name { get; set; } = "";
+    public string? SessionId { get; set; }
+    public int SessionRestarts { get; set; }
+    public DateTimeOffset? SessionRestartLimitReachedAtUtc { get; set; }
+
+    public Upload2State Copy() => new()
+    {
+        IdempotencyKey = IdempotencyKey,
+        Sha256 = Sha256,
+        Size = Size,
+        ContentType = ContentType,
+        Name = Name,
+        SessionId = SessionId,
+        SessionRestarts = SessionRestarts,
+        SessionRestartLimitReachedAtUtc = SessionRestartLimitReachedAtUtc,
+    };
 }
 
 internal sealed class PersistOperation
 {
     public PersistStage Stage { get; set; } = PersistStage.Upload;
     public string? FileId { get; set; }
+    public Upload2State? Upload2 { get; set; }
     public bool OldEntryDeleted { get; set; }
     public bool AttachAttempted { get; set; }
     public bool AttachCompleted { get; set; }
@@ -88,6 +114,7 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
     private readonly Dictionary<string, LocalFile> _pendingFiles = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, LocalFile> _openOutboxFiles = new(StringComparer.Ordinal);
     internal Action? ReaderLocalFileFoundForTesting { get; set; }
+    internal Task? UploadCancellationTaskForTesting { get; private set; }
     private string? _preservedPlaceholderError;
 
     private sealed class FileSyncLease : IDisposable
@@ -487,7 +514,7 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
                     using var keepAlive = DokanKeepAlive.Start(info, _time);
                     lock (file.Sync)
                     {
-                        if (file.Modified)
+                        if (file.Modified && file.Op?.Stage != PersistStage.Processing)
                             Persist(file);
                     }
                 }
@@ -512,6 +539,10 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
             {
                 DeleteNode(fileName);
             }
+        }
+        catch (UploadProcessingPendingException ex)
+        {
+            EngineLog.Info(ex.Message);
         }
         catch (Exception ex)
         {
@@ -1865,13 +1896,32 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
             file.Op = operation;
         }
 
-        if (operation.Stage == PersistStage.Upload)
+        if (operation.Stage is PersistStage.Upload or PersistStage.Processing)
         {
-            if (operation.FileId is null)
+            if (operation.Upload2 is not null)
             {
-                var (url, _) = _gateway.GetUploadUrl(cancellationToken);
-                operation.FileId = _gateway.UploadAsync(url, file.Name, file.TempPath, cancellationToken)
-                    .GetAwaiter().GetResult();
+                operation.FileId = _gateway.UploadResumableAsync(operation, file.TempPath, file.Name,
+                    () => SaveOutboxState(file), TimeSpan.FromMinutes(2),
+                    cancellationToken).GetAwaiter().GetResult();
+            }
+            else if (operation.Stage == PersistStage.Processing)
+            {
+                throw new InvalidDataException(Loc.T("Eng_UploadSessionInvalidResponse"));
+            }
+            else if (operation.FileId is null)
+            {
+                if (_gateway.ShouldUseResumableUpload(stream.Length))
+                {
+                    operation.FileId = _gateway.UploadResumableAsync(operation, file.TempPath, file.Name,
+                        () => SaveOutboxState(file), TimeSpan.FromMinutes(2),
+                        cancellationToken).GetAwaiter().GetResult();
+                }
+                else
+                {
+                    var (url, _) = _gateway.GetUploadUrl(cancellationToken);
+                    operation.FileId = _gateway.UploadAsync(url, file.Name, file.TempPath, cancellationToken)
+                        .GetAwaiter().GetResult();
+                }
             }
 
             operation.Stage = file.ExistingEntryId is null && operation.SupersededFileId is null
@@ -1978,9 +2028,14 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
                 try
                 {
                     cancellationToken.ThrowIfCancellationRequested();
+                    var isUploadRetry = operation.AttachAttempted;
                     operation.AttachAttempted = true;
                     SaveOutboxState(file);
-                    _gateway.AttachFile(file.DirectoryId, fileId, file.Name, cancellationToken);
+                    if (operation.Upload2?.SessionId is { } uploadSessionId)
+                        _gateway.AttachFile(file.DirectoryId, fileId, file.Name, cancellationToken,
+                            uploadSessionId, isUploadRetry);
+                    else
+                        _gateway.AttachFile(file.DirectoryId, fileId, file.Name, cancellationToken);
                     operation.AttachCompleted = true;
                 }
                 catch (RpcException ex) when (ServerErrors.HasCode(ex, ServerErrors.FileAlreadyAttached))
@@ -2148,6 +2203,7 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
     {
         Stage = operation.Stage,
         FileId = operation.FileId,
+        Upload2 = operation.Upload2?.Copy(),
         OldEntryDeleted = operation.OldEntryDeleted,
         AttachAttempted = operation.AttachAttempted,
         AttachCompleted = operation.AttachCompleted,
@@ -2187,13 +2243,19 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
             lock (_localFilesLock)
                 shouldPersist = file.OpenCount == 0 && file.Modified
                                 && file.Kind != LocalFileKind.Pending
-                                && !file.DeleteOnClose && file.ActiveCount == 0;
+                                && !file.DeleteOnClose && file.ActiveCount == 0
+                                && file.Op?.Stage != PersistStage.Processing;
             if (shouldPersist)
             {
                 try
                 {
                     using var keepAlive = DokanKeepAlive.Start(info, _time);
                     Persist(file);
+                }
+                catch (UploadProcessingPendingException ex)
+                {
+                    file.KeepData = true;
+                    EngineLog.Info(ex.Message);
                 }
                 catch (Exception ex)
                 {
@@ -2265,6 +2327,9 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
 
         var operation = file.Op;
         var fileIds = new HashSet<string>(StringComparer.Ordinal);
+        if (operation is { Stage: PersistStage.Upload, Upload2.SessionId: { } uploadSessionId })
+            CancelUploadSessionInBackground(uploadSessionId);
+
         if (operation is { AttachAttempted: true, FileId: { } attemptedFileId })
             fileIds.Add(attemptedFileId);
         if (operation?.SupersededFileId is { } supersededFileId)
@@ -2396,7 +2461,7 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
         return file.Stream;
     }
 
-    private static void TruncateLocalFileToZero(LocalFile file)
+    private void TruncateLocalFileToZero(LocalFile file)
     {
         lock (file.DataSync)
         {
@@ -2442,22 +2507,39 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
         return file.Stream?.Length ?? (File.Exists(file.TempPath) ? new FileInfo(file.TempPath).Length : 0);
     }
 
-    private static void MarkModified(LocalFile file)
+    private void MarkModified(LocalFile file)
     {
         file.Stream?.Flush();
         file.Modified = true;
         if (file.Op?.Stage == PersistStage.Done)
             file.DirtyAfterPersist = true;
-        else if (file.Op is { FileId: not null } operation)
+        else if (file.Op is { } operation && (operation.FileId is not null || operation.Upload2 is not null))
         {
             // Потерянный ответ Attach мог скрывать уже созданную запись этой версии.
             if (operation.AttachAttempted)
                 operation.SupersededFileId = operation.FileId;
             operation.FileId = null;
+            if (operation.Stage == PersistStage.Upload && operation.Upload2?.SessionId is { } abandonedSessionId)
+                CancelUploadSessionInBackground(abandonedSessionId);
+            operation.Upload2 = null;
             operation.Stage = PersistStage.Upload;
             operation.AttachAttempted = false;
             operation.AttachCompleted = false;
         }
+    }
+
+    private void CancelUploadSessionInBackground(string sessionId)
+    {
+        UploadCancellationTaskForTesting = Task.Run(() =>
+        {
+            try { _gateway.CancelUploadSession(sessionId); }
+            catch (RpcException ex) when (ServerErrors.HasCode(ex, ServerErrors.UploadSessionState)
+                                          || ServerErrors.HasCode(ex, ServerErrors.UploadSessionNotFound))
+            {
+                EngineLog.Info($"Сессия загрузки {sessionId} уже отсутствует или не находится в состоянии UPLOADING.");
+            }
+            catch (Exception ex) { EngineLog.Error(Loc.T("Eng_UploadCancelFailed"), ex); }
+        });
     }
 
     private LocalFile? FindLocalFile(string path)

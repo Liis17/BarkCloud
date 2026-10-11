@@ -483,4 +483,11 @@
   <data name="Eng_OutboxAdoptedFmt" xml:space="preserve"><value>Die ausstehende Datei „{0}“ ohne Besitzer wurde Benutzer {1} zugeordnet.</value></data>
   <data name="Eng_DokanKeepAliveFailed" xml:space="preserve"><value>Das Zeitlimit des Dokany-Vorgangs konnte nicht verlängert werden.</value></data>
   <data name="Eng_HttpTransferTimedOut" xml:space="preserve"><value>Die Datenübertragung hat das Zeitlimit überschritten.</value></data>
+  <data name="Eng_UploadProcessingPending" xml:space="preserve"><value>Der Server verarbeitet die Datei noch; das Speichern wird in der Warteschlange fortgesetzt.</value></data>
+  <data name="Eng_UploadSessionInvalidResponse" xml:space="preserve"><value>Der Server hat einen ungültigen Status für den fortsetzbaren Upload zurückgegeben.</value></data>
+  <data name="Eng_UploadRestartLimit" xml:space="preserve"><value>Upload nach drei fehlgeschlagenen Serversitzungen pausiert; später erneut versuchen.</value></data>
+  <data name="Eng_UploadResumeLimitFmt" xml:space="preserve"><value>Upload konnte nach drei Versuchen nicht fortgesetzt werden: {0}</value></data>
+  <data name="Eng_UploadSessionMissing" xml:space="preserve"><value>Upload-Sitzung wurde auf dem Server nicht gefunden.</value></data>
+  <data name="Eng_UploadOriginMissing" xml:space="preserve"><value>Die Serveradresse für den mehrteiligen Upload ist nicht konfiguriert.</value></data>
+  <data name="Eng_UploadCancelFailed" xml:space="preserve"><value>Die veraltete Upload-Sitzung konnte nicht abgebrochen werden.</value></data>
 </root>

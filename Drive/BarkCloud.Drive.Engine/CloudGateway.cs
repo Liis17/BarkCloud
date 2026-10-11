@@ -65,6 +65,7 @@ internal sealed partial class CloudGateway : IDisposable
     private readonly string _filesWebBase;
     private readonly Func<string?> _tokenProvider;
     private readonly TimeProvider _time;
+    private readonly ResumableUploader _resumableUploader;
     private readonly long _cacheLimitBytes;
     private readonly object _cacheCleanupLock = new();
     private readonly ITimer _cacheCleanupTimer;
@@ -123,7 +124,8 @@ internal sealed partial class CloudGateway : IDisposable
 
     public CloudGateway(CloudApi.CloudApiClient cloud, FilesApi.FilesApiClient files, HttpClient http,
         string filesWebBase, Func<string?> tokenProvider, string cacheDir, TimeProvider? time = null,
-        long? cacheLimitBytesForTesting = null)
+        long? cacheLimitBytesForTesting = null, string? uploadOrigin = null,
+        long? upload2ThresholdBytesForTesting = null)
     {
         _cloud = cloud;
         _files = files;
@@ -132,6 +134,9 @@ internal sealed partial class CloudGateway : IDisposable
         _tokenProvider = tokenProvider;
         _cacheDir = cacheDir;
         _time = time ?? TimeProvider.System;
+        _resumableUploader = new ResumableUploader(_files, _http,
+            uploadOrigin, _time,
+            upload2ThresholdBytesForTesting ?? ResumableUploader.DefaultThresholdBytes);
         _cacheLimitBytes = cacheLimitBytesForTesting ?? DefaultCacheLimitBytes;
         Directory.CreateDirectory(_cacheDir);
         RemoveOwnedCachePartFiles(_cacheDir);
@@ -1431,6 +1436,19 @@ internal sealed partial class CloudGateway : IDisposable
         }
     }
 
+    internal bool ShouldUseResumableUpload(long size) => _resumableUploader.ShouldUse(size);
+
+    internal Action? ResumableProcessingWaitStartedForTesting
+    {
+        get => _resumableUploader.ProcessingWaitStartedForTesting;
+        set => _resumableUploader.ProcessingWaitStartedForTesting = value;
+    }
+
+    internal Task<string> UploadResumableAsync(PersistOperation operation, string localPath, string name,
+        Action saveState, TimeSpan? processingWaitLimit, CancellationToken cancellationToken = default)
+        => _resumableUploader.UploadAsync(operation, localPath, name, saveState,
+            processingWaitLimit, cancellationToken);
+
     // Скачать байты аватара по его URL (тип UserAvatar качается напрямую по id, без temp-ссылки).
     // URL нормализуется на текущий Files-эндпоинт (как и download-ссылки — они могут быть устаревшими).
     public async Task<byte[]?> DownloadAvatarAsync(string url)
@@ -1449,9 +1467,20 @@ internal sealed partial class CloudGateway : IDisposable
         }
     }
 
-    public void AttachFile(string directoryId, string fileId, string name, CancellationToken cancellationToken = default)
-        => _cloud.AttachFile(new AttachFileRequest { DirectoryId = directoryId, FileId = fileId, Name = name },
-            cancellationToken: cancellationToken);
+    public void CancelUploadSession(string sessionId)
+        => _files.CancelUploadSession(new UploadSessionIdRequest { SessionId = sessionId },
+            deadline: _time.GetUtcNow().UtcDateTime.Add(StorageRpcTimeout));
+
+    public void AttachFile(string directoryId, string fileId, string name,
+        CancellationToken cancellationToken = default, string? uploadSessionId = null, bool isUploadRetry = false)
+        => _cloud.AttachFile(new AttachFileRequest
+        {
+            DirectoryId = directoryId,
+            FileId = fileId,
+            Name = name,
+            UploadSessionId = uploadSessionId ?? "",
+            IsUploadRetry = isUploadRetry,
+        }, cancellationToken: cancellationToken);
 
     public string CreateDirectory(string parentId, string name)
         => _cloud.CreateDirectory(new CreateDirectoryRequest { ParentId = parentId, Name = name }).Id;
@@ -1772,7 +1801,7 @@ internal sealed partial class CloudGateway : IDisposable
         _cacheEpochCancellation.Dispose();
     }
 
-    private sealed class TransferIdleTimeout : IDisposable
+    internal sealed class TransferIdleTimeout : IDisposable
     {
         private readonly CancellationTokenSource _cancellation = new();
         private readonly ITimer _timer;
@@ -1801,7 +1830,7 @@ internal sealed partial class CloudGateway : IDisposable
         }
     }
 
-    private sealed class ProgressStream(Stream stream, Action reportProgress, Action waitForResponse) : Stream
+    internal sealed class ProgressStream(Stream stream, Action reportProgress, Action waitForResponse) : Stream
     {
         public override bool CanRead => stream.CanRead;
         public override bool CanSeek => stream.CanSeek;
