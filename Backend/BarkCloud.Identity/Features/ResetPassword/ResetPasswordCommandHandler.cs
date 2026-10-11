@@ -104,7 +104,17 @@ public class ResetPasswordCommandHandler : IRequestHandler<ResetPasswordCommand,
 
         _logger.LogDebug("Поиск пользователя по логину: {Login}", login);
 
-        var user = await _usersClient.FindByLoginAsync(usersRequest);
+        FindByLoginResponse user;
+        try
+        {
+            user = await _usersClient.FindByLoginAsync(usersRequest, cancellationToken: cancellationToken);
+        }
+        catch (UserNotFoundException)
+        {
+            _metrics.Increment("password_reset_user_not_found");
+            _logger.LogWarning("Запрос сброса пароля для несуществующего пользователя: {Login}", login);
+            return await CreateNeutralResetResponse(cancellationToken);
+        }
 
         if (user.User is null)
         {
@@ -115,8 +125,7 @@ public class ResetPasswordCommandHandler : IRequestHandler<ResetPasswordCommand,
                 "Запрос сброса пароля для несуществующего пользователя: {Login}",
                 login
             );
-            await Task.Delay(Random.Shared.Next(100, 300), cancellationToken);
-            return new ResetPasswordResponse { ResetId = Guid.NewGuid().ToString() };
+            return await CreateNeutralResetResponse(cancellationToken);
         }
 
         _logger.LogDebug("Пользователь {UserId} найден, проверка настроек OTP", user.User.Id);
@@ -177,7 +186,11 @@ public class ResetPasswordCommandHandler : IRequestHandler<ResetPasswordCommand,
 
             if (active is null)
             {
-                throw new TooManyRequestsException();
+                _metrics.Increment("password_reset_mail_throttled");
+                _logger.LogInformation(
+                    "Почтовый лимит сброса исчерпан для пользователя {UserId}; активного запроса нет",
+                    user.User.Id);
+                return await CreateNeutralResetResponse(cancellationToken);
             }
 
             _metrics.Increment("password_reset_mail_throttled");
@@ -250,5 +263,11 @@ public class ResetPasswordCommandHandler : IRequestHandler<ResetPasswordCommand,
         );
 
         return new ResetPasswordResponse() { ResetId = resetEmailPassword.Id.ToString() };
+    }
+
+    private static async Task<ResetPasswordResponse> CreateNeutralResetResponse(CancellationToken cancellationToken)
+    {
+        await Task.Delay(Random.Shared.Next(100, 300), cancellationToken);
+        return new ResetPasswordResponse { ResetId = Guid.NewGuid().ToString() };
     }
 }

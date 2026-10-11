@@ -39,6 +39,25 @@ public class PasswordsStorage : IPasswordsStorage
         return false;
     }
 
+    public async Task<bool> CreateInitialPassword(long userId, string passwordHash,
+        CancellationToken cancellationToken = default)
+    {
+        var userPassword = await _context.UserPasswords.FirstOrDefaultAsync(x => x.UserId == userId, cancellationToken);
+        if (userPassword is not null && !string.IsNullOrEmpty(userPassword.PasswordHash))
+            return false;
+
+        if (userPassword is null)
+        {
+            userPassword = new UserPassword { UserId = userId };
+            _context.UserPasswords.Add(userPassword);
+        }
+
+        userPassword.ChangedAt = DateTime.UtcNow;
+        userPassword.PasswordHash = passwordHash;
+        await _context.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
     public async Task<string?> GetUserPasswordHash(long userId, CancellationToken cancellationToken = default)
     {
         var userPassword = await _context.UserPasswords

@@ -47,6 +47,24 @@ public class ServerExceptionInterceptorTests
     }
 
     [Fact]
+    public async Task UnaryServerHandler_OtpRequired_WritesOtpMetadataTrailers()
+    {
+        var sut = CreateSut();
+        var ctx = new TestServerCallContext();
+        var domain = new OtpCodeNeedException("email", 47, "existing");
+
+        var act = async () => await sut.UnaryServerHandler<string, string>(
+            "req",
+            ctx,
+            (_, _) => throw domain);
+
+        var rpc = (await act.Should().ThrowAsync<RpcException>()).Which;
+        rpc.Trailers.Should().Contain(t => t.Key == "x-otp-method" && t.Value == "email");
+        rpc.Trailers.Should().Contain(t => t.Key == "x-otp-retry-after-seconds" && t.Value == "47");
+        rpc.Trailers.Should().Contain(t => t.Key == "x-otp-mail-status" && t.Value == "existing");
+    }
+
+    [Fact]
     public async Task UnaryServerHandler_UnknownException_ThrowsRpcWithBaseErrorCode()
     {
         var sut = CreateSut();

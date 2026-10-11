@@ -1,7 +1,9 @@
 using Grpc.Core;
 using Grpc.Core.Interceptors;
+using BarkCloud.Shared.Exceptions.Identity;
 
 using System.Reflection;
+using System.Globalization;
 
 namespace BarkCloud.Shared.Exceptions.Interceptors;
 
@@ -43,7 +45,7 @@ public class ExceptionClientInterceptor : Interceptor
 
             if (exception != null)
             {
-                throw exception;
+                throw RestoreMetadata(exception, ex.Trailers);
             }
 
             throw;
@@ -65,5 +67,20 @@ public class ExceptionClientInterceptor : Interceptor
     private BaseGrpcException? FindExceptionByErrorCode(string errorCode)
     {
         return CachedExceptions.FirstOrDefault(e => e.ErrorCode == errorCode);
+    }
+
+    private static BaseGrpcException RestoreMetadata(BaseGrpcException exception, Metadata trailers)
+    {
+        if (exception is not OtpCodeNeedException)
+            return exception;
+
+        var method = trailers.FirstOrDefault(x => x.Key == "x-otp-method")?.Value;
+        var mailStatus = trailers.FirstOrDefault(x => x.Key == "x-otp-mail-status")?.Value;
+        var retryValue = trailers.FirstOrDefault(x => x.Key == "x-otp-retry-after-seconds")?.Value;
+        int? retryAfter = int.TryParse(retryValue, NumberStyles.None, CultureInfo.InvariantCulture, out var seconds)
+            ? seconds
+            : null;
+
+        return new OtpCodeNeedException(method, retryAfter, mailStatus);
     }
 }
