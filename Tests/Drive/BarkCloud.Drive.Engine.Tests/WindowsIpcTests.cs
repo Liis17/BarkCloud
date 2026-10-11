@@ -11,7 +11,7 @@ namespace BarkCloud.Drive.Engine.Tests;
 
 public sealed class WindowsIpcTests
 {
-    [WindowsFact]
+    [Fact]
     [Trait("Category", "WindowsIpc")]
     public async Task Named_pipe_completes_call_and_shutdown_response_before_server_stops()
     {
@@ -25,10 +25,10 @@ public sealed class WindowsIpcTests
         });
         var pipeName = $"{EnginePipe.Name}.{Guid.NewGuid():N}";
         var server = EnginePipeServer.RunAsync(pipeName, engine.Object, lifetime.Token);
+        var pipe = new NamedPipeClientStream(".", pipeName, PipeDirection.InOut, EnginePipe.Options);
 
         try
         {
-            await using var pipe = new NamedPipeClientStream(".", pipeName, PipeDirection.InOut, EnginePipe.Options);
             await pipe.ConnectAsync(5000);
             var proxy = JsonRpc.Attach<IDriveEngine>(pipe);
             try
@@ -43,21 +43,12 @@ public sealed class WindowsIpcTests
                 ((IDisposable)proxy).Dispose();
             }
 
-            await server.WaitAsync(TimeSpan.FromSeconds(3));
         }
         finally
         {
             lifetime.Cancel();
-            await server.WaitAsync(TimeSpan.FromSeconds(3));
-        }
-    }
-
-    private sealed class WindowsFactAttribute : FactAttribute
-    {
-        public WindowsFactAttribute()
-        {
-            if (!OperatingSystem.IsWindows())
-                Skip = "Named pipe integration tests require Windows.";
+            await pipe.DisposeAsync();
+            await server.WaitAsync(TimeSpan.FromSeconds(1.5));
         }
     }
 }

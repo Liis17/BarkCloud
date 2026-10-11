@@ -78,7 +78,10 @@
     <value>Порты сервисов</value>
   </data>
   <data name="Common_AcceptCert" xml:space="preserve">
-    <value>Доверять самоподписанному сертификату</value>
+    <value>Принимать любые сертификаты сервера</value>
+  </data>
+  <data name="Common_AcceptCertWarning" xml:space="preserve">
+    <value>Отключает проверку сертификата. Используйте только для сервера, которому доверяете.</value>
   </data>
   <data name="Common_DriveName" xml:space="preserve">
     <value>Имя диска</value>
@@ -367,6 +370,9 @@
   </data>
   <data name="Eng_LoginRequired" xml:space="preserve">
     <value>Введите логин и пароль</value>
+  </data>
+  <data name="Eng_TlsConnectionError" xml:space="preserve">
+    <value>Не удалось установить защищённое TLS-соединение. Проверьте адрес и сертификат сервера. Для доверенного self-hosted-сервера можно временно включить «Принимать любые сертификаты сервера» в настройках подключения.</value>
   </data>
   <data name="Eng_AuthSuccess" xml:space="preserve">
     <value>Авторизация успешна</value>

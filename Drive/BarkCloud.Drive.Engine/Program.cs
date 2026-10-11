@@ -1,7 +1,6 @@
 using System.Text.Json;
 
 using BarkCloud.Drive.Contracts;
-using BarkCloud.Drive.Contracts.Localization;
 using BarkCloud.Drive.Engine;
 
 // Один экземпляр движка на пользователя.
@@ -35,7 +34,7 @@ await using var outboxWorker = new UploadOutboxWorker(outbox,
     () => (serverKey, profile.UserId),
     (entry, cancellationToken) => fs.ProcessOutboxEntryAsync(entry, cancellationToken),
     completed: fs.CompleteOutboxEntry,
-    failed: (entry, ex) => fs.SetLastSyncError(Loc.T("Eng_SyncFailedFmt", entry.Name, ex.Message)),
+    failed: fs.SetOutboxSyncError,
     deferDataDeletion: fs.DeferOutboxDataDeletion);
 fs.OutboxAdded = outboxWorker.Trigger;
 fs.SyncError = fs.SetLastSyncError;
@@ -92,5 +91,5 @@ internal sealed class EngineConfig
     public int IdentityPort { get; set; } = 7020; // nginx → Identity
     public int FilesPort { get; set; } = 7025;     // nginx → Files (Cloud/Files/Album + /web)
     public int UsersPort { get; set; } = 7021;     // nginx → Users
-    public bool DangerousAcceptAnyServerCert { get; set; } = true;
+    public bool DangerousAcceptAnyServerCert { get; set; } = false;
 }

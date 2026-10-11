@@ -18,7 +18,7 @@ UI ↔ Engine — named pipe + StreamJsonRpc. UI передаёт движку �
 
 1. **Драйвер Dokany 2.x** — `DokanSetup.exe` из https://github.com/dokan-dev/dokany/releases
 2. **Запущенный backend BarkCloud**, доступный с машины
-3. Адреса сервисов — в `BarkCloud.Drive.Engine/appsettings.json`. По умолчанию как в iOS-клиенте: `Host: cloud.barkfluff.com`, `IdentityPort: 7020`, `FilesPort: 7025` (Cloud/Files/Album + `/web`), `DangerousAcceptAnyServerCert: true` (self-signed, как iOS `allowSelfSigned`)
+3. Адреса сервисов — в `BarkCloud.Drive.Engine/appsettings.json`. По умолчанию: `Host: cloud.barkfluff.com`, `IdentityPort: 7020`, `FilesPort: 7025` (Cloud/Files/Album + `/web`), `DangerousAcceptAnyServerCert: false` (строгая проверка TLS). Для self-hosted-сервера можно включить «Принимать любые сертификаты сервера» в мастере или настройках; явный `AcceptAnyCert: true` в существующем `%LOCALAPPDATA%\BarkCloud.Drive\server.json` сохраняет это поведение.
 
 ## Запуск
 

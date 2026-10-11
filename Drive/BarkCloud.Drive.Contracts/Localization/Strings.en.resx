@@ -78,7 +78,10 @@
     <value>Service ports</value>
   </data>
   <data name="Common_AcceptCert" xml:space="preserve">
-    <value>Trust self-signed certificate</value>
+    <value>Accept any server certificate</value>
+  </data>
+  <data name="Common_AcceptCertWarning" xml:space="preserve">
+    <value>Skips server certificate validation. Use only with a server you trust.</value>
   </data>
   <data name="Common_DriveName" xml:space="preserve">
     <value>Drive name</value>
@@ -367,6 +370,9 @@
   </data>
   <data name="Eng_LoginRequired" xml:space="preserve">
     <value>Enter username and password</value>
+  </data>
+  <data name="Eng_TlsConnectionError" xml:space="preserve">
+    <value>Could not establish a secure TLS connection. Check the server address and certificate. For a trusted self-hosted server, you can temporarily enable “Accept any server certificate” in the connection settings.</value>
   </data>
   <data name="Eng_AuthSuccess" xml:space="preserve">
     <value>Signed in successfully</value>

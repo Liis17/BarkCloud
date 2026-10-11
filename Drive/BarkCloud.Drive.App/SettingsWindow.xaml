@@ -65,7 +65,9 @@
                             </StackPanel>
                         </Grid>
 
-                        <CheckBox x:Name="AcceptCertCheck" Content="{loc:Tr Common_AcceptCert}" Margin="0,0,0,10"/>
+                        <CheckBox x:Name="AcceptCertCheck" Content="{loc:Tr Common_AcceptCert}" IsChecked="False" Margin="0,0,0,4"/>
+                        <TextBlock Text="{loc:Tr Common_AcceptCertWarning}"
+                                   Opacity="0.7" TextWrapping="Wrap" Margin="0,0,0,10"/>
                         <ui:Button Content="{loc:Tr Settings_ApplyAddress}" Click="ApplyServerClick"/>
                         <TextBlock Text="{loc:Tr Settings_ApplyAddressHint}"
                                    Opacity="0.7" TextWrapping="Wrap" Margin="0,8,0,0"/>

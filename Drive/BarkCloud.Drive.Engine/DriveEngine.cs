@@ -25,6 +25,7 @@ public sealed class DriveEngine : IDriveEngine
     private readonly object _outboxStateLock = new();
     private string? _outboxOwnerUserId;
     private bool _sessionUnavailable;
+    private int _shutdownRequested;
 
     internal DriveEngine(TokenManager tokens, CloudGateway gateway, MountManager mount,
         BarkCloudFileSystem fs, CancellationTokenSource lifetime, EngineSettingsStore settings,
@@ -70,7 +71,9 @@ public sealed class DriveEngine : IDriveEngine
         {
             // Нет ключей / ошибка — пустой ChallengeId сигнализирует UI о недоступности.
             EngineLog.Error("BeginWebAuthn", ex);
-            return new WebAuthnChallenge();
+            return ConnectionErrors.IsTls(ex)
+                ? new WebAuthnChallenge { Error = ConnectionErrors.GetDisplayMessage(ex) }
+                : new WebAuthnChallenge();
         }
     }
 
@@ -119,10 +122,11 @@ public sealed class DriveEngine : IDriveEngine
         {
             try
             {
-                SetSessionUnavailable(false);
-                if (_tokens.IsAuthenticated)
+                if (!IsShuttingDown())
+                    SetSessionUnavailable(false);
+                if (!IsShuttingDown() && !_lifetime.IsCancellationRequested && _tokens.IsAuthenticated)
                     await StartOutboxForCurrentSessionAsync(forceTrigger: true);
-                if (!_lifetime.IsCancellationRequested
+                if (!IsShuttingDown() && !_lifetime.IsCancellationRequested
                     && mountedLetter is not null && _mountedDriveLetter() is null)
                     _mountDrive(mountedLetter);
             }
@@ -198,6 +202,9 @@ public sealed class DriveEngine : IDriveEngine
         await _sessionOperations.WaitAsync();
         try
         {
+            if (IsShuttingDown() || _lifetime.IsCancellationRequested)
+                return ErrorMessage(Loc.T("Common_EngineNotRunning"));
+
             if (IsSessionUnavailable() || !_tokens.IsAuthenticated)
                 return ErrorMessage(Loc.T("Eng_LoginFirst"));
 
@@ -232,6 +239,9 @@ public sealed class DriveEngine : IDriveEngine
         await _sessionOperations.WaitAsync();
         try
         {
+            if (IsShuttingDown() || _lifetime.IsCancellationRequested)
+                return ErrorMessage(Loc.T("Common_EngineNotRunning"));
+
             if (IsSessionUnavailable() || !_tokens.IsAuthenticated)
                 return ErrorMessage(Loc.T("Eng_LoginFirst"));
 
@@ -357,6 +367,8 @@ public sealed class DriveEngine : IDriveEngine
 
     public async Task ShutdownAsync()
     {
+        Interlocked.Exchange(ref _shutdownRequested, 1);
+        SetSessionUnavailable(true);
         await _outboxWorker.StopAsync();
         try { _gateway.FlushPending(TimeSpan.FromSeconds(2)); }
         catch (Exception ex) { EngineLog.Error("Дренаж удалений при остановке", ex); }
@@ -372,7 +384,7 @@ public sealed class DriveEngine : IDriveEngine
         var trigger = false;
         lock (_outboxStateLock)
         {
-            if (_sessionUnavailable || !_tokens.IsAuthenticated)
+            if (IsShuttingDown() || _lifetime.IsCancellationRequested || _sessionUnavailable || !_tokens.IsAuthenticated)
                 return Task.CompletedTask;
 
             _outboxWorker.Start();
@@ -394,8 +406,10 @@ public sealed class DriveEngine : IDriveEngine
     private bool IsSessionUnavailable()
     {
         lock (_outboxStateLock)
-            return _sessionUnavailable;
+            return IsShuttingDown() || _sessionUnavailable;
     }
+
+    private bool IsShuttingDown() => Volatile.Read(ref _shutdownRequested) != 0;
 
     private void SetSessionUnavailable(bool unavailable)
     {
@@ -440,7 +454,7 @@ public sealed class DriveEngine : IDriveEngine
     {
         EngineLog.Error("DriveEngine", ex);
         var status = Status(null, includeStorage);
-        status.Error = ex is RpcException rpc ? rpc.Status.Detail : ex.Message;
+        status.Error = ConnectionErrors.GetDisplayMessage(ex);
         return status;
     }
 
