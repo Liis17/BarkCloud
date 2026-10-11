@@ -407,6 +407,9 @@
   <data name="Eng_SyncFailedFmt" xml:space="preserve">
     <value>„{0}“ konnte nicht in die Cloud gespeichert werden: {1}</value>
   </data>
+  <data name="Eng_MoveRollbackFailedFmt" xml:space="preserve">
+    <value>„{0}“ konnte nicht vollständig zurückverschoben werden: {1}</value>
+  </data>
   <data name="Eng_AttachedFileNotListedFmt" xml:space="preserve">
     <value>Nach dem Verknüpfen wurde „{0}“ nicht in der aktuellen Verzeichnisliste gefunden.</value>
   </data>

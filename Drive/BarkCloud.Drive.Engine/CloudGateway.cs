@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Http.Headers;
+using System.Runtime.ExceptionServices;
 using System.Text.Json;
 using System.Threading;
 
@@ -171,6 +172,15 @@ internal sealed class CloudGateway : IDisposable
         copy.NextCursorName = listing.NextCursorName;
         copy.NextCursorEntryId = listing.NextCursorEntryId;
         return copy;
+    }
+
+    public bool HasTombstonedFile(string directoryId, string name)
+    {
+        ListDirectory(directoryId);
+        return _listCache.TryGetValue(directoryId, out var cached)
+               && cached.Listing.Files.Any(file =>
+                   string.Equals(file.Entry.Name, name, StringComparison.OrdinalIgnoreCase)
+                   && _delTombstones.ContainsKey(file.Entry.Id));
     }
 
     public void InvalidateListing(string dirId)
@@ -517,13 +527,15 @@ internal sealed class CloudGateway : IDisposable
     // Синхронный дренаж до конца — для путей выхода (Unmount/Logout/Shutdown) и Dispose.
     // best-effort, без перевзвода таймера (на выходе ему уже некому сработать); drainAll
     // докручивает буфер до пустого, добирая всё, что фоновая попытка успела вернуть.
-    public void FlushPending() => SendNow(allowRetry: false, drainAll: true);
+    // MoveFile передаёт throwOnFailure, чтобы не менять путь, если удаление цели не доставлено.
+    public void FlushPending(bool throwOnFailure = false)
+        => SendNow(allowRetry: false, drainAll: true, throwOnFailure: throwOnFailure);
 
     // Единая точка отправки. _sendLock берётся ПЕРЕД снятием batch из _delPending — это делает
     // «взять+отправить» атомарным: фоновый дренаж и блокирующий выход не накладываются и не
     // образуют окна, где batch уже снят, а _sendLock ещё свободен (иначе FlushPending мог бы
     // проскочить, не дождавшись in-flight отправки, и удаление потерялось бы).
-    private void SendNow(bool allowRetry, bool drainAll = false)
+    private void SendNow(bool allowRetry, bool drainAll = false, bool throwOnFailure = false)
     {
         lock (_sendLock)
         {
@@ -537,7 +549,7 @@ internal sealed class CloudGateway : IDisposable
                     batch = TakePendingLocked();
                 }
 
-                SendChunks(batch, allowRetry);
+                SendChunks(batch, allowRetry, throwOnFailure);
             }
             while (drainAll); // выход дренажит до пустого; фон — один проход (ретрай отложит таймер)
         }
@@ -553,10 +565,11 @@ internal sealed class CloudGateway : IDisposable
     }
 
     // Отправляет batch пачками по 100 с gRPC-дедлайном. Вызывается только под _sendLock.
-    // При успехе снимает тумбстоны и инвалидирует листинги. При ошибке: allowRetry → переотправка
-    // (батчинг увеличивает радиус поражения транзиентного сбоя), иначе (выход) — сдаёмся сразу.
-    private void SendChunks(List<(string EntryId, string DirId)> batch, bool allowRetry)
+    // При успехе снимает тумбстоны и инвалидирует листинги. При ошибке: allowRetry или throwOnFailure
+    // → переотправка; иначе (выход) — сдаёмся сразу.
+    private void SendChunks(List<(string EntryId, string DirId)> batch, bool allowRetry, bool throwOnFailure)
     {
+        ExceptionDispatchInfo? firstFailure = null;
         for (var i = 0; i < batch.Count; i += DeleteBatchMax)
         {
             var chunk = batch.GetRange(i, Math.Min(DeleteBatchMax, batch.Count - i));
@@ -570,8 +583,12 @@ internal sealed class CloudGateway : IDisposable
             catch (Exception ex)
             {
                 EngineLog.Error($"Массовое удаление {chunk.Count} записей", ex);
-                if (allowRetry)
+                if (allowRetry || throwOnFailure)
+                {
                     RequeueFailed(chunk);
+                    if (throwOnFailure)
+                        firstFailure ??= ExceptionDispatchInfo.Capture(ex);
+                }
                 else
                     DropFailed(chunk); // на выходе ретраить некому — возвращаем файлы в листинг
                 continue;
@@ -586,6 +603,8 @@ internal sealed class CloudGateway : IDisposable
                 _delAttempts.TryRemove(entryId, out _);
             }
         }
+
+        firstFailure?.Throw();
     }
 
     // Возвращает неотправленную пачку в очередь на повтор (тумбстоны держим — файлы остаются

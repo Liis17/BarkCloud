@@ -136,6 +136,12 @@ internal sealed class FakeCloud
         }
     }
 
+    public bool IsInTrash(string entryId)
+    {
+        lock (_gate)
+            return _trash.ContainsKey(entryId);
+    }
+
     private DirectoryListingDetailed ListDirectoryDetailed(ListDirectoryRequest request)
     {
         lock (_gate)
