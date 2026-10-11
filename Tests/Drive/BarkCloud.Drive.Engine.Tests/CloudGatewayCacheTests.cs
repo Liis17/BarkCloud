@@ -482,7 +482,24 @@ public sealed class CloudGatewayCacheTests
 
         var logPath = Path.Combine(Path.GetTempPath(), "BarkCloud.Drive.Engine.Tests",
             Environment.ProcessId.ToString(), "engine.log");
-        var log = File.Exists(logPath) ? File.ReadAllText(logPath) : string.Empty;
+        string log;
+        for (var attempt = 0; ; attempt++)
+        {
+            try
+            {
+                log = File.ReadAllText(logPath);
+                break;
+            }
+            catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException)
+            {
+                log = string.Empty;
+                break;
+            }
+            catch (IOException ex) when (ex.HResult == unchecked((int)0x80070020) && attempt < 10)
+            {
+                Thread.Sleep(10);
+            }
+        }
         log.Should().NotContain($"[ERROR] Очистка кеша {blockFile}");
         log.Should().NotContain($"[ERROR] Очистка кеша {blockPart}");
 
