@@ -130,7 +130,7 @@ public partial class MainWindow : FluentWindow
         if (_engine != null)
         {
             try { await _engine.ShutdownAsync(); } catch { /* возможно завис */ }
-            _engine = null;
+            finally { DisposeEngineProxy(); }
         }
 
         EngineLauncher.KillEngine();
@@ -367,11 +367,18 @@ public partial class MainWindow : FluentWindow
         {
             try { await _engine.ShutdownAsync(); }
             catch { /* движок завершается */ }
-            _engine = null;
+            finally { DisposeEngineProxy(); }
         }
 
         TrayIcon.Unregister();
         Application.Current.Shutdown();
+    }
+
+    private void DisposeEngineProxy()
+    {
+        var engine = _engine;
+        _engine = null;
+        (engine as IDisposable)?.Dispose();
     }
 
     private void ShowFromTray()
