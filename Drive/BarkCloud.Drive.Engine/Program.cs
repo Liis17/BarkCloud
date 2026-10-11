@@ -35,14 +35,14 @@ await tokens.TryRestoreAsync();
 var settings = new EngineSettingsStore();
 var serverKey = EngineServerKey.FromConfig(config);
 var profile = new UserProfile(connection.Users, userId => settings.SetLastUserId(serverKey, userId));
-var gateway = new CloudGateway(connection.Cloud, connection.Files, connection.Http, $"{filesAddress}/web",
+using var gateway = new CloudGateway(connection.Cloud, connection.Files, connection.Http, $"{filesAddress}/web",
     () => tokens?.CurrentToken, settings.GetCacheDir());
 var outbox = new UploadOutbox(DriveStoragePaths.OutboxDirectory);
 var fs = new BarkCloudFileSystem(gateway, outbox: outbox, serverKey: serverKey,
     ownerUserId: () => profile.UserId ?? settings.GetLastUserId(serverKey));
 await using var outboxWorker = new UploadOutboxWorker(outbox,
     () => (serverKey, profile.UserId),
-    fs.ProcessOutboxEntryAsync,
+    (entry, cancellationToken) => fs.ProcessOutboxEntryAsync(entry, cancellationToken),
     completed: fs.CompleteOutboxEntry,
     failed: (entry, ex) => fs.SetLastSyncError(Loc.T("Eng_SyncFailedFmt", entry.Name, ex.Message)),
     deferDataDeletion: fs.DeferOutboxDataDeletion);

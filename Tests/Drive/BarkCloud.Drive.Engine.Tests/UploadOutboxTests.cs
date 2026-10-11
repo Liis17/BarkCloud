@@ -1,5 +1,6 @@
 using System.Net;
 
+using BarkCloud.Drive.Contracts.Localization;
 using BarkCloud.Drive.Engine;
 using BarkCloud.Drive.Engine.Tests.Fakes;
 
@@ -203,7 +204,8 @@ public sealed class UploadOutboxTests
             FileOptions.None, FileAttributes.Normal, reader).Should().Be(DokanResult.Success);
         var localFile = ((HandleContext)reader.Context!).File!;
         await using var worker = new UploadOutboxWorker(outbox, () => ("server", "42"),
-            fileSystem.ProcessOutboxEntryAsync, fileSystem.CompleteOutboxEntry,
+            (entry, cancellationToken) => fileSystem.ProcessOutboxEntryAsync(entry, cancellationToken),
+            fileSystem.CompleteOutboxEntry,
             time: new FakeTimeProvider(), deferDataDeletion: fileSystem.DeferOutboxDataDeletion);
         worker.Start();
         var processing = Task.Run(worker.TriggerAsync);
@@ -303,7 +305,8 @@ public sealed class UploadOutboxTests
         using var gateway = cloud.CreateGateway(temp.Path("cache"));
         var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"), outbox, "server", () => "42");
         await using var worker = new UploadOutboxWorker(outbox, () => ("server", "42"),
-            fileSystem.ProcessOutboxEntryAsync, fileSystem.CompleteOutboxEntry,
+            (entry, cancellationToken) => fileSystem.ProcessOutboxEntryAsync(entry, cancellationToken),
+            fileSystem.CompleteOutboxEntry,
             time: new FakeTimeProvider(), deferDataDeletion: fileSystem.DeferOutboxDataDeletion);
         worker.Start();
 
@@ -530,7 +533,8 @@ public sealed class UploadOutboxTests
             "server", () => "42");
         fileSystem.SetLastSyncError("предыдущая ошибка");
         await using var worker = new UploadOutboxWorker(outbox, () => ("server", "42"),
-            fileSystem.ProcessOutboxEntryAsync, fileSystem.CompleteOutboxEntry,
+            (entry, cancellationToken) => fileSystem.ProcessOutboxEntryAsync(entry, cancellationToken),
+            fileSystem.CompleteOutboxEntry,
             (_, ex) => fileSystem.SetLastSyncError(ex.Message), new FakeTimeProvider(),
             fileSystem.DeferOutboxDataDeletion);
         worker.Start();
@@ -580,6 +584,139 @@ public sealed class UploadOutboxTests
             await worker.StopAsync();
         }
         outbox.Count.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Stop_cancels_outbox_upload_without_changing_manifest_or_data()
+    {
+        using var temp = new TestDirectory();
+        var sourcePath = temp.Path("source.bin");
+        File.WriteAllBytes(sourcePath, [1, 2, 3]);
+        var outbox = new UploadOutbox(temp.Path("outbox"));
+        var entry = outbox.Add(NewLocalFile(sourcePath, "stopped.bin"), "server", "42");
+        var manifestPath = Path.Combine(outbox.DirectoryPath, entry.Id + ".json");
+        var manifest = File.ReadAllBytes(manifestPath);
+        var cloud = new FakeCloud();
+        var uploadStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        cloud.HttpHandler.Responder = async (request, cancellationToken) =>
+        {
+            if (request.Method == HttpMethod.Post)
+            {
+                uploadStarted.TrySetResult();
+                await Task.Delay(Timeout.Infinite, cancellationToken);
+            }
+
+            return new HttpResponseMessage(HttpStatusCode.OK);
+        };
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+        var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"), outbox, "server", () => "42");
+        var failedCalls = 0;
+        await using var worker = new UploadOutboxWorker(outbox, () => ("server", "42"),
+            (snapshot, cancellationToken) => fileSystem.ProcessOutboxEntryAsync(snapshot, cancellationToken),
+            failed: (_, _) => Interlocked.Increment(ref failedCalls),
+            time: new FakeTimeProvider());
+        worker.Start();
+        var pass = worker.TriggerAsync();
+        await uploadStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        await worker.StopAsync().WaitAsync(TimeSpan.FromSeconds(3));
+        await pass.WaitAsync(TimeSpan.FromSeconds(3));
+
+        var saved = outbox.Find(entry.Id)!;
+        saved.Stage.Should().Be(PersistStage.Upload);
+        saved.Attempts.Should().Be(0);
+        failedCalls.Should().Be(0);
+        File.ReadAllBytes(manifestPath).Should().Equal(manifest);
+        File.ReadAllBytes(entry.DataPath).Should().Equal([1, 2, 3]);
+    }
+
+    [Theory]
+    [MemberData(nameof(StopCancellationErrors))]
+    public async Task Start_after_stop_retries_cancelled_pass_without_counting_an_attempt(Exception stopError)
+    {
+        using var temp = new TestDirectory();
+        File.WriteAllBytes(temp.Path("source.bin"), [1]);
+        var outbox = new UploadOutbox(temp.Path("outbox"));
+        var entry = outbox.Add(NewLocalFile(temp.Path("source.bin")), "server", "42");
+        var firstStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseFirst = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var secondStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseSecond = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var calls = 0;
+        var failedCalls = 0;
+        var completedCalls = 0;
+        await using var worker = new UploadOutboxWorker(outbox, () => ("server", "42"),
+            async (_, _) =>
+            {
+                if (Interlocked.Increment(ref calls) == 1)
+                {
+                    firstStarted.TrySetResult();
+                    await releaseFirst.Task;
+                    throw stopError;
+                }
+
+                secondStarted.TrySetResult();
+                await releaseSecond.Task;
+            },
+            _ => Interlocked.Increment(ref completedCalls),
+            (_, _) => Interlocked.Increment(ref failedCalls),
+            new FakeTimeProvider());
+        worker.Start();
+        var firstPass = worker.TriggerAsync();
+        Task? stopping = null;
+        try
+        {
+            await firstStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            stopping = worker.StopAsync();
+            worker.Start();
+            releaseFirst.TrySetResult();
+            await secondStarted.Task.WaitAsync(TimeSpan.FromSeconds(15));
+
+            outbox.Find(entry.Id)!.Attempts.Should().Be(0);
+            failedCalls.Should().Be(0);
+        }
+        finally
+        {
+            releaseFirst.TrySetResult();
+            releaseSecond.TrySetResult();
+            if (stopping is not null)
+                await stopping.WaitAsync(TimeSpan.FromSeconds(15));
+            await firstPass.WaitAsync(TimeSpan.FromSeconds(15));
+        }
+
+        await WaitUntilAsync(() => outbox.Count == 0 && Volatile.Read(ref completedCalls) == 1);
+        calls.Should().Be(2);
+        failedCalls.Should().Be(0);
+    }
+
+    public static IEnumerable<object[]> StopCancellationErrors()
+    {
+        yield return [new RpcException(new Status(StatusCode.Cancelled, "cancelled"))];
+        yield return [new AggregateException("cancelled", new IOException("transport stopped"),
+            new RpcException(new Status(StatusCode.Cancelled, "cancelled")))];
+    }
+
+    [Fact]
+    public async Task Timeout_failure_is_counted_as_a_regular_outbox_attempt()
+    {
+        using var temp = new TestDirectory();
+        File.WriteAllBytes(temp.Path("source.bin"), [1]);
+        var outbox = new UploadOutbox(temp.Path("outbox"));
+        var entry = outbox.Add(NewLocalFile(temp.Path("source.bin")), "server", "42");
+        var error = new TimeoutException(Loc.T("Eng_HttpTransferTimedOut"));
+        Exception? callbackError = null;
+        await using var worker = new UploadOutboxWorker(outbox, () => ("server", "42"),
+            (_, _) => Task.FromException(error),
+            failed: (_, failure) => callbackError = failure,
+            time: new FakeTimeProvider());
+        worker.Start();
+
+        await worker.TriggerAsync();
+
+        var saved = outbox.Find(entry.Id)!;
+        saved.Attempts.Should().Be(1);
+        saved.LastError.Should().Be(error.Message);
+        callbackError.Should().BeSameAs(error);
     }
 
     [Fact]
@@ -770,7 +907,8 @@ public sealed class UploadOutboxTests
         }), "server", "42");
         var fs = new BarkCloudFileSystem(gateway, temp.Path("write"), outbox, "server", () => "42");
         await using var worker = new UploadOutboxWorker(outbox, () => ("server", "42"),
-            fs.ProcessOutboxEntryAsync, fs.CompleteOutboxEntry, time: new FakeTimeProvider(),
+            (entry, cancellationToken) => fs.ProcessOutboxEntryAsync(entry, cancellationToken),
+            fs.CompleteOutboxEntry, time: new FakeTimeProvider(),
             deferDataDeletion: fs.DeferOutboxDataDeletion);
         worker.Start();
         await worker.TriggerAsync();
@@ -807,7 +945,8 @@ public sealed class UploadOutboxTests
         var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"), outbox, "server", () => "42");
         var completed = 0;
         await using var worker = new UploadOutboxWorker(outbox, () => ("server", "42"),
-            fileSystem.ProcessOutboxEntryAsync, _ => Interlocked.Increment(ref completed),
+            (snapshot, cancellationToken) => fileSystem.ProcessOutboxEntryAsync(snapshot, cancellationToken),
+            _ => Interlocked.Increment(ref completed),
             time: new FakeTimeProvider(), deferDataDeletion: fileSystem.DeferOutboxDataDeletion);
         using var reader = new FileStream(entry.DataPath, FileMode.Open, System.IO.FileAccess.Read, FileShare.ReadWrite);
         worker.Start();

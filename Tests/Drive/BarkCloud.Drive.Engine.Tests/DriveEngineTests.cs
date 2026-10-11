@@ -47,7 +47,8 @@ public sealed class DriveEngineTests
             () => profile.UserId ?? settings.GetLastUserId("server"));
         await using var worker = new UploadOutboxWorker(outbox,
             () => ("server", profile.UserId ?? settings.GetLastUserId("server")),
-            fileSystem.ProcessOutboxEntryAsync, fileSystem.CompleteOutboxEntry,
+            (entry, cancellationToken) => fileSystem.ProcessOutboxEntryAsync(entry, cancellationToken),
+            fileSystem.CompleteOutboxEntry,
             time: new FakeTimeProvider(), deferDataDeletion: fileSystem.DeferOutboxDataDeletion);
         using var lifetime = new CancellationTokenSource();
         var engine = new DriveEngine(new TokenManager(new IdentityApi.IdentityApiClient(identityInvoker),
@@ -118,7 +119,8 @@ public sealed class DriveEngineTests
             () => profile.UserId ?? settings.GetLastUserId("server"));
         await using var worker = new UploadOutboxWorker(outbox,
             () => ("server", profile.UserId ?? settings.GetLastUserId("server")),
-            fileSystem.ProcessOutboxEntryAsync, fileSystem.CompleteOutboxEntry,
+            (entry, cancellationToken) => fileSystem.ProcessOutboxEntryAsync(entry, cancellationToken),
+            fileSystem.CompleteOutboxEntry,
             time: new FakeTimeProvider(), deferDataDeletion: fileSystem.DeferOutboxDataDeletion);
         using var lifetime = new CancellationTokenSource();
         var engine = new DriveEngine(new TokenManager(new IdentityApi.IdentityApiClient(identityInvoker),

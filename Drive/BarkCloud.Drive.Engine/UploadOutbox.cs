@@ -255,13 +255,15 @@ internal sealed class UploadOutboxWorker : IAsyncDisposable
     private readonly UploadOutbox _outbox;
     private readonly TimeProvider _time;
     private readonly Func<(string? ServerKey, string? OwnerUserId)> _session;
-    private readonly Func<UploadOutboxEntry, Task> _process;
+    private readonly Func<UploadOutboxEntry, CancellationToken, Task> _process;
     private readonly Action<UploadOutboxEntry>? _completed;
     private readonly Action<UploadOutboxEntry, Exception>? _failed;
     private readonly Func<UploadOutboxEntry, bool>? _deferDataDeletion;
-    private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly object _timerLock = new();
     private ITimer? _timer;
+    private CancellationTokenSource? _passCancellation;
+    private TaskCompletionSource? _passCompletion;
+    private bool _passActive;
     private bool _running;
     private bool _rerunRequested;
     private int _retryIndex;
@@ -269,6 +271,17 @@ internal sealed class UploadOutboxWorker : IAsyncDisposable
     public UploadOutboxWorker(UploadOutbox outbox,
         Func<(string? ServerKey, string? OwnerUserId)> session,
         Func<UploadOutboxEntry, Task> process,
+        Action<UploadOutboxEntry>? completed = null,
+        Action<UploadOutboxEntry, Exception>? failed = null,
+        TimeProvider? time = null,
+        Func<UploadOutboxEntry, bool>? deferDataDeletion = null)
+        : this(outbox, session, (entry, _) => process(entry), completed, failed, time, deferDataDeletion)
+    {
+    }
+
+    public UploadOutboxWorker(UploadOutbox outbox,
+        Func<(string? ServerKey, string? OwnerUserId)> session,
+        Func<UploadOutboxEntry, CancellationToken, Task> process,
         Action<UploadOutboxEntry>? completed = null,
         Action<UploadOutboxEntry, Exception>? failed = null,
         TimeProvider? time = null,
@@ -319,14 +332,21 @@ internal sealed class UploadOutboxWorker : IAsyncDisposable
 
     public async Task StopAsync()
     {
+        CancellationTokenSource? passCancellation;
+        Task? passCompletion;
         lock (_timerLock)
         {
             _running = false;
             _timer?.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+            passCancellation = _passCancellation;
+            passCompletion = _passCompletion?.Task;
         }
 
-        await _gate.WaitAsync().ConfigureAwait(false);
-        _gate.Release();
+        try { passCancellation?.Cancel(); }
+        catch (ObjectDisposedException) { }
+
+        if (passCompletion is not null)
+            await passCompletion.ConfigureAwait(false);
     }
 
     private void OnTimer(object? _)
@@ -336,24 +356,36 @@ internal sealed class UploadOutboxWorker : IAsyncDisposable
 
     private async Task RunPassAsync()
     {
-        if (!await _gate.WaitAsync(0).ConfigureAwait(false))
+        CancellationTokenSource passCancellation;
+        TaskCompletionSource passCompletion;
+        lock (_timerLock)
         {
-            lock (_timerLock)
-                if (_running)
-                    _rerunRequested = true;
-            return;
+            if (!_running)
+                return;
+            if (_passActive)
+            {
+                _rerunRequested = true;
+                return;
+            }
+
+            _passActive = true;
+            passCancellation = new CancellationTokenSource();
+            _passCancellation = passCancellation;
+            passCompletion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            _passCompletion = passCompletion;
         }
 
         var failed = false;
         var retryAfterDirectoryNotFound = false;
         try
         {
+            var cancellationToken = passCancellation.Token;
             bool runAgain;
             do
             {
                 lock (_timerLock)
                 {
-                    if (!_running)
+                    if (!_running || cancellationToken.IsCancellationRequested)
                         break;
                     _rerunRequested = false;
                 }
@@ -369,9 +401,12 @@ internal sealed class UploadOutboxWorker : IAsyncDisposable
                         {
                             lock (_timerLock)
                             {
-                                if (!_running)
+                                if (!_running || cancellationToken.IsCancellationRequested)
                                     break;
                             }
+
+                            if (cancellationToken.IsCancellationRequested)
+                                break;
 
                             if (!string.Equals(snapshot.ServerKey, serverKey, StringComparison.Ordinal)
                                 || !string.Equals(snapshot.OwnerUserId, ownerUserId, StringComparison.Ordinal))
@@ -379,9 +414,13 @@ internal sealed class UploadOutboxWorker : IAsyncDisposable
 
                             try
                             {
-                                await _process(snapshot).ConfigureAwait(false);
+                                await _process(snapshot, cancellationToken).ConfigureAwait(false);
                                 _outbox.Remove(snapshot, () => _deferDataDeletion?.Invoke(snapshot) ?? false);
                                 _completed?.Invoke(snapshot);
+                            }
+                            catch (Exception ex) when (IsStopCancellation(ex, cancellationToken))
+                            {
+                                break;
                             }
                             catch (Exception ex)
                             {
@@ -405,6 +444,10 @@ internal sealed class UploadOutboxWorker : IAsyncDisposable
                         }
                     }
                 }
+                catch (Exception ex) when (IsStopCancellation(ex, cancellationToken))
+                {
+                    // Остановка не считается ошибкой попытки outbox.
+                }
                 catch (Exception ex)
                 {
                     failed = true;
@@ -412,21 +455,27 @@ internal sealed class UploadOutboxWorker : IAsyncDisposable
                 }
 
                 lock (_timerLock)
-                    runAgain = _running && _rerunRequested;
+                    runAgain = _running && !cancellationToken.IsCancellationRequested && _rerunRequested;
             }
             while (runAgain);
         }
         finally
         {
-            _gate.Release();
             var runAgain = false;
             lock (_timerLock)
             {
+                if (ReferenceEquals(_passCancellation, passCancellation))
+                    _passCancellation = null;
                 if (_running)
                 {
                     if (!failed)
                         _retryIndex = 0;
-                    if (_rerunRequested)
+                    if (passCancellation.IsCancellationRequested)
+                    {
+                        _rerunRequested = false;
+                        runAgain = true;
+                    }
+                    else if (_rerunRequested)
                     {
                         _rerunRequested = false;
                         runAgain = true;
@@ -439,10 +488,40 @@ internal sealed class UploadOutboxWorker : IAsyncDisposable
                         _timer?.Change(delay, Timeout.InfiniteTimeSpan);
                     }
                 }
+                _passActive = false;
+                if (ReferenceEquals(_passCompletion, passCompletion))
+                    _passCompletion = null;
             }
+            passCancellation.Dispose();
+            passCompletion.TrySetResult();
             if (runAgain)
                 Trigger();
         }
+    }
+
+    private static bool IsStopCancellation(Exception exception, CancellationToken cancellationToken)
+    {
+        if (!cancellationToken.IsCancellationRequested)
+            return false;
+
+        var pending = new Stack<Exception>();
+        pending.Push(exception);
+        while (pending.TryPop(out var current))
+        {
+            if (current is OperationCanceledException
+                || current is RpcException { StatusCode: StatusCode.Cancelled })
+                return true;
+
+            if (current is AggregateException aggregate)
+            {
+                foreach (var inner in aggregate.InnerExceptions)
+                    pending.Push(inner);
+            }
+            else if (current.InnerException is { } inner)
+                pending.Push(inner);
+        }
+
+        return false;
     }
 
     private TimeSpan NextRetryDelay()

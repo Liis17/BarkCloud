@@ -466,4 +466,6 @@
   </data>
   <data name="Eng_AttachedFileRetryFmt" xml:space="preserve"><value>Подтверждённая запись «{0}» отсутствует в каталоге; повторная привязка сохранённых данных.</value></data>
   <data name="Eng_OutboxAdoptedFmt" xml:space="preserve"><value>Неотправленный файл «{0}» без владельца привязан к пользователю {1}.</value></data>
+  <data name="Eng_DokanKeepAliveFailed" xml:space="preserve"><value>Не удалось продлить таймаут операции Dokany.</value></data>
+  <data name="Eng_HttpTransferTimedOut" xml:space="preserve"><value>Истёк таймаут передачи данных.</value></data>
 </root>

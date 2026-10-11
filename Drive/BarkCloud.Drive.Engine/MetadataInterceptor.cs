@@ -10,6 +10,8 @@ namespace BarkCloud.Drive.Engine;
 // поэтому авторефреш не требует пересоздания канала/клиентов.
 internal sealed class MetadataInterceptor(DeviceIdentity device, Func<string?> tokenProvider) : Interceptor
 {
+    private static readonly TimeSpan DefaultDeadline = TimeSpan.FromSeconds(30);
+
     public override AsyncUnaryCall<TResponse> AsyncUnaryCall<TRequest, TResponse>(
         TRequest request,
         ClientInterceptorContext<TRequest, TResponse> context,
@@ -39,8 +41,11 @@ internal sealed class MetadataInterceptor(DeviceIdentity device, Func<string?> t
         if (!string.IsNullOrEmpty(token))
             h.Add("x-auth-token", token); // токен — сырой, не base64
 
-        return new ClientInterceptorContext<TRequest, TResponse>(
-            context.Method, context.Host, context.Options.WithHeaders(h));
+        var options = context.Options.WithHeaders(h);
+        if (options.Deadline is null)
+            options = options.WithDeadline(DateTime.UtcNow.Add(DefaultDeadline));
+
+        return new ClientInterceptorContext<TRequest, TResponse>(context.Method, context.Host, options);
     }
 
     private static string B64(string value) => Convert.ToBase64String(Encoding.UTF8.GetBytes(value));

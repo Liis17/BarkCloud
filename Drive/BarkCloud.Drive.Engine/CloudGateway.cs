@@ -9,6 +9,7 @@ using BarkCloud.Drive.Contracts.Localization;
 using BarkCloud.Proto.Files;
 
 using Google.Protobuf.WellKnownTypes;
+using Grpc.Core;
 
 namespace BarkCloud.Drive.Engine;
 
@@ -31,6 +32,11 @@ internal sealed class CloudGateway : IDisposable
 {
     private static readonly TimeSpan ListTtl = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan StorageTtl = TimeSpan.FromSeconds(10);
+    private static readonly TimeSpan StorageFailureCache = TimeSpan.FromSeconds(10);
+    private static readonly TimeSpan StorageRpcTimeout = TimeSpan.FromSeconds(15);
+    private static readonly TimeSpan HttpTransferIdleLimit = TimeSpan.FromSeconds(60);
+    private static readonly TimeSpan RangeBlockTimeout = TimeSpan.FromSeconds(60);
+    private static readonly TimeSpan HttpUploadResponseLimit = TimeSpan.FromMinutes(10);
     private const int DirectoryPageSize = 200;
 
     private readonly CloudApi.CloudApiClient _cloud;
@@ -47,6 +53,9 @@ internal sealed class CloudGateway : IDisposable
     private readonly ConcurrentDictionary<DownloadKey, Lazy<Task<string>>> _downloads = new();
     private readonly object _storageLock = new();
     private (DateTime At, GetUserStorageInfoResponse Info)? _storage;
+    private TaskCompletionSource<GetUserStorageInfoResponse>? _storageLoad;
+    private DateTime _storageRetryAfter;
+    private ExceptionDispatchInfo? _storageFailure;
 
     // Поблочное чтение (фаза 5): кэш temp-URL на файл (живёт 60 мин — обновляем заранее),
     // дедуп параллельных скачиваний блоков, и файлы, для которых сервер не дал Range (целиком).
@@ -99,19 +108,82 @@ internal sealed class CloudGateway : IDisposable
 
     public GetUserStorageInfoResponse GetStorage()
     {
+        Task<GetUserStorageInfoResponse> pending;
+        TaskCompletionSource<GetUserStorageInfoResponse>? load = null;
+        var startedAt = _time.GetUtcNow().UtcDateTime;
         lock (_storageLock)
         {
-            if (_storage is { } s && _time.GetUtcNow().UtcDateTime - s.At < StorageTtl)
-                return s.Info;
+            if (_storage is { } cached && startedAt - cached.At < StorageTtl)
+                return cached.Info;
 
-            var info = _files.GetUserStorageInfo(new GetUserStorageInfoRequest());
-            _storage = (_time.GetUtcNow().UtcDateTime, info);
+            if (startedAt < _storageRetryAfter)
+            {
+                if (_storage is { } stale)
+                    return stale.Info;
+                _storageFailure?.Throw();
+            }
+
+            if (_storageLoad is { } existingLoad)
+                pending = existingLoad.Task;
+            else
+            {
+                load = new TaskCompletionSource<GetUserStorageInfoResponse>(
+                    TaskCreationOptions.RunContinuationsAsynchronously);
+                _storageLoad = load;
+                pending = load.Task;
+            }
+        }
+
+        if (load is null)
+            return pending.GetAwaiter().GetResult();
+
+        try
+        {
+            var info = _files.GetUserStorageInfo(new GetUserStorageInfoRequest(),
+                deadline: DateTime.UtcNow.Add(StorageRpcTimeout));
+            lock (_storageLock)
+            {
+                _storage = (_time.GetUtcNow().UtcDateTime, info);
+                _storageRetryAfter = DateTime.MinValue;
+                _storageFailure = null;
+                info = _storage.Value.Info;
+            }
+
+            load.TrySetResult(info);
             return info;
+        }
+        catch (Exception ex)
+        {
+            GetUserStorageInfoResponse? stale;
+            lock (_storageLock)
+            {
+                stale = _storage?.Info;
+                _storageRetryAfter = _time.GetUtcNow().UtcDateTime + StorageFailureCache;
+                _storageFailure = ExceptionDispatchInfo.Capture(ex);
+            }
+
+            if (stale is not null)
+            {
+                load.TrySetResult(stale);
+                return stale;
+            }
+
+            load.TrySetException(ex);
+            return pending.GetAwaiter().GetResult();
+        }
+        finally
+        {
+            lock (_storageLock)
+            {
+                if (ReferenceEquals(_storageLoad, load))
+                    _storageLoad = null;
+            }
         }
     }
 
-    public DirectoryListingDetailed ListDirectory(string dirId)
+    public DirectoryListingDetailed ListDirectory(string dirId, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (_listCache.TryGetValue(dirId, out var c) && _time.GetUtcNow().UtcDateTime - c.At < ListTtl)
             return HidePending(c.Listing);
 
@@ -129,7 +201,7 @@ internal sealed class CloudGateway : IDisposable
             };
             if (!string.IsNullOrEmpty(cursorName)) request.CursorName = cursorName;
 
-            var page = _cloud.ListDirectoryDetailed(request);
+            var page = _cloud.ListDirectoryDetailed(request, cancellationToken: cancellationToken);
             if (listing.Subdirs.Count == 0) listing.Subdirs.AddRange(page.Subdirs);
             listing.Files.AddRange(page.Files);
 
@@ -154,10 +226,11 @@ internal sealed class CloudGateway : IDisposable
         return HidePending(listing);
     }
 
-    public FileEntryDetailed? FindFileEntryByFileId(string directoryId, string fileId)
+    public FileEntryDetailed? FindFileEntryByFileId(string directoryId, string fileId,
+        CancellationToken cancellationToken = default)
     {
         InvalidateListing(directoryId);
-        return ListDirectory(directoryId).Files.FirstOrDefault(file =>
+        return ListDirectory(directoryId, cancellationToken).Files.FirstOrDefault(file =>
             string.Equals(file.File.Id, fileId, StringComparison.Ordinal));
     }
 
@@ -272,28 +345,43 @@ internal sealed class CloudGateway : IDisposable
 
     // Читает [offset, offset+len) файла, подкачивая недостающие блоки по 1 МиБ Range-запросами.
     // fileLength берётся из листинга (CloudFile.FileSize). Whole-режим включается только при 200 OK на Range-запрос.
-    public int Read(string fileId, long fileLength, byte[] buffer, long offset)
+    public int Read(string fileId, long fileLength, byte[] buffer, long offset,
+        Func<IDisposable>? keepAliveFactory = null)
     {
-        var cacheDir = Volatile.Read(ref _cacheDir);
-        if (_wholeMode.ContainsKey(fileId))
-            return ReadWhole(fileId, fileLength, buffer, offset, cacheDir);
-
-        if (fileLength <= 0 || offset >= fileLength)
-            return 0;
+        IDisposable? keepAlive = null;
+        void StartKeepAlive()
+        {
+            keepAlive ??= keepAliveFactory?.Invoke();
+        }
 
         try
         {
-            return ReadBlocks(fileId, fileLength, buffer, offset, cacheDir);
+            var cacheDir = Volatile.Read(ref _cacheDir);
+            if (_wholeMode.ContainsKey(fileId))
+                return ReadWhole(fileId, fileLength, buffer, offset, cacheDir, StartKeepAlive);
+
+            if (fileLength <= 0 || offset >= fileLength)
+                return 0;
+
+            try
+            {
+                return ReadBlocks(fileId, fileLength, buffer, offset, cacheDir, StartKeepAlive);
+            }
+            catch (RangeNotSupportedException)
+            {
+                _wholeMode[fileId] = true;
+                EngineLog.Info($"Сервер не отдал Range для {fileId} — переключаюсь на скачивание целиком");
+                return ReadWhole(fileId, fileLength, buffer, offset, cacheDir, StartKeepAlive);
+            }
         }
-        catch (RangeNotSupportedException)
+        finally
         {
-            _wholeMode[fileId] = true;
-            EngineLog.Info($"Сервер не отдал Range для {fileId} — переключаюсь на скачивание целиком");
-            return ReadWhole(fileId, fileLength, buffer, offset, cacheDir);
+            keepAlive?.Dispose();
         }
     }
 
-    private int ReadBlocks(string fileId, long fileLength, byte[] buffer, long offset, string cacheDir)
+    private int ReadBlocks(string fileId, long fileLength, byte[] buffer, long offset, string cacheDir,
+        Action? startKeepAlive)
     {
         var toRead = (int)Math.Min(buffer.Length, fileLength - offset);
         if (toRead <= 0)
@@ -304,7 +392,7 @@ internal sealed class CloudGateway : IDisposable
         var lastBlock = endInclusive / BlockSize;
 
         for (var b = firstBlock; b <= lastBlock; b++)
-            EnsureBlock(cacheDir, fileId, fileLength, b);
+            EnsureBlock(cacheDir, fileId, fileLength, b, startKeepAlive);
 
         var bytesRead = 0;
         for (var b = firstBlock; b <= lastBlock; b++)
@@ -330,7 +418,8 @@ internal sealed class CloudGateway : IDisposable
         return bytesRead;
     }
 
-    private void EnsureBlock(string cacheDir, string fileId, long fileLength, long blockIndex)
+    private void EnsureBlock(string cacheDir, string fileId, long fileLength, long blockIndex,
+        Action? startKeepAlive)
     {
         var blockStart = blockIndex * BlockSize;
         var expectedLen = Math.Min(BlockSize, fileLength - blockStart);
@@ -343,7 +432,12 @@ internal sealed class CloudGateway : IDisposable
             _ => new Lazy<Task>(() => FetchBlockAsync(cacheDir, fileId, fileLength, blockIndex)));
         try
         {
-            lazy.Value.GetAwaiter().GetResult();
+            if (!lazy.IsValueCreated)
+                startKeepAlive?.Invoke();
+            var fetch = lazy.Value;
+            if (!fetch.IsCompleted)
+                startKeepAlive?.Invoke();
+            fetch.GetAwaiter().GetResult();
         }
         finally
         {
@@ -360,51 +454,69 @@ internal sealed class CloudGateway : IDisposable
         if (HasExpectedLength(path, expectedLength))
             return;
 
-        using var response = await SendDownloadRequestAsync(fileId, new RangeHeaderValue(start, end));
-        if (response.StatusCode == HttpStatusCode.OK)
-            throw new RangeNotSupportedException();
-        if (response.StatusCode != HttpStatusCode.PartialContent)
-            throw CreateHttpException(response.StatusCode);
-
-        var contentRange = response.Content.Headers.ContentRange;
-        if (contentRange is null
-            || !string.Equals(contentRange.Unit, "bytes", StringComparison.OrdinalIgnoreCase)
-            || contentRange.From != start
-            || contentRange.To != end
-            || contentRange.Length != fileLength)
-            throw new InvalidDataException($"Сервер вернул неверный Content-Range для {fileId}");
-
-        var directory = BlockDir(cacheDir, fileId);
-        Directory.CreateDirectory(directory);
-        var partPath = PartPath(path);
+        using var rangeTimeout = new CancellationTokenSource(RangeBlockTimeout, _time);
+        using var idleTimeout = new TransferIdleTimeout(_time);
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(
+            rangeTimeout.Token, idleTimeout.Token);
         try
         {
-            await CopyToPartAsync(response, partPath, expectedLength);
-            if (!HasExpectedLength(path, expectedLength))
+            using var response = await SendDownloadRequestAsync(
+                fileId, new RangeHeaderValue(start, end), cancellation.Token);
+            if (response.StatusCode == HttpStatusCode.OK)
+                throw new RangeNotSupportedException();
+            if (response.StatusCode != HttpStatusCode.PartialContent)
+                throw CreateHttpException(response.StatusCode);
+
+            var contentRange = response.Content.Headers.ContentRange;
+            if (contentRange is null
+                || !string.Equals(contentRange.Unit, "bytes", StringComparison.OrdinalIgnoreCase)
+                || contentRange.From != start
+                || contentRange.To != end
+                || contentRange.Length != fileLength)
+                throw new InvalidDataException($"Сервер вернул неверный Content-Range для {fileId}");
+
+            var directory = BlockDir(cacheDir, fileId);
+            Directory.CreateDirectory(directory);
+            var partPath = PartPath(path);
+            try
             {
-                try
+                await CopyToPartAsync(response, partPath, expectedLength, cancellation.Token, idleTimeout);
+                if (!HasExpectedLength(path, expectedLength))
                 {
-                    File.Move(partPath, path, overwrite: true);
-                }
-                catch (Exception ex) when ((ex is IOException or UnauthorizedAccessException)
-                                           && HasExpectedLength(path, expectedLength))
-                {
-                    // Другой запрос уже опубликовал готовый блок, возможно открытый читателем.
+                    try
+                    {
+                        File.Move(partPath, path, overwrite: true);
+                    }
+                    catch (Exception ex) when ((ex is IOException or UnauthorizedAccessException)
+                                               && HasExpectedLength(path, expectedLength))
+                    {
+                        // Другой запрос уже опубликовал готовый блок, возможно открытый читателем.
+                    }
                 }
             }
+            finally
+            {
+                DeletePart(partPath);
+            }
         }
-        finally
+        catch (OperationCanceledException ex) when (rangeTimeout.IsCancellationRequested || idleTimeout.Token.IsCancellationRequested)
         {
-            DeletePart(partPath);
+            throw new TimeoutException(Loc.T("Eng_HttpTransferTimedOut"), ex);
+        }
+        catch (RpcException ex) when (ex.StatusCode == StatusCode.Cancelled
+                                      && (rangeTimeout.IsCancellationRequested || idleTimeout.Token.IsCancellationRequested))
+        {
+            throw new TimeoutException(Loc.T("Eng_HttpTransferTimedOut"), ex);
         }
     }
 
-    private async Task<string> GetTempUrlAsync(string fileId)
+    private async Task<string> GetTempUrlAsync(string fileId, CancellationToken cancellationToken)
     {
         if (_tempUrls.TryGetValue(fileId, out var c) && _time.GetUtcNow().UtcDateTime - c.At < UrlTtl)
             return c.Url;
 
-        var resp = await _files.GetTempDownloadUrlAsync(new GetTempDownloadUrlRequest { FileIds = { fileId } });
+        var resp = await _files.GetTempDownloadUrlAsync(
+            new GetTempDownloadUrlRequest { FileIds = { fileId } }, cancellationToken: cancellationToken);
         var raw = resp.FileUrls.FirstOrDefault()?.Url
                   ?? throw new InvalidOperationException($"Сервер не вернул download URL для {fileId}");
         var url = NormalizeDownloadUrl(raw);
@@ -417,21 +529,36 @@ internal sealed class CloudGateway : IDisposable
         => Path.Combine(BlockDir(cacheDir, fileId), blockIndex + ".blk");
 
     // Скачивание файла целиком (whole-режим: сервер без Range, и для гидрации копии при записи).
-    private int ReadWhole(string fileId, long fileLength, byte[] buffer, long offset, string cacheDir)
+    private int ReadWhole(string fileId, long fileLength, byte[] buffer, long offset, string cacheDir,
+        Action? startKeepAlive)
     {
+        var cachedPath = Path.Combine(cacheDir, fileId);
+        if (HasExpectedLength(cachedPath, fileLength))
+            return ReadWholeFile(cachedPath, fileLength, buffer, offset);
+
         var key = new DownloadKey(cacheDir, fileId, fileLength);
         var lazy = _downloads.GetOrAdd(key,
             _ => new Lazy<Task<string>>(() => DownloadAsync(cacheDir, fileId, fileLength)));
         string local;
         try
         {
-            local = lazy.Value.GetAwaiter().GetResult();
+            if (!lazy.IsValueCreated)
+                startKeepAlive?.Invoke();
+            var download = lazy.Value;
+            if (!download.IsCompleted)
+                startKeepAlive?.Invoke();
+            local = download.GetAwaiter().GetResult();
         }
         finally
         {
             _downloads.TryRemove(new KeyValuePair<DownloadKey, Lazy<Task<string>>>(key, lazy));
         }
 
+        return ReadWholeFile(local, fileLength, buffer, offset);
+    }
+
+    private static int ReadWholeFile(string local, long fileLength, byte[] buffer, long offset)
+    {
         using var handle = File.OpenHandle(local, FileMode.Open, FileAccess.Read, FileShare.Read);
         if (offset >= fileLength)
             return 0;
@@ -469,12 +596,13 @@ internal sealed class CloudGateway : IDisposable
     }
 
     // Скачать блоб в произвольный путь (для гидрации рабочей копии при записи).
-    public async Task DownloadToAsync(string fileId, string destPath, long expectedLength)
+    public async Task DownloadToAsync(string fileId, string destPath, long expectedLength,
+        CancellationToken cancellationToken = default)
     {
         var partPath = PartPath(destPath);
         try
         {
-            await DownloadToPartAsync(fileId, partPath, expectedLength);
+            await DownloadToPartAsync(fileId, partPath, expectedLength, cancellationToken);
             File.Move(partPath, destPath, overwrite: true);
         }
         finally
@@ -483,26 +611,40 @@ internal sealed class CloudGateway : IDisposable
         }
     }
 
-    private async Task DownloadToPartAsync(string fileId, string partPath, long expectedLength)
+    private async Task DownloadToPartAsync(string fileId, string partPath, long expectedLength,
+        CancellationToken cancellationToken = default)
     {
-        using var response = await SendDownloadRequestAsync(fileId, range: null);
-        if (response.StatusCode != HttpStatusCode.OK)
-            throw CreateHttpException(response.StatusCode);
+        using var idleTimeout = new TransferIdleTimeout(_time);
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(
+            cancellationToken, idleTimeout.Token);
+        try
+        {
+            using var response = await SendDownloadRequestAsync(fileId, range: null, cancellation.Token);
+            if (response.StatusCode != HttpStatusCode.OK)
+                throw CreateHttpException(response.StatusCode);
 
-        await CopyToPartAsync(response, partPath, expectedLength);
+            await CopyToPartAsync(response, partPath, expectedLength, cancellation.Token, idleTimeout);
+        }
+        catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested
+                                                   && idleTimeout.Token.IsCancellationRequested)
+        {
+            throw new TimeoutException(Loc.T("Eng_HttpTransferTimedOut"), ex);
+        }
     }
 
-    private async Task<HttpResponseMessage> SendDownloadRequestAsync(string fileId, RangeHeaderValue? range)
+    private async Task<HttpResponseMessage> SendDownloadRequestAsync(string fileId, RangeHeaderValue? range,
+        CancellationToken cancellationToken)
     {
         var retried = false;
         while (true)
         {
-            var url = await GetTempUrlAsync(fileId);
+            cancellationToken.ThrowIfCancellationRequested();
+            var url = await GetTempUrlAsync(fileId, cancellationToken);
             using var request = new HttpRequestMessage(HttpMethod.Get, url);
             if (range is not null)
                 request.Headers.Range = range;
 
-            var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+            var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
             if (response.StatusCode is not (HttpStatusCode.Forbidden or HttpStatusCode.NotFound or HttpStatusCode.Gone))
                 return response;
 
@@ -525,13 +667,24 @@ internal sealed class CloudGateway : IDisposable
     private static HttpRequestException CreateHttpException(HttpStatusCode statusCode)
         => new($"Сервер вернул HTTP {(int)statusCode} ({statusCode}) при скачивании файла", null, statusCode);
 
-    private static async Task CopyToPartAsync(HttpResponseMessage response, string partPath, long expectedLength)
+    private static async Task CopyToPartAsync(HttpResponseMessage response, string partPath, long expectedLength,
+        CancellationToken cancellationToken, TransferIdleTimeout idleTimeout)
     {
-        await using (var net = await response.Content.ReadAsStreamAsync())
-        await using (var file = new FileStream(partPath, FileMode.CreateNew, FileAccess.Write, FileShare.None,
-                         81920, FileOptions.Asynchronous))
-            await net.CopyToAsync(file);
+        await using var net = await response.Content.ReadAsStreamAsync(cancellationToken);
+        await using var file = new FileStream(partPath, FileMode.CreateNew, FileAccess.Write, FileShare.None,
+            81920, FileOptions.Asynchronous);
+        var buffer = new byte[81920];
+        while (true)
+        {
+            var read = await net.ReadAsync(buffer, cancellationToken);
+            if (read == 0)
+                break;
 
+            idleTimeout.ReportProgress();
+            await file.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
+        }
+
+        await file.FlushAsync(cancellationToken);
         var actualLength = new FileInfo(partPath).Length;
         if (actualLength != expectedLength)
             throw new InvalidDataException($"Ожидалось {expectedLength} байт, получено {actualLength}");
@@ -557,20 +710,26 @@ internal sealed class CloudGateway : IDisposable
 
     // ───────── запись ─────────
 
-    public (string Url, string FileId) GetUploadUrl()
+    public (string Url, string FileId) GetUploadUrl(CancellationToken cancellationToken = default)
     {
-        var resp = _files.GetUploadUrl(new GetUploadUrlRequest { FileType = UploadFileType.CloudFile });
+        var resp = _files.GetUploadUrl(new GetUploadUrlRequest { FileType = UploadFileType.CloudFile },
+            cancellationToken: cancellationToken);
         return (resp.Url, resp.FileId);
     }
 
     // Заливает локальный файл (multipart-поле "file" + x-auth-token, как iOS).
     // Возвращает fileId из ответа; сервер не выполняет дедупликацию содержимого.
-    public async Task<string> UploadAsync(string uploadUrl, string fileName, string localPath)
+    public async Task<string> UploadAsync(string uploadUrl, string fileName, string localPath,
+        CancellationToken cancellationToken = default)
     {
+        using var idleTimeout = new TransferIdleTimeout(_time);
+        using var requestCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+            cancellationToken, idleTimeout.Token);
         using var content = new MultipartFormDataContent();
         // FileShare.ReadWrite: рабочая копия ещё открыта на запись хэндлом сессии.
         await using var fileStream = new FileStream(localPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-        using var fileContent = new StreamContent(fileStream);
+        using var progressStream = new ProgressStream(fileStream, idleTimeout.ReportProgress, idleTimeout.WaitForResponse);
+        using var fileContent = new StreamContent(progressStream);
         fileContent.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
         content.Add(fileContent, "file", fileName);
 
@@ -579,13 +738,23 @@ internal sealed class CloudGateway : IDisposable
         if (!string.IsNullOrEmpty(token))
             request.Headers.Add("x-auth-token", token);
 
-        using var response = await _http.SendAsync(request);
-        response.EnsureSuccessStatusCode();
+        try
+        {
+            using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead,
+                requestCancellation.Token);
+            idleTimeout.ReportProgress();
+            response.EnsureSuccessStatusCode();
 
-        await using var stream = await response.Content.ReadAsStreamAsync();
-        using var doc = await JsonDocument.ParseAsync(stream);
-        return doc.RootElement.GetProperty("fileId").GetString()
-               ?? throw new InvalidOperationException("Ответ загрузки без fileId");
+            await using var stream = await response.Content.ReadAsStreamAsync(requestCancellation.Token);
+            using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: requestCancellation.Token);
+            return doc.RootElement.GetProperty("fileId").GetString()
+                   ?? throw new InvalidOperationException("Ответ загрузки без fileId");
+        }
+        catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested
+                                                   && idleTimeout.Token.IsCancellationRequested)
+        {
+            throw new TimeoutException(Loc.T("Eng_HttpTransferTimedOut"), ex);
+        }
     }
 
     // Скачать байты аватара по его URL (тип UserAvatar качается напрямую по id, без temp-ссылки).
@@ -606,8 +775,9 @@ internal sealed class CloudGateway : IDisposable
         }
     }
 
-    public void AttachFile(string directoryId, string fileId, string name)
-        => _cloud.AttachFile(new AttachFileRequest { DirectoryId = directoryId, FileId = fileId, Name = name });
+    public void AttachFile(string directoryId, string fileId, string name, CancellationToken cancellationToken = default)
+        => _cloud.AttachFile(new AttachFileRequest { DirectoryId = directoryId, FileId = fileId, Name = name },
+            cancellationToken: cancellationToken);
 
     public string CreateDirectory(string parentId, string name)
         => _cloud.CreateDirectory(new CreateDirectoryRequest { ParentId = parentId, Name = name }).Id;
@@ -618,12 +788,14 @@ internal sealed class CloudGateway : IDisposable
     public void MoveFileEntry(string entryId, string newDirectoryId)
         => _cloud.MoveFileEntry(new MoveFileEntryRequest { EntryId = entryId, NewDirectoryId = newDirectoryId });
 
-    public void DeleteFileEntry(string entryId)
-        => _cloud.DeleteFileEntry(new DeleteFileEntryRequest { EntryId = entryId });
+    public void DeleteFileEntry(string entryId, CancellationToken cancellationToken = default)
+        => _cloud.DeleteFileEntry(new DeleteFileEntryRequest { EntryId = entryId },
+            cancellationToken: cancellationToken);
 
-    public void RestoreFromTrash(string entryId, string directoryId)
+    public void RestoreFromTrash(string entryId, string directoryId, CancellationToken cancellationToken = default)
     {
-        _cloud.RestoreFromTrash(new RestoreFromTrashRequest { EntryId = entryId });
+        _cloud.RestoreFromTrash(new RestoreFromTrashRequest { EntryId = entryId },
+            cancellationToken: cancellationToken);
         InvalidateListing(directoryId);
         if (directoryId.Length > 0)
             InvalidateListing("");
@@ -810,6 +982,89 @@ internal sealed class CloudGateway : IDisposable
     {
         FlushPending(); // не теряем буферизованные удаления при размонтировании/выходе
         _delTimer.Dispose();
-        _http.Dispose();
+    }
+
+    private sealed class TransferIdleTimeout : IDisposable
+    {
+        private readonly CancellationTokenSource _cancellation = new();
+        private readonly ITimer _timer;
+
+        public TransferIdleTimeout(TimeProvider time)
+        {
+            _timer = time.CreateTimer(_ => Cancel(), null, HttpTransferIdleLimit, Timeout.InfiniteTimeSpan);
+        }
+
+        public CancellationToken Token => _cancellation.Token;
+
+        public void ReportProgress() => _timer.Change(HttpTransferIdleLimit, Timeout.InfiniteTimeSpan);
+
+        public void WaitForResponse() => _timer.Change(HttpUploadResponseLimit, Timeout.InfiniteTimeSpan);
+
+        private void Cancel()
+        {
+            try { _cancellation.Cancel(); }
+            catch (ObjectDisposedException) { }
+        }
+
+        public void Dispose()
+        {
+            _timer.Dispose();
+            _cancellation.Dispose();
+        }
+    }
+
+    private sealed class ProgressStream(Stream stream, Action reportProgress, Action waitForResponse) : Stream
+    {
+        public override bool CanRead => stream.CanRead;
+        public override bool CanSeek => stream.CanSeek;
+        public override bool CanWrite => stream.CanWrite;
+        public override long Length => stream.Length;
+        public override long Position { get => stream.Position; set => stream.Position = value; }
+
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            var read = stream.Read(buffer, offset, count);
+            if (read > 0)
+                reportProgress();
+            else
+                waitForResponse();
+            return read;
+        }
+
+        public override async ValueTask<int> ReadAsync(Memory<byte> buffer,
+            CancellationToken cancellationToken = default)
+        {
+            var read = await stream.ReadAsync(buffer, cancellationToken);
+            if (read > 0)
+                reportProgress();
+            else
+                waitForResponse();
+            return read;
+        }
+
+        public override async Task<int> ReadAsync(byte[] buffer, int offset, int count,
+            CancellationToken cancellationToken)
+        {
+            var read = await stream.ReadAsync(buffer, offset, count, cancellationToken);
+            if (read > 0)
+                reportProgress();
+            else
+                waitForResponse();
+            return read;
+        }
+
+        public override void Flush() => stream.Flush();
+        public override long Seek(long offset, SeekOrigin origin) => stream.Seek(offset, origin);
+        public override void SetLength(long value) => stream.SetLength(value);
+        public override void Write(byte[] buffer, int offset, int count) => stream.Write(buffer, offset, count);
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+                stream.Dispose();
+            base.Dispose(disposing);
+        }
+
+        public override ValueTask DisposeAsync() => stream.DisposeAsync();
     }
 }
