@@ -91,4 +91,79 @@ public class ExceptionClientInterceptorTests
 
         ex.Should().BeOfType<OtpCodeNeedException>();
     }
+
+    [Fact]
+    public async Task AsyncUnary_OtpCodeNeededWithoutMetadata_RetainsLegacyException()
+    {
+        var sut = new ExceptionClientInterceptor();
+        var domain = new OtpCodeNeedException();
+        var trailers = new Metadata { { "x-error-code", domain.ErrorCode } };
+
+        var ex = await InvokeAsync(sut, trailers);
+
+        ex.Should().BeOfType<OtpCodeNeedException>();
+        ((OtpCodeNeedException)ex).ErrorMetadata.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task AsyncUnary_OtpAuthenticatorMethod_RestoresMethodMetadata()
+    {
+        var sut = new ExceptionClientInterceptor();
+        var domain = new OtpCodeNeedException();
+        var trailers = new Metadata
+        {
+            { "x-error-code", domain.ErrorCode },
+            { "x-otp-method", "authenticator" }
+        };
+
+        var ex = await InvokeAsync(sut, trailers);
+
+        ((OtpCodeNeedException)ex).ErrorMetadata.Should().BeEquivalentTo(
+            new Dictionary<string, string> { ["x-otp-method"] = "authenticator" });
+    }
+
+    [Fact]
+    public async Task AsyncUnary_OtpEmailStatus_RestoresIssueSnapshotMetadata()
+    {
+        var sut = new ExceptionClientInterceptor();
+        var domain = new OtpCodeNeedException();
+        var trailers = new Metadata
+        {
+            { "x-error-code", domain.ErrorCode },
+            { "x-otp-method", "email" },
+            { "x-otp-retry-after-seconds", "42" },
+            { "x-otp-mail-status", "existing" }
+        };
+
+        var ex = await InvokeAsync(sut, trailers);
+
+        ((OtpCodeNeedException)ex).ErrorMetadata.Should().BeEquivalentTo(new Dictionary<string, string>
+        {
+            ["x-otp-method"] = "email",
+            ["x-otp-retry-after-seconds"] = "42",
+            ["x-otp-mail-status"] = "existing"
+        });
+    }
+
+    [Fact]
+    public async Task AsyncUnary_OtpEmailMalformedRetryValue_IsIgnored()
+    {
+        var sut = new ExceptionClientInterceptor();
+        var domain = new OtpCodeNeedException();
+        var trailers = new Metadata
+        {
+            { "x-error-code", domain.ErrorCode },
+            { "x-otp-method", "email" },
+            { "x-otp-retry-after-seconds", "later" },
+            { "x-otp-mail-status", "sent" }
+        };
+
+        var ex = await InvokeAsync(sut, trailers);
+
+        ((OtpCodeNeedException)ex).ErrorMetadata.Should().BeEquivalentTo(new Dictionary<string, string>
+        {
+            ["x-otp-method"] = "email",
+            ["x-otp-mail-status"] = "sent"
+        });
+    }
 }

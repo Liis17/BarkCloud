@@ -20,6 +20,8 @@ Parent: [[Index]] · See also: [[Architecture]], [[Backend/GrpcServer]]
 
 Каждый API задаёт `package barkcloud.*` и C# namespace `BarkCloud.Proto.*`; временные значения представлены `google.protobuf.Timestamp`.
 
+`IdentityApi` предоставляет отдельные `CreateAccountWithPassword` и `ConfirmAccountWithPassword` для регистрации с первоначальным паролем. Они используют request-типы `CreateAccountRequest` и `ConfirmAccountRequest` с optional `initial_password` (поля 5 и 3 соответственно); legacy `CreateAccount` и `ConfirmAccount` это поле игнорируют. Сервер проверяет пароль нового контракта до побочных эффектов.
+
 ## Генерация и взаимодействия
 
 `Shared/BarkCloud.Proto/BarkCloud.Proto.csproj` не перечисляет `.proto` для генерации. Backend и Web подключают исходные файлы в собственных `.csproj` с нужным `GrpcServices` режимом. `Backend/BarkCloud.GrpcServer/BarkCloud.GrpcServer.csproj` генерирует `configuration_api.proto` и `session_revocation_api.proto` с `Both`; Identity, Users, Files, Torrent и Web компилируют клиентские/серверные стороны используемых ими API.
