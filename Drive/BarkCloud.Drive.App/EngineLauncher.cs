@@ -13,8 +13,6 @@ namespace BarkCloud.Drive.App;
 // стартуем его процесс и ждём появления pipe.
 internal static class EngineLauncher
 {
-    private const string PipeName = "BarkCloud.Drive.Engine";
-
     public static async Task<IDriveEngine> ConnectAsync()
     {
         var proxy = await TryConnectAsync(500);
@@ -36,7 +34,7 @@ internal static class EngineLauncher
 
     private static async Task<IDriveEngine?> TryConnectAsync(int timeoutMs)
     {
-        var pipe = new NamedPipeClientStream(".", PipeName, PipeDirection.InOut, PipeOptions.Asynchronous);
+        var pipe = new NamedPipeClientStream(".", EnginePipe.Name, PipeDirection.InOut, EnginePipe.Options);
         try
         {
             await pipe.ConnectAsync(timeoutMs);

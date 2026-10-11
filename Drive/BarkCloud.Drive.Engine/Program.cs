@@ -1,13 +1,8 @@
-using System.IO.Pipes;
 using System.Text.Json;
 
 using BarkCloud.Drive.Contracts;
 using BarkCloud.Drive.Contracts.Localization;
 using BarkCloud.Drive.Engine;
-
-using StreamJsonRpc;
-
-const string PipeName = "BarkCloud.Drive.Engine";
 
 // Один экземпляр движка на пользователя.
 using var mutex = new Mutex(true, "BarkCloud.Drive.Engine.Singleton", out var isNew);
@@ -56,33 +51,7 @@ Console.WriteLine("BarkCloud.Drive.Engine запущен. Ожидание по�
 var restoreTask = tokens.TryRestoreAsync();
 // IPC: named pipe + StreamJsonRpc. Обслуживаем по одному клиенту за раз,
 // переживая переподключения UI. Выходим только по ShutdownAsync.
-var pipe = new NamedPipeServerStream(
-    PipeName, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
-while (!lifetime.IsCancellationRequested)
-{
-    try
-    {
-        await pipe.WaitForConnectionAsync(lifetime.Token);
-    }
-    catch (OperationCanceledException)
-    {
-        await pipe.DisposeAsync();
-        break;
-    }
-
-    using (var rpc = JsonRpc.Attach(pipe, engine))
-    {
-        try { await rpc.Completion; }
-        catch { /* клиент отключился — ждём следующего */ }
-    }
-
-    await pipe.DisposeAsync();
-    if (!lifetime.IsCancellationRequested)
-    {
-        pipe = new NamedPipeServerStream(
-            PipeName, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
-    }
-}
+await EnginePipeServer.RunAsync(EnginePipe.Name, engine, lifetime.Token);
 
 if (await Task.WhenAny(restoreTask, Task.Delay(TimeSpan.FromSeconds(3))) == restoreTask)
     await restoreTask;

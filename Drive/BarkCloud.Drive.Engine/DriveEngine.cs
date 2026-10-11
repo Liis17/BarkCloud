@@ -122,7 +122,8 @@ public sealed class DriveEngine : IDriveEngine
                 SetSessionUnavailable(false);
                 if (_tokens.IsAuthenticated)
                     await StartOutboxForCurrentSessionAsync(forceTrigger: true);
-                if (mountedLetter is not null && _mountedDriveLetter() is null)
+                if (!_lifetime.IsCancellationRequested
+                    && mountedLetter is not null && _mountedDriveLetter() is null)
                     _mountDrive(mountedLetter);
             }
             catch (Exception ex)

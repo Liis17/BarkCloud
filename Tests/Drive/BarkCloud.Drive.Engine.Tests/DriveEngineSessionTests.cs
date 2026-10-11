@@ -657,6 +657,39 @@ public sealed class DriveEngineSessionTests
     }
 
     [Fact]
+    public async Task Login_finishing_after_shutdown_does_not_remount_drive()
+    {
+        await using var harness = new EngineHarness();
+        var authCalls = 0;
+        var secondAuthStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseSecondAuth = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        harness.IdentityInvoker.Handle<AuthRequest, AuthResponse>("/barkcloud.identity.IdentityApi/Auth", _ =>
+        {
+            var call = Interlocked.Increment(ref authCalls);
+            if (call == 2)
+            {
+                secondAuthStarted.TrySetResult();
+                releaseSecondAuth.Task.GetAwaiter().GetResult();
+            }
+            return LoginResponse(harness.Time, $"access-{call}", $"refresh-{call}");
+        });
+        (await harness.Engine.LoginAsync("first", "password", null)).Error.Should().BeNull();
+        (await harness.Engine.MountAsync("Z", null)).Error.Should().BeNull();
+
+        var login = Task.Factory.StartNew(
+            () => harness.Engine.LoginAsync("second", "password", null).GetAwaiter().GetResult(),
+            CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
+        await secondAuthStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        await harness.Engine.ShutdownAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        harness.IsMounted.Should().BeFalse();
+        releaseSecondAuth.TrySetResult();
+
+        await login.WaitAsync(TimeSpan.FromSeconds(5));
+        harness.IsMounted.Should().BeFalse();
+    }
+
+    [Fact]
     public async Task Session_restored_auto_mount_completes_without_reentering_session_lock()
     {
         await using var harness = new EngineHarness();
