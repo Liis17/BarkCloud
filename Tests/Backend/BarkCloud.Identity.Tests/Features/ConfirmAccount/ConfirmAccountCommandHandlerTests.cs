@@ -9,9 +9,12 @@ using BarkCloud.Identity.Services;
 using BarkCloud.Proto.Identity;
 using BarkCloud.Proto.Users;
 using BarkCloud.Shared.Exceptions.Identity;
+using BarkCloud.Shared.Exceptions.Users;
 using BarkCloud.Shared.Queue.Notifications;
 using BarkCloud.TestKit;
 using BarkCloud.Identity.Tests._Helpers;
+
+using Grpc.Core;
 
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -24,6 +27,7 @@ public class ConfirmAccountCommandHandlerTests : IDisposable
     private readonly Mock<IConfirmationCodesStorage> _codes = new();
     private readonly Mock<UsersServerApi.UsersServerApiClient> _usersClient = new();
     private readonly Mock<IRefreshTokensStorage> _refreshTokens = new();
+    private readonly Mock<IPasswordsStorage> _passwords = new();
     private readonly Mock<INotificationOutbox> _outbox = new();
     private readonly Mock<IAuthRateLimiter> _rateLimiter = new();
     private readonly MetricsCollector _metrics = new();
@@ -38,7 +42,7 @@ public class ConfirmAccountCommandHandlerTests : IDisposable
 
     private ConfirmAccountCommandHandler CreateSut(RequestContext? ctx = null, bool registrationEnabled = true) => new(
         _codes.Object, _usersClient.Object, _refreshTokens.Object, _database.Context, ctx ?? FullContext(),
-        _outbox.Object, _metrics, RegistrationPolicy(registrationEnabled), _rateLimiter.Object, _logger);
+        _passwords.Object, _outbox.Object, _metrics, RegistrationPolicy(registrationEnabled), _rateLimiter.Object, _logger);
 
     private static IRegistrationPolicy RegistrationPolicy(bool enabled)
     {
@@ -60,6 +64,35 @@ public class ConfirmAccountCommandHandlerTests : IDisposable
         DeviceId = "device-1",
         IpAddress = "1.1.1.1"
     };
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("12345")]
+    public async Task Handle_WithPasswordRejectsMissingOrShortPasswordBeforeSideEffects(string? password)
+    {
+        var command = new ConfirmAccountCommand
+        {
+            CodeId = Guid.NewGuid().ToString(),
+            Code = "123456",
+            InitialPassword = password,
+            RequiresInitialPassword = true
+        };
+
+        var act = () => CreateSut().Handle(command, default);
+
+        await act.Should().ThrowAsync<InvalidPasswordException>();
+        _codes.Verify(s => s.GetCode(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
+        _codes.Verify(s => s.TryReserveAttempt(It.IsAny<Guid>(), It.IsAny<int>()), Times.Never);
+        _usersClient.Verify(c => c.ConfirmUserAsync(It.IsAny<ConfirmUserRequest>(), null, It.IsAny<DateTime?>(),
+            It.IsAny<CancellationToken>()), Times.Never);
+        _refreshTokens.Verify(s => s.CreateNewRefreshToken(It.IsAny<string>(), It.IsAny<long>(),
+            It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        _passwords.Verify(s => s.CreateInitialPassword(It.IsAny<long>(), It.IsAny<string>(),
+            It.IsAny<CancellationToken>()), Times.Never);
+        _outbox.Verify(o => o.EnqueueAsync(It.IsAny<long>(), It.IsAny<NotificationType>(),
+            It.IsAny<string>(), It.IsAny<Dictionary<string, string>>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
 
     [Fact]
     public async Task Handle_NoDeviceName_Throws()
@@ -83,7 +116,7 @@ public class ConfirmAccountCommandHandlerTests : IDisposable
         await act.Should().ThrowAsync<RegistrationDisabledException>();
 
         _codes.Verify(s => s.GetCode(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
-        _usersClient.Verify(c => c.ConfirmUserAsync(It.IsAny<ConfirmUserRequest>(), null, null, default), Times.Never);
+        _usersClient.Verify(c => c.ConfirmUserAsync(It.IsAny<ConfirmUserRequest>(), null, It.IsAny<DateTime?>(), default), Times.Never);
         _refreshTokens.Verify(s => s.CreateNewRefreshToken(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<int>()), Times.Never);
         _outbox.Verify(o => o.EnqueueAsync(
             It.IsAny<long>(), It.IsAny<NotificationType>(), It.IsAny<string>(), It.IsAny<Dictionary<string, string>>()), Times.Never);
@@ -158,7 +191,7 @@ public class ConfirmAccountCommandHandlerTests : IDisposable
             OwnerId = 42
         });
         _usersClient
-            .Setup(c => c.ConfirmUserAsync(It.IsAny<ConfirmUserRequest>(), null, null, default))
+            .Setup(c => c.ConfirmUserAsync(It.IsAny<ConfirmUserRequest>(), null, It.IsAny<DateTime?>(), default))
             .Returns(GrpcCallHelpers.AsyncUnary(new ConfirmUserResponse()));
 
         var response = await CreateSut().Handle(
@@ -166,7 +199,8 @@ public class ConfirmAccountCommandHandlerTests : IDisposable
             default);
 
         response.RefreshToken.Value.Should().NotBeNullOrWhiteSpace();
-        _usersClient.Verify(c => c.ConfirmUserAsync(It.Is<ConfirmUserRequest>(r => r.UserId == 42), null, null, default), Times.Once);
+        _usersClient.Verify(c => c.ConfirmUserAsync(It.Is<ConfirmUserRequest>(r => r.UserId == 42), null,
+            It.IsAny<DateTime?>(), default), Times.Once);
         _codes.Verify(s => s.TryConsumeRegistrationCode(codeId, 42, "123456", It.IsAny<DateTime>(),
             AuthLimits.ChallengeMaxAttempts, It.IsAny<CancellationToken>()), Times.Once);
         _refreshTokens.Verify(s => s.CreateNewRefreshToken(It.IsAny<string>(), 42, "device-1", It.IsAny<int>()), Times.Once);
@@ -181,7 +215,7 @@ public class ConfirmAccountCommandHandlerTests : IDisposable
         var codeId = Guid.NewGuid();
         _codes.Setup(s => s.GetCode(codeId, It.IsAny<CancellationToken>())).ReturnsAsync(ValidCode(codeId));
         _usersClient
-            .Setup(c => c.ConfirmUserAsync(It.IsAny<ConfirmUserRequest>(), null, null, default))
+            .Setup(c => c.ConfirmUserAsync(It.IsAny<ConfirmUserRequest>(), null, It.IsAny<DateTime?>(), default))
             .Returns(GrpcCallHelpers.AsyncUnary(new ConfirmUserResponse()));
 
         await CreateSut().Handle(new ConfirmAccountCommand { CodeId = codeId.ToString(), Code = "123456" }, default);
@@ -193,6 +227,27 @@ public class ConfirmAccountCommandHandlerTests : IDisposable
         _usersClient.Verify(
             c => c.GetUserContactsAsync(It.IsAny<GetUserContactsRequest>(), null, null, default), Times.Never);
         _usersClient.Verify(c => c.GetByIdAsync(It.IsAny<GetByIdRequest>(), null, null, default), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_LegacyConfirmationRejectsProtectedDraftBeforeUsersOrSession()
+    {
+        var codeId = Guid.NewGuid();
+        _codes.Setup(s => s.GetCode(codeId, It.IsAny<CancellationToken>())).ReturnsAsync(ValidCode(codeId));
+        _passwords.Setup(s => s.GetUserPasswordHash(42, It.IsAny<CancellationToken>())).ReturnsAsync("existing-hash");
+
+        var act = () => CreateSut().Handle(
+            new ConfirmAccountCommand { CodeId = codeId.ToString(), Code = "123456" }, default);
+
+        await act.Should().ThrowAsync<UserIsDraftException>();
+        _usersClient.Verify(c => c.ConfirmUserAsync(It.IsAny<ConfirmUserRequest>(), It.IsAny<Metadata>(),
+            It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()), Times.Never);
+        _codes.Verify(s => s.TryConsumeRegistrationCode(It.IsAny<Guid>(), It.IsAny<long>(), It.IsAny<string>(),
+            It.IsAny<DateTime>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        _refreshTokens.Verify(s => s.CreateNewRefreshToken(It.IsAny<string>(), It.IsAny<long>(),
+            It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        _outbox.Verify(o => o.EnqueueAsync(It.IsAny<long>(), It.IsAny<NotificationType>(),
+            It.IsAny<string>(), It.IsAny<Dictionary<string, string>>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     private static ConfirmationCode ValidCode(Guid id) => new()
@@ -238,7 +293,7 @@ public class ConfirmAccountCommandHandlerTests : IDisposable
         var act = () => CreateSut().Handle(new ConfirmAccountCommand { CodeId = codeId.ToString(), Code = "123456" }, default);
 
         await act.Should().ThrowAsync<ConfirmationCodeIncorrectException>();
-        _usersClient.Verify(c => c.ConfirmUserAsync(It.IsAny<ConfirmUserRequest>(), null, null, default), Times.Never);
+        _usersClient.Verify(c => c.ConfirmUserAsync(It.IsAny<ConfirmUserRequest>(), null, It.IsAny<DateTime?>(), default), Times.Never);
         _codes.Verify(s => s.TryConsumeRegistrationCode(It.IsAny<Guid>(), It.IsAny<long>(), It.IsAny<string>(),
             It.IsAny<DateTime>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
         _metrics.SnapshotAndReset().Should().ContainKey("account_confirmation_failed_attempts_exceeded");

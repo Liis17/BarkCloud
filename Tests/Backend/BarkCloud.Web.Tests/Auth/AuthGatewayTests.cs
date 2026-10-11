@@ -101,6 +101,10 @@ public class AuthGatewayTests
         return new RpcException(new Status(StatusCode.Unauthenticated, "denied"), trailers);
     }
 
+    private static string CookieLine(HttpContext http, string name)
+        => http.Response.Headers.SetCookie.ToArray().OfType<string>()
+            .Single(cookie => cookie.StartsWith(name + "=", StringComparison.OrdinalIgnoreCase));
+
     [Fact]
     public async Task LoginAsync_Success_SetsCookiesAndReturnsSuccess()
     {
@@ -114,6 +118,76 @@ public class AuthGatewayTests
         var setCookie = http.Response.Headers.SetCookie.ToString();
         setCookie.Should().Contain(AuthGateway.AccessCookie);
         setCookie.Should().Contain(AuthGateway.RefreshCookie);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task LoginAsync_AccessCookieIsSessionOnlyAndRememberControlsRefreshCookie(bool remember)
+    {
+        _identity.Setup(c => c.AuthAsync(It.IsAny<AuthRequest>(), It.IsAny<Metadata>(), null, default))
+            .Returns(GrpcCallHelpers.AsyncUnary(SuccessResponse()));
+        var http = new DefaultHttpContext();
+
+        var result = await CreateSut().LoginAsync(http, "user", "pass", otp: null, remember: remember);
+
+        result.Outcome.Should().Be(LoginOutcome.Success);
+        CookieLine(http, AuthGateway.AccessCookie).ToLowerInvariant().Should().NotContain("expires=");
+        var refresh = CookieLine(http, AuthGateway.RefreshCookie).ToLowerInvariant();
+        refresh.Contains("expires=").Should().Be(remember);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task CompleteWebAuthnAsync_AccessCookieIsSessionOnlyAndRememberControlsRefreshCookie(bool remember)
+    {
+        _identity.Setup(c => c.CompleteWebAuthnAssertionAsync(It.IsAny<CompleteWebAuthnAssertionRequest>(),
+                It.IsAny<Metadata>(), null, default))
+            .Returns(GrpcCallHelpers.AsyncUnary(SuccessResponse()));
+        var http = new DefaultHttpContext();
+
+        var result = await CreateSut().CompleteWebAuthnAsync(http, "challenge", "{}", remember);
+
+        result.Outcome.Should().Be(LoginOutcome.Success);
+        CookieLine(http, AuthGateway.AccessCookie).ToLowerInvariant().Should().NotContain("expires=");
+        var refresh = CookieLine(http, AuthGateway.RefreshCookie).ToLowerInvariant();
+        refresh.Contains("expires=").Should().Be(remember);
+    }
+
+    [Fact]
+    public void GetOrCreateDeviceId_IsStableWithinRequestAndSetsOneCookie()
+    {
+        var http = new DefaultHttpContext();
+        var auth = CreateSut();
+
+        var first = auth.GetOrCreateDeviceId(http);
+        var second = auth.GetOrCreateDeviceId(http);
+
+        second.Should().Be(first);
+        http.Response.Headers.SetCookie.ToArray().Should().ContainSingle()
+            .Which.Should().StartWith(AuthGateway.DeviceCookie + "=");
+    }
+
+    [Fact]
+    public async Task LoginAsync_ParsesTypedOtpMetadata()
+    {
+        var trailers = new Metadata
+        {
+            { "x-error-code", new OtpCodeNeedException().ErrorCode },
+            { "x-otp-method", "email" },
+            { "x-otp-retry-after-seconds", "40" },
+            { "x-otp-mail-status", "existing" }
+        };
+        _identity.Setup(c => c.AuthAsync(It.IsAny<AuthRequest>(), It.IsAny<Metadata>(), null, default))
+            .Throws(new RpcException(new Status(StatusCode.Unauthenticated, "denied"), trailers));
+
+        var result = await CreateSut().LoginAsync(new DefaultHttpContext(), "user", "pass", null, remember: false);
+
+        result.Outcome.Should().Be(LoginOutcome.NeedsOtp);
+        result.OtpMethod.Should().Be("email");
+        result.OtpMailStatus.Should().Be("existing");
+        result.RetryAfterSeconds.Should().Be(40);
     }
 
     // Коды берём из самих исключений Identity — тест ловит рассинхрон между

@@ -127,6 +127,14 @@ builder.Services.AddGrpcClient<FilesServerApi.FilesServerApiClient>(o => o.Addre
 
 builder.Services.AddSingleton<TemplateRenderer>();
 builder.Services.AddSingleton<PageService>();
+builder.Services.AddAntiforgery(options =>
+{
+    options.FormFieldName = "__RequestVerificationToken";
+    options.HeaderName = "X-CSRF-TOKEN";
+});
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddSingleton<AuthFlowStore>();
+builder.Services.AddSingleton<AuthPageService>();
 builder.Services.AddSingleton<AdminGate>();
 builder.Services.AddSingleton<AdminUnlockLimiter>();
 builder.Services.AddSingleton<ComposeImageService>();
@@ -172,6 +180,7 @@ app.UseForwardedHeaders(fhOptions);
 // Бандл React-SPA из wwwroot (собирается Vite из ClientApp). Отдаём статику до эндпоинтов.
 app.UseStaticFiles();
 
+app.MapAuthEndpoints();
 app.MapWebEndpoints();
 app.MapCloudApiEndpoints();
 app.MapTextPreviewEndpoints();

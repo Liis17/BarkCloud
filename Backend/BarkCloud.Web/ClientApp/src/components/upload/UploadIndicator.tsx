@@ -25,6 +25,7 @@ function fmtEta(seconds: number | null): string {
 
 function StatusIcon({ status }: { status: TaskStatus }) {
   switch (status) {
+    case 'paused': return <Icon.pause size={14} />;
     case 'done': return <Icon.check size={14} className="upload-status done" />;
     case 'failed':
     case 'needs_file':
@@ -47,6 +48,7 @@ function statusLabel(s: TaskStatus): string {
     case 'checking': return 'Проверка…';
     case 'needs_file': return 'Нужен файл';
     case 'uploading': return 'Загрузка…';
+    case 'paused': return 'На паузе';
     case 'processing': return 'Обработка…';
     case 'attaching': return 'Прикрепление…';
     case 'uploaded_not_attached': return 'Загружен, не прикреплён';
@@ -59,7 +61,8 @@ function statusLabel(s: TaskStatus): string {
 function TaskRow({ task, onRetry, onReselect, onDismiss, onCancel }: { task: UploadTask; onRetry: (id: string) => void; onReselect: (id: string) => void; onDismiss: (id: string) => void; onCancel: (id: string) => void }) {
   const canCancel = task.status === 'hashing'
     || task.status === 'checking'
-    || task.status === 'uploading';
+    || task.status === 'uploading'
+    || task.status === 'paused';
   return (
     <div className={'upload-task' + (task.status === 'failed' || task.status === 'uploaded_not_attached' || task.status === 'needs_file' ? ' has-error' : '')}>
       <div className="upload-task-icon"><StatusIcon status={task.status} /></div>
@@ -72,7 +75,7 @@ function TaskRow({ task, onRetry, onReselect, onDismiss, onCancel }: { task: Upl
             <span className="upload-task-eta">~{fmtEta(task.eta)}</span>
           )}
         </div>
-        {(task.status === 'hashing' || task.status === 'uploading') && (
+        {(task.status === 'hashing' || task.status === 'uploading' || task.status === 'paused') && (
           <div className="upload-task-bar">
             <div className="bar-fill" style={{ width: Math.round(task.progress * 100) + '%' }} />
           </div>
@@ -118,20 +121,23 @@ function TaskRow({ task, onRetry, onReselect, onDismiss, onCancel }: { task: Upl
 }
 
 export function UploadIndicator() {
-  const { tasks, summary, hasActive, dupPrompt, retry, reselect, dismiss, clearCompleted, cancel, answerDuplicate } = useUploadState();
+  const { tasks, summary, hasActive, isPaused, dupPrompt, retry, reselect, dismiss, clearCompleted, pauseAll, resumeAll, clearAll, cancel, answerDuplicate } = useUploadState();
   const [open, setOpen] = React.useState(false);
   const orderedTasks = [...tasks].sort(uploadTaskOrdering);
+  const canPause = tasks.some(t => t.status === 'hashing' || t.status === 'checking' || t.status === 'uploading');
+  const canClearCompleted = tasks.some(t => t.status === 'done' || t.status === 'failed' || t.status === 'skipped');
+  const pauseLabel = isPaused ? 'Продолжить все загрузки' : 'Приостановить все загрузки';
 
   if (tasks.length === 0) return null;
 
   return (
     <>
       <button
-        className={'icon-btn upload-indicator' + (hasActive ? ' active' : '')}
-        title={hasActive ? `Загрузка ${summary.active} файл(ов)` : 'Загрузки'}
+        className={'icon-btn upload-indicator' + (hasActive && !isPaused ? ' active' : '')}
+        title={isPaused ? 'Загрузки на паузе' : hasActive ? `Загрузка ${summary.active} файл(ов)` : 'Загрузки'}
         onClick={() => setOpen(v => !v)}
       >
-        <Icon.upload size={20} />
+        {isPaused ? <Icon.pause size={20} /> : <Icon.upload size={20} />}
         {hasActive && <span className="upload-ind-badge">{summary.active}</span>}
         {!hasActive && summary.error > 0 && <span className="upload-ind-badge err">{summary.error}</span>}
       </button>
@@ -160,11 +166,17 @@ export function UploadIndicator() {
               <TaskRow key={t.id} task={t} onRetry={retry} onReselect={reselect} onDismiss={dismiss} onCancel={cancel} />
             ))}
           </div>
-          {summary.done + summary.skipped + summary.error > 0 && (
-            <div className="upload-popup-foot">
-              <button className="btn text" onClick={() => { clearCompleted(); if (!tasks.some(t => t.status !== 'done' && t.status !== 'failed' && t.status !== 'skipped')) setOpen(false); }}>Очистить завершённые</button>
-            </div>
-          )}
+          <div className="upload-popup-foot">
+            <button className="icon-btn" title="Очистить завершённые" aria-label="Очистить завершённые" disabled={!canClearCompleted} onClick={() => { clearCompleted(); if (tasks.every(t => t.status === 'done' || t.status === 'failed' || t.status === 'skipped')) setOpen(false); }}>
+              <Icon.check size={20} />
+            </button>
+            <button className="icon-btn" title={pauseLabel} aria-label={pauseLabel} disabled={!isPaused && !canPause} onClick={isPaused ? resumeAll : pauseAll}>
+              {isPaused ? <Icon.play size={20} /> : <Icon.pause size={20} />}
+            </button>
+            <button className="icon-btn" title="Очистить всю очередь" aria-label="Очистить всю очередь" onClick={() => { clearAll(); setOpen(false); }}>
+              <Icon.trash size={20} />
+            </button>
+          </div>
         </div>
       )}
 
