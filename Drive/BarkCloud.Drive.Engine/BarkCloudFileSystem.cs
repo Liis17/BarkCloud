@@ -1046,10 +1046,7 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
 
         if (isDirectory)
         {
-            var directory = listing.Subdirs.FirstOrDefault(item =>
-                string.Equals(item.Name, name, StringComparison.Ordinal))
-                ?? listing.Subdirs.FirstOrDefault(item =>
-                    string.Equals(item.Name, name, StringComparison.OrdinalIgnoreCase));
+            var directory = _gateway.FindSubdirectoryByName(directoryId, listing, name, exactFirst: true);
             return directory is null ? null : new ResolvedNode
             {
                 IsDirectory = true,
@@ -1060,20 +1057,14 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
             };
         }
 
-        var source = listing.Files.FirstOrDefault(item =>
-            string.Equals(item.Entry.Name, name, StringComparison.Ordinal))
-            ?? listing.Files.FirstOrDefault(item =>
-                string.Equals(item.Entry.Name, name, StringComparison.OrdinalIgnoreCase));
+        var source = _gateway.FindFileByName(directoryId, listing, name, exactFirst: true);
         return source is null ? null : CopyNode(source);
     }
 
     private ResolvedNode? ResolveMoveTarget(string directoryId, string name)
     {
         var listing = _gateway.ListDirectory(directoryId);
-        var directory = listing.Subdirs.FirstOrDefault(item =>
-            string.Equals(item.Name, name, StringComparison.Ordinal))
-            ?? listing.Subdirs.FirstOrDefault(item =>
-                string.Equals(item.Name, name, StringComparison.OrdinalIgnoreCase));
+        var directory = _gateway.FindSubdirectoryByName(directoryId, listing, name, exactFirst: true);
         if (directory is not null)
             return new ResolvedNode
             {
@@ -1084,10 +1075,7 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
                 Updated = ToDate(directory.UpdatedAt),
             };
 
-        var file = listing.Files.FirstOrDefault(item =>
-            string.Equals(item.Entry.Name, name, StringComparison.Ordinal))
-            ?? listing.Files.FirstOrDefault(item =>
-                string.Equals(item.Entry.Name, name, StringComparison.OrdinalIgnoreCase));
+        var file = _gateway.FindFileByName(directoryId, listing, name, exactFirst: true);
         return file is null ? null : CopyNode(file);
     }
 

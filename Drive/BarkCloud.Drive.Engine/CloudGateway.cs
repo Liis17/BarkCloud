@@ -31,6 +31,21 @@ internal sealed class ResolvedNode
 // целиком) и запись (upload по HTTP + привязка/перемещение/удаление через gRPC).
 internal sealed class CloudGateway : IDisposable
 {
+    private readonly record struct ListingLoadKey(string DirectoryId, int Generation, long AccountEpoch);
+
+    private sealed record DirectoryListingIndex(
+        Dictionary<string, BarkCloud.Proto.Files.DirectoryInfo> SubdirectoriesByName,
+        Dictionary<string, BarkCloud.Proto.Files.DirectoryInfo> SubdirectoriesByExactName,
+        Dictionary<string, FileEntryDetailed> FilesByName,
+        Dictionary<string, FileEntryDetailed> FilesByExactName);
+
+    private sealed record CachedDirectoryListing(
+        DateTime At,
+        int Generation,
+        long AccountEpoch,
+        DirectoryListingDetailed Listing,
+        DirectoryListingIndex Index);
+
     private static readonly TimeSpan ListTtl = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan StorageTtl = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan StorageFailureCache = TimeSpan.FromSeconds(10);
@@ -48,9 +63,10 @@ internal sealed class CloudGateway : IDisposable
     private readonly Func<string?> _tokenProvider;
     private readonly TimeProvider _time;
 
-    private readonly ConcurrentDictionary<string, (DateTime At, DirectoryListingDetailed Listing)> _listCache = new();
+    private readonly ConcurrentDictionary<string, CachedDirectoryListing> _listCache = new();
     private readonly ConcurrentDictionary<string, int> _listGen = new(); // «поколение» инвалидации на папку — защита от записи устаревшего ответа
-    private readonly object _listLock = new(); // делает (проверка поколения + запись кэша) и (инвалидация + бамп) атомарными друг к другу
+    private readonly object _listLock = new(); // защищает кэш, поколения и реестр объединяемых загрузок
+    private readonly Dictionary<ListingLoadKey, TaskCompletionSource<DirectoryListingDetailed>> _listLoads = new();
     private readonly ConcurrentDictionary<DownloadKey, Lazy<Task<string>>> _downloads = new();
     private readonly object _cacheEpochLock = new();
     private CancellationTokenSource _cacheEpochCancellation = new();
@@ -87,6 +103,8 @@ internal sealed class CloudGateway : IDisposable
     private readonly ITimer _delTimer;
 
     public Action<string>? SyncError { get; set; }
+
+    internal Action? ListingLoadWaiterJoinedForTesting { get; set; }
 
     public CloudGateway(CloudApi.CloudApiClient cloud, FilesApi.FilesApiClient files, HttpClient http,
         string filesWebBase, Func<string?> tokenProvider, string cacheDir, TimeProvider? time = null)
@@ -235,15 +253,121 @@ internal sealed class CloudGateway : IDisposable
     }
 
     public DirectoryListingDetailed ListDirectory(string dirId, CancellationToken cancellationToken = default)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        var accountEpoch = Volatile.Read(ref _accountEpoch);
-        if (_listCache.TryGetValue(dirId, out var c)
-            && accountEpoch == Volatile.Read(ref _accountEpoch)
-            && _time.GetUtcNow().UtcDateTime - c.At < ListTtl)
-            return HidePending(c.Listing);
+        => HidePending(ListDirectoryUnfiltered(dirId, cancellationToken));
 
-        _listGen.TryGetValue(dirId, out var gen);
+    private DirectoryListingDetailed ListDirectoryUnfiltered(
+        string dirId, CancellationToken cancellationToken = default)
+    {
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            ListingLoadKey key;
+            TaskCompletionSource<DirectoryListingDetailed> load;
+            DirectoryListingDetailed? cachedListing = null;
+            var ownsLoad = false;
+            lock (_listLock)
+            {
+                _listGen.TryGetValue(dirId, out var generation);
+                var accountEpoch = Volatile.Read(ref _accountEpoch);
+                key = new ListingLoadKey(dirId, generation, accountEpoch);
+
+                if (_listCache.TryGetValue(dirId, out var cached)
+                    && cached.Generation == generation
+                    && cached.AccountEpoch == accountEpoch
+                    && _time.GetUtcNow().UtcDateTime - cached.At < ListTtl)
+                    cachedListing = cached.Listing;
+
+                if (cachedListing is null)
+                {
+                    if (!_listLoads.TryGetValue(key, out load!))
+                    {
+                        load = new TaskCompletionSource<DirectoryListingDetailed>(
+                            TaskCreationOptions.RunContinuationsAsynchronously);
+                        _listLoads.Add(key, load);
+                        ownsLoad = true;
+                    }
+                }
+                else
+                    load = null!;
+            }
+
+            if (cachedListing is not null)
+                return cachedListing;
+
+            if (!ownsLoad)
+                ListingLoadWaiterJoinedForTesting?.Invoke();
+
+            if (ownsLoad)
+            {
+                DirectoryListingDetailed? loadedListing = null;
+                OperationCanceledException? cancellation = null;
+                Exception? failure = null;
+                try
+                {
+                    var listing = LoadDirectoryListing(dirId, cancellationToken);
+                    loadedListing = listing;
+                    var cached = new CachedDirectoryListing(
+                        _time.GetUtcNow().UtcDateTime,
+                        key.Generation,
+                        key.AccountEpoch,
+                        listing,
+                        CreateDirectoryListingIndex(listing));
+
+                    // Кэшируем только если за время RPC папку не инвалидировали: иначе ответ устарел
+                    // (например, запись удалена и тумбстон уже снят) и не должен затирать инвалидацию,
+                    // удерживая исчезнувший файл в кэше на ListTtl. Проверка поколения и запись кэша —
+                    // под _listLock (тем же, что инвалидация), иначе попавшая между ними InvalidateListing терялась бы.
+                    lock (_listLock)
+                    {
+                        _listGen.TryGetValue(dirId, out var generationAfter);
+                        if (key.Generation == generationAfter
+                            && key.AccountEpoch == Volatile.Read(ref _accountEpoch))
+                            _listCache[dirId] = cached;
+                    }
+                }
+                catch (OperationCanceledException ex)
+                {
+                    cancellation = ex;
+                }
+                catch (Exception ex)
+                {
+                    failure = ex;
+                }
+                finally
+                {
+                    lock (_listLock)
+                        if (_listLoads.TryGetValue(key, out var current) && ReferenceEquals(current, load))
+                            _listLoads.Remove(key);
+                }
+
+                if (cancellation is not null)
+                    load.TrySetCanceled(cancellation.CancellationToken);
+                else if (failure is not null)
+                    load.TrySetException(failure);
+                else
+                    load.TrySetResult(loadedListing!);
+            }
+
+            var result = ownsLoad ? load.Task : load.Task.WaitAsync(cancellationToken);
+            try
+            {
+                return result.GetAwaiter().GetResult();
+            }
+            catch (OperationCanceledException) when (!ownsLoad && !cancellationToken.IsCancellationRequested)
+            {
+                // У чужого токена владельца завершилась общая загрузка; повторно ищем кеш или новую загрузку.
+            }
+            catch (RpcException ex) when (!ownsLoad
+                                          && ex.StatusCode == StatusCode.Cancelled
+                                          && !cancellationToken.IsCancellationRequested)
+            {
+                // Отмена общей gRPC-загрузки не должна отменять живой вызов-ожидатель.
+            }
+        }
+    }
+
+    private DirectoryListingDetailed LoadDirectoryListing(string dirId, CancellationToken cancellationToken)
+    {
         var listing = new DirectoryListingDetailed();
         var cursorName = "";
         var cursorEntryId = "";
@@ -268,18 +392,31 @@ internal sealed class CloudGateway : IDisposable
             cursorEntryId = page.NextCursorEntryId;
         }
 
-        // Кэшируем только если за время RPC папку не инвалидировали: иначе ответ устарел
-        // (например, запись удалена и тумбстон уже снят) и не должен затирать инвалидацию,
-        // удерживая исчезнувший файл в кэше на ListTtl. Проверка поколения и запись кэша —
-        // под _listLock (тем же, что инвалидация), иначе попавшая между ними InvalidateListing терялась бы.
-        lock (_listLock)
+        return listing;
+    }
+
+    private static DirectoryListingIndex CreateDirectoryListingIndex(DirectoryListingDetailed listing)
+    {
+        var subdirectoriesByName = new Dictionary<string, BarkCloud.Proto.Files.DirectoryInfo>(
+            StringComparer.OrdinalIgnoreCase);
+        var filesByName = new Dictionary<string, FileEntryDetailed>(StringComparer.OrdinalIgnoreCase);
+        var subdirectoriesByExactName = new Dictionary<string, BarkCloud.Proto.Files.DirectoryInfo>(
+            StringComparer.Ordinal);
+        var filesByExactName = new Dictionary<string, FileEntryDetailed>(StringComparer.Ordinal);
+
+        foreach (var directory in listing.Subdirs)
         {
-            _listGen.TryGetValue(dirId, out var genAfter);
-            if (gen == genAfter && accountEpoch == Volatile.Read(ref _accountEpoch))
-                _listCache[dirId] = (_time.GetUtcNow().UtcDateTime, listing);
+            subdirectoriesByName.TryAdd(directory.Name, directory);
+            subdirectoriesByExactName.TryAdd(directory.Name, directory);
+        }
+        foreach (var file in listing.Files)
+        {
+            filesByName.TryAdd(file.Entry.Name, file);
+            filesByExactName.TryAdd(file.Entry.Name, file);
         }
 
-        return HidePending(listing);
+        return new DirectoryListingIndex(
+            subdirectoriesByName, subdirectoriesByExactName, filesByName, filesByExactName);
     }
 
     public FileEntryDetailed? FindFileEntryByFileId(string directoryId, string fileId,
@@ -303,6 +440,67 @@ internal sealed class CloudGateway : IDisposable
         copy.NextCursorEntryId = listing.NextCursorEntryId;
         return copy;
     }
+
+    public BarkCloud.Proto.Files.DirectoryInfo? FindSubdirectoryByName(
+        string directoryId, DirectoryListingDetailed listing, string name, bool exactFirst = false)
+    {
+        var index = GetDirectoryListingIndex(directoryId, listing);
+        if (index is not null)
+        {
+            if (!exactFirst)
+                return index.SubdirectoriesByName.GetValueOrDefault(name);
+            return index.SubdirectoriesByExactName.GetValueOrDefault(name)
+                   ?? index.SubdirectoriesByName.GetValueOrDefault(name);
+        }
+
+        var exact = exactFirst
+            ? listing.Subdirs.FirstOrDefault(item => string.Equals(item.Name, name, StringComparison.Ordinal))
+            : null;
+        return exact ?? listing.Subdirs.FirstOrDefault(item =>
+            string.Equals(item.Name, name, StringComparison.OrdinalIgnoreCase));
+    }
+
+    public FileEntryDetailed? FindFileByName(
+        string directoryId, DirectoryListingDetailed listing, string name, bool exactFirst = false)
+    {
+        var index = GetDirectoryListingIndex(directoryId, listing);
+        if (index is not null)
+        {
+            if (!exactFirst)
+            {
+                var indexed = index.FilesByName.GetValueOrDefault(name);
+                if (indexed is null || !_delTombstones.ContainsKey(indexed.Entry.Id))
+                    return indexed;
+            }
+            else
+            {
+                var indexedExact = index.FilesByExactName.GetValueOrDefault(name);
+                if (indexedExact is not null && !_delTombstones.ContainsKey(indexedExact.Entry.Id))
+                    return indexedExact;
+                if (indexedExact is null)
+                {
+                    var indexed = index.FilesByName.GetValueOrDefault(name);
+                    if (indexed is null || !_delTombstones.ContainsKey(indexed.Entry.Id))
+                        return indexed;
+                }
+            }
+        }
+
+        var exact = exactFirst
+            ? listing.Files.FirstOrDefault(item =>
+                string.Equals(item.Entry.Name, name, StringComparison.Ordinal)
+                && !_delTombstones.ContainsKey(item.Entry.Id))
+            : null;
+        return exact ?? listing.Files.FirstOrDefault(item =>
+            string.Equals(item.Entry.Name, name, StringComparison.OrdinalIgnoreCase)
+            && !_delTombstones.ContainsKey(item.Entry.Id));
+    }
+
+    private DirectoryListingIndex? GetDirectoryListingIndex(string directoryId, DirectoryListingDetailed listing)
+        => _listCache.TryGetValue(directoryId, out var cached)
+           && ReferenceEquals(cached.Listing, listing)
+            ? cached.Index
+            : null;
 
     public bool HasTombstonedFile(string directoryId, string name)
     {
@@ -333,11 +531,11 @@ internal sealed class CloudGateway : IDisposable
 
         for (var i = 0; i < segments.Length; i++)
         {
-            var listing = ListDirectory(currentDir);
+            var listing = ListDirectoryUnfiltered(currentDir);
             var last = i == segments.Length - 1;
             var seg = segments[i];
 
-            var sub = listing.Subdirs.FirstOrDefault(s => string.Equals(s.Name, seg, StringComparison.OrdinalIgnoreCase));
+            var sub = FindSubdirectoryByName(currentDir, listing, seg);
             if (sub != null)
             {
                 if (last)
@@ -356,8 +554,7 @@ internal sealed class CloudGateway : IDisposable
 
             if (last)
             {
-                var fe = listing.Files.FirstOrDefault(f =>
-                    string.Equals(f.Entry.Name, seg, StringComparison.OrdinalIgnoreCase));
+                var fe = FindFileByName(currentDir, listing, seg);
                 if (fe != null)
                     return new ResolvedNode
                     {

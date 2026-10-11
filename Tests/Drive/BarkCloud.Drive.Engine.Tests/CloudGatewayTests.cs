@@ -33,6 +33,53 @@ public sealed class CloudGatewayTests
     }
 
     [Fact]
+    public void Name_indexes_preserve_resolve_and_move_lookup_order()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        var lowerCaseFile = cloud.AddFile("", "report.txt");
+        cloud.AddFile("", "REPORT.TXT");
+        var sameNameDirectory = cloud.AddDirectory("same.txt");
+        cloud.AddFile("", "same.txt");
+        var lowerCaseDirectory = cloud.AddDirectory("docs");
+        cloud.AddDirectory("DOCS");
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+        var listing = gateway.ListDirectory("");
+
+        gateway.Resolve("\\report.txt")!.EntryId.Should().Be(listing.Files[0].Entry.Id);
+        gateway.FindFileByName("", listing, "report.txt", exactFirst: true)!.Entry.Id
+            .Should().Be(lowerCaseFile.EntryId);
+
+        var sameName = gateway.Resolve("\\SAME.TXT");
+        sameName.Should().NotBeNull();
+        sameName!.IsDirectory.Should().BeTrue();
+        sameName.DirectoryId.Should().Be(sameNameDirectory);
+
+        gateway.FindSubdirectoryByName("", listing, "docs", exactFirst: true)!.Id
+            .Should().Be(lowerCaseDirectory);
+    }
+
+    [Fact]
+    public void Resolve_skips_a_tombstoned_name_match_for_a_live_case_variant()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        var deletedFile = cloud.AddFile("", "report.txt");
+        var liveFile = cloud.AddFile("", "REPORT.TXT");
+        var unrelatedDeletedFile = cloud.AddFile("", "unrelated.txt");
+        var visibleFile = cloud.AddFile("", "visible.txt");
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+
+        gateway.QueueDeleteFileEntry(deletedFile.EntryId, "");
+        gateway.QueueDeleteFileEntry(unrelatedDeletedFile.EntryId, "");
+
+        gateway.Resolve("\\visible.txt")!.EntryId.Should().Be(visibleFile.EntryId);
+        gateway.Resolve("\\report.txt")!.EntryId.Should().Be(liveFile.EntryId);
+        gateway.ListDirectory("").Files.Select(file => file.Entry.Id)
+            .Should().BeEquivalentTo(new[] { liveFile.EntryId, visibleFile.EntryId });
+    }
+
+    [Fact]
     public void ListDirectory_fetches_all_pages()
     {
         using var temp = new TestDirectory();
@@ -69,6 +116,353 @@ public sealed class CloudGatewayTests
         time.Advance(TimeSpan.FromSeconds(1) + TimeSpan.FromMilliseconds(1));
         gateway.ListDirectory("").Files.Should().HaveCount(2);
 
+        cloud.Invoker.Calls.Count(call => call.MethodFullName == FakeCloudMethods.ListDirectoryDetailed)
+            .Should().Be(2);
+    }
+
+    [Fact]
+    public void Resolve_reuses_the_name_index_for_a_large_listing_within_ttl()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        for (var i = 0; i < 10_000; i++)
+            cloud.AddFile("", $"file-{i:D5}.txt");
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+
+        gateway.Resolve("\\FILE-09999.TXT")!.Name.Should().Be("file-09999.txt");
+        gateway.Resolve("\\FILE-00000.TXT")!.Name.Should().Be("file-00000.txt");
+
+        cloud.Invoker.Calls.Count(call => call.MethodFullName == FakeCloudMethods.ListDirectoryDetailed)
+            .Should().Be(50);
+    }
+
+    [Fact]
+    public async Task Concurrent_cold_directory_requests_share_one_pagination()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        for (var i = 0; i < 205; i++)
+            cloud.AddFile("", $"file-{i:D3}.txt");
+        var callersReady = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var startCallers = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var requestStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var allWaitersJoined = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseRequest = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        const int callerCount = 20;
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+        var joinedWaiters = 0;
+        gateway.ListingLoadWaiterJoinedForTesting = () =>
+        {
+            if (Interlocked.Increment(ref joinedWaiters) == callerCount - 1)
+                allWaitersJoined.TrySetResult();
+        };
+        cloud.Invoker.OnCall += method =>
+        {
+            if (method != FakeCloudMethods.ListDirectoryDetailed)
+                return;
+            requestStarted.TrySetResult();
+            releaseRequest.Task.GetAwaiter().GetResult();
+        };
+
+        var readyCount = 0;
+        var requests = Enumerable.Range(0, callerCount).Select(_ => Task.Factory.StartNew(() =>
+        {
+            if (Interlocked.Increment(ref readyCount) == callerCount)
+                callersReady.TrySetResult();
+            startCallers.Task.GetAwaiter().GetResult();
+            return gateway.ListDirectory("");
+        }, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default)).ToArray();
+
+        await callersReady.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        startCallers.TrySetResult();
+        try
+        {
+            await requestStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            await allWaitersJoined.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        }
+        finally
+        {
+            releaseRequest.TrySetResult();
+        }
+
+        var listings = await Task.WhenAll(requests).WaitAsync(TimeSpan.FromSeconds(10));
+
+        listings.Should().OnlyContain(listing => listing.Files.Count == 205);
+        cloud.Invoker.Calls.Count(call => call.MethodFullName == FakeCloudMethods.ListDirectoryDetailed)
+            .Should().Be(2);
+    }
+
+    [Fact]
+    public async Task Canceling_a_waiter_does_not_cancel_the_shared_listing_load()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        cloud.AddFile("", "shared.txt");
+        var requestStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var waiterJoined = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseRequest = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var waiterCancellation = new CancellationTokenSource();
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+        gateway.ListingLoadWaiterJoinedForTesting = () => waiterJoined.TrySetResult();
+        cloud.Invoker.OnCall += method =>
+        {
+            if (method != FakeCloudMethods.ListDirectoryDetailed)
+                return;
+            requestStarted.TrySetResult();
+            releaseRequest.Task.GetAwaiter().GetResult();
+        };
+
+        var owner = Task.Factory.StartNew(() => gateway.ListDirectory(""),
+            CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
+        try
+        {
+            await requestStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            var waiter = Task.Factory.StartNew(() => gateway.ListDirectory("", waiterCancellation.Token),
+                CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
+            await waiterJoined.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+            waiterCancellation.Cancel();
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                () => waiter.WaitAsync(TimeSpan.FromSeconds(10)));
+            owner.IsCompleted.Should().BeFalse();
+        }
+        finally
+        {
+            releaseRequest.TrySetResult();
+        }
+
+        (await owner.WaitAsync(TimeSpan.FromSeconds(10))).Files
+            .Should().ContainSingle(file => file.Entry.Name == "shared.txt");
+        cloud.Invoker.Calls.Count(call => call.MethodFullName == FakeCloudMethods.ListDirectoryDetailed)
+            .Should().Be(1);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Canceling_the_listing_owner_retries_for_a_live_waiter(bool useRpcCancellation)
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        cloud.AddFile("", "retry.txt");
+        var requestStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var waiterJoined = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var requestCount = 0;
+        using var ownerCancellation = new CancellationTokenSource();
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+        gateway.ListingLoadWaiterJoinedForTesting = () => waiterJoined.TrySetResult();
+        cloud.Invoker.OnCall += method =>
+        {
+            if (method != FakeCloudMethods.ListDirectoryDetailed)
+                return;
+
+            var request = Interlocked.Increment(ref requestCount);
+            if (request == 1)
+            {
+                requestStarted.TrySetResult();
+                var cancellationToken = cloud.Invoker.Calls[^1].CancellationToken;
+                cancellationToken.WaitHandle.WaitOne();
+                if (useRpcCancellation)
+                    throw new RpcException(new Status(StatusCode.Cancelled, "owner canceled"));
+                throw new OperationCanceledException(cancellationToken);
+            }
+
+        };
+
+        var owner = Task.Factory.StartNew(() => gateway.ListDirectory("", ownerCancellation.Token),
+            CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
+        await requestStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        var waiter = Task.Factory.StartNew(() => gateway.ListDirectory(""),
+            CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
+        await waiterJoined.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+        ownerCancellation.Cancel();
+        Exception? ownerFailure = null;
+        try
+        {
+            await owner.WaitAsync(TimeSpan.FromSeconds(10));
+        }
+        catch (RpcException ex)
+        {
+            ownerFailure = ex;
+        }
+        catch (OperationCanceledException ex)
+        {
+            ownerFailure = ex;
+        }
+
+        ownerFailure.Should().NotBeNull();
+        if (ownerFailure is RpcException rpcFailure)
+            rpcFailure.StatusCode.Should().Be(StatusCode.Cancelled);
+        else
+            ownerFailure.Should().BeAssignableTo<OperationCanceledException>();
+        (await waiter.WaitAsync(TimeSpan.FromSeconds(10))).Files
+            .Should().ContainSingle(file => file.Entry.Name == "retry.txt");
+        cloud.Invoker.Calls.Count(call => call.MethodFullName == FakeCloudMethods.ListDirectoryDetailed)
+            .Should().Be(2);
+    }
+
+    [Fact]
+    public async Task InvalidateListing_during_a_load_starts_a_new_load_and_discards_the_old_result()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        cloud.AddFile("", "old.txt");
+        var firstResponseReady = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseFirstResponse = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var secondResponseReady = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var responseCount = 0;
+        cloud.Invoker.AfterResponse += (method, _) =>
+        {
+            if (method != FakeCloudMethods.ListDirectoryDetailed)
+                return;
+            if (Interlocked.Increment(ref responseCount) == 1)
+            {
+                firstResponseReady.TrySetResult();
+                releaseFirstResponse.Task.GetAwaiter().GetResult();
+            }
+            else
+                secondResponseReady.TrySetResult();
+        };
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+
+        var firstRequest = Task.Factory.StartNew(() => gateway.ListDirectory(""),
+            CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
+        try
+        {
+            await firstResponseReady.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            cloud.AddFile("", "new.txt");
+            gateway.InvalidateListing("");
+
+            var secondRequest = Task.Factory.StartNew(() => gateway.ListDirectory(""),
+                CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
+            await secondResponseReady.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            var freshListing = await secondRequest.WaitAsync(TimeSpan.FromSeconds(10));
+            freshListing.Files.Should().Contain(file => file.Entry.Name == "new.txt");
+        }
+        finally
+        {
+            releaseFirstResponse.TrySetResult();
+        }
+
+        var oldListing = await firstRequest.WaitAsync(TimeSpan.FromSeconds(10));
+        oldListing.Files.Should().NotContain(file => file.Entry.Name == "new.txt");
+        gateway.ListDirectory("").Files.Should().Contain(file => file.Entry.Name == "new.txt");
+        cloud.Invoker.Calls.Count(call => call.MethodFullName == FakeCloudMethods.ListDirectoryDetailed)
+            .Should().Be(2);
+    }
+
+    [Fact]
+    public async Task ClearCache_during_a_load_uses_a_new_account_epoch()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        cloud.AddFile("", "old.txt");
+        var firstResponseReady = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseFirstResponse = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var secondResponseReady = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var responseCount = 0;
+        cloud.Invoker.AfterResponse += (method, _) =>
+        {
+            if (method != FakeCloudMethods.ListDirectoryDetailed)
+                return;
+            if (Interlocked.Increment(ref responseCount) == 1)
+            {
+                firstResponseReady.TrySetResult();
+                releaseFirstResponse.Task.GetAwaiter().GetResult();
+            }
+            else
+                secondResponseReady.TrySetResult();
+        };
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+
+        var firstRequest = Task.Factory.StartNew(() => gateway.ListDirectory(""),
+            CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
+        try
+        {
+            await firstResponseReady.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            cloud.AddFile("", "new.txt");
+            gateway.ClearCache();
+
+            var secondRequest = Task.Factory.StartNew(() => gateway.ListDirectory(""),
+                CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
+            await secondResponseReady.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            var freshListing = await secondRequest.WaitAsync(TimeSpan.FromSeconds(10));
+            freshListing.Files.Should().Contain(file => file.Entry.Name == "new.txt");
+        }
+        finally
+        {
+            releaseFirstResponse.TrySetResult();
+        }
+
+        var oldListing = await firstRequest.WaitAsync(TimeSpan.FromSeconds(10));
+        oldListing.Files.Should().NotContain(file => file.Entry.Name == "new.txt");
+        gateway.ListDirectory("").Files.Should().Contain(file => file.Entry.Name == "new.txt");
+        cloud.Invoker.Calls.Count(call => call.MethodFullName == FakeCloudMethods.ListDirectoryDetailed)
+            .Should().Be(2);
+    }
+
+    [Fact]
+    public async Task Concurrent_cold_directory_requests_share_rpc_failures_without_caching_them()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        cloud.AddFile("", "retry.txt");
+        var callersReady = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var startCallers = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var requestStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var waiterJoined = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseRequest = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+        gateway.ListingLoadWaiterJoinedForTesting = () => waiterJoined.TrySetResult();
+        cloud.Invoker.FailNext(FakeCloudMethods.ListDirectoryDetailed,
+            new RpcException(new Status(StatusCode.Unavailable, "offline")));
+        cloud.Invoker.OnCall += method =>
+        {
+            if (method != FakeCloudMethods.ListDirectoryDetailed)
+                return;
+            requestStarted.TrySetResult();
+            releaseRequest.Task.GetAwaiter().GetResult();
+        };
+
+        const int callerCount = 2;
+        var readyCount = 0;
+        var requests = Enumerable.Range(0, callerCount).Select(_ => Task.Factory.StartNew(() =>
+        {
+            if (Interlocked.Increment(ref readyCount) == callerCount)
+                callersReady.TrySetResult();
+            startCallers.Task.GetAwaiter().GetResult();
+            return gateway.ListDirectory("");
+        }, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default)).ToArray();
+
+        await callersReady.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        startCallers.TrySetResult();
+        try
+        {
+            await requestStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            await waiterJoined.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        }
+        finally
+        {
+            releaseRequest.TrySetResult();
+        }
+
+        var failures = await Task.WhenAll(requests.Select(async request =>
+        {
+            try
+            {
+                await request.WaitAsync(TimeSpan.FromSeconds(10));
+                return null;
+            }
+            catch (Exception ex)
+            {
+                return ex;
+            }
+        }));
+        failures.Select(error => (error as RpcException)?.StatusCode)
+            .Should().OnlyContain(statusCode => statusCode == StatusCode.Unavailable);
+
+        gateway.ListDirectory("").Files.Should().ContainSingle(file => file.Entry.Name == "retry.txt");
         cloud.Invoker.Calls.Count(call => call.MethodFullName == FakeCloudMethods.ListDirectoryDetailed)
             .Should().Be(2);
     }
