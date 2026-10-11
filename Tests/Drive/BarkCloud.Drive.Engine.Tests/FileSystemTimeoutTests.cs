@@ -168,8 +168,12 @@ public sealed class FileSystemTimeoutTests
         using var gateway = cloud.CreateGateway(temp.Path("cache"), time);
         var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"), time: time);
         var info = new FakeDokanFileInfo();
-        var open = Task.Run(() => fileSystem.CreateFile("\\hydrate-keepalive.bin", FileAccess.WriteData,
-            FileShare.ReadWrite, FileMode.Open, FileOptions.None, FileAttributes.Normal, info));
+        fileSystem.CreateFile("\\hydrate-keepalive.bin", FileAccess.WriteData,
+            FileShare.ReadWrite, FileMode.Open, FileOptions.None, FileAttributes.Normal, info)
+            .Should().Be(DokanResult.Success);
+        var buffer = new byte[3];
+        var read = Task.Run(() => fileSystem.ReadFile("\\hydrate-keepalive.bin", buffer,
+            out _, 0, info));
         NtStatus result;
         try
         {
@@ -182,15 +186,74 @@ public sealed class FileSystemTimeoutTests
         finally
         {
             releaseDownload.TrySetResult();
-            result = await open.WaitAsync(TimeSpan.FromSeconds(5));
-            if (result == DokanResult.Success)
-            {
-                fileSystem.Cleanup("\\hydrate-keepalive.bin", info);
-                fileSystem.CloseFile("\\hydrate-keepalive.bin", info);
-            }
+            result = await read.WaitAsync(TimeSpan.FromSeconds(5));
+            fileSystem.Cleanup("\\hydrate-keepalive.bin", info);
+            fileSystem.CloseFile("\\hydrate-keepalive.bin", info);
         }
 
         result.Should().Be(DokanResult.Success);
+        buffer.Should().Equal([1, 2, 3]);
+    }
+
+    [Fact]
+    public async Task ReadFile_waiting_for_hydration_renews_its_own_Dokany_timeout()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        cloud.AddFile("", "waiter.bin", [1, 2, 3]);
+        var time = new TrackingTimeProvider();
+        var downloadStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseDownload = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var originalResponder = cloud.HttpHandler.Responder;
+        cloud.HttpHandler.Responder = async (request, cancellationToken) =>
+        {
+            if (request.Method == HttpMethod.Get)
+            {
+                downloadStarted.TrySetResult();
+                await releaseDownload.Task.WaitAsync(cancellationToken);
+            }
+            return await originalResponder(request, cancellationToken);
+        };
+        using var gateway = cloud.CreateGateway(temp.Path("cache"), time);
+        var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"), time: time);
+        var firstInfo = new FakeDokanFileInfo();
+        var secondInfo = new FakeDokanFileInfo();
+        fileSystem.CreateFile("\\waiter.bin", FileAccess.WriteData, FileShare.ReadWrite, FileMode.Open,
+            FileOptions.None, FileAttributes.Normal, firstInfo).Should().Be(DokanResult.Success);
+        fileSystem.CreateFile("\\waiter.bin", FileAccess.WriteData, FileShare.ReadWrite, FileMode.Open,
+            FileOptions.None, FileAttributes.Normal, secondInfo).Should().Be(DokanResult.Success);
+
+        Task<(NtStatus Status, int BytesRead)> ReadAsync(FakeDokanFileInfo info)
+            => Task.Run(() =>
+            {
+                var buffer = new byte[3];
+                var status = fileSystem.ReadFile("\\waiter.bin", buffer, out var bytesRead, 0, info);
+                return (status, bytesRead);
+            });
+
+        var firstRead = ReadAsync(firstInfo);
+        Task<(NtStatus Status, int BytesRead)>? secondRead = null;
+        try
+        {
+            await downloadStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            secondRead = ReadAsync(secondInfo);
+            await time.WaitForKeepAliveTimerAsync(2).WaitAsync(TimeSpan.FromSeconds(5));
+            time.Advance(TimeSpan.FromSeconds(10));
+
+            secondInfo.TryResetTimeoutCalls.Should().BeGreaterThan(0);
+            secondInfo.LastTimeoutMilliseconds.Should().Be(60_000);
+        }
+        finally
+        {
+            releaseDownload.TrySetResult();
+            await firstRead.WaitAsync(TimeSpan.FromSeconds(5));
+            if (secondRead is not null)
+                await secondRead.WaitAsync(TimeSpan.FromSeconds(5));
+            fileSystem.Cleanup("\\waiter.bin", firstInfo);
+            fileSystem.Cleanup("\\waiter.bin", secondInfo);
+            fileSystem.CloseFile("\\waiter.bin", firstInfo);
+            fileSystem.CloseFile("\\waiter.bin", secondInfo);
+        }
     }
 
     [Fact]
@@ -353,7 +416,7 @@ public sealed class FileSystemTimeoutTests
     }
 
     [Fact]
-    public void Failed_hydration_removes_working_copy_and_partial_download()
+    public void Failed_hydration_keeps_working_copy_unhydrated_and_removes_partial_download()
     {
         using var temp = new TestDirectory();
         var cloud = new FakeCloud();
@@ -366,11 +429,19 @@ public sealed class FileSystemTimeoutTests
         using var gateway = cloud.CreateGateway(temp.Path("cache"));
         var fileSystem = new BarkCloudFileSystem(gateway, writeDir);
 
+        var info = new FakeDokanFileInfo();
         var result = fileSystem.CreateFile("\\hydrate.bin", FileAccess.WriteData, FileShare.ReadWrite,
-            FileMode.Open, FileOptions.None, FileAttributes.Normal, new FakeDokanFileInfo());
+            FileMode.Open, FileOptions.None, FileAttributes.Normal, info);
+        result.Should().Be(DokanResult.Success);
+        var file = ((HandleContext)info.Context!).File!;
 
+        result = fileSystem.WriteFile("\\hydrate.bin", [4], out _, 1, info);
         result.Should().Be(BarkCloudFileSystem.UnexpectedNetworkError);
+        file.Hydrated.Should().BeFalse();
+        file.Stream.Should().BeNull();
         Directory.GetFiles(writeDir).Should().BeEmpty();
+        fileSystem.Cleanup("\\hydrate.bin", info);
+        fileSystem.CloseFile("\\hydrate.bin", info);
     }
 
     [Theory]
@@ -456,6 +527,7 @@ public sealed class FileSystemTimeoutTests
         public override ITimer CreateTimer(TimerCallback callback, object? state,
             TimeSpan dueTime, TimeSpan period)
         {
+            var timer = _inner.CreateTimer(callback, state, dueTime, period);
             if (dueTime == KeepAliveInterval && period == KeepAliveInterval)
             {
                 TaskCompletionSource? waiter;
@@ -467,7 +539,7 @@ public sealed class FileSystemTimeoutTests
                 waiter?.TrySetResult();
             }
 
-            return _inner.CreateTimer(callback, state, dueTime, period);
+            return timer;
         }
 
         public void Advance(TimeSpan amount) => _inner.Advance(amount);

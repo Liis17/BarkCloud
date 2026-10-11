@@ -87,7 +87,23 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
     private readonly Dictionary<string, LocalFile> _localFiles = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, LocalFile> _pendingFiles = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, LocalFile> _openOutboxFiles = new(StringComparer.Ordinal);
+    internal Action? ReaderLocalFileFoundForTesting { get; set; }
     private string? _preservedPlaceholderError;
+
+    private sealed class FileSyncLease : IDisposable
+    {
+        private object? _sync;
+
+        public FileSyncLease(object sync) => _sync = sync;
+
+        public void Dispose()
+        {
+            if (_sync is not { } sync)
+                return;
+            _sync = null;
+            Monitor.Exit(sync);
+        }
+    }
 
     // Метка тома (имя диска), отдаётся в GetVolumeInformation. Устанавливается перед Mount.
     public string VolumeLabel { get; set; } = "BarkCloud";
@@ -320,7 +336,7 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
         }
         else
         {
-            if (TryOpenRegisteredLocal(fileName, mode, wantsWrite, out var localContext, out var localStatus))
+            if (TryOpenRegisteredLocal(fileName, mode, wantsWrite, info, out var localContext, out var localStatus))
             {
                 if (localStatus != DokanResult.Success)
                     return localStatus;
@@ -339,7 +355,7 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
             node = SafeResolve(fileName);
 
             // Разрешение пути могло завершиться одновременно с регистрацией рабочей копии.
-            if (TryOpenRegisteredLocal(fileName, mode, wantsWrite, out localContext, out localStatus))
+            if (TryOpenRegisteredLocal(fileName, mode, wantsWrite, info, out localContext, out localStatus))
             {
                 if (localStatus != DokanResult.Success)
                     return localStatus;
@@ -405,9 +421,9 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
 
             try
             {
-                var candidate = OpenExistingForWrite(fileName, node, info,
+                var candidate = OpenExistingForWrite(fileName, node,
                     truncate: mode is FileMode.Create or FileMode.Truncate);
-                if (!TryOpenCandidate(candidate, mode, out var context, out var alreadyExists, out var candidateStatus))
+                if (!TryOpenCandidate(candidate, mode, info, out var context, out var alreadyExists, out var candidateStatus))
                     return candidateStatus;
                 info.Context = context;
                 return ExistingStatus(mode);
@@ -426,7 +442,7 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
             if (parent is null)
                 return DokanResult.PathNotFound;
             var candidate = OpenNew(fileName, parent.Value.DirectoryId, parent.Value.Name);
-            if (!TryOpenCandidate(candidate, mode, out var context, out var alreadyExists, out var candidateStatus))
+            if (!TryOpenCandidate(candidate, mode, info, out var context, out var alreadyExists, out var candidateStatus))
                 return candidateStatus;
             info.Context = context;
             return alreadyExists ? ExistingStatus(mode) : DokanResult.Success;
@@ -503,7 +519,7 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
             // записи в облако выставляем ошибку в статус, чтобы App показал её пользователю.
             if (info.Context is HandleContext { File: { } file })
             {
-                lock (file.Sync)
+                using (AcquireFileSync(file, info))
                     file.KeepData = true;
             }
             EngineLog.Error($"Cleanup(\"{fileName}\")", ex);
@@ -533,7 +549,7 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
             EngineLog.Error($"CloseFile(\"{fileName}\")", ex);
             if (info.Context is HandleContext { File: { } file })
             {
-                lock (file.Sync)
+                using (AcquireFileSync(file, info))
                     file.KeepData = true;
                 LastSyncError = Loc.T("Eng_SyncFailedFmt", Path.GetFileName(fileName), ConnectionErrors.GetDisplayMessage(ex));
             }
@@ -550,25 +566,78 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
         try
         {
             var handle = info.Context as HandleContext;
+            var readerNode = handle?.File is null && handle?.Node is { IsDirectory: false } nodeHandle
+                ? nodeHandle
+                : null;
             var file = handle?.File;
-            if (file is null && handle?.Node is { IsDirectory: false } nodeHandle)
-                file = FindLocalFileByEntryId(nodeHandle.EntryId);
+            if (file is null && readerNode is not null)
+            {
+                file = FindLocalFileByEntryId(readerNode.EntryId);
+                if (file is not null)
+                    ReaderLocalFileFoundForTesting?.Invoke();
+            }
             if (file is null && handle?.Node is null)
                 file = FindLocalFile(fileName) ?? FindPendingFileByPath(fileName);
 
-            if (file != null)
+            if (file is not null && readerNode is not null)
             {
+                bool hydrated;
                 lock (file.DataSync)
                 {
-                    using var stream = new FileStream(file.TempPath, FileMode.Open,
-                        System.IO.FileAccess.Read, FileShare.ReadWrite);
-                    if (offset >= stream.Length)
-                        return DokanResult.Success;
-                    stream.Position = offset;
-                    bytesRead = stream.Read(buffer, 0, buffer.Length);
+                    if (!IsRegisteredReadableLocalFile(file, readerNode.EntryId))
+                        file = null;
+                    hydrated = file?.Hydrated == true;
+                    if (file is not null && hydrated)
+                        bytesRead = ReadLocalCopy(file, buffer, offset);
                 }
-                return DokanResult.Success;
+
+                if (file is not null && !hydrated)
+                {
+                    using (AcquireFileSync(file, info))
+                    {
+                        lock (file.DataSync)
+                        {
+                            if (!IsRegisteredReadableLocalFile(file, readerNode.EntryId))
+                                file = null;
+                            hydrated = file?.Hydrated == true;
+                        }
+
+                        if (file is not null)
+                        {
+                            if (!hydrated)
+                                EnsureHydrated(file, info);
+                            lock (file.DataSync)
+                            {
+                                if (!IsRegisteredReadableLocalFile(file, readerNode.EntryId))
+                                    file = null;
+                                else
+                                    bytesRead = ReadLocalCopy(file, buffer, offset);
+                            }
+                        }
+                    }
+                }
             }
+            else if (file is not null)
+            {
+                bool hydrated;
+                lock (file.DataSync)
+                    hydrated = file.Hydrated;
+                if (!hydrated)
+                {
+                    using (AcquireFileSync(file, info))
+                    {
+                        lock (file.DataSync)
+                            hydrated = file.Hydrated;
+                        if (!hydrated)
+                            EnsureHydrated(file, info);
+                    }
+                }
+
+                bytesRead = ReadLocalCopy(file, buffer, offset);
+            }
+
+            if (file is not null)
+                return DokanResult.Success;
 
             var node = handle?.Node ?? SafeResolve(fileName);
             if (node is null || node.IsDirectory)
@@ -593,15 +662,31 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
             if (info.Context is not HandleContext { File: { } file })
                 return DokanResult.AccessDenied;
 
-            lock (file.Sync)
-            lock (file.DataSync)
+            using (AcquireFileSync(file, info))
             {
                 if (file.Kind == LocalFileKind.Pending)
                     return DokanResult.AccessDenied;
-                var stream = EnsureStreamOpen(file, writable: true);
-                stream.Position = info.WriteToEndOfFile ? stream.Length : offset;
-                stream.Write(buffer, 0, buffer.Length);
-                MarkModified(file);
+                var appendToEnd = info.WriteToEndOfFile;
+                bool hydrate;
+                lock (file.DataSync)
+                {
+                    var length = LocalFileLengthLocked(file);
+                    hydrate = !file.Hydrated
+                              && (appendToEnd || offset != 0 || buffer.LongLength < length);
+                }
+
+                if (hydrate)
+                    EnsureHydrated(file, info);
+
+                lock (file.DataSync)
+                {
+                    if (!file.Hydrated)
+                        CreateEmptyStream(file);
+                    var stream = EnsureStreamOpen(file, writable: true);
+                    stream.Position = appendToEnd ? stream.Length : offset;
+                    stream.Write(buffer, 0, buffer.Length);
+                    MarkModified(file);
+                }
             }
             bytesWritten = buffer.Length;
             return DokanResult.Success;
@@ -750,13 +835,25 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
         {
             if (info.Context is not HandleContext { File: { } file })
                 return DokanResult.AccessDenied;
-            lock (file.Sync)
-            lock (file.DataSync)
+            using (AcquireFileSync(file, info))
             {
                 if (file.Kind == LocalFileKind.Pending)
                     return DokanResult.AccessDenied;
-                EnsureStreamOpen(file, writable: true).SetLength(length);
-                MarkModified(file);
+                if (length == 0)
+                    TruncateLocalFileToZero(file);
+                else
+                {
+                    lock (file.DataSync)
+                        if (length == LocalFileLengthLocked(file))
+                            return DokanResult.Success;
+
+                    EnsureHydrated(file, info);
+                    lock (file.DataSync)
+                    {
+                        EnsureStreamOpen(file, writable: true).SetLength(length);
+                        MarkModified(file);
+                    }
+                }
             }
             return DokanResult.Success;
         }
@@ -773,16 +870,28 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
         {
             if (info.Context is not HandleContext { File: { } file })
                 return DokanResult.AccessDenied;
-            lock (file.Sync)
-            lock (file.DataSync)
+            using (AcquireFileSync(file, info))
             {
                 if (file.Kind == LocalFileKind.Pending)
                     return DokanResult.AccessDenied;
-                var stream = EnsureStreamOpen(file, writable: true);
-                if (length < stream.Length)
+                if (length == 0)
+                    TruncateLocalFileToZero(file);
+                else
                 {
-                    stream.SetLength(length);
-                    MarkModified(file);
+                    lock (file.DataSync)
+                        if (length >= LocalFileLengthLocked(file))
+                            return DokanResult.Success;
+
+                    EnsureHydrated(file, info);
+                    lock (file.DataSync)
+                    {
+                        var stream = EnsureStreamOpen(file, writable: true);
+                        if (length < stream.Length)
+                        {
+                            stream.SetLength(length);
+                            MarkModified(file);
+                        }
+                    }
                 }
             }
             return DokanResult.Success;
@@ -1415,7 +1524,7 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
 
     // ───────── внутреннее ─────────
 
-    private bool TryOpenRegisteredLocal(string path, FileMode mode, bool wantsWrite,
+    private bool TryOpenRegisteredLocal(string path, FileMode mode, bool wantsWrite, IDokanFileInfo info,
         out HandleContext? context, out NtStatus status)
     {
         context = null;
@@ -1451,7 +1560,7 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
                 var pendingDenied = false;
                 var missingRegistration = false;
                 var deleteAfterRejectedOpen = false;
-                lock (file.Sync)
+                using (AcquireFileSync(file, info))
                 {
                     lock (file.DataSync)
                     {
@@ -1477,12 +1586,16 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
 
                         if (!pendingDenied && !missingRegistration && wantsWrite)
                         {
-                            var stream = EnsureStreamOpen(file, writable: true);
                             if (mode is FileMode.Create or FileMode.Truncate)
                             {
+                                var stream = file.Hydrated
+                                    ? EnsureStreamOpen(file, writable: true)
+                                    : CreateEmptyStream(file);
                                 stream.SetLength(0);
                                 MarkModified(file);
                             }
+                            else if (file.Hydrated)
+                                EnsureStreamOpen(file, writable: true);
                         }
                     }
                 }
@@ -1571,7 +1684,7 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
         }
     }
 
-    private bool TryOpenCandidate(LocalFile candidate, FileMode mode, out HandleContext? context,
+    private bool TryOpenCandidate(LocalFile candidate, FileMode mode, IDokanFileInfo info, out HandleContext? context,
         out bool alreadyExists, out NtStatus status)
     {
         context = null;
@@ -1620,12 +1733,16 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
 
         try
         {
-            lock (file.Sync)
+            using (AcquireFileSync(file, info))
             lock (file.DataSync)
             {
-                var stream = EnsureStreamOpen(file, writable: true);
+                if (file.Hydrated)
+                    EnsureStreamOpen(file, writable: true);
                 if (alreadyExists && (mode is FileMode.Create or FileMode.Truncate))
                 {
+                    var stream = file.Hydrated
+                        ? EnsureStreamOpen(file, writable: true)
+                        : CreateEmptyStream(file);
                     stream.SetLength(0);
                     MarkModified(file);
                 }
@@ -1676,20 +1793,14 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
         }
     }
 
-    private LocalFile OpenExistingForWrite(string path, ResolvedNode node, IDokanFileInfo info, bool truncate)
+    private LocalFile OpenExistingForWrite(string path, ResolvedNode node, bool truncate)
     {
         var temp = Path.Combine(_writeDir, Guid.NewGuid().ToString("N"));
         try
         {
-            if (!truncate)
-            {
-                using var keepAlive = DokanKeepAlive.Start(info, _time);
-                _gateway.DownloadToAsync(node.FileId, temp, node.Length).GetAwaiter().GetResult(); // гидрация до включения ленивой загрузки
-            }
-
-            var stream = new FileStream(temp, FileMode.OpenOrCreate, System.IO.FileAccess.ReadWrite, FileShare.Read);
-            if (truncate)
-                stream.SetLength(0);
+            var stream = truncate
+                ? new FileStream(temp, FileMode.Create, System.IO.FileAccess.ReadWrite, FileShare.Read)
+                : null;
             return new LocalFile
             {
                 Path = NormalizePath(path),
@@ -1701,7 +1812,7 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
                 ExistingNode = node,
                 Kind = LocalFileKind.Writable,
                 Modified = truncate,
-                Hydrated = true,
+                Hydrated = truncate,
             };
         }
         catch
@@ -2070,7 +2181,7 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
             return;
         }
 
-        lock (file.Sync)
+        using (AcquireFileSync(file, info))
         {
             bool shouldPersist;
             lock (_localFilesLock)
@@ -2139,7 +2250,8 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
             }
 
             if (!keep)
-                TryDelete(file.TempPath);
+                lock (file.DataSync)
+                    TryDelete(file.TempPath);
         }
     }
 
@@ -2198,8 +2310,11 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
 
     private void DisposeCandidate(LocalFile file)
     {
-        try { file.Stream?.Dispose(); } catch { /* ignore */ }
-        TryDelete(file.TempPath);
+        lock (file.DataSync)
+        {
+            try { file.Stream?.Dispose(); } catch { /* ignore */ }
+            TryDelete(file.TempPath);
+        }
     }
 
     private void DeleteClosedLocalFile(LocalFile file)
@@ -2208,8 +2323,8 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
         {
             file.Stream?.Dispose();
             file.Stream = null;
+            TryDelete(file.TempPath);
         }
-        TryDelete(file.TempPath);
     }
 
     private static FileStream EnsureStreamOpen(LocalFile file, bool writable)
@@ -2222,6 +2337,109 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
             writable ? System.IO.FileAccess.ReadWrite : System.IO.FileAccess.Read,
             writable ? FileShare.Read : FileShare.ReadWrite);
         return file.Stream;
+    }
+
+    private static int ReadLocalCopy(LocalFile file, byte[] buffer, long offset)
+    {
+        lock (file.DataSync)
+        {
+            using var stream = new FileStream(file.TempPath, FileMode.Open,
+                System.IO.FileAccess.Read, FileShare.ReadWrite);
+            if (offset >= stream.Length)
+                return 0;
+            stream.Position = offset;
+            return stream.Read(buffer, 0, buffer.Length);
+        }
+    }
+
+    private void EnsureHydrated(LocalFile file, IDokanFileInfo info)
+    {
+        ResolvedNode? node;
+        lock (file.DataSync)
+        {
+            if (file.Hydrated)
+                return;
+            file.Stream?.Dispose();
+            file.Stream = null;
+            node = file.ExistingNode;
+        }
+
+        if (node is null)
+        {
+            lock (file.DataSync)
+            {
+                if (file.Hydrated)
+                    return;
+                file.Stream = new FileStream(file.TempPath, FileMode.OpenOrCreate,
+                    System.IO.FileAccess.ReadWrite, FileShare.Read);
+                file.Hydrated = true;
+            }
+            return;
+        }
+
+        using var keepAlive = DokanKeepAlive.Start(info, _time);
+        _gateway.DownloadToAsync(node.FileId, file.TempPath, node.Length).GetAwaiter().GetResult();
+        lock (file.DataSync)
+        {
+            file.Stream = new FileStream(file.TempPath, FileMode.Open,
+                System.IO.FileAccess.ReadWrite, FileShare.Read);
+            file.Hydrated = true;
+        }
+    }
+
+    private static FileStream CreateEmptyStream(LocalFile file)
+    {
+        file.Stream?.Dispose();
+        file.Stream = new FileStream(file.TempPath, FileMode.Create,
+            System.IO.FileAccess.ReadWrite, FileShare.Read);
+        file.Hydrated = true;
+        return file.Stream;
+    }
+
+    private static void TruncateLocalFileToZero(LocalFile file)
+    {
+        lock (file.DataSync)
+        {
+            if (LocalFileLengthLocked(file) == 0)
+                return;
+            var stream = file.Hydrated
+                ? EnsureStreamOpen(file, writable: true)
+                : CreateEmptyStream(file);
+            stream.SetLength(0);
+            MarkModified(file);
+        }
+    }
+
+    private bool IsRegisteredReadableLocalFile(LocalFile file, string entryId)
+    {
+        lock (_localFilesLock)
+        {
+            var registered = (!string.IsNullOrEmpty(file.Path)
+                              && _localFiles.TryGetValue(file.Path, out var current)
+                              && ReferenceEquals(current, file))
+                             || (_pendingFiles.TryGetValue(PendingKey(file.DirectoryId, file.Name), out var pending)
+                                 && ReferenceEquals(pending, file));
+            return registered
+                   && string.Equals(file.ExistingEntryId, entryId, StringComparison.Ordinal)
+                   && (file.Hydrated || file.OpenCount > 0 || file.Kind == LocalFileKind.Pending);
+        }
+    }
+
+    private IDisposable AcquireFileSync(LocalFile file, IDokanFileInfo info)
+    {
+        if (Monitor.TryEnter(file.Sync))
+            return new FileSyncLease(file.Sync);
+
+        using var keepAlive = DokanKeepAlive.Start(info, _time);
+        Monitor.Enter(file.Sync);
+        return new FileSyncLease(file.Sync);
+    }
+
+    private static long LocalFileLengthLocked(LocalFile file)
+    {
+        if (!file.Hydrated && file.ExistingNode is { } node)
+            return node.Length;
+        return file.Stream?.Length ?? (File.Exists(file.TempPath) ? new FileInfo(file.TempPath).Length : 0);
     }
 
     private static void MarkModified(LocalFile file)
@@ -2277,11 +2495,14 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
     private static FileInformation GetLocalFileInformation(LocalFile file)
     {
         long length;
+        DateTime created;
+        DateTime updated;
         lock (file.DataSync)
-            length = File.Exists(file.TempPath) ? new FileInfo(file.TempPath).Length : 0;
-
-        var created = file.ExistingNode?.Created ?? file.CreatedAt;
-        var updated = file.ExistingNode?.Updated ?? file.CreatedAt;
+        {
+            length = LocalFileLengthLocked(file);
+            created = file.ExistingNode?.Created ?? file.CreatedAt;
+            updated = file.ExistingNode?.Updated ?? file.CreatedAt;
+        }
         return new FileInformation
         {
             FileName = file.Name,

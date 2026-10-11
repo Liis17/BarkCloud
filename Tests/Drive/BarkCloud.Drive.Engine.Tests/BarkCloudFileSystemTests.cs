@@ -1141,6 +1141,709 @@ public sealed class BarkCloudFileSystemTests
     }
 
     [Fact]
+    public async Task Reader_opened_before_writer_reads_hydrated_copy_while_upload_is_blocked()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        cloud.AddFile("", "shared.bin", [1, 2, 3]);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+        var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"));
+        var reader = new FakeDokanFileInfo();
+        fileSystem.CreateFile("\\shared.bin", FileAccess.ReadData, FileShare.ReadWrite, FileMode.Open,
+            FileOptions.None, FileAttributes.Normal, reader).Should().Be(DokanResult.Success);
+        var writer = new FakeDokanFileInfo();
+        fileSystem.CreateFile("\\shared.bin", FileAccess.WriteData, FileShare.ReadWrite, FileMode.Open,
+            FileOptions.None, FileAttributes.Normal, writer).Should().Be(DokanResult.Success);
+        fileSystem.WriteFile("\\shared.bin", [4, 5, 6], out _, 0, writer).Should().Be(DokanResult.Success);
+
+        var uploadStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseUpload = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var responder = cloud.HttpHandler.Responder;
+        cloud.HttpHandler.Responder = async (request, cancellationToken) =>
+        {
+            if (request.Method == System.Net.Http.HttpMethod.Post)
+            {
+                uploadStarted.TrySetResult();
+                await releaseUpload.Task.WaitAsync(cancellationToken);
+            }
+            return await responder(request, cancellationToken);
+        };
+
+        var saving = Task.Run(() => fileSystem.Cleanup("\\shared.bin", writer));
+        Task? reading = null;
+        Exception? readError = null;
+        try
+        {
+            await uploadStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            var readStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            reading = Task.Run(() =>
+            {
+                readStarted.TrySetResult();
+                var buffer = new byte[3];
+                fileSystem.ReadFile("\\shared.bin", buffer, out var bytesRead, 0, reader)
+                    .Should().Be(DokanResult.Success);
+                bytesRead.Should().Be(3);
+                buffer.Should().Equal([4, 5, 6]);
+            });
+            await readStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            try
+            {
+                await reading.WaitAsync(TimeSpan.FromSeconds(2));
+            }
+            catch (Exception ex)
+            {
+                readError = ex;
+            }
+        }
+        finally
+        {
+            releaseUpload.TrySetResult();
+            await saving;
+            if (reading is not null)
+            {
+                try { await reading; }
+                catch when (readError is not null) { }
+            }
+            fileSystem.Cleanup("\\shared.bin", reader);
+            fileSystem.CloseFile("\\shared.bin", writer);
+            fileSystem.CloseFile("\\shared.bin", reader);
+        }
+        readError.Should().BeNull("the reader should finish without waiting for the upload");
+    }
+
+    [Fact]
+    public void Reader_opened_before_writer_reads_pending_copy_after_upload_failure()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        cloud.AddFile("", "shared.bin", [1, 2, 3]);
+        var responder = cloud.HttpHandler.Responder;
+        cloud.HttpHandler.Responder = (request, cancellationToken) => request.Method == System.Net.Http.HttpMethod.Post
+            ? Task.FromResult(new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.InternalServerError))
+            : responder(request, cancellationToken);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+        var outbox = new UploadOutbox(temp.Path("outbox"));
+        var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"), outbox, "server", () => "42");
+        var reader = new FakeDokanFileInfo();
+        fileSystem.CreateFile("\\shared.bin", FileAccess.ReadData, FileShare.ReadWrite, FileMode.Open,
+            FileOptions.None, FileAttributes.Normal, reader).Should().Be(DokanResult.Success);
+        var writer = new FakeDokanFileInfo();
+        fileSystem.CreateFile("\\shared.bin", FileAccess.WriteData, FileShare.ReadWrite, FileMode.Open,
+            FileOptions.None, FileAttributes.Normal, writer).Should().Be(DokanResult.Success);
+        var local = ((HandleContext)writer.Context!).File!;
+        fileSystem.WriteFile("\\shared.bin", [4, 5, 6], out _, 0, writer).Should().Be(DokanResult.Success);
+
+        fileSystem.Cleanup("\\shared.bin", writer);
+        fileSystem.CloseFile("\\shared.bin", writer);
+
+        local.Kind.Should().Be(LocalFileKind.Pending);
+        local.OpenCount.Should().Be(0);
+        var buffer = new byte[3];
+        fileSystem.ReadFile("\\shared.bin", buffer, out var bytesRead, 0, reader).Should().Be(DokanResult.Success);
+        bytesRead.Should().Be(3);
+        buffer.Should().Equal([4, 5, 6]);
+
+        fileSystem.Cleanup("\\shared.bin", reader);
+        fileSystem.CloseFile("\\shared.bin", reader);
+    }
+
+    [Fact]
+    public void Opening_existing_file_for_write_without_changes_does_not_download_or_upload()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        cloud.AddFile("", "existing.bin", [1, 2, 3]);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+        var outbox = new UploadOutbox(temp.Path("outbox"));
+        var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"), outbox,
+            "server", () => "42");
+
+        foreach (var (mode, expectedStatus) in new[]
+                 {
+                     (FileMode.Open, DokanResult.Success),
+                     (FileMode.OpenOrCreate, DokanResult.AlreadyExists),
+                 })
+        {
+            var info = new FakeDokanFileInfo();
+            fileSystem.CreateFile("\\existing.bin", FileAccess.WriteData, FileShare.ReadWrite, mode,
+                FileOptions.None, FileAttributes.Normal, info).Should().Be(expectedStatus);
+            fileSystem.Cleanup("\\existing.bin", info);
+            fileSystem.CloseFile("\\existing.bin", info);
+        }
+
+        cloud.HttpHandler.Calls.Should().BeEmpty();
+        outbox.Count.Should().Be(0);
+    }
+
+    [Fact]
+    public void GetFileInformation_before_hydration_uses_cloud_length_without_download()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        cloud.AddFile("", "existing.bin", [1, 2, 3, 4]);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+        var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"));
+        var writer = new FakeDokanFileInfo();
+        fileSystem.CreateFile("\\existing.bin", FileAccess.WriteData, FileShare.ReadWrite, FileMode.Open,
+            FileOptions.None, FileAttributes.Normal, writer).Should().Be(DokanResult.Success);
+
+        fileSystem.GetFileInformation("\\existing.bin", out var info, writer).Should().Be(DokanResult.Success);
+        info.Length.Should().Be(4);
+        fileSystem.FindFiles("\\", out var files, new FakeDokanFileInfo()).Should().Be(DokanResult.Success);
+        files.Single(file => file.FileName == "existing.bin").Length.Should().Be(4);
+        cloud.HttpHandler.Calls.Should().BeEmpty();
+
+        fileSystem.Cleanup("\\existing.bin", writer);
+        fileSystem.CloseFile("\\existing.bin", writer);
+    }
+
+    [Theory]
+    [InlineData(FileMode.Create, DokanResult.AlreadyExists)]
+    [InlineData(FileMode.Truncate, DokanResult.Success)]
+    public void Create_or_truncate_existing_file_resets_copy_without_downloading(
+        FileMode mode, NtStatus expectedStatus)
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        cloud.AddFile("", "truncate.bin", [1, 2, 3]);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+        var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"));
+        var writer = new FakeDokanFileInfo();
+
+        fileSystem.CreateFile("\\truncate.bin", FileAccess.WriteData, FileShare.ReadWrite, mode,
+            FileOptions.None, FileAttributes.Normal, writer).Should().Be(expectedStatus);
+        var local = ((HandleContext)writer.Context!).File!;
+        local.Hydrated.Should().BeTrue();
+        fileSystem.GetFileInformation("\\truncate.bin", out var info, writer).Should().Be(DokanResult.Success);
+        info.Length.Should().Be(0);
+        cloud.HttpHandler.Calls.Should().BeEmpty();
+
+        fileSystem.Cleanup("\\truncate.bin", writer);
+        fileSystem.CloseFile("\\truncate.bin", writer);
+    }
+
+    [Fact]
+    public async Task Writing_in_the_middle_hydrates_and_uploads_the_full_contents()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        cloud.AddFile("", "existing.bin", [1, 2, 3, 4, 5]);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+        var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"));
+        var writer = new FakeDokanFileInfo();
+        fileSystem.CreateFile("\\existing.bin", FileAccess.WriteData, FileShare.ReadWrite, FileMode.Open,
+            FileOptions.None, FileAttributes.Normal, writer).Should().Be(DokanResult.Success);
+        cloud.HttpHandler.Calls.Should().BeEmpty();
+
+        fileSystem.WriteFile("\\existing.bin", [8, 9], out var bytesWritten, 2, writer)
+            .Should().Be(DokanResult.Success);
+        bytesWritten.Should().Be(2);
+        cloud.HttpHandler.Calls.Count(call => call.Method == "GET").Should().Be(1);
+
+        fileSystem.Cleanup("\\existing.bin", writer);
+        fileSystem.CloseFile("\\existing.bin", writer);
+        cloud.HttpHandler.Calls.Count(call => call.Method == "POST").Should().Be(1);
+
+        var saved = gateway.ListDirectory("").Files.Single(file => file.Entry.Name == "existing.bin");
+        var savedPath = temp.Path("saved.bin");
+        await gateway.DownloadToAsync(saved.File.Id, savedPath, saved.File.FileSize);
+        File.ReadAllBytes(savedPath).Should().Equal([1, 2, 8, 9, 5]);
+    }
+
+    [Fact]
+    public async Task Full_overwrite_from_zero_does_not_download_the_cloud_file()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        cloud.AddFile("", "replace.bin", [1, 2, 3]);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+        var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"));
+        var writer = new FakeDokanFileInfo();
+        fileSystem.CreateFile("\\replace.bin", FileAccess.WriteData, FileShare.ReadWrite, FileMode.Open,
+            FileOptions.None, FileAttributes.Normal, writer).Should().Be(DokanResult.Success);
+
+        fileSystem.WriteFile("\\replace.bin", [7, 8, 9], out _, 0, writer).Should().Be(DokanResult.Success);
+        cloud.HttpHandler.Calls.Count(call => call.Method == "GET").Should().Be(0);
+        fileSystem.Cleanup("\\replace.bin", writer);
+        fileSystem.CloseFile("\\replace.bin", writer);
+        cloud.HttpHandler.Calls.Count(call => call.Method == "POST").Should().Be(1);
+
+        var saved = gateway.ListDirectory("").Files.Single(file => file.Entry.Name == "replace.bin");
+        var savedPath = temp.Path("saved.bin");
+        await gateway.DownloadToAsync(saved.File.Id, savedPath, saved.File.FileSize);
+        File.ReadAllBytes(savedPath).Should().Equal([7, 8, 9]);
+    }
+
+    [Fact]
+    public async Task Short_write_from_zero_hydrates_and_preserves_the_tail()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        cloud.AddFile("", "short.bin", [1, 2, 3, 4]);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+        var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"));
+        var writer = new FakeDokanFileInfo();
+        fileSystem.CreateFile("\\short.bin", FileAccess.WriteData, FileShare.ReadWrite, FileMode.Open,
+            FileOptions.None, FileAttributes.Normal, writer).Should().Be(DokanResult.Success);
+
+        fileSystem.WriteFile("\\short.bin", [9], out _, 0, writer).Should().Be(DokanResult.Success);
+        cloud.HttpHandler.Calls.Count(call => call.Method == "GET").Should().Be(1);
+        fileSystem.Cleanup("\\short.bin", writer);
+        fileSystem.CloseFile("\\short.bin", writer);
+
+        var saved = gateway.ListDirectory("").Files.Single(file => file.Entry.Name == "short.bin");
+        var savedPath = temp.Path("saved.bin");
+        await gateway.DownloadToAsync(saved.File.Id, savedPath, saved.File.FileSize);
+        File.ReadAllBytes(savedPath).Should().Equal([9, 2, 3, 4]);
+    }
+
+    [Fact]
+    public void SetEndOfFile_zero_truncates_without_downloading()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        cloud.AddFile("", "zero.bin", [1, 2, 3]);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+        var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"));
+        var writer = new FakeDokanFileInfo();
+        fileSystem.CreateFile("\\zero.bin", FileAccess.WriteData, FileShare.ReadWrite, FileMode.Open,
+            FileOptions.None, FileAttributes.Normal, writer).Should().Be(DokanResult.Success);
+
+        fileSystem.SetEndOfFile("\\zero.bin", 0, writer).Should().Be(DokanResult.Success);
+        fileSystem.GetFileInformation("\\zero.bin", out var info, writer).Should().Be(DokanResult.Success);
+        info.Length.Should().Be(0);
+        cloud.HttpHandler.Calls.Count(call => call.Method == "GET").Should().Be(0);
+        fileSystem.Cleanup("\\zero.bin", writer);
+        fileSystem.CloseFile("\\zero.bin", writer);
+        cloud.HttpHandler.Calls.Count(call => call.Method == "POST").Should().Be(0);
+    }
+
+    [Fact]
+    public async Task SetEndOfFile_in_the_middle_hydrates_and_uploads_the_truncated_contents()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        cloud.AddFile("", "truncate.bin", [1, 2, 3, 4]);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+        var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"));
+        var writer = new FakeDokanFileInfo();
+        fileSystem.CreateFile("\\truncate.bin", FileAccess.WriteData, FileShare.ReadWrite, FileMode.Open,
+            FileOptions.None, FileAttributes.Normal, writer).Should().Be(DokanResult.Success);
+
+        fileSystem.SetEndOfFile("\\truncate.bin", 2, writer).Should().Be(DokanResult.Success);
+        cloud.HttpHandler.Calls.Count(call => call.Method == "GET").Should().Be(1);
+        fileSystem.Cleanup("\\truncate.bin", writer);
+        fileSystem.CloseFile("\\truncate.bin", writer);
+
+        var saved = gateway.ListDirectory("").Files.Single(file => file.Entry.Name == "truncate.bin");
+        var savedPath = temp.Path("saved.bin");
+        await gateway.DownloadToAsync(saved.File.Id, savedPath, saved.File.FileSize);
+        File.ReadAllBytes(savedPath).Should().Equal([1, 2]);
+    }
+
+    [Fact]
+    public void SetAllocationSize_hydrates_for_nonzero_size_and_truncates_zero_without_download()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        cloud.AddFile("", "allocation-zero.bin", [1, 2, 3]);
+        cloud.AddFile("", "allocation.bin", [4, 5, 6, 7]);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+        var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"));
+        var zero = new FakeDokanFileInfo();
+        fileSystem.CreateFile("\\allocation-zero.bin", FileAccess.WriteData, FileShare.ReadWrite, FileMode.Open,
+            FileOptions.None, FileAttributes.Normal, zero).Should().Be(DokanResult.Success);
+        fileSystem.SetAllocationSize("\\allocation-zero.bin", 0, zero).Should().Be(DokanResult.Success);
+        cloud.HttpHandler.Calls.Count(call => call.Method == "GET").Should().Be(0);
+        fileSystem.Cleanup("\\allocation-zero.bin", zero);
+        fileSystem.CloseFile("\\allocation-zero.bin", zero);
+
+        var writer = new FakeDokanFileInfo();
+        fileSystem.CreateFile("\\allocation.bin", FileAccess.WriteData, FileShare.ReadWrite, FileMode.Open,
+            FileOptions.None, FileAttributes.Normal, writer).Should().Be(DokanResult.Success);
+        fileSystem.SetAllocationSize("\\allocation.bin", 2, writer).Should().Be(DokanResult.Success);
+        cloud.HttpHandler.Calls.Count(call => call.Method == "GET").Should().Be(1);
+        fileSystem.Cleanup("\\allocation.bin", writer);
+        fileSystem.CloseFile("\\allocation.bin", writer);
+    }
+
+    [Fact]
+    public void ReadFile_on_writer_handle_hydrates_and_returns_cloud_contents()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        cloud.AddFile("", "read.bin", [1, 2, 3]);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+        var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"));
+        var writer = new FakeDokanFileInfo();
+        fileSystem.CreateFile("\\read.bin", FileAccess.WriteData, FileShare.ReadWrite, FileMode.Open,
+            FileOptions.None, FileAttributes.Normal, writer).Should().Be(DokanResult.Success);
+        var local = ((HandleContext)writer.Context!).File!;
+        local.Hydrated.Should().BeFalse();
+
+        var buffer = new byte[3];
+        fileSystem.ReadFile("\\read.bin", buffer, out var bytesRead, 0, writer).Should().Be(DokanResult.Success);
+        bytesRead.Should().Be(3);
+        buffer.Should().Equal([1, 2, 3]);
+        local.Hydrated.Should().BeTrue();
+        cloud.HttpHandler.Calls.Count(call => call.Method == "GET").Should().Be(1);
+        fileSystem.Cleanup("\\read.bin", writer);
+        fileSystem.CloseFile("\\read.bin", writer);
+    }
+
+    [Fact]
+    public void Reader_opened_before_writer_hydrates_local_copy_through_entry_registry()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        cloud.AddFile("", "reader.bin", [1, 2, 3]);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+        var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"));
+        var reader = new FakeDokanFileInfo();
+        fileSystem.CreateFile("\\reader.bin", FileAccess.ReadData, FileShare.ReadWrite, FileMode.Open,
+            FileOptions.None, FileAttributes.Normal, reader).Should().Be(DokanResult.Success);
+        var writer = new FakeDokanFileInfo();
+        fileSystem.CreateFile("\\reader.bin", FileAccess.WriteData, FileShare.ReadWrite, FileMode.Open,
+            FileOptions.None, FileAttributes.Normal, writer).Should().Be(DokanResult.Success);
+        var local = ((HandleContext)writer.Context!).File!;
+        local.Hydrated.Should().BeFalse();
+
+        var buffer = new byte[3];
+        fileSystem.ReadFile("\\reader.bin", buffer, out var bytesRead, 0, reader).Should().Be(DokanResult.Success);
+        bytesRead.Should().Be(3);
+        buffer.Should().Equal([1, 2, 3]);
+        local.Hydrated.Should().BeTrue();
+        cloud.HttpHandler.Calls.Count(call => call.Method == "GET").Should().Be(1);
+
+        fileSystem.Cleanup("\\reader.bin", writer);
+        fileSystem.Cleanup("\\reader.bin", reader);
+        fileSystem.CloseFile("\\reader.bin", writer);
+        fileSystem.CloseFile("\\reader.bin", reader);
+    }
+
+    [Fact]
+    public async Task Reader_handle_falls_back_to_cloud_if_local_copy_closes_before_hydration()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        cloud.AddFile("", "reader-close.bin", [1, 2, 3]);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+        var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"));
+        var reader = new FakeDokanFileInfo();
+        fileSystem.CreateFile("\\reader-close.bin", FileAccess.ReadData, FileShare.ReadWrite, FileMode.Open,
+            FileOptions.None, FileAttributes.Normal, reader).Should().Be(DokanResult.Success);
+        var writer = new FakeDokanFileInfo();
+        fileSystem.CreateFile("\\reader-close.bin", FileAccess.WriteData, FileShare.ReadWrite, FileMode.Open,
+            FileOptions.None, FileAttributes.Normal, writer).Should().Be(DokanResult.Success);
+        var local = ((HandleContext)writer.Context!).File!;
+        var localFileFound = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var syncHeld = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        fileSystem.ReaderLocalFileFoundForTesting = () => localFileFound.TrySetResult();
+        var buffer = new byte[3];
+        var holdSyncAndCloseWriter = Task.Run(() =>
+        {
+            Monitor.Enter(local.Sync);
+            try
+            {
+                syncHeld.TrySetResult();
+                localFileFound.Task.GetAwaiter().GetResult();
+                fileSystem.CloseFile("\\reader-close.bin", writer);
+            }
+            finally
+            {
+                Monitor.Exit(local.Sync);
+            }
+        });
+        Task<(NtStatus Status, int BytesRead)>? read = null;
+        try
+        {
+            await syncHeld.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            read = Task.Run(() =>
+            {
+                var status = fileSystem.ReadFile("\\reader-close.bin", buffer, out var bytesRead, 0, reader);
+                return (status, bytesRead);
+            });
+            await localFileFound.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            await holdSyncAndCloseWriter.WaitAsync(TimeSpan.FromSeconds(5));
+        }
+        finally
+        {
+            localFileFound.TrySetResult();
+            await holdSyncAndCloseWriter.WaitAsync(TimeSpan.FromSeconds(5));
+        }
+
+        var result = await read!.WaitAsync(TimeSpan.FromSeconds(5));
+        result.Status.Should().Be(DokanResult.Success);
+        result.BytesRead.Should().Be(3);
+        buffer.Should().Equal([1, 2, 3]);
+        local.Hydrated.Should().BeFalse();
+        local.Stream.Should().BeNull();
+        File.Exists(local.TempPath).Should().BeFalse();
+        cloud.HttpHandler.Calls.Count(call => call.Method == "GET").Should().Be(1);
+
+        fileSystem.Cleanup("\\reader-close.bin", reader);
+        fileSystem.CloseFile("\\reader-close.bin", reader);
+    }
+
+    [Fact]
+    public async Task Concurrent_reads_share_one_hydration()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        cloud.AddFile("", "concurrent.bin", [1, 2, 3]);
+        var requestStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseDownload = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var originalResponder = cloud.HttpHandler.Responder;
+        cloud.HttpHandler.Responder = async (request, cancellationToken) =>
+        {
+            if (request.Method == HttpMethod.Get)
+            {
+                requestStarted.TrySetResult();
+                await releaseDownload.Task.WaitAsync(cancellationToken);
+            }
+            return await originalResponder(request, cancellationToken);
+        };
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+        var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"));
+        var writer = new FakeDokanFileInfo();
+        fileSystem.CreateFile("\\concurrent.bin", FileAccess.WriteData, FileShare.ReadWrite, FileMode.Open,
+            FileOptions.None, FileAttributes.Normal, writer).Should().Be(DokanResult.Success);
+
+        Task<(NtStatus Status, int BytesRead, byte[] Buffer)> ReadAsync()
+            => Task.Run(() =>
+            {
+                var buffer = new byte[3];
+                var status = fileSystem.ReadFile("\\concurrent.bin", buffer, out var bytesRead, 0, writer);
+                return (status, bytesRead, buffer);
+            });
+
+        var firstRead = ReadAsync();
+        await requestStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        var secondRead = ReadAsync();
+        releaseDownload.TrySetResult();
+        var results = await Task.WhenAll(firstRead, secondRead);
+
+        results.Should().OnlyContain(result => result.Status == DokanResult.Success && result.BytesRead == 3);
+        results.Should().OnlyContain(result => result.Buffer.SequenceEqual(new byte[] { 1, 2, 3 }));
+        cloud.HttpHandler.Calls.Count(call => call.Method == "GET").Should().Be(1);
+        fileSystem.Cleanup("\\concurrent.bin", writer);
+        fileSystem.CloseFile("\\concurrent.bin", writer);
+    }
+
+    [Fact]
+    public async Task Writing_past_end_hydrates_and_uploads_zero_filled_gap()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        cloud.AddFile("", "sparse.bin", [1, 2]);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+        var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"));
+        var writer = new FakeDokanFileInfo();
+        fileSystem.CreateFile("\\sparse.bin", FileAccess.WriteData, FileShare.ReadWrite, FileMode.Open,
+            FileOptions.None, FileAttributes.Normal, writer).Should().Be(DokanResult.Success);
+
+        fileSystem.WriteFile("\\sparse.bin", [9], out _, 5, writer).Should().Be(DokanResult.Success);
+        cloud.HttpHandler.Calls.Count(call => call.Method == "GET").Should().Be(1);
+        fileSystem.Cleanup("\\sparse.bin", writer);
+        fileSystem.CloseFile("\\sparse.bin", writer);
+
+        var saved = gateway.ListDirectory("").Files.Single(file => file.Entry.Name == "sparse.bin");
+        var savedPath = temp.Path("saved.bin");
+        await gateway.DownloadToAsync(saved.File.Id, savedPath, saved.File.FileSize);
+        File.ReadAllBytes(savedPath).Should().Equal([1, 2, 0, 0, 0, 9]);
+    }
+
+    [Fact]
+    public async Task SetEndOfFile_increase_hydrates_and_uploads_zero_filled_tail()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        cloud.AddFile("", "extend.bin", [1, 2]);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+        var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"));
+        var writer = new FakeDokanFileInfo();
+        fileSystem.CreateFile("\\extend.bin", FileAccess.WriteData, FileShare.ReadWrite, FileMode.Open,
+            FileOptions.None, FileAttributes.Normal, writer).Should().Be(DokanResult.Success);
+
+        fileSystem.SetEndOfFile("\\extend.bin", 5, writer).Should().Be(DokanResult.Success);
+        cloud.HttpHandler.Calls.Count(call => call.Method == "GET").Should().Be(1);
+        fileSystem.Cleanup("\\extend.bin", writer);
+        fileSystem.CloseFile("\\extend.bin", writer);
+
+        var saved = gateway.ListDirectory("").Files.Single(file => file.Entry.Name == "extend.bin");
+        var savedPath = temp.Path("saved.bin");
+        await gateway.DownloadToAsync(saved.File.Id, savedPath, saved.File.FileSize);
+        File.ReadAllBytes(savedPath).Should().Equal([1, 2, 0, 0, 0]);
+    }
+
+    [Fact]
+    public void SetEndOfFile_to_current_length_does_not_hydrate_or_modify()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        cloud.AddFile("", "same-length.bin", [1, 2, 3]);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+        var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"));
+        var writer = new FakeDokanFileInfo();
+        fileSystem.CreateFile("\\same-length.bin", FileAccess.WriteData, FileShare.ReadWrite, FileMode.Open,
+            FileOptions.None, FileAttributes.Normal, writer).Should().Be(DokanResult.Success);
+        var local = ((HandleContext)writer.Context!).File!;
+
+        fileSystem.SetEndOfFile("\\same-length.bin", 3, writer).Should().Be(DokanResult.Success);
+
+        local.Hydrated.Should().BeFalse();
+        local.Modified.Should().BeFalse();
+        cloud.HttpHandler.Calls.Should().BeEmpty();
+        fileSystem.Cleanup("\\same-length.bin", writer);
+        fileSystem.CloseFile("\\same-length.bin", writer);
+    }
+
+    [Fact]
+    public void SetAllocationSize_does_not_hydrate_when_length_is_not_smaller()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        cloud.AddFile("", "allocation-noop.bin", [1, 2, 3]);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+        var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"));
+        var writer = new FakeDokanFileInfo();
+        fileSystem.CreateFile("\\allocation-noop.bin", FileAccess.WriteData, FileShare.ReadWrite,
+            FileMode.Open, FileOptions.None, FileAttributes.Normal, writer).Should().Be(DokanResult.Success);
+        var local = ((HandleContext)writer.Context!).File!;
+
+        fileSystem.SetAllocationSize("\\allocation-noop.bin", 3, writer).Should().Be(DokanResult.Success);
+        fileSystem.SetAllocationSize("\\allocation-noop.bin", 5, writer).Should().Be(DokanResult.Success);
+
+        local.Hydrated.Should().BeFalse();
+        cloud.HttpHandler.Calls.Should().BeEmpty();
+        fileSystem.Cleanup("\\allocation-noop.bin", writer);
+        fileSystem.CloseFile("\\allocation-noop.bin", writer);
+    }
+
+    [Fact]
+    public async Task Writing_after_moving_unhydrated_file_hydrates_by_file_id_and_uploads_under_new_name()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        cloud.AddFile("", "before-move.bin", [1, 2, 3, 4]);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+        var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"));
+        var writer = new FakeDokanFileInfo();
+        fileSystem.CreateFile("\\before-move.bin", FileAccess.WriteData, FileShare.ReadWrite, FileMode.Open,
+            FileOptions.None, FileAttributes.Normal, writer).Should().Be(DokanResult.Success);
+        var local = ((HandleContext)writer.Context!).File!;
+        var originalFileId = local.ExistingNode!.FileId;
+
+        fileSystem.MoveFile("\\before-move.bin", "\\after-move.bin", replace: false,
+            new FakeDokanFileInfo()).Should().Be(DokanResult.Success);
+        local.Hydrated.Should().BeFalse();
+        fileSystem.WriteFile("\\after-move.bin", [9], out _, 2, writer).Should().Be(DokanResult.Success);
+        cloud.HttpHandler.Calls.Count(call => call.Method == "GET").Should().Be(1);
+        local.ExistingNode!.FileId.Should().Be(originalFileId);
+        fileSystem.Cleanup("\\after-move.bin", writer);
+        fileSystem.CloseFile("\\after-move.bin", writer);
+
+        gateway.Resolve("\\before-move.bin").Should().BeNull();
+        var saved = gateway.ListDirectory("").Files.Should().ContainSingle(file => file.Entry.Name == "after-move.bin").Subject;
+        var savedPath = temp.Path("saved.bin");
+        await gateway.DownloadToAsync(saved.File.Id, savedPath, saved.File.FileSize);
+        File.ReadAllBytes(savedPath).Should().Equal([1, 2, 9, 4]);
+    }
+
+    [Fact]
+    public async Task Two_writer_handles_share_one_copy_for_full_and_partial_writes()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        cloud.AddFile("", "shared-overwrite.bin", [1, 2, 3, 4]);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+        var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"));
+        var fullWriter = new FakeDokanFileInfo();
+        var partialWriter = new FakeDokanFileInfo();
+        fileSystem.CreateFile("\\shared-overwrite.bin", FileAccess.WriteData, FileShare.ReadWrite,
+            FileMode.Open, FileOptions.None, FileAttributes.Normal, fullWriter).Should().Be(DokanResult.Success);
+        fileSystem.CreateFile("\\shared-overwrite.bin", FileAccess.WriteData, FileShare.ReadWrite,
+            FileMode.Open, FileOptions.None, FileAttributes.Normal, partialWriter).Should().Be(DokanResult.Success);
+
+        fileSystem.WriteFile("\\shared-overwrite.bin", [7, 8, 9, 10], out _, 0, fullWriter)
+            .Should().Be(DokanResult.Success);
+        fileSystem.WriteFile("\\shared-overwrite.bin", [5], out _, 1, partialWriter)
+            .Should().Be(DokanResult.Success);
+        cloud.HttpHandler.Calls.Should().BeEmpty();
+        fileSystem.Cleanup("\\shared-overwrite.bin", fullWriter);
+        fileSystem.Cleanup("\\shared-overwrite.bin", partialWriter);
+        fileSystem.CloseFile("\\shared-overwrite.bin", fullWriter);
+        fileSystem.CloseFile("\\shared-overwrite.bin", partialWriter);
+
+        var saved = gateway.ListDirectory("").Files.Single(file => file.Entry.Name == "shared-overwrite.bin");
+        var savedPath = temp.Path("saved.bin");
+        await gateway.DownloadToAsync(saved.File.Id, savedPath, saved.File.FileSize);
+        File.ReadAllBytes(savedPath).Should().Equal([7, 5, 9, 10]);
+    }
+
+    [Fact]
+    public async Task Write_to_end_of_file_hydrates_and_appends_even_when_paging_io_is_set()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        cloud.AddFile("", "append.bin", [1, 2]);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+        var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"));
+        var writer = new FakeDokanFileInfo { PagingIo = true, WriteToEndOfFile = true };
+        fileSystem.CreateFile("\\append.bin", FileAccess.WriteData, FileShare.ReadWrite, FileMode.Open,
+            FileOptions.None, FileAttributes.Normal, writer).Should().Be(DokanResult.Success);
+
+        fileSystem.WriteFile("\\append.bin", [3], out _, 0, writer).Should().Be(DokanResult.Success);
+        cloud.HttpHandler.Calls.Count(call => call.Method == "GET").Should().Be(1);
+        fileSystem.Cleanup("\\append.bin", writer);
+        fileSystem.CloseFile("\\append.bin", writer);
+
+        var saved = gateway.ListDirectory("").Files.Single(file => file.Entry.Name == "append.bin");
+        var savedPath = temp.Path("saved.bin");
+        await gateway.DownloadToAsync(saved.File.Id, savedPath, saved.File.FileSize);
+        File.ReadAllBytes(savedPath).Should().Equal([1, 2, 3]);
+    }
+
+    [Fact]
+    public void Failed_hydration_keeps_local_file_unhydrated_and_can_be_retried()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        cloud.AddFile("", "retry-read.bin", [1, 2, 3]);
+        var originalResponder = cloud.HttpHandler.Responder;
+        var failNextDownload = true;
+        cloud.HttpHandler.Responder = (request, cancellationToken) =>
+        {
+            if (request.Method == HttpMethod.Get && failNextDownload)
+            {
+                failNextDownload = false;
+                return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.ServiceUnavailable));
+            }
+            return originalResponder(request, cancellationToken);
+        };
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+        var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"));
+        var writer = new FakeDokanFileInfo();
+        fileSystem.CreateFile("\\retry-read.bin", FileAccess.WriteData, FileShare.ReadWrite, FileMode.Open,
+            FileOptions.None, FileAttributes.Normal, writer).Should().Be(DokanResult.Success);
+        var local = ((HandleContext)writer.Context!).File!;
+        var buffer = new byte[3];
+
+        fileSystem.ReadFile("\\retry-read.bin", buffer, out var firstRead, 0, writer)
+            .Should().Be(BarkCloudFileSystem.UnexpectedNetworkError);
+        firstRead.Should().Be(0);
+        local.Hydrated.Should().BeFalse();
+        fileSystem.ReadFile("\\retry-read.bin", buffer, out var secondRead, 0, writer)
+            .Should().Be(DokanResult.Success);
+        secondRead.Should().Be(3);
+        buffer.Should().Equal([1, 2, 3]);
+        local.Hydrated.Should().BeTrue();
+
+        fileSystem.Cleanup("\\retry-read.bin", writer);
+        fileSystem.CloseFile("\\retry-read.bin", writer);
+    }
+
+    [Fact]
     public void Read_handle_uses_opened_node_after_listing_cache_expires()
     {
         using var temp = new TestDirectory();
@@ -1861,38 +2564,22 @@ public sealed class BarkCloudFileSystemTests
         cloud.AddFile("", "race.bin", [1, 2, 3]);
         using var gateway = cloud.CreateGateway(temp.Path("cache"));
         var fs = new BarkCloudFileSystem(gateway, temp.Path("write"));
-        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var responder = cloud.HttpHandler.Responder;
-        var downloads = 0;
-        cloud.HttpHandler.Responder = async (request, cancellation) =>
-        {
-            if (request.Method == System.Net.Http.HttpMethod.Get && Interlocked.Increment(ref downloads) == 1)
-            {
-                entered.TrySetResult();
-                await release.Task;
-            }
-            return await responder(request, cancellation);
-        };
         var first = new FakeDokanFileInfo();
         var second = new FakeDokanFileInfo();
-        var opening = Task.Run(() => fs.CreateFile("\\race.bin", FileAccess.WriteData, FileShare.ReadWrite,
-            mode, FileOptions.None, FileAttributes.Normal, first));
-        try
-        {
-            await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
-            fs.CreateFile("\\race.bin", FileAccess.WriteData, FileShare.ReadWrite,
-                mode, FileOptions.None, FileAttributes.Normal, second).Should().Be(DokanResult.Success);
-        }
-        finally
-        {
-            release.TrySetResult();
-            (await opening).Should().Be(DokanResult.Success);
-            fs.Cleanup("\\race.bin", first);
-            fs.Cleanup("\\race.bin", second);
-            fs.CloseFile("\\race.bin", first);
-            fs.CloseFile("\\race.bin", second);
-        }
+
+        var openings = await Task.WhenAll(
+            Task.Run(() => fs.CreateFile("\\race.bin", FileAccess.WriteData, FileShare.ReadWrite,
+                mode, FileOptions.None, FileAttributes.Normal, first)),
+            Task.Run(() => fs.CreateFile("\\race.bin", FileAccess.WriteData, FileShare.ReadWrite,
+                mode, FileOptions.None, FileAttributes.Normal, second)));
+
+        openings.Should().OnlyContain(status => status == DokanResult.Success);
+        ((HandleContext)first.Context!).File.Should().BeSameAs(((HandleContext)second.Context!).File);
+        cloud.HttpHandler.Calls.Should().BeEmpty();
+        fs.Cleanup("\\race.bin", first);
+        fs.Cleanup("\\race.bin", second);
+        fs.CloseFile("\\race.bin", first);
+        fs.CloseFile("\\race.bin", second);
     }
 
     [Fact]
