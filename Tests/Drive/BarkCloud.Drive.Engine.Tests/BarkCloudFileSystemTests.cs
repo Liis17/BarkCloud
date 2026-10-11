@@ -1415,6 +1415,63 @@ public sealed class BarkCloudFileSystemTests
     }
 
     [Fact]
+    public async Task Stopping_outbox_during_restore_does_not_cancel_compensating_restore()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        var original = cloud.AddFile("", "restore-on-stop.bin", [1, 2, 3]);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+        var outbox = new UploadOutbox(temp.Path("outbox"));
+        var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"), outbox,
+            "server", () => "owner");
+        var (info, local) = OpenWritableAndWrite(fileSystem, "\\restore-on-stop.bin", [4, 5, 6]);
+        var responder = cloud.HttpHandler.Responder;
+        cloud.HttpHandler.Responder = (_, _) => Task.FromResult(
+            new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.InternalServerError));
+        fileSystem.Cleanup("\\restore-on-stop.bin", info);
+        fileSystem.CloseFile("\\restore-on-stop.bin", info);
+        cloud.HttpHandler.Responder = responder;
+        local.OutboxId.Should().NotBeNull();
+
+        cloud.Invoker.FailNext(FakeCloudMethods.AttachFile,
+            FakeCallInvoker.BusinessError(ServerErrors.DirectoryNotFound));
+        var restoreStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseRestore = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        cloud.Invoker.OnCall = method =>
+        {
+            if (method != FakeCloudMethods.RestoreFromTrash)
+                return;
+            restoreStarted.TrySetResult();
+            releaseRestore.Task.GetAwaiter().GetResult();
+        };
+        var stopObserved = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using var worker = new UploadOutboxWorker(outbox,
+            () => ("server", "owner"),
+            (entry, cancellationToken) =>
+            {
+                cancellationToken.Register(() => stopObserved.TrySetResult());
+                return fileSystem.ProcessOutboxEntryAsync(entry, cancellationToken);
+            },
+            fileSystem.CompleteOutboxEntry,
+            time: new Microsoft.Extensions.Time.Testing.FakeTimeProvider());
+        worker.Start();
+
+        var pass = Task.Factory.StartNew(() => worker.TriggerAsync().GetAwaiter().GetResult(),
+            CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
+        await restoreStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        var stop = Task.Factory.StartNew(() => worker.StopAsync().GetAwaiter().GetResult(),
+            CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
+        await stopObserved.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        releaseRestore.TrySetResult();
+        await Task.WhenAll(pass, stop).WaitAsync(TimeSpan.FromSeconds(5));
+
+        cloud.IsInTrash(original.EntryId).Should().BeFalse();
+        outbox.Entries.Single().Op!.OldEntryDeleted.Should().BeFalse();
+        cloud.Invoker.Calls.Single(call => call.MethodFullName == FakeCloudMethods.RestoreFromTrash)
+            .CancellationToken.CanBeCanceled.Should().BeFalse();
+    }
+
+    [Fact]
     public void Persist_reports_attach_and_restore_errors_together()
     {
         using var temp = new TestDirectory();

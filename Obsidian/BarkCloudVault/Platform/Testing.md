@@ -12,7 +12,7 @@ Parent: [[Architecture]] · See also: [[Web/WebApp]] · [[Backend/Files]] · [[B
 |---|---|---|
 | `Tests/Directory.Build.props` | общие test properties | .NET 10, xUnit, Moq и FluentAssertions |
 | `Tests/BarkCloud.TestKit/` | общие test helpers | gRPC-контекст, вызовы и логгер для тестов |
-| `Tests/Drive/BarkCloud.Drive.Engine.Tests/` | тесты Windows Drive | Изоляция путей, фейки gRPC/HTTP/Dokany и страховочные тесты CloudGateway |
+| `Tests/Drive/BarkCloud.Drive.Engine.Tests/` | тесты Windows Drive | Изоляция путей, фейки gRPC/HTTP/Dokany, сценарии поколений сессии и эпох кеша |
 | `.github/workflows/tests.yml` | path filters, test jobs | Выбор тестов на PR и ручном запуске |
 | `.github/workflows/backend-service-ci.yml` | test/build jobs | Тесты сервиса перед сборкой и публикацией образа |
 | `Backend/BarkCloud.Web/ClientApp/package.json` | npm scripts | Vitest-команда клиентских тестов и сборка SPA |
@@ -42,6 +42,8 @@ Parent: [[Architecture]] · See also: [[Web/WebApp]] · [[Backend/Files]] · [[B
 - Центральный тестовый workflow также содержит Android unit job; отдельные тестовые jobs для iOS и desktop-клиентов в этих workflows не определены.
 
 ## Ограничения и важные детали
+
+Windows Drive использует `FakeTimeProvider`, `TaskCompletionSource` и `FakeCallInvoker` для детерминированных проверок повторного входа, устаревших ответов авторизации, временных сетевых ошибок, очистки кеша при смене аккаунта и порядка logout. Шов `DriveEngine` для mount/unmount и текущей буквы проверяет вход на смонтированном диске без драйвера Dokany: закрытие старых хэндлов перед сменой токена, сохранение владельца outbox, восстановление монтирования при ошибке и сериализацию mount/logout. Параллельные тесты с блокирующими фейками запускают отдельный поток через `Task.Factory.StartNew` с `LongRunning`. Временные каталоги тестов создаются под системным temp, а не в `%LOCALAPPDATA%/BarkCloud.Drive`.
 
 PostgreSQL-сценарии зависят от отдельной тестовой базы и настройки `BARKCLOUD_TEST_POSTGRES`. В локальном запуске следует передавать строку подключения только к тестовому PostgreSQL; workflow предоставляет её через контейнер `test-postgres`.
 

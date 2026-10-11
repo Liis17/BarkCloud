@@ -309,6 +309,11 @@ internal sealed class UploadOutboxWorker : IAsyncDisposable
         }
     }
 
+    internal bool IsRunning
+    {
+        get { lock (_timerLock) return _running; }
+    }
+
     public async Task TriggerAsync()
     {
         lock (_timerLock)

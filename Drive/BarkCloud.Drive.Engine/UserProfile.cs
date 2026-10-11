@@ -7,9 +7,11 @@ namespace BarkCloud.Drive.Engine;
 internal sealed class UserProfile(UsersApi.UsersApiClient users, Action<string>? ownerLoaded = null)
 {
     private readonly object _lock = new();
+    private readonly object _ownerCallbackLock = new();
     private long? _userId;
     private string? _username;
     private string? _avatarUrl;
+    private long _epoch;
 
     public string? Username
     {
@@ -27,24 +29,44 @@ internal sealed class UserProfile(UsersApi.UsersApiClient users, Action<string>?
         get { lock (_lock) return _avatarUrl; }
     }
 
+    public long Epoch
+    {
+        get { lock (_lock) return _epoch; }
+    }
+
     // Ленивая загрузка имени (первый GetStatus после авторизации). Ошибка не критична.
     public async Task EnsureLoadedAsync()
     {
-        if (UserId != null)
-            return;
+        long epoch;
+        lock (_lock)
+        {
+            if (_userId != null)
+                return;
+            epoch = _epoch;
+        }
 
         try
         {
             var user = (await users.GetUserAsync(new GetUserRequest { UserId = 0 })).User;
             lock (_lock)
             {
+                if (epoch != _epoch)
+                    return;
                 _userId = user.Id;
                 _username = user.Username;
                 _avatarUrl = !string.IsNullOrEmpty(user.ProfilePicture)
                     ? user.ProfilePicture
                     : user.ProfilePicturePreview;
             }
-            ownerLoaded?.Invoke(user.Id.ToString(System.Globalization.CultureInfo.InvariantCulture));
+
+            lock (_ownerCallbackLock)
+            {
+                lock (_lock)
+                    if (epoch != _epoch)
+                        return;
+                // Сериализуем запись владельца с Clear(); состояние профиля при callback не заблокировано.
+                ownerLoaded?.Invoke(user.Id.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            }
         }
         catch (Exception ex)
         {
@@ -52,13 +74,18 @@ internal sealed class UserProfile(UsersApi.UsersApiClient users, Action<string>?
         }
     }
 
-    public void Clear()
+    public void Clear(Action? clearOwner = null)
     {
-        lock (_lock)
+        lock (_ownerCallbackLock)
         {
-            _userId = null;
-            _username = null;
-            _avatarUrl = null;
+            lock (_lock)
+            {
+                ++_epoch;
+                _userId = null;
+                _username = null;
+                _avatarUrl = null;
+            }
+            clearOwner?.Invoke();
         }
     }
 }

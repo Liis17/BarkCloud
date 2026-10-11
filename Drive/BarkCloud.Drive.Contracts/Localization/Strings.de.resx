@@ -371,8 +371,17 @@
   <data name="Eng_AuthSuccess" xml:space="preserve">
     <value>Erfolgreich angemeldet</value>
   </data>
+  <data name="Eng_AuthSuperseded" xml:space="preserve">
+    <value>Die Anmeldung wurde abgebrochen, weil sich die Sitzung geändert hat</value>
+  </data>
   <data name="Eng_LoggedOut" xml:space="preserve">
     <value>Abgemeldet</value>
+  </data>
+  <data name="Eng_PlaceholderDataPreservedFmt" xml:space="preserve">
+    <value>Platzhalter „{0}“ enthält Daten und wurde unter {1} aufbewahrt; er wurde nicht hochgeladen.</value>
+  </data>
+  <data name="Eng_DeleteFlushTimeout" xml:space="preserve">
+    <value>Ausstehende Löschvorgänge konnten nicht rechtzeitig gesendet werden</value>
   </data>
   <data name="Eng_LoginFirst" xml:space="preserve">
     <value>Bitte zuerst anmelden</value>

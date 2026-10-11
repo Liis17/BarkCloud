@@ -371,8 +371,17 @@
   <data name="Eng_AuthSuccess" xml:space="preserve">
     <value>Signed in successfully</value>
   </data>
+  <data name="Eng_AuthSuperseded" xml:space="preserve">
+    <value>Sign-in was canceled because the session changed</value>
+  </data>
   <data name="Eng_LoggedOut" xml:space="preserve">
     <value>Signed out</value>
+  </data>
+  <data name="Eng_PlaceholderDataPreservedFmt" xml:space="preserve">
+    <value>Placeholder “{0}” contains data and was preserved at {1}; it was not uploaded.</value>
+  </data>
+  <data name="Eng_DeleteFlushTimeout" xml:space="preserve">
+    <value>Could not send pending deletions within the allotted time</value>
   </data>
   <data name="Eng_LoginFirst" xml:space="preserve">
     <value>Sign in first</value>
