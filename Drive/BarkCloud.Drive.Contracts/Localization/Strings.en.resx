@@ -466,4 +466,6 @@
   </data>
   <data name="Eng_AttachedFileRetryFmt" xml:space="preserve"><value>Confirmed entry “{0}” is missing from the directory; retrying attachment of saved data.</value></data>
   <data name="Eng_OutboxAdoptedFmt" xml:space="preserve"><value>Unowned pending file “{0}” adopted by user {1}.</value></data>
+  <data name="Eng_DokanKeepAliveFailed" xml:space="preserve"><value>Could not extend the Dokany operation timeout.</value></data>
+  <data name="Eng_HttpTransferTimedOut" xml:space="preserve"><value>The data transfer timed out.</value></data>
 </root>

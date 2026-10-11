@@ -466,4 +466,6 @@
   </data>
   <data name="Eng_AttachedFileRetryFmt" xml:space="preserve"><value>Der bestätigte Eintrag „{0}“ fehlt im Ordner; die gespeicherten Daten werden erneut verknüpft.</value></data>
   <data name="Eng_OutboxAdoptedFmt" xml:space="preserve"><value>Die ausstehende Datei „{0}“ ohne Besitzer wurde Benutzer {1} zugeordnet.</value></data>
+  <data name="Eng_DokanKeepAliveFailed" xml:space="preserve"><value>Das Zeitlimit des Dokany-Vorgangs konnte nicht verlängert werden.</value></data>
+  <data name="Eng_HttpTransferTimedOut" xml:space="preserve"><value>Die Datenübertragung hat das Zeitlimit überschritten.</value></data>
 </root>

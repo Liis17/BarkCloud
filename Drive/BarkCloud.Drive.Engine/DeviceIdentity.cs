@@ -21,6 +21,15 @@ internal sealed class DeviceIdentity
         DeviceId = LoadOrCreateDeviceId();
     }
 
+    internal DeviceIdentity(string deviceId, string deviceName, string osName, string appName, string appVersion)
+    {
+        DeviceId = deviceId;
+        DeviceName = deviceName;
+        OsName = osName;
+        AppName = appName;
+        AppVersion = appVersion;
+    }
+
     private static string LoadOrCreateDeviceId()
     {
         var dir = Path.Combine(
