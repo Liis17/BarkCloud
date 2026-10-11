@@ -4,6 +4,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Runtime.ExceptionServices;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading;
 
 using BarkCloud.Drive.Contracts.Localization;
@@ -29,7 +30,7 @@ internal sealed class ResolvedNode
 
 // Обёртка над CloudApi + FilesApi: листинги (TTL-кэш), резолв путей, чтение (гидрация
 // целиком) и запись (upload по HTTP + привязка/перемещение/удаление через gRPC).
-internal sealed class CloudGateway : IDisposable
+internal sealed partial class CloudGateway : IDisposable
 {
     private readonly record struct ListingLoadKey(string DirectoryId, int Generation, long AccountEpoch);
 
@@ -53,6 +54,8 @@ internal sealed class CloudGateway : IDisposable
     private static readonly TimeSpan HttpTransferIdleLimit = TimeSpan.FromSeconds(60);
     private static readonly TimeSpan RangeBlockTimeout = TimeSpan.FromSeconds(60);
     private static readonly TimeSpan HttpUploadResponseLimit = TimeSpan.FromMinutes(10);
+    private static readonly TimeSpan CacheCleanupInterval = TimeSpan.FromMinutes(1);
+    private const long DefaultCacheLimitBytes = 5L * 1024 * 1024 * 1024;
     private const int DirectoryPageSize = 200;
 
     private readonly CloudApi.CloudApiClient _cloud;
@@ -62,6 +65,11 @@ internal sealed class CloudGateway : IDisposable
     private readonly string _filesWebBase;
     private readonly Func<string?> _tokenProvider;
     private readonly TimeProvider _time;
+    private readonly long _cacheLimitBytes;
+    private readonly object _cacheCleanupLock = new();
+    private readonly ITimer _cacheCleanupTimer;
+    private Task? _cacheCleanupTask;
+    private bool _cacheCleanupStopping;
 
     private readonly ConcurrentDictionary<string, CachedDirectoryListing> _listCache = new();
     private readonly ConcurrentDictionary<string, int> _listGen = new(); // «поколение» инвалидации на папку — защита от записи устаревшего ответа
@@ -105,9 +113,17 @@ internal sealed class CloudGateway : IDisposable
     public Action<string>? SyncError { get; set; }
 
     internal Action? ListingLoadWaiterJoinedForTesting { get; set; }
+    internal Action<string>? CacheEntryBeforeOpenForTesting { get; set; }
+    internal Action<string>? CacheFileOpenedForTesting { get; set; }
+    internal Action<string>? CacheFileBeforeDeleteForTesting { get; set; }
+    internal Action<string>? BlockDirectoryCreatedForTesting { get; set; }
+    internal Action? CacheCleanupStartedForTesting { get; set; }
+    internal Action? CacheCleanupWaitForTesting { get; set; }
+    internal Action<string>? CacheEvictionCandidateBeforeInfoForTesting { get; set; }
 
     public CloudGateway(CloudApi.CloudApiClient cloud, FilesApi.FilesApiClient files, HttpClient http,
-        string filesWebBase, Func<string?> tokenProvider, string cacheDir, TimeProvider? time = null)
+        string filesWebBase, Func<string?> tokenProvider, string cacheDir, TimeProvider? time = null,
+        long? cacheLimitBytesForTesting = null)
     {
         _cloud = cloud;
         _files = files;
@@ -116,9 +132,13 @@ internal sealed class CloudGateway : IDisposable
         _tokenProvider = tokenProvider;
         _cacheDir = cacheDir;
         _time = time ?? TimeProvider.System;
+        _cacheLimitBytes = cacheLimitBytesForTesting ?? DefaultCacheLimitBytes;
         Directory.CreateDirectory(_cacheDir);
+        RemoveOwnedCachePartFiles(_cacheDir);
         _delTimer = _time.CreateTimer(
             _ => DrainTimer(), null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+        _cacheCleanupTimer = _time.CreateTimer(
+            _ => ScheduleCacheCleanup(), null, CacheCleanupInterval, CacheCleanupInterval);
     }
 
     // Сменить папку кэша на лету: новые чтения пойдут в неё. Уже скачанные файлы
@@ -126,6 +146,7 @@ internal sealed class CloudGateway : IDisposable
     public void SetCacheDir(string path)
     {
         Directory.CreateDirectory(path);
+        RemoveOwnedCachePartFiles(path);
         Volatile.Write(ref _cacheDir, path);
         _downloads.Clear();
         _blockFetches.Clear();
@@ -671,14 +692,37 @@ internal sealed class CloudGateway : IDisposable
             var bufPos = (int)(copyFrom - offset);
             var inBlockPos = copyFrom - blockStart;
 
-            using var handle = File.OpenHandle(BlockPath(cacheDir, fileId, b), FileMode.Open, FileAccess.Read, FileShare.Read);
-            var read = RandomAccess.Read(handle, buffer.AsSpan(bufPos, len), inBlockPos);
+            var read = ReadBlockWithRetry(cacheDir, fileId, fileLength, b, buffer,
+                bufPos, len, inBlockPos, startKeepAlive, accountEpoch, epochToken);
             bytesRead += read;
             if (read != len)
                 break;
         }
 
         return bytesRead;
+    }
+
+    private int ReadBlockWithRetry(string cacheDir, string fileId, long fileLength, long blockIndex,
+        byte[] buffer, int bufferOffset, int length, long blockOffset, Action? startKeepAlive,
+        long accountEpoch, CancellationToken epochToken)
+    {
+        var path = BlockPath(cacheDir, fileId, blockIndex);
+        for (var attempt = 0; ; attempt++)
+        {
+            try
+            {
+                CacheEntryBeforeOpenForTesting?.Invoke(path);
+                using var handle = File.OpenHandle(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+                TouchCacheEntry(path);
+                CacheFileOpenedForTesting?.Invoke(path);
+                return RandomAccess.Read(handle, buffer.AsSpan(bufferOffset, length), blockOffset);
+            }
+            catch (Exception ex) when (attempt == 0 && IsCacheReadRetryException(ex))
+            {
+                EnsureBlock(cacheDir, fileId, fileLength, blockIndex,
+                    startKeepAlive, accountEpoch, epochToken);
+            }
+        }
     }
 
     private void EnsureBlock(string cacheDir, string fileId, long fileLength, long blockIndex,
@@ -743,10 +787,25 @@ internal sealed class CloudGateway : IDisposable
 
             var directory = BlockDir(cacheDir, fileId);
             Directory.CreateDirectory(directory);
+            BlockDirectoryCreatedForTesting?.Invoke(directory);
             var partPath = PartPath(path);
+            FileStream part;
             try
             {
-                await CopyToPartAsync(response, partPath, expectedLength, cancellation.Token, idleTimeout);
+                part = new FileStream(partPath, FileMode.CreateNew, FileAccess.Write, FileShare.None,
+                    81920, FileOptions.Asynchronous);
+            }
+            catch (DirectoryNotFoundException)
+            {
+                Directory.CreateDirectory(directory);
+                part = new FileStream(partPath, FileMode.CreateNew, FileAccess.Write, FileShare.None,
+                    81920, FileOptions.Asynchronous);
+            }
+
+            try
+            {
+                await using (part)
+                    await CopyToPartAsync(response, part, expectedLength, cancellation.Token, idleTimeout);
                 if (!HasExpectedLength(path, expectedLength))
                 {
                     try
@@ -811,42 +870,300 @@ internal sealed class CloudGateway : IDisposable
             return new CacheEpoch(_accountEpoch, _cacheEpochCancellation.Token);
     }
 
+    private enum CacheArtifactKind
+    {
+        None,
+        WholeFile,
+        BlocksDirectory,
+        PartFile,
+        BlockFile,
+        BlockPartFile
+    }
+
+    private sealed record CacheEvictionCandidate(
+        string Path, CacheArtifactKind Kind, long Length, DateTime LastWriteUtc)
+    {
+        public bool CanEvict => Kind is CacheArtifactKind.WholeFile or CacheArtifactKind.BlockFile;
+    }
+
+    private static CacheArtifactKind GetCacheArtifactKind(string name, bool isDirectory)
+    {
+        if (isDirectory)
+            return name.EndsWith(".blocks", StringComparison.Ordinal)
+                   && IsCanonicalFileId(name[..^7])
+                ? CacheArtifactKind.BlocksDirectory
+                : CacheArtifactKind.None;
+
+        if (IsCanonicalFileId(name))
+            return CacheArtifactKind.WholeFile;
+        return CachePartFileNameRegex().IsMatch(name) ? CacheArtifactKind.PartFile : CacheArtifactKind.None;
+    }
+
+    private static bool IsExcludedCacheDirectory(string path)
+    {
+        var name = Path.GetFileName(Path.TrimEndingDirectorySeparator(path));
+        return name.Equals("write", StringComparison.OrdinalIgnoreCase)
+               || name.Equals("outbox", StringComparison.OrdinalIgnoreCase);
+    }
+
+    [GeneratedRegex(@"\A[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\z",
+        RegexOptions.CultureInvariant)]
+    private static partial Regex CanonicalFileIdRegex();
+
+    [GeneratedRegex(@"\A[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.[0-9a-f]{32}\.part\z",
+        RegexOptions.CultureInvariant)]
+    private static partial Regex CachePartFileNameRegex();
+
+    [GeneratedRegex(@"\A(?:0|[1-9][0-9]*)\.blk\.[0-9a-f]{32}\.part\z",
+        RegexOptions.CultureInvariant)]
+    private static partial Regex BlockPartFileNameRegex();
+
+    [GeneratedRegex(@"\A(?:0|[1-9][0-9]*)\.blk\z", RegexOptions.CultureInvariant)]
+    private static partial Regex BlockCacheFileNameRegex();
+
+    private static bool IsCanonicalFileId(string value) => CanonicalFileIdRegex().IsMatch(value);
+
+    private static void RemoveOwnedCachePartFiles(string cacheDir)
+    {
+        foreach (var (path, kind) in EnumerateCacheArtifacts(cacheDir))
+            if (kind is CacheArtifactKind.PartFile or CacheArtifactKind.BlockPartFile)
+                DeletePart(path);
+    }
+
     private static void ClearOwnedCacheFiles(string cacheDir)
     {
+        foreach (var (path, kind) in EnumerateCacheArtifacts(cacheDir))
+        {
+            if (kind is not (CacheArtifactKind.WholeFile
+                or CacheArtifactKind.BlocksDirectory
+                or CacheArtifactKind.PartFile))
+                continue;
+
+            try
+            {
+                if (kind == CacheArtifactKind.BlocksDirectory)
+                    Directory.Delete(path, recursive: true);
+                else
+                    File.Delete(path);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                EngineLog.Error($"Очистка кеша {path}", ex);
+            }
+        }
+    }
+
+    private static List<(string Path, CacheArtifactKind Kind)> EnumerateCacheArtifacts(string cacheDir)
+    {
+        var artifacts = new List<(string Path, CacheArtifactKind Kind)>();
+        if (IsExcludedCacheDirectory(cacheDir))
+            return artifacts;
+
         try
         {
             foreach (var path in Directory.EnumerateFileSystemEntries(cacheDir))
             {
-                var name = Path.GetFileName(path);
-                var isBlocks = name.EndsWith(".blocks", StringComparison.OrdinalIgnoreCase)
-                               && Guid.TryParseExact(name[..^7], "D", out _);
-                var isFile = Guid.TryParseExact(name, "D", out _);
-                var separator = name.IndexOf('.');
-                var isPart = separator > 0
-                             && Guid.TryParseExact(name[..separator], "D", out _)
-                             && name.EndsWith(".part", StringComparison.OrdinalIgnoreCase);
-                if (!isBlocks && !isFile && !isPart)
+                if (!TryGetCacheAttributes(path, out var attributes))
+                    continue;
+
+                if ((attributes & FileAttributes.ReparsePoint) != 0)
+                    continue;
+
+                var isDirectory = (attributes & FileAttributes.Directory) != 0;
+                var kind = GetCacheArtifactKind(Path.GetFileName(path), isDirectory);
+                if (kind == CacheArtifactKind.None)
+                    continue;
+
+                artifacts.Add((path, kind));
+                if (kind != CacheArtifactKind.BlocksDirectory)
                     continue;
 
                 try
                 {
-                    if (Directory.Exists(path))
-                        Directory.Delete(path, recursive: true);
-                    else
-                        File.Delete(path);
+                    foreach (var blockPath in Directory.EnumerateFileSystemEntries(path))
+                    {
+                        if (!TryGetCacheAttributes(blockPath, out var blockAttributes))
+                            continue;
+
+                        if ((blockAttributes & (FileAttributes.Directory | FileAttributes.ReparsePoint)) != 0)
+                            continue;
+
+                        var blockName = Path.GetFileName(blockPath);
+                        var blockKind = BlockCacheFileNameRegex().IsMatch(blockName)
+                            ? CacheArtifactKind.BlockFile
+                            : BlockPartFileNameRegex().IsMatch(blockName)
+                                ? CacheArtifactKind.BlockPartFile
+                                : CacheArtifactKind.None;
+                        if (blockKind != CacheArtifactKind.None)
+                            artifacts.Add((blockPath, blockKind));
+                    }
                 }
-                catch (IOException) { }
-                catch (UnauthorizedAccessException) { }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    EngineLog.Error($"Поиск блоков кеша в {path}", ex);
+                }
             }
         }
-        catch (IOException) { }
-        catch (UnauthorizedAccessException) { }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            EngineLog.Error($"Поиск файлов кеша в {cacheDir}", ex);
+        }
+
+        return artifacts;
+    }
+
+    private static bool TryGetCacheAttributes(string path, out FileAttributes attributes)
+    {
+        try
+        {
+            attributes = File.GetAttributes(path);
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            EngineLog.Error($"Чтение атрибутов кеша {path}", ex);
+            attributes = default;
+            return false;
+        }
+    }
+
+    private void ScheduleCacheCleanup()
+    {
+        lock (_cacheCleanupLock)
+        {
+            if (_cacheCleanupStopping || _cacheCleanupTask is { IsCompleted: false })
+                return;
+
+            var cacheDir = Volatile.Read(ref _cacheDir);
+            _cacheCleanupTask = Task.Run(() => CleanupCache(cacheDir));
+        }
+    }
+
+    internal Task WaitForCacheCleanupForTestingAsync()
+    {
+        lock (_cacheCleanupLock)
+            return _cacheCleanupTask ?? Task.CompletedTask;
+    }
+
+    internal void StartCacheCleanupForTesting() => ScheduleCacheCleanup();
+
+    private void CleanupCache(string cacheDir)
+    {
+        try
+        {
+            CacheCleanupStartedForTesting?.Invoke();
+            var candidates = GetCacheEvictionCandidates(cacheDir)
+                .OrderBy(candidate => candidate.LastWriteUtc)
+                .ThenBy(candidate => candidate.Path, StringComparer.Ordinal)
+                .ToArray();
+            var totalBytes = candidates.Sum(candidate => candidate.Length);
+            if (totalBytes <= _cacheLimitBytes)
+                return;
+
+            var targetBytes = _cacheLimitBytes * 4 / 5;
+            foreach (var candidate in candidates)
+            {
+                lock (_cacheCleanupLock)
+                {
+                    if (_cacheCleanupStopping)
+                        break;
+                }
+
+                if (totalBytes <= targetBytes)
+                    break;
+                if (!candidate.CanEvict)
+                    continue;
+
+                try
+                {
+                    if (_time.GetUtcNow().UtcDateTime - File.GetLastWriteTimeUtc(candidate.Path)
+                        < CacheCleanupInterval)
+                        continue;
+
+                    CacheFileBeforeDeleteForTesting?.Invoke(candidate.Path);
+                    File.Delete(candidate.Path);
+                    totalBytes -= candidate.Length;
+                    if (candidate.Kind == CacheArtifactKind.BlockFile)
+                        DeleteEmptyBlocksDirectory(candidate.Path);
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    EngineLog.Error($"Вытеснение кеша {candidate.Path}", ex);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            EngineLog.Error($"Очистка кеша в {cacheDir}", ex);
+        }
+    }
+
+    private List<CacheEvictionCandidate> GetCacheEvictionCandidates(string cacheDir)
+    {
+        var candidates = new List<CacheEvictionCandidate>();
+        foreach (var (path, kind) in EnumerateCacheArtifacts(cacheDir))
+        {
+            if (kind is not (CacheArtifactKind.WholeFile
+                or CacheArtifactKind.PartFile
+                or CacheArtifactKind.BlockFile
+                or CacheArtifactKind.BlockPartFile))
+                continue;
+
+            try
+            {
+                CacheEvictionCandidateBeforeInfoForTesting?.Invoke(path);
+                var file = new FileInfo(path);
+                candidates.Add(new CacheEvictionCandidate(path, kind, file.Length, file.LastWriteTimeUtc));
+            }
+            catch (FileNotFoundException)
+            {
+                // Файл мог исчезнуть после перечисления; следующий артефакт всё ещё учитывается.
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                EngineLog.Error($"Подсчёт кеша {path}", ex);
+            }
+        }
+
+        return candidates;
+    }
+
+    private static void DeleteEmptyBlocksDirectory(string blockPath)
+    {
+        var directory = Path.GetDirectoryName(blockPath);
+        if (directory is null)
+            return;
+
+        try
+        {
+            Directory.Delete(directory);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+        }
     }
 
     private readonly record struct CacheEpoch(long Generation, CancellationToken CancellationToken);
 
     // Скачивание файла целиком (whole-режим: сервер без Range, и для гидрации копии при записи).
     private int ReadWhole(string fileId, long fileLength, byte[] buffer, long offset, string cacheDir,
+        Action? startKeepAlive, long accountEpoch, CancellationToken epochToken)
+    {
+        for (var attempt = 0; ; attempt++)
+        {
+            epochToken.ThrowIfCancellationRequested();
+            try
+            {
+                return ReadWholeOnce(fileId, fileLength, buffer, offset, cacheDir,
+                    startKeepAlive, accountEpoch, epochToken);
+            }
+            catch (Exception ex) when (attempt == 0 && IsCacheReadRetryException(ex))
+            {
+            }
+        }
+    }
+
+    private int ReadWholeOnce(string fileId, long fileLength, byte[] buffer, long offset, string cacheDir,
         Action? startKeepAlive, long accountEpoch, CancellationToken epochToken)
     {
         var cachedPath = Path.Combine(cacheDir, fileId);
@@ -875,15 +1192,36 @@ internal sealed class CloudGateway : IDisposable
         return ReadWholeFile(local, fileLength, buffer, offset);
     }
 
-    private static int ReadWholeFile(string local, long fileLength, byte[] buffer, long offset)
+    private int ReadWholeFile(string local, long fileLength, byte[] buffer, long offset)
     {
+        CacheEntryBeforeOpenForTesting?.Invoke(local);
         using var handle = File.OpenHandle(local, FileMode.Open, FileAccess.Read, FileShare.Read);
+        TouchCacheEntry(local);
+        CacheFileOpenedForTesting?.Invoke(local);
         if (offset >= fileLength)
             return 0;
 
         var toRead = (int)Math.Min(buffer.Length, fileLength - offset);
         return RandomAccess.Read(handle, buffer.AsSpan(0, toRead), offset);
     }
+
+    private void TouchCacheEntry(string path)
+    {
+        try
+        {
+            var now = _time.GetUtcNow().UtcDateTime;
+            if (now - File.GetLastWriteTimeUtc(path) <= CacheCleanupInterval / 2)
+                return;
+
+            File.SetLastWriteTimeUtc(path, now);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+        }
+    }
+
+    private static bool IsCacheReadRetryException(Exception exception)
+        => exception is FileNotFoundException or DirectoryNotFoundException or UnauthorizedAccessException;
 
     private sealed class RangeNotSupportedException : Exception;
 
@@ -957,7 +1295,9 @@ internal sealed class CloudGateway : IDisposable
             if (response.StatusCode != HttpStatusCode.OK)
                 throw CreateHttpException(response.StatusCode);
 
-            await CopyToPartAsync(response, partPath, expectedLength, cancellation.Token, idleTimeout);
+            await using var part = new FileStream(partPath, FileMode.CreateNew, FileAccess.Write, FileShare.None,
+                81920, FileOptions.Asynchronous);
+            await CopyToPartAsync(response, part, expectedLength, cancellation.Token, idleTimeout);
         }
         catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested
                                                    && idleTimeout.Token.IsCancellationRequested)
@@ -1003,12 +1343,10 @@ internal sealed class CloudGateway : IDisposable
     private static HttpRequestException CreateHttpException(HttpStatusCode statusCode)
         => new($"Сервер вернул HTTP {(int)statusCode} ({statusCode}) при скачивании файла", null, statusCode);
 
-    private static async Task CopyToPartAsync(HttpResponseMessage response, string partPath, long expectedLength,
+    private static async Task CopyToPartAsync(HttpResponseMessage response, FileStream file, long expectedLength,
         CancellationToken cancellationToken, TransferIdleTimeout idleTimeout)
     {
         await using var net = await response.Content.ReadAsStreamAsync(cancellationToken);
-        await using var file = new FileStream(partPath, FileMode.CreateNew, FileAccess.Write, FileShare.None,
-            81920, FileOptions.Asynchronous);
         var buffer = new byte[81920];
         while (true)
         {
@@ -1021,7 +1359,7 @@ internal sealed class CloudGateway : IDisposable
         }
 
         await file.FlushAsync(cancellationToken);
-        var actualLength = new FileInfo(partPath).Length;
+        var actualLength = file.Length;
         if (actualLength != expectedLength)
             throw new InvalidDataException($"Ожидалось {expectedLength} байт, получено {actualLength}");
     }
@@ -1414,11 +1752,21 @@ internal sealed class CloudGateway : IDisposable
 
     public void Dispose()
     {
+        lock (_cacheCleanupLock)
+            _cacheCleanupStopping = true;
+        _cacheCleanupTimer.Dispose();
         if (Interlocked.Exchange(ref _ending, 1) == 0)
         {
             try { FlushPending(TimeSpan.FromSeconds(2)); }
             catch (Exception ex) { EngineLog.Error("Дренаж удалений при освобождении шлюза", ex); }
         }
+        Task? cacheCleanupTask;
+        lock (_cacheCleanupLock)
+            cacheCleanupTask = _cacheCleanupTask;
+        if (cacheCleanupTask is not null)
+            CacheCleanupWaitForTesting?.Invoke();
+        try { cacheCleanupTask?.GetAwaiter().GetResult(); }
+        catch (Exception ex) { EngineLog.Error("Остановка очистки кеша", ex); }
         _delTimer.Dispose();
         _cacheEpochCancellation.Cancel();
         _cacheEpochCancellation.Dispose();

@@ -86,7 +86,8 @@ internal sealed class FakeCloud
     public FakeHttpHandler HttpHandler { get; }
     public IReadOnlyList<string> Operations => _operations.ToArray();
 
-    public CloudGateway CreateGateway(string cacheDir, TimeProvider? time = null, string? token = "test-token")
+    public CloudGateway CreateGateway(string cacheDir, TimeProvider? time = null, string? token = "test-token",
+        long? cacheLimitBytesForTesting = null)
         => new(
             new CloudApi.CloudApiClient(Invoker),
             new FilesApi.FilesApiClient(Invoker),
@@ -94,7 +95,8 @@ internal sealed class FakeCloud
             "https://files.test",
             () => token,
             cacheDir,
-            time);
+            time,
+            cacheLimitBytesForTesting);
 
     public string AddDirectory(string name, string parentId = "")
     {
