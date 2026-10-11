@@ -32,7 +32,7 @@ namespace BarkCloud.Web.Tests.Auth;
 public sealed class AuthEndpointsTests
 {
     [Fact]
-    public async Task HtmlBootstrap_UsesSafeStateJsonAndBuiltManifestAssets()
+    public async Task HtmlBootstrap_UsesSafeStateJsonAndTestManifestAssets()
     {
         const string hostileServerName = "</script>\"{{ app.name }}";
         await using var fixture = await Fixture.CreateAsync(serverName: hostileServerName);
@@ -48,7 +48,14 @@ public sealed class AuthEndpointsTests
         state.RootElement.GetProperty("serverName").GetString().Should().Be(hostileServerName);
         html.Should().NotContain(hostileServerName);
         html.Should().Contain("{{ app.name }}");
-        html.Should().Contain("/assets/").And.Contain("type=\"module\"");
+        Regex.Matches(html, "<link rel=\"stylesheet\" href=\"([^\"]+)\" />")
+            .Select(match => match.Groups[1].Value)
+            .Should().Equal("/assets/shared-nested.css", "/assets/shared-first.css", "/assets/auth-entry.css");
+        Regex.Matches(html, "<link rel=\"modulepreload\" href=\"([^\"]+)\" />")
+            .Select(match => match.Groups[1].Value)
+            .Should().Equal("/assets/shared-nested.js", "/assets/shared-first.js");
+        Regex.Match(html, "<script type=\"module\" src=\"([^\"]+)\"></script>")
+            .Groups[1].Value.Should().Be("/assets/auth-entry.js");
         html.IndexOf("localStorage.getItem('bark_theme')", StringComparison.Ordinal)
             .Should().BeLessThan(html.IndexOf("rel=\"stylesheet\"", StringComparison.Ordinal));
     }
@@ -664,12 +671,34 @@ public sealed class AuthEndpointsTests
     private sealed class Fixture : IAsyncDisposable
     {
         private static readonly string JwtSecret = "auth-endpoint-fixture-signing-secret-at-least-32-bytes";
+        private const string TestAssetManifest = """
+            {
+              "src/auth/main.tsx": {
+                "file": "assets/auth-entry.js",
+                "name": "auth",
+                "src": "src/auth/main.tsx",
+                "isEntry": true,
+                "imports": ["_shared/first.js"],
+                "css": ["assets/auth-entry.css"]
+              },
+              "_shared/first.js": {
+                "file": "assets/shared-first.js",
+                "imports": ["_shared/nested.js"],
+                "css": ["assets/shared-first.css"]
+              },
+              "_shared/nested.js": {
+                "file": "assets/shared-nested.js",
+                "css": ["assets/shared-nested.css"]
+              }
+            }
+            """;
         private readonly CookieContainer _cookies;
         private readonly Uri _baseAddress;
+        private readonly string _temporaryWebRoot;
 
         private Fixture(WebApplication app, HttpClient client, CookieContainer cookies, Uri baseAddress,
             Mock<IdentityApi.IdentityApiClient> identity, Mock<ConfigurationApi.ConfigurationApiClient> configuration,
-            string serverName, bool registrationEnabled)
+            string serverName, bool registrationEnabled, string temporaryWebRoot)
         {
             App = app;
             Client = client;
@@ -679,6 +708,7 @@ public sealed class AuthEndpointsTests
             Configuration = configuration;
             ServerName = serverName;
             RegistrationEnabled = registrationEnabled;
+            _temporaryWebRoot = temporaryWebRoot;
         }
 
         public WebApplication App { get; }
@@ -714,79 +744,103 @@ public sealed class AuthEndpointsTests
             string serverName = "BarkCloud test", bool registrationEnabled = true)
         {
             var webProject = FindWebProject();
-            var outputWebRoot = Path.Combine(AppContext.BaseDirectory, "wwwroot");
-            Directory.CreateDirectory(outputWebRoot);
-            File.Copy(Path.Combine(webProject, "wwwroot", "asset-manifest.json"),
-                Path.Combine(outputWebRoot, "asset-manifest.json"), overwrite: true);
-            var cookies = new CookieContainer();
-            var options = new WebApplicationOptions
+            var temporaryWebRoot = Path.Combine(Path.GetTempPath(), $"BarkCloud.Web.Tests.Auth.{Guid.NewGuid():N}");
+            WebApplication? app = null;
+            HttpClient? client = null;
+            try
             {
-                ApplicationName = typeof(AuthEndpoints).Assembly.FullName,
-                EnvironmentName = Environments.Production
-            };
-            var builder = WebApplication.CreateBuilder(options);
-            builder.WebHost.UseUrls("http://127.0.0.1:0");
-            builder.Logging.ClearProviders();
-            builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["JwtSettings:SecretKey"] = JwtSecret,
-                ["JwtSettings:Issuer"] = "bark",
-                ["JwtSettings:Audience"] = "bark",
-                ["App:PublicHost"] = serverName,
-                ["App:Version"] = "1.10.0",
-                ["Features:RegistrationEnabled"] = registrationEnabled.ToString(),
-                ["Features:EmailEnabled"] = emailEnabled.ToString()
-            });
+                Directory.CreateDirectory(temporaryWebRoot);
+                await File.WriteAllTextAsync(Path.Combine(temporaryWebRoot, "asset-manifest.json"), TestAssetManifest);
 
-            var identity = new Mock<IdentityApi.IdentityApiClient>(MockBehavior.Strict);
-            var configuration = new Mock<ConfigurationApi.ConfigurationApiClient>(MockBehavior.Strict);
-            var fixture = new Fixture(null!, null!, cookies, null!, identity, configuration, serverName, registrationEnabled);
-            configuration.Setup(x => x.GetConfigurationAsync(It.IsAny<GetConfigurationRequest>(),
-                    It.IsAny<Metadata>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
-                .Returns(() => GrpcCallHelpers.AsyncUnary(new GetConfigurationResponse
+                var cookies = new CookieContainer();
+                var options = new WebApplicationOptions
                 {
-                    Configurations =
+                    ApplicationName = typeof(AuthEndpoints).Assembly.FullName,
+                    ContentRootPath = webProject,
+                    WebRootPath = temporaryWebRoot,
+                    EnvironmentName = Environments.Production
+                };
+                var builder = WebApplication.CreateBuilder(options);
+                builder.WebHost.UseUrls("http://127.0.0.1:0");
+                builder.Logging.ClearProviders();
+                builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["JwtSettings:SecretKey"] = JwtSecret,
+                    ["JwtSettings:Issuer"] = "bark",
+                    ["JwtSettings:Audience"] = "bark",
+                    ["App:PublicHost"] = serverName,
+                    ["App:Version"] = "1.10.0",
+                    ["Features:RegistrationEnabled"] = registrationEnabled.ToString(),
+                    ["Features:EmailEnabled"] = emailEnabled.ToString()
+                });
+
+                var identity = new Mock<IdentityApi.IdentityApiClient>(MockBehavior.Strict);
+                var configuration = new Mock<ConfigurationApi.ConfigurationApiClient>(MockBehavior.Strict);
+                var fixture = new Fixture(null!, null!, cookies, null!, identity, configuration,
+                    serverName, registrationEnabled, temporaryWebRoot);
+                configuration.Setup(x => x.GetConfigurationAsync(It.IsAny<GetConfigurationRequest>(),
+                        It.IsAny<Metadata>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
+                    .Returns(() => GrpcCallHelpers.AsyncUnary(new GetConfigurationResponse
                     {
-                        new ConfigurationItem
+                        Configurations =
                         {
-                            Section = "Features",
-                            Key = "RegistrationEnabled",
-                            Value = fixture.RegistrationEnabled ? "true" : "false"
+                            new ConfigurationItem
+                            {
+                                Section = "Features",
+                                Key = "RegistrationEnabled",
+                                Value = fixture.RegistrationEnabled ? "true" : "false"
+                            }
                         }
-                    }
-                }));
-            identity.Setup(x => x.AuthAsync(It.IsAny<AuthRequest>(), It.IsAny<Metadata>(),
-                    It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
-                .Callback<AuthRequest, Metadata, DateTime?, CancellationToken>((_, metadata, _, _) =>
+                    }));
+                identity.Setup(x => x.AuthAsync(It.IsAny<AuthRequest>(), It.IsAny<Metadata>(),
+                        It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
+                    .Callback<AuthRequest, Metadata, DateTime?, CancellationToken>((_, metadata, _, _) =>
+                    {
+                        var rawId = metadata.Single(item => item.Key == MetadataKeys.DeviceId).Value;
+                        fixture.ObservedDeviceId = Encoding.UTF8.GetString(Convert.FromBase64String(rawId));
+                    })
+                    .Throws(RpcFailure("not-configured"));
+
+                builder.Services.AddAntiforgery(antiforgery =>
                 {
-                    var rawId = metadata.Single(item => item.Key == MetadataKeys.DeviceId).Value;
-                    fixture.ObservedDeviceId = Encoding.UTF8.GetString(Convert.FromBase64String(rawId));
-                })
-                .Throws(RpcFailure("not-configured"));
+                    antiforgery.FormFieldName = "__RequestVerificationToken";
+                    antiforgery.HeaderName = "X-CSRF-TOKEN";
+                });
+                builder.Services.AddSingleton(TimeProvider.System);
+                builder.Services.AddSingleton<TokenRevocationCache>();
+                builder.Services.AddSingleton(identity.Object);
+                builder.Services.AddSingleton(configuration.Object);
+                builder.Services.AddSingleton<FeatureConfigurationGateway>();
+                builder.Services.AddSingleton<AuthFlowStore>();
+                builder.Services.AddSingleton<AuthPageService>();
+                builder.Services.AddScoped<AuthGateway>();
+                builder.Services.AddScoped<RegistrationGateway>();
+                builder.Services.AddScoped<PasswordResetGateway>();
 
-            builder.Services.AddAntiforgery(antiforgery =>
+                app = builder.Build();
+                app.MapAuthEndpoints();
+                await app.StartAsync();
+                var baseAddress = new Uri(app.Urls.Single());
+                var handler = new HttpClientHandler { CookieContainer = cookies, UseCookies = true };
+                client = new HttpClient(handler) { BaseAddress = baseAddress };
+                return new Fixture(app, client, cookies, baseAddress, identity, configuration,
+                    serverName, registrationEnabled, temporaryWebRoot);
+            }
+            catch
             {
-                antiforgery.FormFieldName = "__RequestVerificationToken";
-                antiforgery.HeaderName = "X-CSRF-TOKEN";
-            });
-            builder.Services.AddSingleton(TimeProvider.System);
-            builder.Services.AddSingleton<TokenRevocationCache>();
-            builder.Services.AddSingleton(identity.Object);
-            builder.Services.AddSingleton(configuration.Object);
-            builder.Services.AddSingleton<FeatureConfigurationGateway>();
-            builder.Services.AddSingleton<AuthFlowStore>();
-            builder.Services.AddSingleton<AuthPageService>();
-            builder.Services.AddScoped<AuthGateway>();
-            builder.Services.AddScoped<RegistrationGateway>();
-            builder.Services.AddScoped<PasswordResetGateway>();
-
-            var app = builder.Build();
-            app.MapAuthEndpoints();
-            await app.StartAsync();
-            var baseAddress = new Uri(app.Urls.Single());
-            var handler = new HttpClientHandler { CookieContainer = cookies, UseCookies = true };
-            return new Fixture(app, new HttpClient(handler) { BaseAddress = baseAddress }, cookies,
-                baseAddress, identity, configuration, serverName, registrationEnabled);
+                client?.Dispose();
+                try
+                {
+                    if (app is not null)
+                        await app.DisposeAsync();
+                }
+                finally
+                {
+                    if (Directory.Exists(temporaryWebRoot))
+                        Directory.Delete(temporaryWebRoot, recursive: true);
+                }
+                throw;
+            }
         }
 
         public async Task<JsonDocument> GetStateAsync(string path)
@@ -858,7 +912,15 @@ public sealed class AuthEndpointsTests
         public async ValueTask DisposeAsync()
         {
             Client.Dispose();
-            await App.DisposeAsync();
+            try
+            {
+                await App.DisposeAsync();
+            }
+            finally
+            {
+                if (Directory.Exists(_temporaryWebRoot))
+                    Directory.Delete(_temporaryWebRoot, recursive: true);
+            }
         }
 
         private static string FindWebProject()
