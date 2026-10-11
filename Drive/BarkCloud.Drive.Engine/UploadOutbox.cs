@@ -427,6 +427,11 @@ internal sealed class UploadOutboxWorker : IAsyncDisposable
                             {
                                 break;
                             }
+                            catch (UploadProcessingPendingException)
+                            {
+                                failed = true;
+                                EngineLog.Info(Loc.T("Eng_UploadProcessingPending"));
+                            }
                             catch (Exception ex)
                             {
                                 var current = _outbox.Find(snapshot.Id);

@@ -4,6 +4,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 
+using BarkCloud.Drive.Engine;
 using BarkCloud.Proto.Files;
 
 using Google.Protobuf.WellKnownTypes;
@@ -15,6 +16,11 @@ namespace BarkCloud.Drive.Engine.Tests.Fakes;
 internal static class FakeCloudMethods
 {
     public const string GetUploadUrl = "/barkcloud.files.FilesApi/GetUploadUrl";
+    public const string CreateUploadSession = "/barkcloud.files.FilesApi/CreateUploadSession";
+    public const string GetUploadSession = "/barkcloud.files.FilesApi/GetUploadSession";
+    public const string ResumeUploadSession = "/barkcloud.files.FilesApi/ResumeUploadSession";
+    public const string CancelUploadSession = "/barkcloud.files.FilesApi/CancelUploadSession";
+    public const string CompleteUploadSession = "/barkcloud.files.FilesApi/CompleteUploadSession";
     public const string GetTempDownloadUrl = "/barkcloud.files.FilesApi/GetTempDownloadUrl";
     public const string GetUserStorageInfo = "/barkcloud.files.FilesApi/GetUserStorageInfo";
     public const string ListDirectoryDetailed = "/barkcloud.files.CloudApi/ListDirectoryDetailed";
@@ -44,7 +50,10 @@ internal sealed class FakeCloud
     private readonly Dictionary<string, CloudEntry> _entries = new(StringComparer.Ordinal);
     private readonly Dictionary<string, CloudEntry> _trash = new(StringComparer.Ordinal);
     private readonly Dictionary<string, CloudBlob> _blobs = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, FakeUploadSession> _uploadSessions = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, FakeUploadSession> _uploadSessionsByKey = new(StringComparer.Ordinal);
     private readonly ConcurrentQueue<string> _operations = new();
+    private bool _failedUploadPart;
 
     public FakeCloud()
     {
@@ -60,6 +69,25 @@ internal sealed class FakeCloud
             FakeCloudMethods.ListDirectoryDetailed, ListDirectoryDetailed);
         Invoker.Handle<GetUploadUrlRequest, GetUploadUrlResponse>(
             FakeCloudMethods.GetUploadUrl, GetUploadUrl);
+        Invoker.Handle<CreateUploadSessionRequest, UploadSessionResponse>(
+            FakeCloudMethods.CreateUploadSession, CreateUploadSession);
+        Invoker.Handle<UploadSessionIdRequest, UploadSessionResponse>(
+            FakeCloudMethods.GetUploadSession, GetUploadSession);
+        Invoker.Handle<UploadSessionIdRequest, UploadSessionResponse>(
+            FakeCloudMethods.ResumeUploadSession, ResumeUploadSession);
+        Invoker.Handle<UploadSessionIdRequest, UploadSessionResponse>(
+            FakeCloudMethods.CompleteUploadSession, CompleteUploadSession);
+        Invoker.Handle<UploadSessionIdRequest, UploadSessionResponse>(
+            FakeCloudMethods.CancelUploadSession, request =>
+            {
+                var session = GetUploadSession(request);
+                if (session.Status is UploadSessionStatus.Cancelled or UploadSessionStatus.Expired)
+                    return session;
+                if (session.Status != UploadSessionStatus.Uploading)
+                    throw BusinessError(ServerErrors.UploadSessionState);
+                SetUploadSessionStatus(request.SessionId, UploadSessionStatus.Cancelled);
+                return GetUploadSession(request);
+            });
         Invoker.Handle<GetTempDownloadUrlRequest, GetTempDownloadUrlResponse>(
             FakeCloudMethods.GetTempDownloadUrl, GetTempDownloadUrl);
         Invoker.Handle<GetUserStorageInfoRequest, GetUserStorageInfoResponse>(
@@ -85,9 +113,17 @@ internal sealed class FakeCloud
     public FakeCallInvoker Invoker { get; } = new();
     public FakeHttpHandler HttpHandler { get; }
     public IReadOnlyList<string> Operations => _operations.ToArray();
+    public long UploadPartSize { get; set; } = 3;
+    public Queue<UploadSessionStatus> UploadCompleteStatuses { get; } = new();
+    public int? FailUploadPartNumberOnce { get; set; }
+
+    public IReadOnlyList<string> UploadSessionIds
+    {
+        get { lock (_gate) return _uploadSessions.Keys.ToArray(); }
+    }
 
     public CloudGateway CreateGateway(string cacheDir, TimeProvider? time = null, string? token = "test-token",
-        long? cacheLimitBytesForTesting = null)
+        long? cacheLimitBytesForTesting = null, long? upload2ThresholdBytesForTesting = null)
         => new(
             new CloudApi.CloudApiClient(Invoker),
             new FilesApi.FilesApiClient(Invoker),
@@ -96,7 +132,9 @@ internal sealed class FakeCloud
             () => token,
             cacheDir,
             time,
-            cacheLimitBytesForTesting);
+            cacheLimitBytesForTesting,
+            uploadOrigin: "https://files.test",
+            upload2ThresholdBytesForTesting: upload2ThresholdBytesForTesting);
 
     public string AddDirectory(string name, string parentId = "")
     {
@@ -196,6 +234,120 @@ internal sealed class FakeCloud
             _blobs.Add(fileId, new CloudBlob(fileId, Array.Empty<byte>()));
             return new GetUploadUrlResponse { FileId = fileId, Url = $"https://files.test/upload/{fileId}" };
         }
+    }
+
+    public void SetUploadSessionStatus(string sessionId, UploadSessionStatus status, string errorMessage = "")
+    {
+        lock (_gate)
+        {
+            var session = _uploadSessions[sessionId];
+            session.Status = status;
+            session.ErrorMessage = errorMessage;
+            if (status == UploadSessionStatus.Ready && session.CompletedData is not null)
+                _blobs[session.FileId] = new CloudBlob(session.FileId, session.CompletedData.ToArray());
+        }
+    }
+
+    private UploadSessionResponse CreateUploadSession(CreateUploadSessionRequest request)
+    {
+        lock (_gate)
+        {
+            if (_uploadSessionsByKey.TryGetValue(request.IdempotencyKey, out var existing))
+            {
+                if (existing.Name != request.FileName || existing.Size != request.FileSize
+                    || existing.ContentType != request.ContentType || existing.Sha256 != request.Sha256)
+                    throw BusinessError(ServerErrors.UploadIdempotencyConflict);
+                return ToUploadSession(existing, includeToken: true);
+            }
+
+            var session = new FakeUploadSession
+            {
+                SessionId = Guid.NewGuid().ToString("D"),
+                FileId = Guid.NewGuid().ToString("D"),
+                IdempotencyKey = request.IdempotencyKey,
+                Name = request.FileName,
+                Size = request.FileSize,
+                ContentType = request.ContentType,
+                Sha256 = request.Sha256,
+                PartSize = UploadPartSize,
+                UploadToken = Guid.NewGuid().ToString("N"),
+                Status = UploadSessionStatus.Uploading,
+            };
+            _uploadSessions.Add(session.SessionId, session);
+            _uploadSessionsByKey.Add(session.IdempotencyKey, session);
+            return ToUploadSession(session, includeToken: true);
+        }
+    }
+
+    private UploadSessionResponse GetUploadSession(UploadSessionIdRequest request)
+    {
+        lock (_gate)
+        {
+            if (!_uploadSessions.TryGetValue(request.SessionId, out var session))
+                throw BusinessError(ServerErrors.UploadSessionNotFound);
+            return ToUploadSession(session, includeToken: false);
+        }
+    }
+
+    private UploadSessionResponse ResumeUploadSession(UploadSessionIdRequest request)
+    {
+        lock (_gate)
+        {
+            if (!_uploadSessions.TryGetValue(request.SessionId, out var session))
+                throw BusinessError(ServerErrors.UploadSessionNotFound);
+            if (session.Status == UploadSessionStatus.Uploading)
+                session.UploadToken = Guid.NewGuid().ToString("N");
+            return ToUploadSession(session, includeToken: true);
+        }
+    }
+
+    private UploadSessionResponse CompleteUploadSession(UploadSessionIdRequest request)
+    {
+        lock (_gate)
+        {
+            if (!_uploadSessions.TryGetValue(request.SessionId, out var session))
+                throw BusinessError(ServerErrors.UploadSessionNotFound);
+            var partCount = (session.Size - 1) / session.PartSize + 1;
+            if (Enumerable.Range(1, checked((int)partCount)).Any(number =>
+                    !session.Parts.TryGetValue(number, out var part) || !part.HasEtag))
+                return ToUploadSession(session, includeToken: false);
+
+            var data = new byte[checked((int)session.Size)];
+            foreach (var part in session.Parts.OrderBy(item => item.Key))
+            {
+                var start = (long)(part.Key - 1) * session.PartSize;
+                Buffer.BlockCopy(part.Value.Data, 0, data, checked((int)start), part.Value.Data.Length);
+            }
+            session.CompletedData = data;
+            session.Status = UploadCompleteStatuses.Count == 0
+                ? UploadSessionStatus.Ready
+                : UploadCompleteStatuses.Dequeue();
+            if (session.Status == UploadSessionStatus.Ready)
+                _blobs[session.FileId] = new CloudBlob(session.FileId, data.ToArray());
+            return ToUploadSession(session, includeToken: false);
+        }
+    }
+
+    private static UploadSessionResponse ToUploadSession(FakeUploadSession session, bool includeToken)
+    {
+        var response = new UploadSessionResponse
+        {
+            SessionId = session.SessionId,
+            FileId = session.FileId,
+            Status = session.Status,
+            FileSize = session.Size,
+            PartSize = session.PartSize,
+            UploadToken = includeToken && session.Status == UploadSessionStatus.Uploading
+                ? session.UploadToken : "",
+            ErrorMessage = session.ErrorMessage,
+        };
+        response.UploadedParts.Add(session.Parts.OrderBy(part => part.Key).Select(part => new UploadPartInfo
+        {
+            PartNumber = part.Key,
+            Size = part.Value.Data.LongLength,
+            HasEtag = part.Value.HasEtag,
+        }));
+        return response;
     }
 
     private GetTempDownloadUrlResponse GetTempDownloadUrl(GetTempDownloadUrlRequest request)
@@ -394,6 +546,53 @@ internal sealed class FakeCloud
     private async Task<HttpResponseMessage> HandleHttpAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
         var segments = (request.RequestUri?.AbsolutePath ?? "").Split('/', StringSplitOptions.RemoveEmptyEntries);
+        if (segments.Length == 4 && string.Equals(segments[0], "file-upload", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(segments[2], "parts", StringComparison.OrdinalIgnoreCase)
+            && request.Method == HttpMethod.Put)
+        {
+            var sessionId = segments[1];
+            if (!int.TryParse(segments[3], out var partNumber))
+                return UploadPartFailure(HttpStatusCode.BadRequest, ServerErrors.UploadPartInvalid);
+            var data = request.Content is null
+                ? Array.Empty<byte>()
+                : await request.Content.ReadAsByteArrayAsync(cancellationToken);
+            var range = request.Content?.Headers.ContentRange;
+            var token = request.Headers.TryGetValues("X-Upload-Token", out var values)
+                ? values.FirstOrDefault()
+                : null;
+            lock (_gate)
+            {
+                if (!_uploadSessions.TryGetValue(sessionId, out var session))
+                    return UploadPartFailure(HttpStatusCode.NotFound, ServerErrors.UploadSessionNotFound);
+                if (session.Status != UploadSessionStatus.Uploading)
+                    return UploadPartFailure(HttpStatusCode.Conflict, ServerErrors.UploadSessionState);
+                if (!string.Equals(token, session.UploadToken, StringComparison.Ordinal))
+                    return UploadPartFailure(HttpStatusCode.Unauthorized, ServerErrors.UploadTokenInvalid);
+
+                var expectedStart = (long)(partNumber - 1) * session.PartSize;
+                var expectedEnd = Math.Min(expectedStart + session.PartSize, session.Size) - 1;
+                if (partNumber <= 0 || range is null || range.From != expectedStart || range.To != expectedEnd
+                    || range.Length != session.Size || request.Content?.Headers.ContentLength != data.LongLength)
+                    return UploadPartFailure(HttpStatusCode.Conflict, ServerErrors.UploadPartInvalid);
+
+                var hasEtag = true;
+                if (!_failedUploadPart && FailUploadPartNumberOnce == partNumber)
+                {
+                    _failedUploadPart = true;
+                    hasEtag = false;
+                }
+                session.Parts[partNumber] = new FakeUploadPart(data, hasEtag);
+                if (!hasEtag)
+                    return new HttpResponseMessage(HttpStatusCode.InternalServerError);
+            }
+
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(JsonSerializer.Serialize(new { partNumber, size = data.LongLength }),
+                    Encoding.UTF8, "application/json"),
+            };
+        }
+
         if (segments.Length == 2 && string.Equals(segments[0], "upload", StringComparison.OrdinalIgnoreCase)
             && request.Method == HttpMethod.Post)
         {
@@ -444,6 +643,13 @@ internal sealed class FakeCloud
 
         return new HttpResponseMessage(HttpStatusCode.NotFound);
     }
+
+    private static HttpResponseMessage UploadPartFailure(HttpStatusCode statusCode, string errorCode)
+        => new(statusCode)
+        {
+            Content = new StringContent(JsonSerializer.Serialize(new { code = errorCode }),
+                Encoding.UTF8, "application/json"),
+        };
 
     private static byte[] ExtractMultipartFile(byte[] body, MediaTypeHeaderValue? contentType)
     {
@@ -597,6 +803,25 @@ internal sealed class FakeCloud
         public byte[] Data { get; set; } = data;
         public DateTime UploadedAt { get; } = DateTime.UtcNow;
     }
+
+    private sealed class FakeUploadSession
+    {
+        public string SessionId { get; init; } = "";
+        public string FileId { get; init; } = "";
+        public string IdempotencyKey { get; init; } = "";
+        public string Name { get; init; } = "";
+        public long Size { get; init; }
+        public string ContentType { get; init; } = "";
+        public string Sha256 { get; init; } = "";
+        public long PartSize { get; init; }
+        public string UploadToken { get; set; } = "";
+        public UploadSessionStatus Status { get; set; }
+        public string ErrorMessage { get; set; } = "";
+        public Dictionary<int, FakeUploadPart> Parts { get; } = new();
+        public byte[]? CompletedData { get; set; }
+    }
+
+    private sealed record FakeUploadPart(byte[] Data, bool HasEtag);
 }
 
 internal sealed record FakeCloudFile(string EntryId, string FileId, string Name, string DirectoryId);
