@@ -15,9 +15,14 @@ Parent: [[Architecture]] · See also: [[Web/Settings]] · [[Web/SystemUpdates]] 
 | `Backend/BarkCloud.Web/Program.cs` | top-level host | Конфигурация, gRPC-клиенты, DI и HTTP-маршруты |
 | `Backend/BarkCloud.Web/AppVersion.cs` | `AppVersion.Current` | Версия по умолчанию |
 | `Backend/BarkCloud.Web/Auth/AuthGateway.cs` | `AuthGateway` | Сессия браузера, refresh и проверка отзыва |
-| `Backend/BarkCloud.Web/WebEndpoints.cs` | `MapWebEndpoints` | Вход, регистрация, выход и публичные ссылки |
+| `Backend/BarkCloud.Web/Auth/AuthEndpoints.cs` | `MapAuthEndpoints` | Серверные auth-маршруты, antiforgery и переходы входа, регистрации и сброса пароля |
+| `Backend/BarkCloud.Web/Auth/AuthFlowStore.cs` | `AuthFlowStore` | Ограниченное process-local состояние auth-потоков, привязанное к device cookie |
+| `Backend/BarkCloud.Web/Auth/AuthPageState.cs` | `AuthPageState` | Публичный JSON-контракт страницы входа React |
+| `Backend/BarkCloud.Web/Rendering/AuthPageService.cs` | `AuthPageService` | HTML-оболочка, manifest-ресурсы Vite и безопасная вставка auth state |
+| `Backend/BarkCloud.Web/WebEndpoints.cs` | `MapWebEndpoints` | Корень, публичные ссылки и image proxy |
 | `Backend/BarkCloud.Web/Endpoints/CloudApiEndpoints.cs` | `MapCloudApiEndpoints` | HTTP API облачных файлов и пользовательского интерфейса |
 | `Backend/BarkCloud.Web/ClientApp/src/main.tsx` | React entry | Точка входа SPA |
+| `Backend/BarkCloud.Web/ClientApp/src/auth/main.tsx` | Auth React entry | Точка входа интерфейса входа и восстановления |
 
 ## Публичные контракты
 
@@ -25,14 +30,21 @@ Parent: [[Architecture]] · See also: [[Web/Settings]] · [[Web/SystemUpdates]] 
 |---|---|
 | `AppVersion.Current` | Единственный источник версии по умолчанию (поднимается при каждой функциональной правке веба); конфигурация `App:Version` может его переопределить. Версия попадает в данные оболочки и метаданные устройства клиента |
 | Cookie `bark_at`, `bark_rt`, `bark_did` | Access-, refresh- и device-id cookie. Все HttpOnly, режим Secure задаётся `App:CookieSecure` |
-| `/login`, `/register`, `/forgot` | Серверные страницы и формы входа, регистрации и сброса пароля |
-| `POST /login/webauthn/begin`, `POST /login/webauthn/complete` | Начало и завершение входа WebAuthn |
+| `GET /login`, `GET /register`, `GET /forgot` | Отдают лёгкую HTML-оболочку и state для React auth entry. `Accept: application/json` возвращает сам state; успешная операция возвращает `{ "redirectTo": "/photos" }` |
+| `POST /login`, `/register`, `/register/confirm`, `/forgot`, `/forgot/confirm` | Формы входа, регистрации и сброса пароля; все POST требуют antiforgery token и отвечают с `no-store` |
+| `POST /login/resend`, `/register/resend`, `/forgot/resend` | Повторный запрос email-кода в исходном потоке; resend не продлевает 15-минутный срок потока |
+| `POST /login/webauthn/begin`, `POST /login/webauthn/complete` | WebAuthn; CSRF передаётся заголовком `X-CSRF-TOKEN`, assertion принимается как JSON object |
+| `GET /logout`, `POST /logout` | Выход; GET сохранён для совместимости, оба маршрута находятся в auth-группе с `no-store` |
 | `GET /api/me`, `GET /api/storage` | Данные оболочки приложения и отдельная статистика хранилища |
 | `/api/settings/*`, `/api/system/*` | API настроек и обслуживания; детали в [[Web/Settings]] и [[Web/SystemUpdates]] |
 | `/s/{token}`, `/v/{token}`, `/m/{token}`, `/f/{token}`, `/al/{token}`, `/mpl/{token}` | Публичные ссылки на файлы, медиа, папки, альбомы и музыкальные плейлисты |
 
 ## Зависимости и взаимодействия
 
+- Отдельный React auth entry (`ClientApp/src/auth/main.tsx`) собирается Vite вместе с SPA. В production `AuthPageService` рекурсивно собирает CSS и modulepreload из manifest; dev server разрешён только через явный loopback `Auth:ViteDevServerUrl` в Development. Auth state вставляется в отдельный `application/json` script после подготовки оболочки и не проходит через общий `TemplateRenderer`.
+- Auth state содержит текущий экран, безопасные значения полей и ошибки; пароли, OTP и backend code/reset IDs остаются вне ответа. POST auth-маршруты и WebAuthn требуют antiforgery, ответы auth-страниц и ошибок не кешируются.
+- `AuthFlowStore` ограничен 1024 потоками и абсолютным TTL 15 минут. Поток привязан к HttpOnly `bark_did`, а per-flow lock сериализует подтверждение и resend. Секреты и Identity IDs хранятся на сервере; после рестарта процесса flow теряется. Регистрация использует атомарные `CreateAccountWithPassword` и `ConfirmAccountWithPassword`; экран `session-pending` повторяет только `CreateToken`.
+- Auth shell использует локальные Roboto Flex/Roboto Mono из Vite output и устанавливает `bark_theme` до CSS.
 - При запуске Web получает адреса сервисов и общую конфигурацию через `LoadConfiguration(ServiceId.Web)`. Внутренние gRPC-соединения идут по HTTP/2 без TLS внутри Docker-сети.
 - Пользовательский access-токен проверяется локально. При истечении или отзыве Web запрашивает токены по refresh-cookie у Identity. Локальный кэш отзыва синхронизируется с Identity; см. [[Backend/SessionRevocation]].
 - Большинство `/api/*`-маршрутов требует пользовательскую сессию. Неизвестный `/api/*` возвращает 404; остальные маршруты SPA обслуживаются fallback-маршрутом и требуют сессию, кроме публичных страниц ссылок.
