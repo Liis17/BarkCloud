@@ -62,6 +62,54 @@ describe('auth screen states', () => {
     expect((screen.getByRole('textbox', { name: 'Шестизначный код' }) as HTMLInputElement).value).toBe('');
   });
 
+  it.each([
+    ['login-otp', 'email'],
+    ['register-otp', undefined],
+    ['reset', undefined],
+  ] as const)('shows a matching %s OTP error only once and keeps it associated with the input', (screenName, otpMethod) => {
+    const message = 'Код недействителен или истёк.';
+    render(<AuthPage initialState={state({
+      screen: screenName,
+      flowId: 'otp-flow',
+      otpMethod,
+      formError: message,
+      fieldErrors: { otp: message },
+    })} />);
+
+    const input = screen.getByRole('textbox', { name: 'Шестизначный код' });
+    expect(screen.getAllByText(message)).toHaveLength(1);
+    expect(input.getAttribute('aria-invalid')).toBe('true');
+    expect(input.getAttribute('aria-describedby')).toBe('auth-otp-error');
+    expect(document.getElementById('auth-otp-error')?.getAttribute('role')).toBe('alert');
+  });
+
+  it('keeps distinct form, network, and status messages alongside field errors', async () => {
+    const request = vi.fn<typeof fetch>().mockRejectedValue(new Error('Сеть недоступна.'));
+    render(<AuthPage initialState={state({
+      screen: 'login-otp',
+      flowId: 'otp-flow',
+      otpMethod: 'email',
+      formError: 'Проверьте данные формы.',
+      formMessage: 'Код запрошен повторно.',
+      fieldErrors: { otp: 'Код неверен.' },
+    })} request={request} />);
+    fireEvent.change(screen.getByRole('textbox', { name: 'Шестизначный код' }), { target: { value: '123456' } });
+
+    await act(async () => fireEvent.submit(screen.getByRole('button', { name: 'Продолжить' }).closest('form')!));
+
+    expect(screen.getByText('Проверьте данные формы.')).not.toBeNull();
+    expect(screen.getByText('Код неверен.')).not.toBeNull();
+    expect(screen.getByText('Код запрошен повторно.')).not.toBeNull();
+    expect(screen.getByText('Сеть недоступна.')).not.toBeNull();
+    expect(screen.getByRole('status').textContent).toBe('Код запрошен повторно.');
+    expect(screen.getAllByRole('alert')).toHaveLength(2);
+  });
+
+  it('keeps the registration spam hint to one visible copy', () => {
+    render(<AuthPage initialState={state({ screen: 'register-otp', flowId: 'reg-flow' })} />);
+    expect(screen.getAllByText('Если письма нет, проверьте папку «Спам».')).toHaveLength(1);
+  });
+
   it('shows optional registration names and does not require them', async () => {
     const request = requestReturning(state({ screen: 'register-otp', flowId: 'reg-flow' }));
     render(<AuthPage initialState={state({ screen: 'register' })} request={request} />);

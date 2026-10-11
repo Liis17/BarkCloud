@@ -117,7 +117,7 @@ public sealed class AuthGateway
     }
 
     public async Task<LoginResult> LoginAsync(HttpContext http, string login, string password, string? otp, bool remember,
-        bool issueSessionOnSuccess = true, CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default)
     {
         var deviceId = GetOrCreateDeviceId(http);
         var device = BrowserContext.BuildDeviceInfo(http, deviceId, _appName, _appVersion);
@@ -137,11 +137,8 @@ public sealed class AuthGateway
             var response = await _identity.AuthAsync(request, device.ToMetadata(), cancellationToken: cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
 
-            if (issueSessionOnSuccess)
-            {
-                SetCookie(http, AccessCookie, response.AccessToken.Value, response.AccessToken.ExpirationDate, persistent: false);
-                SetCookie(http, RefreshCookie, response.RefreshToken.Value, response.RefreshToken.ExpirationDate, remember);
-            }
+            SetCookie(http, AccessCookie, response.AccessToken.Value, response.AccessToken.ExpirationDate, persistent: false);
+            SetCookie(http, RefreshCookie, response.RefreshToken.Value, response.RefreshToken.ExpirationDate, remember);
 
             return new LoginResult(LoginOutcome.Success);
         }

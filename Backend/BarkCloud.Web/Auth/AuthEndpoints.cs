@@ -14,7 +14,6 @@ public static class AuthEndpoints
 {
     private const string RegistrationRestartMessage = "Регистрация уже была создана. Войдите с выбранными логином и паролем.";
     private const string ExpiredFlowMessage = "Этот шаг истёк или недоступен. Начните заново.";
-    private const string RegistrationCodeMessage = "Если письма нет, проверьте папку «Спам» или запросите код повторно.";
     private const int DefaultResendCooldownSeconds = 60;
 
     public sealed record WebAuthnLoginCompleteBody(string? ChallengeId, JsonElement Assertion, bool Remember);
@@ -228,7 +227,7 @@ public static class AuthEndpoints
             var flow = lease.Flow;
             using var cancellation = LinkRequestAndFlow(http, lease);
             var result = await auth.LoginAsync(http, flow.Login!, flow.Password!, null, flow.Remember,
-                issueSessionOnSuccess: false, cancellationToken: cancellation.Token);
+                cancellationToken: cancellation.Token);
             if (result.Outcome == LoginOutcome.NeedsOtp)
             {
                 flow.FormError = result.OtpMethod == "email"
@@ -240,6 +239,12 @@ public static class AuthEndpoints
                     await features.RegistrationEnabledAsync(http.RequestAborted), "login-otp", flow));
             }
 
+            if (result.Outcome == LoginOutcome.Success)
+            {
+                flows.Complete(flow);
+                return Redirect(http, "/photos");
+            }
+
             if (result.Outcome is LoginOutcome.TooManyAttempts or LoginOutcome.Error or LoginOutcome.WrongOtp)
             {
                 flow.FormError = result.Message ?? "Не удалось запросить новый код. Попробуйте позже.";
@@ -249,13 +254,9 @@ public static class AuthEndpoints
                     await features.RegistrationEnabledAsync(http.RequestAborted), "login-otp", flow));
             }
 
-            // If Identity no longer requires OTP, discard the retained password instead of completing login here.
             flows.Complete(flow);
-            var message = result.Outcome == LoginOutcome.Success
-                ? "Условия входа изменились. Начните вход заново."
-                : result.Message ?? "Не удалось запросить новый код. Начните вход заново.";
             return await RenderLoginErrorAsync(http, antiforgery, pages, configuration, features,
-                message, flow.Login, flow.Remember);
+                result.Message ?? "Не удалось запросить новый код. Начните заново.", flow.Login, flow.Remember);
         }
     }
 
@@ -410,8 +411,7 @@ public static class AuthEndpoints
                 flow.RetryAt = DateTimeOffset.UtcNow.AddSeconds(DefaultResendCooldownSeconds);
                 flow.OtpMailStatus = null;
                 return await RenderStateAsync(http, pages, State(http, antiforgery, configuration,
-                    registrationEnabled, "register-otp", flow,
-                    formMessage: RegistrationCodeMessage));
+                    registrationEnabled, "register-otp", flow));
             }
 
             if (result.Outcome == RegistrationOutcome.SessionPending)

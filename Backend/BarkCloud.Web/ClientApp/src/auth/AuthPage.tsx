@@ -21,6 +21,7 @@ interface TextFieldProps {
   disabled: boolean;
   type?: string;
   autoComplete?: string;
+  formError?: string;
   required?: boolean;
   minLength?: number;
   inputMode?: 'text' | 'email';
@@ -36,6 +37,7 @@ function TextField({
   disabled,
   type = 'text',
   autoComplete,
+  formError,
   required,
   minLength,
   inputMode,
@@ -59,7 +61,7 @@ function TextField({
         aria-describedby={error ? errorId : undefined}
         onChange={(event) => onChange(event.currentTarget.value)}
       />
-      {error && <p className="auth-field-error" id={errorId}>{error}</p>}
+      {error && <p className="auth-field-error" id={errorId} role={error === formError ? 'alert' : undefined}>{error}</p>}
     </div>
   );
 }
@@ -414,9 +416,10 @@ export function AuthPage({
       {page.flowId && <input type="hidden" name="flow_id" value={page.flowId} />}
     </>
   );
+  const formErrorIsFieldError = Boolean(page.formError && Object.values(page.fieldErrors).includes(page.formError));
   const formFeedback = (
     <>
-      {page.formError && <p className="auth-alert auth-alert-error" role="alert">{page.formError}</p>}
+      {page.formError && !formErrorIsFieldError && <p className="auth-alert auth-alert-error" role="alert">{page.formError}</p>}
       {networkError && <p className="auth-alert auth-alert-error" role="alert">{networkError}</p>}
       {page.formMessage && <p className="auth-alert auth-alert-message" role="status">{page.formMessage}</p>}
     </>
@@ -473,6 +476,7 @@ export function AuthPage({
                 label="Логин или почта"
                 value={values.login ?? ''}
                 error={fieldError('login')}
+                formError={page.formError}
                 disabled={busy}
                 autoComplete="username"
                 required
@@ -522,7 +526,7 @@ export function AuthPage({
               <div className="auth-field">
                 <label htmlFor="auth-otp">Код подтверждения</label>
                 <OtpInput ref={otpRef} value={otp} disabled={busy} error={otpError || fieldError('otp')} onChange={setOtp} onInvalid={setOtpError} />
-                {(otpError || fieldError('otp')) && <p className="auth-field-error" id="auth-otp-error">{otpError || fieldError('otp')}</p>}
+                {(otpError || fieldError('otp')) && <p className="auth-field-error" id="auth-otp-error" role={(otpError || fieldError('otp')) === page.formError ? 'alert' : undefined}>{otpError || fieldError('otp')}</p>}
               </div>
               {page.otpMethod === 'authenticator' ? (
                 <p className="auth-inline-note">Откройте приложение-аутентификатор и введите текущий код.</p>
@@ -548,11 +552,11 @@ export function AuthPage({
               <form className="auth-form" onSubmit={submitForm} aria-busy={busy}>
                 {csrfAndFlow}
                 <div className="auth-name-fields">
-                  <TextField id="auth-first-name" name="first_name" label="Имя (необязательно)" value={values.first_name ?? ''} error={fieldError('first_name')} disabled={busy} autoComplete="given-name" onChange={setTextValue('first_name')} />
-                  <TextField id="auth-last-name" name="last_name" label="Фамилия (необязательно)" value={values.last_name ?? ''} error={fieldError('last_name')} disabled={busy} autoComplete="family-name" onChange={setTextValue('last_name')} />
+                  <TextField id="auth-first-name" name="first_name" label="Имя (необязательно)" value={values.first_name ?? ''} error={fieldError('first_name')} formError={page.formError} disabled={busy} autoComplete="given-name" onChange={setTextValue('first_name')} />
+                  <TextField id="auth-last-name" name="last_name" label="Фамилия (необязательно)" value={values.last_name ?? ''} error={fieldError('last_name')} formError={page.formError} disabled={busy} autoComplete="family-name" onChange={setTextValue('last_name')} />
                 </div>
-                <TextField id="auth-username" name="username" label="Логин" value={values.username ?? ''} error={fieldError('username')} disabled={busy} autoComplete="username" required onChange={setTextValue('username')} />
-                <TextField id="auth-email" name="email" label="Электронная почта" value={values.email ?? ''} error={fieldError('email')} disabled={busy} type="email" autoComplete="email" inputMode="email" required onChange={setTextValue('email')} />
+                <TextField id="auth-username" name="username" label="Логин" value={values.username ?? ''} error={fieldError('username')} formError={page.formError} disabled={busy} autoComplete="username" required onChange={setTextValue('username')} />
+                <TextField id="auth-email" name="email" label="Электронная почта" value={values.email ?? ''} error={fieldError('email')} formError={page.formError} disabled={busy} type="email" autoComplete="email" inputMode="email" required onChange={setTextValue('email')} />
                 <div className="auth-field">
                   <label htmlFor="auth-password">Пароль</label>
                   <div className="auth-password-wrap">
@@ -574,7 +578,7 @@ export function AuthPage({
                     </button>
                   </div>
                   <p className="auth-helper">Не менее 6 символов.</p>
-                  {fieldError('password') && <p className="auth-field-error" id="auth-password-error">{fieldError('password')}</p>}
+                  {fieldError('password') && <p className="auth-field-error" id="auth-password-error" role={fieldError('password') === page.formError ? 'alert' : undefined}>{fieldError('password')}</p>}
                 </div>
                 <button className="auth-primary-button" type="submit" disabled={busy}>{busy ? 'Создаём аккаунт…' : 'Создать аккаунт'}</button>
                 <p className="auth-form-footer">Уже есть аккаунт? {link('/login', 'Войти')}</p>
@@ -593,7 +597,7 @@ export function AuthPage({
               <div className="auth-field">
                 <label htmlFor="auth-otp">Код из письма</label>
                 <OtpInput ref={otpRef} value={otp} disabled={busy} error={otpError || fieldError('otp')} onChange={setOtp} onInvalid={setOtpError} />
-                {(otpError || fieldError('otp')) && <p className="auth-field-error" id="auth-otp-error">{otpError || fieldError('otp')}</p>}
+                {(otpError || fieldError('otp')) && <p className="auth-field-error" id="auth-otp-error" role={(otpError || fieldError('otp')) === page.formError ? 'alert' : undefined}>{otpError || fieldError('otp')}</p>}
               </div>
               <p className="auth-inline-note">{page.otpMailStatus === 'existing' ? 'Код уже отправлен. Проверьте почту.' : 'Если письма нет, проверьте папку «Спам».'}</p>
               <button className="auth-primary-button" type="submit" disabled={busy}>{busy ? 'Проверяем…' : 'Подтвердить почту'}</button>
@@ -607,7 +611,7 @@ export function AuthPage({
             page.features.emailEnabled ? (
               <form className="auth-form" onSubmit={submitForm} aria-busy={busy}>
                 {csrfAndFlow}
-                <TextField id="auth-login" name="login" label="Логин или почта" value={values.login ?? ''} error={fieldError('login')} disabled={busy} autoComplete="username" required onChange={setTextValue('login')} />
+                <TextField id="auth-login" name="login" label="Логин или почта" value={values.login ?? ''} error={fieldError('login')} formError={page.formError} disabled={busy} autoComplete="username" required onChange={setTextValue('login')} />
                 <p className="auth-inline-note">Если аккаунт существует, мы отправим письмо с кодом для восстановления.</p>
                 <button className="auth-primary-button" type="submit" disabled={busy}>{busy ? 'Отправляем…' : 'Продолжить'}</button>
                 <p className="auth-form-footer">{link('/login', 'Назад ко входу')}</p>
@@ -626,7 +630,7 @@ export function AuthPage({
               <div className="auth-field">
                 <label htmlFor="auth-otp">Код из письма</label>
                 <OtpInput ref={otpRef} value={otp} disabled={busy} error={otpError || fieldError('otp')} onChange={setOtp} onInvalid={setOtpError} />
-                {(otpError || fieldError('otp')) && <p className="auth-field-error" id="auth-otp-error">{otpError || fieldError('otp')}</p>}
+                {(otpError || fieldError('otp')) && <p className="auth-field-error" id="auth-otp-error" role={(otpError || fieldError('otp')) === page.formError ? 'alert' : undefined}>{otpError || fieldError('otp')}</p>}
               </div>
               <div className="auth-field">
                 <label htmlFor="auth-new-password">Новый пароль</label>
@@ -649,7 +653,7 @@ export function AuthPage({
                   </button>
                 </div>
                 <p className="auth-helper">Не менее 6 символов.</p>
-                {fieldError('password') && <p className="auth-field-error" id="auth-new-password-error">{fieldError('password')}</p>}
+                {fieldError('password') && <p className="auth-field-error" id="auth-new-password-error" role={fieldError('password') === page.formError ? 'alert' : undefined}>{fieldError('password')}</p>}
               </div>
               <label className="auth-checkbox">
                 <input type="checkbox" name="revoke_sessions" value="true" checked={values.revoke_sessions ?? false} disabled={busy} onChange={(event) => updateValue('revoke_sessions', event.currentTarget.checked)} />
