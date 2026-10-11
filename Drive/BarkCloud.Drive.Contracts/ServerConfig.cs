@@ -13,7 +13,7 @@ public sealed class ServerConfig
     public int IdentityPort { get; set; } = 7020;
     public int FilesPort { get; set; } = 7025;
     public int UsersPort { get; set; } = 7021;
-    public bool AcceptAnyCert { get; set; } = true;
+    public bool AcceptAnyCert { get; set; } = false;
 
     private static string FilePath => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),

@@ -78,7 +78,10 @@
     <value>Dienst-Ports</value>
   </data>
   <data name="Common_AcceptCert" xml:space="preserve">
-    <value>Selbstsigniertem Zertifikat vertrauen</value>
+    <value>Alle Serverzertifikate akzeptieren</value>
+  </data>
+  <data name="Common_AcceptCertWarning" xml:space="preserve">
+    <value>Überspringt die Prüfung des Serverzertifikats. Nur bei einem vertrauenswürdigen Server verwenden.</value>
   </data>
   <data name="Common_DriveName" xml:space="preserve">
     <value>Laufwerksname</value>
@@ -367,6 +370,9 @@
   </data>
   <data name="Eng_LoginRequired" xml:space="preserve">
     <value>Benutzername und Passwort eingeben</value>
+  </data>
+  <data name="Eng_TlsConnectionError" xml:space="preserve">
+    <value>Die sichere TLS-Verbindung konnte nicht hergestellt werden. Prüfen Sie Serveradresse und Zertifikat. Für einen vertrauenswürdigen selbst gehosteten Server können Sie vorübergehend „Alle Serverzertifikate akzeptieren“ in den Verbindungseinstellungen aktivieren.</value>
   </data>
   <data name="Eng_AuthSuccess" xml:space="preserve">
     <value>Erfolgreich angemeldet</value>

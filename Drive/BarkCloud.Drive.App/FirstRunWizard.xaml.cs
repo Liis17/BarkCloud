@@ -353,6 +353,12 @@ public partial class FirstRunWizard : FluentWindow
         try
         {
             var challenge = await _engine.BeginWebAuthnAsync();
+            if (!string.IsNullOrEmpty(challenge.Error))
+            {
+                Fail(challenge.Error);
+                return;
+            }
+
             if (string.IsNullOrEmpty(challenge.ChallengeId))
             {
                 Fail(Loc.T("Wizard_KeyUnavailable"));

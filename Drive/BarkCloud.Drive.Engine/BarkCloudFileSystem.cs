@@ -169,6 +169,9 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
 
     internal void SetLastSyncError(string message) => LastSyncError = message;
 
+    internal void SetOutboxSyncError(UploadOutboxEntry entry, Exception exception)
+        => SetLastSyncError(Loc.T("Eng_SyncFailedFmt", entry.Name, ConnectionErrors.GetDisplayMessage(exception)));
+
     internal void RegisterOutboxPending(UploadOutboxEntry entry, LocalFile? file = null)
     {
         var operation = CopyOperation(entry.Op ?? new PersistOperation { Stage = entry.Stage, FileId = entry.FileId });
@@ -506,14 +509,14 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
             EngineLog.Error($"Cleanup(\"{fileName}\")", ex);
             if (info.Context is HandleContext { File: not null })
             {
-                LastSyncError = Loc.T("Eng_SyncFailedFmt", Path.GetFileName(fileName), ex.Message);
+                LastSyncError = Loc.T("Eng_SyncFailedFmt", Path.GetFileName(fileName), ConnectionErrors.GetDisplayMessage(ex));
             }
             else if (info.DeletePending)
             {
                 LastSyncError = info.IsDirectory
                     || info.Context is HandleContext { Node: { IsDirectory: true } }
-                    ? Loc.T("Eng_DirectoryDeleteFailedFmt", Path.GetFileName(fileName), ex.Message)
-                    : Loc.T("Eng_SyncFailedFmt", Path.GetFileName(fileName), ex.Message);
+                    ? Loc.T("Eng_DirectoryDeleteFailedFmt", Path.GetFileName(fileName), ConnectionErrors.GetDisplayMessage(ex))
+                    : Loc.T("Eng_SyncFailedFmt", Path.GetFileName(fileName), ConnectionErrors.GetDisplayMessage(ex));
             }
         }
     }
@@ -532,7 +535,7 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
             {
                 lock (file.Sync)
                     file.KeepData = true;
-                LastSyncError = Loc.T("Eng_SyncFailedFmt", Path.GetFileName(fileName), ex.Message);
+                LastSyncError = Loc.T("Eng_SyncFailedFmt", Path.GetFileName(fileName), ConnectionErrors.GetDisplayMessage(ex));
             }
         }
         finally
@@ -2097,7 +2100,7 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
                 {
                     file.KeepData = true;
                     EngineLog.Error($"CloseFile(\"{fileName}\")", ex);
-                    LastSyncError = Loc.T("Eng_SyncFailedFmt", Path.GetFileName(fileName), ex.Message);
+                    LastSyncError = Loc.T("Eng_SyncFailedFmt", Path.GetFileName(fileName), ConnectionErrors.GetDisplayMessage(ex));
                 }
             }
 
@@ -2143,7 +2146,7 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
                 {
                     file.KeepData = true;
                     EngineLog.Error(Loc.T("Eng_OutboxTransferFailedFmt", file.Name), ex);
-                    LastSyncError = Loc.T("Eng_SyncFailedFmt", file.Name, ex.Message);
+                    LastSyncError = Loc.T("Eng_SyncFailedFmt", file.Name, ConnectionErrors.GetDisplayMessage(ex));
                 }
             }
 
@@ -2188,7 +2191,7 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
     private void RecordDeleteError(LocalFile file, Exception exception)
     {
         EngineLog.Error($"DeleteLocalFile(\"{file.Name}\")", exception);
-        LastSyncError = Loc.T("Eng_SyncFailedFmt", file.Name, exception.Message);
+        LastSyncError = Loc.T("Eng_SyncFailedFmt", file.Name, ConnectionErrors.GetDisplayMessage(exception));
     }
 
     private void RemoveLocalFileLocked(LocalFile file)

@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Security.Authentication;
 
 using BarkCloud.Drive.Contracts.Localization;
 using BarkCloud.Drive.Engine.Tests.Fakes;
@@ -16,6 +17,41 @@ namespace BarkCloud.Drive.Engine.Tests;
 
 public sealed class DriveEngineSessionTests
 {
+    [Fact]
+    public async Task Login_tls_failure_returns_tls_guidance()
+    {
+        await using var harness = new EngineHarness();
+        harness.IdentityInvoker.FailNext("/barkcloud.identity.IdentityApi/Auth",
+            new RpcException(new Status(StatusCode.Unavailable, "service unavailable",
+                new AuthenticationException("certificate rejected"))));
+
+        var status = await harness.Engine.LoginAsync("user", "password", null);
+
+        status.Error.Should().Be(Loc.T("Eng_TlsConnectionError"));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Begin_web_authn_returns_error_only_for_tls_failures(bool tlsFailure)
+    {
+        await using var harness = new EngineHarness();
+        var exception = tlsFailure
+            ? new RpcException(new Status(StatusCode.Unavailable, "service unavailable",
+                new AuthenticationException("certificate rejected")))
+            : new RpcException(new Status(StatusCode.NotFound, "no security keys"));
+        harness.IdentityInvoker.FailNext("/barkcloud.identity.IdentityApi/BeginWebAuthnAssertion", exception);
+
+        var challenge = await harness.Engine.BeginWebAuthnAsync();
+
+        challenge.Error.Should().Be(tlsFailure ? Loc.T("Eng_TlsConnectionError") : null);
+        if (!tlsFailure)
+        {
+            challenge.OptionsJson.Should().BeNullOrEmpty();
+            challenge.ChallengeId.Should().BeNullOrEmpty();
+        }
+    }
+
     [Theory]
     [InlineData(false, false)]
     [InlineData(false, true)]
@@ -657,12 +693,14 @@ public sealed class DriveEngineSessionTests
     }
 
     [Fact]
-    public async Task Login_finishing_after_shutdown_does_not_remount_drive()
+    public async Task Login_finishing_during_shutdown_does_not_restart_or_mount()
     {
         await using var harness = new EngineHarness();
         var authCalls = 0;
         var secondAuthStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var releaseSecondAuth = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var deleteStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseDelete = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         harness.IdentityInvoker.Handle<AuthRequest, AuthResponse>("/barkcloud.identity.IdentityApi/Auth", _ =>
         {
             var call = Interlocked.Increment(ref authCalls);
@@ -673,6 +711,13 @@ public sealed class DriveEngineSessionTests
             }
             return LoginResponse(harness.Time, $"access-{call}", $"refresh-{call}");
         });
+        harness.Cloud.Invoker.Handle<DeleteFileEntriesRequest, DeleteFileEntriesResponse>(
+            FakeCloudMethods.DeleteFileEntries, _ =>
+            {
+                deleteStarted.TrySetResult();
+                releaseDelete.Task.GetAwaiter().GetResult();
+                return new DeleteFileEntriesResponse();
+            });
         (await harness.Engine.LoginAsync("first", "password", null)).Error.Should().BeNull();
         (await harness.Engine.MountAsync("Z", null)).Error.Should().BeNull();
 
@@ -680,13 +725,32 @@ public sealed class DriveEngineSessionTests
             () => harness.Engine.LoginAsync("second", "password", null).GetAwaiter().GetResult(),
             CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
         await secondAuthStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        var mounting = harness.Engine.MountAsync("Y", null);
+        var remounting = harness.Engine.RemountAsync("X", null);
+        harness.Gateway.QueueDeleteFileEntry("queued-entry", "");
 
-        await harness.Engine.ShutdownAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        harness.IsMounted.Should().BeFalse();
-        releaseSecondAuth.TrySetResult();
+        var shutdown = Task.Factory.StartNew(
+            () => harness.Engine.ShutdownAsync().GetAwaiter().GetResult(),
+            CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
+        try
+        {
+            await deleteStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            releaseSecondAuth.TrySetResult();
 
-        await login.WaitAsync(TimeSpan.FromSeconds(5));
+            await login.WaitAsync(TimeSpan.FromSeconds(5));
+            (await mounting.WaitAsync(TimeSpan.FromSeconds(5))).Error.Should().Be(Loc.T("Common_EngineNotRunning"));
+            (await remounting.WaitAsync(TimeSpan.FromSeconds(5))).Error.Should().Be(Loc.T("Common_EngineNotRunning"));
+            harness.OutboxWorker.IsRunning.Should().BeFalse();
+        }
+        finally
+        {
+            releaseSecondAuth.TrySetResult();
+            releaseDelete.TrySetResult();
+        }
+
+        await shutdown.WaitAsync(TimeSpan.FromSeconds(5));
         harness.IsMounted.Should().BeFalse();
+        harness.OutboxWorker.IsRunning.Should().BeFalse();
     }
 
     [Fact]

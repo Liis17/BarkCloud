@@ -7,7 +7,15 @@ namespace BarkCloud.Drive.Contracts;
 [SupportedOSPlatform("windows")]
 public static class EnginePipe
 {
-    public static string Name => $"BarkCloud.Drive.Engine.{WindowsIdentity.GetCurrent().User!.Value}";
+    private static readonly string UserSid = GetCurrentUserSid();
+
+    public static string Name => $"BarkCloud.Drive.Engine.{UserSid}";
 
     public const PipeOptions Options = PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly;
+
+    private static string GetCurrentUserSid()
+    {
+        using var identity = WindowsIdentity.GetCurrent();
+        return identity.User!.Value;
+    }
 }

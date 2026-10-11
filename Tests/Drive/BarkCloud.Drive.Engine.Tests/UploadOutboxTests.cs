@@ -1,4 +1,6 @@
 using System.Net;
+using System.Net.Http;
+using System.Security.Authentication;
 
 using BarkCloud.Drive.Contracts.Localization;
 using BarkCloud.Drive.Engine;
@@ -474,18 +476,23 @@ public sealed class UploadOutboxTests
     {
         using var temp = new TestDirectory();
         var cloud = new FakeCloud();
-        cloud.HttpHandler.Responder = (_, _) => Task.FromResult(
-            new HttpResponseMessage(HttpStatusCode.InternalServerError));
+        cloud.HttpHandler.Responder = (_, _) => Task.FromException<HttpResponseMessage>(
+            new HttpRequestException("TLS handshake failed", new AuthenticationException("certificate rejected")));
         using var gateway = cloud.CreateGateway(temp.Path("cache"));
         var outbox = new UploadOutbox(temp.Path("outbox"));
         var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"), outbox,
             "server", () => "42");
         var processStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        await using var worker = new UploadOutboxWorker(outbox, () => ("server", "42"), _ =>
+        var failureReported = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using var worker = new UploadOutboxWorker(outbox, () => ("server", "42"), (entry, cancellationToken) =>
         {
             processStarted.TrySetResult();
-            throw new IOException("worker retry failed");
-        }, time: new FakeTimeProvider());
+            return fileSystem.ProcessOutboxEntryAsync(entry, cancellationToken);
+        }, failed: (entry, exception) =>
+        {
+            fileSystem.SetOutboxSyncError(entry, exception);
+            failureReported.TrySetResult();
+        }, time: new FakeTimeProvider(), deferDataDeletion: fileSystem.DeferOutboxDataDeletion);
         worker.Start();
         fileSystem.OutboxAdded = () => _ = Task.Run(worker.TriggerAsync);
 
@@ -496,6 +503,8 @@ public sealed class UploadOutboxTests
         fileSystem.WriteFile("\\retry.bin", [8, 9], out _, 0, info).Should().Be(DokanResult.Success);
         fileSystem.Cleanup("\\retry.bin", info);
 
+        fileSystem.LastSyncError.Should().Be(Loc.T("Eng_SyncFailedFmt", "retry.bin",
+            Loc.T("Eng_TlsConnectionError")));
         outbox.Count.Should().Be(0);
         processStarted.Task.IsCompleted.Should().BeFalse();
         file.KeepData.Should().BeTrue();
@@ -505,6 +514,9 @@ public sealed class UploadOutboxTests
         outbox.Count.Should().Be(1);
         file.Kind.Should().Be(LocalFileKind.Pending);
         File.Exists(file.TempPath).Should().BeTrue();
+        await failureReported.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        fileSystem.LastSyncError.Should().Be(Loc.T("Eng_SyncFailedFmt", "retry.bin",
+            Loc.T("Eng_TlsConnectionError")));
     }
 
     [Fact]

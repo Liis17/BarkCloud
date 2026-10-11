@@ -24,7 +24,7 @@ Parent: [[Architecture]] · See also: [[Web/WebApp]] · [[Backend/Files]] · [[B
 | `Tests/Backend/BarkCloud.*.Tests` | Тесты backend и инфраструктуры по сервисам |
 | `Tests/Backend/BarkCloud.Identity.IntegrationTests`, `Tests/Backend/BarkCloud.Users.IntegrationTests` | Отдельные интеграционные проекты |
 | `Tests/Shared/*` | Тесты общих библиотек |
-| `Tests/Drive/BarkCloud.Drive.Engine.Tests` | `net10.0-windows`; unit-тесты работают без Dokany. Тесты настоящего named pipe помечаются категорией `WindowsIpc` и пропускаются на не-Windows |
+| `Tests/Drive/BarkCloud.Drive.Engine.Tests` | `net10.0-windows`; unit-тесты работают без Dokany. Тесты настоящего named pipe помечаются категорией `WindowsIpc` и выполняются в Windows-окружении |
 | `npm test` в `Backend/BarkCloud.Web/ClientApp` | Запускает Vitest |
 | `dotnet test <project.csproj> -c Release` | Запуск указанного .NET test-проекта |
 
