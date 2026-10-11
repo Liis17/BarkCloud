@@ -1141,6 +1141,46 @@ public sealed class BarkCloudFileSystemTests
     }
 
     [Fact]
+    public void Read_handle_uses_opened_node_after_listing_cache_expires()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        cloud.AddFile("", "cached.bin", [1, 2, 3]);
+        var time = new FakeTimeProvider();
+        using var gateway = cloud.CreateGateway(temp.Path("cache"), time);
+        var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"));
+        var reader = new FakeDokanFileInfo();
+
+        fileSystem.CreateFile("\\cached.bin", FileAccess.ReadData | FileAccess.GenericRead, FileShare.ReadWrite,
+            FileMode.Open, FileOptions.None, FileAttributes.Normal, reader).Should().Be(DokanResult.Success);
+        var handle = (HandleContext)reader.Context!;
+        handle.Node.Should().NotBeNull();
+        handle.File.Should().BeNull();
+        var listingCalls = cloud.Invoker.Calls.Count(call =>
+            call.MethodFullName == FakeCloudMethods.ListDirectoryDetailed);
+        listingCalls.Should().Be(1);
+
+        time.Advance(TimeSpan.FromSeconds(6));
+        var buffer = new byte[3];
+        for (var i = 0; i < 100; i++)
+        {
+            fileSystem.ReadFile("\\cached.bin", buffer, out var bytesRead, 0, reader).Should()
+                .Be(DokanResult.Success);
+            bytesRead.Should().Be(3);
+            buffer.Should().Equal([1, 2, 3]);
+
+            fileSystem.GetFileInformation("\\cached.bin", out var info, reader).Should()
+                .Be(DokanResult.Success);
+            info.Length.Should().Be(3);
+        }
+
+        cloud.Invoker.Calls.Count(call => call.MethodFullName == FakeCloudMethods.ListDirectoryDetailed)
+            .Should().Be(listingCalls);
+        fileSystem.Cleanup("\\cached.bin", reader);
+        fileSystem.CloseFile("\\cached.bin", reader);
+    }
+
+    [Fact]
     public void Local_CreateNew_fails_and_Create_truncates_the_shared_copy()
     {
         using var temp = new TestDirectory();
