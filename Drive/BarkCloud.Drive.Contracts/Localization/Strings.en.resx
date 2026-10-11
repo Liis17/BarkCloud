@@ -407,6 +407,9 @@
   <data name="Eng_SyncFailedFmt" xml:space="preserve">
     <value>Failed to save “{0}” to the cloud: {1}</value>
   </data>
+  <data name="Eng_MoveRollbackFailedFmt" xml:space="preserve">
+    <value>Could not fully roll back moving “{0}”: {1}</value>
+  </data>
   <data name="Eng_AttachedFileNotListedFmt" xml:space="preserve">
     <value>After attaching, “{0}” was not found in the fresh directory listing.</value>
   </data>

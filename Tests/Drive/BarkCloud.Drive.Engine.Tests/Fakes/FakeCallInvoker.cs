@@ -23,9 +23,9 @@ internal sealed class FakeCallInvoker : CallInvoker
     public void FailNext(string methodFullName, Exception exception)
         => _failures.GetOrAdd(methodFullName, _ => new ConcurrentQueue<Exception>()).Enqueue(exception);
 
-    public void LoseNextResponseAfterEffect(string methodFullName)
+    public void LoseNextResponseAfterEffect(string methodFullName, StatusCode statusCode = StatusCode.Unavailable)
         => _lostResponses.GetOrAdd(methodFullName, _ => new ConcurrentQueue<Exception>())
-            .Enqueue(new RpcException(new Status(StatusCode.Unavailable, "Ответ потерян после выполнения операции")));
+            .Enqueue(new RpcException(new Status(statusCode, "Ответ потерян после выполнения операции")));
 
     public static RpcException BusinessError(string code)
     {

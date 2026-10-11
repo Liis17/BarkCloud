@@ -241,9 +241,11 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
 
     internal bool RegisterLocalFile(LocalFile file)
     {
-        file.Path = NormalizePath(file.Path);
         lock (_localFilesLock)
+        {
+            file.Path = NormalizePath(file.Path);
             return _localFiles.TryAdd(file.Path, file);
+        }
     }
 
     public NtStatus CreateFile(string fileName, FileAccess access, FileShare share, FileMode mode,
@@ -752,38 +754,512 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
 
     private NtStatus MoveFileCore(string oldName, string newName, bool replace, IDokanFileInfo info)
     {
+        // Проверка до Sync сохраняет AccessDenied, даже если worker удерживает Sync у Pending;
+        // MoveFileLocked повторяет её после захвата Sync, чтобы закрыть гонку.
+        if (FindLocalFile(oldName)?.Kind == LocalFileKind.Pending
+            || FindLocalFile(newName)?.Kind == LocalFileKind.Pending)
+            return DokanResult.AccessDenied;
+
+        var sourceCandidate = FindLocalFile(oldName);
+        if (sourceCandidate is null)
+            return MoveFileLocked(oldName, newName, replace, info.IsDirectory, null);
+
+        if (!Monitor.TryEnter(sourceCandidate.Sync, 0))
+            return DokanResult.SharingViolation;
+        try
+        {
+            return MoveFileLocked(oldName, newName, replace, info.IsDirectory, sourceCandidate);
+        }
+        finally
+        {
+            Monitor.Exit(sourceCandidate.Sync);
+        }
+    }
+
+    private NtStatus MoveFileLocked(string oldName, string newName, bool replace, bool sourceIsDirectory,
+        LocalFile? sourceCandidate)
+    {
         if (FindLocalFile(oldName)?.Kind == LocalFileKind.Pending
             || FindLocalFile(newName)?.Kind == LocalFileKind.Pending
             || FindPendingFileByPath(oldName) is not null
             || FindPendingFileByPath(newName) is not null)
             return DokanResult.AccessDenied;
 
-        var node = SafeResolve(oldName);
-        if (node is null)
-            return DokanResult.FileNotFound;
+        LocalFile? sourceFile = sourceCandidate;
+        if (sourceFile is not null)
+        {
+            lock (_localFilesLock)
+                if (!_localFiles.TryGetValue(NormalizePath(oldName), out var registered)
+                    || !ReferenceEquals(registered, sourceFile))
+                    sourceFile = null;
+        }
 
         var from = _gateway.ResolveParentDirectory(oldName);
         var to = _gateway.ResolveParentDirectory(newName);
         if (from is null || to is null)
             return DokanResult.PathNotFound;
 
-        var parentChanged = !string.Equals(from.Value.DirectoryId, to.Value.DirectoryId, StringComparison.Ordinal);
-        var nameChanged = !string.Equals(from.Value.Name, to.Value.Name, StringComparison.Ordinal);
-
-        if (node.IsDirectory)
+        ResolvedNode? ResolveSource()
         {
-            if (parentChanged) _gateway.MoveDirectory(node.DirectoryId, to.Value.DirectoryId);
-            if (nameChanged) _gateway.RenameDirectory(node.DirectoryId, to.Value.Name);
-        }
-        else
-        {
-            if (parentChanged) _gateway.MoveFileEntry(node.EntryId, to.Value.DirectoryId);
-            if (nameChanged) _gateway.RenameFileEntry(node.EntryId, to.Value.Name);
+            if (sourceFile is null)
+                return ResolveMoveSource(from.Value.DirectoryId, from.Value.Name, sourceIsDirectory, null);
+            return sourceFile.ExistingEntryId is null
+                ? null
+                : ResolveMoveSource(from.Value.DirectoryId, from.Value.Name, isDirectory: false,
+                    sourceFile.ExistingEntryId);
         }
 
-        _gateway.InvalidateListing(from.Value.DirectoryId);
-        _gateway.InvalidateListing(to.Value.DirectoryId);
-        return DokanResult.Success;
+        LocalFile? targetFile = null;
+        var targetSyncHeld = false;
+        try
+        {
+            var sourceNode = ResolveSource();
+            if (sourceFile is null && sourceNode is null
+                || sourceFile?.ExistingEntryId is not null && sourceNode is null)
+                return DokanResult.FileNotFound;
+
+            if (_gateway.HasTombstonedFile(to.Value.DirectoryId, to.Value.Name))
+            {
+                _gateway.FlushPending(throwOnFailure: true);
+                sourceNode = ResolveSource();
+                if (sourceFile is null && sourceNode is null
+                    || sourceFile?.ExistingEntryId is not null && sourceNode is null)
+                    return DokanResult.FileNotFound;
+            }
+
+            targetFile = FindLocalFile(newName);
+
+            var isDirectory = sourceFile is null && sourceNode!.IsDirectory;
+            var sourceEntryId = sourceFile is null
+                ? sourceNode is { IsDirectory: false } ? sourceNode.EntryId : null
+                : sourceFile.ExistingEntryId;
+            var targetNode = ResolveMoveTarget(to.Value.DirectoryId, to.Value.Name);
+            var targetEntryId = targetNode is { IsDirectory: false }
+                ? targetNode.EntryId
+                : targetNode is null ? targetFile?.ExistingEntryId : null;
+            var targetExists = targetNode is not null || targetFile is not null;
+            var sameObject = isDirectory
+                ? targetNode is { IsDirectory: true }
+                  && string.Equals(sourceNode!.DirectoryId, targetNode.DirectoryId, StringComparison.Ordinal)
+                : targetNode?.IsDirectory != true
+                  && ((sourceEntryId is not null && sourceEntryId == targetEntryId)
+                      || (sourceFile is not null && ReferenceEquals(sourceFile, targetFile)));
+
+            if (targetExists && !sameObject && isDirectory != (targetNode?.IsDirectory == true))
+                return DokanResult.AccessDenied;
+
+            // Документация MoveFileEx запрещает заменять уже существующую папку.
+            if (targetExists && !sameObject && isDirectory)
+                return DokanResult.FileExists;
+
+            if (targetFile is not null && !sameObject && !ReferenceEquals(sourceFile, targetFile)
+                && IsLocalFileOpen(targetFile))
+                return DokanResult.SharingViolation;
+
+            if (targetFile is not null && !ReferenceEquals(targetFile, sourceFile))
+            {
+                targetSyncHeld = Monitor.TryEnter(targetFile.Sync, 0);
+                if (!targetSyncHeld)
+                    return DokanResult.SharingViolation;
+            }
+
+            if (targetExists && !sameObject && !replace)
+                return DokanResult.FileExists;
+
+            var sourceName = sourceNode?.Name ?? sourceFile!.Name;
+            var sourceDirectoryId = isDirectory
+                ? from.Value.DirectoryId
+                : sourceNode?.DirectoryId ?? sourceFile!.DirectoryId;
+            var parentChanged = !string.Equals(sourceDirectoryId, to.Value.DirectoryId, StringComparison.Ordinal);
+            var nameChanged = !string.Equals(sourceName, to.Value.Name, StringComparison.Ordinal);
+
+            if (sourceFile is not null && sourceFile.ExistingEntryId is null)
+            {
+                var existingEntryId = replace && !sameObject ? targetEntryId : null;
+                var existingNode = existingEntryId is null
+                    ? sourceFile.ExistingNode
+                    : targetNode ?? targetFile?.ExistingNode;
+                try
+                {
+                    var discarded = CommitLocalFileMove(sourceFile, newName, to.Value.DirectoryId,
+                        targetFile, existingEntryId, existingNode);
+                    if (discarded is not null)
+                        DisposeCandidate(discarded);
+                }
+                catch (MoveStatusException ex)
+                {
+                    return ex.Status;
+                }
+
+                return DokanResult.Success;
+            }
+
+            var replaceEntryId = replace && !sameObject && !isDirectory ? targetEntryId : null;
+            var rollback = new Stack<Action>();
+            var targetDeleted = false;
+            try
+            {
+                if (replaceEntryId is not null)
+                {
+                    try
+                    {
+                        _gateway.DeleteFileEntry(replaceEntryId);
+                        targetDeleted = true;
+                    }
+                    catch (Exception ex) when (IsUncertainMoveResult(ex))
+                    {
+                        targetDeleted = true;
+                        throw;
+                    }
+                }
+
+                MoveCloudNode(sourceNode!, sourceDirectoryId, sourceName, to.Value.DirectoryId, to.Value.Name,
+                    parentChanged, nameChanged, rollback);
+
+                if (sourceFile is not null)
+                {
+                    var movedNode = sourceNode is { IsDirectory: false }
+                        ? CopyNode(sourceNode, to.Value.DirectoryId, to.Value.Name)
+                        : sourceFile.ExistingNode;
+                    var discarded = CommitLocalFileMove(sourceFile, newName, to.Value.DirectoryId,
+                        targetFile, sourceEntryId, movedNode);
+                    if (discarded is not null)
+                        DisposeCandidate(discarded);
+                }
+                else if (targetFile is not null && !sameObject)
+                {
+                    var discarded = RemoveClosedTargetFile(targetFile);
+                    if (discarded is not null)
+                        DisposeCandidate(discarded);
+                }
+
+                if (isDirectory)
+                    MoveLocalFilesUnderDirectory(oldName, newName);
+            }
+            catch (Exception ex)
+            {
+                var rollbackErrors = RollbackMove(rollback, oldName);
+                if (targetDeleted)
+                {
+                    try
+                    {
+                        _gateway.RestoreFromTrash(replaceEntryId!, to.Value.DirectoryId);
+                    }
+                    catch (Exception restoreError)
+                    {
+                        EngineLog.Error($"MoveFile restore target \"{newName}\"", restoreError);
+                        if (!IsExpectedMoveRollbackError(restoreError))
+                            rollbackErrors.Add(restoreError);
+                    }
+                }
+
+                if (rollbackErrors.Count > 0)
+                    LastSyncError = Loc.T("Eng_MoveRollbackFailedFmt", oldName,
+                        string.Join("; ", rollbackErrors.Select(error => error.Message)));
+
+                if (ex is MoveStatusException statusException)
+                    return statusException.Status;
+                throw;
+            }
+
+            return DokanResult.Success;
+        }
+        finally
+        {
+            if (targetSyncHeld)
+                Monitor.Exit(targetFile!.Sync);
+            _gateway.InvalidateListing(from.Value.DirectoryId);
+            _gateway.InvalidateListing(to.Value.DirectoryId);
+        }
+    }
+
+    private bool IsLocalFileOpen(LocalFile file)
+    {
+        lock (_localFilesLock)
+            return file.OpenCount > 0;
+    }
+
+    private ResolvedNode? ResolveMoveSource(string directoryId, string name, bool isDirectory, string? entryId)
+    {
+        var listing = _gateway.ListDirectory(directoryId);
+        if (entryId is not null)
+        {
+            var file = listing.Files.FirstOrDefault(item =>
+                string.Equals(item.Entry.Id, entryId, StringComparison.Ordinal));
+            return file is null ? null : CopyNode(file);
+        }
+
+        if (isDirectory)
+        {
+            var directory = listing.Subdirs.FirstOrDefault(item =>
+                string.Equals(item.Name, name, StringComparison.Ordinal))
+                ?? listing.Subdirs.FirstOrDefault(item =>
+                    string.Equals(item.Name, name, StringComparison.OrdinalIgnoreCase));
+            return directory is null ? null : new ResolvedNode
+            {
+                IsDirectory = true,
+                DirectoryId = directory.Id,
+                Name = directory.Name,
+                Created = ToDate(directory.CreatedAt),
+                Updated = ToDate(directory.UpdatedAt),
+            };
+        }
+
+        var source = listing.Files.FirstOrDefault(item =>
+            string.Equals(item.Entry.Name, name, StringComparison.Ordinal))
+            ?? listing.Files.FirstOrDefault(item =>
+                string.Equals(item.Entry.Name, name, StringComparison.OrdinalIgnoreCase));
+        return source is null ? null : CopyNode(source);
+    }
+
+    private ResolvedNode? ResolveMoveTarget(string directoryId, string name)
+    {
+        var listing = _gateway.ListDirectory(directoryId);
+        var directory = listing.Subdirs.FirstOrDefault(item =>
+            string.Equals(item.Name, name, StringComparison.Ordinal))
+            ?? listing.Subdirs.FirstOrDefault(item =>
+                string.Equals(item.Name, name, StringComparison.OrdinalIgnoreCase));
+        if (directory is not null)
+            return new ResolvedNode
+            {
+                IsDirectory = true,
+                DirectoryId = directory.Id,
+                Name = directory.Name,
+                Created = ToDate(directory.CreatedAt),
+                Updated = ToDate(directory.UpdatedAt),
+            };
+
+        var file = listing.Files.FirstOrDefault(item =>
+            string.Equals(item.Entry.Name, name, StringComparison.Ordinal))
+            ?? listing.Files.FirstOrDefault(item =>
+                string.Equals(item.Entry.Name, name, StringComparison.OrdinalIgnoreCase));
+        return file is null ? null : CopyNode(file);
+    }
+
+    private static ResolvedNode CopyNode(FileEntryDetailed file)
+        => new()
+        {
+            DirectoryId = file.Entry.DirectoryId,
+            EntryId = file.Entry.Id,
+            FileId = file.File.Id,
+            Name = file.Entry.Name,
+            Length = file.File.FileSize,
+            Created = ToDate(file.Entry.CreatedAt),
+            Updated = ToDate(file.File.UploadedAt),
+        };
+
+    private LocalFile? CommitLocalFileMove(LocalFile file, string newName, string newDirectoryId,
+        LocalFile? targetFile, string? existingEntryId, ResolvedNode? existingNode)
+    {
+        LocalFile? discarded = null;
+        var newPath = NormalizePath(newName);
+        var targetSyncHeld = false;
+        if (targetFile is not null && !ReferenceEquals(targetFile, file))
+        {
+            targetSyncHeld = Monitor.TryEnter(targetFile.Sync, 0);
+            if (!targetSyncHeld)
+                throw new MoveStatusException(DokanResult.SharingViolation);
+        }
+
+        try
+        {
+            lock (file.DataSync)
+            lock (_localFilesLock)
+            {
+                if (file.Kind == LocalFileKind.Pending)
+                    throw new MoveStatusException(DokanResult.AccessDenied);
+                if (!_localFiles.TryGetValue(file.Path, out var source) || !ReferenceEquals(source, file))
+                    throw new MoveStatusException(DokanResult.FileNotFound);
+
+                if (_localFiles.TryGetValue(newPath, out var currentTarget) && !ReferenceEquals(currentTarget, file))
+                {
+                    if (currentTarget.Kind == LocalFileKind.Pending)
+                        throw new MoveStatusException(DokanResult.AccessDenied);
+                    if (currentTarget.OpenCount > 0)
+                        throw new MoveStatusException(DokanResult.SharingViolation);
+                    RemoveLocalFileLocked(currentTarget);
+                    discarded = currentTarget;
+                }
+                else if (targetFile is not null && !ReferenceEquals(targetFile, file)
+                         && targetFile.OpenCount > 0)
+                    throw new MoveStatusException(DokanResult.SharingViolation);
+
+                _localFiles.Remove(file.Path);
+                file.Path = newPath;
+                file.Name = Path.GetFileName(newPath);
+                file.DirectoryId = newDirectoryId;
+                file.ExistingEntryId = existingEntryId;
+                file.ExistingNode = existingNode;
+                _localFiles[file.Path] = file;
+            }
+        }
+        finally
+        {
+            if (targetSyncHeld)
+                Monitor.Exit(targetFile!.Sync);
+        }
+        return discarded;
+    }
+
+    private LocalFile? RemoveClosedTargetFile(LocalFile file)
+    {
+        if (!Monitor.TryEnter(file.Sync, 0))
+            throw new MoveStatusException(DokanResult.SharingViolation);
+        try
+        {
+            lock (_localFilesLock)
+            {
+                if (!_localFiles.TryGetValue(file.Path, out var current) || !ReferenceEquals(current, file))
+                    return null;
+                if (file.Kind == LocalFileKind.Pending)
+                    throw new MoveStatusException(DokanResult.AccessDenied);
+                if (file.OpenCount > 0)
+                    throw new MoveStatusException(DokanResult.SharingViolation);
+                RemoveLocalFileLocked(file);
+                return file;
+            }
+        }
+        finally
+        {
+            Monitor.Exit(file.Sync);
+        }
+    }
+
+    private void MoveCloudNode(ResolvedNode node, string sourceDirectoryId, string sourceName,
+        string destinationDirectoryId, string destinationName, bool parentChanged, bool nameChanged,
+        Stack<Action> rollback)
+    {
+        void Rename(string name)
+        {
+            if (node.IsDirectory)
+                _gateway.RenameDirectory(node.DirectoryId, name);
+            else
+                _gateway.RenameFileEntry(node.EntryId, name);
+        }
+
+        void Move(string directoryId)
+        {
+            if (node.IsDirectory)
+                _gateway.MoveDirectory(node.DirectoryId, directoryId);
+            else
+                _gateway.MoveFileEntry(node.EntryId, directoryId);
+        }
+
+        void Apply(Action action, Action undo, string? conflictName = null)
+        {
+            try
+            {
+                action();
+            }
+            catch (RpcException ex) when (conflictName is not null
+                                          && ServerErrors.HasCode(ex, ServerErrors.DirectoryNameConflict)
+                                          && _gateway.HasTombstonedFile(destinationDirectoryId, conflictName))
+            {
+                _gateway.FlushPending(throwOnFailure: true);
+                try
+                {
+                    action();
+                }
+                catch (Exception retryError) when (IsUncertainMoveResult(retryError))
+                {
+                    rollback.Push(undo);
+                    throw;
+                }
+            }
+            catch (Exception ex) when (IsUncertainMoveResult(ex))
+            {
+                rollback.Push(undo);
+                throw;
+            }
+
+            rollback.Push(undo);
+        }
+
+        if (parentChanged && nameChanged)
+        {
+            var temporaryName = ".~bc-" + Guid.NewGuid().ToString("N")[..8];
+            Apply(() => Rename(temporaryName), () => Rename(sourceName));
+            Apply(() => Move(destinationDirectoryId), () => Move(sourceDirectoryId));
+            Apply(() => Rename(destinationName), () => Rename(temporaryName),
+                node.IsDirectory ? null : destinationName);
+        }
+        else if (parentChanged)
+        {
+            Apply(() => Move(destinationDirectoryId), () => Move(sourceDirectoryId),
+                node.IsDirectory ? null : sourceName);
+        }
+        else if (nameChanged)
+        {
+            Apply(() => Rename(destinationName), () => Rename(sourceName),
+                node.IsDirectory ? null : destinationName);
+        }
+    }
+
+    private List<Exception> RollbackMove(Stack<Action> rollback, string oldName)
+    {
+        var errors = new List<Exception>();
+        while (rollback.TryPop(out var undo))
+        {
+            try
+            {
+                undo();
+            }
+            catch (Exception ex)
+            {
+                EngineLog.Error($"MoveFile rollback \"{oldName}\"", ex);
+                if (!IsExpectedMoveRollbackError(ex))
+                    errors.Add(ex);
+            }
+        }
+        return errors;
+    }
+
+    private void MoveLocalFilesUnderDirectory(string oldName, string newName)
+    {
+        var oldPrefix = NormalizePath(oldName) + "\\";
+        var newPrefix = NormalizePath(newName) + "\\";
+        lock (_localFilesLock)
+        {
+            var updates = _localFiles.Values.Distinct()
+                .Where(file => file.Path.StartsWith(oldPrefix, StringComparison.OrdinalIgnoreCase))
+                .OrderBy(file => file.Path, StringComparer.OrdinalIgnoreCase)
+                .Select(file => (File: file, OldPath: file.Path,
+                    NewPath: newPrefix + file.Path[oldPrefix.Length..]))
+                .ToArray();
+            var moving = updates.Select(update => update.File).ToHashSet();
+            foreach (var update in updates)
+                if (_localFiles.TryGetValue(update.NewPath, out var current)
+                    && !ReferenceEquals(current, update.File) && !moving.Contains(current))
+                    throw new MoveStatusException(current.OpenCount > 0
+                        ? DokanResult.SharingViolation
+                        : DokanResult.FileExists);
+
+            foreach (var update in updates)
+                _localFiles.Remove(update.OldPath);
+            foreach (var update in updates)
+            {
+                update.File.Path = update.NewPath;
+                _localFiles[update.NewPath] = update.File;
+            }
+        }
+    }
+
+    private static ResolvedNode CopyNode(ResolvedNode node, string directoryId, string name)
+        => new()
+        {
+            IsDirectory = node.IsDirectory,
+            DirectoryId = directoryId,
+            EntryId = node.EntryId,
+            FileId = node.FileId,
+            Name = name,
+            Length = node.Length,
+            Created = node.Created,
+            Updated = node.Updated,
+        };
+
+    private sealed class MoveStatusException(NtStatus status) : Exception
+    {
+        public NtStatus Status { get; } = status;
     }
 
     public NtStatus DeleteFile(string fileName, IDokanFileInfo info)
@@ -1403,6 +1879,9 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
     private static bool IsBusinessError(RpcException exception)
         => exception.StatusCode == StatusCode.FailedPrecondition && ServerErrors.GetCode(exception) is not null;
 
+    private static bool IsUncertainMoveResult(Exception exception)
+        => exception is not RpcException rpc || !IsBusinessError(rpc);
+
     private static bool IsUncertainAttachResult(Exception exception)
         => exception switch
         {
@@ -1410,6 +1889,13 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
             TimeoutException or HttpRequestException or IOException or OperationCanceledException => true,
             _ => false,
         };
+
+    private static bool IsExpectedMoveRollbackError(Exception exception)
+        => exception is RpcException rpc
+           && (ServerErrors.HasCode(rpc, ServerErrors.FileEntryNotFound)
+               || ServerErrors.HasCode(rpc, ServerErrors.DirectoryNotFound)
+               || ServerErrors.HasCode(rpc, ServerErrors.DirectoryNameConflict)
+               || ServerErrors.HasCode(rpc, ServerErrors.FileAlreadyAttached));
 
     private void ClearLastSyncErrorIfNoPendingUploads()
     {

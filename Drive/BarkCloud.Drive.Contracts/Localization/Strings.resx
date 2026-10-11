@@ -407,6 +407,9 @@
   <data name="Eng_SyncFailedFmt" xml:space="preserve">
     <value>Не удалось сохранить «{0}» в облако: {1}</value>
   </data>
+  <data name="Eng_MoveRollbackFailedFmt" xml:space="preserve">
+    <value>Не удалось полностью откатить перемещение «{0}»: {1}</value>
+  </data>
   <data name="Eng_AttachedFileNotListedFmt" xml:space="preserve">
     <value>После привязки файл «{0}» не найден в свежем листинге каталога.</value>
   </data>

@@ -133,6 +133,73 @@ public sealed class CloudGatewayTests
     }
 
     [Fact]
+    public async Task FlushPending_throw_on_failure_processes_and_requeues_all_chunks()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        var files = Enumerable.Range(0, 101).Select(i => cloud.AddFile("", $"file-{i:D3}.txt")).ToArray();
+        var time = new FakeTimeProvider();
+        using var gateway = cloud.CreateGateway(temp.Path("cache"), time);
+        using var firstCallStarted = new ManualResetEventSlim();
+        using var releaseFirstCall = new ManualResetEventSlim();
+        var failDeletes = true;
+        var callNumber = 0;
+        cloud.Invoker.OnCall += method =>
+        {
+            if (method != FakeCloudMethods.DeleteFileEntries)
+                return;
+
+            if (Interlocked.Increment(ref callNumber) == 1)
+            {
+                firstCallStarted.Set();
+                releaseFirstCall.Wait();
+            }
+
+            if (failDeletes)
+                cloud.Invoker.FailNext(FakeCloudMethods.DeleteFileEntries,
+                    new RpcException(new Status(StatusCode.Unavailable, "offline")));
+        };
+
+        var queueFirstHundred = Task.Run(() =>
+        {
+            foreach (var file in files.Take(100))
+                gateway.QueueDeleteFileEntry(file.EntryId, "");
+        });
+
+        try
+        {
+            firstCallStarted.Wait(TimeSpan.FromSeconds(5)).Should().BeTrue();
+            gateway.QueueDeleteFileEntry(files[100].EntryId, "");
+            releaseFirstCall.Set();
+            await queueFirstHundred.WaitAsync(TimeSpan.FromSeconds(5));
+
+            Action flush = () => gateway.FlushPending(throwOnFailure: true);
+            flush.Should().Throw<RpcException>().Which.StatusCode.Should().Be(StatusCode.Unavailable);
+
+            var failedCalls = cloud.Invoker.Calls
+                .Where(call => call.MethodFullName == FakeCloudMethods.DeleteFileEntries)
+                .ToArray();
+            failedCalls.Should().HaveCount(3);
+            failedCalls.Select(call => ((DeleteFileEntriesRequest)call.Request).EntryIds.Count)
+                .Should().Equal(100, 100, 1);
+            gateway.ListDirectory("").Files.Should().BeEmpty();
+
+            failDeletes = false;
+            time.Advance(TimeSpan.FromSeconds(1));
+
+            cloud.Invoker.Calls.Count(call => call.MethodFullName == FakeCloudMethods.DeleteFileEntries)
+                .Should().Be(5);
+            files.Should().OnlyContain(file => cloud.IsInTrash(file.EntryId));
+            gateway.ListDirectory("").Files.Should().BeEmpty();
+        }
+        finally
+        {
+            releaseFirstCall.Set();
+            await queueFirstHundred;
+        }
+    }
+
+    [Fact]
     public void Exhausted_buffered_delete_attempts_report_sync_error()
     {
         using var temp = new TestDirectory();
@@ -147,7 +214,12 @@ public sealed class CloudGatewayTests
                 new RpcException(new Status(StatusCode.Unavailable, "offline")));
         gateway.QueueDeleteFileEntry(file.EntryId, "");
 
+        Action flush = () => gateway.FlushPending(throwOnFailure: true);
+        flush.Should().Throw<RpcException>().Which.StatusCode.Should().Be(StatusCode.Unavailable);
+        gateway.ListDirectory("").Files.Should().BeEmpty();
+
         time.Advance(TimeSpan.FromSeconds(1));
+        gateway.ListDirectory("").Files.Should().BeEmpty();
         time.Advance(TimeSpan.FromSeconds(1));
         time.Advance(TimeSpan.FromSeconds(1));
 

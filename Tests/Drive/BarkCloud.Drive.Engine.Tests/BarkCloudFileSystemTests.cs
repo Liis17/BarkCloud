@@ -4,6 +4,7 @@ using BarkCloud.Drive.Engine.Tests.Fakes;
 
 using DokanNet;
 using Grpc.Core;
+using Microsoft.Extensions.Time.Testing;
 
 using Xunit;
 
@@ -68,6 +69,717 @@ public sealed class BarkCloudFileSystemTests
             new FakeDokanFileInfo());
 
         status.Should().Be(DokanResult.FileExists);
+        cloud.Invoker.Calls.Should().NotContain(call =>
+            call.MethodFullName == FakeCloudMethods.DeleteFileEntry
+            || call.MethodFullName == FakeCloudMethods.RenameFileEntry
+            || call.MethodFullName == FakeCloudMethods.MoveFileEntry
+            || call.MethodFullName == FakeCloudMethods.DeleteFileEntries);
+    }
+
+    [Fact]
+    public void MoveFile_uses_temporary_name_when_both_intermediate_names_are_occupied()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        var sourceDirectory = cloud.AddDirectory("X");
+        var destinationDirectory = cloud.AddDirectory("Y");
+        var source = cloud.AddFile(sourceDirectory, "a.bin", [1]);
+        cloud.AddFile(destinationDirectory, "a.bin", [2]);
+        cloud.AddFile(sourceDirectory, "b.bin", [3]);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+        var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"));
+
+        var status = fileSystem.MoveFile("\\X\\a.bin", "\\Y\\b.bin", replace: false,
+            new FakeDokanFileInfo());
+
+        status.Should().Be(DokanResult.Success);
+        gateway.Resolve("\\Y\\b.bin")!.EntryId.Should().Be(source.EntryId);
+        gateway.Resolve("\\Y\\a.bin")!.Name.Should().Be("a.bin");
+        gateway.Resolve("\\X\\b.bin")!.Name.Should().Be("b.bin");
+        gateway.Resolve("\\X\\a.bin").Should().BeNull();
+        cloud.Invoker.Calls.Where(call => call.MethodFullName is
+                FakeCloudMethods.RenameFileEntry or FakeCloudMethods.MoveFileEntry)
+            .Select(call => call.MethodFullName)
+            .Should().Equal(FakeCloudMethods.RenameFileEntry, FakeCloudMethods.MoveFileEntry,
+                FakeCloudMethods.RenameFileEntry);
+    }
+
+    [Fact]
+    public void MoveFile_replaces_cloud_target_and_rolls_back_when_move_fails()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        var sourceDirectory = cloud.AddDirectory("X");
+        var destinationDirectory = cloud.AddDirectory("Y");
+        var source = cloud.AddFile(sourceDirectory, "a.bin", [1]);
+        var target = cloud.AddFile(destinationDirectory, "b.bin", [2]);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+        var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"));
+        cloud.Invoker.FailNext(FakeCloudMethods.MoveFileEntry,
+            new RpcException(new Status(StatusCode.Unavailable, "Сбой перемещения")));
+
+        var status = fileSystem.MoveFile("\\X\\a.bin", "\\Y\\b.bin", replace: true,
+            new FakeDokanFileInfo());
+
+        status.Should().Be(BarkCloudFileSystem.UnexpectedNetworkError);
+        gateway.Resolve("\\X\\a.bin")!.EntryId.Should().Be(source.EntryId);
+        gateway.Resolve("\\Y\\b.bin")!.EntryId.Should().Be(target.EntryId);
+        fileSystem.LastSyncError.Should().BeNull();
+        cloud.Invoker.Calls.Select(call => call.MethodFullName).Should().ContainInOrder(
+            FakeCloudMethods.DeleteFileEntry, FakeCloudMethods.RenameFileEntry,
+            FakeCloudMethods.MoveFileEntry, FakeCloudMethods.RenameFileEntry,
+            FakeCloudMethods.RestoreFromTrash);
+    }
+
+    [Fact]
+    public void MoveFile_deletes_cloud_target_before_renaming_cloud_source()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        var source = cloud.AddFile("", "source.bin", [1]);
+        var target = cloud.AddFile("", "target.bin", [2]);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+        var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"));
+
+        var status = fileSystem.MoveFile("\\source.bin", "\\target.bin", replace: true,
+            new FakeDokanFileInfo());
+
+        status.Should().Be(DokanResult.Success);
+        var moved = gateway.Resolve("\\target.bin");
+        moved!.EntryId.Should().Be(source.EntryId);
+        moved.Name.Should().Be("target.bin");
+        gateway.Resolve("\\source.bin").Should().BeNull();
+        cloud.Invoker.Calls.Select(call => call.MethodFullName).Should().ContainInOrder(
+            FakeCloudMethods.DeleteFileEntry, FakeCloudMethods.RenameFileEntry);
+        target.EntryId.Should().NotBe(source.EntryId);
+    }
+
+    [Fact]
+    public void MoveFile_replaces_cloud_target_on_persist_for_new_local_file()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        var target = cloud.AddFile("", "target.bin", [9]);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+        var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"));
+        var info = new FakeDokanFileInfo();
+        fileSystem.CreateFile("\\source.bin", FileAccess.WriteData, FileShare.ReadWrite,
+            FileMode.CreateNew, FileOptions.None, FileAttributes.Normal, info).Should().Be(DokanResult.Success);
+        fileSystem.WriteFile("\\source.bin", [1, 2, 3], out var written, 0, info)
+            .Should().Be(DokanResult.Success);
+        written.Should().Be(3);
+
+        fileSystem.MoveFile("\\source.bin", "\\target.bin", replace: true,
+            new FakeDokanFileInfo()).Should().Be(DokanResult.Success);
+
+        gateway.Resolve("\\target.bin")!.EntryId.Should().Be(target.EntryId);
+        cloud.Invoker.Calls.Should().NotContain(call =>
+            call.MethodFullName == FakeCloudMethods.DeleteFileEntry
+            || call.MethodFullName == FakeCloudMethods.RenameFileEntry
+            || call.MethodFullName == FakeCloudMethods.MoveFileEntry);
+
+        fileSystem.Cleanup("\\source.bin", info);
+        fileSystem.CloseFile("\\target.bin", info);
+
+        var replacement = gateway.Resolve("\\target.bin");
+        replacement!.EntryId.Should().NotBe(target.EntryId);
+        replacement.Name.Should().Be("target.bin");
+        gateway.Resolve("\\source.bin").Should().BeNull();
+        cloud.Invoker.Calls.Select(call => call.MethodFullName).Should().ContainInOrder(
+            FakeCloudMethods.DeleteFileEntry, FakeCloudMethods.AttachFile);
+    }
+
+    [Fact]
+    public void MoveFile_renames_cloud_file_when_only_case_changes()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        var source = cloud.AddFile("", "name.txt", [1]);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+        var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"));
+
+        var status = fileSystem.MoveFile("\\name.txt", "\\NAME.TXT", replace: false,
+            new FakeDokanFileInfo());
+
+        status.Should().Be(DokanResult.Success);
+        gateway.Resolve("\\NAME.TXT")!.EntryId.Should().Be(source.EntryId);
+        gateway.Resolve("\\NAME.TXT")!.Name.Should().Be("NAME.TXT");
+        cloud.Invoker.Calls.Should().ContainSingle(call =>
+            call.MethodFullName == FakeCloudMethods.RenameFileEntry);
+    }
+
+    [Fact]
+    public void MoveFile_replaces_case_insensitive_cloud_target()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        var target = cloud.AddFile("", "b.txt", [2]);
+        var source = cloud.AddFile("", "a.txt", [1]);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+        var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"));
+
+        fileSystem.MoveFile("\\a.txt", "\\B.txt", replace: false, new FakeDokanFileInfo())
+            .Should().Be(DokanResult.FileExists);
+        fileSystem.MoveFile("\\a.txt", "\\B.txt", replace: true, new FakeDokanFileInfo())
+            .Should().Be(DokanResult.Success);
+
+        gateway.Resolve("\\B.txt")!.EntryId.Should().Be(source.EntryId);
+        gateway.ListDirectory("").Files.Should().ContainSingle(file => file.Entry.Name == "B.txt");
+        cloud.Invoker.Calls.Select(call => call.MethodFullName).Should().ContainInOrder(
+            FakeCloudMethods.DeleteFileEntry, FakeCloudMethods.RenameFileEntry);
+        target.EntryId.Should().NotBe(source.EntryId);
+    }
+
+    [Fact]
+    public void MoveFile_returns_network_error_and_rolls_back_when_rename_response_is_lost()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        var source = cloud.AddFile("", "source.txt", [1]);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+        var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"));
+        cloud.Invoker.LoseNextResponseAfterEffect(FakeCloudMethods.RenameFileEntry);
+
+        var status = fileSystem.MoveFile("\\source.txt", "\\moved.txt", replace: false,
+            new FakeDokanFileInfo());
+
+        status.Should().Be(BarkCloudFileSystem.UnexpectedNetworkError);
+        gateway.Resolve("\\source.txt")!.EntryId.Should().Be(source.EntryId);
+        gateway.Resolve("\\moved.txt").Should().BeNull();
+        fileSystem.LastSyncError.Should().BeNull();
+    }
+
+    [Fact]
+    public void MoveFile_rolls_back_after_move_response_is_lost()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        var sourceDirectory = cloud.AddDirectory("X");
+        cloud.AddDirectory("Y");
+        var source = cloud.AddFile(sourceDirectory, "a.txt", [1]);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+        var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"));
+        cloud.Invoker.LoseNextResponseAfterEffect(FakeCloudMethods.MoveFileEntry);
+
+        var status = fileSystem.MoveFile("\\X\\a.txt", "\\Y\\b.txt", replace: false,
+            new FakeDokanFileInfo());
+
+        status.Should().Be(BarkCloudFileSystem.UnexpectedNetworkError);
+        gateway.Resolve("\\X\\a.txt")!.EntryId.Should().Be(source.EntryId);
+        gateway.Resolve("\\Y\\b.txt").Should().BeNull();
+        fileSystem.LastSyncError.Should().BeNull();
+    }
+
+    [Fact]
+    public void MoveFile_rolls_back_when_rename_applied_but_server_returns_internal()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        var source = cloud.AddFile("", "source.txt", [1]);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+        var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"));
+        cloud.Invoker.LoseNextResponseAfterEffect(FakeCloudMethods.RenameFileEntry, StatusCode.Internal);
+
+        var status = fileSystem.MoveFile("\\source.txt", "\\renamed.txt", replace: false,
+            new FakeDokanFileInfo());
+
+        status.Should().Be(BarkCloudFileSystem.UnexpectedNetworkError);
+        gateway.Resolve("\\source.txt")!.EntryId.Should().Be(source.EntryId);
+        gateway.Resolve("\\renamed.txt").Should().BeNull();
+        fileSystem.LastSyncError.Should().BeNull();
+    }
+
+    [Fact]
+    public void MoveFile_restores_target_when_delete_response_is_lost()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        var source = cloud.AddFile("", "source.txt", [1]);
+        var target = cloud.AddFile("", "target.txt", [2]);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+        var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"));
+        cloud.Invoker.LoseNextResponseAfterEffect(FakeCloudMethods.DeleteFileEntry);
+
+        var status = fileSystem.MoveFile("\\source.txt", "\\target.txt", replace: true,
+            new FakeDokanFileInfo());
+
+        status.Should().Be(BarkCloudFileSystem.UnexpectedNetworkError);
+        gateway.Resolve("\\source.txt")!.EntryId.Should().Be(source.EntryId);
+        gateway.Resolve("\\target.txt")!.EntryId.Should().Be(target.EntryId);
+        cloud.IsInTrash(target.EntryId).Should().BeFalse();
+        fileSystem.LastSyncError.Should().BeNull();
+    }
+
+    [Fact]
+    public void MoveFile_does_not_report_already_restored_target_as_rollback_failure()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        var source = cloud.AddFile("", "source.txt", [1]);
+        var target = cloud.AddFile("", "target.txt", [2]);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+        var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"));
+        cloud.Invoker.FailNext(FakeCloudMethods.DeleteFileEntry,
+            new RpcException(new Status(StatusCode.Unavailable, "Ответ на удаление потерян")));
+        cloud.Invoker.FailNext(FakeCloudMethods.RestoreFromTrash,
+            FakeCallInvoker.BusinessError(ServerErrors.FileEntryNotFound));
+
+        var status = fileSystem.MoveFile("\\source.txt", "\\target.txt", replace: true,
+            new FakeDokanFileInfo());
+
+        status.Should().Be(BarkCloudFileSystem.UnexpectedNetworkError);
+        gateway.Resolve("\\source.txt")!.EntryId.Should().Be(source.EntryId);
+        gateway.Resolve("\\target.txt")!.EntryId.Should().Be(target.EntryId);
+        fileSystem.LastSyncError.Should().BeNull();
+    }
+
+    [Fact]
+    public void MoveFile_records_rollback_error_in_last_sync_error()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        var sourceDirectory = cloud.AddDirectory("X");
+        cloud.AddDirectory("Y");
+        cloud.AddFile(sourceDirectory, "a.txt", [1]);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+        var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"));
+        var renameCalls = 0;
+        cloud.Invoker.OnCall += method =>
+        {
+            if (method == FakeCloudMethods.RenameFileEntry && Interlocked.Increment(ref renameCalls) == 2)
+                cloud.Invoker.FailNext(FakeCloudMethods.RenameFileEntry,
+                    new RpcException(new Status(StatusCode.Unavailable, "Ошибка отката")));
+        };
+        cloud.Invoker.FailNext(FakeCloudMethods.MoveFileEntry,
+            new RpcException(new Status(StatusCode.Unavailable, "Ошибка перемещения")));
+
+        var status = fileSystem.MoveFile("\\X\\a.txt", "\\Y\\b.txt", replace: false,
+            new FakeDokanFileInfo());
+
+        status.Should().Be(BarkCloudFileSystem.UnexpectedNetworkError);
+        fileSystem.LastSyncError.Should().NotBeNullOrEmpty();
+    }
+
+    [Fact]
+    public void MoveFile_rolls_back_when_first_rename_of_three_step_move_fails()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        var sourceDirectory = cloud.AddDirectory("X");
+        cloud.AddDirectory("Y");
+        var source = cloud.AddFile(sourceDirectory, "a.txt", [1]);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+        var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"));
+        cloud.Invoker.FailNext(FakeCloudMethods.RenameFileEntry,
+            new RpcException(new Status(StatusCode.Unavailable, "Ошибка первого переименования")));
+
+        var status = fileSystem.MoveFile("\\X\\a.txt", "\\Y\\b.txt", replace: false,
+            new FakeDokanFileInfo());
+
+        status.Should().Be(BarkCloudFileSystem.UnexpectedNetworkError);
+        gateway.Resolve("\\X\\a.txt")!.EntryId.Should().Be(source.EntryId);
+        gateway.Resolve("\\Y\\b.txt").Should().BeNull();
+        fileSystem.LastSyncError.Should().BeNull();
+    }
+
+    [Fact]
+    public void MoveFile_rolls_back_when_final_rename_of_three_step_move_fails()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        var sourceDirectory = cloud.AddDirectory("X");
+        cloud.AddDirectory("Y");
+        var source = cloud.AddFile(sourceDirectory, "a.txt", [1]);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+        var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"));
+        var renameCalls = 0;
+        cloud.Invoker.OnCall += method =>
+        {
+            if (method == FakeCloudMethods.RenameFileEntry && Interlocked.Increment(ref renameCalls) == 2)
+                cloud.Invoker.FailNext(FakeCloudMethods.RenameFileEntry,
+                    new RpcException(new Status(StatusCode.Unavailable, "Ошибка последнего переименования")));
+        };
+
+        var status = fileSystem.MoveFile("\\X\\a.txt", "\\Y\\b.txt", replace: false,
+            new FakeDokanFileInfo());
+
+        status.Should().Be(BarkCloudFileSystem.UnexpectedNetworkError);
+        gateway.Resolve("\\X\\a.txt")!.EntryId.Should().Be(source.EntryId);
+        gateway.Resolve("\\Y\\b.txt").Should().BeNull();
+        fileSystem.LastSyncError.Should().BeNull();
+    }
+
+    [Fact]
+    public void MoveFile_returns_access_denied_when_file_target_is_a_directory()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        cloud.AddFile("", "source.txt", [1]);
+        cloud.AddDirectory("target");
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+        var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"));
+
+        fileSystem.MoveFile("\\source.txt", "\\TARGET", replace: true, new FakeDokanFileInfo())
+            .Should().Be(DokanResult.AccessDenied);
+        cloud.Invoker.Calls.Should().NotContain(call =>
+            call.MethodFullName == FakeCloudMethods.DeleteFileEntry
+            || call.MethodFullName == FakeCloudMethods.RenameFileEntry
+            || call.MethodFullName == FakeCloudMethods.MoveFileEntry);
+    }
+
+    [Fact]
+    public void MoveDirectory_renames_when_only_case_changes()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        var source = cloud.AddDirectory("name");
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+        var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"));
+
+        fileSystem.MoveFile("\\name", "\\NAME", replace: false,
+            new FakeDokanFileInfo { IsDirectory = true }).Should().Be(DokanResult.Success);
+
+        gateway.Resolve("\\NAME")!.DirectoryId.Should().Be(source);
+        gateway.Resolve("\\NAME")!.Name.Should().Be("NAME");
+        cloud.Invoker.Calls.Should().ContainSingle(call =>
+            call.MethodFullName == FakeCloudMethods.RenameDirectory);
+    }
+
+    [Fact]
+    public void MoveFile_updates_existing_writable_metadata_before_persisting_to_new_directory()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        var sourceDirectory = cloud.AddDirectory("X");
+        var destinationDirectory = cloud.AddDirectory("Y");
+        var source = cloud.AddFile(sourceDirectory, "a.txt", [1]);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+        var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"));
+        var (info, local) = OpenWritableAndWrite(fileSystem, "\\X\\a.txt", [7, 8]);
+
+        fileSystem.MoveFile("\\X\\a.txt", "\\Y\\b.txt", replace: false,
+            new FakeDokanFileInfo()).Should().Be(DokanResult.Success);
+
+        local.Name.Should().Be("b.txt");
+        local.DirectoryId.Should().Be(destinationDirectory);
+        local.ExistingEntryId.Should().Be(source.EntryId);
+        fileSystem.Cleanup("\\Y\\b.txt", info);
+        fileSystem.CloseFile("\\Y\\b.txt", info);
+
+        var moved = gateway.Resolve("\\Y\\b.txt");
+        moved.Should().NotBeNull();
+        moved!.DirectoryId.Should().Be(destinationDirectory);
+        var bytes = new byte[2];
+        gateway.Read(moved.FileId, moved.Length, bytes, 0).Should().Be(2);
+        bytes.Should().Equal(7, 8);
+        gateway.Resolve("\\X\\a.txt").Should().BeNull();
+    }
+
+    [Fact]
+    public void MoveFile_flushes_tombstoned_target_before_safe_save_rename()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        var target = cloud.AddFile("", "b.txt", [9]);
+        var source = cloud.AddFile("", "a.txt", [1]);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+        var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"));
+        var deleteHandle = new FakeDokanFileInfo { DeletePending = true };
+        fileSystem.CreateFile("\\b.txt", FileAccess.ReadData, FileShare.ReadWrite,
+            FileMode.Open, FileOptions.None, FileAttributes.Normal, deleteHandle).Should().Be(DokanResult.Success);
+        fileSystem.Cleanup("\\b.txt", deleteHandle);
+
+        fileSystem.MoveFile("\\a.txt", "\\b.txt", replace: false, new FakeDokanFileInfo())
+            .Should().Be(DokanResult.Success);
+
+        gateway.Resolve("\\b.txt")!.EntryId.Should().Be(source.EntryId);
+        gateway.ListDirectory("").Files.Should().ContainSingle(file => file.Entry.Name == "b.txt");
+        cloud.IsInTrash(target.EntryId).Should().BeTrue();
+        fileSystem.LastSyncError.Should().BeNull();
+    }
+
+    [Fact]
+    public void MoveFile_returns_flush_error_without_rename_when_tombstoned_target_delete_fails()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        var target = cloud.AddFile("", "b.txt", [9]);
+        var source = cloud.AddFile("", "a.txt", [1]);
+        var time = new FakeTimeProvider();
+        using var gateway = cloud.CreateGateway(temp.Path("cache"), time);
+        var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"));
+        var deleteHandle = new FakeDokanFileInfo { DeletePending = true };
+        fileSystem.CreateFile("\\b.txt", FileAccess.ReadData, FileShare.ReadWrite,
+            FileMode.Open, FileOptions.None, FileAttributes.Normal, deleteHandle).Should().Be(DokanResult.Success);
+        fileSystem.Cleanup("\\b.txt", deleteHandle);
+        cloud.Invoker.FailNext(FakeCloudMethods.DeleteFileEntries,
+            new RpcException(new Status(StatusCode.Unavailable, "Ошибка доставки удаления")));
+
+        fileSystem.MoveFile("\\a.txt", "\\b.txt", replace: false, new FakeDokanFileInfo())
+            .Should().Be(BarkCloudFileSystem.UnexpectedNetworkError);
+        gateway.Resolve("\\b.txt").Should().BeNull();
+        gateway.Resolve("\\a.txt")!.EntryId.Should().Be(source.EntryId);
+        cloud.Invoker.Calls.Should().NotContain(call =>
+            call.MethodFullName == FakeCloudMethods.DeleteFileEntry
+            || call.MethodFullName == FakeCloudMethods.RenameFileEntry
+            || call.MethodFullName == FakeCloudMethods.MoveFileEntry);
+
+        time.Advance(TimeSpan.FromSeconds(1));
+
+        cloud.IsInTrash(target.EntryId).Should().BeTrue();
+        gateway.Resolve("\\b.txt").Should().BeNull();
+        gateway.Resolve("\\a.txt")!.EntryId.Should().Be(source.EntryId);
+        cloud.Invoker.Calls.Count(call => call.MethodFullName == FakeCloudMethods.DeleteFileEntries).Should().Be(2);
+    }
+
+    [Fact]
+    public void MoveFile_returns_file_exists_when_replace_targets_a_directory()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        cloud.AddDirectory("source");
+        cloud.AddDirectory("target");
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+        var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"));
+
+        var status = fileSystem.MoveFile("\\source", "\\target", replace: true,
+            new FakeDokanFileInfo { IsDirectory = true });
+
+        status.Should().Be(DokanResult.FileExists);
+        cloud.Invoker.Calls.Should().NotContain(call =>
+            call.MethodFullName == FakeCloudMethods.MoveDirectory
+            || call.MethodFullName == FakeCloudMethods.RenameDirectory);
+    }
+
+    [Fact]
+    public void MoveFile_denies_pending_source_and_target()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        cloud.AddFile("", "source.bin", [1]);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+        var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"));
+        RegisterPending(fileSystem, "pending-source.bin", "");
+        RegisterPending(fileSystem, "pending-target.bin", "");
+
+        fileSystem.MoveFile("\\pending-source.bin", "\\renamed.bin", replace: true,
+            new FakeDokanFileInfo()).Should().Be(DokanResult.AccessDenied);
+        fileSystem.MoveFile("\\source.bin", "\\pending-target.bin", replace: true,
+            new FakeDokanFileInfo()).Should().Be(DokanResult.AccessDenied);
+        cloud.Invoker.Calls.Should().NotContain(call =>
+            call.MethodFullName == FakeCloudMethods.DeleteFileEntry
+            || call.MethodFullName == FakeCloudMethods.RenameFileEntry
+            || call.MethodFullName == FakeCloudMethods.MoveFileEntry);
+    }
+
+    [Fact]
+    public void MoveFile_returns_sharing_violation_for_open_local_target()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        cloud.AddFile("", "source.bin", [1]);
+        cloud.AddFile("", "target.bin", [2]);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+        var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"));
+        var targetHandle = new FakeDokanFileInfo();
+        fileSystem.CreateFile("\\target.bin", FileAccess.WriteData, FileShare.ReadWrite,
+            FileMode.Open, FileOptions.None, FileAttributes.Normal, targetHandle).Should().Be(DokanResult.Success);
+
+        var status = fileSystem.MoveFile("\\source.bin", "\\target.bin", replace: true,
+            new FakeDokanFileInfo());
+
+        status.Should().Be(DokanResult.SharingViolation);
+        cloud.Invoker.Calls.Should().NotContain(call =>
+            call.MethodFullName == FakeCloudMethods.DeleteFileEntry
+            || call.MethodFullName == FakeCloudMethods.RenameFileEntry
+            || call.MethodFullName == FakeCloudMethods.MoveFileEntry);
+        fileSystem.Cleanup("\\target.bin", targetHandle);
+        fileSystem.CloseFile("\\target.bin", targetHandle);
+    }
+
+    [Fact]
+    public void MoveDirectory_updates_open_local_path_and_keeps_pending_key_by_directory_id()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        var directoryId = cloud.AddDirectory("old");
+        cloud.AddFile(directoryId, "open.txt", [1]);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+        var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"));
+        RegisterPending(fileSystem, "pending.bin", directoryId);
+        var info = new FakeDokanFileInfo();
+        fileSystem.CreateFile("\\old\\open.txt", FileAccess.WriteData, FileShare.ReadWrite,
+            FileMode.Open, FileOptions.None, FileAttributes.Normal, info).Should().Be(DokanResult.Success);
+        var local = ((HandleContext)info.Context!).File!;
+        fileSystem.WriteFile("\\old\\open.txt", [7], out _, 0, info).Should().Be(DokanResult.Success);
+
+        var status = fileSystem.MoveFile("\\old", "\\new", replace: false,
+            new FakeDokanFileInfo { IsDirectory = true });
+
+        status.Should().Be(DokanResult.Success);
+        AssertLocalFileAtPath(fileSystem, "\\new\\open.txt", local);
+        local.DirectoryId.Should().Be(directoryId);
+        fileSystem.MoveFile("\\new\\pending.bin", "\\new\\renamed.bin", replace: true,
+            new FakeDokanFileInfo()).Should().Be(DokanResult.AccessDenied);
+
+        fileSystem.Cleanup("\\new\\open.txt", info);
+        fileSystem.CloseFile("\\new\\open.txt", info);
+
+        gateway.Resolve("\\old").Should().BeNull();
+        var persisted = gateway.Resolve("\\new\\open.txt");
+        persisted.Should().NotBeNull();
+        persisted!.DirectoryId.Should().Be(directoryId);
+    }
+
+    [Fact]
+    public async Task MoveFile_returns_sharing_violation_without_rpc_when_source_persist_lock_is_held()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        cloud.AddFile("", "source.bin", [1]);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+        var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"));
+        var (info, local) = OpenWritableAndWrite(fileSystem, "\\source.bin", [2]);
+
+        using var locked = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+        var holder = Task.Run(() =>
+        {
+            Monitor.Enter(local.Sync);
+            locked.Set();
+            release.Wait();
+            Monitor.Exit(local.Sync);
+        });
+        Task<NtStatus>? move = null;
+
+        try
+        {
+            locked.Wait(TimeSpan.FromSeconds(5)).Should().BeTrue();
+            var callCount = cloud.Invoker.Calls.Count;
+            move = Task.Run(() => fileSystem.MoveFile("\\source.bin", "\\moved.bin", replace: false,
+                new FakeDokanFileInfo()));
+            (await move.WaitAsync(TimeSpan.FromSeconds(2))).Should().Be(DokanResult.SharingViolation);
+            cloud.Invoker.Calls.Should().HaveCount(callCount);
+        }
+        finally
+        {
+            release.Set();
+            await holder;
+            if (move is not null)
+                await move;
+        }
+
+        fileSystem.Cleanup("\\source.bin", info);
+        fileSystem.CloseFile("\\source.bin", info);
+        gateway.Resolve("\\source.bin").Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task MoveDirectory_updates_nested_path_while_nested_sync_is_held()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        var directoryId = cloud.AddDirectory("old");
+        cloud.AddFile(directoryId, "open.txt", [1]);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+        var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"));
+        var info = new FakeDokanFileInfo();
+        fileSystem.CreateFile("\\old\\open.txt", FileAccess.WriteData, FileShare.ReadWrite,
+            FileMode.Open, FileOptions.None, FileAttributes.Normal, info).Should().Be(DokanResult.Success);
+        var local = ((HandleContext)info.Context!).File!;
+
+        using var locked = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+        var holder = Task.Run(() =>
+        {
+            Monitor.Enter(local.Sync);
+            locked.Set();
+            release.Wait();
+            Monitor.Exit(local.Sync);
+        });
+        Task<NtStatus>? move = null;
+        try
+        {
+            (await Task.Run(() => locked.Wait(TimeSpan.FromSeconds(5)))).Should().BeTrue();
+            move = Task.Run(() => fileSystem.MoveFile("\\old", "\\new", replace: false,
+                new FakeDokanFileInfo { IsDirectory = true }));
+            (await move.WaitAsync(TimeSpan.FromSeconds(2))).Should().Be(DokanResult.Success);
+            AssertLocalFileAtPath(fileSystem, "\\new\\open.txt", local);
+        }
+        finally
+        {
+            release.Set();
+            await holder;
+            if (move is not null)
+                await move;
+        }
+
+        fileSystem.Cleanup("\\new\\open.txt", info);
+        fileSystem.CloseFile("\\new\\open.txt", info);
+    }
+
+    [Fact]
+    public async Task MoveFile_returns_sharing_violation_when_closed_target_sync_is_held()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        cloud.AddFile("", "source.bin", [1]);
+        cloud.AddFile("", "target.bin", [2]);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+        var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"));
+        var (info, target) = OpenWritableAndWrite(fileSystem, "\\target.bin", [3]);
+        fileSystem.Cleanup("\\target.bin", info);
+
+        using var locked = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+        var holder = Task.Run(() =>
+        {
+            Monitor.Enter(target.Sync);
+            locked.Set();
+            release.Wait();
+            Monitor.Exit(target.Sync);
+        });
+        Task? close = null;
+        Task<NtStatus>? move = null;
+        try
+        {
+            (await Task.Run(() => locked.Wait(TimeSpan.FromSeconds(5)))).Should().BeTrue();
+            close = Task.Run(() => fileSystem.CloseFile("\\target.bin", info));
+            SpinWait.SpinUntil(() => target.OpenCount == 0, TimeSpan.FromSeconds(5)).Should().BeTrue();
+            var callCount = cloud.Invoker.Calls.Count;
+
+            move = Task.Run(() => fileSystem.MoveFile("\\source.bin", "\\target.bin", replace: true,
+                new FakeDokanFileInfo()));
+            (await move.WaitAsync(TimeSpan.FromSeconds(2))).Should().Be(DokanResult.SharingViolation);
+            cloud.Invoker.Calls.Skip(callCount).Should().NotContain(call =>
+                call.MethodFullName == FakeCloudMethods.DeleteFileEntry
+                || call.MethodFullName == FakeCloudMethods.RenameFileEntry
+                || call.MethodFullName == FakeCloudMethods.MoveFileEntry);
+        }
+        finally
+        {
+            release.Set();
+            await holder;
+            if (close is not null)
+                await close;
+            if (move is not null)
+                await move;
+        }
+    }
+
+    private static void RegisterPending(BarkCloudFileSystem fileSystem, string name, string directoryId)
+    {
+        fileSystem.RegisterOutboxPending(new UploadOutboxEntry
+        {
+            Id = Guid.NewGuid().ToString("D"),
+            DataPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N")),
+            Name = name,
+            DirectoryId = directoryId,
+            ServerKey = "server",
+            OwnerUserId = "42",
+            Stage = PersistStage.Upload,
+            CreatedAt = DateTimeOffset.UtcNow,
+        });
     }
 
     [Fact]
@@ -952,5 +1664,14 @@ public sealed class BarkCloudFileSystemTests
         fileSystem.WriteFile(path, content, out var bytesWritten, 0, info).Should().Be(DokanResult.Success);
         bytesWritten.Should().Be(content.Length);
         return (info, file);
+    }
+
+    private static void AssertLocalFileAtPath(BarkCloudFileSystem fileSystem, string path, LocalFile expected)
+    {
+        var info = new FakeDokanFileInfo();
+        fileSystem.CreateFile(path, FileAccess.ReadData, FileShare.ReadWrite, FileMode.Open,
+            FileOptions.None, FileAttributes.Normal, info).Should().Be(DokanResult.Success);
+        ((HandleContext)info.Context!).File.Should().BeSameAs(expected);
+        fileSystem.CloseFile(path, info);
     }
 }
