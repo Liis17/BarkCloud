@@ -416,6 +416,12 @@
   <data name="Eng_DeleteFailedFmt" xml:space="preserve">
     <value>Не удалось удалить запись «{0}» из облака после {1} попыток.</value>
   </data>
+  <data name="Eng_DirectoryNotEmpty" xml:space="preserve">
+    <value>Папка не пуста.</value>
+  </data>
+  <data name="Eng_DirectoryDeleteFailedFmt" xml:space="preserve">
+    <value>Не удалось удалить папку «{0}» из облака: {1}</value>
+  </data>
   <data name="Eng_OutboxMoveFailedFmt" xml:space="preserve">
     <value>Не удалось перенести файл «{0}» в outbox.</value>
   </data>

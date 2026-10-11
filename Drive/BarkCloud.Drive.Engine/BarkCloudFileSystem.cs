@@ -444,8 +444,9 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
                     }
                 }
             }
-            else if (info.DeletePending && FindLocalFile(fileName)?.Kind != LocalFileKind.Pending
-                     && FindPendingFileByPath(fileName) is null)
+            else if (info.DeletePending && (info.IsDirectory
+                     || FindLocalFile(fileName)?.Kind != LocalFileKind.Pending
+                     && FindPendingFileByPath(fileName) is null))
             {
                 DeleteNode(fileName);
             }
@@ -463,6 +464,13 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
             if (info.Context is HandleContext { File: not null })
             {
                 LastSyncError = Loc.T("Eng_SyncFailedFmt", Path.GetFileName(fileName), ex.Message);
+            }
+            else if (info.DeletePending)
+            {
+                LastSyncError = info.IsDirectory
+                    || info.Context is HandleContext { Node: { IsDirectory: true } }
+                    ? Loc.T("Eng_DirectoryDeleteFailedFmt", Path.GetFileName(fileName), ex.Message)
+                    : Loc.T("Eng_SyncFailedFmt", Path.GetFileName(fileName), ex.Message);
             }
         }
     }
@@ -1266,10 +1274,16 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
     {
         try
         {
-            return FindLocalFile(fileName)?.Kind == LocalFileKind.Pending
-                   || FindPendingFileByPath(fileName) is not null
-                ? DokanResult.AccessDenied
-                : DokanResult.Success;
+            var localFile = FindLocalFile(fileName);
+            if (localFile?.Kind == LocalFileKind.Pending || FindPendingFileByPath(fileName) is not null)
+                return DokanResult.AccessDenied;
+            if (localFile is not null)
+                return DokanResult.Success;
+
+            var node = SafeResolve(fileName);
+            if (node is null)
+                return DokanResult.FileNotFound;
+            return node.IsDirectory ? DokanResult.AccessDenied : DokanResult.Success;
         }
         catch (Exception ex)
         {
@@ -1286,8 +1300,8 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
             if (node is null || !node.IsDirectory)
                 return DokanResult.Success;
 
-            var listing = _gateway.ListDirectory(node.DirectoryId);
-            if (listing.Subdirs.Count > 0 || listing.Files.Count > 0)
+            _gateway.InvalidateListing(node.DirectoryId);
+            if (DirectoryIsNotEmpty(fileName, node))
                 return DokanResult.DirectoryNotEmpty;
 
             return DokanResult.Success;
@@ -2252,6 +2266,16 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
 
         if (node.IsDirectory)
         {
+            _gateway.FlushPending();
+            _gateway.InvalidateListing(node.DirectoryId);
+            if (DirectoryIsNotEmpty(fileName, node))
+            {
+                var reason = Loc.T("Eng_DirectoryNotEmpty");
+                LastSyncError = Loc.T("Eng_DirectoryDeleteFailedFmt", Path.GetFileName(fileName), reason);
+                EngineLog.Error($"Cleanup(\"{fileName}\")", new IOException(reason));
+                return;
+            }
+
             _gateway.DeleteDirectory(node.DirectoryId);
             _gateway.InvalidateListing(node.DirectoryId);
         }
@@ -2262,6 +2286,25 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
 
         if (parent != null)
             _gateway.InvalidateListing(parent.Value.DirectoryId);
+    }
+
+    private bool DirectoryIsNotEmpty(string path, ResolvedNode node)
+    {
+        var normalizedPath = NormalizePath(path).TrimEnd('\\');
+        var childPathPrefix = normalizedPath.Length == 0 ? "\\" : normalizedPath + "\\";
+        lock (_localFilesLock)
+            if (_localFiles.Values.Concat(_pendingFiles.Values).Distinct().Any(file =>
+                string.Equals(file.DirectoryId, node.DirectoryId, StringComparison.Ordinal)
+                || !string.IsNullOrEmpty(file.Path)
+                && file.Path.StartsWith(childPathPrefix, StringComparison.OrdinalIgnoreCase)))
+                return true;
+
+        if (_outbox?.Entries.Any(entry => entry.ServerKey == _serverKey
+                && entry.DirectoryId == node.DirectoryId) == true)
+            return true;
+
+        var listing = _gateway.ListDirectory(node.DirectoryId);
+        return listing.Subdirs.Count > 0 || listing.Files.Count > 0;
     }
 
     internal static NtStatus ToStatus(Exception exception)
