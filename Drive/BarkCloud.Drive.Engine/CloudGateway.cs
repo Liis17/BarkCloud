@@ -44,7 +44,7 @@ internal sealed class CloudGateway : IDisposable
     private readonly ConcurrentDictionary<string, (DateTime At, DirectoryListingDetailed Listing)> _listCache = new();
     private readonly ConcurrentDictionary<string, int> _listGen = new(); // «поколение» инвалидации на папку — защита от записи устаревшего ответа
     private readonly object _listLock = new(); // делает (проверка поколения + запись кэша) и (инвалидация + бамп) атомарными друг к другу
-    private readonly ConcurrentDictionary<string, Lazy<Task<string>>> _downloads = new();
+    private readonly ConcurrentDictionary<DownloadKey, Lazy<Task<string>>> _downloads = new();
     private readonly object _storageLock = new();
     private (DateTime At, GetUserStorageInfoResponse Info)? _storage;
 
@@ -53,7 +53,7 @@ internal sealed class CloudGateway : IDisposable
     private const int BlockSize = 1 << 20; // 1 МиБ
     private static readonly TimeSpan UrlTtl = TimeSpan.FromMinutes(50);
     private readonly ConcurrentDictionary<string, (DateTime At, string Url)> _tempUrls = new();
-    private readonly ConcurrentDictionary<string, Lazy<Task>> _blockFetches = new();
+    private readonly ConcurrentDictionary<BlockFetchKey, Lazy<Task>> _blockFetches = new();
     private readonly ConcurrentDictionary<string, bool> _wholeMode = new();
 
     // Батчинг удалений: пользовательские удаления файлов копятся до 1 c (или порога в 100)
@@ -92,8 +92,9 @@ internal sealed class CloudGateway : IDisposable
     public void SetCacheDir(string path)
     {
         Directory.CreateDirectory(path);
-        _cacheDir = path;
+        Volatile.Write(ref _cacheDir, path);
         _downloads.Clear();
+        _blockFetches.Clear();
     }
 
     public GetUserStorageInfoResponse GetStorage()
@@ -270,29 +271,29 @@ internal sealed class CloudGateway : IDisposable
     // ───────── чтение содержимого (поблочно по HTTP Range; фаза 5) ─────────
 
     // Читает [offset, offset+len) файла, подкачивая недостающие блоки по 1 МиБ Range-запросами.
-    // fileLength берётся из листинга (CloudFile.FileSize). Если сервер не поддерживает Range —
-    // откатываемся на скачивание файла целиком (whole-режим).
+    // fileLength берётся из листинга (CloudFile.FileSize). Whole-режим включается только при 200 OK на Range-запрос.
     public int Read(string fileId, long fileLength, byte[] buffer, long offset)
     {
+        var cacheDir = Volatile.Read(ref _cacheDir);
         if (_wholeMode.ContainsKey(fileId))
-            return ReadWhole(fileId, buffer, offset);
+            return ReadWhole(fileId, fileLength, buffer, offset, cacheDir);
 
         if (fileLength <= 0 || offset >= fileLength)
             return 0;
 
         try
         {
-            return ReadBlocks(fileId, fileLength, buffer, offset);
+            return ReadBlocks(fileId, fileLength, buffer, offset, cacheDir);
         }
         catch (RangeNotSupportedException)
         {
             _wholeMode[fileId] = true;
             EngineLog.Info($"Сервер не отдал Range для {fileId} — переключаюсь на скачивание целиком");
-            return ReadWhole(fileId, buffer, offset);
+            return ReadWhole(fileId, fileLength, buffer, offset, cacheDir);
         }
     }
 
-    private int ReadBlocks(string fileId, long fileLength, byte[] buffer, long offset)
+    private int ReadBlocks(string fileId, long fileLength, byte[] buffer, long offset, string cacheDir)
     {
         var toRead = (int)Math.Min(buffer.Length, fileLength - offset);
         if (toRead <= 0)
@@ -303,8 +304,9 @@ internal sealed class CloudGateway : IDisposable
         var lastBlock = endInclusive / BlockSize;
 
         for (var b = firstBlock; b <= lastBlock; b++)
-            EnsureBlock(fileId, fileLength, b);
+            EnsureBlock(cacheDir, fileId, fileLength, b);
 
+        var bytesRead = 0;
         for (var b = firstBlock; b <= lastBlock; b++)
         {
             var blockStart = b * BlockSize;
@@ -318,55 +320,83 @@ internal sealed class CloudGateway : IDisposable
             var bufPos = (int)(copyFrom - offset);
             var inBlockPos = copyFrom - blockStart;
 
-            using var handle = File.OpenHandle(BlockPath(fileId, b), FileMode.Open, FileAccess.Read, FileShare.Read);
-            RandomAccess.Read(handle, buffer.AsSpan(bufPos, len), inBlockPos);
+            using var handle = File.OpenHandle(BlockPath(cacheDir, fileId, b), FileMode.Open, FileAccess.Read, FileShare.Read);
+            var read = RandomAccess.Read(handle, buffer.AsSpan(bufPos, len), inBlockPos);
+            bytesRead += read;
+            if (read != len)
+                break;
         }
 
-        return toRead;
+        return bytesRead;
     }
 
-    private void EnsureBlock(string fileId, long fileLength, long blockIndex)
+    private void EnsureBlock(string cacheDir, string fileId, long fileLength, long blockIndex)
     {
         var blockStart = blockIndex * BlockSize;
         var expectedLen = Math.Min(BlockSize, fileLength - blockStart);
-        var path = BlockPath(fileId, blockIndex);
-        if (File.Exists(path) && new FileInfo(path).Length == expectedLen)
+        var path = BlockPath(cacheDir, fileId, blockIndex);
+        if (HasExpectedLength(path, expectedLen))
             return;
 
-        var key = $"{fileId}:{blockIndex}";
-        var lazy = _blockFetches.GetOrAdd(key, _ => new Lazy<Task>(() => FetchBlockAsync(fileId, fileLength, blockIndex)));
+        var key = new BlockFetchKey(cacheDir, fileId, fileLength, blockIndex);
+        var lazy = _blockFetches.GetOrAdd(key,
+            _ => new Lazy<Task>(() => FetchBlockAsync(cacheDir, fileId, fileLength, blockIndex)));
         try
         {
             lazy.Value.GetAwaiter().GetResult();
         }
         finally
         {
-            _blockFetches.TryRemove(key, out _);
+            _blockFetches.TryRemove(new KeyValuePair<BlockFetchKey, Lazy<Task>>(key, lazy));
         }
     }
 
-    private async Task FetchBlockAsync(string fileId, long fileLength, long blockIndex)
+    private async Task FetchBlockAsync(string cacheDir, string fileId, long fileLength, long blockIndex)
     {
         var start = blockIndex * BlockSize;
         var end = Math.Min(start + BlockSize, fileLength) - 1; // включительно
+        var expectedLength = end - start + 1;
+        var path = BlockPath(cacheDir, fileId, blockIndex);
+        if (HasExpectedLength(path, expectedLength))
+            return;
 
-        var url = await GetTempUrlAsync(fileId);
-        using var request = new HttpRequestMessage(HttpMethod.Get, url);
-        request.Headers.Range = new RangeHeaderValue(start, end);
-
-        using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+        using var response = await SendDownloadRequestAsync(fileId, new RangeHeaderValue(start, end));
+        if (response.StatusCode == HttpStatusCode.OK)
+            throw new RangeNotSupportedException();
         if (response.StatusCode != HttpStatusCode.PartialContent)
-            throw new RangeNotSupportedException(); // старый бэкенд без Range → откат на целиком
+            throw CreateHttpException(response.StatusCode);
 
-        Directory.CreateDirectory(BlockDir(fileId));
-        var path = BlockPath(fileId, blockIndex);
-        var tmp = path + ".part";
+        var contentRange = response.Content.Headers.ContentRange;
+        if (contentRange is null
+            || !string.Equals(contentRange.Unit, "bytes", StringComparison.OrdinalIgnoreCase)
+            || contentRange.From != start
+            || contentRange.To != end
+            || contentRange.Length != fileLength)
+            throw new InvalidDataException($"Сервер вернул неверный Content-Range для {fileId}");
 
-        await using (var net = await response.Content.ReadAsStreamAsync())
-        await using (var file = File.Create(tmp))
-            await net.CopyToAsync(file);
-
-        File.Move(tmp, path, overwrite: true);
+        var directory = BlockDir(cacheDir, fileId);
+        Directory.CreateDirectory(directory);
+        var partPath = PartPath(path);
+        try
+        {
+            await CopyToPartAsync(response, partPath, expectedLength);
+            if (!HasExpectedLength(path, expectedLength))
+            {
+                try
+                {
+                    File.Move(partPath, path, overwrite: true);
+                }
+                catch (Exception ex) when ((ex is IOException or UnauthorizedAccessException)
+                                           && HasExpectedLength(path, expectedLength))
+                {
+                    // Другой запрос уже опубликовал готовый блок, возможно открытый читателем.
+                }
+            }
+        }
+        finally
+        {
+            DeletePart(partPath);
+        }
     }
 
     private async Task<string> GetTempUrlAsync(string fileId)
@@ -382,49 +412,147 @@ internal sealed class CloudGateway : IDisposable
         return url;
     }
 
-    private string BlockDir(string fileId) => Path.Combine(_cacheDir, fileId + ".blocks");
-    private string BlockPath(string fileId, long blockIndex) => Path.Combine(BlockDir(fileId), blockIndex + ".blk");
+    private static string BlockDir(string cacheDir, string fileId) => Path.Combine(cacheDir, fileId + ".blocks");
+    private static string BlockPath(string cacheDir, string fileId, long blockIndex)
+        => Path.Combine(BlockDir(cacheDir, fileId), blockIndex + ".blk");
 
     // Скачивание файла целиком (whole-режим: сервер без Range, и для гидрации копии при записи).
-    private int ReadWhole(string fileId, byte[] buffer, long offset)
+    private int ReadWhole(string fileId, long fileLength, byte[] buffer, long offset, string cacheDir)
     {
-        var local = _downloads
-            .GetOrAdd(fileId, id => new Lazy<Task<string>>(() => DownloadAsync(id)))
-            .Value.GetAwaiter().GetResult();
+        var key = new DownloadKey(cacheDir, fileId, fileLength);
+        var lazy = _downloads.GetOrAdd(key,
+            _ => new Lazy<Task<string>>(() => DownloadAsync(cacheDir, fileId, fileLength)));
+        string local;
+        try
+        {
+            local = lazy.Value.GetAwaiter().GetResult();
+        }
+        finally
+        {
+            _downloads.TryRemove(new KeyValuePair<DownloadKey, Lazy<Task<string>>>(key, lazy));
+        }
 
         using var handle = File.OpenHandle(local, FileMode.Open, FileAccess.Read, FileShare.Read);
-        var length = RandomAccess.GetLength(handle);
-        if (offset >= length)
+        if (offset >= fileLength)
             return 0;
 
-        var toRead = (int)Math.Min(buffer.Length, length - offset);
+        var toRead = (int)Math.Min(buffer.Length, fileLength - offset);
         return RandomAccess.Read(handle, buffer.AsSpan(0, toRead), offset);
     }
 
     private sealed class RangeNotSupportedException : Exception;
 
-    private async Task<string> DownloadAsync(string fileId)
-    {
-        var local = Path.Combine(_cacheDir, fileId);
-        if (File.Exists(local))
-            return local;
+    private readonly record struct DownloadKey(string CacheDir, string FileId, long FileLength);
+    private readonly record struct BlockFetchKey(string CacheDir, string FileId, long FileLength, long BlockIndex);
 
-        var tmp = local + ".part";
-        await DownloadToAsync(fileId, tmp);
-        File.Move(tmp, local, overwrite: true);
-        return local;
+    private async Task<string> DownloadAsync(string cacheDir, string fileId, long expectedLength)
+    {
+        var local = Path.Combine(cacheDir, fileId);
+        if (File.Exists(local))
+        {
+            if (new FileInfo(local).Length == expectedLength)
+                return local;
+            File.Delete(local);
+        }
+
+        var partPath = PartPath(local);
+        try
+        {
+            await DownloadToPartAsync(fileId, partPath, expectedLength);
+            File.Move(partPath, local, overwrite: true);
+            return local;
+        }
+        finally
+        {
+            DeletePart(partPath);
+        }
     }
 
     // Скачать блоб в произвольный путь (для гидрации рабочей копии при записи).
-    public async Task DownloadToAsync(string fileId, string destPath)
+    public async Task DownloadToAsync(string fileId, string destPath, long expectedLength)
     {
-        var resp = _files.GetTempDownloadUrl(new GetTempDownloadUrlRequest { FileIds = { fileId } });
-        var raw = resp.FileUrls.FirstOrDefault()?.Url
-                  ?? throw new InvalidOperationException($"Сервер не вернул download URL для {fileId}");
+        var partPath = PartPath(destPath);
+        try
+        {
+            await DownloadToPartAsync(fileId, partPath, expectedLength);
+            File.Move(partPath, destPath, overwrite: true);
+        }
+        finally
+        {
+            DeletePart(partPath);
+        }
+    }
 
-        await using var net = await _http.GetStreamAsync(NormalizeDownloadUrl(raw));
-        await using var file = File.Create(destPath);
-        await net.CopyToAsync(file);
+    private async Task DownloadToPartAsync(string fileId, string partPath, long expectedLength)
+    {
+        using var response = await SendDownloadRequestAsync(fileId, range: null);
+        if (response.StatusCode != HttpStatusCode.OK)
+            throw CreateHttpException(response.StatusCode);
+
+        await CopyToPartAsync(response, partPath, expectedLength);
+    }
+
+    private async Task<HttpResponseMessage> SendDownloadRequestAsync(string fileId, RangeHeaderValue? range)
+    {
+        var retried = false;
+        while (true)
+        {
+            var url = await GetTempUrlAsync(fileId);
+            using var request = new HttpRequestMessage(HttpMethod.Get, url);
+            if (range is not null)
+                request.Headers.Range = range;
+
+            var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+            if (response.StatusCode is not (HttpStatusCode.Forbidden or HttpStatusCode.NotFound or HttpStatusCode.Gone))
+                return response;
+
+            var statusCode = response.StatusCode;
+            response.Dispose();
+            InvalidateTempUrl(fileId, url);
+            if (retried)
+                throw CreateHttpException(statusCode);
+
+            retried = true;
+        }
+    }
+
+    private void InvalidateTempUrl(string fileId, string url)
+    {
+        if (_tempUrls.TryGetValue(fileId, out var cached) && cached.Url == url)
+            _tempUrls.TryRemove(new KeyValuePair<string, (DateTime At, string Url)>(fileId, cached));
+    }
+
+    private static HttpRequestException CreateHttpException(HttpStatusCode statusCode)
+        => new($"Сервер вернул HTTP {(int)statusCode} ({statusCode}) при скачивании файла", null, statusCode);
+
+    private static async Task CopyToPartAsync(HttpResponseMessage response, string partPath, long expectedLength)
+    {
+        await using (var net = await response.Content.ReadAsStreamAsync())
+        await using (var file = new FileStream(partPath, FileMode.CreateNew, FileAccess.Write, FileShare.None,
+                         81920, FileOptions.Asynchronous))
+            await net.CopyToAsync(file);
+
+        var actualLength = new FileInfo(partPath).Length;
+        if (actualLength != expectedLength)
+            throw new InvalidDataException($"Ожидалось {expectedLength} байт, получено {actualLength}");
+    }
+
+    private static string PartPath(string path) => $"{path}.{Guid.NewGuid():N}.part";
+
+    private static bool HasExpectedLength(string path, long expectedLength)
+        => File.Exists(path) && new FileInfo(path).Length == expectedLength;
+
+    private static void DeletePart(string path)
+    {
+        try
+        {
+            if (File.Exists(path))
+                File.Delete(path);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            EngineLog.Error($"Не удалось удалить временный файл {path}", ex);
+        }
     }
 
     // ───────── запись ─────────
