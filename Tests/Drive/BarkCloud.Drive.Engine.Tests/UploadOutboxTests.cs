@@ -313,7 +313,7 @@ public sealed class UploadOutboxTests
         cloud.HttpHandler.Calls.Count(call => call.Method == "POST").Should().Be(1);
         var saved = gateway.ListDirectory("").Files.Should().ContainSingle().Subject;
         saved.File.Id.Should().NotBe(original.FileId);
-        await gateway.DownloadToAsync(saved.File.Id, temp.Path("saved.bin"));
+        await gateway.DownloadToAsync(saved.File.Id, temp.Path("saved.bin"), 3);
         File.ReadAllBytes(temp.Path("saved.bin")).Should().Equal([8, 9, 10]);
         outbox.Count.Should().Be(0);
     }

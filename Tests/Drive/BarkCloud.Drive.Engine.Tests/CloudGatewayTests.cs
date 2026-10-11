@@ -1,3 +1,6 @@
+using System.Net;
+using System.Net.Http.Headers;
+
 using BarkCloud.Drive.Engine;
 using BarkCloud.Drive.Engine.Tests.Fakes;
 using BarkCloud.Proto.Files;
@@ -385,5 +388,290 @@ public sealed class CloudGatewayTests
         cloud.HttpHandler.Calls[0].Method.Should().Be("POST");
         cloud.HttpHandler.Calls[0].Headers.Should().ContainKey("x-auth-token");
         cloud.HttpHandler.Calls[1].Range.Should().Be("bytes=0-7");
+    }
+
+    [Fact]
+    public void Read_caches_a_valid_partial_response()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        var content = new byte[] { 0, 1, 2, 3, 4, 5, 6, 7 };
+        var file = cloud.AddFile("", "cached.bin", content);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+        var first = new byte[4];
+        var second = new byte[3];
+
+        gateway.Read(file.FileId, content.Length, first, 0).Should().Be(4);
+        gateway.Read(file.FileId, content.Length, second, 3).Should().Be(3);
+
+        first.Should().Equal(content[..4]);
+        second.Should().Equal(content[3..6]);
+        cloud.HttpHandler.Calls.Should().ContainSingle();
+        cloud.HttpHandler.Calls[0].Range.Should().Be("bytes=0-7");
+        File.Exists(Path.Combine(temp.Path("cache"), file.FileId + ".blocks", "0.blk")).Should().BeTrue();
+    }
+
+    [Fact]
+    public void Read_uses_whole_download_only_after_http_200()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        var content = new byte[] { 0, 1, 2, 3, 4, 5, 6, 7 };
+        var file = cloud.AddFile("", "whole.bin", content);
+        cloud.HttpHandler.Responder = (_, _) => Task.FromResult(Response(HttpStatusCode.OK, content));
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+        var buffer = new byte[4];
+
+        gateway.Read(file.FileId, content.Length, buffer, 2).Should().Be(4);
+
+        buffer.Should().Equal(content[2..6]);
+        cloud.HttpHandler.Calls.Should().HaveCount(2);
+        cloud.HttpHandler.Calls[0].Range.Should().Be("bytes=0-7");
+        cloud.HttpHandler.Calls[1].Range.Should().BeNull();
+        File.Exists(Path.Combine(temp.Path("cache"), file.FileId)).Should().BeTrue();
+    }
+
+    [Fact]
+    public void Read_does_not_use_whole_download_after_http_500()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        var file = cloud.AddFile("", "error.bin", [1, 2, 3]);
+        cloud.HttpHandler.Responder = (_, _) => Task.FromResult(Response(HttpStatusCode.InternalServerError, []));
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+        var buffer = new byte[3];
+
+        var read = () => gateway.Read(file.FileId, 3, buffer, 0);
+
+        read.Should().Throw<HttpRequestException>().Which.StatusCode.Should().Be(HttpStatusCode.InternalServerError);
+        cloud.HttpHandler.Calls.Should().ContainSingle();
+        cloud.HttpHandler.Calls[0].Range.Should().Be("bytes=0-2");
+    }
+
+    [Fact]
+    public void Read_refreshes_temp_url_once_after_http_403()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        var content = new byte[] { 1, 2, 3, 4 };
+        var file = cloud.AddFile("", "refresh.bin", content);
+        var defaultResponder = cloud.HttpHandler.Responder;
+        var attempts = 0;
+        cloud.HttpHandler.Responder = (request, cancellationToken) =>
+            Interlocked.Increment(ref attempts) == 1
+                ? Task.FromResult(Response(HttpStatusCode.Forbidden, []))
+                : defaultResponder(request, cancellationToken);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+        var buffer = new byte[4];
+
+        gateway.Read(file.FileId, content.Length, buffer, 0).Should().Be(4);
+
+        buffer.Should().Equal(content);
+        cloud.HttpHandler.Calls.Should().HaveCount(2);
+        cloud.Invoker.Calls.Count(call => call.MethodFullName == FakeCloudMethods.GetTempDownloadUrl).Should().Be(2);
+    }
+
+    [Fact]
+    public void Read_throws_after_two_forbidden_responses()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        var content = new byte[] { 1, 2, 3, 4 };
+        var file = cloud.AddFile("", "forbidden.bin", content);
+        cloud.HttpHandler.Responder = (_, _) => Task.FromResult(Response(HttpStatusCode.Forbidden, []));
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+
+        var read = () => gateway.Read(file.FileId, content.Length, new byte[content.Length], 0);
+
+        read.Should().Throw<HttpRequestException>().Which.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        cloud.HttpHandler.Calls.Should().HaveCount(2);
+        cloud.Invoker.Calls.Count(call => call.MethodFullName == FakeCloudMethods.GetTempDownloadUrl).Should().Be(2);
+    }
+
+    [Fact]
+    public void Read_does_not_publish_a_block_with_invalid_content_range()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        var content = new byte[] { 1, 2, 3, 4 };
+        var file = cloud.AddFile("", "bad-range.bin", content);
+        cloud.HttpHandler.Responder = (_, _) => Task.FromResult(PartialResponse(content, 1, 3, content.Length));
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+
+        var read = () => gateway.Read(file.FileId, content.Length, new byte[4], 0);
+
+        read.Should().Throw<InvalidDataException>();
+        Directory.Exists(Path.Combine(temp.Path("cache"), file.FileId + ".blocks")).Should().BeFalse();
+    }
+
+    [Fact]
+    public void Read_does_not_publish_a_block_with_an_invalid_content_range_total()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        var content = new byte[] { 1, 2, 3, 4 };
+        var file = cloud.AddFile("", "wrong-total.bin", content);
+        cloud.HttpHandler.Responder = (_, _) => Task.FromResult(PartialResponse(content, 0, 3, content.Length + 1));
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+
+        var read = () => gateway.Read(file.FileId, content.Length, new byte[content.Length], 0);
+
+        read.Should().Throw<InvalidDataException>();
+        Directory.Exists(Path.Combine(temp.Path("cache"), file.FileId + ".blocks")).Should().BeFalse();
+    }
+
+    [Fact]
+    public void Read_does_not_publish_a_block_without_content_range()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        var content = new byte[] { 1, 2, 3, 4 };
+        var file = cloud.AddFile("", "missing-range.bin", content);
+        cloud.HttpHandler.Responder = (_, _) => Task.FromResult(Response(HttpStatusCode.PartialContent, content));
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+
+        var read = () => gateway.Read(file.FileId, content.Length, new byte[content.Length], 0);
+
+        read.Should().Throw<InvalidDataException>();
+        Directory.Exists(Path.Combine(temp.Path("cache"), file.FileId + ".blocks")).Should().BeFalse();
+    }
+
+    [Fact]
+    public void Read_does_not_publish_a_block_with_a_short_body()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        var content = new byte[] { 1, 2, 3, 4 };
+        var file = cloud.AddFile("", "short-range.bin", content);
+        cloud.HttpHandler.Responder = (_, _) => Task.FromResult(PartialResponse([1, 2, 3], 0, 3, content.Length));
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+
+        var read = () => gateway.Read(file.FileId, content.Length, new byte[4], 0);
+
+        read.Should().Throw<InvalidDataException>();
+        Directory.GetFiles(Path.Combine(temp.Path("cache"), file.FileId + ".blocks")).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Failed_whole_download_is_removed_from_task_cache_and_retried()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        var content = new byte[] { 1, 2, 3, 4 };
+        var file = cloud.AddFile("", "retry-whole.bin", content);
+        var attempts = 0;
+        cloud.HttpHandler.Responder = (_, _) =>
+        {
+            var attempt = Interlocked.Increment(ref attempts);
+            return Task.FromResult(Response(HttpStatusCode.OK, attempt == 2 ? [1, 2, 3] : content));
+        };
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+        var buffer = new byte[4];
+
+        var firstRead = () => gateway.Read(file.FileId, content.Length, buffer, 0);
+        firstRead.Should().Throw<InvalidDataException>();
+        gateway.Read(file.FileId, content.Length, buffer, 0).Should().Be(4);
+
+        buffer.Should().Equal(content);
+        cloud.HttpHandler.Calls.Should().HaveCount(3);
+        cloud.HttpHandler.Calls[0].Range.Should().Be("bytes=0-3");
+        cloud.HttpHandler.Calls[1].Range.Should().BeNull();
+        cloud.HttpHandler.Calls[2].Range.Should().BeNull();
+        Directory.GetFiles(temp.Path("cache"), "*.part").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Read_crosses_into_a_nonzero_incomplete_last_block()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        const int blockSize = 1 << 20;
+        var content = Enumerable.Range(0, blockSize + 17).Select(i => (byte)(i % 251)).ToArray();
+        var file = cloud.AddFile("", "multi-block.bin", content);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+        var offset = blockSize - 3;
+        var buffer = new byte[12];
+
+        gateway.Read(file.FileId, content.Length, buffer, offset).Should().Be(buffer.Length);
+
+        buffer.Should().Equal(content.AsSpan((int)offset, buffer.Length).ToArray());
+        cloud.HttpHandler.Calls.Should().HaveCount(2);
+        cloud.HttpHandler.Calls[0].Range.Should().Be($"bytes=0-{blockSize - 1}");
+        cloud.HttpHandler.Calls[1].Range.Should().Be($"bytes={blockSize}-{content.Length - 1}");
+
+        var blockPath = Path.Combine(temp.Path("cache"), file.FileId + ".blocks", "1.blk");
+        new FileInfo(blockPath).Length.Should().Be(17);
+    }
+
+    [Fact]
+    public async Task Concurrent_reads_of_one_block_share_one_http_request()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        var content = new byte[] { 1, 2, 3, 4 };
+        var file = cloud.AddFile("", "concurrent.bin", content);
+        var allReadsStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var responseStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseResponse = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var startedReads = 0;
+        cloud.HttpHandler.Responder = async (_, cancellationToken) =>
+        {
+            responseStarted.TrySetResult();
+            await releaseResponse.Task.WaitAsync(cancellationToken);
+            return PartialResponse(content, 0, content.Length - 1, content.Length);
+        };
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+
+        var reads = Enumerable.Range(0, 10).Select(_ => Task.Factory.StartNew(() =>
+        {
+            if (Interlocked.Increment(ref startedReads) == 10)
+                allReadsStarted.TrySetResult();
+            var buffer = new byte[4];
+            var bytesRead = gateway.Read(file.FileId, content.Length, buffer, 0);
+            return (bytesRead, buffer);
+        }, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default)).ToArray();
+        int callsWhileResponseHeld;
+        try
+        {
+            await allReadsStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            await responseStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            await Task.Delay(100);
+            callsWhileResponseHeld = cloud.HttpHandler.Calls.Count;
+        }
+        finally
+        {
+            releaseResponse.TrySetResult();
+        }
+        var results = await Task.WhenAll(reads).WaitAsync(TimeSpan.FromSeconds(10));
+
+        callsWhileResponseHeld.Should().Be(1);
+        results.Should().OnlyContain(result => result.bytesRead == content.Length && result.buffer.SequenceEqual(content));
+        cloud.HttpHandler.Calls.Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task DownloadTo_checks_expected_length_and_removes_part_on_mismatch()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        var file = cloud.AddFile("", "hydrate.bin", [1, 2, 3]);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+        var destination = temp.Path("hydrated.bin");
+
+        var download = () => gateway.DownloadToAsync(file.FileId, destination, 4);
+
+        await download.Should().ThrowAsync<InvalidDataException>();
+        File.Exists(destination).Should().BeFalse();
+        Directory.GetFiles(temp.Root, "*.part").Should().BeEmpty();
+    }
+
+    private static HttpResponseMessage Response(HttpStatusCode status, byte[] body)
+        => new(status) { Content = new ByteArrayContent(body) };
+
+    private static HttpResponseMessage PartialResponse(byte[] body, long from, long to, long total)
+    {
+        var response = Response(HttpStatusCode.PartialContent, body);
+        response.Content.Headers.ContentRange = new ContentRangeHeaderValue(from, to, total);
+        return response;
     }
 }

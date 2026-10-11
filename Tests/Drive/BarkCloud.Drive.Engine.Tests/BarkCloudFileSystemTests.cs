@@ -201,13 +201,12 @@ public sealed class BarkCloudFileSystemTests
     }
 
     [Fact]
-    public async Task Cleanup_keeps_directory_when_persist_finishes_during_stale_listing()
+    public void Cleanup_keeps_directory_while_file_is_registered()
     {
         using var temp = new TestDirectory();
         var cloud = new FakeCloud();
         var directoryId = cloud.AddDirectory("directory");
         using var gateway = cloud.CreateGateway(temp.Path("cache"));
-        gateway.ListDirectory("");
         var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"));
         const string filePath = "\\directory\\fresh.txt";
         var fileInfo = new FakeDokanFileInfo();
@@ -215,53 +214,23 @@ public sealed class BarkCloudFileSystemTests
             FileOptions.None, FileAttributes.Normal, fileInfo).Should().Be(DokanResult.Success);
         fileSystem.WriteFile(filePath, [7, 8, 9], out var bytesWritten, 0, fileInfo).Should().Be(DokanResult.Success);
         bytesWritten.Should().Be(3);
-        var listingStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        using var resumeListing = new ManualResetEventSlim();
-        var delayedListing = 0;
-        var watchDirectoryListing = 1;
-        cloud.Invoker.AfterResponse = (method, request) =>
-        {
-            if (Volatile.Read(ref watchDirectoryListing) == 0
-                || method != FakeCloudMethods.ListDirectoryDetailed
-                || ((BarkCloud.Proto.Files.ListDirectoryRequest)request).DirectoryId != directoryId
-                || Interlocked.Exchange(ref delayedListing, 1) != 0)
-                return;
-
-            listingStarted.TrySetResult();
-            if (!resumeListing.Wait(TimeSpan.FromSeconds(5)))
-                throw new TimeoutException("Не дождались завершения Persist внутри листинга");
-        };
+        var directoryListings = cloud.Invoker.Calls.Count(call =>
+            call.MethodFullName == FakeCloudMethods.ListDirectoryDetailed
+            && ((BarkCloud.Proto.Files.ListDirectoryRequest)call.Request).DirectoryId == directoryId);
         var directoryInfo = new FakeDokanFileInfo { IsDirectory = true, DeletePending = true };
-        var cleanup = Task.Run(() => fileSystem.Cleanup("\\directory", directoryInfo));
-
-        try
-        {
-            var first = await Task.WhenAny(listingStarted.Task, cleanup);
-            if (first == listingStarted.Task)
-            {
-                fileSystem.Cleanup(filePath, fileInfo);
-                fileSystem.CloseFile(filePath, fileInfo);
-            }
-            else
-                await cleanup.WaitAsync(TimeSpan.FromSeconds(5));
-        }
-        finally
-        {
-            Volatile.Write(ref watchDirectoryListing, 0);
-            resumeListing.Set();
-        }
-
-        await cleanup.WaitAsync(TimeSpan.FromSeconds(5));
-        if (Volatile.Read(ref delayedListing) == 0)
-        {
-            fileSystem.Cleanup(filePath, fileInfo);
-            fileSystem.CloseFile(filePath, fileInfo);
-        }
+        fileSystem.Cleanup("\\directory", directoryInfo);
 
         cloud.Invoker.Calls.Should().NotContain(call => call.MethodFullName == FakeCloudMethods.DeleteDirectory);
+        cloud.Invoker.Calls.Count(call =>
+            call.MethodFullName == FakeCloudMethods.ListDirectoryDetailed
+            && ((BarkCloud.Proto.Files.ListDirectoryRequest)call.Request).DirectoryId == directoryId)
+            .Should().Be(directoryListings);
         fileSystem.LastSyncError.Should().Be(Loc.T("Eng_DirectoryDeleteFailedFmt",
             "directory", Loc.T("Eng_DirectoryNotEmpty")));
-        gateway.Resolve(filePath).Should().NotBeNull();
+
+        fileSystem.Cleanup(filePath, fileInfo);
+        fileSystem.CloseFile(filePath, fileInfo);
+        cloud.Invoker.Calls.Should().NotContain(call => call.MethodFullName == FakeCloudMethods.DeleteDirectory);
     }
 
     [Fact]
@@ -1495,7 +1464,7 @@ public sealed class BarkCloudFileSystemTests
         saved.Entry.Id.Should().NotBe(firstSave.Entry.Id);
         local.ExistingEntryId.Should().Be(saved.Entry.Id);
         var downloaded = temp.Path("saved.bin");
-        await gateway.DownloadToAsync(saved.File.Id, downloaded);
+        await gateway.DownloadToAsync(saved.File.Id, downloaded, 3);
         File.ReadAllBytes(downloaded).Should().Equal([7, 8, 9]);
     }
 
@@ -1609,7 +1578,7 @@ public sealed class BarkCloudFileSystemTests
         fs.CloseFile("\\edited.bin", first);
         fs.CloseFile("\\edited.bin", second);
         var saved = gateway.ListDirectory("").Files.Should().ContainSingle().Subject;
-        await gateway.DownloadToAsync(saved.File.Id, temp.Path("saved.bin"));
+        await gateway.DownloadToAsync(saved.File.Id, temp.Path("saved.bin"), 3);
         File.ReadAllBytes(temp.Path("saved.bin")).Should().Equal([7, 7, 7]);
         cloud.Invoker.Calls.Count(call => call.MethodFullName == FakeCloudMethods.DeleteFileEntry).Should().Be(1);
     }
@@ -1631,7 +1600,7 @@ public sealed class BarkCloudFileSystemTests
         fs.CloseFile("\\mapped.bin", info);
         cloud.HttpHandler.Calls.Count(call => call.Method == "POST").Should().Be(1);
         var saved = gateway.ListDirectory("").Files.Should().ContainSingle().Subject;
-        await gateway.DownloadToAsync(saved.File.Id, temp.Path("saved.bin"));
+        await gateway.DownloadToAsync(saved.File.Id, temp.Path("saved.bin"), 3);
         File.ReadAllBytes(temp.Path("saved.bin")).Should().Equal([7, 8, 9]);
     }
 
@@ -1654,7 +1623,7 @@ public sealed class BarkCloudFileSystemTests
         fs.CloseFile("\\uncertain.bin", second);
         var saved = gateway.ListDirectory("").Files.Should().ContainSingle().Subject;
         saved.Entry.Name.Should().Be("uncertain.bin");
-        await gateway.DownloadToAsync(saved.File.Id, temp.Path("saved.bin"));
+        await gateway.DownloadToAsync(saved.File.Id, temp.Path("saved.bin"), 3);
         File.ReadAllBytes(temp.Path("saved.bin")).Should().Equal([7, 7, 7]);
     }
 

@@ -1646,7 +1646,7 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
         try
         {
             if (!truncate)
-                _gateway.DownloadToAsync(node.FileId, temp).GetAwaiter().GetResult(); // гидрация до включения ленивой загрузки
+                _gateway.DownloadToAsync(node.FileId, temp, node.Length).GetAwaiter().GetResult(); // гидрация до включения ленивой загрузки
 
             var stream = new FileStream(temp, FileMode.OpenOrCreate, System.IO.FileAccess.ReadWrite, FileShare.Read);
             if (truncate)
