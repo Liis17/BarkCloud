@@ -20,6 +20,7 @@ namespace BarkCloud.Web.Auth;
 /// </summary>
 public sealed class AuthGateway
 {
+    private static readonly object DeviceIdItemKey = new();
     public const string AccessCookie = "bark_at";
     public const string RefreshCookie = "bark_rt";
     public const string DeviceCookie = "bark_did";
@@ -102,7 +103,8 @@ public sealed class AuthGateway
 
             if (TryReadUser(newAccess.Value, out var refreshedUser, out var stillExpired) && !stillExpired)
             {
-                SetCookie(http, AccessCookie, newAccess.Value, newAccess.ExpirationDate, persistent: http.Request.Cookies[RefreshCookie] != null);
+                // Access cookies live for one browser session even when the refresh cookie is persistent.
+                SetCookie(http, AccessCookie, newAccess.Value, newAccess.ExpirationDate, persistent: false);
                 return refreshedUser;
             }
         }
@@ -114,7 +116,8 @@ public sealed class AuthGateway
         return null;
     }
 
-    public async Task<LoginResult> LoginAsync(HttpContext http, string login, string password, string? otp, bool remember)
+    public async Task<LoginResult> LoginAsync(HttpContext http, string login, string password, string? otp, bool remember,
+        CancellationToken cancellationToken = default)
     {
         var deviceId = GetOrCreateDeviceId(http);
         var device = BrowserContext.BuildDeviceInfo(http, deviceId, _appName, _appVersion);
@@ -131,9 +134,10 @@ public sealed class AuthGateway
 
         try
         {
-            var response = await _identity.AuthAsync(request, device.ToMetadata());
+            var response = await _identity.AuthAsync(request, device.ToMetadata(), cancellationToken: cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
 
-            SetCookie(http, AccessCookie, response.AccessToken.Value, response.AccessToken.ExpirationDate, remember);
+            SetCookie(http, AccessCookie, response.AccessToken.Value, response.AccessToken.ExpirationDate, persistent: false);
             SetCookie(http, RefreshCookie, response.RefreshToken.Value, response.RefreshToken.ExpirationDate, remember);
 
             return new LoginResult(LoginOutcome.Success);
@@ -144,25 +148,27 @@ public sealed class AuthGateway
 
             return code switch
             {
-                ErrOtpNeeded => new LoginResult(LoginOutcome.NeedsOtp),
-                ErrOtpInvalid => new LoginResult(LoginOutcome.WrongOtp, ex.Status.Detail),
-                ErrInvalidLogin => new LoginResult(LoginOutcome.InvalidCredentials, ex.Status.Detail),
-                ErrPasswordAttemptsExceeded or ErrTooManyRequests => new LoginResult(LoginOutcome.TooManyAttempts, ex.Status.Detail),
-                _ => new LoginResult(LoginOutcome.Error, ex.Status.Detail)
+                ErrOtpNeeded => OtpNeededResult(ex),
+                ErrOtpInvalid => new LoginResult(LoginOutcome.WrongOtp, "Код неверен или устарел.",
+                    RetryAfterSeconds: ReadRetryAfter(ex)),
+                ErrInvalidLogin => new LoginResult(LoginOutcome.InvalidCredentials, "Неверный логин или пароль."),
+                ErrPasswordAttemptsExceeded or ErrTooManyRequests => new LoginResult(LoginOutcome.TooManyAttempts,
+                    "Слишком много попыток. Попробуйте позже.", RetryAfterSeconds: ReadRetryAfter(ex)),
+                _ => new LoginResult(LoginOutcome.Error, "Не удалось войти. Попробуйте позже.")
             };
         }
     }
 
     /// <summary>Начать passwordless-вход по ключу: вернуть options и challengeId (логин не нужен —
     /// пользователь определяется самим ключом). null при ошибке сервиса.</summary>
-    public async Task<(string OptionsJson, string ChallengeId)?> BeginWebAuthnAsync(HttpContext http)
+    public async Task<(string OptionsJson, string ChallengeId)?> BeginWebAuthnAsync(HttpContext http, CancellationToken cancellationToken = default)
     {
         var deviceId = GetOrCreateDeviceId(http);
         var device = BrowserContext.BuildDeviceInfo(http, deviceId, _appName, _appVersion);
 
         try
         {
-            var response = await _identity.BeginWebAuthnAssertionAsync(new BeginWebAuthnAssertionRequest(), device.ToMetadata());
+            var response = await _identity.BeginWebAuthnAssertionAsync(new BeginWebAuthnAssertionRequest(), device.ToMetadata(), cancellationToken: cancellationToken);
             return (response.OptionsJson, response.ChallengeId);
         }
         catch (RpcException ex)
@@ -173,7 +179,8 @@ public sealed class AuthGateway
     }
 
     /// <summary>Завершить вход по ключу безопасности: проверить assertion и выставить cookie сессии.</summary>
-    public async Task<LoginResult> CompleteWebAuthnAsync(HttpContext http, string challengeId, string assertionJson, bool remember)
+    public async Task<LoginResult> CompleteWebAuthnAsync(HttpContext http, string challengeId, string assertionJson, bool remember,
+        CancellationToken cancellationToken = default)
     {
         var deviceId = GetOrCreateDeviceId(http);
         var device = BrowserContext.BuildDeviceInfo(http, deviceId, _appName, _appVersion);
@@ -186,9 +193,10 @@ public sealed class AuthGateway
 
         try
         {
-            var response = await _identity.CompleteWebAuthnAssertionAsync(request, device.ToMetadata());
+            var response = await _identity.CompleteWebAuthnAssertionAsync(request, device.ToMetadata(), cancellationToken: cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
 
-            SetCookie(http, AccessCookie, response.AccessToken.Value, response.AccessToken.ExpirationDate, remember);
+            SetCookie(http, AccessCookie, response.AccessToken.Value, response.AccessToken.ExpirationDate, persistent: false);
             SetCookie(http, RefreshCookie, response.RefreshToken.Value, response.RefreshToken.ExpirationDate, remember);
 
             return new LoginResult(LoginOutcome.Success);
@@ -196,9 +204,32 @@ public sealed class AuthGateway
         catch (RpcException ex)
         {
             _logger.LogInformation("WebAuthn complete не выполнен: {Status} {Detail}", ex.StatusCode, ex.Status.Detail);
-            return new LoginResult(LoginOutcome.Error, ex.Status.Detail);
+            return new LoginResult(LoginOutcome.Error, "Не удалось войти по ключу. Попробуйте ещё раз.");
         }
     }
+
+    private static LoginResult OtpNeededResult(RpcException exception)
+    {
+        var trailers = exception.Trailers;
+        var method = trailers.GetValue("x-otp-method")?.ToLowerInvariant();
+        if (method is not ("email" or "authenticator"))
+            method = null;
+
+        var retryAfter = int.TryParse(trailers.GetValue("x-otp-retry-after-seconds"), out var seconds)
+            ? Math.Clamp(seconds, 0, 3600)
+            : (int?)null;
+        var mailStatus = trailers.GetValue("x-otp-mail-status")?.ToLowerInvariant();
+        if (mailStatus is not ("sent" or "existing"))
+            mailStatus = null;
+
+        return new LoginResult(LoginOutcome.NeedsOtp, OtpMethod: method,
+            RetryAfterSeconds: retryAfter, OtpMailStatus: mailStatus);
+    }
+
+    private static int? ReadRetryAfter(RpcException exception)
+        => int.TryParse(exception.Trailers.GetValue("x-retry-after-seconds"), out var seconds)
+            ? Math.Clamp(seconds, 1, 3600)
+            : null;
 
     public async Task LogoutAsync(HttpContext http, WebUser? user)
     {
@@ -277,7 +308,7 @@ public sealed class AuthGateway
     /// <summary>Выставляет cookie сессии (access/refresh) — общий путь для логина и регистрации.</summary>
     public void IssueSession(HttpContext http, Token access, Token refresh, bool persistent)
     {
-        SetCookie(http, AccessCookie, access.Value, access.ExpirationDate, persistent);
+        SetCookie(http, AccessCookie, access.Value, access.ExpirationDate, persistent: false);
         SetCookie(http, RefreshCookie, refresh.Value, refresh.ExpirationDate, persistent);
     }
 
@@ -287,7 +318,11 @@ public sealed class AuthGateway
         if (!string.IsNullOrEmpty(existing))
             return existing;
 
+        if (http.Items.TryGetValue(DeviceIdItemKey, out var cached) && cached is string cachedDeviceId)
+            return cachedDeviceId;
+
         var deviceId = Guid.NewGuid().ToString();
+        http.Items[DeviceIdItemKey] = deviceId;
 
         http.Response.Cookies.Append(DeviceCookie, deviceId, new CookieOptions
         {

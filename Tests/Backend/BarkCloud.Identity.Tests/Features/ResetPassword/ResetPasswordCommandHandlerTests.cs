@@ -91,6 +91,19 @@ public class ResetPasswordCommandHandlerTests
     }
 
     [Fact]
+    public async Task Handle_TypedUserNotFound_ReturnsNeutralFakeResetId()
+    {
+        _usersClient
+            .Setup(c => c.FindByLoginAsync(It.IsAny<FindByLoginRequest>(), null, null, default))
+            .Throws(new UserNotFoundException());
+
+        var response = await CreateSut().Handle(new ResetPasswordCommand { Username = "u" }, default);
+
+        Guid.TryParse(response.ResetId, out _).Should().BeTrue();
+        _resets.Verify(s => s.AddResetPassword(It.IsAny<DomainResetPassword>()), Times.Never);
+    }
+
+    [Fact]
     public async Task Handle_AuthenticatorRequestedButNotEnabled_Throws()
     {
         _usersClient
@@ -205,15 +218,18 @@ public class ResetPasswordCommandHandlerTests
     }
 
     [Fact]
-    public async Task Handle_EmailMailThrottledWithoutActiveReset_ThrowsTooManyRequests()
+    public async Task Handle_EmailMailThrottledWithoutActiveReset_ReturnsNeutralResetId()
     {
         ArrangeEmailUser();
         _resets.Setup(s => s.GetActiveEmailReset(42)).ReturnsAsync((DomainResetPassword?)null);
         _rateLimiter.Setup(l => l.TryReserveAsync(AuthLimits.ResetMailHourly, "42")).ReturnsAsync(false);
 
-        var act = () => CreateSut().Handle(new ResetPasswordCommand { Email = "u@e", OtpType = OtpType.Email }, default);
+        var response = await CreateSut().Handle(
+            new ResetPasswordCommand { Email = "u@e", OtpType = OtpType.Email }, default);
 
-        await act.Should().ThrowAsync<TooManyRequestsException>();
+        Guid.TryParse(response.ResetId, out _).Should().BeTrue();
+        _metrics.SnapshotAndReset().Should().ContainKey("password_reset_mail_throttled");
+        _resets.Verify(s => s.AddResetPassword(It.IsAny<DomainResetPassword>()), Times.Never);
         _notifications.Verify(n => n.SendNotification(It.IsAny<Notification>()), Times.Never);
     }
 

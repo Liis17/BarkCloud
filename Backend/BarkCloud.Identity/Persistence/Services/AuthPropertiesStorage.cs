@@ -204,6 +204,13 @@ public class AuthPropertiesStorage : IAuthPropertiesStorage
     public async Task<bool> TryIssueEmailAuthCode(long userId, EmailAuthCodePurpose purpose, string code,
         CancellationToken cancellationToken = default)
     {
+        var issue = await TryIssueEmailAuthCodeWithSnapshot(userId, purpose, code, cancellationToken);
+        return issue.Sent;
+    }
+
+    public async Task<EmailAuthCodeIssueResult> TryIssueEmailAuthCodeWithSnapshot(long userId,
+        EmailAuthCodePurpose purpose, string code, CancellationToken cancellationToken = default)
+    {
         var now = DateTime.UtcNow;
         var cooldownBorder = now - EmailAuthCodeResendCooldown;
         var expiresAt = now + EmailAuthCodeLifetime;
@@ -222,13 +229,21 @@ public class AuthPropertiesStorage : IAuthPropertiesStorage
 
         if (updated == 1)
         {
-            return true;
+            return new EmailAuthCodeIssueResult(true, now, RemainingResendSeconds(now));
         }
 
-        // Строка есть, но сработал cooldown.
+        var existingIssue = await _context.AuthUserProperties.AsNoTracking()
+            .Where(x => x.UserId == userId && x.EmailAuthCodePurpose == purpose
+                        && x.EmailAuthCodeIssuedAt != null)
+            .Select(x => x.EmailAuthCodeIssuedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (existingIssue is { } issuedAt)
+            return new EmailAuthCodeIssueResult(false, issuedAt, RemainingResendSeconds(issuedAt));
+
         if (await _context.AuthUserProperties.AnyAsync(x => x.UserId == userId, cancellationToken))
         {
-            return false;
+            // Existing same-purpose issuance must be present when the cooldown blocks an update.
+            throw new InvalidOperationException("Email OTP issuance snapshot is missing.");
         }
 
         await _context.AuthUserProperties.AddAsync(new AuthUserProperty
@@ -241,8 +256,11 @@ public class AuthPropertiesStorage : IAuthPropertiesStorage
         }, cancellationToken);
         await _context.SaveChangesAsync(cancellationToken);
 
-        return true;
+        return new EmailAuthCodeIssueResult(true, now, RemainingResendSeconds(now));
     }
+
+    private static int RemainingResendSeconds(DateTime issuedAt) =>
+        Math.Max(1, (int)Math.Ceiling((issuedAt + EmailAuthCodeResendCooldown - DateTime.UtcNow).TotalSeconds));
 
     /// <summary>
     /// Резервирует попытку для неизменяемого снимка выдачи и возвращает его, только если введённый код совпал.
