@@ -77,7 +77,8 @@ internal sealed class FakeCallInvoker : CallInvoker
         where TResponse : class
     {
         var fullName = method.FullName;
-        _calls.Enqueue(new FakeRpcCall(Interlocked.Increment(ref _order), fullName, request, options.Deadline));
+        _calls.Enqueue(new FakeRpcCall(Interlocked.Increment(ref _order), fullName, request,
+            options.Deadline, options.CancellationToken));
         OnCall?.Invoke(fullName);
 
         if (TryTake(_failures, fullName, out var failure))
@@ -112,4 +113,5 @@ internal sealed class FakeCallInvoker : CallInvoker
         => new($"Потоковый вызов {method.FullName} не поддержан FakeCallInvoker");
 }
 
-internal sealed record FakeRpcCall(long Order, string MethodFullName, object Request, DateTime? Deadline);
+internal sealed record FakeRpcCall(
+    long Order, string MethodFullName, object Request, DateTime? Deadline, CancellationToken CancellationToken);

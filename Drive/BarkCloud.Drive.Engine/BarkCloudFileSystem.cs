@@ -87,6 +87,7 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
     private readonly Dictionary<string, LocalFile> _localFiles = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, LocalFile> _pendingFiles = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, LocalFile> _openOutboxFiles = new(StringComparer.Ordinal);
+    private string? _preservedPlaceholderError;
 
     // Метка тома (имя диска), отдаётся в GetVolumeInformation. Устанавливается перед Mount.
     public string VolumeLabel { get; set; } = "BarkCloud";
@@ -247,6 +248,45 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
         {
             file.Path = NormalizePath(file.Path);
             return _localFiles.TryAdd(file.Path, file);
+        }
+    }
+
+    internal void RemovePlaceholdersForAccountChange()
+    {
+        LocalFile[] placeholders;
+        lock (_localFilesLock)
+            placeholders = _localFiles.Values.Where(file => file.Kind == LocalFileKind.Placeholder).ToArray();
+
+        foreach (var file in placeholders)
+        {
+            lock (file.Sync)
+            lock (file.DataSync)
+            {
+                bool hasData;
+                lock (_localFilesLock)
+                {
+                    if (!_localFiles.TryGetValue(file.Path, out var current) || !ReferenceEquals(current, file)
+                        || file.Kind != LocalFileKind.Placeholder)
+                        continue;
+
+                    hasData = file.Modified || file.KeepData
+                              || (file.Stream?.Length
+                                  ?? (File.Exists(file.TempPath) ? new FileInfo(file.TempPath).Length : 0)) > 0;
+                    RemoveLocalFileLocked(file);
+                }
+
+                file.Stream?.Dispose();
+                file.Stream = null;
+                if (hasData)
+                {
+                    var warning = Loc.T("Eng_PlaceholderDataPreservedFmt", file.Name, file.TempPath);
+                    _preservedPlaceholderError = warning;
+                    LastSyncError = warning;
+                    EngineLog.Error(warning, new IOException(warning));
+                }
+                else
+                    TryDelete(file.TempPath);
+            }
         }
     }
 
@@ -1792,7 +1832,7 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
             catch (RpcException ex) when (IsBusinessError(ex))
             {
                 file.KeepData = true;
-                RestoreOldEntry(file, operation, ex, cancellationToken);
+                RestoreOldEntry(file, operation, ex);
                 throw;
             }
         }
@@ -1883,15 +1923,14 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
         return attached;
     }
 
-    private void RestoreOldEntry(LocalFile file, PersistOperation operation, RpcException originalError,
-        CancellationToken cancellationToken)
+    private void RestoreOldEntry(LocalFile file, PersistOperation operation, RpcException originalError)
     {
         if (!operation.OldEntryDeleted || file.ExistingEntryId is not { } oldEntryId)
             return;
 
         try
         {
-            _gateway.RestoreFromTrash(oldEntryId, file.DirectoryId, cancellationToken);
+            _gateway.RestoreFromTrash(oldEntryId, file.DirectoryId, CancellationToken.None);
             operation.OldEntryDeleted = false;
             operation.AttachAttempted = false;
             operation.AttachCompleted = false;
@@ -1928,7 +1967,7 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
     private void ClearLastSyncErrorIfNoPendingUploads()
     {
         if (_outbox is not null && _outbox.Count == 0)
-            LastSyncError = null;
+            LastSyncError = _preservedPlaceholderError;
     }
 
     private void SaveOutboxState(LocalFile file)
@@ -2083,7 +2122,8 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
                 file.Stream = null;
             }
 
-            if (keep && !file.DeleteOnClose && file.Kind != LocalFileKind.Pending && file.KeepData
+            if (keep && !file.DeleteOnClose
+                && file.Kind != LocalFileKind.Pending && file.KeepData
                 && (file.Modified || file.Op is { Stage: not PersistStage.Done }) && _outbox is not null)
             {
                 try

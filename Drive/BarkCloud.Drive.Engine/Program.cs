@@ -16,6 +16,8 @@ if (!isNew)
 
 var config = LoadConfig();
 var device = new DeviceIdentity();
+var settings = new EngineSettingsStore();
+var serverKey = EngineServerKey.FromConfig(config);
 
 // Адреса по сервисам, как в iOS (nginx-порты): Identity :7020, Files :7025, Users :7021.
 var identityAddress = $"https://{config.Host}:{config.IdentityPort}";
@@ -27,13 +29,7 @@ var usersAddress = $"https://{config.Host}:{config.UsersPort}";
 TokenManager? tokens = null;
 using var connection = new BarkCloudConnection(
     identityAddress, filesAddress, usersAddress, config.DangerousAcceptAnyServerCert, device, () => tokens?.CurrentToken);
-tokens = new TokenManager(connection.Identity, new TokenStore());
-
-// Молча восстановить сессию из сохранённого refresh-токена (если есть).
-await tokens.TryRestoreAsync();
-
-var settings = new EngineSettingsStore();
-var serverKey = EngineServerKey.FromConfig(config);
+tokens = new TokenManager(connection.Identity, new TokenStore(serverKey: serverKey));
 var profile = new UserProfile(connection.Users, userId => settings.SetLastUserId(serverKey, userId));
 using var gateway = new CloudGateway(connection.Cloud, connection.Files, connection.Http, $"{filesAddress}/web",
     () => tokens?.CurrentToken, settings.GetCacheDir());
@@ -53,43 +49,17 @@ using var lifetime = new CancellationTokenSource();
 
 var engine = new DriveEngine(tokens, gateway, mount, fs, lifetime, settings, profile, outboxWorker,
     serverKey, config.Host);
-
-// Автомонтаж на старте: при автозапуске движка (без UI) поднимаем последний диск,
-// если сессия восстановлена и буква запомнена. UI при своём старте увидит Mounted и не дублирует.
-if (tokens.IsAuthenticated)
-{
-    await profile.EnsureLoadedAsync();
-    if (profile.UserId is { } ownerUserId)
-        fs.AdoptOutboxForSession(ownerUserId);
-    outboxWorker.Start();
-    outboxWorker.Trigger();
-
-    var (letter, label) = settings.GetLastMount();
-    if (!string.IsNullOrEmpty(letter))
-    {
-        try
-        {
-            if (!string.IsNullOrEmpty(label))
-                fs.VolumeLabel = label;
-            mount.Mount(letter, fs);
-            EngineLog.Info($"Автомонтаж {letter}: ({fs.VolumeLabel}) на старте");
-        }
-        catch (Exception ex)
-        {
-            EngineLog.Error("Автомонтаж на старте", ex);
-        }
-    }
-}
+tokens.SessionRestored += engine.SessionRestoredAsync;
 
 Console.WriteLine("BarkCloud.Drive.Engine запущен. Ожидание подключения UI...");
 
+var restoreTask = tokens.TryRestoreAsync();
 // IPC: named pipe + StreamJsonRpc. Обслуживаем по одному клиенту за раз,
 // переживая переподключения UI. Выходим только по ShutdownAsync.
+var pipe = new NamedPipeServerStream(
+    PipeName, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
 while (!lifetime.IsCancellationRequested)
 {
-    var pipe = new NamedPipeServerStream(
-        PipeName, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
-
     try
     {
         await pipe.WaitForConnectionAsync(lifetime.Token);
@@ -107,8 +77,15 @@ while (!lifetime.IsCancellationRequested)
     }
 
     await pipe.DisposeAsync();
+    if (!lifetime.IsCancellationRequested)
+    {
+        pipe = new NamedPipeServerStream(
+            PipeName, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
+    }
 }
 
+if (await Task.WhenAny(restoreTask, Task.Delay(TimeSpan.FromSeconds(3))) == restoreTask)
+    await restoreTask;
 mount.Unmount();
 Console.WriteLine("BarkCloud.Drive.Engine завершён.");
 return 0;

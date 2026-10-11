@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Runtime.ExceptionServices;
@@ -51,9 +52,14 @@ internal sealed class CloudGateway : IDisposable
     private readonly ConcurrentDictionary<string, int> _listGen = new(); // «поколение» инвалидации на папку — защита от записи устаревшего ответа
     private readonly object _listLock = new(); // делает (проверка поколения + запись кэша) и (инвалидация + бамп) атомарными друг к другу
     private readonly ConcurrentDictionary<DownloadKey, Lazy<Task<string>>> _downloads = new();
+    private readonly object _cacheEpochLock = new();
+    private CancellationTokenSource _cacheEpochCancellation = new();
+    private long _accountEpoch;
     private readonly object _storageLock = new();
     private (DateTime At, GetUserStorageInfoResponse Info)? _storage;
+    private long _storageEpoch;
     private TaskCompletionSource<GetUserStorageInfoResponse>? _storageLoad;
+    private long _storageLoadEpoch;
     private DateTime _storageRetryAfter;
     private ExceptionDispatchInfo? _storageFailure;
 
@@ -61,7 +67,7 @@ internal sealed class CloudGateway : IDisposable
     // дедуп параллельных скачиваний блоков, и файлы, для которых сервер не дал Range (целиком).
     private const int BlockSize = 1 << 20; // 1 МиБ
     private static readonly TimeSpan UrlTtl = TimeSpan.FromMinutes(50);
-    private readonly ConcurrentDictionary<string, (DateTime At, string Url)> _tempUrls = new();
+    private readonly ConcurrentDictionary<string, (long Epoch, DateTime At, string Url)> _tempUrls = new();
     private readonly ConcurrentDictionary<BlockFetchKey, Lazy<Task>> _blockFetches = new();
     private readonly ConcurrentDictionary<string, bool> _wholeMode = new();
 
@@ -74,6 +80,7 @@ internal sealed class CloudGateway : IDisposable
     private static readonly TimeSpan DeleteDeadline = TimeSpan.FromSeconds(5); // gRPC-дедлайн, чтобы выход не висел при недоступном сервере
     private readonly object _delLock = new();   // защищает _delPending и перепланирование _delTimer
     private readonly object _sendLock = new();  // сериализует отправку: фоновую (таймер/порог) и блокирующую (выход)
+    private int _ending;
     private readonly List<(string EntryId, string DirId)> _delPending = new();
     private readonly ConcurrentDictionary<string, byte> _delTombstones = new();
     private readonly ConcurrentDictionary<string, int> _delAttempts = new();
@@ -106,30 +113,68 @@ internal sealed class CloudGateway : IDisposable
         _blockFetches.Clear();
     }
 
+    public void ClearCache()
+    {
+        CancellationTokenSource oldCancellation;
+        var cacheDir = Volatile.Read(ref _cacheDir);
+        lock (_cacheEpochLock)
+        {
+            // Порядок блокировок — _cacheEpochLock → _listLock. Публикация и инвалидация
+            // листинга берут только _listLock, поэтому старый ответ не переживёт смену аккаунта.
+            lock (_listLock)
+            {
+                ++_accountEpoch;
+                oldCancellation = _cacheEpochCancellation;
+                _cacheEpochCancellation = new CancellationTokenSource();
+                _listCache.Clear();
+            }
+            _tempUrls.Clear();
+            _downloads.Clear();
+            _blockFetches.Clear();
+            _wholeMode.Clear();
+        }
+
+        oldCancellation.Cancel();
+        oldCancellation.Dispose();
+        ClearOwnedCacheFiles(cacheDir);
+        lock (_storageLock)
+        {
+            _storage = null;
+            _storageEpoch = Volatile.Read(ref _accountEpoch);
+            _storageLoad = null;
+            _storageLoadEpoch = _storageEpoch;
+            _storageFailure = null;
+            _storageRetryAfter = DateTime.MinValue;
+        }
+    }
+
     public GetUserStorageInfoResponse GetStorage()
     {
         Task<GetUserStorageInfoResponse> pending;
         TaskCompletionSource<GetUserStorageInfoResponse>? load = null;
+        var epoch = Volatile.Read(ref _accountEpoch);
         var startedAt = _time.GetUtcNow().UtcDateTime;
         lock (_storageLock)
         {
-            if (_storage is { } cached && startedAt - cached.At < StorageTtl)
+            if (_storage is { } cached && _storageEpoch == epoch && startedAt - cached.At < StorageTtl)
                 return cached.Info;
 
             if (startedAt < _storageRetryAfter)
             {
-                if (_storage is { } stale)
+                if (_storage is { } stale && _storageEpoch == epoch)
                     return stale.Info;
-                _storageFailure?.Throw();
+                if (_storageEpoch == epoch)
+                    _storageFailure?.Throw();
             }
 
-            if (_storageLoad is { } existingLoad)
+            if (_storageLoad is { } existingLoad && _storageLoadEpoch == epoch)
                 pending = existingLoad.Task;
             else
             {
                 load = new TaskCompletionSource<GetUserStorageInfoResponse>(
                     TaskCreationOptions.RunContinuationsAsynchronously);
                 _storageLoad = load;
+                _storageLoadEpoch = epoch;
                 pending = load.Task;
             }
         }
@@ -143,7 +188,10 @@ internal sealed class CloudGateway : IDisposable
                 deadline: DateTime.UtcNow.Add(StorageRpcTimeout));
             lock (_storageLock)
             {
+                if (epoch != Volatile.Read(ref _accountEpoch))
+                    throw new OperationCanceledException();
                 _storage = (_time.GetUtcNow().UtcDateTime, info);
+                _storageEpoch = epoch;
                 _storageRetryAfter = DateTime.MinValue;
                 _storageFailure = null;
                 info = _storage.Value.Info;
@@ -157,9 +205,14 @@ internal sealed class CloudGateway : IDisposable
             GetUserStorageInfoResponse? stale;
             lock (_storageLock)
             {
-                stale = _storage?.Info;
-                _storageRetryAfter = _time.GetUtcNow().UtcDateTime + StorageFailureCache;
-                _storageFailure = ExceptionDispatchInfo.Capture(ex);
+                stale = epoch == Volatile.Read(ref _accountEpoch) && _storageEpoch == epoch
+                    ? _storage?.Info
+                    : null;
+                if (epoch == Volatile.Read(ref _accountEpoch))
+                {
+                    _storageRetryAfter = _time.GetUtcNow().UtcDateTime + StorageFailureCache;
+                    _storageFailure = ExceptionDispatchInfo.Capture(ex);
+                }
             }
 
             if (stale is not null)
@@ -184,7 +237,10 @@ internal sealed class CloudGateway : IDisposable
     public DirectoryListingDetailed ListDirectory(string dirId, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (_listCache.TryGetValue(dirId, out var c) && _time.GetUtcNow().UtcDateTime - c.At < ListTtl)
+        var accountEpoch = Volatile.Read(ref _accountEpoch);
+        if (_listCache.TryGetValue(dirId, out var c)
+            && accountEpoch == Volatile.Read(ref _accountEpoch)
+            && _time.GetUtcNow().UtcDateTime - c.At < ListTtl)
             return HidePending(c.Listing);
 
         _listGen.TryGetValue(dirId, out var gen);
@@ -219,7 +275,7 @@ internal sealed class CloudGateway : IDisposable
         lock (_listLock)
         {
             _listGen.TryGetValue(dirId, out var genAfter);
-            if (gen == genAfter)
+            if (gen == genAfter && accountEpoch == Volatile.Read(ref _accountEpoch))
                 _listCache[dirId] = (_time.GetUtcNow().UtcDateTime, listing);
         }
 
@@ -357,21 +413,31 @@ internal sealed class CloudGateway : IDisposable
         try
         {
             var cacheDir = Volatile.Read(ref _cacheDir);
+            var epoch = CaptureCacheEpoch();
+            epoch.CancellationToken.ThrowIfCancellationRequested();
             if (_wholeMode.ContainsKey(fileId))
-                return ReadWhole(fileId, fileLength, buffer, offset, cacheDir, StartKeepAlive);
+                return ReadWhole(fileId, fileLength, buffer, offset, cacheDir, StartKeepAlive,
+                    epoch.Generation, epoch.CancellationToken);
 
             if (fileLength <= 0 || offset >= fileLength)
                 return 0;
 
             try
             {
-                return ReadBlocks(fileId, fileLength, buffer, offset, cacheDir, StartKeepAlive);
+                return ReadBlocks(fileId, fileLength, buffer, offset, cacheDir, StartKeepAlive,
+                    epoch.Generation, epoch.CancellationToken);
             }
             catch (RangeNotSupportedException)
             {
-                _wholeMode[fileId] = true;
+                lock (_cacheEpochLock)
+                {
+                    if (epoch.Generation != _accountEpoch)
+                        throw new OperationCanceledException(epoch.CancellationToken);
+                    _wholeMode[fileId] = true;
+                }
                 EngineLog.Info($"Сервер не отдал Range для {fileId} — переключаюсь на скачивание целиком");
-                return ReadWhole(fileId, fileLength, buffer, offset, cacheDir, StartKeepAlive);
+                return ReadWhole(fileId, fileLength, buffer, offset, cacheDir, StartKeepAlive,
+                    epoch.Generation, epoch.CancellationToken);
             }
         }
         finally
@@ -381,7 +447,7 @@ internal sealed class CloudGateway : IDisposable
     }
 
     private int ReadBlocks(string fileId, long fileLength, byte[] buffer, long offset, string cacheDir,
-        Action? startKeepAlive)
+        Action? startKeepAlive, long accountEpoch, CancellationToken epochToken)
     {
         var toRead = (int)Math.Min(buffer.Length, fileLength - offset);
         if (toRead <= 0)
@@ -392,7 +458,7 @@ internal sealed class CloudGateway : IDisposable
         var lastBlock = endInclusive / BlockSize;
 
         for (var b = firstBlock; b <= lastBlock; b++)
-            EnsureBlock(cacheDir, fileId, fileLength, b, startKeepAlive);
+            EnsureBlock(cacheDir, fileId, fileLength, b, startKeepAlive, accountEpoch, epochToken);
 
         var bytesRead = 0;
         for (var b = firstBlock; b <= lastBlock; b++)
@@ -419,17 +485,19 @@ internal sealed class CloudGateway : IDisposable
     }
 
     private void EnsureBlock(string cacheDir, string fileId, long fileLength, long blockIndex,
-        Action? startKeepAlive)
+        Action? startKeepAlive, long accountEpoch, CancellationToken epochToken)
     {
+        epochToken.ThrowIfCancellationRequested();
         var blockStart = blockIndex * BlockSize;
         var expectedLen = Math.Min(BlockSize, fileLength - blockStart);
         var path = BlockPath(cacheDir, fileId, blockIndex);
         if (HasExpectedLength(path, expectedLen))
             return;
 
-        var key = new BlockFetchKey(cacheDir, fileId, fileLength, blockIndex);
+        var key = new BlockFetchKey(cacheDir, fileId, fileLength, blockIndex, accountEpoch);
         var lazy = _blockFetches.GetOrAdd(key,
-            _ => new Lazy<Task>(() => FetchBlockAsync(cacheDir, fileId, fileLength, blockIndex)));
+            _ => new Lazy<Task>(() => FetchBlockAsync(cacheDir, fileId, fileLength, blockIndex,
+                accountEpoch, epochToken)));
         try
         {
             if (!lazy.IsValueCreated)
@@ -445,7 +513,8 @@ internal sealed class CloudGateway : IDisposable
         }
     }
 
-    private async Task FetchBlockAsync(string cacheDir, string fileId, long fileLength, long blockIndex)
+    private async Task FetchBlockAsync(string cacheDir, string fileId, long fileLength, long blockIndex,
+        long accountEpoch, CancellationToken epochToken)
     {
         var start = blockIndex * BlockSize;
         var end = Math.Min(start + BlockSize, fileLength) - 1; // включительно
@@ -457,11 +526,11 @@ internal sealed class CloudGateway : IDisposable
         using var rangeTimeout = new CancellationTokenSource(RangeBlockTimeout, _time);
         using var idleTimeout = new TransferIdleTimeout(_time);
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(
-            rangeTimeout.Token, idleTimeout.Token);
+            rangeTimeout.Token, idleTimeout.Token, epochToken);
         try
         {
             using var response = await SendDownloadRequestAsync(
-                fileId, new RangeHeaderValue(start, end), cancellation.Token);
+                fileId, new RangeHeaderValue(start, end), cancellation.Token, accountEpoch);
             if (response.StatusCode == HttpStatusCode.OK)
                 throw new RangeNotSupportedException();
             if (response.StatusCode != HttpStatusCode.PartialContent)
@@ -485,7 +554,12 @@ internal sealed class CloudGateway : IDisposable
                 {
                     try
                     {
-                        File.Move(partPath, path, overwrite: true);
+                        lock (_cacheEpochLock)
+                        {
+                            if (accountEpoch != _accountEpoch)
+                                throw new OperationCanceledException(epochToken);
+                            File.Move(partPath, path, overwrite: true);
+                        }
                     }
                     catch (Exception ex) when ((ex is IOException or UnauthorizedAccessException)
                                                && HasExpectedLength(path, expectedLength))
@@ -510,9 +584,10 @@ internal sealed class CloudGateway : IDisposable
         }
     }
 
-    private async Task<string> GetTempUrlAsync(string fileId, CancellationToken cancellationToken)
+    private async Task<string> GetTempUrlAsync(string fileId, CancellationToken cancellationToken, long accountEpoch)
     {
-        if (_tempUrls.TryGetValue(fileId, out var c) && _time.GetUtcNow().UtcDateTime - c.At < UrlTtl)
+        if (_tempUrls.TryGetValue(fileId, out var c) && c.Epoch == accountEpoch
+            && _time.GetUtcNow().UtcDateTime - c.At < UrlTtl)
             return c.Url;
 
         var resp = await _files.GetTempDownloadUrlAsync(
@@ -520,7 +595,12 @@ internal sealed class CloudGateway : IDisposable
         var raw = resp.FileUrls.FirstOrDefault()?.Url
                   ?? throw new InvalidOperationException($"Сервер не вернул download URL для {fileId}");
         var url = NormalizeDownloadUrl(raw);
-        _tempUrls[fileId] = (_time.GetUtcNow().UtcDateTime, url);
+        lock (_cacheEpochLock)
+        {
+            if (accountEpoch != _accountEpoch)
+                throw new OperationCanceledException(cancellationToken);
+            _tempUrls[fileId] = (accountEpoch, _time.GetUtcNow().UtcDateTime, url);
+        }
         return url;
     }
 
@@ -528,17 +608,58 @@ internal sealed class CloudGateway : IDisposable
     private static string BlockPath(string cacheDir, string fileId, long blockIndex)
         => Path.Combine(BlockDir(cacheDir, fileId), blockIndex + ".blk");
 
+    private CacheEpoch CaptureCacheEpoch()
+    {
+        lock (_cacheEpochLock)
+            return new CacheEpoch(_accountEpoch, _cacheEpochCancellation.Token);
+    }
+
+    private static void ClearOwnedCacheFiles(string cacheDir)
+    {
+        try
+        {
+            foreach (var path in Directory.EnumerateFileSystemEntries(cacheDir))
+            {
+                var name = Path.GetFileName(path);
+                var isBlocks = name.EndsWith(".blocks", StringComparison.OrdinalIgnoreCase)
+                               && Guid.TryParseExact(name[..^7], "D", out _);
+                var isFile = Guid.TryParseExact(name, "D", out _);
+                var separator = name.IndexOf('.');
+                var isPart = separator > 0
+                             && Guid.TryParseExact(name[..separator], "D", out _)
+                             && name.EndsWith(".part", StringComparison.OrdinalIgnoreCase);
+                if (!isBlocks && !isFile && !isPart)
+                    continue;
+
+                try
+                {
+                    if (Directory.Exists(path))
+                        Directory.Delete(path, recursive: true);
+                    else
+                        File.Delete(path);
+                }
+                catch (IOException) { }
+                catch (UnauthorizedAccessException) { }
+            }
+        }
+        catch (IOException) { }
+        catch (UnauthorizedAccessException) { }
+    }
+
+    private readonly record struct CacheEpoch(long Generation, CancellationToken CancellationToken);
+
     // Скачивание файла целиком (whole-режим: сервер без Range, и для гидрации копии при записи).
     private int ReadWhole(string fileId, long fileLength, byte[] buffer, long offset, string cacheDir,
-        Action? startKeepAlive)
+        Action? startKeepAlive, long accountEpoch, CancellationToken epochToken)
     {
         var cachedPath = Path.Combine(cacheDir, fileId);
         if (HasExpectedLength(cachedPath, fileLength))
             return ReadWholeFile(cachedPath, fileLength, buffer, offset);
 
-        var key = new DownloadKey(cacheDir, fileId, fileLength);
+        var key = new DownloadKey(cacheDir, fileId, fileLength, accountEpoch);
         var lazy = _downloads.GetOrAdd(key,
-            _ => new Lazy<Task<string>>(() => DownloadAsync(cacheDir, fileId, fileLength)));
+            _ => new Lazy<Task<string>>(() => DownloadAsync(cacheDir, fileId, fileLength,
+                accountEpoch, epochToken)));
         string local;
         try
         {
@@ -569,10 +690,12 @@ internal sealed class CloudGateway : IDisposable
 
     private sealed class RangeNotSupportedException : Exception;
 
-    private readonly record struct DownloadKey(string CacheDir, string FileId, long FileLength);
-    private readonly record struct BlockFetchKey(string CacheDir, string FileId, long FileLength, long BlockIndex);
+    private readonly record struct DownloadKey(string CacheDir, string FileId, long FileLength, long AccountEpoch);
+    private readonly record struct BlockFetchKey(
+        string CacheDir, string FileId, long FileLength, long BlockIndex, long AccountEpoch);
 
-    private async Task<string> DownloadAsync(string cacheDir, string fileId, long expectedLength)
+    private async Task<string> DownloadAsync(string cacheDir, string fileId, long expectedLength,
+        long accountEpoch, CancellationToken epochToken)
     {
         var local = Path.Combine(cacheDir, fileId);
         if (File.Exists(local))
@@ -585,8 +708,13 @@ internal sealed class CloudGateway : IDisposable
         var partPath = PartPath(local);
         try
         {
-            await DownloadToPartAsync(fileId, partPath, expectedLength);
-            File.Move(partPath, local, overwrite: true);
+            await DownloadToPartAsync(fileId, partPath, expectedLength, epochToken, accountEpoch);
+            lock (_cacheEpochLock)
+            {
+                if (accountEpoch != _accountEpoch)
+                    throw new OperationCanceledException(epochToken);
+                File.Move(partPath, local, overwrite: true);
+            }
             return local;
         }
         finally
@@ -599,11 +727,19 @@ internal sealed class CloudGateway : IDisposable
     public async Task DownloadToAsync(string fileId, string destPath, long expectedLength,
         CancellationToken cancellationToken = default)
     {
+        var epoch = CaptureCacheEpoch();
+        using var linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+            cancellationToken, epoch.CancellationToken);
         var partPath = PartPath(destPath);
         try
         {
-            await DownloadToPartAsync(fileId, partPath, expectedLength, cancellationToken);
-            File.Move(partPath, destPath, overwrite: true);
+            await DownloadToPartAsync(fileId, partPath, expectedLength, linkedCancellation.Token, epoch.Generation);
+            lock (_cacheEpochLock)
+            {
+                if (epoch.Generation != _accountEpoch)
+                    throw new OperationCanceledException(epoch.CancellationToken);
+                File.Move(partPath, destPath, overwrite: true);
+            }
         }
         finally
         {
@@ -612,14 +748,15 @@ internal sealed class CloudGateway : IDisposable
     }
 
     private async Task DownloadToPartAsync(string fileId, string partPath, long expectedLength,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default, long? accountEpoch = null)
     {
         using var idleTimeout = new TransferIdleTimeout(_time);
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(
             cancellationToken, idleTimeout.Token);
         try
         {
-            using var response = await SendDownloadRequestAsync(fileId, range: null, cancellation.Token);
+            using var response = await SendDownloadRequestAsync(fileId, range: null, cancellation.Token,
+                accountEpoch ?? Volatile.Read(ref _accountEpoch));
             if (response.StatusCode != HttpStatusCode.OK)
                 throw CreateHttpException(response.StatusCode);
 
@@ -633,13 +770,13 @@ internal sealed class CloudGateway : IDisposable
     }
 
     private async Task<HttpResponseMessage> SendDownloadRequestAsync(string fileId, RangeHeaderValue? range,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, long accountEpoch)
     {
         var retried = false;
         while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var url = await GetTempUrlAsync(fileId, cancellationToken);
+            var url = await GetTempUrlAsync(fileId, cancellationToken, accountEpoch);
             using var request = new HttpRequestMessage(HttpMethod.Get, url);
             if (range is not null)
                 request.Headers.Range = range;
@@ -650,7 +787,7 @@ internal sealed class CloudGateway : IDisposable
 
             var statusCode = response.StatusCode;
             response.Dispose();
-            InvalidateTempUrl(fileId, url);
+            InvalidateTempUrl(fileId, url, accountEpoch);
             if (retried)
                 throw CreateHttpException(statusCode);
 
@@ -658,10 +795,12 @@ internal sealed class CloudGateway : IDisposable
         }
     }
 
-    private void InvalidateTempUrl(string fileId, string url)
+    private void InvalidateTempUrl(string fileId, string url, long accountEpoch)
     {
-        if (_tempUrls.TryGetValue(fileId, out var cached) && cached.Url == url)
-            _tempUrls.TryRemove(new KeyValuePair<string, (DateTime At, string Url)>(fileId, cached));
+        if (accountEpoch == Volatile.Read(ref _accountEpoch)
+            && _tempUrls.TryGetValue(fileId, out var cached)
+            && cached.Epoch == accountEpoch && cached.Url == url)
+            _tempUrls.TryRemove(new KeyValuePair<string, (long Epoch, DateTime At, string Url)>(fileId, cached));
     }
 
     private static HttpRequestException CreateHttpException(HttpStatusCode statusCode)
@@ -831,12 +970,59 @@ internal sealed class CloudGateway : IDisposable
     public void FlushPending(bool throwOnFailure = false)
         => SendNow(allowRetry: false, drainAll: true, throwOnFailure: throwOnFailure);
 
+    public void FlushPending(TimeSpan timeout, bool throwOnFailure = false, bool final = false)
+    {
+        if (final)
+            Volatile.Write(ref _ending, 1);
+        var elapsed = Stopwatch.StartNew();
+        var deadline = _time.GetUtcNow().UtcDateTime.Add(timeout);
+        if (!Monitor.TryEnter(_sendLock, timeout))
+        {
+            if (throwOnFailure)
+                throw new TimeoutException(Loc.T("Eng_DeleteFlushTimeout"));
+
+            DropQueuedDeletes();
+            return;
+        }
+
+        try
+        {
+            var remaining = timeout - elapsed.Elapsed;
+            if (remaining <= TimeSpan.Zero)
+            {
+                if (throwOnFailure)
+                    throw new TimeoutException(Loc.T("Eng_DeleteFlushTimeout"));
+
+                DropQueuedDeletes();
+                return;
+            }
+
+            using var cancellation = new CancellationTokenSource(remaining);
+            SendNow(allowRetry: false, drainAll: true, throwOnFailure: throwOnFailure,
+                cancellationToken: cancellation.Token, totalDeadline: deadline);
+        }
+        finally
+        {
+            Monitor.Exit(_sendLock);
+        }
+    }
+
+    internal void DropPendingDeletes()
+    {
+        lock (_sendLock)
+            DropQueuedDeletes();
+    }
+
     // Единая точка отправки. _sendLock берётся ПЕРЕД снятием batch из _delPending — это делает
     // «взять+отправить» атомарным: фоновый дренаж и блокирующий выход не накладываются и не
     // образуют окна, где batch уже снят, а _sendLock ещё свободен (иначе FlushPending мог бы
     // проскочить, не дождавшись in-flight отправки, и удаление потерялось бы).
-    private void SendNow(bool allowRetry, bool drainAll = false, bool throwOnFailure = false)
+    private void SendNow(bool allowRetry, bool drainAll = false, bool throwOnFailure = false,
+        CancellationToken cancellationToken = default, DateTime? totalDeadline = null)
     {
+        if (allowRetry && Volatile.Read(ref _ending) != 0)
+            return;
+
         lock (_sendLock)
         {
             do
@@ -849,7 +1035,8 @@ internal sealed class CloudGateway : IDisposable
                     batch = TakePendingLocked();
                 }
 
-                SendChunks(batch, allowRetry, throwOnFailure);
+                if (!SendChunks(batch, allowRetry, throwOnFailure, cancellationToken, totalDeadline))
+                    return;
             }
             while (drainAll); // выход дренажит до пустого; фон — один проход (ретрай отложит таймер)
         }
@@ -867,23 +1054,43 @@ internal sealed class CloudGateway : IDisposable
     // Отправляет batch пачками по 100 с gRPC-дедлайном. Вызывается только под _sendLock.
     // При успехе снимает тумбстоны и инвалидирует листинги. При ошибке: allowRetry или throwOnFailure
     // → переотправка; иначе (выход) — сдаёмся сразу.
-    private void SendChunks(List<(string EntryId, string DirId)> batch, bool allowRetry, bool throwOnFailure)
+    private bool SendChunks(List<(string EntryId, string DirId)> batch, bool allowRetry, bool throwOnFailure,
+        CancellationToken cancellationToken = default, DateTime? totalDeadline = null)
     {
         ExceptionDispatchInfo? firstFailure = null;
+        var allSent = true;
         for (var i = 0; i < batch.Count; i += DeleteBatchMax)
         {
             var chunk = batch.GetRange(i, Math.Min(DeleteBatchMax, batch.Count - i));
+            if (cancellationToken.IsCancellationRequested
+                || totalDeadline is { } budget && _time.GetUtcNow().UtcDateTime >= budget)
+            {
+                allSent = false;
+                var unsent = batch.GetRange(i, batch.Count - i);
+                if (throwOnFailure || allowRetry && Volatile.Read(ref _ending) == 0)
+                    RequeueUnsent(unsent);
+                else
+                    DropUnsent(unsent);
+                if (throwOnFailure)
+                    firstFailure ??= ExceptionDispatchInfo.Capture(new TimeoutException(Loc.T("Eng_DeleteFlushTimeout")));
+                break;
+            }
+
             var request = new DeleteFileEntriesRequest();
             request.EntryIds.AddRange(chunk.Select(x => x.EntryId));
 
             try
             {
-                _cloud.DeleteFileEntries(request, deadline: _time.GetUtcNow().UtcDateTime.Add(DeleteDeadline));
+                var deadline = _time.GetUtcNow().UtcDateTime.Add(DeleteDeadline);
+                if (totalDeadline is { } overall && overall < deadline)
+                    deadline = overall;
+                _cloud.DeleteFileEntries(request, new CallOptions(deadline: deadline,
+                    cancellationToken: cancellationToken));
             }
             catch (Exception ex)
             {
                 EngineLog.Error($"Массовое удаление {chunk.Count} записей", ex);
-                if (allowRetry || throwOnFailure)
+                if (allowRetry && Volatile.Read(ref _ending) == 0 || throwOnFailure)
                 {
                     RequeueFailed(chunk);
                     if (throwOnFailure)
@@ -905,6 +1112,25 @@ internal sealed class CloudGateway : IDisposable
         }
 
         firstFailure?.Throw();
+        return allSent;
+    }
+
+    private void RequeueUnsent(List<(string EntryId, string DirId)> chunk)
+    {
+        if (chunk.Count == 0)
+            return;
+
+        lock (_delLock)
+        {
+            _delPending.AddRange(chunk);
+            _delTimer.Change(DeleteWindow, Timeout.InfiniteTimeSpan);
+        }
+    }
+
+    private void DropUnsent(List<(string EntryId, string DirId)> chunk)
+    {
+        foreach (var item in chunk)
+            DropOne(item, attempts: null);
     }
 
     // Возвращает неотправленную пачку в очередь на повтор (тумбстоны держим — файлы остаются
@@ -938,10 +1164,21 @@ internal sealed class CloudGateway : IDisposable
             DropOne(item, _delAttempts.TryGetValue(item.EntryId, out var a) ? a + 1 : 1);
     }
 
-    private void DropOne((string EntryId, string DirId) item, int attempts)
+    private void DropQueuedDeletes()
     {
-        EngineLog.Info($"Удаление записи {item.EntryId} не выполнено (попыток: {attempts}) — файл возвращён в листинг");
-        try { SyncError?.Invoke(Loc.T("Eng_DeleteFailedFmt", item.EntryId, attempts)); }
+        List<(string EntryId, string DirId)> queued;
+        lock (_delLock)
+            queued = TakePendingLocked();
+        DropFailed(queued);
+    }
+
+    private void DropOne((string EntryId, string DirId) item, int? attempts)
+    {
+        var error = attempts is { } count
+            ? Loc.T("Eng_DeleteFailedFmt", item.EntryId, count)
+            : Loc.T("Eng_DeleteFlushTimeout");
+        EngineLog.Info($"Удаление записи {item.EntryId} не выполнено — файл возвращён в листинг. {error}");
+        try { SyncError?.Invoke(error); }
         catch (Exception ex) { EngineLog.Error("Обновление ошибки синхронизации удаления", ex); }
         InvalidateListing(item.DirId);
         _delTombstones.TryRemove(item.EntryId, out _);
@@ -980,8 +1217,14 @@ internal sealed class CloudGateway : IDisposable
 
     public void Dispose()
     {
-        FlushPending(); // не теряем буферизованные удаления при размонтировании/выходе
+        if (Interlocked.Exchange(ref _ending, 1) == 0)
+        {
+            try { FlushPending(TimeSpan.FromSeconds(2)); }
+            catch (Exception ex) { EngineLog.Error("Дренаж удалений при освобождении шлюза", ex); }
+        }
         _delTimer.Dispose();
+        _cacheEpochCancellation.Cancel();
+        _cacheEpochCancellation.Dispose();
     }
 
     private sealed class TransferIdleTimeout : IDisposable

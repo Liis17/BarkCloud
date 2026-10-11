@@ -371,8 +371,17 @@
   <data name="Eng_AuthSuccess" xml:space="preserve">
     <value>Авторизация успешна</value>
   </data>
+  <data name="Eng_AuthSuperseded" xml:space="preserve">
+    <value>Вход отменён, так как сессия уже изменилась</value>
+  </data>
   <data name="Eng_LoggedOut" xml:space="preserve">
     <value>Выполнен выход</value>
+  </data>
+  <data name="Eng_PlaceholderDataPreservedFmt" xml:space="preserve">
+    <value>Заготовка «{0}» содержит данные и сохранена по пути {1}; она не перенесена в облако.</value>
+  </data>
+  <data name="Eng_DeleteFlushTimeout" xml:space="preserve">
+    <value>Не удалось отправить ожидающие удаления за отведённое время</value>
   </data>
   <data name="Eng_LoginFirst" xml:space="preserve">
     <value>Сначала выполните вход</value>

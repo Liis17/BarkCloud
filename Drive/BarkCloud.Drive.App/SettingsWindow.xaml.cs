@@ -111,7 +111,13 @@ public partial class SettingsWindow : FluentWindow
 
         try
         {
-            await engine.LogoutAsync();
+            var status = await engine.LogoutAsync();
+            if (!string.IsNullOrEmpty(status.Error))
+            {
+                Status(Loc.T("Settings_LogoutErrorFmt", status.Error));
+                return;
+            }
+
             _settings.Configured = false; // следующий показ — мастер
             _settings.Save();
             Close();

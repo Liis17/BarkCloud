@@ -99,4 +99,82 @@ public sealed class CloudGatewayStorageTests
 
         cloud.Invoker.Calls.Should().ContainSingle(call => call.MethodFullName == FakeCloudMethods.GetUserStorageInfo);
     }
+
+    [Fact]
+    public async Task GetStorage_does_not_publish_a_late_result_after_account_cache_clear()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        var firstStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseFirst = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var calls = 0;
+        cloud.Invoker.Handle<GetUserStorageInfoRequest, GetUserStorageInfoResponse>(
+            FakeCloudMethods.GetUserStorageInfo, _ =>
+            {
+                var call = Interlocked.Increment(ref calls);
+                if (call == 1)
+                {
+                    firstStarted.TrySetResult();
+                    releaseFirst.Task.GetAwaiter().GetResult();
+                    return new GetUserStorageInfoResponse { StorageLimit = 100 };
+                }
+
+                return new GetUserStorageInfoResponse { StorageLimit = 200 };
+            });
+        using var gateway = cloud.CreateGateway(temp.Path("cache"), new FakeTimeProvider());
+
+        var oldRequest = StartLongRunning(gateway.GetStorage);
+        await firstStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        gateway.ClearCache();
+        gateway.GetStorage().StorageLimit.Should().Be(200);
+        releaseFirst.TrySetResult();
+
+        var act = async () => await oldRequest.WaitAsync(TimeSpan.FromSeconds(5));
+        await act.Should().ThrowAsync<OperationCanceledException>();
+        gateway.GetStorage().StorageLimit.Should().Be(200);
+        calls.Should().Be(2);
+    }
+
+    [Fact]
+    public async Task GetStorage_does_not_return_old_quota_when_old_account_request_fails()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        var time = new FakeTimeProvider();
+        var failureStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseFailure = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var calls = 0;
+        cloud.Invoker.Handle<GetUserStorageInfoRequest, GetUserStorageInfoResponse>(
+            FakeCloudMethods.GetUserStorageInfo, _ =>
+            {
+                var call = Interlocked.Increment(ref calls);
+                if (call == 1)
+                    return new GetUserStorageInfoResponse { StorageLimit = 100 };
+                if (call == 2)
+                {
+                    failureStarted.TrySetResult();
+                    releaseFailure.Task.GetAwaiter().GetResult();
+                    throw new RpcException(new Status(StatusCode.Unavailable, "offline"));
+                }
+
+                return new GetUserStorageInfoResponse { StorageLimit = 200 };
+            });
+        using var gateway = cloud.CreateGateway(temp.Path("cache"), time);
+
+        gateway.GetStorage().StorageLimit.Should().Be(100);
+        time.Advance(TimeSpan.FromSeconds(11));
+        var oldRequest = StartLongRunning(gateway.GetStorage);
+        await failureStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        gateway.ClearCache();
+        releaseFailure.TrySetResult();
+
+        var act = async () => await oldRequest.WaitAsync(TimeSpan.FromSeconds(5));
+        await act.Should().ThrowAsync<RpcException>();
+        gateway.GetStorage().StorageLimit.Should().Be(200);
+        calls.Should().Be(3);
+    }
+
+    private static Task<T> StartLongRunning<T>(Func<T> action)
+        => Task.Factory.StartNew(action, CancellationToken.None,
+            TaskCreationOptions.LongRunning, TaskScheduler.Default);
 }
