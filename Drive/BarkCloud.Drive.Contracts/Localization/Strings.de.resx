@@ -416,6 +416,12 @@
   <data name="Eng_DeleteFailedFmt" xml:space="preserve">
     <value>Cloud-Eintrag „{0}“ konnte nach {1} Versuchen nicht gelöscht werden.</value>
   </data>
+  <data name="Eng_DirectoryNotEmpty" xml:space="preserve">
+    <value>Das Verzeichnis ist nicht leer.</value>
+  </data>
+  <data name="Eng_DirectoryDeleteFailedFmt" xml:space="preserve">
+    <value>Das Verzeichnis „{0}“ konnte nicht aus der Cloud gelöscht werden: {1}</value>
+  </data>
   <data name="Eng_OutboxMoveFailedFmt" xml:space="preserve">
     <value>„{0}“ konnte nicht in den Outbox-Ordner verschoben werden.</value>
   </data>

@@ -14,6 +14,7 @@ internal sealed class FakeCallInvoker : CallInvoker
 
     public IReadOnlyList<FakeRpcCall> Calls => _calls.OrderBy(call => call.Order).ToArray();
     public Action<string>? OnCall { get; set; }
+    public Action<string, object>? AfterResponse { get; set; }
 
     public void Handle<TRequest, TResponse>(string methodFullName, Func<TRequest, TResponse> handler)
         where TRequest : class
@@ -85,6 +86,7 @@ internal sealed class FakeCallInvoker : CallInvoker
             throw new RpcException(new Status(StatusCode.Unimplemented, $"Нет обработчика для {fullName}"));
 
         var response = (TResponse)handler(request);
+        AfterResponse?.Invoke(fullName, request);
         if (TryTake(_lostResponses, fullName, out var lostResponse))
             throw lostResponse;
 

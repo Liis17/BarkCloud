@@ -1,5 +1,6 @@
 using System.Text.Json;
 
+using BarkCloud.Drive.Contracts.Localization;
 using BarkCloud.Drive.Engine.Tests.Fakes;
 
 using DokanNet;
@@ -53,6 +54,279 @@ public sealed class BarkCloudFileSystemTests
         cloud.Invoker.Calls.Should().ContainSingle(call =>
             call.MethodFullName == FakeCloudMethods.ListDirectoryDetailed
             && ((BarkCloud.Proto.Files.ListDirectoryRequest)call.Request).DirectoryId == directoryId);
+    }
+
+    [Fact]
+    public void DeleteDirectory_uses_fresh_listing_instead_of_cached_empty_listing()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        var directoryId = cloud.AddDirectory("directory");
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+        gateway.ListDirectory(directoryId).Files.Should().BeEmpty();
+        cloud.AddFile(directoryId, "new.txt");
+        var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"));
+
+        var status = fileSystem.DeleteDirectory("\\directory", new FakeDokanFileInfo());
+
+        status.Should().Be(DokanResult.DirectoryNotEmpty);
+        cloud.Invoker.Calls.Should().NotContain(call => call.MethodFullName == FakeCloudMethods.DeleteDirectory);
+    }
+
+    [Fact]
+    public void DeleteDirectory_returns_directory_not_empty_for_subdirectory()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        var directoryId = cloud.AddDirectory("directory");
+        cloud.AddDirectory("nested", directoryId);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+        var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"));
+
+        fileSystem.DeleteDirectory("\\directory", new FakeDokanFileInfo()).Should()
+            .Be(DokanResult.DirectoryNotEmpty);
+    }
+
+    [Fact]
+    public void DeleteDirectory_returns_directory_not_empty_for_local_file_under_path()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        cloud.AddDirectory("directory");
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+        var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"));
+        fileSystem.RegisterLocalFile(new LocalFile
+        {
+            Path = "\\directory\\nested\\draft.txt",
+            Name = "draft.txt",
+            DirectoryId = "removed-nested-directory",
+            TempPath = temp.Path("write", "draft.txt"),
+        }).Should().BeTrue();
+
+        fileSystem.DeleteDirectory("\\directory", new FakeDokanFileInfo()).Should()
+            .Be(DokanResult.DirectoryNotEmpty);
+    }
+
+    [Fact]
+    public void DeleteDirectory_returns_directory_not_empty_for_pending_file()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        var directoryId = cloud.AddDirectory("directory");
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+        var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"));
+        fileSystem.RegisterOutboxPending(new UploadOutboxEntry
+        {
+            Id = "pending-id",
+            Name = "pending.txt",
+            DirectoryId = directoryId,
+            DataPath = temp.Path("pending.bin"),
+        });
+
+        fileSystem.DeleteDirectory("\\directory", new FakeDokanFileInfo()).Should()
+            .Be(DokanResult.DirectoryNotEmpty);
+    }
+
+    [Fact]
+    public void DeleteDirectory_returns_directory_not_empty_for_unowned_outbox_file()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        var directoryId = cloud.AddDirectory("directory");
+        var dataPath = temp.Path("draft.bin");
+        File.WriteAllBytes(dataPath, [1, 2, 3]);
+        var outbox = new UploadOutbox(temp.Path("outbox"));
+        outbox.Add(new LocalFile
+        {
+            Path = "\\directory\\draft.txt",
+            Name = "draft.txt",
+            DirectoryId = directoryId,
+            TempPath = dataPath,
+        }, "server-key", ownerUserId: null);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+        var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"), outbox,
+            "server-key", ownerUserId: () => null);
+
+        fileSystem.DeleteDirectory("\\directory", new FakeDokanFileInfo()).Should()
+            .Be(DokanResult.DirectoryNotEmpty);
+        cloud.Invoker.Calls.Should().NotContain(call => call.MethodFullName == FakeCloudMethods.DeleteDirectory);
+    }
+
+    [Fact]
+    public void DeleteDirectory_cleanup_flushes_file_deletions_before_deleting_empty_directory()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        var directoryId = cloud.AddDirectory("directory");
+        var file = cloud.AddFile(directoryId, "file.txt");
+        using var gateway = cloud.CreateGateway(temp.Path("cache"), new FakeTimeProvider());
+        var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"));
+        var fileInfo = new FakeDokanFileInfo();
+        fileSystem.CreateFile("\\directory\\file.txt", FileAccess.ReadData, FileShare.Read,
+            FileMode.Open, FileOptions.None, FileAttributes.Normal, fileInfo).Should().Be(DokanResult.Success);
+        fileSystem.DeleteFile("\\directory\\file.txt", fileInfo).Should().Be(DokanResult.Success);
+        fileInfo.DeletePending = true;
+        fileSystem.Cleanup("\\directory\\file.txt", fileInfo);
+        fileSystem.CloseFile("\\directory\\file.txt", fileInfo);
+        var directoryInfo = new FakeDokanFileInfo { IsDirectory = true };
+
+        fileSystem.DeleteDirectory("\\directory", directoryInfo).Should().Be(DokanResult.Success);
+        directoryInfo.DeletePending = true;
+        fileSystem.Cleanup("\\directory", directoryInfo);
+
+        cloud.Invoker.Calls.Count(call => call.MethodFullName == FakeCloudMethods.DeleteDirectory).Should().Be(1);
+        cloud.Invoker.Calls
+            .Where(call => call.MethodFullName is FakeCloudMethods.DeleteFileEntries or FakeCloudMethods.DeleteDirectory)
+            .Select(call => call.MethodFullName)
+            .Should().Equal(FakeCloudMethods.DeleteFileEntries, FakeCloudMethods.DeleteDirectory);
+        cloud.IsInTrash(file.EntryId).Should().BeTrue();
+        gateway.Resolve("\\directory").Should().BeNull();
+    }
+
+    [Fact]
+    public void Cleanup_does_not_delete_nonempty_directory_without_delete_directory_callback()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        cloud.AddFile(cloud.AddDirectory("directory"), "file.txt");
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+        var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"));
+        var directoryInfo = new FakeDokanFileInfo { IsDirectory = true, DeletePending = true };
+
+        fileSystem.Cleanup("\\directory", directoryInfo);
+
+        cloud.Invoker.Calls.Should().NotContain(call => call.MethodFullName == FakeCloudMethods.DeleteDirectory);
+        fileSystem.LastSyncError.Should().Be(Loc.T("Eng_DirectoryDeleteFailedFmt",
+            "directory", Loc.T("Eng_DirectoryNotEmpty")));
+    }
+
+    [Fact]
+    public async Task Cleanup_keeps_directory_when_persist_finishes_during_stale_listing()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        var directoryId = cloud.AddDirectory("directory");
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+        gateway.ListDirectory("");
+        var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"));
+        const string filePath = "\\directory\\fresh.txt";
+        var fileInfo = new FakeDokanFileInfo();
+        fileSystem.CreateFile(filePath, FileAccess.WriteData, FileShare.ReadWrite, FileMode.Create,
+            FileOptions.None, FileAttributes.Normal, fileInfo).Should().Be(DokanResult.Success);
+        fileSystem.WriteFile(filePath, [7, 8, 9], out var bytesWritten, 0, fileInfo).Should().Be(DokanResult.Success);
+        bytesWritten.Should().Be(3);
+        var listingStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var resumeListing = new ManualResetEventSlim();
+        var delayedListing = 0;
+        var watchDirectoryListing = 1;
+        cloud.Invoker.AfterResponse = (method, request) =>
+        {
+            if (Volatile.Read(ref watchDirectoryListing) == 0
+                || method != FakeCloudMethods.ListDirectoryDetailed
+                || ((BarkCloud.Proto.Files.ListDirectoryRequest)request).DirectoryId != directoryId
+                || Interlocked.Exchange(ref delayedListing, 1) != 0)
+                return;
+
+            listingStarted.TrySetResult();
+            if (!resumeListing.Wait(TimeSpan.FromSeconds(5)))
+                throw new TimeoutException("Не дождались завершения Persist внутри листинга");
+        };
+        var directoryInfo = new FakeDokanFileInfo { IsDirectory = true, DeletePending = true };
+        var cleanup = Task.Run(() => fileSystem.Cleanup("\\directory", directoryInfo));
+
+        try
+        {
+            var first = await Task.WhenAny(listingStarted.Task, cleanup);
+            if (first == listingStarted.Task)
+            {
+                fileSystem.Cleanup(filePath, fileInfo);
+                fileSystem.CloseFile(filePath, fileInfo);
+            }
+            else
+                await cleanup.WaitAsync(TimeSpan.FromSeconds(5));
+        }
+        finally
+        {
+            Volatile.Write(ref watchDirectoryListing, 0);
+            resumeListing.Set();
+        }
+
+        await cleanup.WaitAsync(TimeSpan.FromSeconds(5));
+        if (Volatile.Read(ref delayedListing) == 0)
+        {
+            fileSystem.Cleanup(filePath, fileInfo);
+            fileSystem.CloseFile(filePath, fileInfo);
+        }
+
+        cloud.Invoker.Calls.Should().NotContain(call => call.MethodFullName == FakeCloudMethods.DeleteDirectory);
+        fileSystem.LastSyncError.Should().Be(Loc.T("Eng_DirectoryDeleteFailedFmt",
+            "directory", Loc.T("Eng_DirectoryNotEmpty")));
+        gateway.Resolve(filePath).Should().NotBeNull();
+    }
+
+    [Fact]
+    public void Cleanup_does_not_delete_directory_when_fresh_listing_fails()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        var directoryId = cloud.AddDirectory("directory");
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+        gateway.Resolve("\\directory").Should().NotBeNull();
+        var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"));
+        cloud.Invoker.FailNext(FakeCloudMethods.ListDirectoryDetailed,
+            new RpcException(new Status(StatusCode.Unavailable, "Сервер недоступен")));
+        var directoryInfo = new FakeDokanFileInfo { IsDirectory = true, DeletePending = true };
+
+        fileSystem.Cleanup("\\directory", directoryInfo);
+
+        cloud.Invoker.Calls.Should().Contain(call => call.MethodFullName == FakeCloudMethods.ListDirectoryDetailed
+            && ((BarkCloud.Proto.Files.ListDirectoryRequest)call.Request).DirectoryId == directoryId);
+        cloud.Invoker.Calls.Should().NotContain(call => call.MethodFullName == FakeCloudMethods.DeleteDirectory);
+        fileSystem.LastSyncError.Should().NotBeNullOrEmpty();
+    }
+
+    [Fact]
+    public void DeleteDirectory_cleanup_does_not_delete_directory_when_file_flush_fails()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        var directoryId = cloud.AddDirectory("directory");
+        var file = cloud.AddFile(directoryId, "file.txt");
+        using var gateway = cloud.CreateGateway(temp.Path("cache"), new FakeTimeProvider());
+        var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"));
+        fileSystem.SyncError = fileSystem.SetLastSyncError;
+        var fileInfo = new FakeDokanFileInfo();
+        fileSystem.CreateFile("\\directory\\file.txt", FileAccess.ReadData, FileShare.Read,
+            FileMode.Open, FileOptions.None, FileAttributes.Normal, fileInfo).Should().Be(DokanResult.Success);
+        fileSystem.DeleteFile("\\directory\\file.txt", fileInfo).Should().Be(DokanResult.Success);
+        fileInfo.DeletePending = true;
+        fileSystem.Cleanup("\\directory\\file.txt", fileInfo);
+        fileSystem.CloseFile("\\directory\\file.txt", fileInfo);
+        cloud.Invoker.FailNext(FakeCloudMethods.DeleteFileEntries,
+            new RpcException(new Status(StatusCode.Unavailable, "Ошибка доставки удаления")));
+        var directoryInfo = new FakeDokanFileInfo { IsDirectory = true };
+
+        fileSystem.DeleteDirectory("\\directory", directoryInfo).Should().Be(DokanResult.Success);
+        directoryInfo.DeletePending = true;
+        fileSystem.Cleanup("\\directory", directoryInfo);
+
+        cloud.Invoker.Calls.Should().NotContain(call => call.MethodFullName == FakeCloudMethods.DeleteDirectory);
+        gateway.ListDirectory(directoryId).Files.Should().ContainSingle(item => item.Entry.Id == file.EntryId);
+        fileSystem.LastSyncError.Should().Be(Loc.T("Eng_DirectoryDeleteFailedFmt",
+            "directory", Loc.T("Eng_DirectoryNotEmpty")));
+    }
+
+    [Fact]
+    public void DeleteFile_returns_access_denied_for_directory_and_file_not_found_for_missing_path()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        cloud.AddDirectory("directory");
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+        var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"));
+
+        fileSystem.DeleteFile("\\directory", new FakeDokanFileInfo()).Should().Be(DokanResult.AccessDenied);
+        fileSystem.DeleteFile("\\missing.txt", new FakeDokanFileInfo()).Should().Be(DokanResult.FileNotFound);
     }
 
     [Fact]

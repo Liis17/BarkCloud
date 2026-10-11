@@ -229,6 +229,24 @@ public sealed class CloudGatewayTests
     }
 
     [Fact]
+    public void DeleteDirectory_does_not_call_rpc_when_strict_file_flush_fails()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        var directoryId = cloud.AddDirectory("directory");
+        var file = cloud.AddFile(directoryId, "pending-delete.txt");
+        using var gateway = cloud.CreateGateway(temp.Path("cache"), new FakeTimeProvider());
+        gateway.QueueDeleteFileEntry(file.EntryId, directoryId);
+        cloud.Invoker.FailNext(FakeCloudMethods.DeleteFileEntries,
+            new RpcException(new Status(StatusCode.Unavailable, "offline")));
+
+        Action delete = () => gateway.DeleteDirectory(directoryId);
+
+        delete.Should().Throw<RpcException>().Which.StatusCode.Should().Be(StatusCode.Unavailable);
+        cloud.Invoker.Calls.Should().NotContain(call => call.MethodFullName == FakeCloudMethods.DeleteDirectory);
+    }
+
+    [Fact]
     public void Resolve_returns_root_directories_and_null_for_missing_paths()
     {
         using var temp = new TestDirectory();

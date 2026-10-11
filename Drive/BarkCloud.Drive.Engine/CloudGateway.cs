@@ -656,7 +656,8 @@ internal sealed class CloudGateway : IDisposable
 
     public void DeleteDirectory(string directoryId)
     {
-        FlushPending(); // порядок: сначала отправляем отложенные удаления файлов, потом рекурсивное удаление папки
+        // Если после проверки содержимого появилась новая пачка, при сбое не удаляем папку рекурсивно.
+        FlushPending(throwOnFailure: true);
         _cloud.DeleteDirectory(new DeleteDirectoryRequest { DirectoryId = directoryId });
     }
 

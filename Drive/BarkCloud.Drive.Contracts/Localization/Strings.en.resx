@@ -416,6 +416,12 @@
   <data name="Eng_DeleteFailedFmt" xml:space="preserve">
     <value>Could not delete cloud entry “{0}” after {1} attempts.</value>
   </data>
+  <data name="Eng_DirectoryNotEmpty" xml:space="preserve">
+    <value>The directory is not empty.</value>
+  </data>
+  <data name="Eng_DirectoryDeleteFailedFmt" xml:space="preserve">
+    <value>Could not delete directory “{0}” from the cloud: {1}</value>
+  </data>
   <data name="Eng_OutboxMoveFailedFmt" xml:space="preserve">
     <value>Could not move “{0}” into the outbox.</value>
   </data>
