@@ -462,6 +462,11 @@ a {
   gap: 12px;
 }
 
+.auth-name-fields .auth-field > label {
+  min-height: 2.4em;
+  line-height: 1.2;
+}
+
 .auth-helper,
 .auth-inline-note {
   margin: 0;
@@ -713,6 +718,10 @@ a {
   .auth-name-fields {
     grid-template-columns: minmax(0, 1fr);
     gap: 16px;
+  }
+
+  .auth-name-fields .auth-field > label {
+    min-height: 0;
   }
 
   .auth-otp-cells {

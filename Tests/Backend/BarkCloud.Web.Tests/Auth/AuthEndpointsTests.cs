@@ -382,6 +382,45 @@ public sealed class AuthEndpointsTests
             It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()), Times.Exactly(5));
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task LoginResendCompletesLoginWhenOtpIsNoLongerRequired(bool remember)
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        fixture.Identity.SetupSequence(x => x.AuthAsync(It.IsAny<AuthRequest>(), It.IsAny<Metadata>(),
+                It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
+            .Throws(OtpRequired("sent", 60))
+            .Returns(GrpcCallHelpers.AsyncUnary(SuccessAuthResponse()));
+
+        using var initial = await fixture.GetStateAsync("/login");
+        using var requested = await fixture.PostStateAsync("/login", initial.RootElement.GetProperty("csrfToken").GetString()!,
+            Fields(("login", "demo@example.test"), ("password", "secret-password"), ("remember", remember.ToString())));
+        var flowId = requested.Json.RootElement.GetProperty("flowId").GetString()!;
+
+        using var resend = await fixture.PostStateAsync("/login/resend", requested.Json.RootElement.GetProperty("csrfToken").GetString()!,
+            Fields(("flow_id", flowId)));
+
+        resend.Json.RootElement.GetProperty("redirectTo").GetString().Should().Be("/photos");
+        fixture.CookieValue(resend.Response, AuthGateway.AccessCookie).Should().Be("private-access-token");
+        fixture.CookieValue(resend.Response, AuthGateway.RefreshCookie).Should().Be("private-refresh-token");
+        resend.Response.Headers.GetValues("Set-Cookie")
+            .Single(value => value.StartsWith(AuthGateway.AccessCookie + "=", StringComparison.Ordinal))
+            .ToLowerInvariant().Should().NotContain("expires=");
+        resend.Response.Headers.GetValues("Set-Cookie")
+            .Single(value => value.StartsWith(AuthGateway.RefreshCookie + "=", StringComparison.Ordinal))
+            .ToLowerInvariant().Contains("expires=").Should().Be(remember);
+
+        using var completedFlow = await fixture.PostStateAsync("/login", requested.Json.RootElement.GetProperty("csrfToken").GetString()!,
+            Fields(("flow_id", flowId), ("otp", "123456")));
+        completedFlow.Json.RootElement.GetProperty("screen").GetString().Should().Be("login");
+        completedFlow.Json.RootElement.GetProperty("formError").GetString().Should().Contain("истёк или недоступен");
+
+        fixture.Identity.Verify(x => x.AuthAsync(It.IsAny<AuthRequest>(), It.IsAny<Metadata>(),
+            It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
+        fixture.Identity.VerifyNoOtherCalls();
+    }
+
     [Fact]
     public async Task AuthenticatorOtpWrongCodeRetainsItsMethod()
     {
@@ -427,6 +466,7 @@ public sealed class AuthEndpointsTests
         pending.Json.RootElement.GetProperty("screen").GetString().Should().Be("register-otp");
         pending.Json.RootElement.GetProperty("values").GetProperty("username").GetString().Should().Be("demo-user");
         pending.Json.RootElement.TryGetProperty("codeExpiresAt", out _).Should().BeFalse();
+        pending.Json.RootElement.TryGetProperty("formMessage", out _).Should().BeFalse();
         pending.Json.RootElement.GetRawText().Should().NotContain("secret-password").And.NotContain("private-code-id");
         var returnedDevice = fixture.CookieValue(pending.Response, AuthGateway.DeviceCookie);
         fixture.ObservedDeviceId.Should().Be(returnedDevice);
