@@ -19,9 +19,15 @@ service IdentityApi {
   
   // Создать аккаунт
   rpc CreateAccount(CreateAccountRequest) returns(CreateAccountResponse); 
+
+  // Создать аккаунт с первоначальным паролем
+  rpc CreateAccountWithPassword(CreateAccountRequest) returns(CreateAccountResponse);
   
   // Подтвердить создания аккаунта
   rpc ConfirmAccount(ConfirmAccountRequest) returns(ConfirmAccountResponse);
+
+  // Подтвердить аккаунт и установить первоначальный пароль
+  rpc ConfirmAccountWithPassword(ConfirmAccountRequest) returns(ConfirmAccountResponse);
   
   // Получить активные сессии
   rpc GetActiveSessions(GetActiveSessionsRequest) returns(GetActiveSessionsResponse);
@@ -259,6 +265,7 @@ message CreateAccountRequest {
   string last_name = 2; // Фамилия
   string username = 3; // Имя пользователя
   string email = 4; // Почта
+  optional string initial_password = 5; // Первоначальный пароль (только CreateAccountWithPassword)
 }
 
 message CreateAccountResponse {
@@ -269,6 +276,7 @@ message CreateAccountResponse {
 message ConfirmAccountRequest {
   string code_id = 1; // Идентификатор кода подтверждения
   string code_value = 2; // Значение кода
+  optional string initial_password = 3; // Первоначальный пароль (только ConfirmAccountWithPassword)
 }
 
 message ConfirmAccountResponse {

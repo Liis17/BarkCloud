@@ -76,17 +76,20 @@ public class AuthCommandHandler(UsersServerApi.UsersServerApiClient usersClient,
 
         logger.LogDebug("Поиск пользователя по логину: {Login}", login);
 
-        var user = await usersClient.FindByLoginAsync(usersRequest);
+        FindByLoginResponse user;
+        try
+        {
+            user = await usersClient.FindByLoginAsync(usersRequest, cancellationToken: cancellationToken);
+        }
+        catch (UserNotFoundException)
+        {
+            RecordMissingUser(login);
+            throw new InvalidLoginOrPasswordException();
+        }
 
         if (user.User is null)
         {
-            metrics.Increment("auth_login_failed");
-            metrics.Increment("auth_login_failed_user_not_found");
-            logger.LogWarning(
-                "Неудачная попытка входа: пользователь не найден. Логин: {Login}, IP: {IpAddress}",
-                login,
-                requestContext.IpAddress
-            );
+            RecordMissingUser(login);
             throw new InvalidLoginOrPasswordException();
         }
 
@@ -170,8 +173,9 @@ public class AuthCommandHandler(UsersServerApi.UsersServerApiClient usersClient,
                 var code = CodeGenerator.GenerateDigitalCode(6);
 
                 // false — прежний код выдан совсем недавно и остаётся в силе: письмо не отправляем.
-                if (await authPropertiesStorage.TryIssueEmailAuthCode(userContactInfo.User.Id, EmailAuthCodePurpose.Login, code,
-                        cancellationToken))
+                var issue = await authPropertiesStorage.TryIssueEmailAuthCodeWithSnapshot(
+                    userContactInfo.User.Id, EmailAuthCodePurpose.Login, code, cancellationToken);
+                if (issue.Sent)
                 {
                     // Получаем данные о местоположении IP-адреса
                     var locationInfo = await locationClient.GetLocationString(requestContext.IpAddress);
@@ -207,10 +211,14 @@ public class AuthCommandHandler(UsersServerApi.UsersServerApiClient usersClient,
                         user.User.Id
                     );
                 }
+
+                metrics.Increment("auth_otp_required");
+                throw new OtpCodeNeedException("email", issue.RetryAfterSeconds,
+                    issue.Sent ? "sent" : "existing");
             }
 
             metrics.Increment("auth_otp_required");
-            throw new OtpCodeNeedException();
+            throw new OtpCodeNeedException("authenticator");
         }
 
         if (optOptions is { OtpEnabled: true })
@@ -290,5 +298,15 @@ public class AuthCommandHandler(UsersServerApi.UsersServerApiClient usersClient,
         );
 
         return response;
+    }
+
+    private void RecordMissingUser(string? login)
+    {
+        metrics.Increment("auth_login_failed");
+        metrics.Increment("auth_login_failed_user_not_found");
+        logger.LogWarning(
+            "Неудачная попытка входа: пользователь не найден. Логин: {Login}, IP: {IpAddress}",
+            login,
+            requestContext.IpAddress);
     }
 }
