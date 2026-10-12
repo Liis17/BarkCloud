@@ -16,6 +16,10 @@ public class ConfigurationContext : DbContext
 
     public DbSet<StorageProfileRevision> StorageProfileRevisions => Set<StorageProfileRevision>();
 
+    public DbSet<StorageQuotaGroup> StorageQuotaGroups => Set<StorageQuotaGroup>();
+
+    public DbSet<StorageQuotaGroupBucket> StorageQuotaGroupBuckets => Set<StorageQuotaGroupBucket>();
+
     public DbSet<SettingRow> Settings(SettingsScope scope) => Set<SettingRow>(scope.EntityName);
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -72,7 +76,6 @@ public class ConfigurationContext : DbContext
             entity.Property(profile => profile.BucketName).HasColumnType("text").IsRequired();
             entity.Property(profile => profile.Region).HasColumnType("text").IsRequired();
             entity.Property(profile => profile.ForcePathStyle).HasDefaultValue(true);
-            entity.Property(profile => profile.QuotaBytes).HasColumnType("bigint");
             entity.Property(profile => profile.CreatedAt).HasColumnType("timestamp with time zone");
             entity.Property(profile => profile.CreatedBy).HasColumnType("text").IsRequired();
             entity.Property(profile => profile.CreatedFrom).HasColumnType("text").IsRequired();
@@ -104,6 +107,35 @@ public class ConfigurationContext : DbContext
                 .WithMany()
                 .HasForeignKey(revision => revision.SourceRevisionId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<StorageQuotaGroup>(entity =>
+        {
+            entity.ToTable("StorageQuotaGroups");
+            entity.HasKey(group => group.Id);
+            entity.Property(group => group.Id).HasColumnType("text");
+            entity.Property(group => group.Name).HasColumnType("text").IsRequired();
+            entity.Property(group => group.QuotaBytes).HasColumnType("bigint");
+            entity.Property(group => group.CreatedAt).HasColumnType("timestamp with time zone");
+            entity.Property(group => group.CreatedBy).HasColumnType("text").IsRequired();
+            entity.Property(group => group.EditedAt).HasColumnType("timestamp with time zone");
+            entity.Property(group => group.EditedBy).HasColumnType("text").IsRequired();
+            entity.Property(group => group.EditedFrom).HasColumnType("text").IsRequired();
+            entity.HasIndex(group => group.Name).IsUnique();
+            entity.HasMany(group => group.Buckets)
+                .WithOne()
+                .HasForeignKey(bucket => bucket.GroupId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<StorageQuotaGroupBucket>(entity =>
+        {
+            entity.ToTable("StorageQuotaGroupBuckets");
+            entity.HasKey(bucket => new { bucket.GroupId, bucket.ServiceUrl, bucket.BucketName });
+            entity.Property(bucket => bucket.GroupId).HasColumnType("text");
+            entity.Property(bucket => bucket.ServiceUrl).HasColumnType("text").IsRequired();
+            entity.Property(bucket => bucket.BucketName).HasColumnType("text").IsRequired();
+            entity.HasIndex(bucket => new { bucket.ServiceUrl, bucket.BucketName }).IsUnique();
         });
     }
 }
