@@ -95,6 +95,7 @@ public class FilesContext : DbContext
             b.Property(x => x.FileName).HasMaxLength(512);
             b.Property(x => x.ContentType).HasMaxLength(255);
             b.Property(x => x.Sha256).HasMaxLength(64);
+            b.Property(x => x.FileType).HasDefaultValue(UploadFileType.CloudFile);
             b.Property(x => x.UploadTokenHash).HasMaxLength(64);
             b.Property(x => x.ErrorCode).HasMaxLength(64);
             b.Property(x => x.ErrorMessage).HasMaxLength(1024);

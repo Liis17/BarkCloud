@@ -52,6 +52,14 @@ public class FilesApiService : FilesApi.FilesApiBase
     {
         try
         {
+            var fileType = request.HasFileType
+                ? request.FileType switch
+                {
+                    BarkCloud.Proto.Files.UploadFileType.UserAvatar => UploadFileType.UserAvatar,
+                    BarkCloud.Proto.Files.UploadFileType.CloudFile => UploadFileType.CloudFile,
+                    _ => throw new InvalidUploadSessionRequestException()
+                }
+                : UploadFileType.CloudFile;
             var result = await _uploadSessions.CreateAsync(
                 GetOwnerId(),
                 _requestContext.DeviceName,
@@ -60,7 +68,8 @@ public class FilesApiService : FilesApi.FilesApiBase
                     request.FileName,
                     request.FileSize,
                     request.ContentType,
-                    request.Sha256),
+                    request.Sha256,
+                    fileType),
                 context.CancellationToken);
             _metrics.Increment("upload_sessions_created_total");
             return Map(result);

@@ -286,8 +286,7 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
         // (CheckFileHash/CheckFileHashes) — например, чтобы автозагрузка iOS пропускала уже залитое.
 
         // Превью генерируем только для облачных файлов с image/* контентом.
-        // Аватары идут через UploadAvatarServer (там собственный пайплайн с 64px-thumb),
-        // здесь FilePreview для них не создаём — намеренно.
+        // Resumable-аватар сохраняет исходный объект и не проходит через отдельное сжатие.
         var isImageContent = contentType.StartsWith("image/");
         var needsDimensions = ImageTypesForDimensions.Contains(file.Type) && isImageContent;
         var needsCloudPreviews = file.Type == UploadFileType.CloudFile && isImageContent;
