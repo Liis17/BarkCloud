@@ -24,7 +24,7 @@ Parent: [[Android/AndroidApp]] · Серверный контракт: [[Backend
 - Control plane использует gRPC Files API; data plane отправляет части через HTTP по базе `fileUploadBase` текущей серверной конфигурации. Точный формат серверного API описан в [[Backend/ResumableUpload]].
 - `UploadJob` хранит источник и назначение, staged path, idempotency key, session ID, размер части, прогресс и целевой каталог/альбом.
 - `UploadDestination.SYSTEM_BY_MEDIA_KIND` передаёт файлы без выбранного каталога на авто-распределение; `DIRECTORY` сохраняет выбранный `directoryId`. Для загрузки в альбом задача хранит `albumId`.
-- Загрузка аватара остаётся отдельным legacy multipart-путём через `UserRepository`; он не проходит через файловую очередь.
+- Смена аватара в `UserRepository` пока вызывает `FilesApi.GetUploadUrl` и legacy multipart-маршрут, который отвечает HTTP 418. До появления Upload 2.0-пути для аватаров смена аватара не работает.
 
 ## Зависимости и взаимодействия
 

@@ -13,7 +13,7 @@ public sealed class ServerConfig
     public int IdentityPort { get; set; } = 7020;
     public int FilesPort { get; set; } = 7025;
     public int UsersPort { get; set; } = 7021;
-    public bool AcceptAnyCert { get; set; } = true;
+    public bool AcceptAnyCert { get; set; } = false;
 
     private static string FilePath => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -42,6 +42,23 @@ public sealed class ServerConfig
     public void Save()
     {
         Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
-        File.WriteAllText(FilePath, JsonSerializer.Serialize(this));
+        var tempFile = FilePath + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        try
+        {
+            File.WriteAllText(tempFile, JsonSerializer.Serialize(this));
+            File.Move(tempFile, FilePath, overwrite: true);
+        }
+        finally
+        {
+            try
+            {
+                if (File.Exists(tempFile))
+                    File.Delete(tempFile);
+            }
+            catch
+            {
+                // Очистка временного файла не должна влиять на сохранение настроек.
+            }
+        }
     }
 }

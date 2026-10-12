@@ -32,7 +32,7 @@ See also: [[Backend/ResumableUpload]] · [[Backend/FilesCloud]] · [[Backend/Dyn
 
 Полный протокол, расчёт размеров частей и состояния — [[Backend/ResumableUpload]].
 
-Старый клиентский маршрут: `FilesApi.GetUploadUrl` возвращает URL внутреннего Files `POST /upload/{uploadId}`. Загрузите multipart-поле `file` по этому URL; это не S3 presigned URL.
+`FilesApi.GetUploadUrl` остаётся в gRPC-контракте и продолжает возвращать URL внутреннего Files, но `POST /upload/{uploadId}` всегда отвечает HTTP 418 (`legacy_upload_removed`) и не принимает multipart. Для загрузок используйте только Upload 2.0: `CreateUploadSession`, части и `CompleteUploadSession`.
 
 ### Скачивание и карточка файла
 

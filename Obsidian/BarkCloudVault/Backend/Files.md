@@ -13,7 +13,7 @@ See also: [[Backend/FilesCloud]] · [[Backend/ResumableUpload]] · [[Backend/Ori
 |---|---|---|
 | `Backend/BarkCloud.Files/Program.cs` | регистрации и хост | gRPC, HTTP, БД, очередь и фоновые службы |
 | `Backend/BarkCloud.Files/Host/FilesApiService.cs` | `FilesApiService` | клиентские RPC |
-| `Backend/BarkCloud.Files/Host/FilesController.cs` | `FilesController` | HTTP-передача частей, legacy upload и download |
+| `Backend/BarkCloud.Files/Host/FilesController.cs` | `FilesController` | HTTP-передача частей, отклонение legacy upload и download |
 | `Backend/BarkCloud.Files/Features/UploadFile/UploadFileCommandHandler.cs` | обработка загрузки | оригинал, хеш, метаданные и превью |
 | `Backend/BarkCloud.Files/Domain/UploadFile.cs` | `UploadFile` | запись блоба и профиль хранения |
 | `Backend/BarkCloud.Files/Persistence/FilesContext.cs` | EF-модель | таблицы и ограничения |
@@ -43,10 +43,10 @@ See also: [[Backend/FilesCloud]] · [[Backend/ResumableUpload]] · [[Backend/Ori
 | HTTP-маршрут | Поведение |
 |---|---|
 | `PUT /file-upload/{sessionId}/parts/{partNumber}` | Часть resumable-загрузки; запрос несёт `Content-Range` и `X-Upload-Token` |
-| `POST /upload/{uploadId}` | Legacy multipart upload; вызывается по URL из `FilesApi.GetUploadUrl` |
+| `POST /upload/{uploadId}` | Всегда возвращает HTTP 418 `legacy_upload_removed`; тело не читается |
 | `GET /download/{fileId}` | Выдача файла; поддерживается один явный byte-range |
 
-`GetUploadUrl` создаёт запись `UploadFile` и возвращает URL собственного HTTP-маршрута Files. Это не presigned URL S3.
+`GetUploadUrl` создаёт запись `UploadFile` и по-прежнему возвращает URL собственного HTTP-маршрута Files; это не presigned URL S3. Отправка файла на этот URL отключена: единственный путь загрузки — Upload 2.0 из [[Backend/ResumableUpload]].
 
 ### Поиск
 
@@ -66,6 +66,7 @@ See also: [[Backend/FilesCloud]] · [[Backend/ResumableUpload]] · [[Backend/Ori
 
 ## Ограничения и важные детали
 
+- Метрики `files_uploaded` и `upload_bytes_total` относились к legacy-загрузке и больше не инкрементируются. Upload 2.0 учитывает принятые части в `upload_parts_total` и `upload_part_bytes_total`.
 - `UploadFileReadiness` считает блоб готовым при заданном `UploadedAt` и непустом `Etag`. Клиентские выборки используют это условие, чтобы не показывать неполностью обработанные файлы.
 - `UploadFileType`: `Unknown=0`, `UserAvatar=1`, `CloudFile=2`. `MediaKind`: `Other=0`, `Photo=1`, `Video=2`, `Document=3`, `Audio=4`; категория вычисляется через `FileExtensions.GetMediaKind()` по имени файла.
 - Каждая загрузка оригинала создаёт отдельный блоб. SHA-256 сохраняется для `CheckFileHash`/`CheckFileHashes`; он не объединяет одинаковые оригиналы. Превью могут дедуплицироваться по SHA-256.

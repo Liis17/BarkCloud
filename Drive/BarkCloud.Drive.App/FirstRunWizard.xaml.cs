@@ -149,6 +149,10 @@ public partial class FirstRunWizard : FluentWindow
                 ShowStep();
             }
         }
+        catch (Exception ex)
+        {
+            Fail(Loc.T("Common_ErrorFmt", ex.Message));
+        }
         finally
         {
             NextButton.IsEnabled = true;
@@ -353,6 +357,12 @@ public partial class FirstRunWizard : FluentWindow
         try
         {
             var challenge = await _engine.BeginWebAuthnAsync();
+            if (!string.IsNullOrEmpty(challenge.Error))
+            {
+                Fail(challenge.Error);
+                return;
+            }
+
             if (string.IsNullOrEmpty(challenge.ChallengeId))
             {
                 Fail(Loc.T("Wizard_KeyUnavailable"));
@@ -386,6 +396,10 @@ public partial class FirstRunWizard : FluentWindow
             OtpBox.Text = string.Empty;
             _step++;
             ShowStep();
+        }
+        catch (Exception ex)
+        {
+            Fail(Loc.T("Common_ErrorFmt", ex.Message));
         }
         finally
         {

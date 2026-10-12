@@ -78,7 +78,10 @@
     <value>Service ports</value>
   </data>
   <data name="Common_AcceptCert" xml:space="preserve">
-    <value>Trust self-signed certificate</value>
+    <value>Accept any server certificate</value>
+  </data>
+  <data name="Common_AcceptCertWarning" xml:space="preserve">
+    <value>Skips server certificate validation. Use only with a server you trust.</value>
   </data>
   <data name="Common_DriveName" xml:space="preserve">
     <value>Drive name</value>
@@ -149,6 +152,12 @@
   <data name="Main_EngineUnavailableFmt" xml:space="preserve">
     <value>Engine unavailable: {0}</value>
   </data>
+  <data name="Main_EngineNotResponding" xml:space="preserve">
+    <value>Engine is not responding.</value>
+  </data>
+  <data name="Main_EngineShuttingDown" xml:space="preserve">
+    <value>Engine is shutting down…</value>
+  </data>
   <data name="Main_NoFreeLetter" xml:space="preserve">
     <value>No free drive letter available to mount.</value>
   </data>
@@ -193,6 +202,12 @@
   </data>
   <data name="Tray_Exit" xml:space="preserve">
     <value>Exit application</value>
+  </data>
+  <data name="Tray_PendingUploads" xml:space="preserve">
+    <value>Pending uploads</value>
+  </data>
+  <data name="Tray_PendingUploadsFmt" xml:space="preserve">
+    <value>Files waiting to upload: {0}</value>
   </data>
   <data name="Wizard_Title" xml:space="preserve">
     <value>BarkCloud Drive Setup</value>
@@ -296,6 +311,15 @@
   <data name="Settings_Cache" xml:space="preserve">
     <value>Cache folder</value>
   </data>
+  <data name="Settings_Outbox" xml:space="preserve">
+    <value>Unsent files</value>
+  </data>
+  <data name="Settings_OpenOutbox" xml:space="preserve">
+    <value>Open unsent files folder</value>
+  </data>
+  <data name="Settings_OutboxOpenFailedFmt" xml:space="preserve">
+    <value>Could not open the unsent files folder: {0}</value>
+  </data>
   <data name="Settings_Autostart" xml:space="preserve">
     <value>Autostart (at Windows sign-in)</value>
   </data>
@@ -309,7 +333,7 @@
     <value>Sign-out error: {0}</value>
   </data>
   <data name="Settings_ApplyingAddress" xml:space="preserve">
-    <value>Applying address, restarting engine…</value>
+    <value>Applying address; engine is shutting down…</value>
   </data>
   <data name="Settings_EngineUnavailableAfterServer" xml:space="preserve">
     <value>Engine unavailable after changing the address.</value>
@@ -329,14 +353,11 @@
   <data name="Settings_DriveRenamed" xml:space="preserve">
     <value>Drive renamed</value>
   </data>
-  <data name="Settings_NameSaved" xml:space="preserve">
-    <value>Name saved (mount the drive)</value>
-  </data>
   <data name="Settings_LetterChangedFmt" xml:space="preserve">
     <value>Letter changed to {0}:</value>
   </data>
-  <data name="Settings_LetterSaved" xml:space="preserve">
-    <value>Letter saved (mount the drive)</value>
+  <data name="Settings_MountFirstToApply" xml:space="preserve">
+    <value>Mount the drive to apply these changes.</value>
   </data>
   <data name="Settings_CacheUpdated" xml:space="preserve">
     <value>Cache folder updated. Previously downloaded content remains in the old folder.</value>
@@ -345,7 +366,7 @@
     <value>Failed to change the cache folder: {0}</value>
   </data>
   <data name="Settings_RestartingEngine" xml:space="preserve">
-    <value>Restarting engine…</value>
+    <value>Engine is shutting down before restart…</value>
   </data>
   <data name="Settings_EngineUnavailableAfterRestart" xml:space="preserve">
     <value>Engine unavailable after restart.</value>
@@ -359,11 +380,23 @@
   <data name="Eng_LoginRequired" xml:space="preserve">
     <value>Enter username and password</value>
   </data>
+  <data name="Eng_TlsConnectionError" xml:space="preserve">
+    <value>Could not establish a secure TLS connection. Check the server address and certificate. For a trusted self-hosted server, you can temporarily enable “Accept any server certificate” in the connection settings.</value>
+  </data>
   <data name="Eng_AuthSuccess" xml:space="preserve">
     <value>Signed in successfully</value>
   </data>
+  <data name="Eng_AuthSuperseded" xml:space="preserve">
+    <value>Sign-in was canceled because the session changed</value>
+  </data>
   <data name="Eng_LoggedOut" xml:space="preserve">
     <value>Signed out</value>
+  </data>
+  <data name="Eng_PlaceholderDataPreservedFmt" xml:space="preserve">
+    <value>Placeholder “{0}” contains data and was preserved at {1}; it was not uploaded.</value>
+  </data>
+  <data name="Eng_DeleteFlushTimeout" xml:space="preserve">
+    <value>Could not send pending deletions within the allotted time</value>
   </data>
   <data name="Eng_LoginFirst" xml:space="preserve">
     <value>Sign in first</value>
@@ -392,8 +425,62 @@
   <data name="Eng_EmptyCachePath" xml:space="preserve">
     <value>Empty cache folder path</value>
   </data>
+  <data name="Eng_EmptyFileNotSupported" xml:space="preserve">
+    <value>The server does not support empty files; the previous version was kept.</value>
+  </data>
   <data name="Eng_SyncFailedFmt" xml:space="preserve">
     <value>Failed to save “{0}” to the cloud: {1}</value>
+  </data>
+  <data name="Eng_MoveRollbackFailedFmt" xml:space="preserve">
+    <value>Could not fully roll back moving “{0}”: {1}</value>
+  </data>
+  <data name="Eng_AttachedFileNotListedFmt" xml:space="preserve">
+    <value>After attaching, “{0}” was not found in the fresh directory listing.</value>
+  </data>
+  <data name="Eng_DeleteFailedFmt" xml:space="preserve">
+    <value>Could not delete cloud entry “{0}” after {1} attempts.</value>
+  </data>
+  <data name="Eng_DirectoryNotEmpty" xml:space="preserve">
+    <value>The directory is not empty.</value>
+  </data>
+  <data name="Eng_DirectoryDeleteFailedFmt" xml:space="preserve">
+    <value>Could not delete directory “{0}” from the cloud: {1}</value>
+  </data>
+  <data name="Eng_OutboxMoveFailedFmt" xml:space="preserve">
+    <value>Could not move “{0}” into the outbox.</value>
+  </data>
+  <data name="Eng_OutboxRollbackFailedFmt" xml:space="preserve">
+    <value>Could not move “{0}” back out of the outbox.</value>
+  </data>
+  <data name="Eng_OutboxManifestReadFailedFmt" xml:space="preserve">
+    <value>Could not read outbox manifest “{0}”.</value>
+  </data>
+  <data name="Eng_OutboxOrphanFileFmt" xml:space="preserve">
+    <value>Left outbox file without a manifest untouched: {0}</value>
+  </data>
+  <data name="Eng_OutboxSaveError" xml:space="preserve">
+    <value>Could not save the outbox error.</value>
+  </data>
+  <data name="Eng_OutboxCallbackError" xml:space="preserve">
+    <value>Outbox callback failed.</value>
+  </data>
+  <data name="Eng_OutboxDataDeleteFailedFmt" xml:space="preserve">
+    <value>Could not delete outbox data for “{0}”; its manifest has already been removed.</value>
+  </data>
+  <data name="Eng_OutboxRetryFmt" xml:space="preserve">
+    <value>Retrying “{0}”.</value>
+  </data>
+  <data name="Eng_OutboxPassError" xml:space="preserve">
+    <value>Outbox pass failed.</value>
+  </data>
+  <data name="Eng_OutboxRegisterFailedFmt" xml:space="preserve">
+    <value>Could not register “{0}” from the outbox.</value>
+  </data>
+  <data name="Eng_OutboxTriggerFailed" xml:space="preserve">
+    <value>Could not start the outbox worker.</value>
+  </data>
+  <data name="Eng_OutboxTransferFailedFmt" xml:space="preserve">
+    <value>Could not transfer “{0}” into the outbox.</value>
   </data>
   <data name="Launcher_ConnectFailed" xml:space="preserve">
     <value>could not connect to the engine</value>
@@ -401,4 +488,15 @@
   <data name="Launcher_EngineNotFoundFmt" xml:space="preserve">
     <value>engine not found: {0}</value>
   </data>
+  <data name="Eng_AttachedFileRetryFmt" xml:space="preserve"><value>Confirmed entry “{0}” is missing from the directory; retrying attachment of saved data.</value></data>
+  <data name="Eng_OutboxAdoptedFmt" xml:space="preserve"><value>Unowned pending file “{0}” adopted by user {1}.</value></data>
+  <data name="Eng_DokanKeepAliveFailed" xml:space="preserve"><value>Could not extend the Dokany operation timeout.</value></data>
+  <data name="Eng_HttpTransferTimedOut" xml:space="preserve"><value>The data transfer timed out.</value></data>
+  <data name="Eng_UploadProcessingPending" xml:space="preserve"><value>The server is still processing the file; saving will continue in the queue.</value></data>
+  <data name="Eng_UploadSessionInvalidResponse" xml:space="preserve"><value>The server returned an invalid resumable upload state.</value></data>
+  <data name="Eng_UploadRestartLimit" xml:space="preserve"><value>Upload paused after three failed server sessions; try again later.</value></data>
+  <data name="Eng_UploadResumeLimitFmt" xml:space="preserve"><value>Could not resume upload after three attempts: {0}</value></data>
+  <data name="Eng_UploadSessionMissing" xml:space="preserve"><value>Upload session was not found on the server.</value></data>
+  <data name="Eng_UploadOriginMissing" xml:space="preserve"><value>The Upload 2.0 part upload address is not configured.</value></data>
+  <data name="Eng_UploadCancelFailed" xml:space="preserve"><value>Could not cancel the superseded upload session.</value></data>
 </root>

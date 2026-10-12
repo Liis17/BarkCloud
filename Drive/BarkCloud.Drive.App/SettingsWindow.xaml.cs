@@ -35,7 +35,10 @@ public partial class SettingsWindow : FluentWindow
 
     private IDriveEngine? Engine => _owner.Engine;
 
-    private void LanguageChanged(object sender, SelectionChangedEventArgs e)
+    private async void LanguageChanged(object sender, SelectionChangedEventArgs e)
+        => await HandleAsync(LanguageChangedAsync());
+
+    private async Task LanguageChangedAsync()
     {
         if (!_langReady || LanguageCombo.SelectedItem is not Language lang)
             return;
@@ -43,10 +46,14 @@ public partial class SettingsWindow : FluentWindow
         Loc.SetCulture(lang.Code);
         _settings.Language = lang.Code;
         _settings.Save();
-        _ = Engine?.SetLanguageAsync(lang.Code);
+        if (Engine is { } engine)
+            await engine.SetLanguageAsync(lang.Code);
     }
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
+        => await HandleAsync(OnLoadedAsync());
+
+    private async Task OnLoadedAsync()
     {
         // Состояние автозагрузки — из реестра, не зависит от движка.
         AutostartAppCheck.IsChecked = Autostart.IsAppEnabled();
@@ -102,6 +109,9 @@ public partial class SettingsWindow : FluentWindow
     }
 
     private async void LogoutClick(object sender, RoutedEventArgs e)
+        => await HandleAsync(LogoutAsync());
+
+    private async Task LogoutAsync()
     {
         var engine = Engine;
         if (engine == null)
@@ -109,7 +119,13 @@ public partial class SettingsWindow : FluentWindow
 
         try
         {
-            await engine.LogoutAsync();
+            var status = await engine.LogoutAsync();
+            if (!string.IsNullOrEmpty(status.Error))
+            {
+                Status(Loc.T("Settings_LogoutErrorFmt", status.Error));
+                return;
+            }
+
             _settings.Configured = false; // следующий показ — мастер
             _settings.Save();
             Close();
@@ -121,6 +137,9 @@ public partial class SettingsWindow : FluentWindow
     }
 
     private async void ApplyServerClick(object sender, RoutedEventArgs e)
+        => await HandleAsync(ApplyServerAsync());
+
+    private async Task ApplyServerAsync()
     {
         var host = ServerInput.StripScheme(HostBox.Text);
         if (string.IsNullOrEmpty(host)) { Status(Loc.T("Common_EnterServer")); return; }
@@ -179,6 +198,9 @@ public partial class SettingsWindow : FluentWindow
     }
 
     private async void MountClick(object sender, RoutedEventArgs e)
+        => await HandleAsync(MountAsync());
+
+    private async Task MountAsync()
     {
         var engine = Engine;
         if (engine == null || LetterCombo.SelectedItem is not string letter)
@@ -202,6 +224,9 @@ public partial class SettingsWindow : FluentWindow
     }
 
     private async void UnmountClick(object sender, RoutedEventArgs e)
+        => await HandleAsync(UnmountAsync());
+
+    private async Task UnmountAsync()
     {
         var engine = Engine;
         if (engine == null)
@@ -218,6 +243,9 @@ public partial class SettingsWindow : FluentWindow
     }
 
     private async void RenameClick(object sender, RoutedEventArgs e)
+        => await HandleAsync(RenameAsync());
+
+    private async Task RenameAsync()
     {
         var engine = Engine;
         if (engine == null)
@@ -230,10 +258,16 @@ public partial class SettingsWindow : FluentWindow
         try
         {
             var s = await engine.GetStatusAsync();
-            if (s.Mounted)
-                s = await engine.RemountAsync(null, label); // имя применяется только при маунте
-            SaveDrive(_settings.DriveLetter, label);
-            ApplyResult(s, Loc.T(s.Mounted ? "Settings_DriveRenamed" : "Settings_NameSaved"));
+            if (!s.Mounted)
+            {
+                ApplyResult(s, Loc.T("Settings_MountFirstToApply"));
+                return;
+            }
+
+            s = await engine.RemountAsync(null, label); // имя применяется только при маунте
+            if (s.Mounted && string.IsNullOrEmpty(s.Error))
+                SaveDrive(_settings.DriveLetter, label);
+            ApplyResult(s, Loc.T(s.Mounted ? "Settings_DriveRenamed" : "Settings_MountFirstToApply"));
         }
         catch (Exception ex)
         {
@@ -242,27 +276,49 @@ public partial class SettingsWindow : FluentWindow
     }
 
     private async void ChangeLetterClick(object sender, RoutedEventArgs e)
+        => await HandleAsync(ChangeLetterAsync());
+
+    private async Task ChangeLetterAsync()
     {
         var engine = Engine;
         if (engine == null || LetterCombo.SelectedItem is not string letter)
             return;
 
+        var previousLetter = _settings.DriveLetter;
         try
         {
             var s = await engine.GetStatusAsync();
-            if (s.Mounted)
-                s = await engine.RemountAsync(letter, null);
-            SaveDrive(letter, _settings.DriveName);
-            PopulateLetters(letter);
-            ApplyResult(s, s.Mounted ? Loc.T("Settings_LetterChangedFmt", letter) : Loc.T("Settings_LetterSaved"));
+            previousLetter = s.DriveLetter ?? previousLetter;
+            if (!s.Mounted)
+            {
+                PopulateLetters(previousLetter);
+                ApplyResult(s, Loc.T("Settings_MountFirstToApply"));
+                return;
+            }
+
+            s = await engine.RemountAsync(letter, null);
+            if (s.Mounted && string.IsNullOrEmpty(s.Error))
+            {
+                SaveDrive(letter, _settings.DriveName);
+                PopulateLetters(letter);
+            }
+            else
+                PopulateLetters(previousLetter);
+            ApplyResult(s, s.Mounted
+                ? Loc.T("Settings_LetterChangedFmt", letter)
+                : Loc.T("Settings_MountFirstToApply"));
         }
         catch (Exception ex)
         {
+            PopulateLetters(previousLetter);
             Status(Loc.T("Common_ErrorFmt", ex.Message));
         }
     }
 
     private async void BrowseCacheClick(object sender, RoutedEventArgs e)
+        => await HandleAsync(BrowseCacheAsync());
+
+    private async Task BrowseCacheAsync()
     {
         var engine = Engine;
         if (engine == null)
@@ -286,7 +342,22 @@ public partial class SettingsWindow : FluentWindow
         }
     }
 
+    private void OpenOutboxClick(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            OutboxFolder.Open();
+        }
+        catch (Exception ex)
+        {
+            Status(Loc.T("Settings_OutboxOpenFailedFmt", ex.Message));
+        }
+    }
+
     private async void RestartClick(object sender, RoutedEventArgs e)
+        => await HandleAsync(RestartAsync());
+
+    private async Task RestartAsync()
     {
         Status(Loc.T("Settings_RestartingEngine"));
         var engine = await _owner.RestartEngineAsync();
@@ -347,6 +418,18 @@ public partial class SettingsWindow : FluentWindow
 
     private static string UserText(EngineStatus s)
         => !string.IsNullOrEmpty(s.Username) ? s.Username! : Loc.T(s.Authenticated ? "User_LoggedIn" : "User_NotLoggedIn");
+
+    private async Task HandleAsync(Task handler)
+    {
+        try
+        {
+            await handler;
+        }
+        catch (Exception ex)
+        {
+            Status(Loc.T("Common_ErrorFmt", ex.Message));
+        }
+    }
 
     private void Status(string message) => SettingsStatus.Text = message;
 }

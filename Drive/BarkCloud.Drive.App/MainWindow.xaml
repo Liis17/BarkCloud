@@ -26,6 +26,7 @@
                     <Separator/>
                     <MenuItem Header="{loc:Tr Tray_Mount}" Click="MountClick"/>
                     <MenuItem Header="{loc:Tr Tray_Unmount}" Click="UnmountClick"/>
+                    <MenuItem x:Name="PendingUploadsMenu" Visibility="Collapsed" Header="{loc:Tr Tray_PendingUploads}" Click="OpenOutboxClick"/>
                     <Separator/>
                     <MenuItem Header="{loc:Tr Tray_Exit}" Click="ExitClick"/>
                 </ContextMenu>

@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Runtime.InteropServices;
 
 namespace BarkCloud.Drive.Engine;
@@ -13,12 +14,21 @@ internal sealed class DeviceIdentity
     public string AppVersion { get; }
 
     public DeviceIdentity()
+        : this(LoadOrCreateDeviceId(), Environment.MachineName, RuntimeInformation.OSDescription, "BarkCloud.Drive")
     {
-        DeviceName = Environment.MachineName;
-        OsName = RuntimeInformation.OSDescription;
-        AppName = "BarkCloud.Drive";
-        AppVersion = "0.1.0";
-        DeviceId = LoadOrCreateDeviceId();
+    }
+
+    private static string ReadAssemblyInformationalVersion()
+        => typeof(DeviceIdentity).Assembly
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion.Split('+')[0];
+
+    internal DeviceIdentity(string deviceId, string deviceName, string osName, string appName, string? appVersion = null)
+    {
+        DeviceId = deviceId;
+        DeviceName = deviceName;
+        OsName = osName;
+        AppName = appName;
+        AppVersion = appVersion ?? ReadAssemblyInformationalVersion();
     }
 
     private static string LoadOrCreateDeviceId()

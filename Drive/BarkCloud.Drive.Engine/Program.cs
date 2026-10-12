@@ -1,12 +1,7 @@
-using System.IO.Pipes;
 using System.Text.Json;
 
 using BarkCloud.Drive.Contracts;
 using BarkCloud.Drive.Engine;
-
-using StreamJsonRpc;
-
-const string PipeName = "BarkCloud.Drive.Engine";
 
 // Один экземпляр движка на пользователя.
 using var mutex = new Mutex(true, "BarkCloud.Drive.Engine.Singleton", out var isNew);
@@ -15,6 +10,8 @@ if (!isNew)
 
 var config = LoadConfig();
 var device = new DeviceIdentity();
+var settings = new EngineSettingsStore();
+var serverKey = EngineServerKey.FromConfig(config);
 
 // Адреса по сервисам, как в iOS (nginx-порты): Identity :7020, Files :7025, Users :7021.
 var identityAddress = $"https://{config.Host}:{config.IdentityPort}";
@@ -26,70 +23,37 @@ var usersAddress = $"https://{config.Host}:{config.UsersPort}";
 TokenManager? tokens = null;
 using var connection = new BarkCloudConnection(
     identityAddress, filesAddress, usersAddress, config.DangerousAcceptAnyServerCert, device, () => tokens?.CurrentToken);
-tokens = new TokenManager(connection.Identity, new TokenStore());
-
-// Молча восстановить сессию из сохранённого refresh-токена (если есть).
-await tokens.TryRestoreAsync();
-
-var settings = new EngineSettingsStore();
-var profile = new UserProfile(connection.Users);
-var gateway = new CloudGateway(connection.Cloud, connection.Files, connection.Http, $"{filesAddress}/web",
-    () => tokens?.CurrentToken, settings.GetCacheDir());
-var fs = new BarkCloudFileSystem(gateway);
+tokens = new TokenManager(connection.Identity, new TokenStore(serverKey: serverKey));
+var profile = new UserProfile(connection.Users, userId => settings.SetLastUserId(serverKey, userId));
+using var gateway = new CloudGateway(connection.Cloud, connection.Files, connection.Http, $"{filesAddress}/web",
+    settings.GetCacheDir(), uploadOrigin: $"https://{config.Host}");
+var outbox = new UploadOutbox(DriveStoragePaths.OutboxDirectory);
+var fs = new BarkCloudFileSystem(gateway, outbox: outbox, serverKey: serverKey,
+    ownerUserId: () => profile.UserId ?? settings.GetLastUserId(serverKey));
+await using var outboxWorker = new UploadOutboxWorker(outbox,
+    () => (serverKey, profile.UserId),
+    (entry, cancellationToken) => fs.ProcessOutboxEntryAsync(entry, cancellationToken),
+    completed: fs.CompleteOutboxEntry,
+    failed: fs.SetOutboxSyncError,
+    deferDataDeletion: fs.DeferOutboxDataDeletion);
+fs.OutboxAdded = outboxWorker.Trigger;
+fs.SyncError = fs.SetLastSyncError;
 using var mount = new MountManager();
 using var lifetime = new CancellationTokenSource();
 
-var engine = new DriveEngine(tokens, gateway, mount, fs, lifetime, settings, profile, config.Host);
-
-// Автомонтаж на старте: при автозапуске движка (без UI) поднимаем последний диск,
-// если сессия восстановлена и буква запомнена. UI при своём старте увидит Mounted и не дублирует.
-if (tokens.IsAuthenticated)
-{
-    var (letter, label) = settings.GetLastMount();
-    if (!string.IsNullOrEmpty(letter))
-    {
-        try
-        {
-            if (!string.IsNullOrEmpty(label))
-                fs.VolumeLabel = label;
-            mount.Mount(letter, fs);
-            EngineLog.Info($"Автомонтаж {letter}: ({fs.VolumeLabel}) на старте");
-        }
-        catch (Exception ex)
-        {
-            EngineLog.Error("Автомонтаж на старте", ex);
-        }
-    }
-}
+var engine = new DriveEngine(tokens, gateway, mount, fs, lifetime, settings, profile, outboxWorker,
+    serverKey, config.Host);
+tokens.SessionRestored += engine.SessionRestoredAsync;
 
 Console.WriteLine("BarkCloud.Drive.Engine запущен. Ожидание подключения UI...");
 
+var restoreTask = tokens.TryRestoreAsync();
 // IPC: named pipe + StreamJsonRpc. Обслуживаем по одному клиенту за раз,
 // переживая переподключения UI. Выходим только по ShutdownAsync.
-while (!lifetime.IsCancellationRequested)
-{
-    var pipe = new NamedPipeServerStream(
-        PipeName, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
+await EnginePipeServer.RunAsync(EnginePipe.Name, engine, lifetime.Token);
 
-    try
-    {
-        await pipe.WaitForConnectionAsync(lifetime.Token);
-    }
-    catch (OperationCanceledException)
-    {
-        await pipe.DisposeAsync();
-        break;
-    }
-
-    using (var rpc = JsonRpc.Attach(pipe, engine))
-    {
-        try { await rpc.Completion; }
-        catch { /* клиент отключился — ждём следующего */ }
-    }
-
-    await pipe.DisposeAsync();
-}
-
+if (await Task.WhenAny(restoreTask, Task.Delay(TimeSpan.FromSeconds(3))) == restoreTask)
+    await restoreTask;
 mount.Unmount();
 Console.WriteLine("BarkCloud.Drive.Engine завершён.");
 return 0;
@@ -127,5 +91,5 @@ internal sealed class EngineConfig
     public int IdentityPort { get; set; } = 7020; // nginx → Identity
     public int FilesPort { get; set; } = 7025;     // nginx → Files (Cloud/Files/Album + /web)
     public int UsersPort { get; set; } = 7021;     // nginx → Users
-    public bool DangerousAcceptAnyServerCert { get; set; } = true;
+    public bool DangerousAcceptAnyServerCert { get; set; } = false;
 }

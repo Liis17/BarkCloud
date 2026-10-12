@@ -1,6 +1,5 @@
 using BarkCloud.Files.Exceptions;
 using BarkCloud.Files.Features.DownloadFile;
-using BarkCloud.Files.Features.UploadFile;
 using BarkCloud.Files.Services;
 using BarkCloud.GrpcServer.Metrics;
 
@@ -17,18 +16,17 @@ public class FilesController : Controller
     private readonly IMediator _mediator;
     private readonly MetricsCollector _metrics;
     private readonly UploadSessionCoordinator _uploadSessions;
-    private readonly LegacyUploadQuotaGuard _legacyQuota;
+
+    private const string LegacyUploadRemovedErrorCode = "legacy_upload_removed";
 
     public FilesController(
         IMediator mediator,
         MetricsCollector metrics,
-        UploadSessionCoordinator uploadSessions,
-        LegacyUploadQuotaGuard legacyQuota)
+        UploadSessionCoordinator uploadSessions)
     {
         _mediator = mediator;
         _metrics = metrics;
         _uploadSessions = uploadSessions;
-        _legacyQuota = legacyQuota;
     }
 
     [HttpPut("file-upload/{sessionId:guid}/parts/{partNumber:int}")]
@@ -83,79 +81,16 @@ public class FilesController : Controller
     }
 
     [HttpPost("upload/{uploadId:guid}")]
-    [ServiceFilter(typeof(LegacyUploadAdmissionFilter))]
-    // Реальный предел размера задаёт фильтр через Kestrel-фичу MaxRequestBodySize на запрос.
-    [RequestFormLimits(MultipartBodyLengthLimit = long.MaxValue)]
-    public async Task<IActionResult> UploadFile([FromRoute] Guid uploadId, [FromForm] IFormFile? file)
+    public IActionResult UploadFile()
     {
-        if (file == null || file.Length == 0)
-        {
-            return BadRequest("Файл не выбран или пустой.");
-        }
+        if (Request.Protocol.StartsWith("HTTP/1.", StringComparison.OrdinalIgnoreCase))
+            Response.Headers.Connection = "close";
 
-        LegacyUploadReservation reservation;
-        try
+        return StatusCode(StatusCodes.Status418ImATeapot, new
         {
-            reservation = await _legacyQuota.ReserveAsync(
-                uploadId, file.FileName, file.Length, HttpContext.RequestAborted,
-                HttpContext.Items[LegacyUploadAdmissionFilter.MigrationActivityKey] as string);
-        }
-        catch (BarkCloud.Shared.Exceptions.Files.UploadQuotaExceededException ex)
-        {
-            _metrics.Increment("upload_quota_rejections_total");
-            return Conflict(new
-            {
-                error = ex.ErrorMessage,
-                code = ex.ErrorCode,
-                limit = ex.LimitBytes,
-                used = ex.UsedBytes,
-                reserved = ex.ReservedBytes,
-                requested = ex.RequestedBytes
-            });
-        }
-        catch (FileAlreadyUploadedException ex)
-        {
-            return BadRequest(ex.Message);
-        }
-        catch (BarkCloud.Shared.Exceptions.Files.StorageMigrationPausedException ex)
-        {
-            return Conflict(new { error = ex.ErrorMessage, code = ex.ErrorCode });
-        }
-
-        if (!reservation.RequiresProcessing)
-            return Ok(new { fileId = uploadId.ToString() });
-
-        using var command = new UploadFileCommand()
-        {
-            FileId = uploadId,
-            FileStream = file.OpenReadStream(),
-            FileName = file.FileName,
-            FileSize = file.Length,
-            QuotaReservationId = reservation.SessionId
-        };
-
-        string resultFileId;
-        try
-        {
-            resultFileId = await _mediator.Send(command, HttpContext.RequestAborted);
-        }
-        catch (FileAlreadyUploadedException ex)
-        {
-            await _legacyQuota.FailAsync(reservation.SessionId, ex, CancellationToken.None);
-            return BadRequest(ex.Message);
-        }
-        catch (Exception ex)
-        {
-            await _legacyQuota.FailAsync(reservation.SessionId, ex, CancellationToken.None);
-            throw;
-        }
-
-        // UploadedAt и резерв меняются одной транзакцией: между ними нет окна
-        // двойного учёта used + reserved и файл не виден до конвертации резерва.
-        await _legacyQuota.CompleteAsync(reservation.SessionId, CancellationToken.None);
-        _metrics.Increment("files_uploaded");
-        _metrics.Add("upload_bytes_total", file.Length);
-        return Ok(new { fileId = resultFileId });
+            error = "Загрузка через этот адрес больше не поддерживается, используйте Upload 2.0 (CreateUploadSession).",
+            code = LegacyUploadRemovedErrorCode
+        });
     }
 
     [HttpGet("download/{fileId}")]

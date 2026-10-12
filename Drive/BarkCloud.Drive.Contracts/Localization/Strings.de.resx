@@ -78,7 +78,10 @@
     <value>Dienst-Ports</value>
   </data>
   <data name="Common_AcceptCert" xml:space="preserve">
-    <value>Selbstsigniertem Zertifikat vertrauen</value>
+    <value>Alle Serverzertifikate akzeptieren</value>
+  </data>
+  <data name="Common_AcceptCertWarning" xml:space="preserve">
+    <value>Überspringt die Prüfung des Serverzertifikats. Nur bei einem vertrauenswürdigen Server verwenden.</value>
   </data>
   <data name="Common_DriveName" xml:space="preserve">
     <value>Laufwerksname</value>
@@ -149,6 +152,12 @@
   <data name="Main_EngineUnavailableFmt" xml:space="preserve">
     <value>Dienst nicht verfügbar: {0}</value>
   </data>
+  <data name="Main_EngineNotResponding" xml:space="preserve">
+    <value>Der Dienst antwortet nicht.</value>
+  </data>
+  <data name="Main_EngineShuttingDown" xml:space="preserve">
+    <value>Der Dienst wird beendet…</value>
+  </data>
   <data name="Main_NoFreeLetter" xml:space="preserve">
     <value>Kein freier Laufwerksbuchstabe zum Einbinden verfügbar.</value>
   </data>
@@ -193,6 +202,12 @@
   </data>
   <data name="Tray_Exit" xml:space="preserve">
     <value>Anwendung beenden</value>
+  </data>
+  <data name="Tray_PendingUploads" xml:space="preserve">
+    <value>Ausstehende Uploads</value>
+  </data>
+  <data name="Tray_PendingUploadsFmt" xml:space="preserve">
+    <value>Dateien warten auf Upload: {0}</value>
   </data>
   <data name="Wizard_Title" xml:space="preserve">
     <value>BarkCloud Drive einrichten</value>
@@ -296,6 +311,15 @@
   <data name="Settings_Cache" xml:space="preserve">
     <value>Cache-Ordner</value>
   </data>
+  <data name="Settings_Outbox" xml:space="preserve">
+    <value>Nicht gesendete Dateien</value>
+  </data>
+  <data name="Settings_OpenOutbox" xml:space="preserve">
+    <value>Ordner mit nicht gesendeten Dateien öffnen</value>
+  </data>
+  <data name="Settings_OutboxOpenFailedFmt" xml:space="preserve">
+    <value>Der Ordner mit nicht gesendeten Dateien konnte nicht geöffnet werden: {0}</value>
+  </data>
   <data name="Settings_Autostart" xml:space="preserve">
     <value>Autostart (bei Windows-Anmeldung)</value>
   </data>
@@ -309,7 +333,7 @@
     <value>Abmeldefehler: {0}</value>
   </data>
   <data name="Settings_ApplyingAddress" xml:space="preserve">
-    <value>Adresse wird übernommen, Dienst wird neu gestartet…</value>
+    <value>Adresse wird übernommen; der Dienst wird beendet…</value>
   </data>
   <data name="Settings_EngineUnavailableAfterServer" xml:space="preserve">
     <value>Dienst nach Adressänderung nicht verfügbar.</value>
@@ -329,14 +353,11 @@
   <data name="Settings_DriveRenamed" xml:space="preserve">
     <value>Laufwerk umbenannt</value>
   </data>
-  <data name="Settings_NameSaved" xml:space="preserve">
-    <value>Name gespeichert (Laufwerk einbinden)</value>
-  </data>
   <data name="Settings_LetterChangedFmt" xml:space="preserve">
     <value>Buchstabe geändert auf {0}:</value>
   </data>
-  <data name="Settings_LetterSaved" xml:space="preserve">
-    <value>Buchstabe gespeichert (Laufwerk einbinden)</value>
+  <data name="Settings_MountFirstToApply" xml:space="preserve">
+    <value>Binden Sie das Laufwerk ein, um diese Änderungen anzuwenden.</value>
   </data>
   <data name="Settings_CacheUpdated" xml:space="preserve">
     <value>Cache-Ordner aktualisiert. Bereits heruntergeladene Inhalte verbleiben im alten Ordner.</value>
@@ -345,7 +366,7 @@
     <value>Cache-Ordner konnte nicht geändert werden: {0}</value>
   </data>
   <data name="Settings_RestartingEngine" xml:space="preserve">
-    <value>Dienst wird neu gestartet…</value>
+    <value>Der Dienst wird vor dem Neustart beendet…</value>
   </data>
   <data name="Settings_EngineUnavailableAfterRestart" xml:space="preserve">
     <value>Dienst nach Neustart nicht verfügbar.</value>
@@ -359,11 +380,23 @@
   <data name="Eng_LoginRequired" xml:space="preserve">
     <value>Benutzername und Passwort eingeben</value>
   </data>
+  <data name="Eng_TlsConnectionError" xml:space="preserve">
+    <value>Die sichere TLS-Verbindung konnte nicht hergestellt werden. Prüfen Sie Serveradresse und Zertifikat. Für einen vertrauenswürdigen selbst gehosteten Server können Sie vorübergehend „Alle Serverzertifikate akzeptieren“ in den Verbindungseinstellungen aktivieren.</value>
+  </data>
   <data name="Eng_AuthSuccess" xml:space="preserve">
     <value>Erfolgreich angemeldet</value>
   </data>
+  <data name="Eng_AuthSuperseded" xml:space="preserve">
+    <value>Die Anmeldung wurde abgebrochen, weil sich die Sitzung geändert hat</value>
+  </data>
   <data name="Eng_LoggedOut" xml:space="preserve">
     <value>Abgemeldet</value>
+  </data>
+  <data name="Eng_PlaceholderDataPreservedFmt" xml:space="preserve">
+    <value>Platzhalter „{0}“ enthält Daten und wurde unter {1} aufbewahrt; er wurde nicht hochgeladen.</value>
+  </data>
+  <data name="Eng_DeleteFlushTimeout" xml:space="preserve">
+    <value>Ausstehende Löschvorgänge konnten nicht rechtzeitig gesendet werden</value>
   </data>
   <data name="Eng_LoginFirst" xml:space="preserve">
     <value>Bitte zuerst anmelden</value>
@@ -392,8 +425,62 @@
   <data name="Eng_EmptyCachePath" xml:space="preserve">
     <value>Leerer Cache-Ordnerpfad</value>
   </data>
+  <data name="Eng_EmptyFileNotSupported" xml:space="preserve">
+    <value>Der Server unterstützt keine leeren Dateien; die vorherige Version blieb erhalten.</value>
+  </data>
   <data name="Eng_SyncFailedFmt" xml:space="preserve">
     <value>„{0}“ konnte nicht in die Cloud gespeichert werden: {1}</value>
+  </data>
+  <data name="Eng_MoveRollbackFailedFmt" xml:space="preserve">
+    <value>„{0}“ konnte nicht vollständig zurückverschoben werden: {1}</value>
+  </data>
+  <data name="Eng_AttachedFileNotListedFmt" xml:space="preserve">
+    <value>Nach dem Verknüpfen wurde „{0}“ nicht in der aktuellen Verzeichnisliste gefunden.</value>
+  </data>
+  <data name="Eng_DeleteFailedFmt" xml:space="preserve">
+    <value>Cloud-Eintrag „{0}“ konnte nach {1} Versuchen nicht gelöscht werden.</value>
+  </data>
+  <data name="Eng_DirectoryNotEmpty" xml:space="preserve">
+    <value>Das Verzeichnis ist nicht leer.</value>
+  </data>
+  <data name="Eng_DirectoryDeleteFailedFmt" xml:space="preserve">
+    <value>Das Verzeichnis „{0}“ konnte nicht aus der Cloud gelöscht werden: {1}</value>
+  </data>
+  <data name="Eng_OutboxMoveFailedFmt" xml:space="preserve">
+    <value>„{0}“ konnte nicht in den Outbox-Ordner verschoben werden.</value>
+  </data>
+  <data name="Eng_OutboxRollbackFailedFmt" xml:space="preserve">
+    <value>„{0}“ konnte nicht aus dem Outbox-Ordner zurückverschoben werden.</value>
+  </data>
+  <data name="Eng_OutboxManifestReadFailedFmt" xml:space="preserve">
+    <value>Outbox-Manifest „{0}“ konnte nicht gelesen werden.</value>
+  </data>
+  <data name="Eng_OutboxOrphanFileFmt" xml:space="preserve">
+    <value>Outbox-Datei ohne Manifest bleibt unverändert: {0}</value>
+  </data>
+  <data name="Eng_OutboxSaveError" xml:space="preserve">
+    <value>Outbox-Fehler konnte nicht gespeichert werden.</value>
+  </data>
+  <data name="Eng_OutboxCallbackError" xml:space="preserve">
+    <value>Outbox-Callback fehlgeschlagen.</value>
+  </data>
+  <data name="Eng_OutboxDataDeleteFailedFmt" xml:space="preserve">
+    <value>Outbox-Daten für „{0}“ konnten nicht gelöscht werden; das Manifest wurde bereits entfernt.</value>
+  </data>
+  <data name="Eng_OutboxRetryFmt" xml:space="preserve">
+    <value>„{0}“ wird erneut gesendet.</value>
+  </data>
+  <data name="Eng_OutboxPassError" xml:space="preserve">
+    <value>Outbox-Durchlauf fehlgeschlagen.</value>
+  </data>
+  <data name="Eng_OutboxRegisterFailedFmt" xml:space="preserve">
+    <value>„{0}“ konnte nicht aus der Outbox registriert werden.</value>
+  </data>
+  <data name="Eng_OutboxTriggerFailed" xml:space="preserve">
+    <value>Outbox-Worker konnte nicht gestartet werden.</value>
+  </data>
+  <data name="Eng_OutboxTransferFailedFmt" xml:space="preserve">
+    <value>„{0}“ konnte nicht in die Outbox übertragen werden.</value>
   </data>
   <data name="Launcher_ConnectFailed" xml:space="preserve">
     <value>Verbindung zum Dienst fehlgeschlagen</value>
@@ -401,4 +488,15 @@
   <data name="Launcher_EngineNotFoundFmt" xml:space="preserve">
     <value>Dienst nicht gefunden: {0}</value>
   </data>
+  <data name="Eng_AttachedFileRetryFmt" xml:space="preserve"><value>Der bestätigte Eintrag „{0}“ fehlt im Ordner; die gespeicherten Daten werden erneut verknüpft.</value></data>
+  <data name="Eng_OutboxAdoptedFmt" xml:space="preserve"><value>Die ausstehende Datei „{0}“ ohne Besitzer wurde Benutzer {1} zugeordnet.</value></data>
+  <data name="Eng_DokanKeepAliveFailed" xml:space="preserve"><value>Das Zeitlimit des Dokany-Vorgangs konnte nicht verlängert werden.</value></data>
+  <data name="Eng_HttpTransferTimedOut" xml:space="preserve"><value>Die Datenübertragung hat das Zeitlimit überschritten.</value></data>
+  <data name="Eng_UploadProcessingPending" xml:space="preserve"><value>Der Server verarbeitet die Datei noch; das Speichern wird in der Warteschlange fortgesetzt.</value></data>
+  <data name="Eng_UploadSessionInvalidResponse" xml:space="preserve"><value>Der Server hat einen ungültigen Status für den fortsetzbaren Upload zurückgegeben.</value></data>
+  <data name="Eng_UploadRestartLimit" xml:space="preserve"><value>Upload nach drei fehlgeschlagenen Serversitzungen pausiert; später erneut versuchen.</value></data>
+  <data name="Eng_UploadResumeLimitFmt" xml:space="preserve"><value>Upload konnte nach drei Versuchen nicht fortgesetzt werden: {0}</value></data>
+  <data name="Eng_UploadSessionMissing" xml:space="preserve"><value>Upload-Sitzung wurde auf dem Server nicht gefunden.</value></data>
+  <data name="Eng_UploadOriginMissing" xml:space="preserve"><value>Die Adresse für den Upload der Teile (Upload 2.0) ist nicht konfiguriert.</value></data>
+  <data name="Eng_UploadCancelFailed" xml:space="preserve"><value>Die veraltete Upload-Sitzung konnte nicht abgebrochen werden.</value></data>
 </root>

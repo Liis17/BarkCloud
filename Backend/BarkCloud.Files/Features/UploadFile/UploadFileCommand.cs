@@ -26,8 +26,6 @@ public class UploadFileCommand : IRequest<string>, IDisposable
 
     public bool DeferAvailability { get; set; }
 
-    public Guid? QuotaReservationId { get; set; }
-
     public void Dispose()
     {
         FileStream?.Dispose();

@@ -24,7 +24,6 @@ public class UploadFileCommandHandlerTests
     private readonly Mock<HeicImageConverter> _heicConverter;
     private readonly Mock<FileMetadataExtractor> _metadataExtractor;
     private readonly Mock<PreviewPersistenceService> _previewPersistence;
-    private readonly Mock<ILegacyUploadCompletionMarker> _legacyCompletion = new();
 
     public UploadFileCommandHandlerTests()
     {
@@ -50,7 +49,7 @@ public class UploadFileCommandHandlerTests
     private UploadFileCommandHandler CreateSut(IUploadTempFileProvider? tempFiles = null) => new(
         _files.Object, _hashes.Object, _metadata.Object, _s3.Object, _bucketRegistry.Object,
         _imageCompressor.Object, _videoExtractor.Object, _heicConverter.Object,
-        _metadataExtractor.Object, _previewPersistence.Object, _legacyCompletion.Object,
+        _metadataExtractor.Object, _previewPersistence.Object,
         NullLogger<UploadFileCommandHandler>.Instance,
         tempFiles: tempFiles);
 
@@ -117,28 +116,6 @@ public class UploadFileCommandHandlerTests
             Times.Once);
         _files.Verify(s => s.UpdateFile(It.Is<UploadFileEntity>(f => f.Etag == "etag-123" && f.Filename == "doc.txt")), Times.Once);
         _hashes.Verify(s => s.AddHash(It.Is<FileHash>(h => h.FileId == id)), Times.Once);
-    }
-
-    [Fact]
-    public async Task Handle_LegacyReservation_KeepsFileHiddenUntilQuotaCommit()
-    {
-        var id = Guid.NewGuid();
-        var reservationId = Guid.NewGuid();
-        _files.Setup(s => s.GetFile(id))
-            .ReturnsAsync(new UploadFileEntity { Id = id, Type = UploadFileType.CloudFile, Uploaders = [42] });
-
-        await CreateSut().Handle(new UploadFileCommand
-        {
-            FileId = id,
-            FileName = "doc.txt",
-            FileStream = MakeStream(),
-            QuotaReservationId = reservationId
-        }, default);
-
-        _files.Verify(s => s.UpdateFile(It.Is<UploadFileEntity>(file =>
-            file.Etag == "etag-123" && file.UploadedAt == null)), Times.Once);
-        _legacyCompletion.Verify(x => x.MarkProcessingCompletedAsync(
-            reservationId, CancellationToken.None), Times.Once);
     }
 
     [Fact]

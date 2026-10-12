@@ -26,7 +26,6 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
     private readonly HeicImageConverter _heicConverter;
     private readonly FileMetadataExtractor _metadataExtractor;
     private readonly PreviewPersistenceService _previewPersistence;
-    private readonly ILegacyUploadCompletionMarker _legacyCompletion;
     private readonly FileActivityWriter _activity;
     private readonly IUploadTempFileProvider _tempFiles;
     private readonly ILogger<UploadFileCommandHandler> _logger;
@@ -58,7 +57,6 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
         HeicImageConverter heicConverter,
         FileMetadataExtractor metadataExtractor,
         PreviewPersistenceService previewPersistence,
-        ILegacyUploadCompletionMarker legacyCompletion,
         ILogger<UploadFileCommandHandler> logger,
         FileActivityWriter? activity = null,
         AudioMetadataExtractor? audioMetadataExtractor = null,
@@ -75,7 +73,6 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
         _heicConverter = heicConverter;
         _metadataExtractor = metadataExtractor;
         _previewPersistence = previewPersistence;
-        _legacyCompletion = legacyCompletion;
         _activity = activity ?? FileActivityWriter.Noop;
         _tempFiles = tempFiles ?? new DefaultUploadTempFileProvider();
         _logger = logger;
@@ -583,7 +580,7 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
             _logger.LogInformation("Файл успешно загружен в S3, получен Etag: {Etag}", etag);
 
             file.Etag = etag;
-            file.UploadedAt = request.DeferAvailability || request.QuotaReservationId.HasValue
+            file.UploadedAt = request.DeferAvailability
                 ? null
                 : DateTime.UtcNow;
             file.Size = fileSize;
@@ -684,14 +681,6 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
                 "Файл загружен",
                 details: new { fileName = file.Filename, size = file.Size, mediaKind = file.MediaKind.ToString() },
                 cancellationToken: cancellationToken);
-        }
-
-        if (request.QuotaReservationId is { } reservationId)
-        {
-            // Это последняя durable-операция legacy pipeline. После неё replay может
-            // безопасно завершить квотный резерв, даже если HTTP-ответ потерялся.
-            await _legacyCompletion.MarkProcessingCompletedAsync(
-                reservationId, CancellationToken.None);
         }
 
         _logger.LogInformation("Обработка файла {FileId} успешно завершена", file.Id);

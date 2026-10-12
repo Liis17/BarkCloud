@@ -51,7 +51,7 @@ services:
     [Fact]
     public void TryRewrite_PreservesCrlfAndTrailingContent()
     {
-        var crlf = Compose.Replace("\n", "\r\n");
+        var crlf = Compose.ReplaceLineEndings("\r\n");
 
         ComposeImageService.TryRewrite(crlf, "cloud-web", "master", out var result, out _).Should().BeTrue();
 
