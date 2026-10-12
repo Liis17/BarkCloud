@@ -1,7 +1,7 @@
 # Files — возобновляемая загрузка
 
 Parent: [[Backend/Files]]
-See also: [[Web/WebApp]] · [[Shared/SharedLibraries]] · [[Api/FilesClientGuide]]
+See also: [[Web/WebApp]] · [[Backend/Torrent]] · [[Shared/SharedLibraries]] · [[Api/FilesClientGuide]]
 
 ## Назначение
 
@@ -38,7 +38,9 @@ Web предоставляет соответствующие маршруты: 
 - Токен содержит 32 случайных байта; в БД хранится SHA-256 токена. `ResumeUploadSession` выпускает новый токен, старый становится недействительным. `uploaded_parts` строится по подтверждённым данным S3 и сохранённым квитанциям Files; часть без ETag нужно отправить повторно.
 - `CompleteUploadSession` проверяет части и переводит сессию в `processing`; consumer запускает общий файловый pipeline. Клиенту следует ждать `ready` перед `CloudApi.AttachFile`. Готовность файла требует `UploadedAt` и непустого `Etag`.
 - Сервис резервирует объявленный размер в квоте при создании сессии. При готовности размер резерва освобождается и учитывается фактический оригинал; отмена, истечение и ошибка обработки освобождают резерв.
-- Legacy `FilesApi.GetUploadUrl` и `POST /upload/{uploadId}` остаются отдельным маршрутом multipart-загрузки. URL ведёт в Files и не является ссылкой S3.
+- `FilesApi.GetUploadUrl` остаётся без изменений и продолжает возвращать URL Files, но `POST /upload/{uploadId}` (внешний адрес `/web/upload/{id}`) всегда отвечает HTTP 418 с `code: legacy_upload_removed`; тело запроса не читается. Полученный URL больше не принимает файл.
+- Единственный поддерживаемый путь передачи — `CreateUploadSession`, `PUT` частей и `CompleteUploadSession`. Импорт Torrent использует этот путь и ждёт Ready перед AttachFile; подробности внутреннего адреса и таймаутов — [[Backend/Torrent]].
+- Известные клиентские ограничения: смена аватара в `Android/BarkCloud.Android/app/src/main/java/com/barkfluff/BarkCloud/data/users/UserRepository.kt` и `Mac/BarkCloudKit/Sources/BarkCloudKit/Data/Users/UserRepository.swift` пока использует `GetUploadUrl` и перестанет работать; отдельного пути Upload 2.0 для аватаров пока нет. `Mac/BarkCloudKit/Sources/BarkCloudKit/Data/Cloud/CloudRepository.swift` (`uploadFile`) также использует старый маршрут, поэтому загрузка файлов через Mac-клиент перестанет работать до миграции.
 
 ## Зависимости и взаимодействия
 

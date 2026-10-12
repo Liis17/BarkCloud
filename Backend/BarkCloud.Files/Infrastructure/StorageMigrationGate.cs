@@ -17,7 +17,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using UploadSessionStatus = BarkCloud.Files.Domain.UploadSessionStatus;
 using UploadFileType = BarkCloud.Files.Domain.UploadFileType;
-using MediaKind = BarkCloud.Files.Domain.MediaKind;
 
 namespace BarkCloud.Files.Infrastructure;
 
@@ -29,13 +28,6 @@ public sealed class StorageMigrationGate(IServiceScopeFactory scopes, S3BucketRe
 {
     private readonly SemaphoreSlim _localLock = new(1, 1);
     private static readonly ConcurrentDictionary<string, byte> LocalActivities = new();
-
-    public string ResolveLegacyProfile(UploadFile file, string fileName) => profiles.ResolveWriteProfileId(
-        file.Type, BarkCloud.Files.Extensions.FileExtensions.GetMediaKind(fileName), false);
-
-    public string[] LegacyUploadProfiles(UploadFileType type) => Enum.GetValues<MediaKind>()
-        .SelectMany(kind => new[] { profiles.ResolveWriteProfileId(type, kind, false), profiles.ResolveWriteProfileId(type, kind, true) })
-        .Distinct(StringComparer.Ordinal).ToArray();
 
     private string[] UploadProfiles(string primary, string fileName, string contentType)
     {
@@ -95,14 +87,6 @@ public sealed class StorageMigrationGate(IServiceScopeFactory scopes, S3BucketRe
             throw;
         }
         finally { foreach (var lease in leases.AsEnumerable().Reverse()) await lease.DisposeAsync(); }
-    }
-
-    public async Task<bool> IsTrackedAsync(string? id, string profileId, CancellationToken ct)
-    {
-        if (string.IsNullOrEmpty(id)) return false;
-        using var scope = scopes.CreateScope();
-        var row = await scope.ServiceProvider.GetRequiredService<FilesContext>().StorageWriteActivities.FindAsync([id], ct);
-        return row is not null && JsonSerializer.Deserialize<string[]>(row.ProfileIdsJson)!.Contains(profileId, StringComparer.Ordinal);
     }
 
     public async Task<IAsyncDisposable> EnterAsync(string profileId, bool admission, CancellationToken ct)

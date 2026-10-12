@@ -110,6 +110,7 @@ services:
       <<: *common-variables
       SERVICE_PORT: ${TORRENT_PORT}
       SERVICE_HTTP1PORT: ${TORRENT_HTTP1PORT}
+      FILES_HTTP1PORT: ${FILES_HTTP1PORT}
       Torrent__DownloadPath: "/mnt/torrents"
       Torrent__PeerPort: ${TORRENT_PEER_PORT}
     volumes:

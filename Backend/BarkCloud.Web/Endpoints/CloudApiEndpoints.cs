@@ -1,5 +1,4 @@
 using System.Globalization;
-using System.Net.Http.Headers;
 using System.Text.Json;
 
 using BarkCloud.Proto.Files;
@@ -17,7 +16,7 @@ namespace BarkCloud.Web.Endpoints;
 /// <summary>
 /// Same-origin JSON-API для React-страниц (Фото / Видео / Файлы). Проксирует вызовы
 /// в Files-сервис (CloudApi / AlbumApi / FilesApi) с пользовательским токеном из cookie.
-/// Загрузка файла идёт через веб-сервер (без CORS на Files).
+/// Управление Upload 2.0 идёт через Web; части передаются прямо в Files.
 /// </summary>
 public static class CloudApiEndpoints
 {
@@ -1285,58 +1284,6 @@ public static class CloudApiEndpoints
                     })
                 }, Json);
             }));
-
-        // Прокси-загрузка: получаем upload-URL у Files и стримим туда байты (same-origin, без CORS).
-        // Байты льём на ВНУТРЕННИЙ HTTP1-эндпоинт Files (минуя nginx/TLS); публичный upload.Url — fallback.
-        api.MapPost("/files/upload", async (HttpContext http, AuthGateway auth, FilesApi.FilesApiClient files, IHttpClientFactory httpFactory, IConfiguration config) =>
-            await Guarded(http, auth, async (user, _) =>
-            {
-                // Отмена браузера останавливает и чтение формы, и upstream-передачу в Files.
-                var ct = http.RequestAborted;
-                var form = await http.Request.ReadFormAsync(ct);
-                var file = form.Files["file"];
-                if (file is null || file.Length == 0)
-                    return Results.BadRequest(new { error = "Файл не выбран или пустой." });
-
-                var device = BrowserContext.BuildDeviceInfo(
-                    http,
-                    user.DeviceId ?? auth.GetOrCreateDeviceId(http),
-                    config.Value("App:AppName", "BarkCloud Web"),
-                    config.Value("App:Version", AppVersion.Current));
-                var uploadToken = BrowserContext.UserTokenWithDevice(user.AccessToken, device);
-                var upload = await files.GetUploadUrlAsync(new GetUploadUrlRequest { FileType = UploadFileType.CloudFile }, uploadToken, cancellationToken: ct);
-
-                var http1Base = config["FilesService:Http1Base"];
-                var uploadUrl = string.IsNullOrEmpty(http1Base) ? upload.Url : $"{http1Base}/upload/{upload.FileId}";
-
-                using var content = new MultipartFormDataContent();
-                var part = new StreamContent(file.OpenReadStream());
-                part.Headers.ContentType = new MediaTypeHeaderValue(
-                    string.IsNullOrEmpty(file.ContentType) ? "application/octet-stream" : file.ContentType);
-                content.Add(part, "file", file.FileName);
-
-                var client = httpFactory.CreateClient(LegacyUploadTransfer.ClientName);
-                using var resp = await client.PostAsync(uploadUrl, content, ct);
-                var responseBody = await resp.Content.ReadAsStringAsync(ct);
-
-                if (!resp.IsSuccessStatusCode)
-                    return Results.Json(new { error = responseBody }, Json, statusCode: (int)resp.StatusCode);
-
-                // ответ upload: { "fileId": "<guid>" } — теперь всегда равен запрошенному (серверный дедуп снят)
-                string? fileId = null;
-                try
-                {
-                    using var doc = JsonDocument.Parse(responseBody);
-                    if (doc.RootElement.TryGetProperty("fileId", out var fid))
-                        fileId = fid.GetString();
-                }
-                catch (JsonException) { /* ниже отдадим ошибку */ }
-
-                if (string.IsNullOrEmpty(fileId))
-                    return Results.Json(new { error = "Не удалось разобрать ответ загрузки." }, Json, statusCode: 502);
-
-                return Results.Json(new { fileId, name = file.FileName }, Json);
-            })).DisableAntiforgery();
 
         // Временная ссылка(и) на оригинал(ы) для просмотра/скачивания.
         api.MapGet("/files/download", async (HttpContext http, AuthGateway auth, FilesApi.FilesApiClient files, string ids) =>

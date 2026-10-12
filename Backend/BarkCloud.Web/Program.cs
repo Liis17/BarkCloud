@@ -87,8 +87,6 @@ builder.Services.AddGrpcClient<TorrentApi.TorrentApiClient>(o => o.Address = new
 
 // HttpClient для прокси скачивания/просмотра байтов Files (на внутренний HTTP1-эндпоинт).
 builder.Services.AddHttpClient("files-upload");
-// Legacy-загрузка байтов в Files — отдельный клиент со сроком 2 ч (см. LegacyUploadTransfer).
-builder.Services.AddLegacyUploadTransferClient();
 builder.Services.AddSingleton<TextPreviewProxy>();
 // HttpClient для прокси-скачивания файлов торрентов с диска (Range).
 builder.Services.AddHttpClient("torrent");
