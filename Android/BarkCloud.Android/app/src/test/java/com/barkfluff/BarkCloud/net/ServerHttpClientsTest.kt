@@ -11,6 +11,9 @@ import org.junit.Test
 import java.io.IOException
 
 class ServerHttpClientsTest {
+    private fun localUrl(server: MockWebServer, path: String = "/") =
+        server.url(path).newBuilder().host("localhost").build()
+
     private fun server(): MockWebServer {
         val cert = HeldCertificate.Builder().commonName("localhost").addSubjectAlternativeName("localhost").build()
         val tls = HandshakeCertificates.Builder().heldCertificate(cert).build()
@@ -20,7 +23,7 @@ class ServerHttpClientsTest {
         server().use { server ->
             var config = ServerConfig("https://localhost")
             val client = ServerHttpClients { config }
-            val request = Request.Builder().url(server.url("/")).build()
+            val request = Request.Builder().url(localUrl(server)).build()
             assertThrows(IOException::class.java) { client.newCall(request).execute().close() }
             config = config.copy(allowSelfSigned = true)
             server.enqueue(MockResponse().setBody("ok"))
@@ -39,7 +42,7 @@ class ServerHttpClientsTest {
         server().use { selected -> server().use { external ->
             val client = ServerHttpClients { ServerConfig("https://localhost", allowSelfSigned = true) }
             selected.enqueue(MockResponse().setResponseCode(302).addHeader("Location", external.url("/").newBuilder().host("127.0.0.1").build()))
-            client.newCall(Request.Builder().url(selected.url("/")).build()).execute().use { assertEquals(302, it.code) }
+            client.newCall(Request.Builder().url(localUrl(selected)).build()).execute().use { assertEquals(302, it.code) }
             assertEquals(0, external.requestCount)
         } }
     }

@@ -5,12 +5,12 @@ import android.net.Uri
 /**
  * Конфигурация эндпоинтов файлового сервиса. nginx терминирует TLS и маршрутизирует
  * gRPC по портам (Identity :8000, Users :8001, Files :8005). HTTP-раздача файлов —
- * `:8005/web/{upload|download}/{id}`. Адрес и порты переопределяются на экране
+ * `:8005/web/download/{id}`. Адрес и порты переопределяются на экране
  * входа — см. [ServerSettings].
  */
 object GrpcEndpoint {
 
-    /** База HTTP-раздачи файлов (`/web/download/{id}`, `/web/upload/{id}`). */
+    /** База HTTP скачивания файлов (`/web/download/{id}`). */
     val filesWebBase: String get() = ServerSettings.filesWebBase
 
     /** База data plane Upload 2.0 (`/file-upload/{session}/parts/{n}`, nginx :443). */

@@ -48,8 +48,14 @@ class GrpcManager(
     fun usersStub(): UsersApiGrpcKt.UsersApiCoroutineStub =
         UsersApiGrpcKt.UsersApiCoroutineStub(channelFor(ServerSettings.usersAddress))
 
+    fun usersStub(accessToken: String): UsersApiGrpcKt.UsersApiCoroutineStub =
+        UsersApiGrpcKt.UsersApiCoroutineStub(fixedTokenChannelFor(ServerSettings.usersAddress, accessToken))
+
     fun filesStub(): FilesApiGrpcKt.FilesApiCoroutineStub =
         FilesApiGrpcKt.FilesApiCoroutineStub(channelFor(ServerSettings.filesAddress))
+
+    fun filesStub(accessToken: String): FilesApiGrpcKt.FilesApiCoroutineStub =
+        FilesApiGrpcKt.FilesApiCoroutineStub(fixedTokenChannelFor(ServerSettings.filesAddress, accessToken))
 
     fun cloudStub(): CloudApiGrpcKt.CloudApiCoroutineStub =
         CloudApiGrpcKt.CloudApiCoroutineStub(channelFor(ServerSettings.filesAddress))
@@ -86,6 +92,9 @@ class GrpcManager(
             managedChannels["public:$it"] = managed
             ClientInterceptors.intercept(managed, metadataInterceptor)
         }
+
+    private fun fixedTokenChannelFor(address: String, accessToken: String): Channel =
+        ClientInterceptors.intercept(publicChannelFor(address), FixedTokenInterceptor(accessToken))
 
     fun shutdown() {
         managedChannels.values.forEach { it.shutdownNow() }

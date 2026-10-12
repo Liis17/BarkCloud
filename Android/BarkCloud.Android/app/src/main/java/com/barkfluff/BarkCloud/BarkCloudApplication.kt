@@ -117,7 +117,7 @@ class BarkCloudApplication : Application(), SingletonImageLoader.Factory {
         authRepository = AuthRepository(grpcManager, globalParam)
         authFlowRepository = AuthFlowRepository(grpcManager, globalParam, PendingRegistrationStore(this))
         localFileRepository = LocalFileRepository()
-        fileTransfer = FileTransferService(this, grpcManager, globalParam, InsecureHttp.client)
+        fileTransfer = FileTransferService(this, grpcManager, InsecureHttp.client)
         cloudRepository = CloudRepository(grpcManager, fileTransfer)
         albumRepository = AlbumRepository(grpcManager)
         dynamicFolderRepository = DynamicFolderRepository(grpcManager)

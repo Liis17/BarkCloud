@@ -58,7 +58,7 @@ class UploadWorker(
 
         val grpc = GrpcManager(globalParam, ClientMetadataInterceptor.create(applicationContext))
         return try {
-            val transfer = FileTransferService(applicationContext, grpc, globalParam, InsecureHttp.client)
+            val transfer = FileTransferService(applicationContext, grpc, InsecureHttp.client)
             val cloud = CloudRepository(grpc, transfer)
             val albums = AlbumRepository(grpc)
             val mediaDao = BarkCloudDatabase.get(applicationContext).mediaCloudStateDao()

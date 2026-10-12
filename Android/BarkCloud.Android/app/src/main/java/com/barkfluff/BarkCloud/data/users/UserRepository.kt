@@ -1,7 +1,7 @@
 package com.barkfluff.BarkCloud.data.users
 
 import android.net.Uri
-import barkcloud.files.FilesApiOuterClass.UploadFileType
+import android.os.SystemClock
 import barkcloud.users.UsersApiOuterClass.ChangeBioRequest
 import barkcloud.users.UsersApiOuterClass.ChangeNameRequest
 import barkcloud.users.UsersApiOuterClass.ChangeUsernameRequest
@@ -24,6 +24,11 @@ import com.barkfluff.BarkCloud.net.FileTransferService
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.withTimeoutOrNull
+import java.io.IOException
+import java.util.concurrent.TimeUnit
 
 /**
  * Доступ к сервису Users (профиль, приватность, устройства, аккаунт) + установка
@@ -33,6 +38,7 @@ import kotlinx.coroutines.coroutineScope
 class UserRepository(
     private val grpc: GrpcManager,
     private val transfer: FileTransferService,
+    private val monotonicNowMillis: () -> Long = { SystemClock.elapsedRealtime() },
 ) {
 
     // MARK: Профиль
@@ -118,18 +124,31 @@ class UserRepository(
     // MARK: Аватар (двухшаговый флоу)
 
     /** Загрузить картинку как `USER_AVATAR` и установить аватаром. */
-    suspend fun setAvatar(uri: Uri, fileName: String) {
-        val target = transfer.getUploadUrl(UploadFileType.USER_AVATAR)
-        val fileId = transfer.upload(uri, fileName, target.url)
-        grpc.usersStub().setProfilePicture(
-            SetProfilePictureRequest.newBuilder().setFileId(fileId).build()
-        )
+    suspend fun setAvatar(uri: Uri) {
+        val fileId = transfer.uploadAvatar(uri)
+        setProfilePicture(fileId)
     }
 
     /** Удалить аватар (`SetProfilePicture("")`). */
-    suspend fun removeAvatar() {
-        grpc.usersStub().setProfilePicture(
-            SetProfilePictureRequest.newBuilder().setFileId("").build()
-        )
+    suspend fun removeAvatar() = setProfilePicture("")
+
+    private suspend fun setProfilePicture(fileId: String) {
+        val startedAt = monotonicNowMillis()
+        val response = withTimeoutOrNull(PROFILE_PICTURE_TIMEOUT_MILLIS) {
+            val accessToken = grpc.validAccessToken()?.takeIf { it.isNotBlank() }
+                ?: throw IOException("Требуется авторизация для изменения аватара")
+            val remainingMillis = PROFILE_PICTURE_TIMEOUT_MILLIS - (monotonicNowMillis() - startedAt)
+            if (remainingMillis <= 0L) null else {
+                currentCoroutineContext().ensureActive()
+                grpc.usersStub(accessToken)
+                    .withDeadlineAfter(remainingMillis, TimeUnit.MILLISECONDS)
+                    .setProfilePicture(SetProfilePictureRequest.newBuilder().setFileId(fileId).build())
+            }
+        }
+        if (response == null) throw IOException("Истекло время ожидания изменения аватара")
+    }
+
+    private companion object {
+        const val PROFILE_PICTURE_TIMEOUT_MILLIS = 15_000L
     }
 }
