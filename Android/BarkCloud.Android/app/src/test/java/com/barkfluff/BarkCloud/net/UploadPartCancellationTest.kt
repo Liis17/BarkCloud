@@ -12,6 +12,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.Call
 import okhttp3.Callback
 import okhttp3.Dispatcher
@@ -181,6 +182,8 @@ class UploadPartCancellationTest {
             assertTrue("request body write did not start", writeStarted.await(5, TimeUnit.SECONDS))
 
             upload.cancel()
+            assertTrue("upload completed while staged-file writer was held", withTimeoutOrNull(200L) { upload.join() } == null)
+            assertTrue("staged file was deleted while PUT writer was held", stagedFile.get()?.exists() == true)
             releaseWrite.countDown()
             upload.join()
 
