@@ -1,6 +1,5 @@
 using System.Net;
 using System.Net.Http.Headers;
-using System.Text;
 using System.Threading.Channels;
 
 using BarkCloud.Drive.Contracts.Localization;
@@ -24,26 +23,26 @@ public sealed class CloudGatewayTimeoutTests
         var time = new FakeTimeProvider();
         var bodySent = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var releaseResponse = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var responder = cloud.HttpHandler.Responder;
         cloud.HttpHandler.Responder = async (request, cancellationToken) =>
         {
-            await request.Content!.CopyToAsync(Stream.Null, cancellationToken);
+            await request.Content!.ReadAsByteArrayAsync(cancellationToken);
             bodySent.TrySetResult();
             await releaseResponse.Task.WaitAsync(cancellationToken);
-            return new HttpResponseMessage(HttpStatusCode.OK)
-            {
-                Content = new StringContent("{\"fileId\":\"uploaded\"}", Encoding.UTF8, "application/json"),
-            };
+            return await responder(request, cancellationToken);
         };
         using var gateway = cloud.CreateGateway(temp.Path("cache"), time);
         var source = temp.Path("upload.bin");
         File.WriteAllBytes(source, [1, 2, 3]);
+        var operation = new PersistOperation();
 
-        var upload = gateway.UploadAsync("https://files.test/upload", "upload.bin", source);
+        var upload = gateway.UploadResumableAsync(operation, source, "upload.bin", () => { },
+            TimeSpan.FromMinutes(2));
         await bodySent.Task.WaitAsync(TimeSpan.FromSeconds(5));
         time.Advance(TimeSpan.FromSeconds(61));
         releaseResponse.TrySetResult();
 
-        (await upload.WaitAsync(TimeSpan.FromSeconds(5))).Should().Be("uploaded");
+        (await upload.WaitAsync(TimeSpan.FromSeconds(5))).Should().Be(operation.FileId);
     }
 
     [Fact]
@@ -54,18 +53,21 @@ public sealed class CloudGatewayTimeoutTests
         var time = new FakeTimeProvider();
         var bodySent = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var releaseResponse = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var responder = cloud.HttpHandler.Responder;
         cloud.HttpHandler.Responder = async (request, cancellationToken) =>
         {
-            await request.Content!.CopyToAsync(Stream.Null, cancellationToken);
+            await request.Content!.ReadAsByteArrayAsync(cancellationToken);
             bodySent.TrySetResult();
             await releaseResponse.Task.WaitAsync(cancellationToken);
-            return new HttpResponseMessage(HttpStatusCode.OK);
+            return await responder(request, cancellationToken);
         };
         using var gateway = cloud.CreateGateway(temp.Path("cache"), time);
         var source = temp.Path("upload.bin");
         File.WriteAllBytes(source, [1, 2, 3]);
+        var operation = new PersistOperation();
 
-        var upload = gateway.UploadAsync("https://files.test/upload", "upload.bin", source);
+        var upload = gateway.UploadResumableAsync(operation, source, "upload.bin", () => { },
+            TimeSpan.FromMinutes(2));
         await bodySent.Task.WaitAsync(TimeSpan.FromSeconds(5));
         time.Advance(TimeSpan.FromMinutes(10));
 

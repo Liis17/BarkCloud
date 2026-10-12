@@ -766,22 +766,24 @@ public sealed class CloudGatewayTests
         var cloud = new FakeCloud();
         using var gateway = cloud.CreateGateway(temp.Path("cache"));
         var content = new byte[] { 0, 1, 2, 3, 4, 5, 6, 7 };
-        var upload = gateway.GetUploadUrl();
         var uploadPath = temp.Path("upload.bin");
         File.WriteAllBytes(uploadPath, content);
+        var operation = new PersistOperation();
 
-        var fileId = await gateway.UploadAsync(upload.Url, "upload.bin", uploadPath);
-        gateway.AttachFile("", fileId, "upload.bin");
+        var fileId = await gateway.UploadResumableAsync(operation, uploadPath, "upload.bin", () => { },
+            TimeSpan.FromMinutes(2));
+        gateway.AttachFile("", fileId, "upload.bin", uploadSessionId: operation.Upload2!.SessionId);
         var buffer = new byte[4];
         var bytesRead = gateway.Read(fileId, content.Length, buffer, 2);
 
-        fileId.Should().Be(upload.FileId);
+        fileId.Should().Be(operation.FileId);
         bytesRead.Should().Be(4);
         buffer.Should().Equal(content[2..6]);
-        cloud.HttpHandler.Calls.Should().HaveCount(2);
-        cloud.HttpHandler.Calls[0].Method.Should().Be("POST");
-        cloud.HttpHandler.Calls[0].Headers.Should().ContainKey("x-auth-token");
-        cloud.HttpHandler.Calls[1].Range.Should().Be("bytes=0-7");
+        cloud.HttpHandler.Calls.Should().HaveCount(4);
+        cloud.HttpHandler.Calls.Take(3).Should().OnlyContain(call => call.Method == "PUT"
+            && call.Headers.ContainsKey("X-Upload-Token"));
+        cloud.HttpHandler.Calls.Should().NotContain(call => call.Method == "POST");
+        cloud.HttpHandler.Calls[3].Range.Should().Be("bytes=0-7");
     }
 
     [Fact]

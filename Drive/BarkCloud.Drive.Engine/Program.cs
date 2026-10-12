@@ -26,7 +26,7 @@ using var connection = new BarkCloudConnection(
 tokens = new TokenManager(connection.Identity, new TokenStore(serverKey: serverKey));
 var profile = new UserProfile(connection.Users, userId => settings.SetLastUserId(serverKey, userId));
 using var gateway = new CloudGateway(connection.Cloud, connection.Files, connection.Http, $"{filesAddress}/web",
-    () => tokens?.CurrentToken, settings.GetCacheDir(), uploadOrigin: $"https://{config.Host}");
+    settings.GetCacheDir(), uploadOrigin: $"https://{config.Host}");
 var outbox = new UploadOutbox(DriveStoragePaths.OutboxDirectory);
 var fs = new BarkCloudFileSystem(gateway, outbox: outbox, serverKey: serverKey,
     ownerUserId: () => profile.UserId ?? settings.GetLastUserId(serverKey));

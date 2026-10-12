@@ -18,35 +18,45 @@ namespace BarkCloud.Drive.Engine.Tests;
 
 public sealed class ResumableUploaderTests
 {
-    [Fact]
-    public void Persist_uploads_parts_with_exact_headers_and_attaches_by_session_id()
+    [Theory]
+    [InlineData(1)]
+    [InlineData(8)]
+    public void Persist_uses_upload2_for_every_file_size_and_attaches_by_session_id(int size)
     {
         using var temp = new TestDirectory();
         var cloud = new FakeCloud();
-        using var gateway = cloud.CreateGateway(temp.Path("cache"), upload2ThresholdBytesForTesting: 1);
+        cloud.UploadPartSize = 3;
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
         var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"));
-        var (info, local) = OpenWritableAndWrite(fileSystem, "\\large.bin", [0, 1, 2, 3, 4, 5, 6, 7]);
+        var data = Enumerable.Range(0, size).Select(index => (byte)index).ToArray();
+        var (info, local) = OpenWritableAndWrite(fileSystem, "\\upload.bin", data);
 
-        fileSystem.Cleanup("\\large.bin", info);
-        fileSystem.CloseFile("\\large.bin", info);
+        fileSystem.Cleanup("\\upload.bin", info);
+        fileSystem.CloseFile("\\upload.bin", info);
 
         var parts = cloud.HttpHandler.Calls.Where(call => call.Method == "PUT").ToArray();
-        parts.Select(call => call.ContentRange).Should().Equal(
-            "bytes 0-2/8", "bytes 3-5/8", "bytes 6-7/8");
-        parts.Select(call => call.Headers["Content-Length"]).Should().Equal("3", "3", "2");
+        var partCount = (size + 2) / 3;
+        parts.Should().HaveCount(partCount);
+        parts.Select(call => call.ContentRange).Should().Equal(Enumerable.Range(0, partCount)
+            .Select(index => $"bytes {index * 3}-{Math.Min(index * 3 + 2, size - 1)}/{size}"));
+        parts.Select(call => call.Headers["Content-Length"]).Should().Equal(Enumerable.Range(0, partCount)
+            .Select(index => $"{Math.Min(3, size - index * 3)}"));
         parts.Should().OnlyContain(call => call.Url.StartsWith("https://files.test/file-upload/", StringComparison.Ordinal)
                                            && call.Headers["Content-Type"] == "application/octet-stream"
                                            && !string.IsNullOrWhiteSpace(call.Headers["X-Upload-Token"]));
+        cloud.HttpHandler.Calls.Should().OnlyContain(call => call.Method == "PUT");
+        cloud.Invoker.Calls.Should().NotContain(call => call.MethodFullName == FakeCloudMethods.GetUploadUrl);
 
         var create = cloud.Invoker.Calls.Single(call => call.MethodFullName == FakeCloudMethods.CreateUploadSession);
         var description = (CreateUploadSessionRequest)create.Request;
-        description.FileName.Should().Be("large.bin");
-        description.FileSize.Should().Be(8);
+        description.FileName.Should().Be("upload.bin");
+        description.FileSize.Should().Be(size);
         description.ContentType.Should().Be("application/octet-stream");
-        description.Sha256.Should().Be(Convert.ToHexString(SHA256.HashData([0, 1, 2, 3, 4, 5, 6, 7])));
+        description.Sha256.Should().Be(Convert.ToHexString(SHA256.HashData(data)));
 
         var attach = (AttachFileRequest)cloud.Invoker.Calls
             .Single(call => call.MethodFullName == FakeCloudMethods.AttachFile).Request;
+        attach.Name.Should().Be("upload.bin");
         attach.UploadSessionId.Should().Be(local.Op!.Upload2!.SessionId);
         attach.IsUploadRetry.Should().BeFalse();
     }
@@ -58,7 +68,7 @@ public sealed class ResumableUploaderTests
         var path = temp.Path("data.bin");
         await File.WriteAllBytesAsync(path, [0, 1, 2, 3, 4, 5, 6, 7]);
         var cloud = new FakeCloud { FailUploadPartNumberOnce = 2 };
-        using var gateway = cloud.CreateGateway(temp.Path("cache"), upload2ThresholdBytesForTesting: 1);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
         var operation = new PersistOperation();
 
         await FluentActions.Invoking(() => gateway.UploadResumableAsync(operation, path, "parts.bin",
@@ -80,7 +90,7 @@ public sealed class ResumableUploaderTests
         await File.WriteAllBytesAsync(path, [1, 2, 3, 4]);
         var cloud = new FakeCloud();
         cloud.Invoker.LoseNextResponseAfterEffect(FakeCloudMethods.CreateUploadSession);
-        using var gateway = cloud.CreateGateway(temp.Path("cache"), upload2ThresholdBytesForTesting: 1);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
         var operation = new PersistOperation();
 
         await gateway.UploadResumableAsync(operation, path, "lost-create.bin", () => { }, TimeSpan.FromMinutes(2));
@@ -104,7 +114,7 @@ public sealed class ResumableUploaderTests
         var cloud = new FakeCloud();
         cloud.UploadCompleteStatuses.Enqueue(status);
         cloud.UploadCompleteStatuses.Enqueue(UploadSessionStatus.Ready);
-        using var gateway = cloud.CreateGateway(temp.Path("cache"), upload2ThresholdBytesForTesting: 1);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
         var operation = new PersistOperation();
 
         await gateway.UploadResumableAsync(operation, path, "terminal.bin", () => { }, TimeSpan.FromMinutes(2));
@@ -123,7 +133,7 @@ public sealed class ResumableUploaderTests
         var cloud = new FakeCloud();
         cloud.Invoker.FailNext(FakeCloudMethods.AttachFile,
             new RpcException(new Status(StatusCode.Unavailable, "offline")));
-        using var gateway = cloud.CreateGateway(temp.Path("cache"), upload2ThresholdBytesForTesting: 1);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
         var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"));
         var (info, local) = OpenWritableAndWrite(fileSystem, "\\retry-attach.bin", [1, 2, 3, 4]);
 
@@ -147,7 +157,7 @@ public sealed class ResumableUploaderTests
         var cloud = new FakeCloud();
         cloud.Invoker.FailNext(FakeCloudMethods.CreateUploadSession,
             FakeCallInvoker.BusinessError(ServerErrors.UploadIdempotencyConflict));
-        using var gateway = cloud.CreateGateway(temp.Path("cache"), upload2ThresholdBytesForTesting: 1);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
         var operation = new PersistOperation();
 
         await gateway.UploadResumableAsync(operation, path, "conflict.bin", () => { }, TimeSpan.FromMinutes(2));
@@ -167,13 +177,12 @@ public sealed class ResumableUploaderTests
         var time = new FakeTimeProvider();
         var cloud = new FakeCloud();
         cloud.UploadCompleteStatuses.Enqueue(UploadSessionStatus.Processing);
-        using var gateway = cloud.CreateGateway(temp.Path("cache"), time,
-            upload2ThresholdBytesForTesting: 1);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"), time);
         var outbox = new UploadOutbox(temp.Path("outbox"), time);
         var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"), outbox,
             "server", () => "owner", time);
         var firstWaitStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        gateway.ResumableProcessingWaitStartedForTesting = () => firstWaitStarted.TrySetResult();
+        gateway.ResumableProcessingWaitStartedForTesting = _ => firstWaitStarted.TrySetResult();
         var (info, _) = OpenWritableAndWrite(fileSystem, "\\processing.bin", [1, 2, 3, 4]);
         var closeTask = Task.Run(() =>
         {
@@ -202,7 +211,7 @@ public sealed class ResumableUploaderTests
         outbox.Save(new UploadOutboxEntry { Id = "second", DataPath = secondPath, Name = "second.bin",
             ServerKey = "server", OwnerUserId = "owner", Op = new PersistOperation() });
         var workerWaitStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        gateway.ResumableProcessingWaitStartedForTesting = () => workerWaitStarted.TrySetResult();
+        gateway.ResumableProcessingWaitStartedForTesting = _ => workerWaitStarted.TrySetResult();
         await using var worker = new UploadOutboxWorker(outbox,
             () => ("server", "owner"),
             (entry, cancellationToken) => fileSystem.ProcessOutboxEntryAsync(entry, cancellationToken),
@@ -238,12 +247,12 @@ public sealed class ResumableUploaderTests
         var time = new FakeTimeProvider();
         var cloud = new FakeCloud();
         cloud.UploadCompleteStatuses.Enqueue(UploadSessionStatus.Processing);
-        using var gateway = cloud.CreateGateway(temp.Path("cache"), time, upload2ThresholdBytesForTesting: 1);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"), time);
         var outbox = new UploadOutbox(temp.Path("outbox"), time);
         var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"), outbox,
             "server", () => "owner", time);
         var firstWaitStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        gateway.ResumableProcessingWaitStartedForTesting = () => firstWaitStarted.TrySetResult();
+        gateway.ResumableProcessingWaitStartedForTesting = _ => firstWaitStarted.TrySetResult();
         var (firstInfo, local) = OpenWritableAndWrite(fileSystem, "\\processing-cleanup.bin", [1, 2, 3, 4]);
         var secondInfo = new FakeDokanFileInfo();
         fileSystem.CreateFile("\\processing-cleanup.bin", FileAccess.ReadData, FileShare.ReadWrite, FileMode.Open,
@@ -259,7 +268,7 @@ public sealed class ResumableUploaderTests
 
         var repeatedWaitStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var repeatedWaits = 0;
-        gateway.ResumableProcessingWaitStartedForTesting = () =>
+        gateway.ResumableProcessingWaitStartedForTesting = _ =>
         {
             Interlocked.Increment(ref repeatedWaits);
             repeatedWaitStarted.TrySetResult();
@@ -322,11 +331,11 @@ public sealed class ResumableUploaderTests
             },
         };
         outbox.Save(entry);
-        using var gateway = cloud.CreateGateway(temp.Path("cache"), time, upload2ThresholdBytesForTesting: 1);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"), time);
         var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"), outbox,
             "server", () => "owner", time);
         var processingWaitStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        gateway.ResumableProcessingWaitStartedForTesting = () => processingWaitStarted.TrySetResult();
+        gateway.ResumableProcessingWaitStartedForTesting = _ => processingWaitStarted.TrySetResult();
         var failedCalls = 0;
         await using var worker = new UploadOutboxWorker(outbox, () => ("server", "owner"),
             (snapshot, cancellationToken) => fileSystem.ProcessOutboxEntryAsync(snapshot, cancellationToken),
@@ -350,7 +359,7 @@ public sealed class ResumableUploaderTests
     {
         using var temp = new TestDirectory();
         var cloud = new FakeCloud();
-        using var gateway = cloud.CreateGateway(temp.Path("cache"), upload2ThresholdBytesForTesting: 1);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
         var outbox = new UploadOutbox(temp.Path("outbox"));
         var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"), outbox,
             "server", () => "owner");
@@ -448,7 +457,7 @@ public sealed class ResumableUploaderTests
         var puts = 0;
         cloud.HttpHandler.Responder = (request, token) => ++puts == 2
             ? Task.FromResult(PartError(httpStatus, code)) : responder(request, token);
-        using var gateway = cloud.CreateGateway(temp.Path("cache"), upload2ThresholdBytesForTesting: 1);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
         await gateway.UploadResumableAsync(new PersistOperation(), path, "retry.bin", () => { }, TimeSpan.FromMinutes(2));
         cloud.HttpHandler.Calls.Select(call => call.Url.Split('/').Last()).Should().Equal("1", "2", "2");
         cloud.Invoker.Calls.Count(call => call.MethodFullName == FakeCloudMethods.ResumeUploadSession).Should().Be(2);
@@ -465,7 +474,7 @@ public sealed class ResumableUploaderTests
         await File.WriteAllBytesAsync(path, [1]);
         var cloud = new FakeCloud();
         cloud.HttpHandler.Responder = (_, _) => Task.FromResult(PartError(httpStatus, code));
-        using var gateway = cloud.CreateGateway(temp.Path("cache"), upload2ThresholdBytesForTesting: 1);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
         var operation = new PersistOperation();
         var error = await FluentActions.Invoking(() => gateway.UploadResumableAsync(operation, path,
             "limit.bin", () => { }, TimeSpan.FromMinutes(2))).Should().ThrowAsync<InvalidOperationException>();
@@ -484,7 +493,7 @@ public sealed class ResumableUploaderTests
         var path = temp.Path("data.bin");
         await File.WriteAllBytesAsync(path, [1, 2, 3, 4]);
         var cloud = new FakeCloud { FailUploadPartNumberOnce = 2 };
-        using var gateway = cloud.CreateGateway(temp.Path("cache"), upload2ThresholdBytesForTesting: 1);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
         var operation = new PersistOperation();
         await FluentActions.Invoking(() => gateway.UploadResumableAsync(operation, path, "missing.bin",
             () => { }, TimeSpan.FromMinutes(2))).Should().ThrowAsync<HttpRequestException>();
@@ -508,7 +517,7 @@ public sealed class ResumableUploaderTests
         var path = temp.Path("data.bin");
         await File.WriteAllBytesAsync(path, [1, 2, 3, 4]);
         var cloud = new FakeCloud { FailUploadPartNumberOnce = 2 };
-        using var gateway = cloud.CreateGateway(temp.Path("cache"), upload2ThresholdBytesForTesting: 1);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
         var operation = new PersistOperation();
         await FluentActions.Invoking(() => gateway.UploadResumableAsync(operation, path, "terminal.bin",
             () => { }, TimeSpan.FromMinutes(2))).Should().ThrowAsync<HttpRequestException>();
@@ -535,7 +544,7 @@ public sealed class ResumableUploaderTests
                     FakeCallInvoker.BusinessError(ServerErrors.UploadIdempotencyConflict));
             else
                 cloud.UploadCompleteStatuses.Enqueue(UploadSessionStatus.Failed);
-        using var gateway = cloud.CreateGateway(temp.Path("cache"), time, upload2ThresholdBytesForTesting: 1);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"), time);
         var operation = new PersistOperation();
         var outbox = new UploadOutbox(temp.Path("outbox"), time);
         var entry = new UploadOutboxEntry { Id = "limit", DataPath = path, Op = operation };
@@ -565,7 +574,7 @@ public sealed class ResumableUploaderTests
         var cloud = new FakeCloud();
         for (var i = 0; i < 3; i++)
             cloud.UploadCompleteStatuses.Enqueue(UploadSessionStatus.Failed);
-        using var gateway = cloud.CreateGateway(temp.Path("cache"), time, upload2ThresholdBytesForTesting: 1);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"), time);
         var outbox = new UploadOutbox(temp.Path("outbox"), time);
         var entry = new UploadOutboxEntry { Id = "cooldown", DataPath = path, Name = "cooldown.bin",
             ServerKey = "server", OwnerUserId = "owner", Op = new PersistOperation() };
@@ -596,7 +605,7 @@ public sealed class ResumableUploaderTests
         var cloud = new FakeCloud();
         for (var i = 0; i < 3; i++)
             cloud.UploadCompleteStatuses.Enqueue(UploadSessionStatus.Failed);
-        using var gateway = cloud.CreateGateway(temp.Path("cache"), time, upload2ThresholdBytesForTesting: 1);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"), time);
         var operation = new PersistOperation();
 
         await FluentActions.Invoking(() => gateway.UploadResumableAsync(operation, path, "future-limit.bin",
@@ -636,9 +645,9 @@ public sealed class ResumableUploaderTests
             cloud.SetUploadSessionStatus(sessionId, status);
             return Task.FromResult(PartError(409, ServerErrors.UploadSessionState));
         };
-        using var gateway = cloud.CreateGateway(temp.Path("cache"), time, upload2ThresholdBytesForTesting: 1);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"), time);
         var waiting = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        gateway.ResumableProcessingWaitStartedForTesting = () => waiting.TrySetResult();
+        gateway.ResumableProcessingWaitStartedForTesting = _ => waiting.TrySetResult();
         var operation = new PersistOperation();
         var upload = gateway.UploadResumableAsync(operation, path, "state.bin", () => { }, TimeSpan.FromMinutes(2));
         if (status == UploadSessionStatus.Processing)
@@ -662,22 +671,86 @@ public sealed class ResumableUploaderTests
         await File.WriteAllBytesAsync(path, [1]);
         var cloud = new FakeCloud();
         cloud.UploadCompleteStatuses.Enqueue(UploadSessionStatus.Processing);
-        using var gateway = cloud.CreateGateway(temp.Path("cache"), time, upload2ThresholdBytesForTesting: 1);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"), time);
         var waits = new System.Threading.Channels.UnboundedChannelOptions { SingleReader = true, SingleWriter = true };
         var signals = System.Threading.Channels.Channel.CreateUnbounded<bool>(waits);
-        gateway.ResumableProcessingWaitStartedForTesting = () => signals.Writer.TryWrite(true);
+        gateway.ResumableProcessingWaitStartedForTesting = _ => signals.Writer.TryWrite(true);
         var saves = 0;
         var operation = new PersistOperation();
         var upload = gateway.UploadResumableAsync(operation, path, "poll.bin", () => saves++, TimeSpan.FromMinutes(2));
         await signals.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(10));
         var initialSaves = saves;
-        time.Advance(TimeSpan.FromSeconds(2));
+        time.Advance(TimeSpan.FromMilliseconds(250));
         await signals.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(10));
         saves.Should().Be(initialSaves);
         cloud.SetUploadSessionStatus(operation.Upload2!.SessionId!, UploadSessionStatus.Ready);
-        time.Advance(TimeSpan.FromSeconds(2));
+        time.Advance(TimeSpan.FromMilliseconds(500));
         await upload.WaitAsync(TimeSpan.FromSeconds(10));
         saves.Should().Be(initialSaves);
+    }
+
+    [Fact]
+    public async Task Processing_poll_intervals_back_off_to_two_seconds()
+    {
+        using var temp = new TestDirectory();
+        var time = new FakeTimeProvider();
+        var path = temp.Path("data.bin");
+        await File.WriteAllBytesAsync(path, [1]);
+        var cloud = new FakeCloud();
+        cloud.UploadCompleteStatuses.Enqueue(UploadSessionStatus.Processing);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"), time);
+        var intervals = System.Threading.Channels.Channel.CreateUnbounded<TimeSpan>(
+            new System.Threading.Channels.UnboundedChannelOptions { SingleReader = true, SingleWriter = true });
+        gateway.ResumableProcessingWaitStartedForTesting = interval => intervals.Writer.TryWrite(interval);
+        var operation = new PersistOperation();
+        var upload = gateway.UploadResumableAsync(operation, path, "poll-backoff.bin", () => { },
+            TimeSpan.FromMinutes(2));
+        var expectedIntervals = new[]
+        {
+            TimeSpan.FromMilliseconds(250),
+            TimeSpan.FromMilliseconds(500),
+            TimeSpan.FromSeconds(1),
+            TimeSpan.FromSeconds(2),
+            TimeSpan.FromSeconds(2),
+        };
+
+        for (var index = 0; index < expectedIntervals.Length; index++)
+        {
+            var expectedInterval = expectedIntervals[index];
+            var interval = await intervals.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+            interval.Should().Be(expectedInterval);
+            if (index == expectedIntervals.Length - 1)
+                cloud.SetUploadSessionStatus(operation.Upload2!.SessionId!, UploadSessionStatus.Ready);
+            time.Advance(interval);
+        }
+
+        (await upload.WaitAsync(TimeSpan.FromSeconds(10))).Should().Be(operation.FileId);
+    }
+
+    [Fact]
+    public async Task Processing_ready_on_first_poll_waits_only_250_milliseconds()
+    {
+        using var temp = new TestDirectory();
+        var time = new FakeTimeProvider();
+        var start = time.GetTimestamp();
+        var path = temp.Path("data.bin");
+        await File.WriteAllBytesAsync(path, [1]);
+        var cloud = new FakeCloud();
+        cloud.UploadCompleteStatuses.Enqueue(UploadSessionStatus.Processing);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"), time);
+        var firstPoll = new TaskCompletionSource<TimeSpan>(TaskCreationOptions.RunContinuationsAsynchronously);
+        gateway.ResumableProcessingWaitStartedForTesting = interval => firstPoll.TrySetResult(interval);
+        var operation = new PersistOperation();
+        var upload = gateway.UploadResumableAsync(operation, path, "poll-ready.bin", () => { },
+            TimeSpan.FromMinutes(2));
+
+        var firstInterval = await firstPoll.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        firstInterval.Should().Be(TimeSpan.FromMilliseconds(250));
+        cloud.SetUploadSessionStatus(operation.Upload2!.SessionId!, UploadSessionStatus.Ready);
+        time.Advance(firstInterval);
+
+        (await upload.WaitAsync(TimeSpan.FromSeconds(10))).Should().Be(operation.FileId);
+        time.GetElapsedTime(start).Should().Be(TimeSpan.FromMilliseconds(250));
     }
 
     [Theory]
@@ -687,7 +760,7 @@ public sealed class ResumableUploaderTests
     {
         using var temp = new TestDirectory();
         var cloud = new FakeCloud();
-        using var gateway = cloud.CreateGateway(temp.Path("cache"), upload2ThresholdBytesForTesting: 1);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
         var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"));
         var (info, local) = OpenWritableAndWrite(fileSystem, "\\modified.bin", [1]);
         var session = new FilesApi.FilesApiClient(cloud.Invoker).CreateUploadSession(new CreateUploadSessionRequest
@@ -710,7 +783,7 @@ public sealed class ResumableUploaderTests
     {
         using var temp = new TestDirectory();
         var cloud = new FakeCloud();
-        using var gateway = cloud.CreateGateway(temp.Path("cache"), upload2ThresholdBytesForTesting: 1);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
         var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"));
         var (info, local) = OpenWritableAndWrite(fileSystem, "\\delete-upload.bin", [1]);
         var session = new FilesApi.FilesApiClient(cloud.Invoker).CreateUploadSession(new CreateUploadSessionRequest
@@ -743,7 +816,7 @@ public sealed class ResumableUploaderTests
         using var http = new HttpClient(cloud.HttpHandler);
         using var gateway = new CloudGateway(new CloudApi.CloudApiClient(cloud.Invoker),
             new FilesApi.FilesApiClient(cloud.Invoker), http, "https://files.test:7025/web",
-            () => "token", temp.Path("cache"));
+            temp.Path("cache"));
         await FluentActions.Invoking(() => gateway.UploadResumableAsync(new PersistOperation(),
             temp.Path("missing.bin"), "missing.bin", () => { }, TimeSpan.FromMinutes(2)))
             .Should().ThrowAsync<InvalidOperationException>();

@@ -3,7 +3,6 @@ using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Runtime.ExceptionServices;
-using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading;
 
@@ -63,7 +62,6 @@ internal sealed partial class CloudGateway : IDisposable
     private readonly HttpClient _http;
     private string _cacheDir;
     private readonly string _filesWebBase;
-    private readonly Func<string?> _tokenProvider;
     private readonly TimeProvider _time;
     private readonly ResumableUploader _resumableUploader;
     private readonly long _cacheLimitBytes;
@@ -123,20 +121,16 @@ internal sealed partial class CloudGateway : IDisposable
     internal Action<string>? CacheEvictionCandidateBeforeInfoForTesting { get; set; }
 
     public CloudGateway(CloudApi.CloudApiClient cloud, FilesApi.FilesApiClient files, HttpClient http,
-        string filesWebBase, Func<string?> tokenProvider, string cacheDir, TimeProvider? time = null,
-        long? cacheLimitBytesForTesting = null, string? uploadOrigin = null,
-        long? upload2ThresholdBytesForTesting = null)
+        string filesWebBase, string cacheDir, TimeProvider? time = null,
+        long? cacheLimitBytesForTesting = null, string? uploadOrigin = null)
     {
         _cloud = cloud;
         _files = files;
         _http = http;
         _filesWebBase = filesWebBase.TrimEnd('/');
-        _tokenProvider = tokenProvider;
         _cacheDir = cacheDir;
         _time = time ?? TimeProvider.System;
-        _resumableUploader = new ResumableUploader(_files, _http,
-            uploadOrigin, _time,
-            upload2ThresholdBytesForTesting ?? ResumableUploader.DefaultThresholdBytes);
+        _resumableUploader = new ResumableUploader(_files, _http, uploadOrigin, _time);
         _cacheLimitBytes = cacheLimitBytesForTesting ?? DefaultCacheLimitBytes;
         Directory.CreateDirectory(_cacheDir);
         RemoveOwnedCachePartFiles(_cacheDir);
@@ -1389,56 +1383,7 @@ internal sealed partial class CloudGateway : IDisposable
 
     // ───────── запись ─────────
 
-    public (string Url, string FileId) GetUploadUrl(CancellationToken cancellationToken = default)
-    {
-        var resp = _files.GetUploadUrl(new GetUploadUrlRequest { FileType = UploadFileType.CloudFile },
-            cancellationToken: cancellationToken);
-        return (resp.Url, resp.FileId);
-    }
-
-    // Заливает локальный файл (multipart-поле "file" + x-auth-token, как iOS).
-    // Возвращает fileId из ответа; сервер не выполняет дедупликацию содержимого.
-    public async Task<string> UploadAsync(string uploadUrl, string fileName, string localPath,
-        CancellationToken cancellationToken = default)
-    {
-        using var idleTimeout = new TransferIdleTimeout(_time);
-        using var requestCancellation = CancellationTokenSource.CreateLinkedTokenSource(
-            cancellationToken, idleTimeout.Token);
-        using var content = new MultipartFormDataContent();
-        // FileShare.ReadWrite: рабочая копия ещё открыта на запись хэндлом сессии.
-        await using var fileStream = new FileStream(localPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-        using var progressStream = new ProgressStream(fileStream, idleTimeout.ReportProgress, idleTimeout.WaitForResponse);
-        using var fileContent = new StreamContent(progressStream);
-        fileContent.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
-        content.Add(fileContent, "file", fileName);
-
-        using var request = new HttpRequestMessage(HttpMethod.Post, uploadUrl) { Content = content };
-        var token = _tokenProvider();
-        if (!string.IsNullOrEmpty(token))
-            request.Headers.Add("x-auth-token", token);
-
-        try
-        {
-            using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead,
-                requestCancellation.Token);
-            idleTimeout.ReportProgress();
-            response.EnsureSuccessStatusCode();
-
-            await using var stream = await response.Content.ReadAsStreamAsync(requestCancellation.Token);
-            using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: requestCancellation.Token);
-            return doc.RootElement.GetProperty("fileId").GetString()
-                   ?? throw new InvalidOperationException("Ответ загрузки без fileId");
-        }
-        catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested
-                                                   && idleTimeout.Token.IsCancellationRequested)
-        {
-            throw new TimeoutException(Loc.T("Eng_HttpTransferTimedOut"), ex);
-        }
-    }
-
-    internal bool ShouldUseResumableUpload(long size) => _resumableUploader.ShouldUse(size);
-
-    internal Action? ResumableProcessingWaitStartedForTesting
+    internal Action<TimeSpan>? ResumableProcessingWaitStartedForTesting
     {
         get => _resumableUploader.ProcessingWaitStartedForTesting;
         set => _resumableUploader.ProcessingWaitStartedForTesting = value;

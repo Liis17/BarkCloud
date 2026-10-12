@@ -1898,31 +1898,12 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
 
         if (operation.Stage is PersistStage.Upload or PersistStage.Processing)
         {
-            if (operation.Upload2 is not null)
-            {
-                operation.FileId = _gateway.UploadResumableAsync(operation, file.TempPath, file.Name,
-                    () => SaveOutboxState(file), TimeSpan.FromMinutes(2),
-                    cancellationToken).GetAwaiter().GetResult();
-            }
-            else if (operation.Stage == PersistStage.Processing)
-            {
+            if (operation.Stage == PersistStage.Processing && operation.Upload2 is null)
                 throw new InvalidDataException(Loc.T("Eng_UploadSessionInvalidResponse"));
-            }
-            else if (operation.FileId is null)
-            {
-                if (_gateway.ShouldUseResumableUpload(stream.Length))
-                {
-                    operation.FileId = _gateway.UploadResumableAsync(operation, file.TempPath, file.Name,
-                        () => SaveOutboxState(file), TimeSpan.FromMinutes(2),
-                        cancellationToken).GetAwaiter().GetResult();
-                }
-                else
-                {
-                    var (url, _) = _gateway.GetUploadUrl(cancellationToken);
-                    operation.FileId = _gateway.UploadAsync(url, file.Name, file.TempPath, cancellationToken)
-                        .GetAwaiter().GetResult();
-                }
-            }
+
+            operation.FileId = _gateway.UploadResumableAsync(operation, file.TempPath, file.Name,
+                () => SaveOutboxState(file), TimeSpan.FromMinutes(2),
+                cancellationToken).GetAwaiter().GetResult();
 
             operation.Stage = file.ExistingEntryId is null && operation.SupersededFileId is null
                 ? PersistStage.Attach : PersistStage.DeleteOld;

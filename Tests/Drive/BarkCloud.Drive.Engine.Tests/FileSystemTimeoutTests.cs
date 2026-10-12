@@ -41,7 +41,7 @@ public sealed class FileSystemTimeoutTests
         var releaseUpload = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         cloud.HttpHandler.Responder = async (request, cancellationToken) =>
         {
-            if (request.Method == HttpMethod.Post)
+            if (request.Method == HttpMethod.Put)
             {
                 uploadStarted.TrySetResult();
                 await releaseUpload.Task.WaitAsync(cancellationToken);
@@ -89,7 +89,7 @@ public sealed class FileSystemTimeoutTests
         fileSystem.WriteFile("\\close-keepalive.bin", [2], out _, 1, info).Should().Be(DokanResult.Success);
         cloud.HttpHandler.Responder = async (request, cancellationToken) =>
         {
-            if (request.Method == HttpMethod.Post)
+            if (request.Method == HttpMethod.Put)
             {
                 uploadStarted.TrySetResult();
                 await releaseUpload.Task.WaitAsync(cancellationToken);
@@ -123,7 +123,7 @@ public sealed class FileSystemTimeoutTests
         var uploadStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         cloud.HttpHandler.Responder = async (request, cancellationToken) =>
         {
-            if (request.Method == HttpMethod.Post)
+            if (request.Method == HttpMethod.Put)
             {
                 uploadStarted.TrySetResult();
                 await Task.Delay(Timeout.Infinite, cancellationToken);

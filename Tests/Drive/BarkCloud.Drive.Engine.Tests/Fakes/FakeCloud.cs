@@ -67,8 +67,6 @@ internal sealed class FakeCloud
 
         Invoker.Handle<ListDirectoryRequest, DirectoryListingDetailed>(
             FakeCloudMethods.ListDirectoryDetailed, ListDirectoryDetailed);
-        Invoker.Handle<GetUploadUrlRequest, GetUploadUrlResponse>(
-            FakeCloudMethods.GetUploadUrl, GetUploadUrl);
         Invoker.Handle<CreateUploadSessionRequest, UploadSessionResponse>(
             FakeCloudMethods.CreateUploadSession, CreateUploadSession);
         Invoker.Handle<UploadSessionIdRequest, UploadSessionResponse>(
@@ -122,19 +120,17 @@ internal sealed class FakeCloud
         get { lock (_gate) return _uploadSessions.Keys.ToArray(); }
     }
 
-    public CloudGateway CreateGateway(string cacheDir, TimeProvider? time = null, string? token = "test-token",
-        long? cacheLimitBytesForTesting = null, long? upload2ThresholdBytesForTesting = null)
+    public CloudGateway CreateGateway(string cacheDir, TimeProvider? time = null,
+        long? cacheLimitBytesForTesting = null)
         => new(
             new CloudApi.CloudApiClient(Invoker),
             new FilesApi.FilesApiClient(Invoker),
             new HttpClient(HttpHandler, disposeHandler: false),
             "https://files.test",
-            () => token,
             cacheDir,
             time,
             cacheLimitBytesForTesting,
-            uploadOrigin: "https://files.test",
-            upload2ThresholdBytesForTesting: upload2ThresholdBytesForTesting);
+            uploadOrigin: "https://files.test");
 
     public string AddDirectory(string name, string parentId = "")
     {
@@ -223,16 +219,6 @@ internal sealed class FakeCloud
             }
 
             return response;
-        }
-    }
-
-    private GetUploadUrlResponse GetUploadUrl(GetUploadUrlRequest _)
-    {
-        lock (_gate)
-        {
-            var fileId = Guid.NewGuid().ToString();
-            _blobs.Add(fileId, new CloudBlob(fileId, Array.Empty<byte>()));
-            return new GetUploadUrlResponse { FileId = fileId, Url = $"https://files.test/upload/{fileId}" };
         }
     }
 
@@ -593,27 +579,6 @@ internal sealed class FakeCloud
             };
         }
 
-        if (segments.Length == 2 && string.Equals(segments[0], "upload", StringComparison.OrdinalIgnoreCase)
-            && request.Method == HttpMethod.Post)
-        {
-            var fileId = segments[1];
-            var content = request.Content is null
-                ? Array.Empty<byte>()
-                : ExtractMultipartFile(await request.Content.ReadAsByteArrayAsync(cancellationToken), request.Content.Headers.ContentType);
-            lock (_gate)
-            {
-                if (!_blobs.ContainsKey(fileId))
-                    _blobs.Add(fileId, new CloudBlob(fileId, content));
-                else
-                    _blobs[fileId].Data = content;
-            }
-
-            return new HttpResponseMessage(HttpStatusCode.OK)
-            {
-                Content = new StringContent(JsonSerializer.Serialize(new { fileId }), Encoding.UTF8, "application/json"),
-            };
-        }
-
         if (segments.Length == 2 && string.Equals(segments[0], "download", StringComparison.OrdinalIgnoreCase)
             && request.Method == HttpMethod.Get)
         {
@@ -650,35 +615,6 @@ internal sealed class FakeCloud
             Content = new StringContent(JsonSerializer.Serialize(new { code = errorCode }),
                 Encoding.UTF8, "application/json"),
         };
-
-    private static byte[] ExtractMultipartFile(byte[] body, MediaTypeHeaderValue? contentType)
-    {
-        var boundary = contentType?.Parameters
-            .FirstOrDefault(parameter => string.Equals(parameter.Name, "boundary", StringComparison.OrdinalIgnoreCase))
-            ?.Value?.Trim('"');
-        if (string.IsNullOrEmpty(boundary))
-            return Array.Empty<byte>();
-
-        var headerEnd = IndexOf(body, new byte[] { 13, 10, 13, 10 }, 0);
-        if (headerEnd < 0)
-            return Array.Empty<byte>();
-        var contentStart = headerEnd + 4;
-        var contentEnd = IndexOf(body, Encoding.ASCII.GetBytes($"\r\n--{boundary}"), contentStart);
-        if (contentEnd < contentStart)
-            return Array.Empty<byte>();
-        return body[contentStart..contentEnd];
-    }
-
-    private static int IndexOf(byte[] source, byte[] value, int startIndex)
-    {
-        for (var i = startIndex; i <= source.Length - value.Length; i++)
-        {
-            if (source.AsSpan(i, value.Length).SequenceEqual(value))
-                return i;
-        }
-
-        return -1;
-    }
 
     private string UniqueName(string directoryId, string name)
     {

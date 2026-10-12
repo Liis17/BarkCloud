@@ -14,28 +14,24 @@ internal sealed class UploadProcessingPendingException() : Exception(Loc.T("Eng_
 
 internal sealed class ResumableUploader
 {
-    internal const long DefaultThresholdBytes = 64L * 1024 * 1024;
-    private static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(2);
+    private static readonly TimeSpan InitialPollInterval = TimeSpan.FromMilliseconds(250);
+    private static readonly TimeSpan MaxPollInterval = TimeSpan.FromSeconds(2);
     private static readonly TimeSpan RestartLimitCooldown = TimeSpan.FromHours(1);
 
     private readonly FilesApi.FilesApiClient _files;
     private readonly HttpClient _http;
     private readonly string? _uploadOrigin;
     private readonly TimeProvider _time;
-    private readonly long _thresholdBytes;
-    internal Action? ProcessingWaitStartedForTesting { get; set; }
+    internal Action<TimeSpan>? ProcessingWaitStartedForTesting { get; set; }
 
     public ResumableUploader(FilesApi.FilesApiClient files, HttpClient http, string? uploadOrigin,
-        TimeProvider time, long thresholdBytes)
+        TimeProvider time)
     {
         _files = files;
         _http = http;
         _uploadOrigin = uploadOrigin?.TrimEnd('/');
         _time = time;
-        _thresholdBytes = thresholdBytes;
     }
-
-    public bool ShouldUse(long size) => size >= _thresholdBytes;
 
     public async Task<string> UploadAsync(PersistOperation operation, string localPath, string name,
         Action saveState, TimeSpan? processingWaitLimit, CancellationToken cancellationToken)
@@ -307,18 +303,21 @@ internal sealed class ResumableUploader
             ? null
             : CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeout.Token);
         var pollCancellationToken = linkedCancellation?.Token ?? cancellationToken;
+        var pollInterval = InitialPollInterval;
         try
         {
             while (true)
             {
-                var delay = Task.Delay(PollInterval, _time, pollCancellationToken);
-                ProcessingWaitStartedForTesting?.Invoke();
+                var delay = Task.Delay(pollInterval, _time, pollCancellationToken);
+                ProcessingWaitStartedForTesting?.Invoke(pollInterval);
                 await delay.ConfigureAwait(false);
                 var session = _files.GetUploadSession(new UploadSessionIdRequest { SessionId = state.SessionId! },
                     cancellationToken: pollCancellationToken);
                 UpdateState(operation, state, session, saveState);
                 if (session.Status != UploadSessionStatus.Processing)
                     return session;
+
+                pollInterval = TimeSpan.FromTicks(Math.Min(pollInterval.Ticks * 2, MaxPollInterval.Ticks));
             }
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested
