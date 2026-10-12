@@ -10,15 +10,18 @@ internal sealed class EngineSettingsStore
     private readonly string _file;
     private readonly string _defaultCacheDir;
     private readonly Stored _data;
+    private readonly object _ownerLock = new();
 
-    public EngineSettingsStore()
+    public EngineSettingsStore(string? dir = null)
     {
-        var dir = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "BarkCloud.Drive");
+        var hasCustomDir = dir is not null;
+        dir ??= Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "BarkCloud.Drive");
         Directory.CreateDirectory(dir);
         _file = Path.Combine(dir, "settings.json");
-        _defaultCacheDir = Path.Combine(Path.GetTempPath(), "BarkCloudDrive");
+        _defaultCacheDir = hasCustomDir
+            ? Path.Combine(dir, "cache")
+            : Path.Combine(Path.GetTempPath(), "BarkCloudDrive");
         _data = Load();
     }
 
@@ -32,6 +35,30 @@ internal sealed class EngineSettingsStore
     }
 
     public (string? Letter, string? Label) GetLastMount() => (_data.LastDriveLetter, _data.LastVolumeLabel);
+
+    public string? GetLastUserId(string serverKey)
+    {
+        lock (_ownerLock)
+            return _data.LastUserIds.GetValueOrDefault(serverKey);
+    }
+
+    public void SetLastUserId(string serverKey, string userId)
+    {
+        lock (_ownerLock)
+        {
+            _data.LastUserIds[serverKey] = userId;
+            Save();
+        }
+    }
+
+    public void ClearLastUserId(string serverKey)
+    {
+        lock (_ownerLock)
+        {
+            _data.LastUserIds.Remove(serverKey);
+            Save();
+        }
+    }
 
     public void SetLastMount(string? letter, string? label)
     {
@@ -57,13 +84,27 @@ internal sealed class EngineSettingsStore
 
     private void Save()
     {
+        var tempFile = _file + "." + Guid.NewGuid().ToString("N") + ".tmp";
         try
         {
-            File.WriteAllText(_file, JsonSerializer.Serialize(_data));
+            File.WriteAllText(tempFile, JsonSerializer.Serialize(_data));
+            File.Move(tempFile, _file, overwrite: true);
         }
         catch
         {
             // не критично
+        }
+        finally
+        {
+            try
+            {
+                if (File.Exists(tempFile))
+                    File.Delete(tempFile);
+            }
+            catch
+            {
+                // очистка временного файла не должна влиять на сохранение настроек
+            }
         }
     }
 
@@ -72,5 +113,6 @@ internal sealed class EngineSettingsStore
         public string? CacheDir { get; set; }
         public string? LastDriveLetter { get; set; }
         public string? LastVolumeLabel { get; set; }
+        public Dictionary<string, string> LastUserIds { get; set; } = new(StringComparer.Ordinal);
     }
 }

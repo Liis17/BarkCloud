@@ -31,21 +31,14 @@ public class Program
         builder.AddBarkCloudSerilog("BarkCloud.Files");
         builder.SetRunningAddress(builder.Configuration);
 
-        // Тело запроса ограничено 32 МиБ (> 20 МиБ gRPC MaxReceiveMessageSize). Загрузки больше
-        // задают свой лимит сами: part-PUT — [DisableRequestSizeLimit], legacy upload —
-        // LegacyUploadAdmissionFilter. Минимальная скорость снята глобально (part-PUT на медленном
-        // канале иначе оборвётся); для legacy upload её выставляет фильтр на запрос (только HTTP/1.x).
+        // Тело запроса ограничено 32 МиБ (> 20 МиБ gRPC MaxReceiveMessageSize). Part-PUT задаёт
+        // собственный лимит через [DisableRequestSizeLimit]. Минимальная скорость снята глобально,
+        // иначе передача частей по медленному каналу может оборваться.
         builder.WebHost.ConfigureKestrel(o =>
         {
             o.Limits.MaxRequestBodySize = 32 * 1024 * 1024;
             o.Limits.MinRequestBodyDataRate = null;
         });
-
-        var legacyUploadOptions = builder.Configuration.GetSection("Uploads:Legacy").Get<LegacyUploadOptions>()
-                                  ?? new LegacyUploadOptions();
-        builder.Services.AddSingleton(legacyUploadOptions);
-        builder.Services.AddSingleton<LegacyUploadBudget>();
-        builder.Services.AddScoped<LegacyUploadAdmissionFilter>();
 
         // Регистрируем gRPC сервисы с интерцепторами
         builder.Services.AddGrpc(options =>
@@ -116,9 +109,6 @@ public class Program
         builder.Services.AddSingleton<IUploadTempFileProvider, UploadTempFileProvider>();
         builder.Services.AddScoped<IStorageLimitProvider, UsersStorageLimitProvider>();
         builder.Services.AddScoped<IStorageQuotaService, StorageQuotaService>();
-        builder.Services.AddScoped<LegacyUploadQuotaGuard>();
-        builder.Services.AddScoped<ILegacyUploadCompletionMarker>(services =>
-            services.GetRequiredService<LegacyUploadQuotaGuard>());
         builder.Services.AddScoped<UploadSessionMaintenance>();
         builder.Services.AddSingleton<IMultipartUploadStore, S3MultipartUploadStore>();
         builder.Services.AddSingleton<StorageMigrationGate>();

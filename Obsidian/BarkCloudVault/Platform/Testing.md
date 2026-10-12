@@ -4,7 +4,7 @@ Parent: [[Architecture]] · See also: [[Web/WebApp]] · [[Backend/Files]] · [[B
 
 ## Назначение
 
-Автоматические проверки сгруппированы по backend-сервисам и общим библиотекам; часть проверок использует настоящие PostgreSQL или RabbitMQ. GitHub Actions выбирает наборы по изменённым путям и запускает сборку образа после успешных тестов сервиса.
+Автоматические проверки сгруппированы по backend-сервисам, общим библиотекам и Windows Drive; часть проверок использует настоящие PostgreSQL или RabbitMQ. GitHub Actions выбирает наборы по изменённым путям и запускает сборку образа после успешных тестов сервиса.
 
 ## Источники
 
@@ -12,6 +12,7 @@ Parent: [[Architecture]] · See also: [[Web/WebApp]] · [[Backend/Files]] · [[B
 |---|---|---|
 | `Tests/Directory.Build.props` | общие test properties | .NET 10, xUnit, Moq и FluentAssertions |
 | `Tests/BarkCloud.TestKit/` | общие test helpers | gRPC-контекст, вызовы и логгер для тестов |
+| `Tests/Drive/BarkCloud.Drive.Engine.Tests/` | тесты Windows Drive | Dokany callbacks, outbox/Upload 2.0, сессия, кеш, TLS, настройки и pipe |
 | `.github/workflows/tests.yml` | path filters, test jobs | Выбор тестов на PR и ручном запуске |
 | `.github/workflows/backend-service-ci.yml` | test/build jobs | Тесты сервиса перед сборкой и публикацией образа |
 | `Backend/BarkCloud.Web/ClientApp/package.json` | npm scripts | Vitest-команда клиентских тестов и сборка SPA |
@@ -23,8 +24,27 @@ Parent: [[Architecture]] · See also: [[Web/WebApp]] · [[Backend/Files]] · [[B
 | `Tests/Backend/BarkCloud.*.Tests` | Тесты backend и инфраструктуры по сервисам |
 | `Tests/Backend/BarkCloud.Identity.IntegrationTests`, `Tests/Backend/BarkCloud.Users.IntegrationTests` | Отдельные интеграционные проекты |
 | `Tests/Shared/*` | Тесты общих библиотек |
+| `Tests/Drive/BarkCloud.Drive.Engine.Tests` | `net10.0-windows`; тесты запускаются в Windows-окружении, unit-сценарии используют фейки вместо сервера и Dokany |
 | `npm test` в `Backend/BarkCloud.Web/ClientApp` | Запускает Vitest |
 | `dotnet test <project.csproj> -c Release` | Запуск указанного .NET test-проекта |
+
+## Windows Drive
+
+Проект `Tests/Drive/BarkCloud.Drive.Engine.Tests` нацелен на `net10.0-windows`; тесты запускаются на Windows. Они покрывают файловые операции Dokany через fake file info, ленивую гидрацию и кеш блоков, сохранение и outbox, MoveFile и удаление папок, Upload 2.0, TLS/метаданные, восстановление сессии, ServerKey, logout, настройки и журнал.
+
+- `TestAssemblyInitializer` перенаправляет `engine.log` в системный temp в каталог с PID процесса тестов. `Fakes/TestDirectory` создаёт отдельный временный каталог на каждый тест и удаляет его при завершении.
+- `WindowsIpcTests` запускает настоящий named pipe и помечен `[Trait("Category", "WindowsIpc")]`. Этот тест не требует установленного Dokany, но требует Windows.
+- `FakeCloud` и `FakeCallInvoker` моделируют Files/Cloud gRPC и состояние сессий загрузки; `FakeHttpHandler` подменяет HTTP-передачу. `FakeDokanFileInfo` моделирует параметры Dokany callback. `FakeTimeProvider` из пакета `Microsoft.Extensions.TimeProvider.Testing` позволяет управлять таймерами и задержками.
+
+Локальный запуск на Windows:
+
+```bash
+dotnet build Drive/BarkCloud.Drive.slnx -c Release
+dotnet test Tests/Drive/BarkCloud.Drive.Engine.Tests -c Release
+dotnet test Tests/Drive/BarkCloud.Drive.Engine.Tests --filter "Category=WindowsIpc"
+```
+
+В `.github/workflows/tests.yml` job `Drive (Windows)` запускается на `windows-latest`, когда фильтр `drive` находит изменения в `Drive/**`, `Tests/Drive/**`, `Shared/BarkCloud.Proto/**`, `Directory.Build.props`, `Tests/Directory.Build.props` или самом workflow. Job устанавливает .NET 10, собирает `Drive/BarkCloud.Drive.slnx` в Release и запускает тестовый проект целиком, в том числе категорию `WindowsIpc`.
 
 ## Зависимости и взаимодействия
 
@@ -37,7 +57,7 @@ Parent: [[Architecture]] · See also: [[Web/WebApp]] · [[Backend/Files]] · [[B
 - `paths` в `build-backend-*.yml` перечисляют `Shared/BarkCloud.Shared.*/**` и только нужные `.proto` по принципу сервиса-владельца; `configuration_api.proto` и `session_revocation_api.proto` компилируются в `BarkCloud.GrpcServer` и затрагивают все сервисы.
 - Telegram-уведомление шлёт `.github/scripts/send-telegram.sh`: при отказе Markdown повторяет текст без разметки, при неудаче пишет `::warning::` и не валит джобу.
 - Для Web CI выполняет `npm ci` и `npm run build` перед `dotnet publish`. Скрипт `npm test` существует, но в текущих workflows вызова Vitest нет.
-- Центральный тестовый workflow также содержит Android unit job; отдельные тестовые jobs для iOS и desktop-клиентов в этих workflows не определены.
+- Центральный test workflow также содержит Android unit job. Отдельные jobs для iOS и macOS не определены; для Windows Drive есть job `Drive (Windows)`.
 
 ## Ограничения и важные детали
 

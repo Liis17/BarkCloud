@@ -32,13 +32,22 @@ internal sealed class MountManager : IDisposable
 
             var mountPoint = $"{driveLetter}:\\";
             var dokan = new Dokan(new NullLogger());
-            var instance = new DokanInstanceBuilder(dokan)
-                .ConfigureOptions(options =>
-                {
-                    options.Options = DokanOptions.FixedDrive;
-                    options.MountPoint = mountPoint;
-                })
-                .Build(fs);
+            DokanInstance instance;
+            try
+            {
+                instance = new DokanInstanceBuilder(dokan)
+                    .ConfigureOptions(options =>
+                    {
+                        options.Options = DokanOptions.FixedDrive;
+                        options.MountPoint = mountPoint;
+                    })
+                    .Build(fs);
+            }
+            catch
+            {
+                dokan.Dispose();
+                throw;
+            }
 
             _dokan = dokan;
             _instance = instance;

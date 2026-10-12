@@ -10,6 +10,11 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <InternalsVisibleTo Include="BarkCloud.Drive.Engine.Tests" />
+        <InternalsVisibleTo Include="DynamicProxyGenAssembly2" />
+    </ItemGroup>
+
+    <ItemGroup>
         <PackageReference Include="DokanNet" Version="2.3.0.3" />
         <PackageReference Include="Google.Protobuf" Version="3.36.1" />
         <PackageReference Include="Grpc.Net.Client" Version="2.83.0" />

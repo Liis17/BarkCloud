@@ -45,7 +45,8 @@
                         <ui:TextBox x:Name="UsersPortBox"/>
                     </StackPanel>
                 </Grid>
-                <CheckBox x:Name="AcceptCertCheck" Content="{loc:Tr Common_AcceptCert}" IsChecked="True"/>
+                <CheckBox x:Name="AcceptCertCheck" Content="{loc:Tr Common_AcceptCert}" IsChecked="False"/>
+                <TextBlock Text="{loc:Tr Common_AcceptCertWarning}" Opacity="0.7" TextWrapping="Wrap" Margin="0,4,0,0"/>
             </StackPanel>
 
             <!-- Шаг 2: вход -->

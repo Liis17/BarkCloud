@@ -38,7 +38,7 @@ internal sealed class BarkCloudConnection : IDisposable
         _usersChannel = CreateChannel(usersAddress, acceptAnyCert);
         Users = new UsersApi.UsersApiClient(_usersChannel.Intercept(interceptor));
 
-        var transferHandler = new SocketsHttpHandler();
+        var transferHandler = new SocketsHttpHandler { ConnectTimeout = TimeSpan.FromSeconds(15) };
         if (acceptAnyCert)
             transferHandler.SslOptions.RemoteCertificateValidationCallback = (_, _, _, _) => true;
         // Без таймаута: крупные upload/download не должны обрываться по умолчанию (100 c).
