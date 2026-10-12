@@ -34,7 +34,7 @@ BarkCloud — самохостируемое облако файлов и мед
 | `Android/`, `Ios/` | [[Android/AndroidApp]], [[Ios/IosApp]] | Мобильные клиенты |
 | `Drive/`, `Mac/` | [[Desktop/WindowsDrive]], [[Desktop/MacDrive]] | Облако как диск/папка ОС |
 | `Tools/BarkCloud.Builder` | [[Tools/Builder]] | WPF-генератор `docker-compose.yml` и `.env` |
-| `Tests/` | [[Platform/Testing]] | Тесты backend и shared |
+| `Tests/` | [[Platform/Testing]] | Тесты backend, shared и Windows Drive (`Tests/Drive/BarkCloud.Drive.Engine.Tests`); Android unit-тесты — в `Android/BarkCloud.Android` (job в `tests.yml`) |
 
 ## Основные потоки
 
