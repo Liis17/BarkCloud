@@ -42,7 +42,6 @@ public sealed class WindowsIpcTests
             {
                 ((IDisposable)proxy).Dispose();
             }
-
         }
         finally
         {

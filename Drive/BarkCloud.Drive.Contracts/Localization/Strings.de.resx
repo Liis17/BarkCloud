@@ -152,6 +152,12 @@
   <data name="Main_EngineUnavailableFmt" xml:space="preserve">
     <value>Dienst nicht verfügbar: {0}</value>
   </data>
+  <data name="Main_EngineNotResponding" xml:space="preserve">
+    <value>Der Dienst antwortet nicht.</value>
+  </data>
+  <data name="Main_EngineShuttingDown" xml:space="preserve">
+    <value>Der Dienst wird beendet…</value>
+  </data>
   <data name="Main_NoFreeLetter" xml:space="preserve">
     <value>Kein freier Laufwerksbuchstabe zum Einbinden verfügbar.</value>
   </data>
@@ -196,6 +202,12 @@
   </data>
   <data name="Tray_Exit" xml:space="preserve">
     <value>Anwendung beenden</value>
+  </data>
+  <data name="Tray_PendingUploads" xml:space="preserve">
+    <value>Ausstehende Uploads</value>
+  </data>
+  <data name="Tray_PendingUploadsFmt" xml:space="preserve">
+    <value>Dateien warten auf Upload: {0}</value>
   </data>
   <data name="Wizard_Title" xml:space="preserve">
     <value>BarkCloud Drive einrichten</value>
@@ -321,7 +333,7 @@
     <value>Abmeldefehler: {0}</value>
   </data>
   <data name="Settings_ApplyingAddress" xml:space="preserve">
-    <value>Adresse wird übernommen, Dienst wird neu gestartet…</value>
+    <value>Adresse wird übernommen; der Dienst wird beendet…</value>
   </data>
   <data name="Settings_EngineUnavailableAfterServer" xml:space="preserve">
     <value>Dienst nach Adressänderung nicht verfügbar.</value>
@@ -341,14 +353,11 @@
   <data name="Settings_DriveRenamed" xml:space="preserve">
     <value>Laufwerk umbenannt</value>
   </data>
-  <data name="Settings_NameSaved" xml:space="preserve">
-    <value>Name gespeichert (Laufwerk einbinden)</value>
-  </data>
   <data name="Settings_LetterChangedFmt" xml:space="preserve">
     <value>Buchstabe geändert auf {0}:</value>
   </data>
-  <data name="Settings_LetterSaved" xml:space="preserve">
-    <value>Buchstabe gespeichert (Laufwerk einbinden)</value>
+  <data name="Settings_MountFirstToApply" xml:space="preserve">
+    <value>Binden Sie das Laufwerk ein, um diese Änderungen anzuwenden.</value>
   </data>
   <data name="Settings_CacheUpdated" xml:space="preserve">
     <value>Cache-Ordner aktualisiert. Bereits heruntergeladene Inhalte verbleiben im alten Ordner.</value>
@@ -357,7 +366,7 @@
     <value>Cache-Ordner konnte nicht geändert werden: {0}</value>
   </data>
   <data name="Settings_RestartingEngine" xml:space="preserve">
-    <value>Dienst wird neu gestartet…</value>
+    <value>Der Dienst wird vor dem Neustart beendet…</value>
   </data>
   <data name="Settings_EngineUnavailableAfterRestart" xml:space="preserve">
     <value>Dienst nach Neustart nicht verfügbar.</value>

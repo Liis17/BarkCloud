@@ -1150,7 +1150,7 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
 
                 if (rollbackErrors.Count > 0)
                     LastSyncError = Loc.T("Eng_MoveRollbackFailedFmt", oldName,
-                        string.Join("; ", rollbackErrors.Select(error => error.Message)));
+                        string.Join("; ", rollbackErrors.Select(ConnectionErrors.GetDisplayMessage)));
 
                 if (ex is MoveStatusException statusException)
                     return statusException.Status;

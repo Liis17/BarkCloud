@@ -84,13 +84,27 @@ internal sealed class EngineSettingsStore
 
     private void Save()
     {
+        var tempFile = _file + "." + Guid.NewGuid().ToString("N") + ".tmp";
         try
         {
-            File.WriteAllText(_file, JsonSerializer.Serialize(_data));
+            File.WriteAllText(tempFile, JsonSerializer.Serialize(_data));
+            File.Move(tempFile, _file, overwrite: true);
         }
         catch
         {
             // не критично
+        }
+        finally
+        {
+            try
+            {
+                if (File.Exists(tempFile))
+                    File.Delete(tempFile);
+            }
+            catch
+            {
+                // очистка временного файла не должна влиять на сохранение настроек
+            }
         }
     }
 

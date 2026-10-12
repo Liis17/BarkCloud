@@ -42,6 +42,23 @@ public sealed class ServerConfig
     public void Save()
     {
         Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
-        File.WriteAllText(FilePath, JsonSerializer.Serialize(this));
+        var tempFile = FilePath + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        try
+        {
+            File.WriteAllText(tempFile, JsonSerializer.Serialize(this));
+            File.Move(tempFile, FilePath, overwrite: true);
+        }
+        finally
+        {
+            try
+            {
+                if (File.Exists(tempFile))
+                    File.Delete(tempFile);
+            }
+            catch
+            {
+                // Очистка временного файла не должна влиять на сохранение настроек.
+            }
+        }
     }
 }

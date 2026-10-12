@@ -769,6 +769,38 @@ public sealed class DriveEngineSessionTests
         harness.OutboxWorker.IsRunning.Should().BeTrue();
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Failed_mount_restores_label_before_next_successful_mount(bool remount)
+    {
+        await using var harness = new EngineHarness();
+        harness.IdentityInvoker.Handle<AuthRequest, AuthResponse>("/barkcloud.identity.IdentityApi/Auth", _ =>
+            LoginResponse(harness.Time, "access", "refresh"));
+        (await harness.Tokens.LoginAsync("user", "password", null)).Should().BeTrue();
+        (await harness.Engine.MountAsync("Z", "Confirmed")).Error.Should().BeNull();
+        if (!remount)
+            await harness.Engine.UnmountAsync();
+        harness.BeforeMount = () => throw new IOException("mount failed");
+
+        var failed = remount
+            ? await harness.Engine.RemountAsync(null, "Unconfirmed")
+            : await harness.Engine.MountAsync("X", "Unconfirmed");
+
+        failed.Error.Should().NotBeNullOrEmpty();
+        harness.FileSystem.VolumeLabel.Should().Be("Confirmed");
+        harness.Settings.GetLastMount().Should().Be(("Z", "Confirmed"));
+        harness.BeforeMount = null;
+
+        var succeeded = remount
+            ? await harness.Engine.RemountAsync("X", null)
+            : await harness.Engine.MountAsync("X", null);
+
+        succeeded.Error.Should().BeNull();
+        succeeded.VolumeLabel.Should().Be("Confirmed");
+        harness.Settings.GetLastMount().Should().Be(("X", "Confirmed"));
+    }
+
     private static AuthResponse LoginResponse(FakeTimeProvider time, string access, string refresh,
         TimeSpan? lifetime = null)
         => new()
