@@ -33,14 +33,28 @@ internal sealed class AppSettings
 
     public void Save()
     {
+        var tempFile = FilePath + "." + Guid.NewGuid().ToString("N") + ".tmp";
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
-            File.WriteAllText(FilePath, JsonSerializer.Serialize(this));
+            File.WriteAllText(tempFile, JsonSerializer.Serialize(this));
+            File.Move(tempFile, FilePath, overwrite: true);
         }
         catch
         {
             // не критично
+        }
+        finally
+        {
+            try
+            {
+                if (File.Exists(tempFile))
+                    File.Delete(tempFile);
+            }
+            catch
+            {
+                // Очистка временного файла не должна влиять на сохранение настроек.
+            }
         }
     }
 }

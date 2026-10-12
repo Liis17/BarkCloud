@@ -200,6 +200,7 @@ public sealed class DriveEngine : IDriveEngine
     public async Task<EngineStatus> MountAsync(string driveLetter, string? volumeLabel)
     {
         await _sessionOperations.WaitAsync();
+        var previousLabel = _fs.VolumeLabel;
         try
         {
             if (IsShuttingDown() || _lifetime.IsCancellationRequested)
@@ -220,10 +221,12 @@ public sealed class DriveEngine : IDriveEngine
         }
         catch (Exception ex) when (IsDokanMissing(ex))
         {
+            _fs.VolumeLabel = previousLabel;
             return ErrorMessage(Loc.T("Eng_DokanMissing"));
         }
         catch (Exception ex)
         {
+            _fs.VolumeLabel = previousLabel;
             return Error(ex);
         }
         finally
@@ -237,6 +240,7 @@ public sealed class DriveEngine : IDriveEngine
     public async Task<EngineStatus> RemountAsync(string? driveLetter, string? volumeLabel)
     {
         await _sessionOperations.WaitAsync();
+        var previousLabel = _fs.VolumeLabel;
         try
         {
             if (IsShuttingDown() || _lifetime.IsCancellationRequested)
@@ -260,10 +264,12 @@ public sealed class DriveEngine : IDriveEngine
         }
         catch (Exception ex) when (IsDokanMissing(ex))
         {
+            _fs.VolumeLabel = previousLabel;
             return ErrorMessage(Loc.T("Eng_DokanMissingShort"));
         }
         catch (Exception ex)
         {
+            _fs.VolumeLabel = previousLabel;
             return Error(ex);
         }
         finally

@@ -67,4 +67,12 @@ public sealed class ConnectionSecurityTests
         ConnectionErrors.GetDisplayMessage(httpError).Should().Be("HTTP request failed");
         ConnectionErrors.GetDisplayMessage(rpcError).Should().Be("service unavailable");
     }
+
+    [Fact]
+    public void Empty_rpc_detail_falls_back_to_exception_message()
+    {
+        var error = new RpcException(new Status(StatusCode.Unavailable, string.Empty));
+
+        ConnectionErrors.GetDisplayMessage(error).Should().Be(error.Message);
+    }
 }

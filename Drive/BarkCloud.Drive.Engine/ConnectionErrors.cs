@@ -36,6 +36,8 @@ internal static class ConnectionErrors
         if (IsTls(exception))
             return Loc.T("Eng_TlsConnectionError");
 
-        return exception is RpcException rpc ? rpc.Status.Detail : exception.Message;
+        return exception is RpcException rpc && !string.IsNullOrEmpty(rpc.Status.Detail)
+            ? rpc.Status.Detail
+            : exception.Message;
     }
 }

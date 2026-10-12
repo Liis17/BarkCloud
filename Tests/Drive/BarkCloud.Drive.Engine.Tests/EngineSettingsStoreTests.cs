@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 using BarkCloud.Drive.Engine;
 using BarkCloud.Drive.Engine.Tests.Fakes;
 using BarkCloud.Proto.Users;
@@ -15,6 +17,21 @@ public sealed class EngineSettingsStoreTests
         var store = new EngineSettingsStore(temp.Root);
 
         store.GetCacheDir().Should().Be(temp.Path("cache"));
+    }
+
+    [Fact]
+    public void Save_replaces_settings_with_valid_json_and_leaves_no_temporary_file()
+    {
+        using var temp = new TestDirectory();
+        var store = new EngineSettingsStore(temp.Root);
+
+        store.SetCacheDir(temp.Path("cache-next"));
+
+        var settingsPath = temp.Path("settings.json");
+        using var json = JsonDocument.Parse(File.ReadAllText(settingsPath));
+        json.RootElement.GetProperty("CacheDir").GetString().Should().Be(temp.Path("cache-next"));
+        Directory.GetFiles(temp.Root, "*.tmp").Should().BeEmpty();
+        new EngineSettingsStore(temp.Root).GetCacheDir().Should().Be(temp.Path("cache-next"));
     }
 
     [Fact]

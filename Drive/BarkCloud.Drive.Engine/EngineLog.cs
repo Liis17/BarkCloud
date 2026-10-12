@@ -9,6 +9,7 @@ namespace BarkCloud.Drive.Engine;
 // поэтому файл — основной канал диагностики.
 internal static class EngineLog
 {
+    private const long MaxLogSize = 5 * 1024 * 1024;
     private static readonly object Gate = new();
     private static string? _logFile;
     private static bool _directoryReady;
@@ -48,6 +49,16 @@ internal static class EngineLog
                 {
                     Directory.CreateDirectory(Path.GetDirectoryName(logFile)!);
                     _directoryReady = true;
+                }
+
+                try
+                {
+                    if (File.Exists(logFile) && new FileInfo(logFile).Length > MaxLogSize)
+                        File.Move(logFile, logFile + ".1", overwrite: true);
+                }
+                catch
+                {
+                    // Ошибка ротации не должна мешать записи в текущий журнал.
                 }
 
                 File.AppendAllText(logFile, line + Environment.NewLine);
