@@ -54,9 +54,7 @@ Web предоставляет соответствующие маршруты: 
 - Единственный поддерживаемый путь передачи — `CreateUploadSession`, `PUT` частей и
   `CompleteUploadSession`. Импорт Torrent использует этот путь и ждёт Ready перед
   AttachFile; подробности внутреннего адреса и таймаутов — [[Backend/Torrent]].
-- Серверный Upload 2.0 поддерживает `USER_AVATAR`, но Android-клиент пока не переведён на этот контракт: смена аватара в
-  `Android/BarkCloud.Android/app/src/main/java/com/barkfluff/BarkCloud/data/users/UserRepository.kt`
-  ещё использует `GetUploadUrl` и получает HTTP 418. Это будет отдельным этапом клиента.
+- Android-клиент загружает аватар как `USER_AVATAR` foreground-потоком и вызывает `UsersApi.SetProfilePicture` только после `READY`; детали ограничения времени и отмены — [[Android/ResumableUpload]].
   `Mac/BarkCloudKit/Sources/BarkCloudKit/Data/Users/UserRepository.swift` также пока использует
   `GetUploadUrl` для смены аватара и получает HTTP 418.
   `Mac/BarkCloudKit/Sources/BarkCloudKit/Data/Cloud/CloudRepository.swift` (`uploadFile`)
