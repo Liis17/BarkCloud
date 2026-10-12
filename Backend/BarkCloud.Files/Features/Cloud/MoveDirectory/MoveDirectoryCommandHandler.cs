@@ -1,4 +1,5 @@
 using BarkCloud.Files.Persistence;
+using BarkCloud.Files.Services;
 using BarkCloud.GrpcServer.XAuth;
 using BarkCloud.Proto.Files;
 using BarkCloud.Shared.Exceptions.Files;
@@ -79,6 +80,7 @@ public class MoveDirectoryCommandHandler : IRequestHandler<MoveDirectoryCommand,
 
         directory.ParentId = request.NewParentId;
         directory.UpdatedAt = DateTime.UtcNow;
+        await DirectoryVisibility.RecomputeSubtreeAsync(_storage, ownerId, directory, cancellationToken);
         await _storage.UpdateDirectory(directory, cancellationToken);
         await treeLock.CommitAsync(cancellationToken);
 
