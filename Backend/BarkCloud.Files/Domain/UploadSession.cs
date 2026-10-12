@@ -31,6 +31,8 @@ public sealed class UploadSession
 
     public string Sha256 { get; set; } = string.Empty;
 
+    public UploadFileType FileType { get; set; } = UploadFileType.CloudFile;
+
     public UploadSessionStatus Status { get; set; }
 
     public string StorageProfileId { get; set; } = string.Empty;

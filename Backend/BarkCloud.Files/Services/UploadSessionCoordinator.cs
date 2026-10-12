@@ -16,7 +16,8 @@ public sealed record CreateUploadSessionInput(
     string FileName,
     long FileSize,
     string ContentType,
-    string Sha256);
+    string Sha256,
+    UploadFileType FileType = UploadFileType.CloudFile);
 
 public sealed record UploadSessionResult(
     Guid SessionId,
@@ -35,6 +36,7 @@ public sealed class UploadSessionCoordinator
     public const long BasePartSize = 16L * 1024 * 1024;
     public const int MaximumParts = 10_000;
     public const long MaximumObjectSize = 5L * 1024 * 1024 * 1024 * 1024;
+    public const long MaximumAvatarSize = 20L * 1024 * 1024;
     public static readonly TimeSpan InactivityTimeout = TimeSpan.FromHours(24);
 
     private readonly FilesContext _context;
@@ -104,9 +106,9 @@ public sealed class UploadSessionCoordinator
         var sessionId = Guid.NewGuid();
         var fileId = Guid.NewGuid();
         var mediaKind = descriptor.FileName.GetMediaKind();
-        var profileId = _profiles.ResolveWriteProfileId(UploadFileType.CloudFile, mediaKind, isPreview: false);
+        var profileId = _profiles.ResolveWriteProfileId(descriptor.FileType, mediaKind, isPreview: false);
         await using var admission = _migrationGate is null ? null : await _migrationGate.EnterUploadAdmissionAsync(
-            profileId, descriptor.FileName, descriptor.ContentType, cancellationToken);
+            descriptor.FileType, profileId, descriptor.FileName, descriptor.ContentType, cancellationToken);
         var uploadToken = GenerateToken();
         string? multipartUploadId = null;
 
@@ -131,6 +133,7 @@ public sealed class UploadSessionCoordinator
                 DeclaredSize = descriptor.FileSize,
                 ContentType = descriptor.ContentType,
                 Sha256 = descriptor.Sha256,
+                FileType = descriptor.FileType,
                 Status = UploadSessionStatus.Uploading,
                 StorageProfileId = profileId,
                 MultipartUploadId = multipartUploadId,
@@ -149,7 +152,7 @@ public sealed class UploadSessionCoordinator
                 Id = fileId,
                 Uploaders = [ownerId],
                 CreatedAt = now,
-                Type = UploadFileType.CloudFile,
+                Type = descriptor.FileType,
                 StorageProfileId = profileId,
                 MediaKind = MediaKind.Other,
                 Filename = descriptor.FileName,
@@ -411,19 +414,24 @@ public sealed class UploadSessionCoordinator
             throw new InvalidUploadSessionRequestException();
         if (input.FileSize <= 0 || input.FileSize > MaximumObjectSize)
             throw new InvalidUploadSessionRequestException();
+        if (input.FileType is not (UploadFileType.UserAvatar or UploadFileType.CloudFile))
+            throw new InvalidUploadSessionRequestException();
+        if (input.FileType == UploadFileType.UserAvatar && input.FileSize > MaximumAvatarSize)
+            throw new InvalidUploadSessionRequestException();
         if (contentType.Length > 255)
             throw new InvalidUploadSessionRequestException();
         if (sha256.Length != 64 || sha256.Any(c => !Uri.IsHexDigit(c)))
             throw new InvalidUploadSessionRequestException();
 
-        return new CreateUploadSessionInput(key, name, input.FileSize, contentType, sha256);
+        return new CreateUploadSessionInput(key, name, input.FileSize, contentType, sha256, input.FileType);
     }
 
     private static bool Matches(UploadSession session, CreateUploadSessionInput input) =>
         session.FileName == input.FileName
         && session.DeclaredSize == input.FileSize
         && session.ContentType == input.ContentType
-        && session.Sha256 == input.Sha256;
+        && session.Sha256 == input.Sha256
+        && session.FileType == input.FileType;
 
     private DateTime UtcNow() => _time.GetUtcNow().UtcDateTime;
 

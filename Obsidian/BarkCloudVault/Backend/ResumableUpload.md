@@ -13,7 +13,9 @@ Resumable-сессия загружает файл частями в S3 multipar
 |---|---|---|
 | `Backend/BarkCloud.Files/Domain/UploadSession.cs` | `UploadSession` | Состояние сессии и резерв квоты |
 | `Backend/BarkCloud.Files/Services/UploadSessionCoordinator.cs` | `UploadSessionCoordinator` | Сессия, части, resume и complete |
+| `Backend/BarkCloud.Files/Features/UploadFile/UploadFileCommandHandler.cs` | `UploadFileCommandHandler` | Обработка исходного объекта и сохранение хеша |
 | `Backend/BarkCloud.Files/Infrastructure/S3MultipartUploadStore.cs` | `S3MultipartUploadStore` | S3 multipart операции |
+| `Backend/BarkCloud.Files/Infrastructure/StorageMigrationGate.cs` | `StorageMigrationGate` | Admission и ожидание сессий при переключении бакета |
 | `Backend/BarkCloud.Files/Services/UploadSessionMaintenance.cs` | `UploadSessionMaintenance` | Истечение и очистка сессий |
 | `Backend/BarkCloud.Files/Services/UploadSessionProcessor.cs` | `UploadSessionProcessor` | Обработка завершённого оригинала |
 | `Backend/BarkCloud.Files/Consumers/ProcessUploadedFileConsumer.cs` | `ProcessUploadedFileConsumer` | Фоновая очередь обработки |
@@ -33,9 +35,11 @@ Web предоставляет соответствующие маршруты: 
 
 ## Ограничения и важные детали
 
-- Создание принимает `idempotency_key`, `file_name`, `file_size`, `content_type`, `sha256`. Ключ уникален в пределах владельца: повтор того же описания возвращает его сессию, другое описание приводит к `UploadIdempotencyConflictException`.
+- Создание принимает `idempotency_key`, `file_name`, `file_size`, `content_type`, `sha256` и optional `file_type`. Отсутствующий `file_type` означает `CLOUD_FILE`; сервер поддерживает `CLOUD_FILE` и `USER_AVATAR`, а явные `UNKNOWN` и неизвестные enum-значения отклоняет. Тип сохраняется в upload-сессии и placeholder.
+- Ключ идемпотентности уникален в пределах владельца. Повтор того же описания, включая тип, возвращает ту же сессию, даже если placeholder уже удалён при отмене, истечении или очистке неудачной обработки. Отличие типа или другого поля приводит к `UploadIdempotencyConflictException`.
 - Состояния: `uploading → processing → ready | failed`; незавершённая сессия также может стать `cancelled` или `expired`. Неактивная загрузка истекает через 24 часа.
 - Размер части не меньше 16 MiB; он увеличивается, если нужно уложить объект максимум в 10 000 частей. Максимальный размер объекта — 5 TiB. Последняя часть может быть короче остальных.
+- `USER_AVATAR` ограничен 20 MiB и направляется в активный S3-профиль роли `avatars`. Общий processing pipeline сохраняет исходный объект с исходными байтами и file ID, проверяет SHA-256, размер и MIME; отдельное сжатие и отдельный `UploadAvatarServer` для этого пути не используются. Обновлять профиль пользователя следует после `READY` через `UsersApi.SetProfilePicture`.
 - Сервер проверяет номер части, смещение, общий размер и длину тела по объявленному размеру файла. Повторный номер части заменяет соответствующую часть multipart.
 - `S3MultipartUploadStore.UploadPartAsync` полностью буферизует неперематываемое тело одной части для обычного S3: AWS SDK требует seekable-поток при включённой подписи тела. До 64 KiB буфер хранится в памяти, далее — во временном файле в `Path.GetTempPath()`, удаляемом при успехе, ошибке или отмене. Объём буфера ограничен объявленным размером части; короткое тело отклоняется до обращения в S3. На временном диске требуется место для одновременно принимаемых частей. R2 с отключённой подписью тела продолжает получать поток напрямую.
 - Токен содержит 32 случайных байта; в БД хранится SHA-256 токена. `ResumeUploadSession` выпускает новый токен, старый становится недействительным. `uploaded_parts` строится по подтверждённым данным S3 и сохранённым квитанциям Files; часть без ETag нужно отправить повторно.
@@ -43,16 +47,18 @@ Web предоставляет соответствующие маршруты: 
 - Сервис резервирует объявленный размер в квоте при создании сессии. При готовности размер
   резерва освобождается и учитывается фактический оригинал; отмена, истечение и ошибка
   обработки освобождают резерв при успешно записанном terminal-состоянии.
+- При миграции хранилища аватарная сессия зависит только от primary-профиля роли `avatars`; отдельный бакет превью не блокирует её admission и не ждёт её завершения. CloudFile сохраняет зависимость от primary и подходящего профиля превью.
 - `FilesApi.GetUploadUrl` остаётся без изменений и продолжает возвращать URL Files, но
   `POST /upload/{uploadId}` (внешний адрес `/web/upload/{id}`) всегда отвечает HTTP 418 с
   `code: legacy_upload_removed`; тело запроса не читается. Полученный URL больше не принимает файл.
 - Единственный поддерживаемый путь передачи — `CreateUploadSession`, `PUT` частей и
   `CompleteUploadSession`. Импорт Torrent использует этот путь и ждёт Ready перед
   AttachFile; подробности внутреннего адреса и таймаутов — [[Backend/Torrent]].
-- Известные клиентские ограничения: смена аватара в
+- Серверный Upload 2.0 поддерживает `USER_AVATAR`, но Android-клиент пока не переведён на этот контракт: смена аватара в
   `Android/BarkCloud.Android/app/src/main/java/com/barkfluff/BarkCloud/data/users/UserRepository.kt`
-  и `Mac/BarkCloudKit/Sources/BarkCloudKit/Data/Users/UserRepository.swift` пока использует
-  `GetUploadUrl` и получает HTTP 418; отдельного пути Upload 2.0 для аватаров пока нет.
+  ещё использует `GetUploadUrl` и получает HTTP 418. Это будет отдельным этапом клиента.
+  `Mac/BarkCloudKit/Sources/BarkCloudKit/Data/Users/UserRepository.swift` также пока использует
+  `GetUploadUrl` для смены аватара и получает HTTP 418.
   `Mac/BarkCloudKit/Sources/BarkCloudKit/Data/Cloud/CloudRepository.swift` (`uploadFile`)
   также использует старый маршрут и получает HTTP 418 до миграции.
 
