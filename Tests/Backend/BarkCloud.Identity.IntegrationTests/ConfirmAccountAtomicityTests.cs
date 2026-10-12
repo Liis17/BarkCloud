@@ -9,6 +9,8 @@ using BarkCloud.Identity.Persistence.Services;
 using BarkCloud.Identity.Services;
 using BarkCloud.Identity.Settings;
 using BarkCloud.Proto.Users;
+using BarkCloud.Shared.Exceptions.Identity;
+using BarkCloud.Shared.Exceptions.Users;
 using BarkCloud.Shared.Queue.Notifications;
 using BarkCloud.TestKit;
 
@@ -76,22 +78,110 @@ public class ConfirmAccountAtomicityTests
     }
 
     [Fact]
+    public async Task PasswordConfirmation_CommitsPasswordCodeRefreshAndOutboxTogether()
+    {
+        var codeId = Guid.NewGuid();
+        await using var database = await PostgresIdentityDatabase.CreateAsync();
+        await SeedRegistrationCode(database, codeId, 42, "123456");
+
+        await using var context = database.CreateContext();
+        var response = await CreateHandler(context, CreateUsersClient().Object).Handle(
+            PasswordCommand(codeId, "secret1"), default);
+
+        response.RefreshToken.Value.Should().NotBeNullOrWhiteSpace();
+        await using var observer = database.CreateContext();
+        var password = await observer.UserPasswords.AsNoTracking().SingleAsync(x => x.UserId == 42);
+        PasswordHasher.VerifyPassword("secret1", password.PasswordHash).Should().BeTrue();
+        (await observer.ConfirmationCodes.AsNoTracking().AnyAsync(x => x.Id == codeId)).Should().BeFalse();
+        (await observer.RefreshTokens.AsNoTracking().CountAsync(x => x.UserId == 42)).Should().Be(1);
+        (await observer.PendingNotifications.AsNoTracking().CountAsync(x => x.UserId == 42)).Should().Be(1);
+    }
+
+    [Fact]
+    public async Task PasswordConfirmation_NotificationFailureRollsBackHashTokenAndCodeThenCanRetry()
+    {
+        var codeId = Guid.NewGuid();
+        var users = CreateUsersClient();
+        await using var database = await PostgresIdentityDatabase.CreateAsync();
+        await SeedRegistrationCode(database, codeId, 42, "123456");
+        await using (var setup = database.CreateContext())
+        {
+            await setup.Database.ExecuteSqlRawAsync("""
+                CREATE FUNCTION reject_password_notification_insert() RETURNS trigger LANGUAGE plpgsql AS $$
+                BEGIN RAISE EXCEPTION 'notification insert failed'; END $$;
+                CREATE TRIGGER reject_password_notification_insert BEFORE INSERT ON "PendingNotifications"
+                FOR EACH ROW EXECUTE FUNCTION reject_password_notification_insert();
+                """);
+        }
+
+        await using (var context = database.CreateContext())
+        {
+            await FluentActions.Awaiting(() => CreateHandler(context, users.Object).Handle(
+                    PasswordCommand(codeId, "secret1"), default))
+                .Should().ThrowAsync<DbUpdateException>();
+        }
+
+        await using (var observer = database.CreateContext())
+        {
+            (await observer.UserPasswords.AsNoTracking().AnyAsync(x => x.UserId == 42)).Should().BeFalse();
+            (await observer.ConfirmationCodes.AsNoTracking().AnyAsync(x => x.Id == codeId)).Should().BeTrue();
+            (await observer.RefreshTokens.AsNoTracking().AnyAsync(x => x.UserId == 42)).Should().BeFalse();
+            (await observer.PendingNotifications.AsNoTracking().AnyAsync()).Should().BeFalse();
+            await observer.Database.ExecuteSqlRawAsync("DROP TRIGGER reject_password_notification_insert ON \"PendingNotifications\"; DROP FUNCTION reject_password_notification_insert();");
+        }
+
+        await using (var retryContext = database.CreateContext())
+        {
+            await CreateHandler(retryContext, users.Object).Handle(PasswordCommand(codeId, "secret1"), default);
+        }
+
+        users.Verify(c => c.ConfirmUserAsync(It.Is<ConfirmUserRequest>(r => r.UserId == 42),
+            It.IsAny<Metadata>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
+        await using var afterRetry = database.CreateContext();
+        var password = await afterRetry.UserPasswords.AsNoTracking().SingleAsync(x => x.UserId == 42);
+        PasswordHasher.VerifyPassword("secret1", password.PasswordHash).Should().BeTrue();
+        (await afterRetry.ConfirmationCodes.AsNoTracking().AnyAsync(x => x.Id == codeId)).Should().BeFalse();
+        (await afterRetry.RefreshTokens.AsNoTracking().CountAsync(x => x.UserId == 42)).Should().Be(1);
+        (await afterRetry.PendingNotifications.AsNoTracking().CountAsync(x => x.UserId == 42)).Should().Be(1);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task ConcurrentPasswordConfirmation_CannotOverwriteInitialPassword(bool sameCode)
+    {
+        var firstCodeId = Guid.NewGuid();
+        var secondCodeId = sameCode ? firstCodeId : Guid.NewGuid();
+        await using var database = await PostgresIdentityDatabase.CreateAsync();
+        await SeedRegistrationCode(database, firstCodeId, 42, "123456");
+        if (!sameCode)
+            await SeedRegistrationCode(database, secondCodeId, 42, "654321");
+
+        await using var firstContext = database.CreateContext();
+        await using var secondContext = database.CreateContext();
+        var users = CreateUsersClient();
+        var firstTask = ConfirmPasswordOnce(CreateHandler(firstContext, users.Object), firstCodeId, "first-password");
+        var secondTask = ConfirmPasswordOnce(CreateHandler(secondContext, users.Object), secondCodeId,
+            "second-password", sameCode ? "123456" : "654321");
+        var results = await Task.WhenAll(firstTask, secondTask);
+
+        results.Count(x => x).Should().Be(1);
+        await using var observer = database.CreateContext();
+        var password = await observer.UserPasswords.AsNoTracking().SingleAsync(x => x.UserId == 42);
+        var firstMatches = PasswordHasher.VerifyPassword("first-password", password.PasswordHash);
+        var secondMatches = PasswordHasher.VerifyPassword("second-password", password.PasswordHash);
+        (firstMatches ^ secondMatches).Should().BeTrue();
+        (await observer.RefreshTokens.AsNoTracking().CountAsync(x => x.UserId == 42)).Should().Be(1);
+        (await observer.PendingNotifications.AsNoTracking().CountAsync(x => x.UserId == 42)).Should().Be(1);
+        users.Verify(c => c.ConfirmUserAsync(It.IsAny<ConfirmUserRequest>(), It.IsAny<Metadata>(),
+            It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
     public async Task ConcurrentConfirmation_OnlyOneLocalSessionAndEventAreCreated()
     {
         var codeId = Guid.NewGuid();
-        var response = new TaskCompletionSource<ConfirmUserResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var bothConfirmed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var arrivals = 0;
-        var users = new Mock<UsersServerApi.UsersServerApiClient>();
-        users.Setup(c => c.ConfirmUserAsync(It.IsAny<ConfirmUserRequest>(), It.IsAny<Metadata>(),
-                It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
-            .Returns((ConfirmUserRequest _, Metadata _, DateTime? _, CancellationToken _) =>
-            {
-                if (Interlocked.Increment(ref arrivals) == 2)
-                    bothConfirmed.TrySetResult();
-                return new AsyncUnaryCall<ConfirmUserResponse>(response.Task, Task.FromResult(new Metadata()),
-                    () => Status.DefaultSuccess, () => new Metadata(), () => { });
-            });
+        var users = CreateUsersClient();
 
         await using var database = await PostgresIdentityDatabase.CreateAsync();
         await using (var setup = database.CreateContext())
@@ -108,8 +198,6 @@ public class ConfirmAccountAtomicityTests
         await using var secondContext = database.CreateContext();
         var first = ConfirmOnce(CreateHandler(firstContext, users.Object), codeId);
         var second = ConfirmOnce(CreateHandler(secondContext, users.Object), codeId);
-        await bothConfirmed.Task.WaitAsync(TimeSpan.FromSeconds(10));
-        response.SetResult(new ConfirmUserResponse());
         var successes = await Task.WhenAll(first, second);
 
         successes.Count(x => x).Should().Be(1);
@@ -117,6 +205,76 @@ public class ConfirmAccountAtomicityTests
         (await observer.ConfirmationCodes.AsNoTracking().AnyAsync(x => x.Id == codeId)).Should().BeFalse();
         (await observer.RefreshTokens.AsNoTracking().CountAsync(x => x.UserId == 42)).Should().Be(1);
         (await observer.PendingNotifications.AsNoTracking().CountAsync()).Should().Be(1);
+    }
+
+    [Theory]
+    [InlineData("password")]
+    [InlineData("refresh")]
+    [InlineData("commit")]
+    public async Task PasswordConfirmation_FailureAtLocalWriteOrCommitRollsBackAndCanRetry(string failurePoint)
+    {
+        var codeId = Guid.NewGuid();
+        var users = CreateUsersClient();
+        await using var database = await PostgresIdentityDatabase.CreateAsync();
+        await SeedRegistrationCode(database, codeId, 42, "123456");
+
+        var (createTrigger, dropTrigger) = failurePoint switch
+        {
+            "password" => ("""
+                CREATE TRIGGER reject_password_registration BEFORE INSERT ON "UserPasswords"
+                FOR EACH ROW EXECUTE FUNCTION reject_password_registration_insert();
+                """, "DROP TRIGGER reject_password_registration ON \"UserPasswords\"; DROP FUNCTION reject_password_registration_insert();"),
+            "refresh" => ("""
+                CREATE TRIGGER reject_password_registration BEFORE INSERT ON "RefreshTokens"
+                FOR EACH ROW EXECUTE FUNCTION reject_password_registration_insert();
+                """, "DROP TRIGGER reject_password_registration ON \"RefreshTokens\"; DROP FUNCTION reject_password_registration_insert();"),
+            "commit" => ("""
+                CREATE CONSTRAINT TRIGGER reject_password_registration AFTER INSERT ON "PendingNotifications"
+                DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION reject_password_registration_insert();
+                """, "DROP TRIGGER reject_password_registration ON \"PendingNotifications\"; DROP FUNCTION reject_password_registration_insert();"),
+            _ => throw new ArgumentOutOfRangeException(nameof(failurePoint))
+        };
+        await using (var setup = database.CreateContext())
+        {
+            await setup.Database.ExecuteSqlRawAsync("""
+                CREATE FUNCTION reject_password_registration_insert() RETURNS trigger LANGUAGE plpgsql AS $$
+                BEGIN RAISE EXCEPTION 'password confirmation write failure'; END $$;
+                """);
+            await setup.Database.ExecuteSqlRawAsync(createTrigger);
+        }
+
+        await using (var context = database.CreateContext())
+        {
+            var act = () => CreateHandler(context, users.Object).Handle(PasswordCommand(codeId, "secret1"), default);
+            if (failurePoint == "commit")
+                await FluentActions.Awaiting(act).Should().ThrowAsync<PostgresException>();
+            else
+                await FluentActions.Awaiting(act).Should().ThrowAsync<DbUpdateException>();
+        }
+
+        await using (var observer = database.CreateContext())
+        {
+            var code = await observer.ConfirmationCodes.AsNoTracking().SingleAsync(x => x.Id == codeId);
+            code.Attempts.Should().Be(1);
+            (await observer.UserPasswords.AsNoTracking().AnyAsync(x => x.UserId == 42)).Should().BeFalse();
+            (await observer.RefreshTokens.AsNoTracking().AnyAsync(x => x.UserId == 42)).Should().BeFalse();
+            (await observer.PendingNotifications.AsNoTracking().AnyAsync(x => x.UserId == 42)).Should().BeFalse();
+            await observer.Database.ExecuteSqlRawAsync(dropTrigger);
+        }
+
+        await using (var retryContext = database.CreateContext())
+        {
+            await CreateHandler(retryContext, users.Object).Handle(PasswordCommand(codeId, "secret1"), default);
+        }
+
+        await using var afterRetry = database.CreateContext();
+        var password = await afterRetry.UserPasswords.AsNoTracking().SingleAsync(x => x.UserId == 42);
+        PasswordHasher.VerifyPassword("secret1", password.PasswordHash).Should().BeTrue();
+        (await afterRetry.ConfirmationCodes.AsNoTracking().AnyAsync(x => x.Id == codeId)).Should().BeFalse();
+        (await afterRetry.RefreshTokens.AsNoTracking().CountAsync(x => x.UserId == 42)).Should().Be(1);
+        (await afterRetry.PendingNotifications.AsNoTracking().CountAsync(x => x.UserId == 42)).Should().Be(1);
+        users.Verify(c => c.ConfirmUserAsync(It.IsAny<ConfirmUserRequest>(), It.IsAny<Metadata>(),
+            It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
     }
 
     [Fact]
@@ -294,6 +452,45 @@ public class ConfirmAccountAtomicityTests
         }
     }
 
+    private static async Task<bool> ConfirmPasswordOnce(ConfirmAccountCommandHandler handler, Guid codeId,
+        string password, string code = "123456")
+    {
+        try
+        {
+            await handler.Handle(PasswordCommand(codeId, password, code), default);
+            return true;
+        }
+        catch (Exception ex) when (ex is UserIsDraftException
+                                   or ConfirmationCodeIncorrectException
+                                   or ConfirmationCodeNotFoundException)
+        {
+            return false;
+        }
+    }
+
+    private static ConfirmAccountCommand PasswordCommand(Guid codeId, string password, string code = "123456") => new()
+    {
+        CodeId = codeId.ToString(),
+        Code = code,
+        InitialPassword = password,
+        RequiresInitialPassword = true
+    };
+
+    private static async Task SeedRegistrationCode(PostgresIdentityDatabase database, Guid codeId, long userId,
+        string value)
+    {
+        await using var setup = database.CreateContext();
+        setup.ConfirmationCodes.Add(new ConfirmationCode
+        {
+            Id = codeId,
+            OwnerId = userId,
+            Type = ConfirmationCodeType.Registration,
+            Value = value,
+            Expires = DateTime.UtcNow.AddMinutes(5)
+        });
+        await setup.SaveChangesAsync();
+    }
+
     private static Mock<UsersServerApi.UsersServerApiClient> CreateUsersClient()
     {
         var users = new Mock<UsersServerApi.UsersServerApiClient>();
@@ -323,7 +520,8 @@ public class ConfirmAccountAtomicityTests
 
         return new ConfirmAccountCommandHandler(new ConfirmationCodesStorage(context), users,
             new RefreshTokensStorage(context, new JwtSettings { ExpiryMinutes = 60 }), context, requestContext,
-            outbox, metrics, policy.Object, rateLimiter.Object, NullLogger<ConfirmAccountCommandHandler>.Instance);
+            new PasswordsStorage(context), outbox, metrics, policy.Object, rateLimiter.Object,
+            NullLogger<ConfirmAccountCommandHandler>.Instance);
     }
 
     private sealed class CancelCommit(CancellationTokenSource cancellation) : DbTransactionInterceptor

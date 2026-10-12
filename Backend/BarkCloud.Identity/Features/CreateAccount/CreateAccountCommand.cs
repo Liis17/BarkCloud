@@ -13,4 +13,8 @@ public class CreateAccountCommand : IRequest<CreateAccountResponse>
     public string Username { get; set; }
 
     public string Email { get; set; }
+
+    public string? InitialPassword { get; set; }
+
+    public bool RequiresInitialPassword { get; set; }
 }

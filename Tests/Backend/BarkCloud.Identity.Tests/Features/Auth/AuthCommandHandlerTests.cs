@@ -22,7 +22,7 @@ namespace BarkCloud.Identity.Tests.Features.Auth;
 
 public class AuthCommandHandlerTests : IDisposable
 {
-    private static readonly string PasswordHash = BCrypt.Net.BCrypt.HashPassword("p");
+    private static readonly string PasswordHash = PasswordHasher.HashPassword("p");
 
     private readonly Mock<UsersServerApi.UsersServerApiClient> _usersClient = new();
     private readonly Mock<IAuthPropertiesStorage> _authProps = new();
@@ -137,12 +137,36 @@ public class AuthCommandHandlerTests : IDisposable
     public async Task Handle_UserNotFound_ThrowsInvalidLoginOrPassword()
     {
         _usersClient
-            .Setup(c => c.FindByLoginAsync(It.IsAny<FindByLoginRequest>(), null, null, default))
+            .Setup(c => c.FindByLoginAsync(It.IsAny<FindByLoginRequest>(), null, null, It.IsAny<CancellationToken>()))
             .Returns(GrpcCallHelpers.AsyncUnary(new FindByLoginResponse()));
 
         var act = () => CreateSut().Handle(new AuthCommand { Username = "u", Password = "p" }, default);
 
         await act.Should().ThrowAsync<InvalidLoginOrPasswordException>();
+    }
+
+    [Fact]
+    public async Task Handle_TypedUserNotFound_IsMappedToInvalidLoginOrPassword()
+    {
+        _usersClient
+            .Setup(c => c.FindByLoginAsync(It.IsAny<FindByLoginRequest>(), null, null, default))
+            .Throws(new UserNotFoundException());
+
+        var act = () => CreateSut().Handle(new AuthCommand { Username = "u", Password = "p" }, default);
+
+        await act.Should().ThrowAsync<InvalidLoginOrPasswordException>();
+    }
+
+    [Fact]
+    public async Task Handle_UserLookupServiceFailure_IsNotMappedAsInvalidCredentials()
+    {
+        _usersClient
+            .Setup(c => c.FindByLoginAsync(It.IsAny<FindByLoginRequest>(), null, null, default))
+            .Throws(new InvalidOperationException("Users unavailable"));
+
+        var act = () => CreateSut().Handle(new AuthCommand { Username = "u", Password = "p" }, default);
+
+        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("Users unavailable");
     }
 
     [Fact]
@@ -176,7 +200,11 @@ public class AuthCommandHandlerTests : IDisposable
 
         var act = () => CreateSut().Handle(new AuthCommand { Username = "u", Password = "p" }, default);
 
-        await act.Should().ThrowAsync<OtpCodeNeedException>();
+        var exception = await act.Should().ThrowAsync<OtpCodeNeedException>();
+        exception.Which.ErrorMetadata.Should().BeEquivalentTo(new Dictionary<string, string>
+        {
+            ["x-otp-method"] = "authenticator"
+        });
     }
 
     [Fact]
@@ -199,7 +227,8 @@ public class AuthCommandHandlerTests : IDisposable
 
         await act.Should().ThrowAsync<InvalidLoginOrPasswordException>();
         _authProps.Verify(
-            s => s.TryIssueEmailAuthCode(It.IsAny<long>(), It.IsAny<EmailAuthCodePurpose>(), It.IsAny<string>()),
+            s => s.TryIssueEmailAuthCodeWithSnapshot(It.IsAny<long>(), It.IsAny<EmailAuthCodePurpose>(),
+                It.IsAny<string>(), It.IsAny<CancellationToken>()),
             Times.Never);
         _notifications.Verify(
             n => n.SendNotification(It.Is<EmailNotification>(e => e.Type == NotificationType.ConfirmationAuth)),
@@ -207,17 +236,42 @@ public class AuthCommandHandlerTests : IDisposable
     }
 
     [Fact]
+    public async Task Handle_BothOtpMethodsEnabled_RequestsAuthenticatorWithoutSendingEmail()
+    {
+        SetupUser(1, new AuthUserProperty { UserId = 1, OtpEnabled = true, EmailOtpEnabled = true });
+
+        var act = () => CreateSut().Handle(new AuthCommand { Username = "u", Password = "p" }, default);
+
+        var exception = await act.Should().ThrowAsync<OtpCodeNeedException>();
+        exception.Which.ErrorMetadata.Should().BeEquivalentTo(new Dictionary<string, string>
+        {
+            ["x-otp-method"] = "authenticator"
+        });
+        _authProps.Verify(s => s.TryIssueEmailAuthCodeWithSnapshot(It.IsAny<long>(),
+            It.IsAny<EmailAuthCodePurpose>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        _notifications.Verify(n => n.SendNotification(It.IsAny<Notification>()), Times.Never);
+    }
+
+    [Fact]
     public async Task Handle_EmailOtpNoCode_IssuesLoginCodeSendsEmailAndThrowsOtpCodeNeed()
     {
         SetupUser(1, new AuthUserProperty { UserId = 1, EmailOtpEnabled = true });
         _authProps
-            .Setup(s => s.TryIssueEmailAuthCode(1, EmailAuthCodePurpose.Login, It.IsAny<string>()))
-            .ReturnsAsync(true);
+            .Setup(s => s.TryIssueEmailAuthCodeWithSnapshot(1, EmailAuthCodePurpose.Login, It.IsAny<string>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new EmailAuthCodeIssueResult(true, DateTime.UtcNow, 60));
 
         var act = () => CreateSut().Handle(new AuthCommand { Username = "u", Password = "p" }, default);
 
-        await act.Should().ThrowAsync<OtpCodeNeedException>();
-        _authProps.Verify(s => s.TryIssueEmailAuthCode(1, EmailAuthCodePurpose.Login, It.IsAny<string>()), Times.Once);
+        var exception = await act.Should().ThrowAsync<OtpCodeNeedException>();
+        exception.Which.ErrorMetadata.Should().BeEquivalentTo(new Dictionary<string, string>
+        {
+            ["x-otp-method"] = "email",
+            ["x-otp-retry-after-seconds"] = "60",
+            ["x-otp-mail-status"] = "sent"
+        });
+        _authProps.Verify(s => s.TryIssueEmailAuthCodeWithSnapshot(1, EmailAuthCodePurpose.Login,
+            It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
         _notifications.Verify(
             n => n.SendNotification(It.Is<EmailNotification>(e => e.Type == NotificationType.ConfirmationAuth)),
             Times.Once);
@@ -228,12 +282,19 @@ public class AuthCommandHandlerTests : IDisposable
     {
         SetupUser(1, new AuthUserProperty { UserId = 1, EmailOtpEnabled = true });
         _authProps
-            .Setup(s => s.TryIssueEmailAuthCode(1, EmailAuthCodePurpose.Login, It.IsAny<string>()))
-            .ReturnsAsync(false);
+            .Setup(s => s.TryIssueEmailAuthCodeWithSnapshot(1, EmailAuthCodePurpose.Login, It.IsAny<string>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new EmailAuthCodeIssueResult(false, DateTime.UtcNow.AddSeconds(-20), 40));
 
         var act = () => CreateSut().Handle(new AuthCommand { Username = "u", Password = "p" }, default);
 
-        await act.Should().ThrowAsync<OtpCodeNeedException>();
+        var exception = await act.Should().ThrowAsync<OtpCodeNeedException>();
+        exception.Which.ErrorMetadata.Should().BeEquivalentTo(new Dictionary<string, string>
+        {
+            ["x-otp-method"] = "email",
+            ["x-otp-retry-after-seconds"] = "40",
+            ["x-otp-mail-status"] = "existing"
+        });
         _notifications.Verify(n => n.SendNotification(It.IsAny<Notification>()), Times.Never);
     }
 
@@ -278,7 +339,7 @@ public class AuthCommandHandlerTests : IDisposable
     private void SetupUser(long id, AuthUserProperty? props)
     {
         _usersClient
-            .Setup(c => c.FindByLoginAsync(It.IsAny<FindByLoginRequest>(), null, null, default))
+            .Setup(c => c.FindByLoginAsync(It.IsAny<FindByLoginRequest>(), null, null, It.IsAny<CancellationToken>()))
             .Returns(GrpcCallHelpers.AsyncUnary(new FindByLoginResponse { User = new User { Id = id, Username = "u" } }));
         _usersClient
             .Setup(c => c.GetUserContactsAsync(It.IsAny<GetUserContactsRequest>(), null, null, default))
@@ -318,7 +379,7 @@ public class AuthCommandHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task Handle_HappyPath_ReturnsTokensFromSharedSessionIssuer()
+    public async Task Handle_InitialPasswordHash_AllowsLogin()
     {
         SetupUser(42, null);
         using var cts = new CancellationTokenSource();
