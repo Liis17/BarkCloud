@@ -27,17 +27,20 @@ public class ConfigurationApiService : BarkCloud.Proto.Configuration.Configurati
     private readonly MetricsCollector _metrics;
     private readonly IConfigurationStorage _configurationStorage;
     private readonly StorageProfileStorage _storageProfiles;
+    private readonly StorageQuotaGroupStorage _storageQuotaGroups;
 
     public ConfigurationApiService(
         IMediator mediator,
         MetricsCollector metrics,
         IConfigurationStorage configurationStorage,
-        StorageProfileStorage storageProfiles)
+        StorageProfileStorage storageProfiles,
+        StorageQuotaGroupStorage storageQuotaGroups)
     {
         _mediator = mediator;
         _metrics = metrics;
         _configurationStorage = configurationStorage;
         _storageProfiles = storageProfiles;
+        _storageQuotaGroups = storageQuotaGroups;
     }
 
     public override async Task<GetConfigurationResponse> GetConfiguration(GetConfigurationRequest request, ServerCallContext context)
@@ -265,8 +268,10 @@ public class ConfigurationApiService : BarkCloud.Proto.Configuration.Configurati
         ServerCallContext context)
     {
         var profiles = await _storageProfiles.GetAllAsync(context.CancellationToken);
+        var groups = await _storageQuotaGroups.GetAllAsync(context.CancellationToken);
         var response = new GetStorageProfilesResponse();
         response.Profiles.AddRange(profiles.Select(ToProto));
+        response.QuotaGroups.AddRange(groups.Select(ToProto));
         if (request.IncludeRevisions)
         {
             foreach (var profile in profiles)
@@ -294,7 +299,6 @@ public class ConfigurationApiService : BarkCloud.Proto.Configuration.Configurati
     {
         try
         {
-            var quotaBytes = await ResolveQuotaBytesAsync(request, context.CancellationToken);
             var profile = await _storageProfiles.SaveAsync(new StorageProfileInput(
                 request.Role,
                 request.ServiceUrl,
@@ -305,7 +309,6 @@ public class ConfigurationApiService : BarkCloud.Proto.Configuration.Configurati
                 request.IsLegacy,
                 string.IsNullOrWhiteSpace(request.ProfileId) ? null : request.ProfileId,
                 request.ConfirmLegacyMutation,
-                quotaBytes,
                 request.HasRegion ? request.Region : null,
                 request.HasForcePathStyle ? request.ForcePathStyle : null),
                 request.EditedBy, request.EditedFrom, context.CancellationToken);
@@ -331,7 +334,7 @@ public class ConfigurationApiService : BarkCloud.Proto.Configuration.Configurati
             await _storageProfiles.RelocateAsync(request.SourceServiceUrl, request.SourceBucketName,
                 request.ProfileIds.ToArray(), new StorageProfileInput("", destination.ServiceUrl,
                     destination.AccessKey, destination.SecretKey, destination.BucketName,
-                    destination.IsR2, false, null, false, 0, destination.Region,
+                    destination.IsR2, false, null, false, destination.Region,
                     destination.HasForcePathStyle ? destination.ForcePathStyle : true),
                 request.MigrationId, request.EditedBy, context.CancellationToken);
             return new UpdateConfigurationResponse { Success = true, Message = "S3-профили переключены" };
@@ -342,22 +345,42 @@ public class ConfigurationApiService : BarkCloud.Proto.Configuration.Configurati
         }
     }
 
-    private async Task<long> ResolveQuotaBytesAsync(
-        SaveStorageProfileRequest request,
-        CancellationToken cancellationToken)
+    public override async Task<UpdateConfigurationResponse> SaveStorageQuotaGroup(
+        SaveStorageQuotaGroupRequest request,
+        ServerCallContext context)
     {
-        if (!string.IsNullOrEmpty(request.QuotaValue) || !string.IsNullOrEmpty(request.QuotaUnit))
-            return StorageProfileQuota.ParseBytes(request.QuotaValue, request.QuotaUnit);
+        try
+        {
+            var quotaBytes = StorageProfileQuota.ParseBytes(request.QuotaValue, request.QuotaUnit);
+            await _storageQuotaGroups.SaveAsync(
+                string.IsNullOrWhiteSpace(request.Id) ? null : request.Id,
+                request.Name,
+                quotaBytes,
+                request.Buckets.Select(bucket => new StorageQuotaGroupBucketInput(bucket.ServiceUrl, bucket.BucketName)).ToArray(),
+                request.EditedBy,
+                request.EditedFrom,
+                context.CancellationToken);
+            return new UpdateConfigurationResponse { Success = true, Message = "Группа S3 сохранена" };
+        }
+        catch (Exception exception)
+        {
+            return new UpdateConfigurationResponse { Success = false, Message = exception.Message };
+        }
+    }
 
-        // Old clients omit both fields. Keep an existing bucket's quota when they update credentials.
-        var profiles = await _storageProfiles.GetAllAsync(cancellationToken);
-        var existing = !string.IsNullOrWhiteSpace(request.ProfileId)
-            ? profiles.SingleOrDefault(profile => profile.ProfileId == request.ProfileId)
-            : profiles.Where(profile => profile.Role == request.Role)
-                .OrderByDescending(profile => profile.IsActive)
-                .ThenByDescending(profile => profile.Version)
-                .FirstOrDefault();
-        return existing?.QuotaBytes ?? 0;
+    public override async Task<UpdateConfigurationResponse> DeleteStorageQuotaGroup(
+        DeleteStorageQuotaGroupRequest request,
+        ServerCallContext context)
+    {
+        try
+        {
+            await _storageQuotaGroups.DeleteAsync(request.Id, context.CancellationToken);
+            return new UpdateConfigurationResponse { Success = true, Message = "Группа S3 удалена" };
+        }
+        catch (Exception exception)
+        {
+            return new UpdateConfigurationResponse { Success = false, Message = exception.Message };
+        }
     }
 
     public override async Task<UpdateConfigurationResponse> ActivateStorageProfile(
@@ -423,7 +446,6 @@ public class ConfigurationApiService : BarkCloud.Proto.Configuration.Configurati
         AccessKey = profile.AccessKey,
         SecretKey = profile.SecretKey,
         BucketName = profile.BucketName,
-        QuotaBytes = profile.QuotaBytes,
         IsR2 = profile.IsR2,
         Region = profile.Region,
         ForcePathStyle = profile.ForcePathStyle,
@@ -437,6 +459,22 @@ public class ConfigurationApiService : BarkCloud.Proto.Configuration.Configurati
         EditedFrom = profile.EditedFrom,
         HasSecretKey = !string.IsNullOrEmpty(profile.SecretKey)
     };
+
+    private static StorageQuotaGroupItem ToProto(StorageQuotaGroup group)
+    {
+        var item = new StorageQuotaGroupItem
+        {
+            Id = group.Id,
+            Name = group.Name,
+            QuotaBytes = group.QuotaBytes
+        };
+        item.Buckets.AddRange(group.Buckets.Select(bucket => new StorageBucketRef
+        {
+            ServiceUrl = bucket.ServiceUrl,
+            BucketName = bucket.BucketName
+        }));
+        return item;
+    }
 
     private static ServiceId ParseServiceId(int value) =>
         Enum.IsDefined(typeof(ServiceId), value)
