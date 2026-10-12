@@ -120,7 +120,8 @@ public static class CloudApiEndpoints
             }));
 
         // Поиск файлов пользователя по имени (по всему облаку), cursor-пагинация.
-        // kind: media (фото+видео) | photo | video; не задан — все типы.
+        // kind: media (фото+видео) | photo | video; эти варианты исключают скрытые из галереи папки.
+        // Не задан — все типы без фильтра видимости.
         api.MapGet("/cloud/search", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud,
             string? q, string? kind, int? limit, string? cursorAt, string? cursorId) =>
             await Guarded(http, auth, async token =>
@@ -130,6 +131,7 @@ public static class CloudApiEndpoints
                     return Results.Json(new { files = Array.Empty<object>(), nextCursorAt = (DateTimeOffset?)null, nextCursorId = "" }, Json);
 
                 var req = new SearchFilesRequest { Query = query, Limit = limit is > 0 and <= 200 ? limit.Value : 50 };
+                if (kind is "media" or "photo" or "video") req.ExcludeHiddenFromGallery = true;
                 switch (kind)
                 {
                     case "media": req.KindFilter.Add(MediaKind.Photo); req.KindFilter.Add(MediaKind.Video); break;
@@ -150,12 +152,34 @@ public static class CloudApiEndpoints
                 }, Json);
             }));
 
+        api.MapGet("/cloud/dir/properties", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud,
+            string id) =>
+            await Guarded(http, auth, async token =>
+            {
+                var properties = await cloud.GetDirectoryPropertiesAsync(
+                    new GetDirectoryPropertiesRequest { DirectoryId = id }, token);
+                return Results.Json(CloudJson.DirProperties(properties), Json);
+            }));
+
         api.MapPost("/cloud/dir", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud, DirCreate body) =>
             await Guarded(http, auth, async token =>
             {
                 var info = await cloud.CreateDirectoryAsync(
                     new CreateDirectoryRequest { ParentId = body.ParentId ?? "", Name = body.Name }, token);
                 return Results.Json(CloudJson.Dir(info), Json);
+            }));
+
+        api.MapPost("/cloud/dir/visibility", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud, VisibilityReq body) =>
+            await Guarded(http, auth, async token =>
+            {
+                var properties = await cloud.SetDirectoryVisibilityAsync(new SetDirectoryVisibilityRequest
+                {
+                    DirectoryId = body.Id,
+                    Inherit = body.Inherit,
+                    HideFromGallery = body.HideFromGallery,
+                    HideFromSearch = body.HideFromSearch
+                }, token);
+                return Results.Json(CloudJson.DirProperties(properties), Json);
             }));
 
         api.MapPost("/cloud/dir/rename", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud, RenameReq body) =>
@@ -1791,6 +1815,7 @@ public static class CloudApiEndpoints
     // ───────────────────────── DTO тел запросов ─────────────────────────
 
     private sealed record DirCreate(string? ParentId, string Name);
+    private sealed record VisibilityReq(string Id, bool Inherit, bool HideFromGallery, bool HideFromSearch);
     private sealed record RenameReq(string Id, string Name);
     private sealed record MoveReq(string Id, string? ParentId);
     private sealed record IdReq(string Id);
