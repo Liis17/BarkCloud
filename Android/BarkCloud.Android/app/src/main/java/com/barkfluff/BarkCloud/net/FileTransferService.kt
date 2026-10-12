@@ -314,17 +314,17 @@ internal suspend fun uploadSessionPartHttp(
         .header("X-Upload-Token", token)
         .build()
 
-    val callFinished = CompletableDeferred<Unit>()
-    var callStarted = false
     try {
         suspendCancellableCoroutine { continuation ->
             val call = http.newCall(request)
-            callStarted = true
-            continuation.invokeOnCancellation { call.cancel() }
+            continuation.invokeOnCancellation {
+                // A queued call may reach writeTo later, so close the body gate before cancelling it.
+                body.cancel()
+                call.cancel()
+            }
             try {
                 call.enqueue(object : Callback {
                     override fun onFailure(call: Call, error: IOException) {
-                        callFinished.complete(Unit)
                         continuation.resumeWithException(error)
                     }
 
@@ -341,7 +341,6 @@ internal suspend fun uploadSessionPartHttp(
                                 }
                             }
                         }
-                        callFinished.complete(Unit)
                         result.fold(
                             onSuccess = { continuation.resume(Unit) },
                             onFailure = continuation::resumeWithException,
@@ -349,12 +348,11 @@ internal suspend fun uploadSessionPartHttp(
                     }
                 })
             } catch (error: Throwable) {
-                callFinished.complete(Unit)
                 continuation.resumeWithException(error)
             }
         }
     } catch (cancelled: CancellationException) {
-        if (callStarted) withContext(NonCancellable) { callFinished.await() }
+        withContext(NonCancellable) { body.cancelAndAwaitWrites() }
         throw cancelled
     }
 }
@@ -644,23 +642,58 @@ internal class FileSegmentRequestBody(
     private val onProgress: (sent: Long) -> Unit,
 ) : RequestBody() {
 
+    private val lifecycleLock = Any()
+    private val writesFinished = CompletableDeferred<Unit>()
+    private var cancelled = false
+    private var activeWriters = 0
+
     override fun contentType() = OCTET_STREAM
     override fun contentLength(): Long = length
 
     override fun writeTo(sink: BufferedSink) {
-        RandomAccessFile(file, "r").use { raf ->
-            raf.seek(offset)
-            val buffer = ByteArray(64 * 1024)
-            var sent = 0L
-            while (sent < length) {
-                val toRead = minOf(buffer.size.toLong(), length - sent).toInt()
-                val read = raf.read(buffer, 0, toRead)
-                if (read < 0) throw IOException("Unexpected EOF in ${file.path} at ${offset + sent}")
-                sink.write(buffer, 0, read)
-                sent += read
-                onProgress(sent)
+        val raf = synchronized(lifecycleLock) {
+            if (cancelled) throw IOException("Upload part body was cancelled")
+            val opened = RandomAccessFile(file, "r")
+            try {
+                opened.seek(offset)
+            } catch (error: Throwable) {
+                runCatching { opened.close() }
+                throw error
+            }
+            activeWriters++
+            opened
+        }
+        try {
+            raf.use { activeFile ->
+                val buffer = ByteArray(64 * 1024)
+                var sent = 0L
+                while (sent < length) {
+                    val toRead = minOf(buffer.size.toLong(), length - sent).toInt()
+                    val read = activeFile.read(buffer, 0, toRead)
+                    if (read < 0) throw IOException("Unexpected EOF in ${file.path} at ${offset + sent}")
+                    sink.write(buffer, 0, read)
+                    sent += read
+                    onProgress(sent)
+                }
+            }
+        } finally {
+            synchronized(lifecycleLock) {
+                activeWriters--
+                if (cancelled && activeWriters == 0) writesFinished.complete(Unit)
             }
         }
+    }
+
+    fun cancel() {
+        synchronized(lifecycleLock) {
+            cancelled = true
+            if (activeWriters == 0) writesFinished.complete(Unit)
+        }
+    }
+
+    suspend fun cancelAndAwaitWrites() {
+        cancel()
+        writesFinished.await()
     }
 
     private companion object {

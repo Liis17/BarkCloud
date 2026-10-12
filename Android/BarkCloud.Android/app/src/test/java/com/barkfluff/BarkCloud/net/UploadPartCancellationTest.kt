@@ -7,14 +7,19 @@ import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import okhttp3.Call
+import okhttp3.Callback
+import okhttp3.Dispatcher
 import okhttp3.EventListener
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
+import okhttp3.mockwebserver.SocketPolicy
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -75,6 +80,42 @@ class UploadPartCancellationTest {
             assertTrue(error.retryable)
         } finally {
             server.shutdown()
+            file.delete()
+        }
+    }
+
+    @Test
+    fun `cancelling queued PUT finishes without waiting for dispatcher slot`() = runBlocking {
+        val server = MockWebServer()
+        val file = File.createTempFile("upload-part-queued-cancel", ".bin").apply { writeBytes(ByteArray(4)) }
+        val dispatcher = Dispatcher().apply { maxRequestsPerHost = 1 }
+        val client = OkHttpClient.Builder().dispatcher(dispatcher).build()
+        var upload: kotlinx.coroutines.Job? = null
+        var heldCall: Call? = null
+        server.enqueue(MockResponse().setSocketPolicy(SocketPolicy.NO_RESPONSE))
+        server.start()
+        try {
+            val activeCall = client.newCall(okhttp3.Request.Builder().url(server.url("/hold")).get().build())
+            heldCall = activeCall
+            activeCall.enqueue(object : Callback {
+                override fun onFailure(call: Call, error: IOException) = Unit
+                override fun onResponse(call: Call, response: okhttp3.Response) { response.close() }
+            })
+            assertTrue("held GET did not reach MockWebServer", server.takeRequest(5, TimeUnit.SECONDS) != null)
+
+            upload = launch(Dispatchers.IO) {
+                uploadSessionPartHttp(client, server.url("/part").toString(), 1, "token", file, 0, 4, 4)
+            }
+            withTimeout(5_000) {
+                while (dispatcher.queuedCalls().none { it.request().method == "PUT" }) delay(10)
+            }
+
+            withTimeout(1_000) { upload.cancelAndJoin() }
+        } finally {
+            heldCall?.cancel()
+            upload?.cancel()
+            server.shutdown()
+            upload?.let { withTimeout(5_000) { it.join() } }
             file.delete()
         }
     }
