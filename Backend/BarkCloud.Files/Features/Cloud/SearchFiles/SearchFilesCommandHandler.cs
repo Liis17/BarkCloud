@@ -51,7 +51,8 @@ public class SearchFilesCommandHandler : IRequestHandler<SearchFilesCommand, Sea
         var limit = request.Limit <= 0 ? DefaultLimit : Math.Min(request.Limit, MaxLimit);
 
         var entries = await _storage.SearchFileEntriesPage(
-            ownerId, query, request.CursorCreatedAt, request.CursorEntryId, limit, request.KindFilter, cancellationToken);
+            ownerId, query, request.CursorCreatedAt, request.CursorEntryId, limit, request.KindFilter, cancellationToken,
+            request.ExcludeHiddenFromGallery);
 
         var hasMore = entries.Count > limit;
         var page = hasMore ? entries.Take(limit).ToList() : entries;

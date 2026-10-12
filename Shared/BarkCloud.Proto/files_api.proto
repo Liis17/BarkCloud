@@ -32,6 +32,8 @@ service FilesApi {
 
 service CloudApi {
   rpc CreateDirectory      (CreateDirectoryRequest)      returns (DirectoryInfo);            // Создать папку
+  rpc GetDirectoryProperties (GetDirectoryPropertiesRequest) returns (DirectoryProperties);   // Свойства папки: даты, счётчики поддерева, видимость
+  rpc SetDirectoryVisibility (SetDirectoryVisibilityRequest) returns (DirectoryProperties);  // Скрыть папку из галереи/поиска и изменить наследование
   rpc RenameDirectory      (RenameDirectoryRequest)      returns (CloudEmpty);               // Переименовать папку
   rpc MoveDirectory        (MoveDirectoryRequest)        returns (CloudEmpty);               // Переместить папку
   rpc DeleteDirectory      (DeleteDirectoryRequest)      returns (CloudEmpty);               // Удалить папку рекурсивно
@@ -478,6 +480,26 @@ message DirectoryInfo {
   string name = 3; // Имя папки
   google.protobuf.Timestamp created_at = 4;
   google.protobuf.Timestamp updated_at = 5;
+}
+
+message GetDirectoryPropertiesRequest { string directory_id = 1; }
+message SetDirectoryVisibilityRequest {
+  string directory_id = 1;
+  bool inherit = 2;
+  bool hide_from_gallery = 3;
+  bool hide_from_search = 4;
+}
+message DirectoryProperties {
+  DirectoryInfo directory = 1;
+  int64 file_count = 2;        // живые записи во всём поддереве
+  int64 folder_count = 3;      // вложенные папки без самой папки
+  int64 total_size_bytes = 4;  // сумма UploadFile.Size живых записей поддерева
+  bool inherit = 5;
+  bool hide_from_gallery = 6;
+  bool hide_from_search = 7;
+  bool effective_hide_from_gallery = 8;
+  bool effective_hide_from_search = 9;
+  bool has_parent = 10;
 }
 
 message FileEntryInfo {
@@ -1168,6 +1190,7 @@ message SearchFilesRequest {
   google.protobuf.Timestamp cursor_created_at = 3;  // exclusive; пусто = с самых свежих
   string cursor_entry_id = 4;                       // tie-breaker для стабильной cursor-пагинации
   repeated MediaKind kind_filter = 5;               // пусто = все типы; иначе только перечисленные (напр. PHOTO+VIDEO)
+  bool exclude_hidden_from_gallery = 6;             // исключить записи в папках, скрытых из галереи
 }
 
 message SearchFilesResponse {

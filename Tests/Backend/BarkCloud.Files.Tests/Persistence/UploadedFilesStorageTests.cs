@@ -136,6 +136,82 @@ public sealed class UploadedFilesStorageTests : IDisposable
     }
 
     [Fact]
+    public async Task GalleryQueries_ExcludeHiddenFilesBeforePagingAndKeepVisibilityOwnerScoped()
+    {
+        const long ownerId = 42;
+        const long otherOwnerId = 7;
+        var today = new DateTime(2026, 10, 13, 12, 0, 0, DateTimeKind.Utc);
+        var hiddenDirectory = new CloudDirectory
+        {
+            Id = Guid.NewGuid(), OwnerId = ownerId, Name = "hidden", EffectiveHideFromGallery = true,
+            CreatedAt = today, UpdatedAt = today
+        };
+        var openDirectory = new CloudDirectory
+        {
+            Id = Guid.NewGuid(), OwnerId = ownerId, Name = "open", InheritVisibility = false,
+            CreatedAt = today, UpdatedAt = today
+        };
+        var hiddenPhoto = ReadyFile(ownerId, MediaKind.Photo, 999);
+        hiddenPhoto.CreatedAt = today;
+        hiddenPhoto.Filename = "hidden.jpg";
+        var visibleNew = ReadyFile(ownerId, MediaKind.Photo, 300);
+        visibleNew.Id = Guid.Parse("11111111-1111-1111-1111-111111111111");
+        visibleNew.CreatedAt = today.AddMinutes(-1);
+        visibleNew.Filename = "visible-new.jpg";
+        var visibleRoot = ReadyFile(ownerId, MediaKind.Photo, 200);
+        visibleRoot.CreatedAt = today.AddMinutes(-2);
+        visibleRoot.Filename = "visible-root.jpg";
+        var shared = ReadyFile(ownerId, MediaKind.Photo, 400);
+        shared.Uploaders.Add(otherOwnerId);
+        shared.CreatedAt = today.AddSeconds(-1);
+        shared.Filename = "shared.jpg";
+        var hiddenVideo = ReadyFile(ownerId, MediaKind.Video, 500);
+        hiddenVideo.CreatedAt = today.AddSeconds(-2);
+        var visibleVideo = ReadyFile(ownerId, MediaKind.Video, 100);
+        visibleVideo.CreatedAt = today.AddSeconds(-3);
+
+        CloudFileEntry Entry(UploadFile file, Guid directoryId, long entryOwnerId = ownerId) => new()
+        {
+            Id = Guid.NewGuid(), OwnerId = entryOwnerId, DirectoryId = directoryId,
+            FileId = file.Id, Name = file.Filename ?? "video.mp4", CreatedAt = file.CreatedAt
+        };
+
+        var entries = new[]
+        {
+            Entry(hiddenPhoto, hiddenDirectory.Id), Entry(visibleNew, openDirectory.Id),
+            Entry(visibleRoot, Guid.Empty), Entry(shared, hiddenDirectory.Id),
+            Entry(hiddenVideo, hiddenDirectory.Id), Entry(visibleVideo, openDirectory.Id)
+        };
+        var files = new[] { hiddenPhoto, visibleNew, visibleRoot, shared, hiddenVideo, visibleVideo };
+        _database.Context.CloudDirectories.AddRange(hiddenDirectory, openDirectory);
+        _database.Context.UploadedFiles.AddRange(files);
+        _database.Context.CloudFileEntries.AddRange(entries);
+        _database.Context.FileMetadata.AddRange(files.Select(file => new FileMetadata
+        {
+            FileId = file.Id, CreatedAt = today, TakenAt = today,
+            Latitude = 40, Longitude = 20
+        }));
+        await _database.Context.SaveChangesAsync();
+
+        var storage = new UploadedFilesStorage(_database.Context);
+        var first = await storage.ListUserMediaPage(ownerId, MediaKind.Photo, null, null, 1);
+        var next = await storage.ListUserMediaPage(ownerId, MediaKind.Photo, first[0].CreatedAt, first[0].Id, 1);
+        var legacyImages = await storage.ListUserImagesPage(ownerId, null, null, 10);
+        var stats = await storage.GetUserMediaStats(ownerId, MediaKind.Photo);
+        var memories = await storage.ListMemoriesForDay(ownerId, today.Month, today.Day, 10);
+        var locations = await storage.ListMediaWithLocationPage(ownerId, null, null, 10);
+        var otherOwnerPage = await storage.ListUserMediaPage(otherOwnerId, MediaKind.Photo, null, null, 10);
+
+        first.Select(x => x.Id).Should().Equal([visibleNew.Id, visibleRoot.Id], "filtering happens before limit+1");
+        next.Should().ContainSingle().Which.Id.Should().Be(visibleRoot.Id);
+        legacyImages.Select(x => x.Id).Should().BeEquivalentTo([visibleNew.Id, visibleRoot.Id]);
+        stats.Should().Be(new UserMediaStats(2, 500));
+        memories.Select(x => x.File.Id).Should().BeEquivalentTo([visibleNew.Id, visibleRoot.Id, visibleVideo.Id]);
+        locations.Select(x => x.File.Id).Should().BeEquivalentTo([visibleNew.Id, visibleRoot.Id, visibleVideo.Id]);
+        otherOwnerPage.Should().ContainSingle().Which.Id.Should().Be(shared.Id);
+    }
+
+    [Fact]
     public async Task AddUploaderToFile_AddsOwnerOnce_AndIgnoresUnknownFile()
     {
         var file = ReadyFile(1, MediaKind.Photo, 10);
