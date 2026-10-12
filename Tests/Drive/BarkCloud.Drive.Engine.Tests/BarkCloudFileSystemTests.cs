@@ -2322,7 +2322,7 @@ public sealed class BarkCloudFileSystemTests
         fileSystem.Cleanup("\\existing.bin", info);
         fileSystem.CloseFile("\\existing.bin", info);
 
-        fileSystem.LastSyncError.Should().Contain("пустые файлы");
+        fileSystem.LastSyncError.Should().Be(Loc.T("Eng_EmptyFileNotSupported"));
         cloud.HttpHandler.Calls.Should().BeEmpty();
         gateway.ListDirectory("").Files.Should().ContainSingle(file => file.File.Id == original.FileId);
     }
