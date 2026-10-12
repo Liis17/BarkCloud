@@ -22,11 +22,14 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
 import io.mockk.verify
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -93,6 +96,33 @@ class UserRepositoryAvatarTest {
         assertEquals(listOf("ready-upload", "token", "fixed-stub", "deadline", "profile-rpc"), order)
         assertEquals("ready-file-id", request.captured.fileId)
         verify(exactly = 0) { grpc.usersStub() }
+    }
+
+    @Test
+    fun `cancellation after READY before profile RPC skips user and cloud calls`() = runTest {
+        val uri = mockk<Uri>()
+        val grpc = mockk<GrpcManager>()
+        val transfer = mockk<FileTransferService>()
+        val users = mockk<UsersApiGrpcKt.UsersApiCoroutineStub>()
+        val order = mutableListOf<String>()
+        coEvery { transfer.uploadAvatar(uri) } coAnswers { order += "ready"; "ready-file-id" }
+        coEvery { grpc.validAccessToken() } coAnswers {
+            order += "token"
+            currentCoroutineContext()[Job]!!.cancel(CancellationException("cancel before profile RPC"))
+            "access-token"
+        }
+        every { grpc.usersStub("access-token") } returns users
+
+        val update = async { UserRepository(grpc, transfer) { 0L }.setAvatar(uri) }
+        runCurrent()
+        val error = runCatching { update.await() }.exceptionOrNull()
+
+        assertTrue(update.isCancelled)
+        assertTrue(error is CancellationException)
+        assertEquals(listOf("ready", "token"), order)
+        verify(exactly = 0) { grpc.usersStub("access-token") }
+        verify(exactly = 0) { grpc.cloudStub() }
+        coVerify(exactly = 0) { users.setProfilePicture(any(), any()) }
     }
 
     @Test

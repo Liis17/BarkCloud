@@ -12,6 +12,8 @@ import io.grpc.Status
 import io.grpc.StatusRuntimeException
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
@@ -80,6 +82,7 @@ class AvatarUploadFlowTest {
             assertEquals("file-id", uploadAvatarFile(file, "photo.png", "image/png", api))
             assertTrue(api.parts.isEmpty())
             assertEquals(0, api.completeCalls)
+            assertEquals(0, api.cancelCalls)
         } finally {
             file.delete()
         }
@@ -241,6 +244,60 @@ class AvatarUploadFlowTest {
     }
 
     @Test
+    fun `cancellation while polling PROCESSING does not cancel the accepted session`() = runTest {
+        val file = tempFile(byteArrayOf(1, 2, 3))
+        val api = FakeAvatarUploadApi(created = avatarSession(3, partSize = 3))
+        api.completeHandler = { avatarSession(3, UploadSessionState.PROCESSING) }
+        val polling = CompletableDeferred<Unit>()
+        try {
+            val upload = async {
+                uploadAvatarFile(file, "photo.png", "image/png", api, nowMillis = { 0L }) {
+                    polling.complete(Unit)
+                    awaitCancellation()
+                }
+            }
+            polling.await()
+            upload.cancelAndJoin()
+            val error = runCatching { upload.await() }.exceptionOrNull()
+
+            assertTrue(upload.isCancelled)
+            assertTrue(error is CancellationException)
+            assertEquals(1, api.completeCalls)
+            assertEquals(0, api.getCalls)
+            assertEquals(0, api.cancelCalls)
+            assertNull(api.cancelledWithToken)
+        } finally {
+            file.delete()
+        }
+    }
+
+    @Test
+    fun `cancellation after server accepts complete keeps cancellation when cleanup is rejected`() = runTest {
+        val file = tempFile(byteArrayOf(1, 2, 3))
+        val api = FakeAvatarUploadApi(created = avatarSession(3, partSize = 3))
+        val completeAccepted = CompletableDeferred<Unit>()
+        api.completeHandler = {
+            completeAccepted.complete(Unit)
+            awaitCancellation()
+        }
+        api.cancelHandler = { throw IOException("session already processing") }
+        try {
+            val upload = async { uploadAvatarFile(file, "photo.png", "image/png", api, nowMillis = { 0L }) }
+            completeAccepted.await()
+            upload.cancelAndJoin()
+            val error = runCatching { upload.await() }.exceptionOrNull()
+
+            assertTrue(upload.isCancelled)
+            assertTrue(error is CancellationException)
+            assertEquals(1, api.completeCalls)
+            assertEquals(1, api.cancelCalls)
+            assertEquals("old-token", api.cancelledWithToken)
+        } finally {
+            file.delete()
+        }
+    }
+
+    @Test
     fun `staging uses provider name and mime type and removes cache file after failure`() = runTest {
         val context = mockk<Context>()
         val resolver = mockk<ContentResolver>(relaxed = true)
@@ -281,6 +338,7 @@ class AvatarUploadFlowTest {
         var resumeCalls = 0
         var completeCalls = 0
         var getCalls = 0
+        var cancelCalls = 0
         var createdFileName: String? = null
         var createdContentType: String? = null
         var createdSha256: String? = null
@@ -328,6 +386,7 @@ class AvatarUploadFlowTest {
         }
 
         override suspend fun cancelUploadSession(sessionId: String, accessToken: String, timeoutMillis: Long) {
+            cancelCalls++
             cancelledWithToken = accessToken
             cancelHandler(accessToken)
         }
