@@ -1080,7 +1080,7 @@ public sealed class BarkCloudFileSystemTests
         fileSystem.Cleanup("\\shared.bin", first);
         shared.ActiveCount.Should().Be(1);
         fileSystem.Cleanup("\\shared.bin", second);
-        cloud.HttpHandler.Calls.Count(call => call.Method == "POST").Should().Be(1);
+        cloud.HttpHandler.Calls.Count(call => call.Method == "PUT").Should().Be(1);
 
         fileSystem.CloseFile("\\shared.bin", first);
         fileSystem.CloseFile("\\shared.bin", second);
@@ -1111,7 +1111,7 @@ public sealed class BarkCloudFileSystemTests
         buffer.Should().Equal([7]);
         fileSystem.Cleanup("\\reopen.bin", second);
         fileSystem.CloseFile("\\reopen.bin", second);
-        cloud.HttpHandler.Calls.Count(call => call.Method == "POST").Should().Be(1);
+        cloud.HttpHandler.Calls.Count(call => call.Method == "PUT").Should().Be(1);
     }
 
     [Fact]
@@ -1161,7 +1161,7 @@ public sealed class BarkCloudFileSystemTests
         var responder = cloud.HttpHandler.Responder;
         cloud.HttpHandler.Responder = async (request, cancellationToken) =>
         {
-            if (request.Method == System.Net.Http.HttpMethod.Post)
+            if (request.Method == System.Net.Http.HttpMethod.Put)
             {
                 uploadStarted.TrySetResult();
                 await releaseUpload.Task.WaitAsync(cancellationToken);
@@ -1218,7 +1218,7 @@ public sealed class BarkCloudFileSystemTests
         var cloud = new FakeCloud();
         cloud.AddFile("", "shared.bin", [1, 2, 3]);
         var responder = cloud.HttpHandler.Responder;
-        cloud.HttpHandler.Responder = (request, cancellationToken) => request.Method == System.Net.Http.HttpMethod.Post
+        cloud.HttpHandler.Responder = (request, cancellationToken) => request.Method == System.Net.Http.HttpMethod.Put
             ? Task.FromResult(new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.InternalServerError))
             : responder(request, cancellationToken);
         using var gateway = cloud.CreateGateway(temp.Path("cache"));
@@ -1342,7 +1342,8 @@ public sealed class BarkCloudFileSystemTests
 
         fileSystem.Cleanup("\\existing.bin", writer);
         fileSystem.CloseFile("\\existing.bin", writer);
-        cloud.HttpHandler.Calls.Count(call => call.Method == "POST").Should().Be(1);
+        cloud.HttpHandler.Calls.Count(call => call.Method == "PUT").Should().Be(2);
+        cloud.Invoker.Calls.Count(call => call.MethodFullName == FakeCloudMethods.CreateUploadSession).Should().Be(1);
 
         var saved = gateway.ListDirectory("").Files.Single(file => file.Entry.Name == "existing.bin");
         var savedPath = temp.Path("saved.bin");
@@ -1366,7 +1367,7 @@ public sealed class BarkCloudFileSystemTests
         cloud.HttpHandler.Calls.Count(call => call.Method == "GET").Should().Be(0);
         fileSystem.Cleanup("\\replace.bin", writer);
         fileSystem.CloseFile("\\replace.bin", writer);
-        cloud.HttpHandler.Calls.Count(call => call.Method == "POST").Should().Be(1);
+        cloud.HttpHandler.Calls.Count(call => call.Method == "PUT").Should().Be(1);
 
         var saved = gateway.ListDirectory("").Files.Single(file => file.Entry.Name == "replace.bin");
         var savedPath = temp.Path("saved.bin");
@@ -1415,7 +1416,7 @@ public sealed class BarkCloudFileSystemTests
         cloud.HttpHandler.Calls.Count(call => call.Method == "GET").Should().Be(0);
         fileSystem.Cleanup("\\zero.bin", writer);
         fileSystem.CloseFile("\\zero.bin", writer);
-        cloud.HttpHandler.Calls.Count(call => call.Method == "POST").Should().Be(0);
+        cloud.HttpHandler.Calls.Count(call => call.Method == "PUT").Should().Be(0);
     }
 
     [Fact]
@@ -1964,7 +1965,7 @@ public sealed class BarkCloudFileSystemTests
 
         fileSystem.CloseFile("\\paging.bin", info);
 
-        cloud.HttpHandler.Calls.Count(call => call.Method == "POST").Should().Be(2);
+        cloud.HttpHandler.Calls.Count(call => call.Method == "PUT").Should().Be(2);
     }
 
     [Fact]
@@ -1992,7 +1993,7 @@ public sealed class BarkCloudFileSystemTests
         fileSystem.WriteFile("\\empty.bin", [5], out _, 0, writer).Should().Be(DokanResult.Success);
         fileSystem.Cleanup("\\empty.bin", writer);
         fileSystem.CloseFile("\\empty.bin", writer);
-        cloud.HttpHandler.Calls.Count(call => call.Method == "POST").Should().Be(1);
+        cloud.HttpHandler.Calls.Count(call => call.Method == "PUT").Should().Be(1);
     }
 
     [Fact]
@@ -2056,10 +2057,10 @@ public sealed class BarkCloudFileSystemTests
         fileSystem.Cleanup("\\replace.bin", info);
         fileSystem.CloseFile("\\replace.bin", info);
 
-        cloud.Operations.Where(operation => operation == "HTTP:POST"
+        cloud.Operations.Where(operation => operation == "HTTP:PUT"
                 || operation == $"RPC:{FakeCloudMethods.DeleteFileEntry}"
                 || operation == $"RPC:{FakeCloudMethods.AttachFile}")
-            .Should().Equal("HTTP:POST", $"RPC:{FakeCloudMethods.DeleteFileEntry}", $"RPC:{FakeCloudMethods.AttachFile}");
+            .Should().Equal("HTTP:PUT", $"RPC:{FakeCloudMethods.DeleteFileEntry}", $"RPC:{FakeCloudMethods.AttachFile}");
         var saved = gateway.ListDirectory("").Files.Should().ContainSingle().Subject;
         saved.Entry.Name.Should().Be("replace.bin");
         local.ExistingEntryId.Should().Be(saved.Entry.Id);
@@ -2095,7 +2096,7 @@ public sealed class BarkCloudFileSystemTests
         fileSystem.CloseFile("\\retry-attach.bin", retry);
         fileSystem.CloseFile("\\retry-attach.bin", first);
 
-        cloud.HttpHandler.Calls.Count(call => call.Method == "POST").Should().Be(1);
+        cloud.HttpHandler.Calls.Count(call => call.Method == "PUT").Should().Be(1);
         cloud.Invoker.Calls.Count(call => call.MethodFullName == FakeCloudMethods.AttachFile).Should().Be(1);
         var saved = gateway.ListDirectory("").Files.Should().ContainSingle().Subject;
         saved.Entry.Name.Should().Be("retry-attach.bin");
@@ -2127,7 +2128,7 @@ public sealed class BarkCloudFileSystemTests
         fileSystem.CloseFile("\\retry-delete.bin", first);
 
         cloud.Invoker.Calls.Count(call => call.MethodFullName == FakeCloudMethods.DeleteFileEntry).Should().Be(2);
-        cloud.HttpHandler.Calls.Count(call => call.Method == "POST").Should().Be(1);
+        cloud.HttpHandler.Calls.Count(call => call.Method == "PUT").Should().Be(1);
         var saved = gateway.ListDirectory("").Files.Should().ContainSingle().Subject;
         saved.Entry.Name.Should().Be("retry-delete.bin");
         local.ExistingEntryId.Should().Be(saved.Entry.Id);
@@ -2398,7 +2399,7 @@ public sealed class BarkCloudFileSystemTests
         info.PagingIo = true;
         fs.WriteFile("\\mapped.bin", [7, 8, 9], out _, 0, info).Should().Be(DokanResult.Success);
         fs.CloseFile("\\mapped.bin", info);
-        cloud.HttpHandler.Calls.Count(call => call.Method == "POST").Should().Be(1);
+        cloud.HttpHandler.Calls.Count(call => call.Method == "PUT").Should().Be(1);
         var saved = gateway.ListDirectory("").Files.Should().ContainSingle().Subject;
         await gateway.DownloadToAsync(saved.File.Id, temp.Path("saved.bin"), 3);
         File.ReadAllBytes(temp.Path("saved.bin")).Should().Equal([7, 8, 9]);
@@ -2509,7 +2510,7 @@ public sealed class BarkCloudFileSystemTests
         var responder = cloud.HttpHandler.Responder;
         cloud.HttpHandler.Responder = async (request, cancellation) =>
         {
-            if (request.Method == System.Net.Http.HttpMethod.Post)
+            if (request.Method == System.Net.Http.HttpMethod.Put)
             {
                 entered.TrySetResult();
                 await release.Task;

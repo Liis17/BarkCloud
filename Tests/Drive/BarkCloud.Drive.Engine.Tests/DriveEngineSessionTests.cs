@@ -78,7 +78,7 @@ public sealed class DriveEngineSessionTests
         var uploadTokens = new List<string?>();
         harness.Cloud.Invoker.OnCall = method =>
         {
-            if (method == FakeCloudMethods.GetUploadUrl)
+            if (method == FakeCloudMethods.CreateUploadSession)
                 uploadTokens.Add(harness.Tokens.CurrentToken);
         };
         void CloseHandle()
@@ -97,8 +97,9 @@ public sealed class DriveEngineSessionTests
             CloseHandle();
 
         uploadTokens.Should().Equal("access-1");
-        harness.Cloud.HttpHandler.Calls.Where(call => call.Method == "POST")
-            .Select(call => call.Headers["x-auth-token"]).Should().Equal("access-1");
+        var uploadPart = harness.Cloud.HttpHandler.Calls.Should().ContainSingle().Subject;
+        uploadPart.Method.Should().Be("PUT");
+        uploadPart.Headers.Should().ContainKey("X-Upload-Token").And.NotContainKey("x-auth-token");
         harness.Tokens.CurrentToken.Should().Be("access-2");
         harness.IsMounted.Should().BeTrue();
     }
@@ -590,7 +591,8 @@ public sealed class DriveEngineSessionTests
         file.Hydrated = true;
         var info = new FakeDokanFileInfo { Context = new HandleContext { File = file } };
         harness.Tokens.Logout(); // Сервер отклонил сессию; профиль и LastUserId ещё известны.
-        harness.Cloud.Invoker.Handle<GetUploadUrlRequest, GetUploadUrlResponse>(FakeCloudMethods.GetUploadUrl, _ =>
+        harness.Cloud.Invoker.Handle<CreateUploadSessionRequest, UploadSessionResponse>(
+            FakeCloudMethods.CreateUploadSession, _ =>
         {
             harness.Tokens.CurrentToken.Should().BeNull();
             throw new RpcException(new Status(StatusCode.Unauthenticated, "rejected"));
@@ -614,7 +616,7 @@ public sealed class DriveEngineSessionTests
         entry.OwnerUserId.Should().Be("1");
         entry.ServerKey.Should().Be("server");
         File.ReadAllBytes(entry.DataPath).Should().Equal([7, 8, 9]);
-        harness.Cloud.Invoker.Calls.Where(call => call.MethodFullName == FakeCloudMethods.GetUploadUrl)
+        harness.Cloud.Invoker.Calls.Where(call => call.MethodFullName == FakeCloudMethods.CreateUploadSession)
             .Should().HaveCount(2); // Cleanup и повтор при последнем CloseFile, оба до авторизации.
     }
 
@@ -833,7 +835,7 @@ public sealed class DriveEngineSessionTests
             Gateway = new CloudGateway(new CloudApi.CloudApiClient(Cloud.Invoker),
                 new FilesApi.FilesApiClient(Cloud.Invoker),
                 new HttpClient(Cloud.HttpHandler, disposeHandler: false), "https://files.test",
-                () => Tokens.CurrentToken, _temp.Path("cache"), Time);
+                _temp.Path("cache"), Time, uploadOrigin: "https://files.test");
             Outbox = new UploadOutbox(_temp.Path("outbox"), Time);
             FileSystem = new BarkCloudFileSystem(Gateway, _temp.Path("write"), Outbox,
                 "server", () => Profile.UserId ?? Settings.GetLastUserId("server"), Time);

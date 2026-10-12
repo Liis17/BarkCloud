@@ -497,6 +497,6 @@
   <data name="Eng_UploadRestartLimit" xml:space="preserve"><value>Upload paused after three failed server sessions; try again later.</value></data>
   <data name="Eng_UploadResumeLimitFmt" xml:space="preserve"><value>Could not resume upload after three attempts: {0}</value></data>
   <data name="Eng_UploadSessionMissing" xml:space="preserve"><value>Upload session was not found on the server.</value></data>
-  <data name="Eng_UploadOriginMissing" xml:space="preserve"><value>The server origin for multipart upload is not configured.</value></data>
+  <data name="Eng_UploadOriginMissing" xml:space="preserve"><value>The Upload 2.0 part upload address is not configured.</value></data>
   <data name="Eng_UploadCancelFailed" xml:space="preserve"><value>Could not cancel the superseded upload session.</value></data>
 </root>

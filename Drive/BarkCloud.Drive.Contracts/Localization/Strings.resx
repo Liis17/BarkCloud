@@ -497,6 +497,6 @@
   <data name="Eng_UploadRestartLimit" xml:space="preserve"><value>Загрузка приостановлена после трёх неудачных сессий сервера; повторите позже.</value></data>
   <data name="Eng_UploadResumeLimitFmt" xml:space="preserve"><value>Не удалось возобновить загрузку после трёх попыток: {0}</value></data>
   <data name="Eng_UploadSessionMissing" xml:space="preserve"><value>Сессия загрузки не найдена на сервере.</value></data>
-  <data name="Eng_UploadOriginMissing" xml:space="preserve"><value>Не задан адрес сервера для загрузки частями.</value></data>
+  <data name="Eng_UploadOriginMissing" xml:space="preserve"><value>Не задан адрес загрузки частей Upload 2.0.</value></data>
   <data name="Eng_UploadCancelFailed" xml:space="preserve"><value>Не удалось отменить устаревшую сессию загрузки.</value></data>
 </root>

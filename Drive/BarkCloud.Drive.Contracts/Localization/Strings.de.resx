@@ -497,6 +497,6 @@
   <data name="Eng_UploadRestartLimit" xml:space="preserve"><value>Upload nach drei fehlgeschlagenen Serversitzungen pausiert; später erneut versuchen.</value></data>
   <data name="Eng_UploadResumeLimitFmt" xml:space="preserve"><value>Upload konnte nach drei Versuchen nicht fortgesetzt werden: {0}</value></data>
   <data name="Eng_UploadSessionMissing" xml:space="preserve"><value>Upload-Sitzung wurde auf dem Server nicht gefunden.</value></data>
-  <data name="Eng_UploadOriginMissing" xml:space="preserve"><value>Die Serveradresse für den mehrteiligen Upload ist nicht konfiguriert.</value></data>
+  <data name="Eng_UploadOriginMissing" xml:space="preserve"><value>Die Adresse für den Upload der Teile (Upload 2.0) ist nicht konfiguriert.</value></data>
   <data name="Eng_UploadCancelFailed" xml:space="preserve"><value>Die veraltete Upload-Sitzung konnte nicht abgebrochen werden.</value></data>
 </root>

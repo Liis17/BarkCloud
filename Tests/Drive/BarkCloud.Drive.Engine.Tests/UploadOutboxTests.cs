@@ -1,10 +1,12 @@
 using System.Net;
 using System.Net.Http;
 using System.Security.Authentication;
+using System.Text.Json.Nodes;
 
 using BarkCloud.Drive.Contracts.Localization;
 using BarkCloud.Drive.Engine;
 using BarkCloud.Drive.Engine.Tests.Fakes;
+using BarkCloud.Proto.Files;
 
 using DokanNet;
 using FluentAssertions;
@@ -192,7 +194,7 @@ public sealed class UploadOutboxTests
         var responder = cloud.HttpHandler.Responder;
         cloud.HttpHandler.Responder = async (request, cancellationToken) =>
         {
-            if (request.Method == HttpMethod.Post)
+            if (request.Method == HttpMethod.Put)
             {
                 uploadStarted.TrySetResult();
                 await releaseUpload.Task.WaitAsync(cancellationToken);
@@ -315,7 +317,7 @@ public sealed class UploadOutboxTests
         await worker.TriggerAsync();
 
         entry.ExistingEntryId.Should().Be(original.EntryId);
-        cloud.HttpHandler.Calls.Count(call => call.Method == "POST").Should().Be(1);
+        cloud.HttpHandler.Calls.Count(call => call.Method == "PUT").Should().Be(1);
         var saved = gateway.ListDirectory("").Files.Should().ContainSingle().Subject;
         saved.File.Id.Should().NotBe(original.FileId);
         await gateway.DownloadToAsync(saved.File.Id, temp.Path("saved.bin"), 3);
@@ -519,11 +521,17 @@ public sealed class UploadOutboxTests
             Loc.T("Eng_TlsConnectionError")));
     }
 
-    [Fact]
-    public async Task Worker_resumes_attach_stage_without_upload_and_clears_error_when_outbox_is_empty()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Worker_resumes_legacy_delete_or_attach_stage_without_upload_session(bool deleteOldStage)
     {
         using var temp = new TestDirectory();
         var cloud = new FakeCloud();
+        var stage = deleteOldStage ? PersistStage.DeleteOld : PersistStage.Attach;
+        var oldEntry = deleteOldStage
+            ? cloud.AddFile("", "old-attach.bin", [1])
+            : null;
         var uploadedFileId = cloud.AddUnattachedFile([7, 8, 9]);
         cloud.Invoker.FailNext(FakeCloudMethods.AttachFile,
             new RpcException(new Status(StatusCode.Unavailable, "Attach unavailable")));
@@ -533,13 +541,16 @@ public sealed class UploadOutboxTests
         File.WriteAllBytes(dataPath, [7, 8, 9]);
         var operation = new PersistOperation
         {
-            Stage = PersistStage.Attach,
+            Stage = stage,
             FileId = uploadedFileId,
-            OldEntryDeleted = true,
+            OldEntryDeleted = stage == PersistStage.Attach,
             AttachAttempted = true,
         };
         var outbox = new UploadOutbox(temp.Path("outbox"));
-        var entry = outbox.Add(NewLocalFile(dataPath, "attach.bin", operation), "server", "42");
+        var local = NewLocalFile(dataPath, "attach.bin", operation);
+        if (oldEntry is not null)
+            local.ExistingEntryId = oldEntry.EntryId;
+        var entry = outbox.Add(local, "server", "42");
         using var gateway = cloud.CreateGateway(temp.Path("cache"));
         var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"), outbox,
             "server", () => "42");
@@ -556,15 +567,66 @@ public sealed class UploadOutboxTests
         saved.Stage.Should().Be(PersistStage.Attach);
         saved.FileId.Should().Be(uploadedFileId);
         saved.Attempts.Should().Be(1);
+        if (oldEntry is not null)
+            cloud.IsInTrash(oldEntry.EntryId).Should().BeTrue();
         cloud.HttpHandler.Calls.Should().BeEmpty();
 
         await worker.TriggerAsync();
 
         cloud.HttpHandler.Calls.Should().BeEmpty();
+        cloud.Invoker.Calls.Should().NotContain(call => call.MethodFullName == FakeCloudMethods.CreateUploadSession);
+        cloud.Invoker.Calls.Where(call => call.MethodFullName == FakeCloudMethods.AttachFile)
+            .Select(call => (AttachFileRequest)call.Request)
+            .Should().OnlyContain(request => string.IsNullOrEmpty(request.UploadSessionId));
         outbox.Count.Should().Be(0);
         File.Exists(entry.DataPath).Should().BeFalse();
         File.Exists(Path.Combine(outbox.DirectoryPath, entry.Id + ".json")).Should().BeFalse();
         fileSystem.LastSyncError.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Worker_uploads_legacy_upload_stage_manifest_with_upload2()
+    {
+        using var temp = new TestDirectory();
+        var dataPath = temp.Path("legacy.bin");
+        File.WriteAllBytes(dataPath, [7, 8, 9]);
+        var outboxPath = temp.Path("outbox");
+        var originalOutbox = new UploadOutbox(outboxPath);
+        var original = originalOutbox.Add(NewLocalFile(dataPath, "legacy.bin", new PersistOperation
+        {
+            Stage = PersistStage.Upload,
+        }), "server", "42");
+        var manifestPath = Path.Combine(outboxPath, original.Id + ".json");
+        var manifest = JsonNode.Parse(File.ReadAllText(manifestPath))!.AsObject();
+        manifest["Op"]!.AsObject().Remove("Upload2");
+        File.WriteAllText(manifestPath, manifest.ToJsonString());
+
+        var outbox = new UploadOutbox(outboxPath);
+        var legacy = outbox.Find(original.Id)!;
+        legacy.Stage.Should().Be(PersistStage.Upload);
+        legacy.Op!.Upload2.Should().BeNull();
+        var cloud = new FakeCloud();
+        using var gateway = cloud.CreateGateway(temp.Path("cache"));
+        var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"), outbox, "server", () => "42");
+        await using var worker = new UploadOutboxWorker(outbox, () => ("server", "42"),
+            (entry, cancellationToken) => fileSystem.ProcessOutboxEntryAsync(entry, cancellationToken),
+            fileSystem.CompleteOutboxEntry,
+            failed: (_, ex) => throw ex,
+            time: new FakeTimeProvider(),
+            deferDataDeletion: fileSystem.DeferOutboxDataDeletion);
+        worker.Start();
+
+        await worker.TriggerAsync();
+
+        var created = cloud.Invoker.Calls.Single(call => call.MethodFullName == FakeCloudMethods.CreateUploadSession);
+        ((CreateUploadSessionRequest)created.Request).FileName.Should().Be("legacy.bin");
+        cloud.Invoker.Calls.Should().NotContain(call => call.MethodFullName == FakeCloudMethods.GetUploadUrl);
+        cloud.HttpHandler.Calls.Should().OnlyContain(call => call.Method == "PUT");
+        var attach = (AttachFileRequest)cloud.Invoker.Calls
+            .Single(call => call.MethodFullName == FakeCloudMethods.AttachFile).Request;
+        attach.Name.Should().Be("legacy.bin");
+        attach.UploadSessionId.Should().NotBeNullOrWhiteSpace();
+        outbox.Count.Should().Be(0);
     }
 
     [Fact]
@@ -599,7 +661,7 @@ public sealed class UploadOutboxTests
     }
 
     [Fact]
-    public async Task Stop_cancels_outbox_upload_without_changing_manifest_or_data()
+    public async Task Stop_cancels_outbox_upload_and_preserves_saved_session_and_data()
     {
         using var temp = new TestDirectory();
         var sourcePath = temp.Path("source.bin");
@@ -607,18 +669,19 @@ public sealed class UploadOutboxTests
         var outbox = new UploadOutbox(temp.Path("outbox"));
         var entry = outbox.Add(NewLocalFile(sourcePath, "stopped.bin"), "server", "42");
         var manifestPath = Path.Combine(outbox.DirectoryPath, entry.Id + ".json");
-        var manifest = File.ReadAllBytes(manifestPath);
         var cloud = new FakeCloud();
         var uploadStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var responder = cloud.HttpHandler.Responder;
         cloud.HttpHandler.Responder = async (request, cancellationToken) =>
         {
-            if (request.Method == HttpMethod.Post)
+            if (request.Method == HttpMethod.Put)
             {
+                await request.Content!.ReadAsByteArrayAsync(cancellationToken);
                 uploadStarted.TrySetResult();
                 await Task.Delay(Timeout.Infinite, cancellationToken);
             }
 
-            return new HttpResponseMessage(HttpStatusCode.OK);
+            return await responder(request, cancellationToken);
         };
         using var gateway = cloud.CreateGateway(temp.Path("cache"));
         var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"), outbox, "server", () => "42");
@@ -638,7 +701,11 @@ public sealed class UploadOutboxTests
         saved.Stage.Should().Be(PersistStage.Upload);
         saved.Attempts.Should().Be(0);
         failedCalls.Should().Be(0);
-        File.ReadAllBytes(manifestPath).Should().Equal(manifest);
+        saved.Op!.Upload2.Should().NotBeNull();
+        saved.Op.Upload2!.SessionId.Should().NotBeNullOrWhiteSpace();
+        new UploadOutbox(outbox.DirectoryPath).Find(entry.Id)!.Op!.Upload2!.SessionId
+            .Should().Be(saved.Op.Upload2.SessionId);
+        File.Exists(manifestPath).Should().BeTrue();
         File.ReadAllBytes(entry.DataPath).Should().Equal([1, 2, 3]);
     }
 
@@ -968,7 +1035,7 @@ public sealed class UploadOutboxTests
 
         completed.Should().Be(1);
         outbox.Count.Should().Be(0);
-        cloud.HttpHandler.Calls.Count(call => call.Method == "POST").Should().Be(1);
+        cloud.HttpHandler.Calls.Count(call => call.Method == "PUT").Should().Be(1);
         gateway.ListDirectory("").Files.Should().ContainSingle(file => file.Entry.Name == "locked.bin");
     }
 
